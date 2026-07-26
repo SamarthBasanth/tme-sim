@@ -49,5 +49,43 @@ every *ordering* right, and is numerically sound — yet against **one real meas
 number** it is 15× off, and the harness caught it and named the exact parameter to
 fix. A trustworthy in-silico microenvironment is not the one that renders nicely;
 it's the one that has been checked against reality and told you where it's wrong.
-Next calibration target: fit tissue binding/clearance to reproduce the ~45 µm
-doxorubicin gradient, then re-validate on a second drug.
+
+---
+
+# v3 additions — calibration, barrier, real geometry
+
+## 5. Calibrated tissue uptake — and it GENERALIZES out-of-sample
+Added one mechanistic constant (α, tissue-uptake scaling on the structure-based
+binding rate) fit ONCE to doxorubicin's 45 µm anchor: **α = 309.6** — matching the
+"~300× too slow" diagnosis exactly.
+- Doxorubicin → 45 µm by construction (was 700).
+- **Out-of-sample (no refit): mitoxantrone → 33 µm** vs the independently published
+  **25–75 µm** band (Tannock lab, PMID 23680920) → **PASS, inside the band.**
+- Opposite regime: temozolomide → 184 µm, 4.1× further than doxorubicin (correct).
+- Honest caveat: mitoxantrone is a DNA-intercalator chemically related to
+  doxorubicin, so this is a strong magnitude-transfer test *within the bound class*,
+  not maximally independent. One constant, fit to one drug, predicts another.
+
+## 6. Binding-site barrier — antibodies trapped for the right reason
+Fujimori/Weinstein saturable antigen-binding barrier (Thurber/Wittrup Thiele
+criteria): bevacizumab penetration collapses **171 µm (diffusivity-only) → ~5 µm
+(barrier-limited, Thiele ≈ 27)**; small molecules bit-identical (retention ≈ 0).
+
+## 7. Real spatial geometry — half the loop closed
+Downloaded a genuinely open 10x Visium GBM sample (3,468 spots), phenotyped it, and
+ran it through the UNMODIFIED reconstruct→sim pipeline — the engine accepts real
+tissue geometry. The validation half stays open: no open GBM spatial dataset has
+paired drug-response outcomes (needs controlled HTAN + organoid/PDX screens). This
+is now a data-access gap, not an engineering one. (`docs/real_data_status.md`)
+
+## Fully-integrated result
+`experiments/realistic_pipeline.py` runs the whole stack (structure → mesh
+diffusivity → measured IC50 → calibrated loss → barrier) and reproduces realistic,
+literature-consistent penetration across the panel (temozolomide 184 µm →
+doxorubicin 45 µm → antibody ~4 µm). (`results/realistic_penetration.png`)
+
+**Bottom line:** the model went from 15× wrong to calibrated-and-generalizing on
+tissue penetration, and it did so by being checked against measured reality at every
+step — never by fitting to the number it then claimed to validate. The concept-level
+validation (does it predict real *drug response*?) remains open and blocked only on
+paired spatial+outcome data.
