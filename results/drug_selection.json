@@ -1,0 +1,58 @@
+{
+  "n": 24,
+  "panel": [
+    "temozolomide",
+    "lomustine",
+    "cisplatin",
+    "methotrexate",
+    "doxorubicin"
+  ],
+  "drug_meta": {
+    "temozolomide": {
+      "mw": 194.154,
+      "ic50": 606.0466722391783,
+      "bbb": 0.5583419608517519
+    },
+    "lomustine": {
+      "mw": 233.699,
+      "ic50": 50.0,
+      "bbb": 0.9734101326009955
+    },
+    "cisplatin": {
+      "mw": 298.03,
+      "ic50": 24.550285905059777,
+      "bbb": 0.893209691716864
+    },
+    "methotrexate": {
+      "mw": 454.447,
+      "ic50": 12.000040202611336,
+      "bbb": 0.11501311296825817
+    },
+    "doxorubicin": {
+      "mw": 543.525,
+      "ic50": 0.5,
+      "bbb": 0.05081647157970104
+    }
+  },
+  "alpha": 309.61327695919545,
+  "acc": {
+    "sim": 0.0,
+    "potency_only": 1.0,
+    "most_potent": 1.0,
+    "random": 0.20000000000000004
+  },
+  "regret": {
+    "sim": 0.3827899139670515,
+    "potency_only": 0.0,
+    "most_potent": 0.0
+  },
+  "frac_transport_matters": 0.0,
+  "best_distribution": {
+    "temozolomide": 0,
+    "lomustine": 0,
+    "cisplatin": 0,
+    "methotrexate": 0,
+    "doxorubicin": 24
+  },
+  "verdict": "Mechanistic sim top-1 0.00 vs potency-only 1.00 (and constant-most-potent 1.00); regret 0.383 vs 0.000. Sim does NOT beat the potency shortcut on this cohort."
+}
