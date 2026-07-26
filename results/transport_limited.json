@@ -1,0 +1,62 @@
+[
+  {
+    "pp": 0.1,
+    "mean_kill": 0.1514339649983139,
+    "sim_auc": 0.7275,
+    "sim_rho": 0.6279549718574109,
+    "intrinsic_auc": 0.8825000000000001,
+    "logreg_auc": 0.85,
+    "best": "intrinsic_sensitivity",
+    "delta": -0.15500000000000003,
+    "beat": false,
+    "verdict": "Sim AUC 0.73 vs best baseline (intrinsic_sensitivity) 0.88 -> DOES NOT beat baseline (delta -0.16 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=40)."
+  },
+  {
+    "pp": 0.3,
+    "mean_kill": 0.3399437388495576,
+    "sim_auc": 0.825,
+    "sim_rho": 0.7570356472795498,
+    "intrinsic_auc": 0.8825000000000001,
+    "logreg_auc": 0.85,
+    "best": "intrinsic_sensitivity",
+    "delta": -0.05750000000000011,
+    "beat": false,
+    "verdict": "Sim AUC 0.82 vs best baseline (intrinsic_sensitivity) 0.88 -> DOES NOT beat baseline (delta -0.06 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=40)."
+  },
+  {
+    "pp": 0.6,
+    "mean_kill": 0.436028148579177,
+    "sim_auc": 0.85,
+    "sim_rho": 0.7676720304894419,
+    "intrinsic_auc": 0.8825000000000001,
+    "logreg_auc": 0.85,
+    "best": "intrinsic_sensitivity",
+    "delta": -0.032500000000000084,
+    "beat": false,
+    "verdict": "Sim AUC 0.85 vs best baseline (intrinsic_sensitivity) 0.88 -> DOES NOT beat baseline (delta -0.03 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=40)."
+  },
+  {
+    "pp": 1.0,
+    "mean_kill": 0.47875619173205763,
+    "sim_auc": 0.86,
+    "sim_rho": 0.7741088180112572,
+    "intrinsic_auc": 0.8825000000000001,
+    "logreg_auc": 0.85,
+    "best": "intrinsic_sensitivity",
+    "delta": -0.022500000000000075,
+    "beat": false,
+    "verdict": "Sim AUC 0.86 vs best baseline (intrinsic_sensitivity) 0.88 -> DOES NOT beat baseline (delta -0.02 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=40)."
+  },
+  {
+    "pp": 2.0,
+    "mean_kill": 0.5072264543716705,
+    "sim_auc": 0.885,
+    "sim_rho": 0.8159474671669794,
+    "intrinsic_auc": 0.8825000000000001,
+    "logreg_auc": 0.85,
+    "best": "intrinsic_sensitivity",
+    "delta": 0.0024999999999999467,
+    "beat": false,
+    "verdict": "Sim AUC 0.89 vs best baseline (intrinsic_sensitivity) 0.88 -> DOES NOT beat baseline (delta +0.00 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=40)."
+  }
+]

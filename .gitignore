@@ -1,0 +1,12 @@
+# virtualenv
+.venv/
+# python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+# large downloaded open datasets (regenerate via `python -m tmesim.cli acquire`)
+data_cache/
+# per-regime experiment output dirs (keep the top-level result artifacts)
+results/regime_pp*/
+results/tl_pp*/

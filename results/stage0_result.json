@@ -1,0 +1,57 @@
+{
+  "primary_metric": "roc_auc",
+  "beat_baseline": false,
+  "verdict": "Sim AUC 1.00 vs best baseline (intrinsic_sensitivity) 1.00 -> DOES NOT beat baseline (delta +0.00 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=3).",
+  "pass_margin": 0.02,
+  "n_patients": 3,
+  "cv_folds": 3,
+  "best_baseline": "intrinsic_sensitivity",
+  "model_scores": {
+    "roc_auc": 1.0,
+    "brier": 0.1999722360879718,
+    "spearman": 1.0
+  },
+  "baseline_scores": {
+    "mean": {
+      "roc_auc": 0.5,
+      "brier": 0.22388058774197914,
+      "spearman": 0.0
+    },
+    "intrinsic_sensitivity": {
+      "roc_auc": 1.0,
+      "brier": 0.11654809124971828,
+      "spearman": 1.0
+    },
+    "expression_logreg": {
+      "roc_auc": 1.0,
+      "brier": 0.21215406366908898,
+      "spearman": 1.0
+    }
+  },
+  "per_patient": [
+    {
+      "patient_id": "SYN-000",
+      "observed": 0.4408614285695601,
+      "sim_pred": 0.4835742444152431,
+      "mean": 0.29261029906822866,
+      "intrinsic_sensitivity": 1.0,
+      "expression_logreg": 0.21836259021017168
+    },
+    {
+      "patient_id": "SYN-001",
+      "observed": 0.2149432387978469,
+      "sim_pred": 0.36687028386633125,
+      "mean": 0.29261029906822866,
+      "intrinsic_sensitivity": 0.0,
+      "expression_logreg": 0.0
+    },
+    {
+      "patient_id": "SYN-002",
+      "observed": 0.22202622983727896,
+      "sim_pred": 0.44567627494456763,
+      "mean": 0.29261029906822866,
+      "intrinsic_sensitivity": 0.5913072583261217,
+      "expression_logreg": 0.15970332064273132
+    }
+  ]
+}

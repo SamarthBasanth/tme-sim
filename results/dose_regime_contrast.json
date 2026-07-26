@@ -1,0 +1,62 @@
+[
+  {
+    "plasma_peak": 4.0,
+    "mean_kill": 0.5223861937322363,
+    "sim_auc": 0.8825000000000001,
+    "sim_spear": 0.8000000000000002,
+    "intrinsic_auc": 0.8825000000000001,
+    "best_baseline": "intrinsic_sensitivity",
+    "best_auc": 0.8825000000000001,
+    "delta_auc": 0.0,
+    "beat": false,
+    "verdict": "Sim AUC 0.88 vs best baseline (intrinsic_sensitivity) 0.88 -> DOES NOT beat baseline (delta +0.00 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=40)."
+  },
+  {
+    "plasma_peak": 10.0,
+    "mean_kill": 0.5241388647685853,
+    "sim_auc": 0.8875,
+    "sim_spear": 0.80093808630394,
+    "intrinsic_auc": 0.8825000000000001,
+    "best_baseline": "intrinsic_sensitivity",
+    "best_auc": 0.8825000000000001,
+    "delta_auc": 0.004999999999999893,
+    "beat": false,
+    "verdict": "Sim AUC 0.89 vs best baseline (intrinsic_sensitivity) 0.88 -> DOES NOT beat baseline (delta +0.00 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=40)."
+  },
+  {
+    "plasma_peak": 25.0,
+    "mean_kill": 0.5245669169977027,
+    "sim_auc": 0.8875,
+    "sim_spear": 0.797373358348968,
+    "intrinsic_auc": 0.8825000000000001,
+    "best_baseline": "intrinsic_sensitivity",
+    "best_auc": 0.8825000000000001,
+    "delta_auc": 0.004999999999999893,
+    "beat": false,
+    "verdict": "Sim AUC 0.89 vs best baseline (intrinsic_sensitivity) 0.88 -> DOES NOT beat baseline (delta +0.00 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=40)."
+  },
+  {
+    "plasma_peak": 60.0,
+    "mean_kill": 0.5247148946296333,
+    "sim_auc": 0.8875,
+    "sim_spear": 0.7990619136960602,
+    "intrinsic_auc": 0.8825000000000001,
+    "best_baseline": "intrinsic_sensitivity",
+    "best_auc": 0.8825000000000001,
+    "delta_auc": 0.004999999999999893,
+    "beat": false,
+    "verdict": "Sim AUC 0.89 vs best baseline (intrinsic_sensitivity) 0.88 -> DOES NOT beat baseline (delta +0.00 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=40)."
+  },
+  {
+    "plasma_peak": 140.0,
+    "mean_kill": 0.5247661545102679,
+    "sim_auc": 0.8875,
+    "sim_spear": 0.7990619136960602,
+    "intrinsic_auc": 0.8825000000000001,
+    "best_baseline": "intrinsic_sensitivity",
+    "best_auc": 0.8825000000000001,
+    "delta_auc": 0.004999999999999893,
+    "beat": false,
+    "verdict": "Sim AUC 0.89 vs best baseline (intrinsic_sensitivity) 0.88 -> DOES NOT beat baseline (delta +0.00 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=40)."
+  }
+]
