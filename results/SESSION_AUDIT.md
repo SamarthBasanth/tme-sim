@@ -54,7 +54,43 @@ writing the math down (`docs/MATHEMATICAL_MODEL.md`) and checking invariants fou
 
 ---
 
-## 3. The structural confound: our vasculature is a blur, not vessels
+## 3. CORRECTED — the "vasculature blur" diagnosis was largely WRONG
+
+**This section is superseded. Read `results/vessel_network_impact.md`.** The original
+diagnosis below attributed three symptoms to the smooth endothelial KDE. Discrete
+vessel segmentation tested it directly and refuted two of the three:
+
+1. **The flat exposure floor is NOT a KDE artifact — it is real diffusion physics.**
+   With a discrete source the field is exactly zero between vessels, yet far-field
+   exposure moves only 1.12x (25.99% -> 23.18%). Reaction-diffusion length is 73-296 um
+   and diffusion length ~4,000 um against a ~40 um intervessel gap, so drug genuinely
+   reaches everywhere in a densely vascularised section. No tumour cell in any arm
+   receives zero drug. The floor is a property of the tissue, not of our smoothing.
+
+2. **"Penetration length cannot discriminate drugs" was STALE, and the cause was
+   defect #7, not the vasculature.** Under the current geometric mask the fitted lengths
+   are 178/109/58 um — a 3.07x spread. The old 26-28 um collapse was reproduced without
+   running a solve by refitting the source null under the RETIRED occupancy mask: it
+   returns 23.68 um, matching the published 23.7 exactly. Fixing the tissue mask cured it.
+
+3. **The perivascular circularity (`niche_response.md`) DOES stand** and is eliminated by
+   the discrete field.
+
+A dose-matched control (absent from the original brief) was decisive: the KDE arm delivers
+3.36x more total drug, so the naive KDE-vs-discrete coverage change for doxorubicin is
+-0.586 while the dose-controlled change is -0.0166 — the naive comparison overstates the
+structural effect 35x.
+
+First vascular quantity to score against a MEASUREMENT rather than a threshold: vascular
+area fraction 2.50% vs measured 2.1+-0.3% (PMID 36611806), 1.19x, untuned.
+
+Status: discrete vessels are NOT yet the global default (alpha was calibrated against the
+KDE and must be re-fitted; grid convergence of a 7.5 um vessel radius on a 12 um mesh is
+untested). They ARE required for any distance-resolved or perivascular claim.
+
+---
+
+### Original (superseded) diagnosis, retained for the record
 
 Three independent analyses converged on one root cause. The vascular source field is a
 **smooth Gaussian KDE of endothelial cell positions** (bandwidth ~40 um), so:

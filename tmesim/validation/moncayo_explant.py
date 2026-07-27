@@ -1669,19 +1669,20 @@ def make_figure(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
     # Direct labels instead of a legend box: the first group names the series,
     # the rest carry values only. Nothing to collide with the annotation.
     for i, (x, v) in enumerate(zip(xs - 0.20, mvals)):
-        lab = f"measured,\nIS-corrected\n{v:.2f}" if i == 0 else f"{v:.2f}"
+        lab = f"measured\n{v:.2f}" if i == 0 else f"{v:.2f}"
         ax.text(x, v * 2.0, lab, ha="center", va="bottom", fontsize=8.5,
                 color=MEAS_COLOR, linespacing=1.35)
     for i, (x, v) in enumerate(zip(xs + 0.20, pvals)):
-        lab = f"predicted,\n+lysosomal trap\n{v:.1e}" if i == 0 else f"{v:.1e}"
+        lab = f"predicted\n{v:.1e}" if i == 0 else f"{v:.1e}"
         ax.text(x, v * 2.0, lab, ha="center", va="bottom", fontsize=8.5,
                 color=PRED_COLOR, linespacing=1.35)
     ax.set_xticks(xs)
     ax.set_xticklabels([f"{c}\npKa {chem[c].pka_structure:.1f}"
                         f"{'  (base)' if chem[c].n_basic_centres else '  (neutral)'}"
                         for c in comps], fontsize=8.5)
-    _style(ax, "", "coefficient of variation across the section (log)",
-           "b  Heterogeneity per compound: the model is 2-3 decades short")
+    _style(ax, "",
+           "CV across the section (log) — measured is IS-noise-corrected",
+           "b  Heterogeneity: measured vs predicted (+ lysosomal trap)")
     gapf = a2["magnitude_gap"]["fold_under_prediction_seq_only"]
     ax.text(0.02, 0.97,
             f"weak base / olaparib, predicted: "
