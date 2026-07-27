@@ -80,7 +80,6 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from ..core import (
-    CellType,
     Microenvironment,
     OxygenConfig,
     PDEConfig,
@@ -91,7 +90,6 @@ from ..reconstruct.real_fields import add_oxygen
 from ..reconstruct.real_pipeline import reconstruct_real, reconstruction_report
 from ..reconstruct.vessel_network import (
     LINK_DISTANCE_UM,
-    PUBLISHED,
     VESSEL_RADIUS_UM,
     discrete_vascular_field,
     link_distance_sweep,
@@ -108,8 +106,6 @@ from .delivery_metrics import (
 )
 from .vessel_profile import (
     BIN_UM,
-    MIN_BIN_COUNT,
-    NEAR_WINDOW_UM,
     VESSEL_PERCENTILE,
     distance_from_vessel_um,
     distance_profile,
@@ -125,10 +121,14 @@ __all__ = [
     "ARMS",
     "build_arm_fields",
     "arm_microenvironment",
+    "field_stats",
     "profile_stats",
     "zero_drug_fractions",
     "coverage_by_distance",
+    "transport_length_scales",
+    "verdicts",
     "run",
+    "selftest",
     "make_figure",
     "write_report",
     "main",
@@ -530,6 +530,7 @@ def run(drugs: Sequence[str] = tuple(DRUGS),
         "tissue_area_mm2": float(tissue.sum()) * domain.dx ** 2 / 1e6,
         "runtime_s": time.time() - t0,
         "_domain": domain,
+        "_ecm_mean": float(np.asarray(micro.fields.ecm_density)[tissue].mean()),
     }
     if cache_path:
         os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
@@ -868,6 +869,49 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
 # --------------------------------------------------------------------------- #
 # 7. Report
 # --------------------------------------------------------------------------- #
+def transport_length_scales(res: Dict) -> List[Dict]:
+    """The physical length scales that decide whether source GEOMETRY can matter.
+
+    Two, both computed from the COMPILED drug parameters the solves actually used
+    (no new solve, no fitting):
+
+    * ``L_rd = sqrt(D_eff / (k_bind + k_clear))`` — the steady-state
+      reaction-diffusion penetration length. This is the distance over which a
+      perivascular gradient can survive against tissue loss; it is the *only*
+      length that can hold a concentration difference open indefinitely.
+    * ``L_diff = sqrt(4 * D_eff * T)`` — how far drug spreads by diffusion alone
+      over the exposure window ``T``.
+
+    ``D_eff`` is quoted at the section's mean ECM density using the engine's own
+    coupling ``D_eff = D * (1 - 0.6 * ecm)`` (``physics.diffusion``), so it is the
+    diffusivity the solve actually saw, not the free-solution value.
+
+    If BOTH lengths are much larger than the intervessel spacing, the interstitium
+    equilibrates between vessels and the shape of the source cannot survive in the
+    exposure field, however sharp the source is. That is the quantitative content
+    of the negative result in §4.
+    """
+    from ..physics.diffusion import ALPHA_TORTUOSITY
+
+    ecm_mean = float(np.asarray(res["_ecm_mean"]))
+    T = float(_PDE["total_time"])
+    out = []
+    for name in res["drugs"]:
+        dp, _ = compile_real_drug(name, res["alpha"])
+        d_eff = float(dp.diffusivity) * (1.0 - ALPHA_TORTUOSITY * ecm_mean)
+        k = float(dp.binding) + float(dp.clearance)
+        out.append({
+            "drug": name,
+            "diffusivity_um2_s": float(dp.diffusivity),
+            "d_eff_um2_s": d_eff,
+            "loss_rate_1_s": k,
+            "L_rd_um": float(np.sqrt(d_eff / k)) if k > 0 else float("inf"),
+            "L_diff_um": float(np.sqrt(4.0 * d_eff * T)),
+            "T_s": T,
+        })
+    return out
+
+
 def _f(x, nd=3, na="—"):
     try:
         v = float(x)
@@ -897,6 +941,7 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     A = res["per_arm"]["A_kde"]
     B = res["per_arm"]["B_discrete"]
     C = res["per_arm"]["C_discrete_matched"]
+    scales = transport_length_scales(res)
 
     floor_A = vd["floor"]["A_mean_empirical"]
     floor_B = vd["floor"]["B_mean_empirical"]
@@ -1230,17 +1275,40 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
                  f"{vd['floor']['fold_reduction']:.2f}×. Removing every trace of source "
                  f"from 97.5% of the tissue barely moves the *exposure* there.")
         L.append("")
-        L.append("**Why, and it is not a bug.** The transport PDE runs for "
-                 f"{_PDE['total_time']/3600:.0f} h. Over that window drug diffuses far "
-                 "further than the "
-                 f"{_f(v['intervessel_nn']['median'],0)} µm median gap between segmented "
-                 "vessels, so the interstitium equilibrates: a source that is exactly "
-                 "zero produces an exposure that is nowhere near zero. The flat floor in "
-                 "`dose_schedule.md` was attributed to the KDE bandwidth; this run shows "
-                 "it is **mostly diffusion across a densely-vascularised section**, and "
-                 "the KDE was only the more visible half of the cause. That is a "
-                 "different — and more robust — conclusion than the audit anticipated, "
-                 "and it survives removing the KDE entirely.")
+        L.append("**Why, and it is not a bug — it is arithmetic.** Two length scales "
+                 "decide whether the *shape* of a source can survive into the exposure "
+                 "field, and both are computed below from the compiled drug parameters "
+                 "the solves actually used:")
+        L.append("")
+        L.append("| drug | D_eff (µm²/s) | loss rate k (1/s) | "
+                 "**L_rd = √(D/k)** (µm) | **L_diff = √(4DT)** over "
+                 f"{_PDE['total_time']/3600:.0f} h (µm) | vs "
+                 f"{_f(v['intervessel_nn']['median'],0)} µm intervessel gap |")
+        L.append("|---|---|---|---|---|---|")
+        for s in scales:
+            L.append(f"| {s['drug']} | {s['d_eff_um2_s']:.0f} | "
+                     f"{s['loss_rate_1_s']:.3g} | **{s['L_rd_um']:.0f}** | "
+                     f"**{s['L_diff_um']:,.0f}** | "
+                     f"{s['L_rd_um']/max(v['intervessel_nn']['median'],1e-9):.0f}× / "
+                     f"{s['L_diff_um']/max(v['intervessel_nn']['median'],1e-9):.0f}× |")
+        L.append("")
+        L.append("`L_rd` is the steady-state reaction-diffusion penetration length — the "
+                 "only length that can hold a concentration difference open against "
+                 "tissue loss indefinitely. `L_diff` is how far drug spreads by diffusion "
+                 "over the exposure window. **Both are one to two orders of magnitude "
+                 "larger than the gap between segmented vessels.** The interstitium "
+                 "therefore equilibrates between vessels long before the window closes, "
+                 "and a source that is exactly zero produces an exposure that is nowhere "
+                 "near zero.")
+        L.append("")
+        L.append("The flat floor in `dose_schedule.md` was attributed to the KDE "
+                 "bandwidth. This run shows the bandwidth was the *visible* cause but not "
+                 "the *sufficient* one: the floor is mostly **diffusion across a densely "
+                 "and near-uniformly vascularised section**, and it survives deleting the "
+                 "KDE entirely. That is a different — and considerably more robust — "
+                 "conclusion than the audit anticipated, and it means the finding "
+                 "'delivery is never the binding constraint *on this section*' was not an "
+                 "artefact of our own smoothing after all.")
     L.append("")
 
     # ------------------------------------------------------------------ #
@@ -1573,8 +1641,14 @@ def main(argv=None) -> Dict:
     args = ap.parse_args(argv)
 
     res = run(drugs=tuple(args.drugs), dx_um=args.dx, cache_path=args.cache)
-    if "_domain" not in res:  # cache written before _domain was stored
-        res["_domain"] = reconstruct_real("xenium", dx_um=res["dx_um"]).domain
+    if "_domain" not in res or "_ecm_mean" not in res:
+        # Cache written before these were stored; the reconstruction is
+        # deterministic, so re-deriving them cannot change any result.
+        m = reconstruct_real("xenium", dx_um=res["dx_um"])
+        t = np.asarray(m.domain.tissue_mask, dtype=bool)
+        res.setdefault("_domain", m.domain)
+        res.setdefault("_ecm_mean",
+                       float(np.asarray(m.fields.ecm_density)[t].mean()))
     res["_verdicts"] = verdicts(res)
     selftest(res)
     png = make_figure(res)

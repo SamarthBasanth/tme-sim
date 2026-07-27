@@ -675,6 +675,7 @@ def run_simulations(geos: Dict[str, SliceGeometry],
                                      first_order_loss=loss)
                 v = res.c_total[g.mask]
                 a = res.auc_total[g.mask]
+                het = heterogeneity(v)
                 rho, _ = spearmanr(g.depth_um[g.mask], v)
                 rows.append({
                     "msi_slice": sid, "own_compound": g.compound,
@@ -684,9 +685,8 @@ def run_simulations(geos: Dict[str, SliceGeometry],
                     "mean_depth_um": g.mean_depth_um,
                     "pred_mean": float(v.mean()),
                     "pred_median": float(np.median(v)),
-                    "pred_cv": heterogeneity(v)["cv"],
-                    "pred_gini": heterogeneity(v)["gini"],
-                    "pred_q90_q50": heterogeneity(v)["q90_q50"],
+                    "pred_cv": het["cv"], "pred_gini": het["gini"],
+                    "pred_q90_q50": het["q90_q50"],
                     "pred_auc_mean": float(a.mean()),
                     "pred_sat_frac": float(v.mean() / (res.R * BATH_CONC_UM)),
                     "pred_rho_depth": float(rho),
@@ -1104,6 +1104,26 @@ def analysis1(roi: pd.DataFrame, sim: pd.DataFrame, meas: pd.DataFrame,
                if not res["conditions"][c]["pooled"].get("degenerate", False)]
     res["headline_condition"] = non_deg[0] if non_deg else list(MODEL_CONDITIONS)[0]
     res["degenerate_conditions"] = [c for c in MODEL_CONDITIONS if c not in non_deg]
+
+    # ---- BASELINES: is the model beating a one-number geometry rule? -------
+    # A slice-constant transport prediction into a uniform explant is, at
+    # bottom, a function of how thick the section is. If a trivial geometric
+    # covariate scores as well, the simulator has added nothing.
+    hc = res["headline_condition"]
+    d = attach_predictions(roi, sim, hc).dropna(subset=["pred_norm"])
+    d = d.merge(meas[["msi_slice", "area_mm2", "max_depth_um", "mean_depth_um"]],
+                on="msi_slice", how="left")
+    base: dict = {}
+    for cov in ("mean_depth_um", "max_depth_um", "area_mm2"):
+        base[cov] = mixed_test(d, "drug_measure_norm", cov)
+    sl = d.groupby("msi_slice").agg(pred=("pred_norm", "first"),
+                                    depth=("mean_depth_um", "first")).reset_index()
+    rho_pd, p_pd = spearmanr(sl["pred"], sl["depth"])
+    base["prediction_is_a_thickness_proxy"] = {
+        "spearman_pred_vs_mean_depth": float(rho_pd), "p": float(p_pd),
+        "n_slices": int(len(sl)),
+    }
+    res["baselines"] = base
     return res
 
 
@@ -1341,7 +1361,13 @@ def analysis2(geos: Dict[str, SliceGeometry], sim: pd.DataFrame,
     # --- (f) can a bigger lysosomal compartment rescue it? -----------------
     sw = sweep.groupby(["phi_lys", "compound"])[["pred_cv", "R"]].mean().reset_index()
     out["phi_lys_sweep"] = sw.to_dict("records")
-    out["phi_lys_sweep_max_cv"] = float(sweep.pred_cv.max())
+    hi_phi = max(PHI_LYS_SWEEP)
+    hi = sweep[(sweep.phi_lys == hi_phi) & (sweep.compound != "Olaparib")]
+    out["phi_lys_sweep_top"] = {
+        "phi_lys": hi_phi,
+        "mean_cv_weak_base": float(hi.pred_cv.mean()),
+        "max_cv_any_section": float(hi.pred_cv.max()),
+    }
 
     # --- (g) direction of the spatial gradient -----------------------------
     out["depth_gradient"] = {
@@ -1472,7 +1498,8 @@ def gene_level_enrichment(expr: pd.DataFrame, bundle: dict,
 
 def analysis3(expr: pd.DataFrame, roi: pd.DataFrame, sim: pd.DataFrame,
               condition: str = "transport+shipped_loss",
-              n_null: int = 1000, verbose: bool = True) -> dict:
+              n_null: int = 1000, n_perm_pred: int = 499,
+              verbose: bool = True) -> dict:
     """Does drug exposure predict the apoptotic signature — measured, then ours?"""
     scores, bundle = signature_scores(expr, n_null=n_null)
     scores["msi_slice"] = scores["Slice"].map(SLICE_MAP)
@@ -1518,11 +1545,20 @@ def analysis3(expr: pd.DataFrame, roi: pd.DataFrame, sim: pd.DataFrame,
             "null_p95_abs_t": float(np.percentile(nt, 95)) if len(nt) else float("nan"),
             "p_empirical": float((np.sum(nt >= obs_t) + 1) / (len(nt) + 1)) if len(nt) else float("nan"),
         }
+        # ---- slice-exchangeable permutation for OUR predictor -------------
+        # Same argument as analysis 1: the prediction is constant within a
+        # slice, so the nominal LRT p is anticonservative. Only 11 slices are
+        # exchangeable, and this is the null that respects that.
+        if n_perm_pred:
+            entry["predicted::pooled::slice_permutation"] = permute_mixed(
+                dp, col, "pred_norm", n_perm=n_perm_pred, seed=1)
         out["tests"][sig] = entry
         if verbose:
+            pp = entry.get("predicted::pooled::slice_permutation", {})
             print(f"  [a3] {sig}: measured beta={entry['measured::pooled']['beta']:+.4f} "
                   f"p={entry['measured::pooled']['p_lrt']:.3g} | "
-                  f"predicted p={entry['predicted::pooled']['p_lrt']:.3g}")
+                  f"predicted p={entry['predicted::pooled']['p_lrt']:.3g} "
+                  f"(slice-perm p={pp.get('p_perm_t', float('nan')):.3g})")
 
     out["gene_level_enrichment"] = {
         "pooled": gene_level_enrichment(expr, bundle),
@@ -1578,7 +1614,6 @@ def make_figure(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
-    from matplotlib.patches import Patch
 
     fig, axes = plt.subplots(2, 3, figsize=(16.5, 9.6))
     fig.patch.set_facecolor("#fcfcfb")
@@ -1618,11 +1653,7 @@ def make_figure(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
             f"(p = {st['spearman_p']:.2f})",
             transform=ax.transAxes, va="top", ha="left", fontsize=8.4, color=INK2,
             bbox=dict(boxstyle="round,pad=0.45", fc="#f3f2ee", ec="#e0dfd9", lw=0.8))
-    handles = [Line2D([], [], marker="o", ls="", ms=7, mfc=c, mec="#fcfcfb", label=p)
-               for p, c in PATIENT_COLOR.items()]
-    handles += [Line2D([], [], marker=m, ls="", ms=7, mfc=INK3, mec="#fcfcfb", label=c)
-                for c, m in COMPOUND_MARKER.items() if c != "Olaparib"]
-    ax.legend(handles=handles, fontsize=8, frameon=False, loc="lower right", ncol=2)
+    ax.margins(x=0.08, y=0.10)
 
     # ---- (b) heterogeneity across compounds -------------------------------
     ax = axes[0, 1]
@@ -1636,7 +1667,7 @@ def make_figure(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
     ax.bar(xs + 0.20, pvals, width=0.36, color=PRED_COLOR, zorder=3,
            label="predicted (transport + lysosomal trap)")
     ax.set_yscale("log")
-    ax.set_ylim(1e-9, 30)
+    ax.set_ylim(1e-9, 1e5)
     for x, v in zip(xs - 0.20, mvals):
         ax.text(x, v * 1.5, f"{v:.2f}", ha="center", fontsize=8, color=MEAS_COLOR)
     for x, v in zip(xs + 0.20, pvals):
@@ -1658,7 +1689,7 @@ def make_figure(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
             f"(indistinguishable)",
             transform=ax.transAxes, va="top", ha="left", fontsize=8.4, color=INK2,
             bbox=dict(boxstyle="round,pad=0.45", fc="#f3f2ee", ec="#e0dfd9", lw=0.8))
-    ax.legend(fontsize=8, frameon=False, loc="lower left")
+    ax.legend(fontsize=8.5, frameon=False, loc="upper right", labelcolor=INK2)
 
     # ---- (c) measured exposure -> apoptosis signature ---------------------
     ax = axes[0, 2]
@@ -1674,13 +1705,17 @@ def make_figure(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
            "apoptosis signature score (mean z)",
            "c  Measured exposure -> apoptosis signature")
     pt = a3["tests"]["apoptosis"]["predicted::pooled"]
+    gn = a3["tests"]["apoptosis"]["gene_set_null"]
+    ge = a3["gene_level_enrichment"]["pooled"]["sets"]["apoptosis"]
+    ax.margins(x=0.06, y=0.12)
     ax.text(0.02, 0.97,
             f"MEASURED drug: $\\beta$ = {t['beta']:+.3f} $\\pm$ {t['se']:.3f}, "
             f"LRT p = {t['p_lrt']:.1e}\n"
-            f"  vs 1,000 size-matched random gene sets: "
-            f"p = {a3['tests']['apoptosis']['gene_set_null']['p_empirical']:.3f}\n"
-            f"OUR predicted exposure: p = {pt['p_lrt']:.2f}"
-            f"{'  (degenerate)' if pt.get('degenerate') else ''}",
+            f"vs {gn['n_random_sets_fitted']} size-matched random gene sets "
+            f"(same model): p = {gn['p_empirical']:.2f}\n"
+            f"within-slice rank enrichment vs 1,000 random sets: "
+            f"z = {ge['z']:.1f}, p < 0.001\n"
+            f"paper's GSEA benchmark: APOPTOSIS NES 2.278, FDR q = 0",
             transform=ax.transAxes, va="top", ha="left", fontsize=8.4, color=INK2,
             bbox=dict(boxstyle="round,pad=0.45", fc="#f3f2ee", ec="#e0dfd9", lw=0.8))
 
@@ -1749,26 +1784,42 @@ def make_figure(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
     _style(ax, "OUR predicted exposure (compound-normalised)",
            "apoptosis signature score (mean z)",
            "f  Our predicted exposure -> apoptosis signature")
-    ax.text(0.02, 0.97,
-            f"$\\beta$ = {pt['beta']:+.3f} $\\pm$ {pt['se']:.3f}, LRT p = {pt['p_lrt']:.2f}\n"
-            f"variance beyond patient+slice REs: "
-            f"{pt['var_explained_beyond_re']*100:.1f}%\n"
-            f"the predictor is constant within a slice, so it can only\n"
-            f"ever reach the between-slice stratum "
+    ppm = a3["tests"]["apoptosis"].get("predicted::pooled::slice_permutation", {})
+    ax.margins(x=0.08, y=0.14)
+    ax.text(0.02, 0.03,
+            f"$\\beta$ = {pt['beta']:+.3f} $\\pm$ {pt['se']:.3f} — "
+            f"OPPOSITE sign to panel c\n"
+            f"nominal LRT p = {pt['p_lrt']:.3f}, but slice-exchangeable\n"
+            f"permutation p = {ppm.get('p_perm_t', float('nan')):.2f} "
+            f"(n = {ppm.get('n_perm_completed', 0)} refits)\n"
+            f"the predictor is constant within a slice, so it can only reach\n"
+            f"the between-slice stratum "
             f"({a1['variance_decomposition']['all']['between_slice_within_patient']*100:.0f}% of variance)",
-            transform=ax.transAxes, va="top", ha="left", fontsize=8.4, color=INK2,
+            transform=ax.transAxes, va="bottom", ha="left", fontsize=8.4, color=INK2,
             bbox=dict(boxstyle="round,pad=0.45", fc="#f3f2ee", ec="#e0dfd9", lw=0.8))
+
+    # One shared identity legend for the whole figure: colour = patient,
+    # marker = compound, so identity is never carried by colour alone.
+    handles = [Line2D([], [], marker="o", ls="", ms=8, mfc=c, mec="#fcfcfb", label=p)
+               for p, c in PATIENT_COLOR.items()]
+    handles += [Line2D([], [], marker=m, ls="", ms=8, mfc=INK3, mec="#fcfcfb", label=c)
+                for c, m in COMPOUND_MARKER.items() if c != "Olaparib"]
+    handles += [Line2D([], [], marker="D", ls="", ms=9, mfc="none", mec=INK,
+                       label="slice mean (a)")]
+    fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.955),
+               ncol=6, frameon=False, fontsize=9.5, labelcolor=INK2,
+               handletextpad=0.4, columnspacing=1.8)
 
     fig.suptitle(
         "Moncayo et al. 2026 HGSOC patient-derived explants — bath-dosed ex vivo (20 uM, 24 h), "
         "NO vasculature: validates diffusion/uptake/sequestration only",
-        fontsize=12.5, color=INK, y=0.985)
+        fontsize=12.5, color=INK, y=0.99)
     fig.text(0.5, 0.005,
              "n = 3 patients, 114 GeoMx ROIs, 18 MALDI-MSI sections. Drug values are "
              "deuterated-internal-standard-normalised ion ratios (unitless) — no absolute uM. "
              "Ovarian, not glioma: physics transfer, not biology transfer.",
              ha="center", fontsize=8.5, color=INK2)
-    fig.tight_layout(rect=[0, 0.02, 1, 0.965])
+    fig.tight_layout(rect=[0, 0.02, 1, 0.935])
     fig.savefig(path, dpi=170, facecolor=fig.get_facecolor())
     plt.close(fig)
     return path
@@ -1800,7 +1851,8 @@ def _p(x):
 def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
                  sim: pd.DataFrame, geos: Dict[str, SliceGeometry],
                  chem: Dict[str, CompoundChemistry], slab: dict,
-                 prov: List[dict], path: str = OUT_MD) -> str:
+                 prov: List[dict], ecm_sens: Optional[pd.DataFrame] = None,
+                 path: str = OUT_MD) -> str:
     cond = a1["headline_condition"]
     C = a1["conditions"]
     vd = a1["variance_decomposition"]["all"]
@@ -2030,21 +2082,61 @@ def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
       f"{_f(mp.get('null_p95_var_explained'), 1, pct=True)} |")
     w(f"| **permutation p for dR2** | {_p(mp.get('p_perm_var_explained'))} |")
     w("")
-    w(f"Slice-level agreement, the same information viewed directly (n = "
-      f"{sl['n_slices']} slices): Spearman rho = {_f(sl['spearman_rho'], 3)} "
-      f"(p = {_p(sl['spearman_p'])}), Pearson r = {_f(sl['pearson_r'], 3)} "
-      f"(p = {_p(sl['pearson_p'])}); within-compound slice permutation "
-      f"p = {_p(C[cond]['permutation']['p_perm_two_sided'])}.")
+    w(f"Slice-level agreement, the same information viewed directly, one point per "
+      f"slice and no ROI-count weighting (n = {sl['n_slices']}): Spearman rho = "
+      f"{_f(sl['spearman_rho'], 3)} (p = {_p(sl['spearman_p'])}), Pearson r = "
+      f"{_f(sl['pearson_r'], 3)} (p = {_p(sl['pearson_p'])}); within-compound slice "
+      f"permutation p = {_p(C[cond]['permutation']['p_perm_two_sided'])}.")
+    w("")
+    w("**The two permutation statistics disagree, and that disagreement is the "
+      f"finding.** On |t| the observed value clears the null 95th percentile "
+      f"({_f(mp.get('observed_abs_t'), 2)} vs {_f(mp.get('null_p95_abs_t'), 2)}, "
+      f"p = {_p(mp.get('p_perm_t'))}); on dR2 it does not "
+      f"({_f(mp.get('observed_var_explained_beyond_re'), 1, pct=True)} vs "
+      f"{_f(mp.get('null_p95_var_explained'), 1, pct=True)}, "
+      f"p = {_p(mp.get('p_perm_var_explained'))}); and the unweighted slice-level "
+      f"Spearman is {_f(sl['spearman_rho'], 3)}. An effect that appears or vanishes "
+      "depending on whether slices are weighted by ROI count is not a validated "
+      "prediction; it is 11 points arranged so that one weighting scheme finds a "
+      "trend.")
+    w("")
+    w("### 3.4 And the effect that does appear is a thickness proxy")
+    w("")
+    b = a1.get("baselines", {})
+    tp = b.get("prediction_is_a_thickness_proxy", {})
+    w(f"Under `{cond}` the model's slice-to-slice prediction is almost exactly a "
+      f"monotone function of how thick the section is: Spearman(prediction, mean "
+      f"distance-to-edge) = {_f(tp.get('spearman_pred_vs_mean_depth'), 3)} "
+      f"(p = {_p(tp.get('p'))}, n = {tp.get('n_slices')}). That is the whole "
+      "mechanism — a first-order sink lets a thin section equilibrate closer to the "
+      "bath than a thick one. So the fair question is whether the simulator beats "
+      "the one-number geometric covariate it is standing in for. Same frame, same "
+      "ROIs:")
+    w("")
+    w("| fixed effect | beta | SE | LRT p | dR2 beyond REs |")
+    w("|---|---:|---:|---:|---:|")
+    w(f"| **our prediction** | {_f(C[cond]['pooled']['beta'])} | "
+      f"{_f(C[cond]['pooled']['se'])} | {_p(C[cond]['pooled']['p_lrt'])} | "
+      f"{_f(C[cond]['pooled']['var_explained_beyond_re'], 1, pct=True)} |")
+    for covlab, cov in (("section mean distance-to-edge (um)", "mean_depth_um"),
+                        ("section max distance-to-edge (um)", "max_depth_um"),
+                        ("section area (mm^2)", "area_mm2")):
+        r = b.get(cov, {})
+        w(f"| {covlab} | {_f(r.get('beta'), 6)} | {_f(r.get('se'), 6)} | "
+          f"{_p(r.get('p_lrt'))} | "
+          f"{_f(r.get('var_explained_beyond_re'), 1, pct=True)} |")
     w("")
     w("**Verdict, analysis 1.** *Variance explained beyond the patient/slice random "
-      f"effects: nominally {_f(C[cond]['pooled']['var_explained_beyond_re'], 1, pct=True)}, "
-      f"but the permutation null median under a random slice ordering is "
-      f"{_f(mp.get('null_median_var_explained'), 1, pct=True)} and the permutation "
-      f"p is {_p(mp.get('p_perm_var_explained'))}.* With 11 exchangeable slices, a "
-      "few percent of marginal R2 is what chance delivers. **The honest number is "
-      "zero: this model does not predict per-ROI drug accumulation in bath-dosed "
-      "explants.** Under `transport_only` it is zero by construction; under "
-      f"`{cond}` it is zero after calibration against the correct null.")
+      f"effects: nominally {_f(C[cond]['pooled']['var_explained_beyond_re'], 1, pct=True)} "
+      f"under `{cond}`, against a slice-permutation null whose median is "
+      f"{_f(mp.get('null_median_var_explained'), 1, pct=True)} and 95th percentile "
+      f"{_f(mp.get('null_p95_var_explained'), 1, pct=True)} "
+      f"(p = {_p(mp.get('p_perm_var_explained'))}); exactly 0.0% under "
+      "`transport_only`, by construction.* Rounded honestly: **between zero and a "
+      "few percent, not separable from chance with 11 exchangeable slices, and what "
+      "little there is is a section-thickness effect rather than a transport "
+      "prediction.** This model does not predict per-ROI drug accumulation in "
+      "bath-dosed explants. It is not close, and §3.1 explains why it cannot be.")
     w("")
 
     # ---- analysis 2 -------------------------------------------------------
@@ -2120,10 +2212,27 @@ def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
         if rec["compound"] == "Niraparib":
             w(f"| {rec['phi_lys']} | {rec['R']:.1f} | {rec['pred_cv']:.2e} |")
     w("")
-    w(f"Even at phi_lys = {max(PHI_LYS_SWEEP)} — 5% of tissue volume as acidic "
+    top = a2["phi_lys_sweep_top"]
+    w(f"Even at phi_lys = {top['phi_lys']} — 5% of tissue volume as acidic "
       "compartment, at or above every value in the cell-biology literature — the "
-      f"predicted CV reaches only {a2['phi_lys_sweep_max_cv']:.2e}, still "
-      f"{_f(gap['meas_excess_cv_weak_base'] / a2['phi_lys_sweep_max_cv'], 1)}x short.")
+      f"mean predicted weak-base CV reaches only {top['mean_cv_weak_base']:.2e} "
+      f"(largest single section {top['max_cv_any_section']:.2e}), still "
+      f"{_f(gap['meas_excess_cv_weak_base'] / top['mean_cv_weak_base'], 1)}x short "
+      "of the measured value.")
+    w("")
+    if ecm_sens is not None and len(ecm_sens):
+        e = (ecm_sens[ecm_sens.compound != "Olaparib"]
+             .groupby("ecm")[["pred_cv", "sat_frac"]].mean())
+        w("")
+        w("The other uncalibrated knob, the ECM volume fraction that sets the "
+          "tortuosity, is equally powerless. Sweeping it over "
+          f"{ECM_SWEEP} (with sequestration on) moves the predicted weak-base CV "
+          "only across "
+          + " / ".join(f"{v:.2e}" for v in e["pred_cv"].values)
+          + " while mean saturation stays at "
+          + " / ".join(f"{v:.3f}" for v in e["sat_frac"].values)
+          + ". No setting of either free parameter brings the model within two "
+            "decades of the measurement.")
     w("")
     w("**And this is structural, not a tuning problem.** With `phi_lys` *uniform in "
       "space*, R is uniform, so at equilibrium C_total = R x C_bath **everywhere** "
@@ -2156,7 +2265,22 @@ def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
           f"one-sided p = {_p(t['p_one_sided_greater'])} "
           f"(n = {t['n_weak_base_slices']} vs {t['n_olaparib_slices']} sections).")
     w("")
+    w("The two metrics say different things, and both readings are given. On "
+      "**dispersion** (Gini, CV) olaparib looks *as* heterogeneous as the weak "
+      "bases. On **spatial autocorrelation** (Moran's I) it does not: the weak-base "
+      "fields are positively autocorrelated (contiguous patches, "
+      f"{_f(a2['measured']['Niraparib']['excess_moran_mean'])} / "
+      f"{_f(a2['measured']['Rucaparib']['excess_moran_mean'])} above their internal-"
+      f"standard floor) while olaparib's is *negatively* autocorrelated "
+      f"({_f(a2['measured']['Olaparib']['excess_moran_mean'])}), i.e. "
+      "salt-and-pepper — the signature of a field dominated by detection noise "
+      "rather than structure. That is qualitatively what the authors describe. But:")
+    w("")
     w(a2["measured_metric_note"])
+    w("")
+    w("A negative Moran's I is exactly what a 51%-zero field produces, so the "
+      "autocorrelation contrast cannot be cleanly separated from the detection "
+      "confound either. We report both metrics and claim neither.")
     w("")
     w("Two further reasons not to read the measured columns as a replication of the "
       "authors' claim: **olaparib contributes zero GeoMx ROIs** (its drug hotspots "
@@ -2252,11 +2376,24 @@ def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
       "comparable — but the **direction and significance replicate**: apoptosis "
       f"genes sit high among the drug-correlated genes (z = {_f(enr['apoptosis']['z'], 1)}, "
       f"p < 0.001) even after absorbing slice identity as a fixed effect. "
-      "**Measured drug level does predict the apoptotic signature, as it should.** "
-      "The dataset's response axis is real and our reading of it agrees with the "
-      "authors'.")
+      "**Measured drug level does predict the apoptotic signature, as it should.**")
     w("")
-    w("### 5.3 Does OUR predicted exposure predict them? No.")
+    w("One caveat that must travel with that sentence. The two null models "
+      "disagree for apoptosis. Against random gene sets *in the ROI-level mixed "
+      f"model* the apoptosis score's |t| = "
+      f"{_f(apo['gene_set_null']['observed_abs_t'], 2)} sits inside the random-set "
+      f"distribution (p = {_p(apo['gene_set_null']['p_empirical'])}); against random "
+      "gene sets *in the within-slice ranking* it is far outside "
+      f"(z = {_f(enr['apoptosis']['z'], 1)}, p < 0.001). The lysosome signature "
+      f"clears both (p = {_p(lys['gene_set_null']['p_empirical'])} and "
+      f"p < 0.001). The reading we stand behind: a broad slice-level "
+      "expression axis co-varies with drug level, so any large gene set picks up "
+      "*some* association at ROI level; the apoptosis-specific part of it is only "
+      "demonstrable once slice identity is absorbed, and there it is unambiguous. "
+      "Direction and specificity agree with the authors; we do not claim their "
+      "effect size.")
+    w("")
+    w("### 5.3 Does OUR predicted exposure predict them? Only backwards.")
     w("")
     w("| signature | subset | beta | SE | LRT p | dR2 beyond REs | singular |")
     w("|---|---|---:|---:|---:|---:|---|")
@@ -2268,14 +2405,30 @@ def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
               f"{'**yes**' if r.get('unstable') else 'no'} |")
     w("")
     ap = apo["predicted::pooled"]
+    app = apo.get("predicted::pooled::slice_permutation", {})
+    lyp = lys.get("predicted::pooled::slice_permutation", {})
     w(f"Pooled apoptosis against our predicted exposure: beta = {_f(ap['beta'], 3)} "
-      f"(**negative** — the wrong sign), LRT p = {_p(ap['p_lrt'])}. Under "
-      "`transport_only` the predictor is constant and the question does not arise "
-      "at all. This is a **clean negative**, and it is the expected consequence of "
-      "§3: a predictor that is constant within a slice can only ever address the "
-      f"{_f(vd['between_slice_within_patient'], 1, pct=True)} between-slice stratum, "
-      "while the measured drug-to-apoptosis coupling lives *within* slices, which is "
-      "exactly where the authors' design put it.")
+      f"— **negative, the opposite sign to the measured relationship** — with a "
+      f"nominal LRT p = {_p(ap['p_lrt'])} and an inflated-looking dR2 of "
+      f"{_f(ap['var_explained_beyond_re'], 1, pct=True)}. Do not read that as a "
+      "result. It is the same pseudo-replication artefact as §3.3, and the same "
+      "slice-exchangeable permutation dissolves it:")
+    w("")
+    w("| signature | observed abs(t) | null median | null 95th pct | permutation p |")
+    w("|---|---:|---:|---:|---:|")
+    for name, pp in (("apoptosis", app), ("lysosome", lyp)):
+        w(f"| {name} | {_f(pp.get('observed_abs_t'), 2)} | "
+          f"{_f(pp.get('null_median_abs_t'), 2)} | "
+          f"{_f(pp.get('null_p95_abs_t'), 2)} | {_p(pp.get('p_perm_t'))} |")
+    w("")
+    w("Under `transport_only` the predictor is constant and the question does not "
+      "arise at all. So: **our predicted exposure does not predict the apoptotic "
+      "signature**; the only nominal association runs backwards and does not "
+      "survive the correct null. This is a clean negative and it is the expected "
+      "consequence of §3 — a predictor that is constant within a slice can only "
+      f"ever address the {_f(vd['between_slice_within_patient'], 1, pct=True)} "
+      "between-slice stratum, while the measured drug-to-apoptosis coupling lives "
+      "*within* slices, which is exactly where the authors' design put it.")
     w("")
     w("### 5.4 The bridge back to analysis 2")
     w("")
@@ -2305,8 +2458,10 @@ def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
     w(f"| 1 | per-ROI accumulation fit, authors' mixed-effects frame | "
       f"**FAIL.** 0.0% beyond REs by construction under `transport_only`; "
       f"{_f(C[cond]['pooled']['var_explained_beyond_re'], 1, pct=True)} nominal "
-      f"under `{cond}`, permutation p = {_p(mp.get('p_perm_var_explained'))} "
-      "against a slice-exchangeable null. Not distinguishable from chance. |")
+      f"under `{cond}`, permutation p = {_p(mp.get('p_perm_var_explained'))} on dR2 "
+      f"and {_p(mp.get('p_perm_t'))} on abs(t) against a slice-exchangeable null, "
+      f"unweighted slice-level Spearman {_f(sl['spearman_rho'], 2)}, and the "
+      "predictor is a section-thickness proxy. Not separable from chance. |")
     w(f"| 2 | compound-specificity falsification | **PARTIAL / effectively "
       f"negative.** Ordering right ({seqp['weak_base_over_olaparib_cv']:,.0f}x weak "
       f"base : olaparib, recovered from SMILES), magnitude "
@@ -2315,16 +2470,22 @@ def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
       f"{dg['n_slices_measured_positive']}/{dg['n_slices']} sections. |")
     w(f"| 3 | exposure -> apoptosis coupling | **Measured: PASS** "
       f"(beta = {_f(mb['apoptosis_signature_beta'], 4)}, p = "
-      f"{_p(mb['apoptosis_signature_p'])}; rank-enrichment z = "
-      f"{_f(enr['apoptosis']['z'], 1)}, replicating the paper's NES 2.278 in "
-      f"direction). **Ours: FAIL** (p = {_p(ap['p_lrt'])}, negative sign). |")
+      f"{_p(mb['apoptosis_signature_p'])}; within-slice rank-enrichment z = "
+      f"{_f(enr['apoptosis']['z'], 1)}, p < 0.001, replicating the paper's NES 2.278 "
+      "in direction — though the ROI-level random-gene-set null is not cleared, see "
+      f"§5.2). **Ours: FAIL** (beta = {_f(ap['beta'], 3)}, wrong sign; "
+      f"slice-permutation p = {_p(app.get('p_perm_t'))}). |")
     w("")
     w("**What this run establishes.**")
     w("")
     w("1. On the *only* open dataset that pairs a measured spatial drug field with "
       "molecular state on the same rows, **this simulator's transport layer "
-      "explains none of the measured per-ROI drug accumulation** beyond patient and "
-      "slice identity. Not a small effect — zero, after the correct null.")
+      "explains essentially none of the measured per-ROI drug accumulation** beyond "
+      "patient and slice identity: exactly zero under `transport_only`, and under "
+      f"`{cond}` a nominal "
+      f"{_f(C[cond]['pooled']['var_explained_beyond_re'], 1, pct=True)} that a "
+      "slice-exchangeable null cannot distinguish from chance and that is, "
+      "mechanically, a section-thickness effect.")
     w("2. The reason is diagnosable and is not a bug: a 24 h bath-dosed explant is "
       f"at diffusive equilibrium (Fo median {_f(fo['median_with_seq'], 1)}), so a "
       "uniform-tissue diffusion model *must* predict a flat field. Everything the "
@@ -2369,7 +2530,7 @@ def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
 # 12. ENTRY POINT
 # ===========================================================================
 def main(n_perm: int = 2000, n_perm_mixed: int = 999, n_null: int = 1000,
-         verbose: bool = True) -> dict:
+         n_perm_pred: int = 499, verbose: bool = True) -> dict:
     t0 = time.time()
     if verbose:
         print("== Moncayo et al. 2026 HGSOC explant validation ==")
@@ -2399,10 +2560,11 @@ def main(n_perm: int = 2000, n_perm_mixed: int = 999, n_null: int = 1000,
                    verbose=verbose)
     a2 = analysis2(geos, sim, meas, chem, sat, sweep)
     a3 = analysis3(expr, roi, sim, condition=a1["headline_condition"],
-                   n_null=n_null, verbose=verbose)
+                   n_null=n_null, n_perm_pred=n_perm_pred, verbose=verbose)
 
     png = make_figure(a1, a2, a3, meas, sim, geos, chem, sat)
-    md = write_report(a1, a2, a3, meas, sim, geos, chem, slab, prov)
+    md = write_report(a1, a2, a3, meas, sim, geos, chem, slab, prov,
+                      ecm_sens=ecm_sens)
     if verbose:
         print(f"  [out] {os.path.relpath(md, REPO)}")
         print(f"  [out] {os.path.relpath(png, REPO)}")

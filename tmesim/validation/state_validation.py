@@ -160,9 +160,11 @@ IO_PERM_SUBSAMPLE = 50_000
 #: Deterministic seed. This module contains no other randomness.
 PERM_SEED = 0
 
-#: Measured hypoxia-RESPONSE genes on the IO panel. Not an oxygen tension —
-#: see caveat 2 in the module docstring.
-HYPOXIA_GENES: Tuple[str, ...] = ("VEGFA", "HIF1A")
+#: Measured hypoxia-RESPONSE genes on the IO panel. Single source of truth is
+#: :data:`marker_panels.HYPOXIA_RESPONSE_GENES`, so the panel module and this
+#: validation can never drift apart. NOT an oxygen tension — see caveat 2 in the
+#: module docstring.
+HYPOXIA_GENES: Tuple[str, ...] = tuple(HYPOXIA_RESPONSE_GENES["io_480"])
 
 #: Measured proliferation markers on the 319-gene panel. TOP2A is NOT on the IO
 #: panel and PCNA/CDK1 are not either, which is why Test 2 cannot be run there.
@@ -971,7 +973,9 @@ def run_test1(
             "grid": st["grid"], "dx_um": DX_CONVERGED,
             "oxygen_field": st["oxygen_field"], "tissue_mask": st["tissue_mask"],
             "per_gene": hs["per_gene"], "totals": totals,
-            "dist_endo": np.asarray(trivial_baselines(
+            # ALREADY sign-aligned to oxygen (= minus the distance), like every
+            # other baseline. Do not negate it again at the call site.
+            "neg_dist_endo": np.asarray(trivial_baselines(
                 st["x"], st["y"], st["cell_type"], st["vascular_at_cell"]
             )["dist_endothelial"]["values"], float),
             "tiles": ref["tiles"],
@@ -1368,6 +1372,12 @@ def run(
     t2 = run_test2(brain_sample, n_perm_brain)
     v1 = verdict_test1(t1)
     v2 = verdict_test2(t2)
+    for v in (v1, v2):
+        if v["verdict"] not in VERDICTS:
+            raise RuntimeError(
+                f"verdict {v['verdict']!r} is outside the fixed vocabulary "
+                f"{VERDICTS} — the conclusion vocabulary must not drift"
+            )
     print(f"\nVERDICT Test 1 (simulated oxygen field): {v1['verdict']}")
     for r in v1["reasons"]:
         print(f"  - {r}")
@@ -1376,3 +1386,1084 @@ def run(
         print(f"  - {r}")
     return {"guard": guard, "test1": t1, "test2": t2,
             "verdict1": v1, "verdict2": v2}
+
+
+# ---------------------------------------------------------------------------
+# Figure.
+# ---------------------------------------------------------------------------
+def _style_axes(ax, grid_axis: str = "y") -> None:
+    """Recessive grid, no top/right spines — the marks carry the ink, not the frame."""
+    ax.set_axisbelow(True)
+    ax.grid(True, axis=grid_axis, color=GRID_COLOR, linewidth=0.8, zorder=0)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(GRID_COLOR)
+    ax.tick_params(colors=INK_SECONDARY, labelsize=8, length=0)
+
+
+def _ramp(colors: Sequence[str], name: str):
+    from matplotlib.colors import LinearSegmentedColormap
+    return LinearSegmentedColormap.from_list(name, list(colors))
+
+
+def _tile_field(
+    row: np.ndarray, col: np.ndarray, dx_um: float, values: np.ndarray,
+    tile_um: float = TILE_UM, min_cells: int = TILE_MIN_CELLS,
+) -> Tuple[np.ndarray, Tuple[float, float, float, float]]:
+    """Mean of ``values`` per fixed physical tile, as an image + its um extent."""
+    cx = (np.asarray(col, float) + 0.5) * float(dx_um)
+    cy = (np.asarray(row, float) + 0.5) * float(dx_um)
+    tx = (cx / float(tile_um)).astype(np.int64)
+    ty = (cy / float(tile_um)).astype(np.int64)
+    ntx, nty = int(tx.max()) + 1, int(ty.max()) + 1
+    flat = ty * ntx + tx
+    cnt = np.bincount(flat, minlength=nty * ntx).astype(np.float64)
+    tot = np.bincount(flat, weights=np.asarray(values, float), minlength=nty * ntx)
+    img = np.full(nty * ntx, np.nan)
+    ok = cnt >= int(min_cells)
+    img[ok] = tot[ok] / cnt[ok]
+    return img.reshape(nty, ntx), (0.0, ntx * tile_um, nty * tile_um, 0.0)
+
+
+def _binned_profile(
+    predictor: np.ndarray, response: np.ndarray, n_bins: int = 25,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Mean response per equal-count bin of the predictor's PERCENTILE rank.
+
+    Percentile rank rather than raw units so predictors on incomparable scales
+    (relative oxygen, micrometres, cell counts) share one x-axis, which is the only
+    way the model and the trivial baseline can be overlaid on the same panel
+    without a second axis (the skill's one-axis rule).
+    """
+    pr = rankdata(np.asarray(predictor, float)) / float(predictor.size) * 100.0
+    edges = np.linspace(0, 100, n_bins + 1)
+    idx = np.clip(np.searchsorted(edges, pr, side="right") - 1, 0, n_bins - 1)
+    centres = 0.5 * (edges[:-1] + edges[1:])
+    means = np.array([
+        float(np.asarray(response, float)[idx == b].mean()) if np.any(idx == b) else np.nan
+        for b in range(n_bins)
+    ])
+    return centres, means
+
+
+def make_figure(results: Dict, out_path: Optional[str] = None) -> str:
+    """Six-panel evidence figure. Returns the written path."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+
+    t1, t2 = results["test1"], results["test2"]
+    v1, v2 = results["verdict1"], results["verdict2"]
+    r = t1["_ref"]
+    preds = t1["sweep"][DX_CONVERGED]["predictors"]
+
+    fig = plt.figure(figsize=(18.0, 10.8))
+    gs = fig.add_gridspec(2, 3, hspace=0.46, wspace=0.28,
+                          left=0.088, right=0.985, top=0.855, bottom=0.095)
+    fig.patch.set_facecolor(SURFACE)
+
+    # ---- A: the SIMULATED oxygen field --------------------------------------
+    ax = fig.add_subplot(gs[0, 0])
+    ofield = np.where(r["tissue_mask"], r["oxygen_field"], np.nan)
+    ny, nx = r["grid"]
+    ext = (0.0, nx * r["dx_um"], ny * r["dx_um"], 0.0)
+    im = ax.imshow(ofield, cmap=_ramp(SEQ_BLUE, "o2"), extent=ext,
+                   interpolation="nearest", rasterized=True)
+    cb = fig.colorbar(im, ax=ax, fraction=0.045, pad=0.02)
+    cb.set_label("relative O₂ (model)", fontsize=8, color=INK_SECONDARY)
+    cb.ax.tick_params(labelsize=7, colors=INK_SECONDARY, length=0)
+    cb.outline.set_visible(False)
+    ax.set_aspect("equal")
+    ax.set_xlabel("x (µm)", fontsize=8.5, color=INK_SECONDARY)
+    ax.set_ylabel("y (µm)", fontsize=8.5, color=INK_SECONDARY)
+    ax.set_title(f"A · SIMULATED oxygen — physics.solve_oxygen, dx={r['dx_um']:.0f} µm\n"
+                 f"mean {t1['sweep'][DX_CONVERGED]['mean_oxygen_tissue']:.3f} over tissue",
+                 fontsize=10, color=INK_PRIMARY, loc="left", pad=8)
+    _style_axes(ax, grid_axis="both")
+    ax.grid(False)
+
+    # ---- B: the MEASURED hypoxia-response field -----------------------------
+    ax = fig.add_subplot(gs[0, 1])
+    simg, sext = _tile_field(r["row"], r["col"], r["dx_um"], r["score"])
+    im = ax.imshow(simg, cmap=_ramp(SEQ_AQUA, "hyp"), extent=sext,
+                   interpolation="nearest", rasterized=True,
+                   vmin=np.nanpercentile(simg, 2), vmax=np.nanpercentile(simg, 98))
+    cb = fig.colorbar(im, ax=ax, fraction=0.045, pad=0.02)
+    cb.set_label("VEGFA+HIF1A z (measured)", fontsize=8, color=INK_SECONDARY)
+    cb.ax.tick_params(labelsize=7, colors=INK_SECONDARY, length=0)
+    cb.outline.set_visible(False)
+    ax.set_aspect("equal")
+    ax.set_xlabel("x (µm)", fontsize=8.5, color=INK_SECONDARY)
+    ax.set_ylabel("y (µm)", fontsize=8.5, color=INK_SECONDARY)
+    tl = t1["sweep"][DX_CONVERGED]["tiles"]
+    ax.set_title(f"B · MEASURED hypoxia response — VEGFA+HIF1A, {TILE_UM:.0f} µm tiles\n"
+                 f"field-vs-field ρ = {tl['rho']:+.3f} over {tl['n_tiles']:,} tiles",
+                 fontsize=10, color=INK_PRIMARY, loc="left", pad=8)
+    _style_axes(ax, grid_axis="both")
+    ax.grid(False)
+
+    # ---- C: the correlation, with the TRIVIAL BASELINE overlaid -------------
+    ax = fig.add_subplot(gs[0, 2])
+    series = [
+        ("SIMULATED O₂ — the PDE", r["o2"],
+         preds["simulated_o2"]["rho_score"], MODEL_COLOR, "-"),
+        ("−dist. to endothelial cell — TRIVIAL", r["neg_dist_endo"],
+         preds["dist_endothelial"]["rho_score"], BASELINE_COLOR, "--"),
+    ]
+    handles = []
+    ends = {}
+    for lab, vals, rho, colr, ls in series:
+        cx, cy = _binned_profile(vals, r["score"])
+        ends[lab] = float(cy[0])
+        ax.plot(cx, cy, color=colr, linewidth=2.0, linestyle=ls, zorder=3,
+                solid_capstyle="round")
+        ax.scatter(cx, cy, s=22, color=colr, edgecolor=SURFACE, linewidth=1.2, zorder=4)
+        handles.append(plt.Line2D([], [], color=colr, linewidth=2.0, linestyle=ls,
+                                  marker="o", markersize=5,
+                                  label=f"{lab}   ρ = {rho:+.4f}"))
+    ax.axhline(0.0, color=INK_MUTED, linewidth=1.0, zorder=2)
+    lo_end = ends["SIMULATED O₂ — the PDE"]
+    hi_end = ends["−dist. to endothelial cell — TRIVIAL"]
+    ax.annotate(
+        f"at the most-hypoxic decile the trivial baseline reaches "
+        f"{hi_end:+.2f}\nz-units of measured hypoxia; the PDE only {lo_end:+.2f}",
+        (2.0, hi_end), textcoords="offset points", xytext=(16, -6),
+        ha="left", va="top", fontsize=8, color=INK_PRIMARY, zorder=6)
+    ax.legend(handles=handles, fontsize=7.5, loc="lower left", frameon=False)
+    ax.set_xlabel("percentile of the predictor  (0 = most hypoxic / furthest from a vessel)",
+                  fontsize=8.5, color=INK_SECONDARY)
+    ax.set_ylabel("mean measured VEGFA+HIF1A z-score", fontsize=8.5, color=INK_SECONDARY)
+    ax.set_title("C · The trivial baseline separates measured hypoxia MORE\n"
+                 "sharply than the reaction-diffusion solve does",
+                 fontsize=10, color=INK_PRIMARY, loc="left", pad=8)
+    _style_axes(ax, grid_axis="both")
+
+    # ---- D: predictor league table -------------------------------------------
+    ax = fig.add_subplot(gs[1, 0])
+    order = ["simulated_o2", "vascular_kde", "dist_endothelial", "local_cell_density"]
+    labels = ["SIMULATED O₂ (PDE)",
+              "vascular KDE (source)",
+              "−dist. to endothelium",
+              f"−cell density ({DENSITY_RADIUS_UM:.0f} µm)"]
+    ys = np.arange(len(order))[::-1]
+    for key, lab, y in zip(order, labels, ys):
+        rho = preds[key]["rho_score"]
+        colr = MODEL_COLOR if key == "simulated_o2" else BASELINE_COLOR
+        ax.barh(y, abs(rho), color=colr, height=0.56, zorder=3)
+        ax.text(abs(rho) + 0.004, y, f"ρ = {rho:+.4f}", va="center", ha="left",
+                fontsize=8.5, color=INK_PRIMARY, zorder=4)
+    best = v1["best_baseline_rho"]
+    ax.axvline(abs(best), color=INK_MUTED, linewidth=1.2, linestyle=(0, (4, 3)), zorder=2)
+    ax.set_yticks(ys)
+    ax.set_yticklabels(labels, fontsize=8, color=INK_PRIMARY)
+    ax.set_xlim(0, max(abs(preds[k]["rho_score"]) for k in order) * 1.42)
+    ax.set_xlabel("|Spearman ρ| with the measured VEGFA+HIF1A score",
+                  fontsize=8.5, color=INK_SECONDARY)
+    ax.set_title("D · Physics-free baselines BEAT the solved oxygen field\n"
+                 "(same inputs, no PDE) — so the solve adds nothing here",
+                 fontsize=10, color=INK_PRIMARY, loc="left", pad=8)
+    _style_axes(ax, grid_axis="x")
+    ax.legend(handles=[Patch(color=MODEL_COLOR, label="simulated (PDE)"),
+                       Patch(color=BASELINE_COLOR, label="trivial baseline")],
+              fontsize=7.5, loc="lower right", frameon=False)
+
+    # ---- E: measured markers by MODEL state (IO section) --------------------
+    ax = fig.add_subplot(gs[1, 1])
+    tracks = ["VEGFA", "HIF1A"]
+    width = 0.36
+    xs = np.arange(len(STATE_ORDER))
+    for gi, g in enumerate(tracks):
+        vals = r["per_gene"][g]
+        for si, name in enumerate(STATE_ORDER):
+            m = r["states"] == int(_STATE_ENUM[name])
+            n = int(m.sum())
+            if n == 0:
+                continue
+            mu = float(vals[m].mean())
+            se = float(vals[m].std(ddof=1) / np.sqrt(n))
+            xpos = si + (gi - 0.5) * width
+            ax.bar(xpos, mu, width=width * 0.9, color=STATE_COLORS[name],
+                   alpha=1.0 if gi == 0 else 0.45, zorder=3,
+                   edgecolor=SURFACE, linewidth=1.0)
+            ax.plot([xpos, xpos], [mu - 1.96 * se, mu + 1.96 * se],
+                    color=INK_PRIMARY, linewidth=1.4, zorder=5)
+            # RELIEF RULE: yellow is sub-3:1, so every bar carries a direct label.
+            ax.text(xpos, mu + (0.012 if mu >= 0 else -0.012), f"{mu:+.3f}",
+                    ha="center", va="bottom" if mu >= 0 else "top",
+                    fontsize=7.5, color=INK_PRIMARY, zorder=6)
+    ax.axhline(0.0, color=INK_MUTED, linewidth=1.0, zorder=2)
+    ax.set_xticks(xs)
+    ax.set_xticklabels([f"{s}\nn={int((r['states']==int(_STATE_ENUM[s])).sum()):,}"
+                        for s in STATE_ORDER], fontsize=8.5, color=INK_PRIMARY)
+    ax.set_ylabel("mean measured expression (z, depth-normalised)",
+                  fontsize=8.5, color=INK_SECONDARY)
+    e = t1["enrichment"]
+    ax.set_ylim(ax.get_ylim()[0] * 1.12, max(ax.get_ylim()[1] * 1.9, 0.22))
+    ax.set_title("E · Measured markers by MODEL state (IO section). The banding does\n"
+                 f"separate VEGFA (d(HYP vs VIA) = "
+                 f"{e['VEGFA']['hypoxic_vs_viable']['cohens_d']:+.2f}); HIF1A only "
+                 f"{e['HIF1A']['hypoxic_vs_viable']['cohens_d']:+.2f}",
+                 fontsize=10, color=INK_PRIMARY, loc="left", pad=8)
+    _style_axes(ax)
+    ax.legend(handles=[Patch(facecolor="#6b6a66", label="VEGFA"),
+                       Patch(facecolor="#6b6a66", alpha=0.45, label="HIF1A")],
+              fontsize=7.5, loc="upper right", frameon=False, ncol=2)
+
+    # ---- F: Test 2 — measured proliferation by model state ------------------
+    ax = fig.add_subplot(gs[1, 2])
+    width = 0.36
+    for gi, g in enumerate(PROLIFERATION_MARKERS):
+        if g not in t2["contrasts"]:
+            continue
+        rates = t2["contrasts"][g]["rates"]
+        for si, name in enumerate(STATE_ORDER):
+            rr = rates[name]
+            if not rr["n"]:
+                continue
+            xpos = si + (gi - 0.5) * width
+            ax.bar(xpos, 100 * rr["rate"], width=width * 0.9,
+                   color=STATE_COLORS[name], alpha=1.0 if gi == 0 else 0.45,
+                   zorder=3, edgecolor=SURFACE, linewidth=1.0)
+            ax.plot([xpos, xpos], [100 * rr["lo"], 100 * rr["hi"]],
+                    color=INK_PRIMARY, linewidth=1.4, zorder=5)
+            ax.text(xpos, 100 * rr["hi"] + 0.06,
+                    f"{100*rr['rate']:.2f}%\n{rr['k']}/{rr['n']:,}",
+                    ha="center", va="bottom", fontsize=7, color=INK_PRIMARY, zorder=6)
+    ax.set_xticks(np.arange(len(STATE_ORDER)))
+    ax.set_xticklabels(STATE_ORDER, fontsize=8.5, color=INK_PRIMARY)
+    ax.set_ylabel("marker-positive tumour cells (%)", fontsize=8.5, color=INK_SECONDARY)
+    ax.set_ylim(0, 7.6)
+    pw = t2["contrasts"]["MKI67"]["viable_vs_rest"]["power"]
+    lo, hi = t2["literature_ki67_range_pct"]
+    ax.text(0.015, 0.985,
+            f"published GBM Ki-67 index {lo:.0f}–{hi:.0f}% — off this axis;\n"
+            f"the panel detects MKI67 in only "
+            f"{100*t2['markers']['MKI67']['nonzero']['fraction']:.2f}% of tumour cells.\n"
+            f"VIABLE holds {pw['n_group']} cells, {pw['expected_positives']:.1f} MKI67+ "
+            f"expected under the null:\nonly a ≥{pw['rate_ratio']:.1f}× rate ratio was "
+            "detectable → UNDERPOWERED",
+            transform=ax.transAxes, fontsize=7.5, color=INK_SECONDARY,
+            va="top", ha="left", zorder=7)
+    ax.set_title(f"F · MEASURED proliferation by model state — 319-gene section,\n"
+                 f"mask '{t2['headline_mask']}', dx={t2['headline_dx']:.0f} µm "
+                 "(the dose_schedule.md configuration)",
+                 fontsize=10, color=INK_PRIMARY, loc="left", pad=8)
+    _style_axes(ax)
+    ax.legend(handles=[Patch(facecolor="#6b6a66", label="MKI67"),
+                       Patch(facecolor="#6b6a66", alpha=0.45, label="TOP2A")],
+              fontsize=7.5, loc="upper right", frameon=False, ncol=2)
+
+    fig.suptitle(
+        "Does the oxygen → cell-state → resistance chain survive contact with "
+        "measured biology? — two real 10x Xenium GBM sections",
+        fontsize=13.5, color=INK_PRIMARY, x=0.055, ha="left", y=0.972)
+    fig.text(0.055, 0.938,
+             f"TEST 1 (simulated O₂ vs measured VEGFA/HIF1A, {t1['n_cells']:,} cells): "
+             f"{v1['verdict']}  ·  "
+             f"TEST 2 (cell states vs measured MKI67/TOP2A, {t2['n_tumor']:,} tumour "
+             f"cells): {v2['verdict']}",
+             fontsize=10, color=INK_PRIMARY, ha="left")
+    fig.text(0.055, 0.905,
+             "The PDE is out-predicted by a one-line distance-to-vessel baseline; "
+             "HIF1A is null; and the proliferation test cannot distinguish a correct "
+             "state model from noise. Two different patients — the tests are "
+             "independent, not corroborating.",
+             fontsize=8.5, color=INK_SECONDARY, ha="left")
+
+    out_path = out_path or os.path.join(_results_dir(), "state_validation.png")
+    fig.savefig(out_path, dpi=140, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    print(f"figure written: {out_path}")
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Report.
+# ---------------------------------------------------------------------------
+def _pmid(entry: Dict[str, object]) -> str:
+    return (f"{entry['citation']} (PMID {entry['pmid']}, "
+            f"doi:{entry['doi']})")
+
+
+def write_report(results: Dict, out_path: Optional[str] = None) -> str:
+    """Write ``results/state_validation.md``. Returns the written path."""
+    t1, t2 = results["test1"], results["test2"]
+    v1, v2 = results["verdict1"], results["verdict2"]
+    guard = results["guard"]
+    preds = t1["sweep"][DX_CONVERGED]["predictors"]
+    L: List[str] = []
+    A = L.append
+
+    # =====================================================================
+    A("# Do the simulated oxygen field and the oxygen-banded cell states carry "
+      "real biology?")
+    A("")
+    A("Two independent falsification tests against MEASURED markers in real GBM "
+      "tissue, on two different open 10x Xenium sections.")
+    A("")
+    A("| | Test 1 — simulated oxygen field | Test 2 — cell-state labelling |")
+    A("|---|---|---|")
+    A(f"| **Verdict** | **{v1['verdict']}** | **{v2['verdict']}** |")
+    A(f"| Section | {t1['dataset']} | {t2['dataset']} |")
+    A(f"| Cells | {t1['n_cells']:,} ({t1['n_genes']}-gene panel) | "
+      f"{t2['n_cells']:,} ({t2['n_tumor']:,} tumour; 319-gene panel) |")
+    A("| Measured against | VEGFA + HIF1A (hypoxia response) | MKI67 + TOP2A "
+      "(proliferation) |")
+    A(f"| Headline statistic | Spearman ρ = "
+      f"{preds['simulated_o2']['rho_score']:+.4f} "
+      f"(p = {t1['perm']['simulated_o2']['p_value']:.5f}) | MKI67+ in VIABLE "
+      f"{100*t2['contrasts']['MKI67']['rates']['VIABLE']['rate']:.2f}% "
+      f"({t2['contrasts']['MKI67']['rates']['VIABLE']['k']}/"
+      f"{t2['contrasts']['MKI67']['rates']['VIABLE']['n']}) |")
+    A(f"| Killer detail | a **one-line distance-to-vessel baseline scores "
+      f"{preds['dist_endothelial']['rho_score']:+.4f}**, i.e. "
+      f"{abs(preds['dist_endothelial']['rho_score']/preds['simulated_o2']['rho_score']):.2f}× "
+      f"the solved field | the test could only have detected a "
+      f"**≥{t2['contrasts']['MKI67']['viable_vs_rest']['power']['rate_ratio']:.1f}× "
+      "rate ratio** |")
+    A("")
+    A("**In one sentence each.** The simulated oxygen field *is* significantly "
+      "anti-correlated with measured hypoxia response, but it is out-predicted by "
+      "a physics-free distance-to-nearest-vessel baseline computed from its own "
+      "inputs — so the reaction–diffusion solve is not what carries the signal. "
+      "And the proliferation test on the 319-gene section is dropout-limited to "
+      "the point where it cannot distinguish a correct cell-state model from "
+      "noise; that is a power failure, not a vindication and not a refutation.")
+    A("")
+    A("> **The two sections are DIFFERENT PATIENTS.** Test 1 and Test 2 are two "
+      "experiments, not two views of one tumour. Nothing here transfers from one "
+      "to the other.")
+    A("")
+
+    # =====================================================================
+    A("## 0. What is under test, and why it matters")
+    A("")
+    A("The chain is: `physics.solve_oxygen` produces an oxygen field → "
+      "`cells.agents.update_cell_states` bands it into HYPOXIC / QUIESCENT / "
+      "VIABLE at `t = OxygenConfig.hypoxia_threshold` = "
+      f"{t2['hypoxia_threshold']} → `cells.pkpd` multiplies drug kill by "
+      f"`PDConfig.hypoxia_resistance` = {t2['pd_config']['hypoxia_resistance']} "
+      f"and `PDConfig.quiescent_resistance` = "
+      f"{t2['pd_config']['quiescent_resistance']}.")
+    A("")
+    A("`results/dose_schedule.md` shows the consequence: for temozolomide — whose "
+      "per-cell sensitivity is uniform 1.0 because MGMT is not on the panel — the "
+      "kill CEILING is *entirely* those two multipliers, and ~89% of it comes from "
+      "the quiescent band alone. If the oxygen field or the banding is wrong, "
+      "every absolute kill number in this repository inherits the error.")
+    A("")
+    A("Both tests drive the **frozen production path** "
+      "(`reconstruct.real_pipeline.reconstruct_real` → `physics.solve_oxygen` → "
+      "`cells.agents.update_cell_states`). Nothing is re-implemented here.")
+    A("")
+
+    # ---- panel guard ----
+    A("### 0.1 Regression guard — the IO panel map did not disturb the 319-gene section")
+    A("")
+    A("Test 1 needs a marker map for the 480-gene Immuno-Oncology panel "
+      "(`reconstruct.marker_panels`), because the brain-panel map collapses that "
+      "section to TUMOR 93.1% / IMMUNE 6.9% with **no ENDOTHELIAL cells at all** — "
+      "and the endothelial cells are the oxygen SOURCE, so that failure would have "
+      "silently produced a supply-free oxygen field. Adding it is only admissible "
+      "if it is inert on the other section:")
+    A("")
+    A("| class | this run | historical reference | drift |")
+    A("|---|---|---|---|")
+    for k, ref_v in guard["reference_percent"].items():
+        A(f"| {k} | {guard['percent'][k]:.2f}% | {ref_v:.2f}% | "
+          f"{abs(guard['percent'][k]-ref_v):.3f} pp |")
+    A("")
+    A(f"`select_marker_map` returns the **same dict object** as "
+      f"`BRAIN_PANEL_MARKER_MAP` for the 319-gene panel "
+      f"(`is` identity: {guard['is_same_map_object']}), so the historical typing is "
+      f"bit-for-bit unchanged. Max drift {guard['max_drift_pct']:.3f} pp. "
+      f"**{'PASS' if guard['pass'] else 'FAIL'}**")
+    A("")
+
+    # =====================================================================
+    A("## 1. TEST 1 — simulated oxygen vs measured hypoxia markers")
+    A("")
+    A(f"**Section.** {t1['dataset']}  ")
+    A(f"**Panel.** {t1['panel']}  ")
+    A(f"**Panel selection.** `{t1['panel_name']}` "
+      f"(marker coverage: {t1['panel_coverage']})  ")
+    A(f"**Cells.** {t1['n_cells']:,} × {t1['n_genes']} gene targets")
+    A("")
+    A("Measured hypoxia-response genes on this panel:")
+    A("")
+    A("| gene | cells with ≥1 transcript |")
+    A("|---|---|")
+    for g in t1["hypoxia_genes_used"]:
+        A(f"| {g} | {100*t1['detection'][g]:.2f}% |")
+    A("")
+    A(f"The two genes correlate with **each other** at Spearman ρ = "
+      f"{t1['gene_gene_rho']:+.4f}. That is close to zero: VEGFA and HIF1A are "
+      "*not* two readouts of one latent 'hypoxia' variable in these data, so the "
+      "composite score is reported alongside — never instead of — the per-gene "
+      "results.")
+    A("")
+
+    # ---- 1.1 the interrupted-run claim
+    A("### 1.1 The interrupted run's claim, adjudicated")
+    A("")
+    A("> *\"VEGFA is the single most anti-correlated gene of all 480 with "
+      "simulated oxygen — but HIF1A is exactly null.\"*")
+    A("")
+    A("**Both halves CONFIRMED.** Every one of the 480 panel genes was "
+      "depth-normalised and rank-correlated against the simulated oxygen at each "
+      f"cell (dx = {DX_CONVERGED:.0f} µm, all {t1['n_cells']:,} cells):")
+    A("")
+    A("| rank (1 = most negative) | gene | ρ vs simulated O₂ | detection |")
+    A("|---|---|---|---|")
+    for i, (g, rho, det) in enumerate(t1["ranking"][:8]):
+        mark = " **←**" if g in t1["hypoxia_genes_used"] else ""
+        A(f"| {i+1} | {g}{mark} | {rho:+.4f} | {100*det:.2f}% |")
+    A("| … | … | … | … |")
+    for g in t1["hypoxia_genes_used"]:
+        rk = t1["rank_of"][g]
+        if rk > 8:
+            rho = dict((a, b) for a, b, _ in t1["ranking"])[g]
+            det = dict((a, c) for a, _, c in t1["ranking"])[g]
+            A(f"| {rk} | {g} **←** | {rho:+.4f} | {100*det:.2f}% |")
+    A("| … | … | … | … |")
+    n_rank = len(t1["ranking"])
+    for off, (g, rho, det) in enumerate(t1["ranking"][-5:][::-1]):
+        A(f"| {n_rank - off} | {g} | {rho:+.4f} | {100*det:.2f}% |")
+    A("")
+    A(f"* **VEGFA is rank 1 of 480** at ρ = "
+      f"{dict((a,b) for a,b,_ in t1['ranking'])['VEGFA']:+.5f}. Of every gene the "
+      "panel measures, the canonical hypoxia-response gene is the one the "
+      "simulated oxygen field most strongly anti-correlates with. That is a real, "
+      "non-trivial hit and it is the strongest positive evidence in this report.")
+    A(f"* **HIF1A is rank {t1['rank_of']['HIF1A']} of 480** at ρ = "
+      f"{dict((a,b) for a,b,_ in t1['ranking'])['HIF1A']:+.5f} — null, and if "
+      "anything the *wrong sign*. This is expected on mechanism, not a surprise: "
+      "HIF-1α is regulated by oxygen-dependent prolyl hydroxylation and "
+      "VHL-mediated proteolysis of the **protein** "
+      f"({_pmid(LITERATURE_HIF1A_POSTTRANSLATIONAL[0])}; "
+      f"{_pmid(LITERATURE_HIF1A_POSTTRANSLATIONAL[1])}), so its mRNA has no "
+      "obligation to track oxygen. HIF1A mRNA should not have been treated as a "
+      "hypoxia readout in the first place, and the composite score is diluted by "
+      "including it.")
+    A("")
+    A("**The circularity, stated plainly.** The positive end of that table is the "
+      "vascular and myeloid programme — RGS5, FLT1, PDGFRB, A2M, IGFBP7, CD163. "
+      "`FLT1` is one of the three ENDOTHELIAL markers that *builds* the oxygen "
+      "source term, so its positive correlation is partly the model correlating "
+      "with itself. Only the NEGATIVE end of the ranking is informative, which is "
+      "why VEGFA's rank-1 position is the claim worth making.")
+    A("")
+    A("VEGFA is the right measured readout here: "
+      f"{_pmid(LITERATURE_VEGF_HYPOXIA)} — *{LITERATURE_VEGF_HYPOXIA['claim']}*.")
+    A("")
+
+    # ---- 1.2 (a) the correlation and the trivial baseline
+    A("### 1.2 (a) Is simulated oxygen anti-correlated with measured hypoxia — "
+      "and does it beat a trivial baseline?")
+    A("")
+    A("Per-cell Spearman ρ against the measured hypoxia score (mean z of "
+      "depth-normalised VEGFA and HIF1A), computed on **all "
+      f"{t1['n_cells']:,} cells** at dx = {DX_CONVERGED:.0f} µm. Every predictor "
+      "is sign-aligned to oxygen (larger = better perfused), so a correct "
+      "predictor gives a NEGATIVE ρ.")
+    A("")
+    A("| predictor | what it is | ρ vs hypoxia score | ρ vs VEGFA | ρ vs HIF1A | "
+      "ρ with log-depth partialled out |")
+    A("|---|---|---|---|---|---|")
+    order = ["simulated_o2", "vascular_kde", "dist_endothelial", "local_cell_density"]
+    for key in order:
+        p = preds[key]
+        name = ("**SIMULATED O₂ (the PDE)**" if key == "simulated_o2"
+                else f"{key}")
+        A(f"| {name} | {p['what']} | **{p['rho_score']:+.4f}** | "
+          f"{p['rho_VEGFA']:+.4f} | {p['rho_HIF1A']:+.4f} | "
+          f"{p['partial_rho_depth_removed']:+.4f} |")
+    A("")
+    A(f"Permutation p-values (label shuffling, {t1['n_perm']:,} draws on a seeded "
+      f"random subsample of {t1['perm_subsample_n']:,} cells — subsampled because "
+      "the kernel is O(n × draws); every effect size above is on the full "
+      "population, so subsampling can only make a p-value *more* conservative):")
+    A("")
+    A("| predictor | ρ on the subsample | permutation p |")
+    A("|---|---|---|")
+    for key, pv in t1["perm"].items():
+        A(f"| {key} | {pv['rho']:+.4f} | {pv['p_value']:.5f} |")
+    A("")
+    A(f"**The answer to (a) is yes — and it does not matter.** The simulated field "
+      f"is genuinely, significantly anti-correlated with measured hypoxia response "
+      f"(ρ = {preds['simulated_o2']['rho_score']:+.4f}, "
+      f"p = {t1['perm']['simulated_o2']['p_value']:.5f}, floor of the estimator). "
+      "But so is every trivial baseline built from the same inputs, and two of "
+      "them do it BETTER:")
+    A("")
+    de = preds["dist_endothelial"]["rho_score"]
+    vk = preds["vascular_kde"]["rho_score"]
+    so = preds["simulated_o2"]["rho_score"]
+    A(f"* **`dist_endothelial` ({de:+.4f}) beats the PDE ({so:+.4f}) by "
+      f"{100*(abs(de)/abs(so)-1):.0f}%.** One `cKDTree` query — the distance from "
+      "each cell to the nearest endothelial cell — predicts measured VEGFA/HIF1A "
+      "better than the reaction–diffusion solve does.")
+    A(f"* **`vascular_kde` ({vk:+.4f}) also beats the PDE.** That is the solver's "
+      "OWN SOURCE TERM, sampled before it is diffused. The solve takes a field "
+      f"correlating at {vk:+.4f} and returns one correlating at {so:+.4f}: the "
+      "diffusion step *destroys* predictive information rather than adding it.")
+    A(f"* **`local_cell_density` ({preds['local_cell_density']['rho_score']:+.4f}) "
+      "is near zero**, which is the sanity floor — not every spatial variable "
+      "correlates with the marker, so the effects above are real signal, not "
+      "autocorrelation artefacts.")
+    A("")
+    nested = t1["sweep"][DX_CONVERGED]["nested"]
+    A("**Nested test — does the PDE add anything beyond the raw geometry?**")
+    A("")
+    A("| partial Spearman | ρ |")
+    A("|---|---|")
+    A(f"| hypoxia score vs **simulated O₂**, distance-to-vessel held fixed | "
+      f"{nested['score_vs_simo2_given_dist']:+.4f} |")
+    A(f"| hypoxia score vs **−distance-to-vessel**, simulated O₂ held fixed | "
+      f"{nested['score_vs_dist_given_simo2']:+.4f} |")
+    A(f"| simulated O₂ vs −distance-to-vessel (how nested the two predictors are) | "
+      f"{nested['simo2_vs_dist']:+.4f} |")
+    A("")
+    A("Distance-to-vessel retains "
+      f"{abs(nested['score_vs_dist_given_simo2']):.4f} of explanatory power after "
+      "the simulated field is conditioned out; the simulated field retains only "
+      f"{abs(nested['score_vs_simo2_given_dist']):.4f} after distance is "
+      "conditioned out. **The PDE is the redundant variable in that pair.**")
+    A("")
+    A(f"**Depth control.** The simulated field correlates with total transcript "
+      f"count — a purely technical variable — at ρ = {t1['o2_vs_depth_rho']:+.4f}. "
+      "Partialling log-depth out of the table above changes nothing material "
+      f"(simulated O₂ goes {so:+.4f} → "
+      f"{preds['simulated_o2']['partial_rho_depth_removed']:+.4f}; distance goes "
+      f"{de:+.4f} → {preds['dist_endothelial']['partial_rho_depth_removed']:+.4f}), "
+      "so the ordering is not a depth artefact.")
+    A("")
+
+    # ---- 1.3 (b) state enrichment
+    A("### 1.3 (b) Are model-HYPOXIC cells enriched for measured VEGFA/HIF1A "
+      "vs model-VIABLE?")
+    A("")
+    frac = t1["sweep"][DX_CONVERGED]["fractions_all"]
+    A("State occupancy on this section at dx = "
+      f"{DX_CONVERGED:.0f} µm (all cells): " + ", ".join(
+          f"**{s}** {100*frac[s]:.2f}%" for s in STATE_ORDER) + ".")
+    A("")
+    A("| marker | contrast | n (A vs B) | mean A | mean B | Cohen's d | "
+      "Cliff's δ | permutation p |")
+    A("|---|---|---|---|---|---|---|---|")
+    for label in ["hypoxia_score"] + list(t1["hypoxia_genes_used"]):
+        for cname in ("hypoxic_vs_viable", "hypoxic_vs_quiescent",
+                      "hypoxic_vs_viable_TUMOUR"):
+            b = t1["enrichment"][label][cname]
+            A(f"| {label} | {cname.replace('_',' ')} | {b['n_a']:,} vs {b['n_b']:,} | "
+              f"{b['mean_a']:+.4f} | {b['mean_b']:+.4f} | **{b['cohens_d']:+.4f}** | "
+              f"{b['cliffs_delta']:+.4f} | {b['p_value']:.5f} |")
+    A("")
+    A("Depth-stratified control (labels permuted **within** total-transcript "
+      "deciles, so only comparably-deep cells are ever compared):")
+    A("")
+    A("| marker | HYPOXIC vs VIABLE, depth-stratified difference | p |")
+    A("|---|---|---|")
+    for label in ["hypoxia_score"] + list(t1["hypoxia_genes_used"]):
+        b = t1["enrichment"][label]["hypoxic_vs_viable_depth_stratified"]
+        A(f"| {label} | {b['observed']:+.5f} | {b['p_value']:.5f} |")
+    A("")
+    vd = t1["enrichment"]["VEGFA"]["hypoxic_vs_viable"]
+    hd = t1["enrichment"]["HIF1A"]["hypoxic_vs_viable"]
+    A(f"**The answer to (b) is yes for VEGFA, no for HIF1A.** Model-HYPOXIC cells "
+      f"carry substantially more measured VEGFA than model-VIABLE cells "
+      f"(d = {vd['cohens_d']:+.3f}, Cliff's δ = {vd['cliffs_delta']:+.3f}, "
+      f"p = {vd['p_value']:.5f}), and the effect survives depth stratification. "
+      f"For HIF1A the same contrast is only d = {hd['cohens_d']:+.3f}, and the "
+      "tumour-only version is not significant at all "
+      f"(p = {t1['enrichment']['HIF1A']['hypoxic_vs_viable_TUMOUR']['p_value']:.5f}).")
+    A("")
+    A("**Two things blunt this result.** First, the VIABLE group holds only "
+      f"{vd['n_b']:,} of {t1['n_cells']:,} cells "
+      f"({100*vd['n_b']/t1['n_cells']:.3f}%), so \"HYPOXIC vs VIABLE\" is a "
+      "comparison against a sliver. The better-balanced HYPOXIC-vs-QUIESCENT "
+      f"contrast is far weaker "
+      f"(VEGFA d = {t1['enrichment']['VEGFA']['hypoxic_vs_quiescent']['cohens_d']:+.3f}, "
+      f"HIF1A d = "
+      f"{t1['enrichment']['HIF1A']['hypoxic_vs_quiescent']['cohens_d']:+.3f}). "
+      "Second — and decisively — §1.2 already showed the same separation is "
+      "obtained, more strongly, by thresholding distance-to-vessel. A large "
+      "Cohen's d here is evidence that the *bands* sit somewhere sensible in "
+      "space, not that the PDE computed them.")
+    A("")
+
+    # ---- 1.4 (c) spatial / field-level
+    A("### 1.4 (c) Field-vs-field agreement on the grid")
+    A("")
+    A("The per-cell test is dominated by single-cell dropout. Averaging both "
+      f"fields over fixed {TILE_UM:.0f} µm tissue tiles (≥{TILE_MIN_CELLS} measured "
+      "cells per tile) suppresses that noise and asks the coarser question: does "
+      "a REGION the model calls hypoxic express more hypoxia response? Tiles are "
+      "a fixed physical size at every dx, so the three rows are comparable to each "
+      "other rather than to the mesh.")
+    A("")
+    A("| dx (µm) | grid | tiles used | Spearman ρ | Pearson r |")
+    A("|---|---|---|---|---|")
+    for dx in DX_SWEEP:
+        tl = t1["sweep"][dx]["tiles"]
+        g = t1["sweep"][dx]["grid"]
+        A(f"| {dx:.0f} | {g[0]}×{g[1]} | {tl['n_tiles']:,} | {tl['rho']:+.4f} | "
+          f"{tl['pearson']:+.4f} |")
+    A("")
+    A("Agreement is ~2.4× stronger at the field level "
+      f"(ρ ≈ {t1['sweep'][DX_CONVERGED]['tiles']['rho']:+.3f} vs "
+      f"{so:+.3f} per cell), which is the expected signature of per-cell dropout "
+      "rather than of a better model. It is the most favourable framing of the "
+      "test and it is reported as such.")
+    A("")
+
+    # ---- 1.5 (d) dx dependence
+    A("### 1.5 (d) Does agreement improve as the grid is refined?")
+    A("")
+    A("**No — it is flat to four decimal places.**")
+    A("")
+    A("| dx (µm) | grid | mean O₂ (tissue) | HYPOXIC / QUIESCENT / VIABLE (all cells) | "
+      "ρ(sim O₂, hypoxia score) | ρ(dist-to-vessel, hypoxia score) |")
+    A("|---|---|---|---|---|---|")
+    for dx in DX_SWEEP:
+        s = t1["sweep"][dx]
+        f = s["fractions_all"]
+        A(f"| {dx:.0f} | {s['grid'][0]}×{s['grid'][1]} | "
+          f"{s['mean_oxygen_tissue']:.4f} | "
+          + " / ".join(f"{100*f[k]:.2f}%" for k in STATE_ORDER)
+          + f" | {s['predictors']['simulated_o2']['rho_score']:+.4f} | "
+          f"{s['predictors']['dist_endothelial']['rho_score']:+.4f} |")
+    A("")
+    A("This is the *good* news about the numerics and the *bad* news about the "
+      "model. With the geometric tissue mask and the areal oxygen sink both in "
+      "place, the field is genuinely grid-converged: mean O₂ moves by 0.2% and "
+      "the correlation by <0.0002 over a 2.5× range of dx. So the disagreement "
+      "with measured biology is **not** a resolution problem — refining the mesh "
+      "cannot rescue it. The model has converged onto an answer that a "
+      "distance transform beats.")
+    A("")
+
+    # ---- 1.6 verdict
+    A("### 1.6 Verdict — Test 1")
+    A("")
+    A(f"## **{v1['verdict']}**")
+    A("")
+    for reason in v1["reasons"]:
+        A(f"* {reason}")
+    A("")
+    A("**Consequences, stated plainly.**")
+    A("")
+    A("1. **The oxygen field is not falsified — it is out-competed.** Its sign is "
+      "right, its significance is overwhelming, and VEGFA being its rank-1 "
+      "anti-correlate out of 480 genes is a genuine hit. But the reaction–"
+      "diffusion solve is not what produces that hit: its own undiffused source "
+      "term and a plain distance transform both do better. Whatever the PDE is "
+      "adding, it is not predictive accuracy about hypoxia.")
+    A("2. **Hypoxia-driven resistance in the kill model is therefore not "
+      "supported *as physics*.** The `PDConfig.hypoxia_resistance` multiplier is "
+      "applied to cells selected by a field that a one-line geometric heuristic "
+      "selects better. Any kill number that leans on the *spatial pattern* of "
+      "hypoxia is, at best, an expensive re-derivation of \"far from a vessel\".")
+    A("3. **Hypoxia should be derived from measured markers where they exist.** On "
+      "a section that measures VEGFA, the defensible per-cell hypoxia covariate is "
+      "the measured VEGFA level, not the simulated oxygen — and where no such "
+      "marker is on the panel (the 319-gene section: no VEGFA, no CA9, no ADM, no "
+      "NDRG1, no SLC2A1), the honest statement is that hypoxia is **unmeasured**, "
+      "not that it has been simulated.")
+    A("4. **Drop HIF1A from any hypoxia score.** Its mRNA is null against the "
+      "field (rank "
+      f"{t1['rank_of']['HIF1A']}/{len(t1['ranking'])}) for a known mechanistic "
+      "reason, and including it dilutes the composite from ρ ≈ "
+      f"{preds['simulated_o2']['rho_VEGFA']:+.3f} (VEGFA alone) to "
+      f"{so:+.3f}.")
+    A("5. **The absolute oxygen level remains uncalibrated.** Nothing here tests "
+      "it. `OxygenConfig.consumption` has never been fitted to a measured oxygen "
+      "tension, and on this section the model calls "
+      f"{100*frac['HYPOXIC']:.1f}% of all cells HYPOXIC while on the 319-gene "
+      "section under the shipping mask it calls 0.0% hypoxic (§2.2). Those two "
+      "numbers cannot both be right.")
+    A("")
+
+    # =====================================================================
+    A("## 2. TEST 2 — cell-state model vs measured proliferation")
+    A("")
+    A(f"**Section.** {t2['dataset']}  ")
+    A(f"**Panel.** {t2['panel']}  ")
+    A(f"**Cells.** {t2['n_cells']:,} total, {t2['n_tumor']:,} tumour  ")
+    A(f"**Headline configuration.** tissue mask `{t2['headline_mask']}`, "
+      f"dx = {t2['headline_dx']:.0f} µm — *the configuration "
+      "`results/dose_schedule.md` actually ran under*, which is the one whose kill "
+      "ceilings are at stake.")
+    A("")
+
+    # ---- 2.1 measured proliferating fraction
+    A("### 2.1 The measured proliferating fraction, under two documented rules")
+    A("")
+    A("| marker | cells at exactly 0 | rule `nonzero` (count ≥ 1) | "
+      f"rule `percentile` (top {100-PERCENTILE_RULE_Q:.0f}% of depth-normalised "
+      "expression) |")
+    A("|---|---|---|---|")
+    for g in PROLIFERATION_MARKERS:
+        m = t2["markers"][g]
+        if not m.get("nonzero"):
+            A(f"| {g} | — | NOT ON PANEL | NOT ON PANEL |")
+            continue
+        deg = " — **DEGENERATE**" if m["percentile"]["degenerate"] else ""
+        A(f"| {g} | {100*m['zero_fraction']:.2f}% | "
+          f"{100*m['nonzero']['fraction']:.3f}% "
+          f"({m['nonzero']['n_positive']}/{m['n_cells']:,}) | "
+          f"{100*m['percentile']['fraction']:.3f}%{deg} |")
+    A("")
+    A(f"**The percentile rule is mathematically degenerate on this panel, and that "
+      f"IS the result.** The rule was written to bracket the published Ki-67 index "
+      f"— \"call the top {100-PERCENTILE_RULE_Q:.0f}% of cells proliferating\" — "
+      "but with >98.9% of tumour cells at exactly zero counts, the "
+      f"{PERCENTILE_RULE_Q:.0f}th percentile of expression *is* zero. The "
+      "threshold falls inside a tie mass at the origin and the rule collapses back "
+      "onto `count ≥ 1`. There is no percentile of this data that corresponds to a "
+      "Ki-67 index, because the data does not reach that far.")
+    A("")
+    lo_lit, hi_lit = t2["literature_ki67_range_pct"]
+    mki_frac = t2["markers"]["MKI67"]["nonzero"]["fraction"]
+    A("**Against the literature.** Published Ki-67 labelling indices in "
+      "glioblastoma (PubMed, all verified):")
+    A("")
+    A("| cohort | Ki-67 index | source |")
+    A("|---|---|---|")
+    for e in LITERATURE_KI67:
+        A(f"| {e['label']} | {e['value_pct']:.0f}% | {e['citation']} "
+          f"(PMID {e['pmid']}, doi:{e['doi']}) |")
+    A("")
+    A(f"The panel detects MKI67 in **{100*mki_frac:.3f}%** of tumour cells — "
+      f"**{lo_lit/(100*mki_frac):.0f}× to {hi_lit/(100*mki_frac):.0f}× below** the "
+      "published range. This is not a claim that this tumour has a Ki-67 index of "
+      "0.44%; it is a statement about probe sensitivity and transcript dropout on "
+      "a targeted in-situ panel. The reference standard is itself imprecise "
+      f"({_pmid(LITERATURE_KI67_VARIABILITY)} — {LITERATURE_KI67_VARIABILITY['claim']}), "
+      "but not by two orders of magnitude.")
+    A("")
+    A("**Model VIABLE fraction, for comparison.** "
+      f"{100*t2['dx_dependence'][t2['headline_mask']][t2['headline_dx']]['fractions']['VIABLE']:.2f}% "
+      "in the headline configuration, but "
+      f"{t2['viable_fraction_range_pct'][0]:.2f}% – "
+      f"{t2['viable_fraction_range_pct'][1]:.2f}% across the mask × dx grid (§2.2). "
+      "**Do not read any agreement between \"model VIABLE %\" and \"MKI67-detected "
+      "%\" as corroboration** — it would be a coincidence between two unrelated "
+      "small numbers, one of which is a bookkeeping artefact and the other a "
+      "dropout rate.")
+    A("")
+
+    # ---- 2.2 the state vector is a bookkeeping choice
+    A("### 2.2 The model's state vector is set by bookkeeping, not by tissue")
+    A("")
+    A("| tissue mask | dx (µm) | mean O₂ (tissue) | HYPOXIC | QUIESCENT | VIABLE |")
+    A("|---|---|---|---|---|---|")
+    for mode in TISSUE_MASK_MODES:
+        for dx in DX_SWEEP:
+            row = t2["dx_dependence"][mode][dx]
+            f = row["fractions"]
+            star = " ←" if (mode, dx) == (t2["headline_mask"], t2["headline_dx"]) else ""
+            A(f"| `{mode}`{star} | {dx:.0f} | {row['mean_oxygen_tissue']:.4f} | "
+              + " | ".join(f"{100*f[k]:.2f}%" for k in STATE_ORDER) + " |")
+    A("")
+    A("Read that table before reading any statistic below it. The tumour-cell "
+      f"VIABLE fraction runs from {t2['viable_fraction_range_pct'][0]:.2f}% to "
+      f"{t2['viable_fraction_range_pct'][1]:.2f}% — a "
+      f"{t2['viable_fraction_range_pct'][1]/max(t2['viable_fraction_range_pct'][0],1e-9):.0f}× "
+      "swing — across two tissue-mask conventions and three grid spacings. "
+      "**Neither the mask nor the mesh is a measurement.** Under the current "
+      "shipping default (`geometric`) the HYPOXIC state is *empty at every dx*, so "
+      "`PDConfig.hypoxia_resistance` has no cells to act on at all; the 86% "
+      "QUIESCENT / 13.4% HYPOXIC split that `results/dose_schedule.md` quotes comes "
+      "from the legacy `occupancy` mask, whose coverage shrinks as the mesh is "
+      "refined. Those kill ceilings are conditional on a convention that the "
+      "reconstruction layer has since abandoned.")
+    A("")
+
+    # ---- 2.3 the contrast + power
+    A("### 2.3 Are model-VIABLE cells more proliferative? — and could we have told?")
+    A("")
+    A("| marker | state | rate | k / n | Wilson 95% CI |")
+    A("|---|---|---|---|---|")
+    for g in PROLIFERATION_MARKERS:
+        if g not in t2["contrasts"]:
+            continue
+        for s in STATE_ORDER:
+            rr = t2["contrasts"][g]["rates"][s]
+            if not rr["n"]:
+                A(f"| {g} | {s} | — | 0 / 0 | state is empty |")
+                continue
+            A(f"| {g} | {s} | {100*rr['rate']:.3f}% | {rr['k']} / {rr['n']:,} | "
+              f"{100*rr['lo']:.3f}–{100*rr['hi']:.3f}% |")
+    A("")
+    A("| marker | contrast | Cohen's d | Cliff's δ | permutation p | "
+      "depth-stratified p | MINIMUM DETECTABLE rate ratio | expected positives |")
+    A("|---|---|---|---|---|---|---|---|")
+    for g in PROLIFERATION_MARKERS:
+        if g not in t2["contrasts"]:
+            continue
+        b = t2["contrasts"][g]
+        for cname, skey in (("VIABLE vs rest", "viable_vs_rest"),
+                            ("HYPOXIC vs QUIESCENT", "hypoxic_vs_quiescent")):
+            c = b[skey]
+            dsk = ("viable_vs_rest_depth_stratified" if skey == "viable_vs_rest"
+                   else "hypoxic_vs_quiescent_depth_stratified")
+            A(f"| {g} | {cname} | {c['cohens_d']:+.4f} | {c['cliffs_delta']:+.4f} | "
+              f"{c['p_value']:.4f} | {b[dsk]['p_value']:.4f} | "
+              f"**{c['power']['rate_ratio']:.2f}×** | "
+              f"{c['power']['expected_positives']:.1f} |")
+    A("")
+    A("**The power analysis is the result.** The \"minimum detectable rate ratio\" "
+      f"column is the smallest enrichment the contrast could have found at "
+      f"α = {MDE_ALPHA}, power = {MDE_POWER} given the observed positivity rate and "
+      "the group sizes.")
+    A("")
+    pw = t2["contrasts"]["MKI67"]["viable_vs_rest"]["power"]
+    A(f"* For **MKI67, VIABLE vs rest**, the VIABLE group holds "
+      f"{pw['n_group']} tumour cells and would contain "
+      f"{pw['expected_positives']:.1f} MKI67-positive cells under the null. The "
+      f"test could only have detected a **≥{pw['rate_ratio']:.1f}× rate ratio**.")
+    A(f"* The measured biology this is supposed to detect is nowhere near that "
+      f"size: {_pmid(LITERATURE_HYPOXIA_PROLIFERATION)} measured that hypoxic "
+      "pseudopalisading GBM cells are *5–50% LESS* proliferative than adjacent "
+      "astrocytoma — a rate ratio of roughly 0.5–0.95, i.e. a **depletion of at "
+      f"most 2×**. A test that needs {pw['rate_ratio']:.1f}× to fire cannot see "
+      "an effect of that size in either direction.")
+    A("* Therefore **no conclusion about the VIABLE label can be drawn from this "
+      "section.** Not \"the state model is wrong\"; not \"the state model is "
+      "right\". The measurement is not capable of adjudicating it.")
+    A("")
+    vr = t2["contrasts"]["MKI67"]["rates"]["VIABLE"]
+    vrest = t2["contrasts"]["MKI67"]
+    A("**A positive result is visible, and it must not be believed.** The point "
+      f"estimate for MKI67 goes the RIGHT way — {100*vr['rate']:.2f}% positive in "
+      f"VIABLE against {100*vrest['overall_rate']:.3f}% section-wide, a "
+      f"{vr['rate']/vrest['overall_rate']:.1f}× rate ratio, permutation "
+      f"p = {vrest['viable_vs_rest']['p_value']:.4f}, surviving depth "
+      f"stratification (p = "
+      f"{vrest['viable_vs_rest_depth_stratified']['p_value']:.4f}). It rests on "
+      f"**{vr['k']} positive cells out of {vr['n']}**. Its Wilson interval spans "
+      f"{100*vr['lo']:.2f}–{100*vr['hi']:.2f}%, one Poisson fluctuation moves it "
+      f"from {vr['k']} to 2 or 7, and TOP2A — the other proliferation marker on "
+      "the same cells — shows nothing "
+      f"({100*t2['contrasts']['TOP2A']['rates']['VIABLE']['rate']:.2f}%, "
+      f"{t2['contrasts']['TOP2A']['rates']['VIABLE']['k']}/"
+      f"{t2['contrasts']['TOP2A']['rates']['VIABLE']['n']}, p = "
+      f"{t2['contrasts']['TOP2A']['viable_vs_rest']['p_value']:.4f}). This is "
+      "precisely the regime the minimum-detectable-effect calculation says is "
+      "uninterpretable, and reporting it as support would be the exact error this "
+      "module exists to prevent.")
+    A("")
+    A("**What the test CAN rule out.** The better-powered "
+      f"HYPOXIC-vs-QUIESCENT contrast (n = "
+      f"{t2['contrasts']['MKI67']['rates']['HYPOXIC']['n']:,} vs "
+      f"{t2['contrasts']['MKI67']['rates']['QUIESCENT']['n']:,}) needs only "
+      f"{t2['contrasts']['MKI67']['hypoxic_vs_quiescent']['power']['rate_ratio']:.2f}× "
+      "for MKI67 and "
+      f"{t2['contrasts']['TOP2A']['hypoxic_vs_quiescent']['power']['rate_ratio']:.2f}× "
+      "for TOP2A, which is inside the plausible range. It rules out a **large** "
+      "proliferation deficit in the model's HYPOXIC band — and it does so in the "
+      "wrong direction:")
+    A("")
+    for g in PROLIFERATION_MARKERS:
+        if g not in t2["contrasts"]:
+            continue
+        rr = t2["contrasts"][g]["rates"]
+        if rr["HYPOXIC"]["n"] and rr["QUIESCENT"]["n"]:
+            A(f"* **{g}+ is HIGHER in model-HYPOXIC "
+              f"({100*rr['HYPOXIC']['rate']:.3f}%, {rr['HYPOXIC']['k']}/"
+              f"{rr['HYPOXIC']['n']:,}) than in model-QUIESCENT "
+              f"({100*rr['QUIESCENT']['rate']:.3f}%, {rr['QUIESCENT']['k']}/"
+              f"{rr['QUIESCENT']['n']:,})** — the opposite of the measured biology. "
+              f"Permutation p = "
+              f"{t2['contrasts'][g]['hypoxic_vs_quiescent']['p_value']:.4f}; "
+              "depth-stratified p = "
+              f"{t2['contrasts'][g]['hypoxic_vs_quiescent_depth_stratified']['p_value']:.4f}.")
+    A("")
+    A("Neither reversal is large, and both sit close to the depth-stratification "
+      "boundary, so this is a weak contradiction rather than a strong one. But it "
+      "is a contradiction, and it points the same way as the continuous test:")
+    A("")
+    A("| continuous test | Spearman ρ | p | ρ with log-depth removed |")
+    A("|---|---|---|---|")
+    for g in PROLIFERATION_MARKERS:
+        if g not in t2["contrasts"]:
+            continue
+        c = t2["contrasts"][g]["o2_continuous"]
+        A(f"| simulated O₂ vs {g} (per tumour cell) | {c['rho']:+.4f} | "
+          f"{c['p_value']:.4f} | {c['partial_rho_depth_removed']:+.4f} |")
+    A("")
+    A("Rank-correlating the **simulated oxygen** against measured proliferation "
+      "across all "
+      f"{t2['n_tumor']:,} tumour cells — the best-powered version of the question, "
+      "because it uses every cell and does not depend on where the band edges fall "
+      "— returns essentially nothing, with a *positive* sign where a negative one "
+      "was not expected either. The oxygen field carries no per-cell proliferation "
+      "information on this section.")
+    A("")
+
+    # ---- 2.4 dx dependence of the contrast
+    A("### 2.4 dx-dependence of the Test 2 contrast")
+    A("")
+    A("| mask | dx (µm) | VIABLE fraction | MKI67+ in VIABLE | MKI67+ elsewhere | "
+      "min. detectable rate ratio |")
+    A("|---|---|---|---|---|---|")
+    for mode in TISSUE_MASK_MODES:
+        for dx in DX_SWEEP:
+            row = t2["dx_dependence"][mode][dx]
+            if "MKI67" not in row:
+                continue
+            A(f"| `{mode}` | {dx:.0f} | "
+              f"{100*row['fractions']['VIABLE']:.2f}% | "
+              f"{100*row['MKI67']['viable_rate']:.3f}% | "
+              f"{100*row['MKI67']['nonviable_rate']:.3f}% | "
+              f"{row['MKI67']['power']['rate_ratio']:.1f}× |")
+    A("")
+    A("The measured MKI67+ rate inside the model's VIABLE band is ~0.44–0.46% at "
+      "five of the six configurations — i.e. **indistinguishable from the "
+      "section-wide rate of "
+      f"{100*mki_frac:.3f}%** — because at those settings VIABLE contains 74–98% "
+      "of the tumour and the \"contrast\" is a population against itself. Only in "
+      "the sixth configuration (the dose_schedule one) does VIABLE become small "
+      "enough to be a real subgroup, and there it is too small to test. There is "
+      "no dx at which this comparison is both meaningful and powered.")
+    A("")
+
+    # ---- 2.5 verdict
+    A("### 2.5 Verdict — Test 2")
+    A("")
+    A(f"## **{v2['verdict']}**")
+    A("")
+    for reason in v2["reasons"]:
+        A(f"* {reason}")
+    A("")
+    A("**Consequences, stated plainly.**")
+    A("")
+    A("1. **The quiescent labelling is UNSUPPORTED — in the specific sense that it "
+      "has not been, and on this section cannot be, tested.** The measurement that "
+      "would adjudicate it is 40–90× too insensitive. Nobody should read this as "
+      "clearance.")
+    A("2. **The kill ceilings inherit that.** `results/dose_schedule.md` derives "
+      "~89% of the temozolomide kill ceiling from the quiescent band, via a "
+      f"×{t2['pd_config']['quiescent_resistance']} multiplier applied to a label "
+      "with no measured support and a "
+      f"{t2['viable_fraction_range_pct'][1]/max(t2['viable_fraction_range_pct'][0],1e-9):.0f}× "
+      "convention-dependent size. Every absolute kill fraction and every ceiling "
+      "in that report carries an unquantified error of that magnitude. The "
+      "dose/schedule **comparisons** are far more robust — they share the same "
+      "multiplier and it largely cancels — but the **levels** are not defensible "
+      "as measurements.")
+    A("3. **The one thing the data does say points the wrong way.** In the "
+      "better-powered HYPOXIC-vs-QUIESCENT contrast, both measured proliferation "
+      "markers are *higher* in the model's HYPOXIC band. That is the opposite of "
+      f"the measured tissue biology ({LITERATURE_HYPOXIA_PROLIFERATION['citation']}, "
+      f"PMID {LITERATURE_HYPOXIA_PROLIFERATION['pmid']}).")
+    A("4. **What would fix it.** Either (a) a proliferation readout with a real "
+      "detection rate — IHC/IF Ki-67 on a serial section, or a whole-"
+      "transcriptome platform — or (b) derive the state labels from measured "
+      "markers (a per-cell proliferation score) instead of from the simulated "
+      "oxygen, and report the states as *observed* rather than *predicted*.")
+    A("")
+
+    # =====================================================================
+    A("## 3. Caveats — what could make these conclusions wrong")
+    A("")
+    A("1. **The two sections are different patients.** "
+      f"Test 1 runs on `{t1['sample']}` ({t1['n_cells']:,} cells, IO panel); "
+      f"Test 2 on `{t2['sample']}` ({t2['n_cells']:,} cells, brain panel). They "
+      "are different tumours with different vascular architectures and different "
+      "panels. Nothing here is a paired observation, and the two verdicts do not "
+      "reinforce each other.")
+    A("2. **VEGFA and HIF1A are hypoxia-RESPONSE genes, not an oxygen tension.** "
+      "They are the transcriptional output of a pathway with its own kinetics and "
+      "its own non-hypoxic inducers. A simulated field could be a perfectly good "
+      "oxygen tension and still correlate weakly with them. What the trivial-"
+      "baseline control establishes is narrower and safer: *whatever* VEGFA is "
+      "reporting, a distance transform predicts it better than the PDE does — and "
+      "that comparison is internal, so it is immune to this caveat.")
+    A(f"3. **Targeted-panel dropout.** A zero is \"no probe fired\", not \"no "
+      f"transcript\". This is fatal for Test 2 (MKI67 at "
+      f"{100*mki_frac:.2f}%) and merely limiting for Test 1 (VEGFA at "
+      f"{100*t1['detection']['VEGFA']:.1f}%, which is why Test 1 is powered and "
+      "Test 2 is not).")
+    A("4. **Typing circularity.** `FLT1` and `PLVAP` are IO-panel ENDOTHELIAL "
+      "markers, so they help build the oxygen source; the positive tail of the "
+      "480-gene ranking is partly the model correlating with its own inputs. "
+      "`MKI67` is one of the four brain-panel TUMOR markers, so an MKI67-high cell "
+      "is marginally more likely to be typed TUMOR — that inflates the MKI67+ rate "
+      "*uniformly across states*, so it cannot manufacture a between-state "
+      "contrast, but it does inflate the marginal rate slightly.")
+    A("5. **`SLC1A3`/`S100B`/`PTN` (the IO STROMAL class) are expressed by "
+      "malignant astrocyte-like glioma cells too**, so the IO section's STROMAL "
+      "compartment is not clean. The brain panel's `AQP4`/`GJA1` have the same "
+      "ambiguity, so the two sections are consistently rather than differently "
+      "wrong here.")
+    A("6. **Pericytes are unlabelled on the IO section.** The panel measures "
+      "`RGS5`/`PDGFRB`/`NOTCH3` but `CellType` has no MURAL member, so mural cells "
+      "fall into the ungated TUMOR default. That inflates the tumour count and "
+      "hence the oxygen sink.")
+    A("7. **The absolute oxygen level is uncalibrated.** "
+      "`OxygenConfig.consumption` has never been fitted against a measured oxygen "
+      "tension. The two sections disagree by orders of magnitude in hypoxic "
+      f"fraction ({100*frac['HYPOXIC']:.1f}% of IO cells vs 0.0% of brain-panel "
+      "cells under the shipping mask), which is a statement about the sink "
+      "constant and the cell density, not about the two tumours.")
+    A("8. **Subsampling.** Permutation p-values on the IO section use a seeded "
+      f"random subsample of {t1['perm_subsample_n']:,} of {t1['n_cells']:,} cells "
+      f"with {t1['n_perm']:,} draws. All effect sizes and all Spearman ρ are on "
+      "the full population. Subsampling the null can only make a p-value more "
+      "conservative, and every p reported here is already at the estimator's "
+      "resolution floor.")
+    A("")
+
+    # =====================================================================
+    A("## 4. Reproduction")
+    A("")
+    A("```bash")
+    A("python -m tmesim.validation.state_validation")
+    A("```")
+    A("")
+    A("Deterministic: the only randomness is the seeded permutation / subsampling "
+      f"(`PERM_SEED = {PERM_SEED}`). Runtime ~8 minutes, dominated by six "
+      "reconstructions of the 816,769-cell IO section and the 480-gene correlation "
+      "scan.")
+    A("")
+    A("**Files added by this validation (nothing else was modified):**")
+    A("")
+    A("* `tmesim/validation/state_validation.py` — this analysis")
+    A("* `tmesim/reconstruct/marker_panels.py` — the panel-aware marker map "
+      "(regression-guarded in §0.1)")
+    A("* `results/state_validation.md`, `results/state_validation.png`")
+    A("")
+    A("**Data provenance.** Both sections are open 10x Genomics Xenium datasets, "
+      "CC BY 4.0, no login or DUA:")
+    A("")
+    A(f"* Test 1 — {t1['dataset']}; panel: {t1['panel']}")
+    A(f"* Test 2 — {t2['dataset']}; panel: {t2['panel']}")
+    A("")
+    A("Neither section carries a paired drug-response outcome label, so nothing "
+      "here validates a kill prediction — only the internal machinery that "
+      "produces one.")
+    A("")
+    A("**Figure.** `results/state_validation.png`.")
+    A("")
+
+    out_path = out_path or os.path.join(_results_dir(), "state_validation.md")
+    with open(out_path, "w") as fh:
+        fh.write("\n".join(L))
+    print(f"report written: {out_path}")
+    return out_path
+
+
+def main() -> Dict:
+    """Run both validations, write the report and the figure."""
+    results = run()
+    write_report(results)
+    make_figure(results)
+    return results
+
+
+if __name__ == "__main__":  # pragma: no cover - drives the real caches
+    main()

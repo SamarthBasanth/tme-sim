@@ -28,6 +28,16 @@ dependent cytotoxics) and leaves sensitivity at 1.0 otherwise (temozolomide's
 determinant, MGMT, is not on this panel). ABSOLUTE kill fractions are CONDITIONAL
 on whichever assumption is in force; this section is an untreated resection with
 no outcome label. Nothing here modifies core / engine / physics / molecular.
+
+MGMT (temozolomide) — an OPT-IN per-patient escape from that uniform assumption.
+:func:`apply_drug_sensitivity` accepts an optional ``mgmt=`` value (measured
+expression, or a binary promoter status). MGMT is not a spatial field we can
+resolve — it is on neither Xenium panel and has no panel surrogate — but it IS a
+per-patient scalar, and the mapping from MGMT level to TMZ sensitivity is
+calibrated on measured ex-vivo response (:mod:`tmesim.molecular.mgmt`;
+``results/mgmt_scalar.md``). **Omitting ``mgmt`` reproduces the previous
+behaviour exactly**; supplying it flips ``upper_bound`` to False and records the
+value, so a TMZ result can no longer silently carry an UPPER BOUND label.
 """
 from __future__ import annotations
 
@@ -44,6 +54,11 @@ from ..core import (
     TissueFields,
 )
 from ..data.real.singlecell_spatial import load as load_singlecell_spatial
+from ..molecular.mgmt import (
+    MGMT_CALIBRATED_DRUGS,
+    is_mgmt_calibrated,
+    mgmt_sensitivity,
+)
 from .real_fields import (
     add_oxygen,
     ecm_density_from_cells,
@@ -270,11 +285,105 @@ _UPPER_BOUND_FLAG = (
 )
 
 
+def _apply_mgmt_scalar(
+    micro: Microenvironment,
+    info: Dict,
+    mgmt,
+    mgmt_units: str,
+    mgmt_model: str,
+) -> Dict:
+    """Scale the per-cell sensitivity by a MEASURED per-patient MGMT scalar.
+
+    Only called when the caller actually supplies ``mgmt``; with ``mgmt=None``
+    this function is never reached and behaviour is bit-identical to before.
+
+    The scalar is a **per-patient**, not a per-cell, quantity: MGMT is on neither
+    Xenium panel and no panel gene surrogates for it
+    (``results/gbm_tmz_exvivo.md`` §B2), while Visium recovers it only as
+    pseudobulk. So it multiplies the whole sensitivity array uniformly, and the
+    returned ``info`` says so.
+    """
+    name = info["drug"]
+    if not is_mgmt_calibrated(name):
+        info["mgmt_supplied"] = True
+        info["mgmt_applied"] = False
+        info["mgmt_note"] = (
+            f"an MGMT value was supplied but {name!r} is not in "
+            f"MGMT_CALIBRATED_DRUGS {MGMT_CALIBRATED_DRUGS}: the calibration is a "
+            "temozolomide dose-response (GSE232173, n = 17) and is NOT "
+            "extrapolated to other alkylators. Sensitivity was left unchanged."
+        )
+        return info
+
+    if isinstance(mgmt, str):
+        det = mgmt_sensitivity(status=mgmt, detail=True)
+    else:
+        det = mgmt_sensitivity(float(mgmt), units=mgmt_units, model=mgmt_model,
+                               detail=True)
+    scalar = float(det["sensitivity"])
+
+    base = (np.ones(micro.cells.n, dtype=np.float64)
+            if info.get("is_uniform", False)
+            else np.asarray(micro.cells.sensitivity, dtype=np.float64))
+    sens = np.clip(base * scalar, 0.0, 1.0)
+    micro.cells.sensitivity = sens
+
+    lam = det.get("lambda")
+    mapping = (
+        f"s = exp(-{lam:.4f} * log2(CPM+1))" if lam is not None
+        else "measured median-kill ratio between the MGMT-expressing and "
+             "MGMT-silent culture groups (Mann-Whitney p = 0.015)"
+    )
+    info["determinant_gene"] = "MGMT"
+    info["kind"] = ("measured per-patient MGMT scalar (calibrated on measured "
+                    "ex-vivo TMZ response, GSE232173 n = 17)")
+    info["rationale"] = (
+        "MGMT reverses the O6-methylguanine lesion temozolomide depends on "
+        "(Hegi PMID 15758010, Esteller PMID 11070098). It is absent from both "
+        "Xenium panels and has no panel surrogate, but it is a PER-PATIENT "
+        "SCALAR, not a spatial field — so a measured MGMT value (clinical assay, "
+        f"or Visium pseudobulk) scales TMZ sensitivity directly. Mapping: {mapping}, "
+        "anchored at s = 1.0 for MGMT-silent, calibrated on measured ex-vivo "
+        "% viability at 100 uM TMZ in 17 paired patient-derived GSC cultures."
+    )
+    info["mgmt_supplied"] = True
+    info["mgmt_applied"] = True
+    info["mgmt_input"] = det["input"]
+    info["mgmt_model"] = det["model"]
+    info["mgmt_scalar"] = scalar
+    info["mgmt_scalar_ci95"] = det.get("ci95")
+    info["mgmt_calibration_n"] = det.get("n")
+    info["mgmt_extrapolated"] = bool(det.get("extrapolated", False))
+    info["mgmt_resolution"] = (
+        "PER-PATIENT SCALAR (uniform over cells). MGMT is not resolvable "
+        "spatially on either Xenium panel or at Visium spot depth; no per-cell "
+        "MGMT heterogeneity is asserted."
+    )
+    info["mean"] = float(sens.mean())
+    info["std"] = float(sens.std())
+    info["min"] = float(sens.min())
+    info["max"] = float(sens.max())
+    info["is_uniform"] = bool(np.allclose(sens, sens.flat[0])) if sens.size else True
+    info["upper_bound"] = False
+    info["comparability"] = (
+        f"MGMT-INFORMED (scalar {scalar:.4f}). This drug's resistance determinant "
+        "is now a MEASURED input, so its kill is no longer a "
+        "no-intrinsic-resistance upper bound. It remains NOT directly comparable "
+        "with drugs still carrying uniform 1.0 (those are still upper bounds) — "
+        "compare like with like, and see results/mgmt_scalar.md for the "
+        "calibration, its n = 17, and its wide CI."
+    )
+    return info
+
+
 def apply_drug_sensitivity(
     micro: Microenvironment,
     drug_name: str,
     sample: Optional[str] = None,
     mode: str = "uniform",
+    mgmt=None,
+    mgmt_units: str = "log2cpm",
+    mgmt_model: str = "exponential",
 ) -> Dict:
     """Set ``micro.cells.sensitivity`` for one drug under an EXPLICIT mode.
 
@@ -301,6 +410,39 @@ def apply_drug_sensitivity(
           falls through to uniform 1.0 is flagged ``upper_bound=True`` with a
           human-readable ``comparability`` string, because in this mode it is
           NOT comparable against drugs that were scaled down by a determinant.
+    mgmt : float or str, optional
+        **OPTIONAL, OPT-IN, BACKWARD-COMPATIBLE.** A MEASURED per-patient MGMT
+        value for a drug whose resistance determinant is MGMT (temozolomide —
+        see :data:`tmesim.molecular.mgmt.MGMT_CALIBRATED_DRUGS`). Either a
+        continuous expression level (``float``, in ``log2(CPM + 1)`` by default;
+        pass ``mgmt_units='cpm'`` for plain CPM) or a binary promoter status
+        (``'methylated'`` / ``'unmethylated'``). Continuous expression is
+        PREFERRED: in the source cohort MGMT *expression* was prognostic
+        (CoxPH HR 1.85, p = 6.1e-05, n = 56) while promoter *methylation* was
+        not (p = 0.16).
+
+        **Default ``None`` leaves every code path exactly as it was** — no MGMT
+        term is applied and the result is bit-identical to the pre-MGMT
+        behaviour (asserted by ``tests/test_mgmt_scalar.py``).
+
+        When supplied and applicable, the sensitivity array is multiplied by
+        :func:`tmesim.molecular.mgmt.mgmt_sensitivity`, the drug is no longer an
+        upper bound (``upper_bound=False``), and ``info`` records
+        ``mgmt_applied``, ``mgmt_scalar``, ``mgmt_input``, ``mgmt_model``,
+        ``mgmt_scalar_ci95`` and ``mgmt_calibration_n`` so the assumption can
+        never be carried silently. Supplying ``mgmt`` for a drug that is not
+        MGMT-calibrated is a NO-OP recorded as ``mgmt_applied=False`` with a
+        reason (so a panel loop can pass it for every drug safely).
+
+        MGMT is applied as ONE PER-PATIENT SCALAR over all cells: it is absent
+        from both Xenium panels, has no panel surrogate (0/396 pass FDR), and is
+        only pseudobulk-recoverable from Visium. No spatial MGMT field is
+        asserted.
+    mgmt_units : {'log2cpm', 'cpm'}
+        Unit of a numeric ``mgmt``. Default is the calibration unit.
+    mgmt_model : {'exponential', 'linear'}
+        Which calibrated mapping to use; ``'exponential'`` is the default and the
+        primary. See :mod:`tmesim.molecular.mgmt`.
 
     Notes
     -----
@@ -351,6 +493,8 @@ def apply_drug_sensitivity(
                 "bounds but the RANKING is not confounded by sensitivity."
             ),
         }
+        if mgmt is not None:
+            info = _apply_mgmt_scalar(micro, info, mgmt, mgmt_units, mgmt_model)
         micro.metadata = dict(micro.metadata)
         micro.metadata["sensitivity_model_applied"] = info
         return info
@@ -391,6 +535,9 @@ def apply_drug_sensitivity(
         "against a drug whose determinant is unmeasured and therefore left at "
         "1.0 — use mode='uniform' for cross-drug ranking."
     )
+
+    if mgmt is not None:
+        info = _apply_mgmt_scalar(micro, info, mgmt, mgmt_units, mgmt_model)
 
     micro.metadata = dict(micro.metadata)
     micro.metadata["sensitivity_model_applied"] = info
@@ -444,6 +591,17 @@ def reconstruction_report(micro: Microenvironment) -> Dict:
         "marker_detection_rate": (
             applied["marker_detection_rate"] if applied else None
         ),
+        # MGMT per-patient scalar (temozolomide). Present ONLY when the caller
+        # supplied a measured MGMT value; None means the old uniform assumption
+        # is in force and the TMZ kill is still an upper bound.
+        "mgmt_applied": bool(applied.get("mgmt_applied", False)) if applied else False,
+        "mgmt_scalar": (applied.get("mgmt_scalar") if applied else None),
+        "mgmt_input": (applied.get("mgmt_input") if applied else None),
+        "mgmt_model": (applied.get("mgmt_model") if applied else None),
+        "mgmt_scalar_ci95": (applied.get("mgmt_scalar_ci95") if applied else None),
+        "mgmt_calibration_n": (applied.get("mgmt_calibration_n") if applied else None),
+        "mgmt_resolution": (applied.get("mgmt_resolution") if applied else None),
+        "mgmt_note": (applied.get("mgmt_note") if applied else None),
         "is_uniform": bool(np.allclose(sens, sens[0])) if sens.size else True,
         "mean_all_cells": float(sens.mean()) if sens.size else None,
         "std_all_cells": float(sens.std()) if sens.size else None,
