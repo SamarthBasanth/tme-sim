@@ -543,9 +543,36 @@ PAPER_OUTCOME_REPORTED = {
     "n_with_survival_analysis": 55,
     "mgmt_methylated": 31, "mgmt_unmethylated": 35,
     "median_PFS_months": 6.65, "median_PFS_range": (1.0, 36.40),
-    "median_PFS_unmethylated": 8.55, "median_PFS_methylated": 5.92,
+    # NOTE: Supplemental Table 5 labels the PFS rows "UM 8.55 / M 5.92", which
+    # CONTRADICTS the paper's own Results text ("Median PFS and OS of the MGMT
+    # methylated group was 8.55 and 17.19 months ... versus 5.92 and 12.4 months
+    # in the unmethylated group") and contradicts the OS rows in the same table.
+    # We follow the text (and the biology); the discrepancy is flagged in the
+    # report rather than silently resolved.
+    "median_PFS_methylated": 8.55, "median_PFS_unmethylated": 5.92,
+    "supp_table5_PFS_labels_contradict_text": True,
     "median_OS_months": 13.69, "median_OS_range": (2.8, 37.40),
     "median_OS_unmethylated": 12.40, "median_OS_methylated": 17.19,
+    # Spearman correlations of in-vitro readout vs patient outcome (Results text,
+    # n = 55).  Negative rho = lower viability (more sensitive) -> longer survival.
+    "spearman_viability100_PFS": (-0.38, 0.014),
+    "spearman_viability100_OS": (-0.495, 0.0002),
+    "spearman_AUC_PFS": (-0.29, 0.03),
+    "spearman_AUC_OS": (-0.399, 0.0026),
+    "spearman_IC50_PFS": (-0.206, 0.132),
+    "spearman_IC50_OS": (-0.35, 0.009),
+    # median OS in months for responders / intermediates / non-responders,
+    # cut at 50% and 75% viability at 100 uM TMZ
+    "median_OS_by_response_group": {"responders": 27.8, "intermediates": 15.9,
+                                    "non_responders": 12.3},
+    "response_group_cutoffs_pct_viability": {"responders": "<50",
+                                             "intermediates": "50-75",
+                                             "non_responders": ">75"},
+    # MGMT in the parental-tissue cohort (MOESM3 CoxPH_tissue_005), n = 56
+    "erasmus_tissue_MGMT_HR": 1.85438910580871,
+    "erasmus_tissue_MGMT_p": 6.0919848747292e-05,
+    "erasmus_tissue_MGMT_padj": 0.00791722829430051,
+    "erasmus_tissue_MGMT_methylation_vs_OS_p": 0.16,
     "cox_viability100_PFS_p": 0.012, "cox_viability100_OS_p": "<0.00005",
     "cox_AUC_PFS_p": 0.092, "cox_AUC_OS_p": 0.001,
     "cox_IC50_PFS_p": "NS", "cox_IC50_OS_p": 0.0004,

@@ -290,6 +290,8 @@ class SliceGeometry:
     area_mm2: float
     max_depth_um: float
     mean_depth_um: float
+    measured_raw: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    measured_is: np.ndarray = field(default_factory=lambda: np.zeros(0))
 
 
 def _rasterise(g: pd.DataFrame, channel: str) -> Tuple[np.ndarray, np.ndarray]:
@@ -321,19 +323,34 @@ def _coarsen(mask: np.ndarray, val: np.ndarray, k: int) -> Tuple[np.ndarray, np.
 
 
 def build_geometries(msi: pd.DataFrame) -> Dict[str, SliceGeometry]:
+    """Rasterise every MSI section into a model geometry.
+
+    Three channels are carried through the identical raster/coarsen path so
+    that they are pixel-for-pixel comparable:
+      ``measured``     IS-normalised drug ion (the quantity being predicted),
+      ``measured_raw`` the bare drug ion count,
+      ``measured_is``  the co-sprayed **deuterated internal standard** count.
+    The IS channel is the technical-noise control used in analysis 2: it is a
+    uniformly applied compound, so any spatial structure in it is matrix
+    effect + ionisation + shot noise, not biology.
+    """
     geos: Dict[str, SliceGeometry] = {}
     for sl, g in msi.groupby("Slice"):
         compound = str(g.Drug.iloc[0])
-        chan = MSI_CHANNEL[compound][0]
+        chan, raw_chan, is_chan = MSI_CHANNEL[compound]
         fine_mask, fine_val = _rasterise(g, chan)
+        _, fine_raw = _rasterise(g, raw_chan)
+        _, fine_is = _rasterise(g, is_chan)
         fine_mask = ndimage.binary_fill_holes(fine_mask)
         mask, val = _coarsen(fine_mask, fine_val, COARSEN)
+        _, val_raw = _coarsen(fine_mask, fine_raw, COARSEN)
+        _, val_is = _coarsen(fine_mask, fine_is, COARSEN)
         # keep the largest connected component (drops rasterisation specks)
         lab, n = ndimage.label(mask)
         if n > 1:
             sizes = ndimage.sum(mask, lab, range(1, n + 1))
             mask = lab == (int(np.argmax(sizes)) + 1)
-            val = val * mask
+            val, val_raw, val_is = val * mask, val_raw * mask, val_is * mask
         depth = ndimage.distance_transform_edt(np.pad(mask, 1))[1:-1, 1:-1] * MODEL_PITCH_UM
         geos[sl] = SliceGeometry(
             slice_id=sl, compound=compound, patient=str(g.Patient.iloc[0]),
@@ -342,6 +359,7 @@ def build_geometries(msi: pd.DataFrame) -> Dict[str, SliceGeometry]:
             area_mm2=float(fine_mask.sum()) * (MSI_PITCH_MM ** 2),
             max_depth_um=float(depth[mask].max()),
             mean_depth_um=float(depth[mask].mean()),
+            measured_raw=val_raw, measured_is=val_is,
         )
     return geos
 
@@ -666,8 +684,9 @@ def run_simulations(geos: Dict[str, SliceGeometry],
                     "mean_depth_um": g.mean_depth_um,
                     "pred_mean": float(v.mean()),
                     "pred_median": float(np.median(v)),
-                    "pred_cv": float(v.std() / max(v.mean(), 1e-30)),
-                    "pred_p10_p90": float(np.percentile(v, 90) / max(np.percentile(v, 10), 1e-30)),
+                    "pred_cv": heterogeneity(v)["cv"],
+                    "pred_gini": heterogeneity(v)["gini"],
+                    "pred_q90_q50": heterogeneity(v)["q90_q50"],
                     "pred_auc_mean": float(a.mean()),
                     "pred_sat_frac": float(v.mean() / (res.R * BATH_CONC_UM)),
                     "pred_rho_depth": float(rho),
@@ -678,32 +697,72 @@ def run_simulations(geos: Dict[str, SliceGeometry],
     return pd.DataFrame(rows)
 
 
+def gini(x: np.ndarray) -> float:
+    """Gini coefficient of a non-negative field: 0 = perfectly uniform.
+
+    Chosen as the PRIMARY heterogeneity metric because, unlike the CV, it is
+    bounded in [0, 1), scale-free, and does not explode when a large fraction
+    of pixels sit at or below the detection floor (olaparib has >50% exact-zero
+    pixels; a p90/p10 ratio literally divides by zero there).
+    """
+    v = np.sort(np.asarray(x, dtype=float).ravel())
+    v = np.clip(v, 0.0, None)
+    n = v.size
+    s = v.sum()
+    if n == 0 or s <= 0:
+        return float("nan")
+    return float((2.0 * np.arange(1, n + 1) - n - 1.0) @ v / (n * s))
+
+
+def heterogeneity(values: np.ndarray) -> Dict[str, float]:
+    v = np.asarray(values, dtype=float)
+    m = float(v.mean())
+    return {
+        "cv": float(v.std() / max(abs(m), 1e-30)),
+        "gini": gini(v),
+        "q90_q50": float(np.percentile(v, 90) / max(np.percentile(v, 50), 1e-30)),
+    }
+
+
 def measured_slice_stats(geos: Dict[str, SliceGeometry],
                          msi: pd.DataFrame) -> pd.DataFrame:
     """Measured per-slice heterogeneity on the SAME 60 um grid as the model.
 
-    Coarsening from 20 um to 60 um is itself the noise control: MALDI per-pixel
-    counts are shot-noise dominated (olaparib has >50% exact-zero pixels), and
-    raw per-pixel CV rewards noise. Block-averaging to the model's own scale
-    makes the measured and predicted CVs commensurable.
+    TWO noise controls, because a raw per-pixel CV mostly measures MALDI shot
+    noise:
+
+    1. **Spatial coarsening.** Block-averaging 20 um -> 60 um puts the measured
+       field on the model's own scale, so measured and predicted dispersion are
+       commensurable rather than the measurement being penalised for resolution
+       the model does not have.
+    2. **The internal-standard channel.** The deuterated IS is sprayed
+       uniformly over the section, so its spatial dispersion on the same pixels
+       is a direct, per-slice estimate of the technical floor. We report
+       ``excess_gini = gini(drug) - gini(IS)`` and
+       ``excess_cv = sqrt(max(cv_drug^2 - cv_IS^2, 0))``. Only the excess can be
+       attributed to real drug-distribution heterogeneity.
     """
     rows = []
     for sid, g in geos.items():
         v = g.measured[g.mask]
+        vis = g.measured_is[g.mask]
         sub = msi[msi.Slice == sid]
-        chan, raw, heavy = MSI_CHANNEL[g.compound]
-        rho, _ = spearmanr(g.depth_um[g.mask], v)
+        chan, _raw, _heavy = MSI_CHANNEL[g.compound]
+        hd, hi = heterogeneity(v), heterogeneity(vis)
+        rho, prho = spearmanr(g.depth_um[g.mask], v)
         rows.append({
             "msi_slice": sid, "compound": g.compound, "patient": g.patient,
             "tissue": g.tissue, "area_mm2": g.area_mm2,
             "max_depth_um": g.max_depth_um, "mean_depth_um": g.mean_depth_um,
             "meas_mean": float(v.mean()),
-            "meas_cv": float(v.std() / max(v.mean(), 1e-30)),
-            "meas_p10_p90": float(np.percentile(v, 90) / max(np.percentile(v, 10), 1e-30)),
-            "meas_rho_depth": float(rho),
-            "meas_rho_depth_p": float(spearmanr(g.depth_um[g.mask], v)[1]),
+            "meas_cv": hd["cv"], "meas_gini": hd["gini"],
+            "meas_q90_q50": hd["q90_q50"],
+            "is_cv": hi["cv"], "is_gini": hi["gini"],
+            "excess_cv": float(math.sqrt(max(hd["cv"] ** 2 - hi["cv"] ** 2, 0.0))),
+            "excess_gini": float(hd["gini"] - hi["gini"]),
+            "meas_rho_depth": float(rho), "meas_rho_depth_p": float(prho),
             "zero_frac_native": float((sub[chan].values <= 0).mean()),
-            "n_px_native": int(len(sub)),
+            "n_px_native": int(len(sub)), "n_vox_model": int(g.mask.sum()),
         })
     return pd.DataFrame(rows)
 
@@ -762,9 +821,33 @@ def _nakagawa(fit, df: pd.DataFrame) -> Tuple[float, float]:
     return var_f / tot, (var_f + var_r) / tot
 
 
+DEGENERATE_TOL = 1e-6
+
+
 def mixed_test(df: pd.DataFrame, response: str, fixed: str) -> dict:
-    """Likelihood-ratio test of one fixed effect inside the authors' frame."""
+    """Likelihood-ratio test of one fixed effect inside the authors' frame.
+
+    DEGENERATE PREDICTORS ARE REPORTED, NOT HIDDEN. If the fixed effect has
+    (near-)zero variance across the rows — which is exactly what a
+    transport-only model produces here, because every explant saturates to the
+    bath concentration — no slope is identifiable. Rather than let the
+    optimiser fail or return a meaningless value, we return
+    ``degenerate: True`` with ``var_explained_beyond_re = 0.0``. Zero variance
+    explained is the *correct* answer for a constant predictor, and it is the
+    headline result of analysis 1.
+    """
     from scipy.stats import chi2
+    x = np.asarray(df[fixed], dtype=float)
+    rel_sd = float(np.std(x)) / max(abs(float(np.mean(x))), 1e-30)
+    if rel_sd < DEGENERATE_TOL:
+        return {
+            "n": int(len(df)), "degenerate": True, "predictor_rel_sd": rel_sd,
+            "beta": float("nan"), "se": float("nan"),
+            "lr_chi2": 0.0, "p_lrt": 1.0,
+            "r2_marginal": 0.0, "r2_conditional": float("nan"),
+            "delta_r2_marginal": 0.0, "var_explained_beyond_re": 0.0,
+            "note": "predictor is constant across rows; no slope identifiable",
+        }
     f0 = _mixedlm(df, response, None)
     f1 = _mixedlm(df, response, fixed)
     lr = float(2.0 * (f1.llf - f0.llf))
@@ -772,7 +855,8 @@ def mixed_test(df: pd.DataFrame, response: str, fixed: str) -> dict:
     r2m0, r2c0 = _nakagawa(f0, df)
     r2m1, r2c1 = _nakagawa(f1, df)
     return {
-        "n": int(len(df)), "beta": float(f1.fe_params.get(fixed, np.nan)),
+        "n": int(len(df)), "degenerate": False, "predictor_rel_sd": rel_sd,
+        "beta": float(f1.fe_params.get(fixed, np.nan)),
         "se": float(f1.bse.get(fixed, np.nan)),
         "lr_chi2": lr, "p_lrt": p,
         "r2_marginal": r2m1, "r2_conditional": r2c1,
@@ -864,10 +948,25 @@ def analysis1(roi: pd.DataFrame, sim: pd.DataFrame, meas: pd.DataFrame,
                 .agg(meas=("drug_measure_norm", "mean"),
                      pred=("pred_norm", "first"), n=("drug_measure_norm", "size"))
                 .reset_index())
+        pred_rel_sd = float(np.std(sl["pred"])) / max(abs(float(np.mean(sl["pred"]))), 1e-30)
+        if pred_rel_sd < DEGENERATE_TOL:
+            entry["slice_level"] = {
+                "n_slices": int(len(sl)), "degenerate": True,
+                "pred_rel_sd": pred_rel_sd,
+                "spearman_rho": float("nan"), "spearman_p": float("nan"),
+                "pearson_r": float("nan"), "pearson_p": float("nan"),
+            }
+            entry["permutation"] = {"n": 0, "p_perm_two_sided": float("nan"),
+                                    "null_sd_rho": float("nan"),
+                                    "note": "constant prediction; nothing to permute"}
+            entry["slice_table"] = sl.to_dict("records")
+            res["conditions"][cond] = entry
+            continue
         rho, prho = spearmanr(sl["pred"], sl["meas"])
         r, pr = pearsonr(sl["pred"], sl["meas"])
         entry["slice_level"] = {
-            "n_slices": int(len(sl)), "spearman_rho": float(rho),
+            "n_slices": int(len(sl)), "degenerate": False,
+            "pred_rel_sd": pred_rel_sd, "spearman_rho": float(rho),
             "spearman_p": float(prho), "pearson_r": float(r), "pearson_p": float(pr),
         }
         # Permutation null on the slice-level statistic: shuffle the prediction
@@ -892,5 +991,253 @@ def analysis1(roi: pd.DataFrame, sim: pd.DataFrame, meas: pd.DataFrame,
                                       / (n_perm + 1)),
             "null_sd_rho": float(np.nanstd(null)),
         }
+        entry["slice_table"] = sl.to_dict("records")
         res["conditions"][cond] = entry
     return res
+
+
+# ===========================================================================
+# 8. ANALYSIS 2 — the compound-specificity falsification test
+# ===========================================================================
+def saturation_timecourse(geos: Dict[str, SliceGeometry],
+                          chem: Dict[str, CompoundChemistry],
+                          hours=(0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 24.0),
+                          ecm: float = ECM_REFERENCE) -> pd.DataFrame:
+    """Mean tissue saturation vs time for each section under its OWN compound.
+
+    This is the quantitative form of the equilibrium argument: if the explant
+    is already at the bath concentration well before the 24 h endpoint, then no
+    purely diffusive model — with or without a uniform sequestration term — can
+    produce spatial structure at the endpoint.
+    """
+    rows = []
+    for sid, g in geos.items():
+        cc = chem[g.compound]
+        for cond in ("transport_only", "transport+lysosomal_seq"):
+            seq, loss = MODEL_CONDITIONS[cond]
+            drug = cc.drug_params_seq if seq else cc.drug_params_shipped
+            R = cc.retardation_R if seq else 1.0
+            for h in hours:
+                res = bath_diffusion(g.mask, g.dx, drug, ecm=ecm, R=R,
+                                     total_time=h * 3600.0, first_order_loss=loss)
+                v = res.c_total[g.mask]
+                rows.append({
+                    "msi_slice": sid, "compound": g.compound, "condition": cond,
+                    "hours": h, "sat_frac": float(v.mean() / (R * BATH_CONC_UM)),
+                    "cv": heterogeneity(v)["cv"], "gini": gini(v),
+                    "max_depth_um": g.max_depth_um,
+                })
+    return pd.DataFrame(rows)
+
+
+def phi_lys_sweep(geos: Dict[str, SliceGeometry],
+                  chem: Dict[str, CompoundChemistry],
+                  phis=PHI_LYS_SWEEP, ecm: float = ECM_REFERENCE) -> pd.DataFrame:
+    """How much heterogeneity can a UNIFORM lysosomal compartment ever buy?
+
+    Sweeps the lysosomal volume fraction over 0.005-0.05 (0.5-5% of tissue
+    volume, bracketing every value in the cell-biology literature) and records
+    the resulting predicted dispersion. The point of the sweep is that the
+    answer is bounded and small: with phi_lys uniform in space, R is uniform,
+    so at equilibrium C_total = R * C_bath everywhere and the dispersion goes to
+    zero no matter how large R gets. Sequestration buys a longer time constant,
+    never an equilibrium pattern.
+    """
+    rows = []
+    for phi in phis:
+        for name, cc in chem.items():
+            R = retardation_factor(cc.pka_structure, phi)
+            dp = DrugParams(
+                name=f"{name}_phi{phi}", diffusivity=cc.drug_params_shipped.diffusivity / R,
+                molecular_weight=cc.drug_params_shipped.molecular_weight,
+                ic50=cc.drug_params_shipped.ic50, hill=cc.drug_params_shipped.hill,
+                binding=cc.drug_params_shipped.binding,
+                clearance=cc.drug_params_shipped.clearance,
+                bbb_penetrance=cc.drug_params_shipped.bbb_penetrance,
+            )
+            for sid, g in geos.items():
+                res = bath_diffusion(g.mask, g.dx, dp, ecm=ecm, R=R)
+                v = res.c_total[g.mask]
+                rows.append({
+                    "phi_lys": phi, "compound": name, "msi_slice": sid,
+                    "R": R, "pred_cv": heterogeneity(v)["cv"],
+                    "pred_gini": gini(v),
+                    "sat_frac": float(v.mean() / (R * BATH_CONC_UM)),
+                })
+    return pd.DataFrame(rows)
+
+
+def ecm_sensitivity(geos: Dict[str, SliceGeometry],
+                    chem: Dict[str, CompoundChemistry],
+                    ecms=ECM_SWEEP) -> pd.DataFrame:
+    """Does the (uncalibrated) ECM volume fraction change any conclusion?"""
+    rows = []
+    for e in ecms:
+        for name, cc in chem.items():
+            for sid, g in geos.items():
+                res = bath_diffusion(g.mask, g.dx, cc.drug_params_seq, ecm=e,
+                                     R=cc.retardation_R)
+                v = res.c_total[g.mask]
+                rows.append({"ecm": e, "compound": name, "msi_slice": sid,
+                             "pred_cv": heterogeneity(v)["cv"],
+                             "pred_gini": gini(v),
+                             "sat_frac": float(v.mean() / (cc.retardation_R * BATH_CONC_UM))})
+    return pd.DataFrame(rows)
+
+
+def analysis2(geos: Dict[str, SliceGeometry], sim: pd.DataFrame,
+              meas: pd.DataFrame, chem: Dict[str, CompoundChemistry],
+              sat: pd.DataFrame, sweep: pd.DataFrame) -> dict:
+    """THE SHARP TEST.
+
+    Claim under test: niraparib and rucaparib are weak bases whose lysosomal
+    sequestration drives accumulation heterogeneity; olaparib is not a base and
+    does not. A model carrying the mechanism must predict MORE heterogeneity
+    for the two bases than for olaparib, AND at a magnitude comparable to what
+    was measured. Both halves must pass. Getting the ordering right at 1/200th
+    of the observed magnitude is not a pass.
+
+    The contrast is run WITHIN geometry: every compound is simulated on all 18
+    explant outlines, so shape cannot confound it.
+    """
+    from scipy.stats import mannwhitneyu
+
+    out: dict = {}
+
+    # --- (a) structure -> basicity, straight out of RDKit ------------------
+    out["chemistry"] = {
+        n: {"inchikey": c.inchikey, "mw": c.mw, "logp": c.logp,
+            "n_basic_centres": c.n_basic_centres, "basic_class": c.basic_class,
+            "pka_structure": c.pka_structure, "pka_literature": c.pka_literature,
+            "lysosome_cytosol_ratio": c.lysosome_cytosol_ratio,
+            "retardation_R": c.retardation_R,
+            "free_diffusivity": c.profile["free_diffusivity"],
+            "effective_diffusivity": c.profile["effective_diffusivity"],
+            "membrane_permeability": c.profile["membrane_permeability"]}
+        for n, c in chem.items()
+    }
+    out["weak_base_split_detected"] = bool(
+        chem["Niraparib"].n_basic_centres > 0 and chem["Rucaparib"].n_basic_centres > 0
+        and chem["Olaparib"].n_basic_centres == 0)
+    out["nir_vs_ruc_ratio_gap_pct"] = float(
+        100.0 * abs(chem["Niraparib"].lysosome_cytosol_ratio
+                    - chem["Rucaparib"].lysosome_cytosol_ratio)
+        / chem["Niraparib"].lysosome_cytosol_ratio)
+
+    # --- (b) predicted heterogeneity, within-geometry ----------------------
+    pred = {}
+    for cond in MODEL_CONDITIONS:
+        s = sim[sim.condition == cond]
+        pred[cond] = {c: {"cv_mean": float(s[s.compound == c].pred_cv.mean()),
+                          "gini_mean": float(s[s.compound == c].pred_gini.mean()),
+                          "sat_frac_mean": float(s[s.compound == c].pred_sat_frac.mean())}
+                      for c in SMILES}
+        wb = float(np.mean([pred[cond]["Niraparib"]["cv_mean"],
+                            pred[cond]["Rucaparib"]["cv_mean"]]))
+        ol = pred[cond]["Olaparib"]["cv_mean"]
+        pred[cond]["weak_base_over_olaparib_cv"] = float(wb / max(ol, 1e-30))
+        pred[cond]["nir_over_ruc_cv"] = float(
+            pred[cond]["Niraparib"]["cv_mean"] / max(pred[cond]["Rucaparib"]["cv_mean"], 1e-30))
+    out["predicted"] = pred
+
+    # --- (c) measured heterogeneity, with the IS noise floor ---------------
+    m = meas.copy()
+    m["is_base"] = m.compound.isin(["Niraparib", "Rucaparib"])
+    out["measured"] = {
+        c: {"n_slices": int((m.compound == c).sum()),
+            "cv_mean": float(m[m.compound == c].meas_cv.mean()),
+            "gini_mean": float(m[m.compound == c].meas_gini.mean()),
+            "is_gini_mean": float(m[m.compound == c].is_gini.mean()),
+            "excess_gini_mean": float(m[m.compound == c].excess_gini.mean()),
+            "excess_cv_mean": float(m[m.compound == c].excess_cv.mean()),
+            "zero_frac_mean": float(m[m.compound == c].zero_frac_native.mean())}
+        for c in SMILES
+    }
+    wb_v = m.loc[m.is_base, "excess_gini"].values
+    ol_v = m.loc[~m.is_base, "excess_gini"].values
+    u, p = mannwhitneyu(wb_v, ol_v, alternative="greater")
+    out["measured_weak_base_vs_olaparib"] = {
+        "metric": "excess_gini (drug Gini minus internal-standard Gini)",
+        "n_weak_base_slices": int(len(wb_v)), "n_olaparib_slices": int(len(ol_v)),
+        "weak_base_mean": float(wb_v.mean()), "olaparib_mean": float(ol_v.mean()),
+        "mannwhitney_u": float(u), "p_one_sided_greater": float(p),
+        "ratio": float(wb_v.mean() / max(ol_v.mean(), 1e-30)),
+    }
+
+    # --- (d) the magnitude gap: predicted vs measured ----------------------
+    best_cond = max(MODEL_CONDITIONS,
+                    key=lambda c: pred[c]["Niraparib"]["cv_mean"])
+    out["magnitude_gap"] = {
+        "best_condition_for_heterogeneity": best_cond,
+        "pred_cv_weak_base": float(np.mean([pred[best_cond]["Niraparib"]["cv_mean"],
+                                            pred[best_cond]["Rucaparib"]["cv_mean"]])),
+        "meas_excess_cv_weak_base": float(m.loc[m.is_base, "excess_cv"].mean()),
+        "meas_cv_weak_base": float(m.loc[m.is_base, "meas_cv"].mean()),
+    }
+    out["magnitude_gap"]["fold_under_prediction"] = float(
+        out["magnitude_gap"]["meas_excess_cv_weak_base"]
+        / max(out["magnitude_gap"]["pred_cv_weak_base"], 1e-30))
+    # sequestration-only condition, which is the one the mechanism claim is about
+    seq_cv = float(np.mean([pred["transport+lysosomal_seq"]["Niraparib"]["cv_mean"],
+                            pred["transport+lysosomal_seq"]["Rucaparib"]["cv_mean"]]))
+    out["magnitude_gap"]["pred_cv_weak_base_seq_only"] = seq_cv
+    out["magnitude_gap"]["fold_under_prediction_seq_only"] = float(
+        out["magnitude_gap"]["meas_excess_cv_weak_base"] / max(seq_cv, 1e-30))
+
+    # --- (e) is the field even diffusion-limited at 24 h? ------------------
+    fo = []
+    for sid, g in geos.items():
+        d_eff = chem[g.compound].profile["effective_diffusivity"]
+        R = chem[g.compound].retardation_R
+        fo.append({"msi_slice": sid, "compound": g.compound,
+                   "L_um": g.max_depth_um,
+                   "fourier_no_seq": d_eff * EXPOSURE_S / g.max_depth_um ** 2,
+                   "fourier_with_seq": (d_eff / R) * EXPOSURE_S / g.max_depth_um ** 2})
+    fo_df = pd.DataFrame(fo)
+    out["fourier"] = {
+        "definition": "Fo = D_eff * t / L^2, L = max in-plane distance to the bath surface",
+        "min_no_seq": float(fo_df.fourier_no_seq.min()),
+        "median_no_seq": float(fo_df.fourier_no_seq.median()),
+        "min_with_seq": float(fo_df.fourier_with_seq.min()),
+        "median_with_seq": float(fo_df.fourier_with_seq.median()),
+        "n_slices_Fo_lt_1_with_seq": int((fo_df.fourier_with_seq < 1).sum()),
+        "n_slices": int(len(fo_df)),
+    }
+    s24 = sat[sat.hours == 24.0]
+    s1 = sat[sat.hours == 1.0]
+    out["saturation"] = {
+        "mean_sat_frac_1h_transport_only":
+            float(s1[s1.condition == "transport_only"].sat_frac.mean()),
+        "mean_sat_frac_1h_with_seq":
+            float(s1[s1.condition == "transport+lysosomal_seq"].sat_frac.mean()),
+        "min_sat_frac_24h_with_seq":
+            float(s24[s24.condition == "transport+lysosomal_seq"].sat_frac.min()),
+        "mean_sat_frac_24h_with_seq":
+            float(s24[s24.condition == "transport+lysosomal_seq"].sat_frac.mean()),
+    }
+
+    # --- (f) can a bigger lysosomal compartment rescue it? -----------------
+    sw = sweep.groupby(["phi_lys", "compound"])[["pred_cv", "R"]].mean().reset_index()
+    out["phi_lys_sweep"] = sw.to_dict("records")
+    out["phi_lys_sweep_max_cv"] = float(sweep.pred_cv.max())
+
+    # --- (g) direction of the spatial gradient -----------------------------
+    out["depth_gradient"] = {
+        "model_mean_rho_depth": float(
+            sim[sim.condition == "transport+lysosomal_seq"].pred_rho_depth.mean()),
+        "measured_mean_rho_depth": float(meas.meas_rho_depth.mean()),
+        "n_slices_measured_positive": int((meas.meas_rho_depth > 0).sum()),
+        "n_slices": int(len(meas)),
+        "sign_agreement": int(((meas.set_index("msi_slice").meas_rho_depth < 0)).sum()),
+    }
+
+    # --- verdict -----------------------------------------------------------
+    ordering_ok = pred["transport+lysosomal_seq"]["weak_base_over_olaparib_cv"] > 2.0
+    magnitude_ok = out["magnitude_gap"]["fold_under_prediction_seq_only"] < 3.0
+    out["verdict"] = {
+        "ordering_correct": bool(ordering_ok),
+        "magnitude_correct": bool(magnitude_ok),
+        "overall": "PASS" if (ordering_ok and magnitude_ok) else
+                   ("PARTIAL - ordering only" if ordering_ok else "FAIL"),
+    }
+    return out

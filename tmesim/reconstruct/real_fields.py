@@ -111,23 +111,64 @@ def _kde_on_grid(
     return np.clip(density, 0.0, 1.0)
 
 
+#: The vascular-source construction to use. ``'kde'`` is the historical default
+#: and is UNCHANGED; ``'discrete'`` routes to the segmented-vessel field of
+#: :mod:`reconstruct.vessel_network`, which is exactly zero away from a vessel.
+#: See ``results/vessel_network_impact.md`` for the A-vs-B quantification and for
+#: the (currently negative) recommendation on flipping this default.
+VASCULAR_MODES = ("kde", "discrete")
+_DEFAULT_VASCULAR_MODE = "kde"
+
+
 def vascular_density_from_cells(
     domain: Domain,
     cells: CellPopulation,
     bandwidth_um: float = _DEFAULT_BANDWIDTH_UM,
+    mode: str = _DEFAULT_VASCULAR_MODE,
+    **discrete_kwargs,
 ) -> np.ndarray:
     """Perfused-vessel-fraction field (ny, nx) in [0,1] from REAL endothelium.
 
-    KDE of the measured positions of ``CellType.ENDOTHELIAL`` cells (the
-    PECAM1+/FLT1+ vessel-lining cells identified upstream). The value at each grid
-    cell is the relative local density of endothelium — a real perfused-vessel
-    fraction, high exactly where vessel cells actually cluster. No vessel geometry
-    is invented.
+    ``mode='kde'`` (DEFAULT, unchanged) — KDE of the measured positions of
+    ``CellType.ENDOTHELIAL`` cells (the PECAM1+/FLT1+ vessel-lining cells
+    identified upstream). The value at each grid cell is the relative local
+    density of endothelium — a real perfused-vessel fraction, high exactly where
+    vessel cells actually cluster. No vessel geometry is invented. This field is
+    SMOOTH: at the default 40 um bandwidth it is nonzero over ~99.7% of the
+    tissue, which is the structural confound documented in
+    ``results/SESSION_AUDIT.md`` §3.
+
+    ``mode='discrete'`` — the same measured endothelial cells, but first clustered
+    into DISCRETE putative vessel objects and then painted as a source that is
+    nonzero only within a vessel radius and EXACTLY zero elsewhere
+    (:func:`reconstruct.vessel_network.segment_vessels` +
+    :func:`~reconstruct.vessel_network.discrete_vascular_field`). Extra keyword
+    arguments (``link_distance_um``, ``radius_um``, ``amplitude``,
+    ``match_total_to``) are forwarded. ``bandwidth_um`` is ignored in this mode.
+
+    This is an ADDITIVE option: the default is unchanged, and every existing
+    caller keeps the KDE field byte-for-byte.
 
     Returns an all-zero field if the population contains no endothelial cells.
     """
-    endo = cells.cell_type == int(CellType.ENDOTHELIAL)
-    return _kde_on_grid(domain, cells.x[endo], cells.y[endo], bandwidth_um)
+    m = str(mode).strip().lower()
+    if m == "kde":
+        if discrete_kwargs:
+            raise TypeError(
+                f"unexpected keyword(s) {sorted(discrete_kwargs)} for mode='kde'")
+        endo = cells.cell_type == int(CellType.ENDOTHELIAL)
+        return _kde_on_grid(domain, cells.x[endo], cells.y[endo], bandwidth_um)
+    if m == "discrete":
+        # Imported lazily so the KDE path takes no new dependency and there is no
+        # import cycle (vessel_network imports only from ..core).
+        from .vessel_network import discrete_vascular_field, segment_vessels
+
+        seg_kw = {}
+        if "link_distance_um" in discrete_kwargs:
+            seg_kw["link_distance_um"] = float(discrete_kwargs.pop("link_distance_um"))
+        vessels = segment_vessels(cells, domain, **seg_kw)
+        return discrete_vascular_field(domain, vessels, **discrete_kwargs)
+    raise ValueError(f"unknown vascular mode {mode!r}; expected one of {VASCULAR_MODES}")
 
 
 def ecm_density_from_cells(
@@ -178,15 +219,20 @@ def build_real_fields(
     domain: Domain,
     cells: CellPopulation,
     bandwidth_um: float = _DEFAULT_BANDWIDTH_UM,
+    vascular_mode: str = _DEFAULT_VASCULAR_MODE,
 ) -> TissueFields:
     """Assemble the real ECM + vascular fields; leave oxygen/ifp unset.
 
     Oxygen is intentionally left ``None`` so the caller can run the physics solver
     on the assembled vascular field via :func:`add_oxygen` (keeping physics in the
     physics package). IFP is left for ``physics.pressure`` similarly.
+
+    ``vascular_mode`` is forwarded to :func:`vascular_density_from_cells` and
+    defaults to the unchanged ``'kde'``.
     """
     ecm = ecm_density_from_cells(domain, cells, bandwidth_um)
-    vascular = vascular_density_from_cells(domain, cells, bandwidth_um)
+    vascular = vascular_density_from_cells(domain, cells, bandwidth_um,
+                                           mode=vascular_mode)
     return TissueFields(ecm_density=ecm, vascular_density=vascular,
                         oxygen=None, ifp=None)
 

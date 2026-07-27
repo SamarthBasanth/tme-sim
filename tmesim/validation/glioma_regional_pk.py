@@ -84,6 +84,11 @@ import pandas as pd
 from ..molecular.descriptors import from_smiles
 from ..molecular.library import GBM_DRUGS
 from ..molecular.permeability import bbb_penetrance, membrane_permeability
+from ..reconstruct.barrier import (
+    L_PARACELLULAR_LEAK,
+    REGION_DISRUPTION,
+    effective_penetrance,
+)
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -167,11 +172,59 @@ def _verify_smiles(name: str) -> None:
         raise ValueError(f"{name}: RDKit MW {mw:.2f} != literature {mw_lit} ({formula})")
 
 
-def molecular_profile(drug: str) -> Dict:
+def _bbb_penetrance_arithmetic(descriptors: Dict[str, float]) -> float:
+    """FROZEN reference implementation of the **pre-fix** ``bbb_penetrance``.
+
+    Byte-for-byte the aggregation that shipped before validation run #1's fixes:
+    the four CNS-MPO desirabilities combined by an ARITHMETIC mean and squashed
+    through the same logistic. It is kept here — in the validation module, not in
+    the molecular layer — for exactly one purpose: so the "before" column of the
+    before/after scorecard is **computed live from the same descriptors**, rather
+    than pasted in from a previous run where it could silently rot.
+
+    Do NOT call this from model code. It is the defect, retained as evidence:
+    an arithmetic mean cannot express a veto, so a molecule with two
+    disqualifying properties is rescued by two favourable ones (eribulin, 66x).
+
+    The per-descriptor desirability curves are IDENTICAL to the shipped
+    :func:`tmesim.molecular.permeability.bbb_penetrance`; only the aggregation
+    differs, which is the whole point of the comparison.
+    """
+    if descriptors.get("is_antibody"):
+        return 0.0
+    mw = float(descriptors.get("mw", 300.0))
+    logp = float(descriptors.get("logp", 0.0))
+    tpsa = float(descriptors.get("tpsa", 75.0))
+    hbd = float(descriptors.get("hbd", 1.0))
+    if mw >= 1000.0:
+        return 0.0
+    d_mw = 1.0 / (1.0 + math.exp((mw - 450.0) / 60.0))
+    d_logp = math.exp(-((logp - 2.5) ** 2) / (2.0 * 1.7 ** 2))
+    d_tpsa = 1.0 / (1.0 + math.exp((tpsa - 90.0) / 12.0))
+    d_hbd = 1.0 / (1.0 + math.exp((hbd - 3.0) / 0.8))
+    mean_desir = (d_mw + d_logp + d_tpsa + d_hbd) / 4.0
+    score = 1.0 / (1.0 + math.exp(-8.0 * (mean_desir - 0.5)))
+    return max(0.0, min(1.0, score))
+
+
+#: ``aggregation`` keyword -> penetrance function. ``"arithmetic"`` is the
+#: pre-fix defect; ``"geometric"`` is what the molecular layer ships now.
+_AGGREGATIONS = {
+    "arithmetic": _bbb_penetrance_arithmetic,
+    "geometric": bbb_penetrance,
+}
+
+
+def molecular_profile(drug: str, aggregation: str = "geometric") -> Dict:
     """Descriptors + the two structure-only transport numbers for one drug.
 
     Returns mw / logp / tpsa / hbd, ``bbb_penetrance`` (the predicted partition
     under assumption A1) and passive ``membrane_permeability`` (um/s).
+
+    ``aggregation`` selects how the four CNS-MPO desirabilities are combined:
+    ``"geometric"`` (the shipped :func:`~tmesim.molecular.permeability.bbb_penetrance`,
+    a veto) or ``"arithmetic"`` (:func:`_bbb_penetrance_arithmetic`, the pre-fix
+    defect, retained so before/after is computed rather than quoted).
     """
     key = drug.strip().lower()
     if key in GBM_DRUGS:
@@ -184,15 +237,22 @@ def molecular_profile(drug: str) -> Dict:
     else:
         raise KeyError(f"drug {drug!r} not mappable to the molecular layer")
     d = mol.descriptors
+    try:
+        penetrance_fn = _AGGREGATIONS[aggregation]
+    except KeyError:
+        raise ValueError(
+            f"aggregation must be one of {sorted(_AGGREGATIONS)}; got {aggregation!r}"
+        ) from None
     return {
         "drug": key,
         "smiles_origin": origin,
         "descriptor_source": mol.source,
+        "aggregation": aggregation,
         "mw": float(d["mw"]),
         "logp": float(d["logp"]),
         "tpsa": float(d["tpsa"]),
         "hbd": int(d["hbd"]),
-        "predicted_partition": float(bbb_penetrance(d)),  # ASSUMPTION A1
+        "predicted_partition": float(penetrance_fn(d)),  # ASSUMPTION A1
         "membrane_permeability_um_s": float(membrane_permeability(d)),
         "note": _DRUG_NOTE.get(key, ""),
     }
@@ -374,21 +434,83 @@ def _drug_level_measured() -> List[Dict]:
 # ---------------------------------------------------------------------------
 # TEST 1 -- the honest scorecard
 # ---------------------------------------------------------------------------
-def run_scorecard() -> Dict:
+#: MRI/pathology region labels that correspond to a DISRUPTED barrier. Necrosis
+#: is included because it sits inside the enhancing rim and measures as leaky
+#: (see ``reconstruct.barrier.REGION_DISRUPTION``); ``non_enhancing`` /
+#: ``nonenhancing`` / ``noncontrast_enhancing`` / ``peritumoral_brain`` are the
+#: intact-barrier reference.
+_DISRUPTED_REGIONS = {"contrast_enhancing", "necrosis"}
+
+
+def measured_sample_disruption() -> Dict[str, float]:
+    """Mean ``bbb_disruption`` implied by each drug's MEASURED sample composition.
+
+    Each drug's scorecard "measured mean" POOLS whatever regions that study
+    sampled. Levetiracetam's 0.697, for instance, is the mean over 39
+    contrast-enhancing + 17 necrotic + 69 non-enhancing specimens. A model with a
+    regional barrier term must therefore be evaluated at the SAME regional mix,
+    or the comparison silently penalises it for a difference in sampling rather
+    than in physics.
+
+    Returns drug -> fraction of that drug's measured samples drawn from
+    disrupted-barrier regions, in [0, 1]. This is a composition weight, NOT a
+    fitted quantity: it is read straight off the region column of the source
+    tables.
+    """
+    out: Dict[str, float] = {}
+    ps = load_per_sample_ratios()
+    for drug, col in _DRUG_COL.items():
+        sub = ps[ps[col].notna()]
+        out[drug] = float(sub["region"].isin(_DISRUPTED_REGIONS).mean()) if len(sub) else 0.0
+    lit = load_literature_anchors()
+    lit = lit[(lit["species"] == "human") & lit["tissue_to_plasma_ratio"].notna()]
+    for drug, g in lit.groupby("drug"):
+        out[str(drug)] = float(g["region"].isin(_DISRUPTED_REGIONS).mean())
+    return out
+
+
+def run_scorecard(aggregation: str = "geometric", apply_leak: bool = False) -> Dict:
     """Predicted (A1) vs measured tissue:plasma partition, per drug.
 
     Reports the fold error ``predicted / measured_mean`` and pass/fail against a
     3x band and a 10x (order-of-magnitude) band, plus the aggregate systematic
     bias as the geometric mean of the fold errors.
+
+    Parameters
+    ----------
+    aggregation : {"geometric", "arithmetic"}
+        Desirability aggregation inside ``bbb_penetrance``. ``"arithmetic"`` is
+        the pre-fix defect, retained for the before/after comparison.
+    apply_leak : bool
+        If True, add the fitted additive paracellular leak
+        (``reconstruct.barrier.L_PARACELLULAR_LEAK``) weighted by each drug's
+        measured regional composition (:func:`measured_sample_disruption`), i.e.
+        score the model AS IT NOW EXISTS rather than its structure-only core.
+
+    Two aggregate bias figures are reported and they answer different questions:
+
+    * ``geometric_mean_fold_error`` — the geometric mean of SIGNED fold errors.
+      Over- and under-predictions CANCEL, so a value near 1.0 can be a genuinely
+      unbiased model or two large opposite errors annihilating.
+    * ``geometric_mean_abs_fold_error`` — the geometric mean of
+      ``max(fold, 1/fold)``. Nothing cancels; this is the honest accuracy figure
+      and the one to read when the signed figure looks suspiciously good.
     """
+    leak_weights = measured_sample_disruption() if apply_leak else {}
     rows: List[Dict] = []
     for m in _drug_level_measured():
         drug = m["drug"]
         try:
-            prof = molecular_profile(drug)
+            prof = molecular_profile(drug, aggregation=aggregation)
         except KeyError:
             continue
         pred = prof["predicted_partition"]
+        prof["structure_only_partition"] = pred
+        disruption = float(leak_weights.get(drug, 0.0)) if apply_leak else 0.0
+        prof["sample_mean_bbb_disruption"] = disruption
+        if apply_leak:
+            pred = float(effective_penetrance(pred, disruption))
+            prof["predicted_partition"] = pred
         meas = m["mean"]
         fold = pred / meas if meas > 0 else float("inf")
         rows.append({
@@ -425,13 +547,29 @@ def run_scorecard() -> Dict:
     gm_md_x = (10.0 ** (sum(r["log10_fold"] for r in md_x) / len(md_x))
                if md_x else float("nan"))
 
+    # UNSIGNED accuracy: |log10 fold|, so over- and under-prediction cannot
+    # cancel each other out into a flattering aggregate.
+    alogs = [abs(r["log10_fold"]) for r in rows if math.isfinite(r["log10_fold"])]
+    gma = 10.0 ** (sum(alogs) / len(alogs)) if alogs else float("nan")
+    alogs_x = [abs(r["log10_fold"]) for r in rows
+               if r is not worst and math.isfinite(r["log10_fold"])]
+    gma_x = 10.0 ** (sum(alogs_x) / len(alogs_x)) if alogs_x else float("nan")
+    worst_abs = max((abs(r["fold_error"]) if r["fold_error"] >= 1.0
+                     else 1.0 / r["fold_error"]) for r in rows) if rows else float("nan")
+
     return {
         "rows": rows,
+        "aggregation": aggregation,
+        "leak_applied": bool(apply_leak),
+        "leak_constant": L_PARACELLULAR_LEAK if apply_leak else 0.0,
         "n_drugs": len(rows),
         "n_pass_3x": sum(r["pass_3x"] for r in rows),
         "n_pass_10x": sum(r["pass_10x"] for r in rows),
         "geometric_mean_fold_error": gm,
         "geometric_mean_fold_error_ex_worst": gm_x,
+        "geometric_mean_abs_fold_error": gma,
+        "geometric_mean_abs_fold_error_ex_worst": gma_x,
+        "worst_abs_fold_error": worst_abs,
         "worst_drug": worst["drug"] if worst else None,
         "worst_fold": worst["fold_error"] if worst else float("nan"),
         "geometric_mean_fold_error_microdialysis_only": gm_md,
@@ -706,6 +844,130 @@ def required_bbb_disruption(regional: Dict) -> Dict:
         "winner": ("additive_leak" if _spread("additive_L") < _spread("multiplicative_f")
                    else "multiplicative"),
     }
+
+
+# ---------------------------------------------------------------------------
+# TEST 4 -- POST-FIX: re-run the regional test with the barrier term ACTIVE
+# ---------------------------------------------------------------------------
+
+#: MRI/pathology region label -> the ``bbb_disruption`` value the model assigns
+#: it, via :data:`tmesim.reconstruct.barrier.REGION_DISRUPTION`. The MRI labels
+#: are the measured side; the Ivy GAP zone names are the model side; the mapping
+#: between them is the anatomic argument documented in ``reconstruct.barrier``.
+_REGION_TO_DISRUPTION = {
+    "contrast_enhancing": REGION_DISRUPTION["perivascular"],   # 1.00, the CE anchor
+    "necrosis": REGION_DISRUPTION["necrotic"],                 # 0.48, measured
+    "non_enhancing": REGION_DISRUPTION["margin"],              # 0.00, the reference
+    # literature-table spellings of the non-enhancing reference
+    "nonenhancing": REGION_DISRUPTION["margin"],
+    "noncontrast_enhancing": REGION_DISRUPTION["margin"],
+    "peritumoral_brain": REGION_DISRUPTION["margin"],
+}
+
+
+def run_post_fix_regional(regional: Dict, aggregation: str = "geometric") -> Dict:
+    """Does the model reproduce the measured regional contrast NOW?
+
+    Pre-fix the answer was trivially no: ``bbb_penetrance`` has no region
+    argument, so every predicted regional fold change was exactly 1.000. With
+    ``reconstruct.barrier`` active the model predicts, per region,
+
+        R_region = clip(bbb_penetrance + L * D_region, 0, 1)
+
+    with ``L = 0.238`` and ``D`` from :data:`_REGION_TO_DISRUPTION`. This
+    function re-scores every contrast in ``regional`` against that prediction.
+
+    **What is and is not a free fit here.** ``L`` WAS fitted to the
+    CE-vs-non-enhancing *differences* of these very drugs, so the model
+    reproducing a difference of ~0.24 is close to circular and is reported as a
+    consistency check, not a prediction. What is NOT circular, and is the real
+    test, is:
+
+    * the **ratios**, which depend on the base ``bbb_penetrance`` the leak is
+      added to — a quantity fitted to nothing;
+    * the **absolute per-region levels**, likewise;
+    * the **necrosis** contrasts under a single ``D = 0.48``;
+    * whether the ceiling clip at 1.0 breaks the penetrant drug.
+
+    Every one of those can fail with ``L`` exactly right, and the report says so.
+    """
+    out: Dict = {"leak_constant": L_PARACELLULAR_LEAK,
+                 "region_disruption": dict(_REGION_TO_DISRUPTION),
+                 "aggregation": aggregation, "drugs": {}, "literature": []}
+
+    base: Dict[str, float] = {}
+    for drug in list(_DRUG_COL) + ["methotrexate", "adavosertib", "temozolomide"]:
+        try:
+            base[drug] = molecular_profile(drug, aggregation=aggregation)[
+                "predicted_partition"]
+        except KeyError:
+            continue
+
+    def _pred(drug: str, region: str) -> float:
+        return float(effective_penetrance(base[drug], _REGION_TO_DISRUPTION[region]))
+
+    for drug in _DRUG_COL:
+        if drug not in base:
+            continue
+        d = regional["drugs"][drug]
+        entry: Dict = {"bbb_penetrance": base[drug], "by_region": {}, "contrasts": []}
+        for region, s in d["by_region"].items():
+            if region not in _REGION_TO_DISRUPTION:
+                continue
+            p = _pred(drug, region)
+            entry["by_region"][region] = {
+                "measured_mean": s["mean"], "predicted": p, "n": s["n"],
+                "fold_error": p / s["mean"] if s["mean"] > 0 else float("inf"),
+            }
+        for c in d["contrasts"]:
+            ra, rb = c["region_a"], c["region_b"]
+            if ra not in _REGION_TO_DISRUPTION or rb not in _REGION_TO_DISRUPTION:
+                continue
+            pa, pb = _pred(drug, ra), _pred(drug, rb)
+            entry["contrasts"].append({
+                "region_a": ra, "region_b": rb,
+                "measured_ratio": c["ratio_of_means"],
+                "measured_difference": c["difference_of_means"],
+                "model_ratio_prefix": 1.0,
+                "model_ratio_postfix": pa / pb if pb > 0 else float("inf"),
+                "model_difference_postfix": pa - pb,
+                "p_perm_within_case": c["p_perm_within_case"],
+                "ratio_error_prefix": (1.0 / c["ratio_of_means"]
+                                       if c["ratio_of_means"] > 0 else float("nan")),
+                "ratio_error_postfix": ((pa / pb) / c["ratio_of_means"]
+                                        if pb > 0 and c["ratio_of_means"] > 0
+                                        else float("nan")),
+                "ceiling_clipped": bool(base[drug] + L_PARACELLULAR_LEAK
+                                        * _REGION_TO_DISRUPTION[ra] > 1.0),
+            })
+        out["drugs"][drug] = entry
+
+    for r in regional.get("literature_regional", []):
+        drug = r["drug"]
+        if drug not in base:
+            continue
+        pa = _pred(drug, "contrast_enhancing")
+        pb = _pred(drug, "nonenhancing")
+        out["literature"].append({
+            "drug": drug, "measured_ratio": r["ratio_ce_over_ne"],
+            "measured_difference": r["difference_ce_minus_ne"],
+            "model_ratio_postfix": pa / pb if pb > 0 else float("inf"),
+            "model_difference_postfix": pa - pb,
+            "method": r["method"], "pmid": r["pmid"],
+        })
+
+    # Headline: how far off are the two anchor CE-vs-non-enhancing ratios now?
+    head = []
+    for drug in _DRUG_COL:
+        for c in out["drugs"].get(drug, {}).get("contrasts", []):
+            if c["region_a"] == "contrast_enhancing" and c["region_b"] == "non_enhancing":
+                head.append({"drug": drug, **c})
+    out["headline"] = head
+    errs = [abs(math.log10(c["ratio_error_postfix"])) for c in head
+            if c["ratio_error_postfix"] > 0 and math.isfinite(c["ratio_error_postfix"])]
+    out["headline_geometric_mean_abs_ratio_error"] = (
+        10.0 ** (sum(errs) / len(errs)) if errs else float("nan"))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1269,9 +1531,19 @@ def write_report(score: Dict, regional: Dict, disruption: Dict,
     A("")
     A("---")
     A("")
-    A(f"Generated by `tmesim/validation/glioma_regional_pk.py`. No core / physics / "
-      "molecular / reconstruct / engine module was modified; the molecular layer was "
-      "read, not tuned. All statistics use 20,000 seeded permutations.")
+    A("Sections 1-6 above are validation run #1 **as it was run, before any fix**. "
+      "The predicted column is recomputed live from the frozen pre-fix aggregation "
+      "(`_bbb_penetrance_arithmetic`), not pasted, so it cannot drift. Everything "
+      "below is the post-fix re-run.")
+
+    if post_fix is not None:
+        _write_post_fix(A, post_fix)
+
+    A("")
+    A("---")
+    A("")
+    A(f"Generated by `tmesim/validation/glioma_regional_pk.py`. `core`, `physics` and "
+      "`sim.engine` are untouched. All statistics use 20,000 seeded permutations.")
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:

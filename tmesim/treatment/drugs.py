@@ -99,7 +99,10 @@ def plasma_profile(pk: PKConfig, times: np.ndarray) -> np.ndarray:
 
 
 def delivery_source(
-    micro: Microenvironment, drug: DrugParams, plasma_conc: float
+    micro: Microenvironment,
+    drug: DrugParams,
+    plasma_conc: float,
+    bbb_disruption: "np.ndarray | float | None" = None,
 ) -> np.ndarray:
     """Instantaneous (ny, nx) drug delivery-rate source into the tissue.
 
@@ -115,13 +118,39 @@ def delivery_source(
     this linear-leak form keeps the treatment module decoupled from the tissue
     state and is what the contract specifies.)
 
+    Regional barrier integrity (optional, OFF by default)
+    -----------------------------------------------------
+    ``bbb_penetrance`` is a pure function of the drug's 2D descriptors, so the
+    form above predicts a contrast-enhancing-vs-non-enhancing fold change of
+    EXACTLY 1.000 for every drug — against measured within-patient fold changes
+    of 1.45x (levetiracetam) and 4.26x (cefazolin), p < 0.0001. Passing
+    ``bbb_disruption`` switches on the measured-derived additive paracellular
+    leak from :mod:`tmesim.reconstruct.barrier`::
+
+        S(x, y) = vascular_density(x, y)
+                  * clip(bbb_penetrance + L * bbb_disruption(x, y), 0, 1)
+                  * plasma_conc
+
+    with ``L = 0.238`` fitted across three independent drug/assay combinations
+    (see :data:`tmesim.reconstruct.barrier.L_PARACELLULAR_LEAK`). An ADDITIVE
+    form is used because a multiplicative one is drug-dependent (3.2x spread
+    across drugs vs 1.3x for additive) and therefore cannot be a property of the
+    barrier.
+
+    **Backward compatibility is exact.** ``bbb_disruption=None`` (the default)
+    short-circuits before any barrier code runs and returns the original
+    expression bit-for-bit; ``bbb_disruption=0`` likewise returns the original
+    values exactly, since ``x + L*0.0 == x`` in IEEE-754 and the clip is a no-op
+    for ``bbb_penetrance`` already in [0, 1]. Both are covered by tests.
+
     Engine usage
     ------------
     The transport engine calls ``plasma_profile`` once to get C_plasma(t) over
     the dosing course, then applies this source each timestep. Because the field
     is linear in ``plasma_conc``, the engine may equivalently build the unit
     field once with ``plasma_conc=1.0`` and multiply it by C_plasma(t) at every
-    step instead of rebuilding it — the two are identical.
+    step instead of rebuilding it — the two are identical. This stays true with
+    the barrier term on: it modulates the penetrance, not the plasma coupling.
 
     Parameters
     ----------
@@ -131,6 +160,11 @@ def delivery_source(
         Supplies ``bbb_penetrance``.
     plasma_conc : float
         Blood concentration in uM at this instant (from ``plasma_profile``).
+    bbb_disruption : ndarray (ny, nx), float, or None
+        Per-location barrier disruption in [0, 1] (0 = intact, 1 = fully
+        disrupted). ``None`` (default) disables the barrier term entirely and
+        reproduces the pre-fix source exactly. Build a field with
+        :func:`tmesim.reconstruct.barrier.bbb_disruption_field`.
 
     Returns
     -------
@@ -139,7 +173,14 @@ def delivery_source(
         same shape as the vascular density field.
     """
     vascular = np.asarray(micro.fields.vascular_density, dtype=np.float64)
-    return vascular * drug.bbb_penetrance * float(plasma_conc)
+    if bbb_disruption is None:
+        return vascular * drug.bbb_penetrance * float(plasma_conc)
+
+    # Imported lazily: reconstruct depends on treatment, not the other way round.
+    from tmesim.reconstruct.barrier import effective_penetrance
+
+    p_eff = effective_penetrance(drug.bbb_penetrance, bbb_disruption)
+    return vascular * p_eff * float(plasma_conc)
 
 
 if __name__ == "__main__":

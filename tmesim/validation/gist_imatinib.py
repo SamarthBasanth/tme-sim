@@ -885,8 +885,9 @@ def write_report(char: Dict, targets: pd.DataFrame, compiled: Dict, pred: Dict,
     s = char["sections"]
     tab = sc["table"]
     liv = tab[tab.organ == "Liver"]
-    prof = compiled["profile"]
     L = pred["L_um"]
+    struct = structural_limit(targets)
+    sens = sensitivity(compiled)
 
     md = []
     A = md.append
@@ -913,11 +914,26 @@ def write_report(char: Dict, targets: pd.DataFrame, compiled: Dict, pred: Dict,
       f"{tab[tab.organ=='Intestine'].fold_M1.iloc[0]:.2f}x and over-predicts every "
       f"one of the five liver-metastasis pairs by "
       f"{liv.fold_M1.min():.1f}-{liv.fold_M1.max():.1f}x.\n")
-    A("- **Verdict: partially falsified, and the failure is diagnostic.** "
-      "Passive reaction-diffusion transport is not what makes a GIST liver "
-      "metastasis 20-40x poorer in imatinib than the liver next to it. "
-      "The missing physics is active hepatic uptake plus lysosomal trapping of a "
-      "weak base in hepatocytes — neither of which exists in our model.\n")
+    A(f"- The failure is **structural, not a bad parameter choice**: a pure "
+      f"reaction-diffusion delivery ratio "
+      f"`E_t/E_n = [(L/R_t)tanh(R_t/L)] / [(L/R_n)tanh(R_n/L)]` is bounded below "
+      f"by `R_n/R_t` as `L -> 0`. For a liver pair that floor is "
+      f"{struct['liver']['floor_nominal']:.3f} at the nominal geometry and "
+      f"{struct['liver']['floor_extreme']:.4f} even at the most model-favourable "
+      f"end of the literature intervessel band. "
+      f"**{struct['liver']['n_below_extreme_floor']} of the 5 measured liver "
+      f"ratios lie below that floor**, so NO penetration length L can make the "
+      f"transport-only model reproduce them.\n")
+    A(f"- **Verdict: falsified as a sufficient explanation, and the failure is "
+      f"diagnostic.** Passive reaction-diffusion transport is not what makes a "
+      f"GIST liver metastasis {struct['liver']['fold_poorer_geomean']:.0f}x poorer "
+      f"in imatinib than the liver next to it (range "
+      f"{struct['liver']['fold_poorer_range'][0]:.0f}-"
+      f"{struct['liver']['fold_poorer_range'][1]:.0f}x). The missing physics is "
+      f"almost certainly the NORMAL side: active hepatic uptake (OCT1/OATP) plus "
+      f"lysosomal ion-trapping of a weak base in hepatocytes concentrates imatinib "
+      f"in normal liver. Neither exists in our model, and neither is a diffusion "
+      f"process.\n")
     A(f"- **n = 6, and 5 of the 6 are the same tissue pairing (liver metastasis "
       f"vs normal liver).** This dataset carries roughly ONE independent "
       f"discriminating comparison. It can falsify a badly wrong transport model; "
@@ -1089,3 +1105,459 @@ def write_report(char: Dict, targets: pd.DataFrame, compiled: Dict, pred: Dict,
       "to probe. Omitting it makes M2 conservative in a known direction — it "
       "UNDER-states liver uptake, i.e. it biases M2 toward looking better than it "
       "is.\n")
+
+    # ---------------- 3.3 sensitivity + the structural bound ----------------
+    A("\n### 3.3 Is the miss a parameter choice? No — it is a structural bound\n")
+    A("The delivery ratio has a hard floor. As `L -> 0` (infinitely poor "
+      "penetration, the most favourable limit for a transport explanation of low "
+      "tumour uptake), `E = (L/R) tanh(R/L) -> L/R`, so\n")
+    A("```\n"
+      "  E_t / E_n  ->  R_normal / R_tumour        (and -> 1 as L -> infinity)\n"
+      "```\n")
+    A("The transport-only prediction can therefore only ever live between "
+      "`R_n/R_t` and 1, **whatever L is**. Sweeping L over five orders of "
+      "magnitude confirms it:\n")
+    A("| L (um) | M1 for a liver pair |\n|---|---|\n" + "".join(
+        f"| {row['L_um']:.0f} | {row['M1_liver']:.3f} |\n"
+        for row in struct["L_sweep"]))
+    A(f"- Nominal geometry (normal liver half-spacing "
+      f"{HALF_SPACING_UM['liver']:.1f} um, tumour {HALF_SPACING_UM['tumour']:.0f} "
+      f"um): floor **{struct['liver']['floor_nominal']:.3f}**.\n")
+    A(f"- Most model-favourable end of the literature band (normal liver "
+      f"{HALF_SPACING_BAND_UM['liver'][0]:.0f} um, tumour "
+      f"{HALF_SPACING_BAND_UM['tumour'][1]:.0f} um): floor "
+      f"**{struct['liver']['floor_extreme']:.4f}**.\n")
+    A(f"- Measured liver ratios: "
+      f"{', '.join(f'{v:.3f}' for v in struct['liver']['measured'])}. "
+      f"**{struct['liver']['n_below_nominal_floor']} of 5 below the nominal floor; "
+      f"{struct['liver']['n_below_extreme_floor']} of 5 below even the extreme "
+      f"floor.**\n")
+    A("This is the cleanest result in the whole exercise: the miss cannot be "
+      "tuned away inside the transport model. Something that is not diffusion is "
+      "doing the work.\n")
+
+    A("\n**Sensitivity of the inputs we did choose** (each varied alone):\n")
+    A("| input | varied | M1 liver | M2 liver | comment |\n|---|---|---|---|---|\n"
+      + "".join(f"| {r['input']} | {r['setting']} | {r['M1_liver']} | "
+               f"{r['M2_liver']} | {r['comment']} |\n" for r in sens["rows"]))
+    A(f"**M2 is not a real prediction and we will not treat it as one.** Swapping "
+      f"the arbitrary normal-tissue parent used to build the surrogate tumour "
+      f"composition moves M2 by {sens['m2_surrogate_swing_fold']:.1f}x "
+      f"({sens['m2_surrogate_min']:.3f} to {sens['m2_surrogate_max']:.3f}) — a "
+      f"swing larger than the effect being predicted, and the 'lung' parent lands "
+      f"near the measurement only because lung has almost no neutral lipid. A "
+      f"free choice among three equally-unjustified surrogates that spans the "
+      f"answer is a knob, not a model. M1 is the prediction that counts.\n")
+    A(f"By contrast the prediction is INSENSITIVE to the logP disagreement: our "
+      f"layer's Crippen logP is {compiled['logp_rdkit']:.2f} against an "
+      f"experimental ~{IMATINIB_LOGP_EXPERIMENTAL:.1f}, but because M2 is a RATIO "
+      f"of Kpu values the lipid term largely cancels and M2 liver moves only from "
+      f"{sens['m2_logp_exp']:.3f} to {sens['m2_logp_rdkit']:.3f}.\n")
+
+    # ---------------- 4. absolute quantitation ----------------
+    A("\n## 4. Absolute quantitation — attempted, and rejected\n")
+    A(f"The bonus layer was genuinely attempted against "
+      f"`data_cache/hunt/maldi_msi_drug/ion_images_quant` "
+      f"({quant['n_quant_maps']} index rows): an internal-standard-normalised "
+      f"GIST liver-metastasis map plus an on-tissue imatinib dilution series, "
+      f"both from the same lab's later METASPACE project. The dilution-series "
+      f"image segments cleanly into **{quant['n_spots']} spots** in a 3x2 layout "
+      f"with IS-normalised means "
+      f"{', '.join(f'{v:.3f}' for v in quant['spot_means_row_major'])} "
+      f"(row-major).\n")
+    A(f"**Verdict: {quant['verdict']}**\n")
+    A("Blockers, each independently sufficient:\n")
+    for b in quant["blockers"]:
+        A(f"1. {b}\n")
+    A("So: **no ng/g, no uM, and no comparison to imatinib's ~0.1 uM KIT-"
+      "inhibitory concentration or to plasma levels.** Everything above and below "
+      "is a unitless ratio. Fabricating an absolute scale here would have been "
+      "the single most tempting and least defensible move available, and the "
+      "sorted-spots-fit-a-line version of it would have produced a beautiful R^2 "
+      "that meant nothing.\n")
+
+    # ---------------- 5. scorecard ----------------
+    A("\n## 5. Scorecard vs the plasma null\n")
+    A("### 5.1 The null, recomputed here from the raw pixels\n")
+    A(f"- Plasma imatinib vs tumour-section mean imatinib: **Spearman rho = "
+      f"{null['spearman_rho']:.3f}, p = {null['spearman_p']:.3f}, n = "
+      f"{null['n_tumours_with_plasma']}** "
+      f"(plasma {null['plasma_range_ng_ml'][0]:.0f}-"
+      f"{null['plasma_range_ng_ml'][1]:.0f} ng/mL, a "
+      f"{null['plasma_range_ng_ml'][1]/null['plasma_range_ng_ml'][0]:.1f}x range, "
+      f"against a {null['tumour_mean_fold_range']:.0f}x range in tissue signal). "
+      f"Log-log Pearson r = {null['pearson_loglog_r']:.3f}, p = "
+      f"{null['pearson_loglog_p']:.2f}.\n")
+    A(f"- Against the RATIO target the model is actually scored on: Spearman rho = "
+      f"{null['spearman_rho_ratio']:.3f}, p = {null['spearman_p_ratio']:.2f}, n = "
+      f"{null['n_ratio']}.\n")
+    A("**Confirmed independently.** Systemic exposure explains essentially none "
+      "of the tissue variance. That is the gap a microenvironment transport model "
+      "exists to fill, and it is why any skill shown here is attributable to "
+      "transport rather than to dose.\n")
+
+    A("\n### 5.2 Predicted vs measured, n = 6 matched patients\n")
+    A(_md_table(tab, ["patient", "organ", "measured", "pred_M1", "pred_M2",
+                      "fold_M1", "fold_M2", "fold_null_unity"],
+                {"measured": "**{:.3f}**", "pred_M1": "{:.3f}",
+                 "pred_M2": "{:.3f}", "fold_M1": "{:.1f}x",
+                 "fold_M2": "{:.1f}x", "fold_null_unity": "{:.1f}x"}))
+    A("\n| model | geomean fold error (n = 6) | worst | within 3x | Spearman rho | p |\n"
+      "|---|---|---|---|---|---|\n" + "".join(
+        f"| {lbl} | **{sc[m]['geomean_fold_error']:.2f}x** | "
+        f"{sc[m]['max_fold_error']:.1f}x | {sc[m]['n_within_3x']}/6 | "
+        + (f"{sc[m]['spearman_rho']:.3f} | {sc[m]['spearman_p']:.2f} |\n"
+           if np.isfinite(sc[m]["spearman_rho"]) else "undefined | — |\n")
+        for m, lbl in (("M1", "M1 transport-only"),
+                       ("M2", "M2 transport x composition"),
+                       ("null_unity", "null: no partitioning (R = 1)"))))
+    A(f"- Baseline for reference: the plasma null on the same n = 6 ratio target "
+      f"has Spearman rho = {null['spearman_rho_ratio']:.3f} (p = "
+      f"{null['spearman_p_ratio']:.2f}).\n")
+
+    A("\n### 5.3 Does it beat the null?\n")
+    A(f"**Narrowly yes on magnitude, and not meaningfully on rank.** M1's "
+      f"{sc['M1']['geomean_fold_error']:.2f}x geometric-mean fold error over "
+      f"**n = 6** is {sc['null_unity']['geomean_fold_error']/sc['M1']['geomean_fold_error']:.2f}x "
+      f"better than the no-partitioning null's "
+      f"{sc['null_unity']['geomean_fold_error']:.2f}x, and its rank correlation "
+      f"({sc['M1']['spearman_rho']:.3f}) exceeds the plasma null's "
+      f"({null['spearman_rho_ratio']:.3f}). But:\n")
+    A(f"- Being 8x wrong instead of 13x wrong is not a useful prediction. Only "
+      f"{sc['M1']['n_within_3x']}/6 patients land within 3x, and that one is the "
+      f"intestinal primary.\n")
+    A(f"- **The rank correlation is one data point.** M1 predicts an IDENTICAL "
+      f"value for all five liver pairs, so the entire rho = "
+      f"{sc['M1']['spearman_rho']:.3f} comes from the single intestinal pair "
+      f"sorting above the tied liver block. It is not evidence of ranking skill; "
+      f"it is evidence that the model knows liver sinusoids are closer together "
+      f"than gut capillaries, which we told it.\n")
+    A(f"- Within the five liver pairs the measurement spreads "
+      f"{sc['liver_only']['measured_spread_fold']:.1f}x and the model spreads "
+      f"{sc['liver_only']['predicted_spread_fold']:.1f}x. The model explains "
+      f"**0%** of the within-tissue variance, because it has no per-patient "
+      f"tumour input — we have no per-patient vessel density, ECM density or "
+      f"necrosis measurement for these sections.\n")
+    A(f"- M2 lowers the fold error to {sc['M2']['geomean_fold_error']:.2f}x but "
+      f"**inverts the ordering** (rho = {sc['M2']['spearman_rho']:.3f}): it "
+      f"predicts the intestinal pair to be the WORST-perfused when it is measured "
+      f"as by far the best. Buying magnitude with the wrong sign is not progress, "
+      f"and combined with the surrogate swing in 3.3 it is why we report M1 as "
+      f"the model's answer.\n")
+
+    # ---------------- 6. heterogeneity ----------------
+    A("\n## 6. Intratumoral heterogeneity — the weaker of the two tests\n")
+    A(f"- Model penetration length **L = {L:.1f} um = {pred['L_px']:.2f} pixels** "
+      f"at the assumed 50 um raster. The model's own claim is that imatinib "
+      f"gradients here are BELOW this experiment's resolution, so this dataset "
+      f"cannot see the structure the model predicts.\n")
+    A(f"- Model Krogh-slab CV at 60 um half-spacing: "
+      f"{het['predicted_cv_krogh_slab']:.2f} "
+      f"({het['predicted_cv_range_over_spacing'][0]:.2f}-"
+      f"{het['predicted_cv_range_over_spacing'][1]:.2f} over the 30-120 um band).\n")
+    A(f"- Measured CV over detected pixels: "
+      f"{het['measured_cv_detected_pixels'][0]:.2f}-"
+      f"{het['measured_cv_detected_pixels'][1]:.2f}. Overlapping. But the overlap "
+      f"is worth very little: the model band spans "
+      f"{het['predicted_cv_range_over_spacing'][1]/het['predicted_cv_range_over_spacing'][0]:.1f}x "
+      f"and would have overlapped almost any measurement.\n")
+    A(f"- Measured CV over ALL tissue pixels is "
+      f"{het['measured_cv_all_pixels'][0]:.2f}-"
+      f"{het['measured_cv_all_pixels'][1]:.2f}, but that is a DETECTION FLOOR, "
+      f"not a gradient: {het['measured_detected_fraction'][0]:.0%}-"
+      f"{het['measured_detected_fraction'][1]:.0%} of tumour pixels are exactly "
+      f"zero, versus 86-100% detected in the matched normals.\n")
+    A(f"- Spatial autocorrelation e-folding: tumours "
+      f"{het['measured_autocorr_px_tumour'][0]:.2f}-"
+      f"{het['measured_autocorr_px_tumour'][1]:.2f} px, matched normals "
+      f"{het['measured_autocorr_px_normal'][0]:.2f}-"
+      f"{het['measured_autocorr_px_normal'][1]:.2f} px; tumour fields are patchier "
+      f"than their own matched normal in 5 of 6 patients. A tumour e-folding of "
+      f"~1 px IS the pixel/point-spread floor, so 'the model predicts sub-pixel "
+      f"gradients and we measure sub-pixel structure' is **not inconsistent**, "
+      f"not a confirmation. Scored honestly, this test is uninformative.\n")
+
+    # ---------------- 7. caveats ----------------
+    A("\n## 7. Hard caveats\n")
+    A("1. **n = 6 matched pairs, and 5 of them are the same tissue pairing.** "
+      "There is approximately ONE independent discriminating comparison in this "
+      "dataset (liver-metastasis-vs-liver, repeated, plus one "
+      "intestinal-primary-vs-intestine). It can falsify a badly wrong transport "
+      "model — and it did — but it **cannot rank two plausible models**, and no "
+      "correlation quoted here should be read as ranking skill.\n")
+    A("2. **Ion counts are not concentrations.** MALDI response is not calibrated; "
+      "only within-patient, same-ion, same-adduct RATIOS are used, and the "
+      "absolute-quantitation route was assessed and rejected (section 4).\n")
+    A("3. **Ion suppression does not fully cancel in the ratio.** The tumour and "
+      "the normal section are different tissues on (generally) different slides; "
+      "matrix effects differ between liver parenchyma and GIST stroma. This is an "
+      "uncontrolled confounder that inflates or deflates every ratio here by an "
+      "unknown factor, and it pushes in the same direction as our finding "
+      "(lipid-rich liver ionises differently from stroma). We cannot separate it "
+      "from real partitioning with this deposit.\n")
+    A(f"4. **Pixel size is absent from the deposit.** `MS_Analysis.Pixel_Size` is "
+      f"null for every dataset in the 'GIST' project; the {PIXEL_UM:.0f} um figure "
+      f"comes from the paper text alone (it IS present, 50x50 um, in the same "
+      f"lab's later quantitative project, which is suggestive but not this "
+      f"deposit). Every micrometre quantity derived from pixel counts "
+      f"(autocorrelation lengths, L in pixels) inherits that assumption. The "
+      f"partition RATIOS, which are the headline result, do not.\n")
+    A("5. **The intervessel half-spacings are literature values, not measured on "
+      "these sections.** No vessel stain accompanies the deposit. They are the "
+      "single largest free input to M1, which is why section 3.3 sweeps them and "
+      "shows the conclusion survives the whole band.\n")
+    A("6. **GIST is not glioma.** This is the transfer argument, stated plainly: "
+      "what carries over is **PHYSICS** — Stokes-Einstein diffusion of a ~490 Da "
+      "small molecule, ECM/mesh hindrance, reaction-diffusion penetration length, "
+      "partition between compartments, and the demonstration that these are "
+      "insufficient without active transport. What does **NOT** carry over is "
+      "biology: KIT vs EGFR, hepatic sinusoids vs the blood-brain barrier, "
+      "imatinib's OCT1/OATP handling vs temozolomide's. No claim about glioma "
+      "drug levels follows from this file.\n")
+    A(f"7. **A known infelicity in our own molecular layer, surfaced by this run.** "
+      f"`molecular.permeability.membrane_permeability` returns "
+      f"{compiled['permeability_um_s']:.2e} um/s for imatinib — physically absurd "
+      f"(tens of metres per second), because the solubility-diffusion estimator "
+      f"exponentiates a Crippen logP of {compiled['logp_rdkit']:.2f} without a "
+      f"realistic ceiling. It is reported here for transparency and is **not used "
+      f"anywhere in this prediction** (M1 depends only on L; M2 adds only logP "
+      f"and pKa). Fixing it is out of scope for this file, which touches no core "
+      f"module.\n")
+    A("8. **Nothing here was fitted to the GIST data.** The one calibrated "
+      "constant, alpha, was fitted once to an unrelated doxorubicin "
+      "perivascular-gradient measurement and was not re-touched. That is what "
+      "makes the miss meaningful rather than a fitting failure.\n")
+
+    # ---------------- 8. verdict ----------------
+    A("\n## 8. Honest verdict\n")
+    A(f"The dataset delivered exactly what it promised. The join is real, the "
+      f"paper's headline reproduces from the raw pixels ("
+      f"{', '.join(f'{v:.3f}' for v in struct['liver']['measured'])} for liver "
+      f"metastases against the published ~0.02-0.14, and "
+      f"{tab[tab.organ=='Intestine'].measured.iloc[0]:.3f} for the intestinal "
+      f"primary against the published ~0.72), and the plasma null reproduces "
+      f"exactly (rho = {null['spearman_rho']:.3f}, p = {null['spearman_p']:.2f}, "
+      f"n = {null['n_tumours_with_plasma']}).\n")
+    A(f"Our transport model, with zero parameters fitted here, gets the one "
+      f"intestinal-primary pair right to {tab[tab.organ=='Intestine'].fold_M1.iloc[0]:.2f}x "
+      f"and misses all five liver-metastasis pairs high by "
+      f"{liv.fold_M1.min():.1f}-{liv.fold_M1.max():.1f}x. It beats the "
+      f"no-partitioning null "
+      f"({sc['M1']['geomean_fold_error']:.2f}x vs "
+      f"{sc['null_unity']['geomean_fold_error']:.2f}x geometric-mean fold error "
+      f"over **n = 6**) and it beats the plasma null's rank correlation, but "
+      f"neither margin is worth much: 8x wrong is still wrong, and the rank "
+      f"result rests on a single non-liver patient.\n")
+    A(f"The valuable output is not the score, it is the **structural "
+      f"falsification** in section 3.3. Passive reaction-diffusion transport is "
+      f"mathematically incapable of producing "
+      f"{struct['liver']['n_below_extreme_floor']} of the 5 measured liver "
+      f"tumour:normal ratios at ANY penetration length, under ANY intervessel "
+      f"geometry in the literature band — they fall below the model's hard floor "
+      f"of {struct['liver']['floor_extreme']:.4f}. (The fifth, patient J at "
+      f"{max(struct['liver']['measured']):.3f}, is reachable only at the extreme "
+      f"edge of that band.) "
+      f"The dominant term is not the tumour being hard to reach — it is normal "
+      "liver actively concentrating a weak base via hepatic uptake transporters "
+      "and lysosomal trapping. Our model has neither, and this dataset says so "
+      "unambiguously.\n")
+    A("That is a genuine, falsifiable, negative result against real in-human "
+      "measurements, and it names the specific missing mechanism. With **n = 6** "
+      "it is enough to rule this model out as a sufficient account of tissue "
+      "partitioning; it is not enough to certify whatever we build next.\n")
+
+    A(f"\n---\n*Generated by `tmesim/validation/gist_imatinib.py`. "
+      f"No file under `core/`, `physics/`, `molecular/`, `reconstruct/` or the "
+      f"engine was modified.*\n")
+
+    text = "".join(md)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as fh:
+        fh.write(text)
+    return path
+
+
+# ===========================================================================
+# 9. STRUCTURAL BOUND + SENSITIVITY (added so the report can prove its claims)
+# ===========================================================================
+def structural_limit(targets: pd.DataFrame,
+                     compiled: Optional[Dict] = None) -> Dict:
+    """Is the transport-only miss tunable, or is it a hard bound?
+
+    ``E = (L/R) tanh(R/L)`` is monotone increasing in ``L`` and satisfies
+    ``E -> L/R`` as ``L -> 0`` and ``E -> 1`` as ``L -> inf``. Hence the delivery
+    ratio ``E_t/E_n`` is confined to ``(R_n/R_t, 1)`` for every positive L. If the
+    measurement sits below ``R_n/R_t`` then NO penetration length can reproduce
+    it and the model is falsified structurally rather than parametrically.
+
+    Reports the floor at the nominal geometry and at the most model-favourable
+    end of the literature intervessel band, and counts how many measured liver
+    ratios fall below each.
+    """
+    compiled = compile_imatinib() if compiled is None else compiled
+    L = compiled["L_um"]
+    liv = targets[targets.organ == "Liver"].ratio_mean.values
+    floor_nom = HALF_SPACING_UM["liver"] / HALF_SPACING_UM["tumour"]
+    floor_ext = HALF_SPACING_BAND_UM["liver"][0] / HALF_SPACING_BAND_UM["tumour"][1]
+    sweep = [dict(L_um=x,
+                  M1_liver=delivery_efficiency(x, HALF_SPACING_UM["tumour"])
+                  / delivery_efficiency(x, HALF_SPACING_UM["liver"]))
+             for x in (1.0, 5.0, 10.0, 20.0, L, 100.0, 400.0)]
+    return {
+        "L_um": L,
+        "L_sweep": sweep,
+        "liver": {
+            "measured": [float(v) for v in np.sort(liv)],
+            "floor_nominal": float(floor_nom),
+            "floor_extreme": float(floor_ext),
+            "n_below_nominal_floor": int((liv < floor_nom).sum()),
+            "n_below_extreme_floor": int((liv < floor_ext).sum()),
+            "fold_poorer_geomean": float(1.0 / 10 ** np.mean(np.log10(liv))),
+            "fold_poorer_range": (float(1.0 / liv.max()), float(1.0 / liv.min())),
+        },
+    }
+
+
+def sensitivity(compiled: Optional[Dict] = None) -> Dict:
+    """Vary each chosen input alone and report the effect on M1/M2 (liver pair).
+
+    Exists so the report cannot quietly hide behind a favourable choice: the
+    tumour-composition surrogate turns out to swing M2 by more than the effect
+    being predicted, which is why M2 is reported as a knob and not a prediction.
+    """
+    compiled = compile_imatinib() if compiled is None else compiled
+    L = compiled["L_um"]
+    rows = []
+
+    def m1(rt, rn):
+        return delivery_efficiency(L, rt) / delivery_efficiency(L, rn)
+
+    base_m1 = m1(HALF_SPACING_UM["tumour"], HALF_SPACING_UM["liver"])
+    base = predict(compiled)
+    base_m2 = base["per_tissue"]["liver"]["M2_transport_x_composition"]
+    rows.append(dict(input="(baseline)", setting=(
+        f"L = {L:.1f} um, R_t = {HALF_SPACING_UM['tumour']:.0f} um, "
+        f"R_n = {HALF_SPACING_UM['liver']:.1f} um, surrogate = "
+        f"{TUMOUR_SURROGATE_DEFAULT}"),
+        M1_liver=f"{base_m1:.3f}", M2_liver=f"{base_m2:.3f}",
+        comment="measured geomean is 0.049"))
+
+    for rt in HALF_SPACING_BAND_UM["tumour"]:
+        rows.append(dict(input="tumour half-spacing",
+                         setting=f"{rt:.0f} um (band end)",
+                         M1_liver=f"{m1(rt, HALF_SPACING_UM['liver']):.3f}",
+                         M2_liver="—", comment="largest single lever on M1"))
+    for rn in HALF_SPACING_BAND_UM["liver"]:
+        rows.append(dict(input="normal-liver half-spacing",
+                         setting=f"{rn:.0f} um (band end)",
+                         M1_liver=f"{m1(HALF_SPACING_UM['tumour'], rn):.3f}",
+                         M2_liver="—", comment="weak lever"))
+    Lu = compiled["L_uncalibrated_um"]
+    m1_uncal = (delivery_efficiency(Lu, HALF_SPACING_UM["tumour"])
+                / delivery_efficiency(Lu, HALF_SPACING_UM["liver"]))
+    rows.append(dict(input="penetration length L",
+                     setting=f"uncalibrated, {Lu:.0f} um",
+                     M1_liver=f"{m1_uncal:.3f}", M2_liver="—",
+                     comment="dropping the doxorubicin calibration makes it worse"))
+
+    m2s = {}
+    for par in TUMOUR_SURROGATE_PARENTS:
+        p = predict(compiled, tumour_parent=par)
+        v = p["per_tissue"]["liver"]["M2_transport_x_composition"]
+        m2s[par] = v
+        rows.append(dict(input="tumour composition surrogate", setting=par,
+                         M1_liver="(unchanged)", M2_liver=f"{v:.3f}",
+                         comment="arbitrary choice; see warning below"))
+    p_exp = predict(compiled, logp=IMATINIB_LOGP_EXPERIMENTAL)
+    m2_exp = p_exp["per_tissue"]["liver"]["M2_transport_x_composition"]
+    rows.append(dict(input="logP", setting=f"experimental {IMATINIB_LOGP_EXPERIMENTAL:.1f} "
+                     f"instead of Crippen {compiled['logp_rdkit']:.2f}",
+                     M1_liver="(unchanged)", M2_liver=f"{m2_exp:.3f}",
+                     comment="ratio of Kpu cancels most of it"))
+
+    vals = np.array(list(m2s.values()))
+    return {
+        "rows": rows,
+        "m2_surrogate_min": float(vals.min()),
+        "m2_surrogate_max": float(vals.max()),
+        "m2_surrogate_swing_fold": float(vals.max() / vals.min()),
+        "m2_logp_exp": float(m2_exp),
+        "m2_logp_rdkit": float(base_m2),
+    }
+
+
+# ===========================================================================
+# 10. ENTRY POINT
+# ===========================================================================
+def run(make_png: bool = True, write_md: bool = True) -> Dict:
+    """Full validation run. Returns every intermediate for inspection/tests."""
+    char = characterize()
+    targets = measured_targets(char)
+    null = plasma_null(char)
+    compiled = compile_imatinib()
+    pred = predict(compiled)
+    sc = score(targets, compiled, pred, null)
+    het = heterogeneity_scorecard(targets, pred)
+    quant = quantitative_layer()
+    out = dict(char=char, targets=targets, null=null, compiled=compiled,
+               pred=pred, score=sc, het=het, quant=quant,
+               structural=structural_limit(targets, compiled),
+               sensitivity=sensitivity(compiled))
+    if make_png:
+        out["png"] = make_figure(char, targets, compiled, pred, sc, null, het)
+    if write_md:
+        out["md"] = write_report(char, targets, compiled, pred, sc, null, het,
+                                 quant)
+    return out
+
+
+if __name__ == "__main__":
+    import warnings
+    warnings.filterwarnings("ignore", message="An input array is constant")
+    r = run()
+    t, s, n = r["targets"], r["score"], r["null"]
+    st = r["structural"]
+    print("=" * 78)
+    print("GIST imatinib -- measured spatial drug distribution in human tumours")
+    print("=" * 78)
+    print(f"sections {r['char']['n_datasets']}  patients {r['char']['n_patients']}"
+          f"  tumour maps {r['char']['n_tumour_maps']}"
+          f"  matched pairs {len(r['char']['matched_patients'])}"
+          f" ({', '.join(r['char']['matched_patients'])})")
+    print("\nMEASURED tumour:normal imatinib ratio (n = 6 matched patients)")
+    for _, x in t.iterrows():
+        print(f"   {x.patient:>2}  {x.organ:<10} {x.ratio_mean:8.3f}")
+    print(f"   liver geomean {10 ** np.mean(np.log10(t[t.organ=='Liver'].ratio_mean)):.3f}"
+          f"   (paper: 0.02-0.14 liver, 0.72 intestinal primary -- REPRODUCED)")
+    print(f"\nPLASMA NULL (recomputed from raw pixels): Spearman rho = "
+          f"{n['spearman_rho']:.3f}, p = {n['spearman_p']:.3f}, "
+          f"n = {n['n_tumours_with_plasma']}")
+    print(f"\nMODEL: L = {r['pred']['L_um']:.1f} um ({r['pred']['L_px']:.2f} px)")
+    print(f"   M1 transport-only  : liver "
+          f"{r['pred']['per_tissue']['liver']['M1_transport_only']:.3f}"
+          f"   intestine "
+          f"{r['pred']['per_tissue']['intestine']['M1_transport_only']:.3f}")
+    print(f"   M2 x composition   : liver "
+          f"{r['pred']['per_tissue']['liver']['M2_transport_x_composition']:.3f}"
+          f"   intestine "
+          f"{r['pred']['per_tissue']['intestine']['M2_transport_x_composition']:.3f}")
+    print("\nSCORECARD (n = 6)")
+    for m, lbl in (("M1", "M1 transport-only"),
+                   ("M2", "M2 x composition "),
+                   ("null_unity", "null R = 1        ")):
+        print(f"   {lbl}  geomean fold err {s[m]['geomean_fold_error']:6.2f}x"
+              f"   within 3x {s[m]['n_within_3x']}/6"
+              f"   rho {s[m]['spearman_rho']:.3f}")
+    print(f"   beats no-partitioning null on magnitude: {s['beats_plasma_null']} "
+          f"(by {s['null_unity']['geomean_fold_error']/s['M1']['geomean_fold_error']:.2f}x)"
+          f"  -- but rho rests on ONE non-liver patient")
+    print(f"\nSTRUCTURAL BOUND: M1 floor {st['liver']['floor_nominal']:.3f} nominal / "
+          f"{st['liver']['floor_extreme']:.4f} extreme; "
+          f"{st['liver']['n_below_extreme_floor']}/5 measured liver ratios lie "
+          f"BELOW the extreme floor -> no L can fit them.")
+    print(f"\nABSOLUTE QUANTITATION: defensible = {r['quant']['defensible']} "
+          f"({r['quant']['n_spots']} unlabelled spots, "
+          f"{r['quant']['dynamic_range']:.1f}x range for a nominal 32x, wrong "
+          f"instrument + wrong tissue). Staying on ratios.")
+    print(f"\nwrote {r['md']}")
+    print(f"wrote {r['png']}")
