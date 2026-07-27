@@ -278,15 +278,80 @@ def run_stage0_experiment(
 # --------------------------------------------------------------------------- #
 # Self-test / smoke run
 # --------------------------------------------------------------------------- #
+def _build_selftest_cohort(n: int = 12):
+    """A tiny hand-built cohort of ``PatientRecord`` objects (no data generator).
+
+    Each patient is a minimal core.Microenvironment: a small tumor mass on a
+    tiny Domain with a vascular/ECM field, plus a fabricated-but-labeled
+    ``observed_response`` and a couple of non-spatial ``features`` — just enough
+    to exercise the Stage-0 harness (sim vs. baselines) end to end. This is a
+    self-test fixture, NOT a validation cohort.
+    """
+    import numpy as _np
+
+    from tmesim.core import (
+        CellPopulation,
+        CellState,
+        CellType,
+        Domain,
+        Microenvironment,
+        PatientRecord,
+        TissueFields,
+    )
+
+    rng = _np.random.default_rng(0)
+    records = []
+    for i in range(n):
+        dom = Domain(nx=24, ny=24, dx=15.0)
+        X, Y = dom.coords_um()
+        cx, cy = X.mean(), Y.mean()
+        R = _np.hypot(X - cx, Y - cy)
+        core_r = 0.4 * R.max()
+        # Per-patient vascularity spans a range so responses vary across the cohort.
+        vascularity = 0.2 + 0.6 * (i / max(n - 1, 1))
+        vascular = _np.clip(
+            vascularity * (1.0 - 0.8 * _np.exp(-(R / (0.9 * core_r)) ** 2)), 0.0, 1.0
+        )
+        ecm = _np.clip(0.3 + 0.5 * _np.exp(-(R / core_r) ** 2), 0.0, 1.0)
+        fields = TissueFields(ecm_density=ecm, vascular_density=vascular)
+
+        n_tumor = 120
+        ang = rng.uniform(0, 2 * _np.pi, n_tumor)
+        rad = _np.abs(rng.normal(0, 0.5 * core_r, n_tumor))
+        tx = _np.clip(cx + rad * _np.cos(ang), 0, dom.extent_um[0] - 1e-6)
+        ty = _np.clip(cy + rad * _np.sin(ang), 0, dom.extent_um[1] - 1e-6)
+        base_sens = 0.3 + 0.5 * (i % 2)  # alternate low/high intrinsic sensitivity
+        sens = _np.clip(base_sens + 0.08 * rng.standard_normal(n_tumor), 0.0, 1.0)
+        cells = CellPopulation(
+            x=tx, y=ty,
+            cell_type=_np.full(n_tumor, int(CellType.TUMOR), dtype=_np.int8),
+            state=_np.full(n_tumor, int(CellState.VIABLE), dtype=_np.int8),
+            sensitivity=sens,
+        )
+        micro = Microenvironment(domain=dom, fields=fields, cells=cells,
+                                 patient_id=f"FIXTURE-{i:02d}")
+        # Fabricated label correlated with BOTH delivery (vascularity) and
+        # intrinsic sensitivity, so no single baseline trivially recovers it.
+        resp = float(_np.clip(0.5 * vascularity + 0.5 * base_sens
+                              + 0.05 * rng.standard_normal(), 0.0, 1.0))
+        observed = 1.0 if resp >= 0.5 else 0.0
+        features = {
+            "mean_sensitivity": float(sens.mean()),
+            "vascular_fraction": float(vascular.mean()),
+            "expr_a": float(base_sens + 0.05 * rng.standard_normal()),
+        }
+        records.append(PatientRecord(patient_id=f"FIXTURE-{i:02d}", micro=micro,
+                                     observed_response=observed, features=features))
+    return records
+
+
 if __name__ == "__main__":
     import copy
 
-    from tmesim.data.synthetic import generate_synthetic_cohort
+    print("Stage 0 harness self-test: building a tiny hand-built fixture cohort...")
+    cohort = _build_selftest_cohort(n=12)
 
-    print("Stage 0 harness self-test: building 24-patient synthetic GBM cohort...")
-    cohort = generate_synthetic_cohort(n=24, seed=0)
-
-    # Small/fast config: shrink the PDE window so 24 patients finish quickly.
+    # Small/fast config: shrink the PDE window so the cohort finishes quickly.
     # (The transport solver is implicit/unconditionally stable, so a short
     # window is a valid smoke test — it just samples less exposure.)
     cfg = SimConfig()

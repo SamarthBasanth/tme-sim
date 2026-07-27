@@ -1,34 +1,41 @@
 """Command-line interface for **tmesim** — the glioblastoma tumor-microenvironment
-drug-response simulator.
+drug-response simulator (REAL data only).
 
 Run as a module::
 
-    python -m tmesim.cli demo
-    python -m tmesim.cli run --n 40 --data synthetic --out results
+    python -m tmesim.cli reconstruct --source xenium --dx 30
+    python -m tmesim.cli simulate --source xenium --drug temozolomide
+    python -m tmesim.cli molecules
+    python -m tmesim.cli molecular-run --drug doxorubicin --source xenium
     python -m tmesim.cli acquire --out data_cache
 
 Subcommands
 -----------
-``demo``
-    Generate ONE synthetic GBM patient, run the full mechanistic simulation, write
-    the microenvironment + simulation figures, and print the headline predictions.
-``run``
-    Build a cohort (synthetic / real / auto), run the honest Stage-0 kill-test
-    experiment (sim vs. cheap baselines), and write a markdown report.
+``reconstruct``
+    Reconstruct a whole-niche REAL microenvironment from open spatial data
+    (10x Xenium single-cell or 10x Visium spot), print the reconstruction report,
+    and save a microenvironment figure. No synthetic data anywhere.
+``simulate``
+    Reconstruct a real microenvironment, compile a REAL calibrated drug
+    (calibrated_drugparams -> binding-site barrier), run the mechanistic
+    transport+kill simulation, print kill fraction / penetration, save a figure.
+``molecules``
+    List the library GBM drugs with structure-derived descriptors (no simulation).
+``molecular-run``
+    Compile a library molecule to DrugParams (Stokes-Einstein -> Brownian
+    hindrance -> BBB/binding) and simulate it on a REAL reconstructed patient.
 ``acquire``
     Best-effort live download of open glioblastoma datasets into a cache dir.
 
 Design notes
 ------------
-* The heavy pipeline modules (``sim.engine``, ``validation.experiment``,
-  ``viz.report``, ``viz.plots``) and the real-data modules (``data.acquire``,
-  ``data.loaders``) are imported **lazily inside each command**. This keeps
-  ``--help`` responsive and lets the CLI degrade gracefully with a clear message
-  if an optional module (e.g. real-data acquisition) is not present yet.
-* ``--seed`` is global and threaded through cohort generation and the simulation
-  config so every run is deterministic.
-* The ``run`` / ``demo`` paths use a *reduced* ``PDEConfig.total_time`` so the CLI
-  finishes quickly; the full-fidelity window lives in the library defaults.
+* Every heavy module (``reconstruct.real_pipeline``, ``sim.engine``,
+  ``validation.calibration``, ``molecular.*``, ``viz.plots``, ``data.acquire``) is
+  imported **lazily inside each command** so ``--help`` stays fast and never
+  crashes if an optional dependency is missing.
+* ``--seed`` is global and threaded into the simulation config for determinism.
+* The commands use a *reduced* ``PDEConfig.total_time`` so the CLI finishes
+  quickly; the full-fidelity window lives in the library defaults.
 """
 from __future__ import annotations
 
@@ -39,177 +46,138 @@ from typing import List, Optional
 
 # Fast default simulated-exposure window (seconds) for the CLI. The library
 # default (see core.config.PDEConfig) is 12 hours, which is far too slow for an
-# interactive demo; a short window still exercises the whole transport+kill
+# interactive run; a short window still exercises the whole transport+kill
 # pipeline and produces meaningful figures.
 _FAST_TOTAL_TIME = 1800.0     # 30 simulated minutes
 _FAST_SAVE_EVERY = 200        # snapshot cadence (PDE steps)
+_DEFAULT_DRUG = "temozolomide"
 
 
 # --------------------------------------------------------------------------- #
 # Config helpers
 # --------------------------------------------------------------------------- #
-def _build_sim_config(seed: int, total_time: Optional[float] = None,
-                      drug_name: Optional[str] = None):
+def _build_sim_config(seed: int, total_time: Optional[float] = None):
     """Construct a :class:`~tmesim.core.SimConfig` with a CLI-friendly (reduced)
-    PDE exposure window.
-
-    Parameters
-    ----------
-    seed : reproducibility seed threaded into the config.
-    total_time : override for ``PDEConfig.total_time`` (seconds); defaults to the
-        fast CLI window so runs complete quickly.
-    drug_name : optional key into ``DRUG_LIBRARY`` selecting the treating agent.
-
-    Returns
-    -------
-    SimConfig
-    """
-    from tmesim.core import DRUG_LIBRARY, SimConfig
+    PDE exposure window. The drug is set separately by the caller."""
+    from tmesim.core import SimConfig
 
     cfg = SimConfig(seed=int(seed))
     cfg.pde.total_time = float(total_time) if total_time is not None else _FAST_TOTAL_TIME
     cfg.pde.save_every = _FAST_SAVE_EVERY
-    if drug_name:
-        if drug_name not in DRUG_LIBRARY:
-            raise SystemExit(
-                f"unknown drug {drug_name!r}; choose from {sorted(DRUG_LIBRARY)}")
-        cfg.drug = DRUG_LIBRARY[drug_name]
     return cfg
 
 
-# --------------------------------------------------------------------------- #
-# demo
-# --------------------------------------------------------------------------- #
-def cmd_demo(args: argparse.Namespace) -> int:
-    """Generate one synthetic GBM patient, simulate drug response, and plot it.
+def _print_report(report: dict) -> None:
+    """Pretty-print a reconstruction_report dict."""
+    print("\n=== REAL whole-niche microenvironment ===")
+    for k, v in report.items():
+        if isinstance(v, dict):
+            print(f"  {k}:")
+            for kk, vv in v.items():
+                vv_s = f"{vv:.4f}" if isinstance(vv, float) else str(vv)
+                print(f"      {kk:14s} {vv_s}")
+        elif isinstance(v, float):
+            print(f"  {k:22s} {v:.4f}")
+        else:
+            print(f"  {k:22s} {v}")
 
-    Writes ``<out>/demo_microenvironment.png`` and ``<out>/demo_simulation.png``
-    and prints ``predicted_response``, ``kill_fraction`` and ``penetration_index``.
+
+# --------------------------------------------------------------------------- #
+# reconstruct
+# --------------------------------------------------------------------------- #
+def cmd_reconstruct(args: argparse.Namespace) -> int:
+    """Reconstruct a REAL microenvironment, print the report, save a figure."""
+    from tmesim.reconstruct.real_pipeline import (
+        reconstruct_real,
+        reconstruction_report,
+    )
+    from tmesim.viz.plots import plot_microenvironment
+
+    out_dir = args.out
+    os.makedirs(out_dir, exist_ok=True)
+
+    print(f"[reconstruct] assembling REAL microenvironment "
+          f"(source={args.source}, sample={args.sample}, dx={args.dx} um) ...")
+    micro = reconstruct_real(source=args.source, sample=args.sample, dx_um=args.dx)
+    report = reconstruction_report(micro)
+    _print_report(report)
+
+    fig = os.path.join(out_dir, f"reconstruct_{args.source}.png")
+    plot_microenvironment(micro, fig)
+    print(f"\n[reconstruct] figure written: {os.path.abspath(fig)}")
+    return 0
+
+
+# --------------------------------------------------------------------------- #
+# simulate
+# --------------------------------------------------------------------------- #
+def _compile_real_drug(drug_name: str):
+    """Compile a REAL, engine-ready drug: calibrated transport/loss params with
+    the binding-site-barrier retention folded in. Returns ``(molecule, DrugParams)``.
     """
-    from tmesim.data.synthetic import generate_synthetic_patient
+    from tmesim.molecular.binding_site_barrier import apply_barrier_to_drugparams
+    from tmesim.molecular.library import get_molecule
+    from tmesim.validation.calibration import calibrated_drugparams
+
+    dp = calibrated_drugparams(drug_name)
+    molecule = get_molecule(drug_name)
+    dp = apply_barrier_to_drugparams(dp, molecule)
+    return molecule, dp
+
+
+def cmd_simulate(args: argparse.Namespace) -> int:
+    """Reconstruct a real microenvironment, compile a real drug, simulate, plot."""
+    from tmesim.reconstruct.real_pipeline import (
+        reconstruct_real,
+        reconstruction_report,
+    )
     from tmesim.sim.engine import simulate_response
     from tmesim.viz.plots import plot_microenvironment, plot_simulation
 
     out_dir = args.out
     os.makedirs(out_dir, exist_ok=True)
+    drug_name = args.drug or _DEFAULT_DRUG
 
-    print(f"[demo] generating one synthetic GBM patient (seed={args.seed}) ...")
-    record = generate_synthetic_patient(patient_id="DEMO-000", seed=args.seed)
-    micro = record.micro
+    print(f"[simulate] reconstructing REAL microenvironment "
+          f"(source={args.source}, sample={args.sample}, dx={args.dx} um) ...")
+    micro = reconstruct_real(source=args.source, sample=args.sample, dx_um=args.dx)
+    report = reconstruction_report(micro)
+    _print_report(report)
 
-    cfg = _build_sim_config(args.seed, total_time=args.total_time,
-                            drug_name=args.drug)
-    print(f"[demo] simulating drug response (drug={cfg.drug.name}, "
-          f"total_time={cfg.pde.total_time:.0f}s) ...")
+    print(f"\n[simulate] compiling REAL calibrated drug {drug_name!r} "
+          "(calibrated_drugparams -> binding-site barrier) ...")
+    molecule, dp = _compile_real_drug(drug_name)
+    print(f"  drug             : {dp.name}")
+    print(f"  effective_D      : {dp.diffusivity:12.3f} um^2/s")
+    print(f"  ic50 / hill      : {dp.ic50:.3f} uM / {dp.hill:.3f}")
+    print(f"  binding+clearance: {dp.binding:.3e} + {dp.clearance:.3e} 1/s")
+    print(f"  bbb_penetrance   : {dp.bbb_penetrance:.3f}")
+
+    cfg = _build_sim_config(args.seed, total_time=args.total_time)
+    cfg.drug = dp
+    if args.plasma is not None:
+        cfg.pk.plasma_peak = float(args.plasma)
+
+    print(f"\n[simulate] running transport+kill simulation "
+          f"(total_time={cfg.pde.total_time:.0f}s) ...")
     result = simulate_response(micro, cfg)
+    pen = result.extras.get("penetration_index", float("nan"))
 
-    micro_png = os.path.join(out_dir, "demo_microenvironment.png")
-    sim_png = os.path.join(out_dir, "demo_simulation.png")
+    micro_png = os.path.join(out_dir, f"simulate_{args.source}_microenvironment.png")
+    sim_png = os.path.join(out_dir, f"simulate_{args.source}_{drug_name}.png")
     plot_microenvironment(micro, micro_png)
     plot_simulation(result, sim_png)
 
-    # penetration_index lives on the TransportResult that drove the kill.
-    pen = getattr(getattr(result, "transport", None), "penetration_index", float("nan"))
-
-    print("\n=== demo results ===")
-    print(f"  patient_id          : {record.patient_id}")
-    print(f"  observed_response   : {record.observed_response:.3f}  (ground truth)")
-    print(f"  predicted_response  : {result.predicted_response:.3f}")
+    print("\n=== simulate results ===")
+    print(f"  patient_id          : {micro.patient_id}")
+    print(f"  drug (molecule)     : {molecule.name}")
+    print(f"  predicted_response  : {result.predicted_response:.3f}  (= kill fraction)")
     print(f"  kill_fraction       : {result.kill_fraction:.3f}")
+    print(f"  viable_tumor_frac   : {result.viable_tumor_fraction:.3f}")
     print(f"  penetration_index   : {pen:.3f}")
-    print("\n[demo] figures written:")
+    print("\n[simulate] figures written:")
     print(f"  {os.path.abspath(micro_png)}")
     print(f"  {os.path.abspath(sim_png)}")
-    return 0
-
-
-# --------------------------------------------------------------------------- #
-# run
-# --------------------------------------------------------------------------- #
-def _load_real_cohort(cache_dir: str) -> List:
-    """Lazily import and call the real-data loader, degrading gracefully.
-
-    Returns an empty list (never raises) if ``tmesim.data.loaders`` is missing or
-    fails, so callers can fall back to synthetic data.
-    """
-    try:
-        from tmesim.data.loaders import load_real_cohort
-    except Exception as exc:  # module not built yet / import error
-        print(f"[run] real-data loader unavailable ({exc}); no real cohort.")
-        return []
-    try:
-        return load_real_cohort(cache_dir=cache_dir) or []
-    except Exception as exc:
-        print(f"[run] real-data load failed ({exc}); no real cohort.")
-        return []
-
-
-def _build_cohort(data: str, n: int, seed: int, cache_dir: str) -> List:
-    """Build the patient cohort per the ``--data`` mode.
-
-    ``synthetic`` : always synthetic.
-    ``real``      : real only (may be empty if no data cached).
-    ``auto``      : try real; fall back to synthetic with a printed notice.
-    """
-    from tmesim.data.synthetic import generate_synthetic_cohort
-
-    if data == "synthetic":
-        print(f"[run] building synthetic cohort (n={n}, seed={seed}) ...")
-        return generate_synthetic_cohort(n=n, seed=seed)
-
-    if data == "real":
-        print(f"[run] loading real cohort from {cache_dir!r} ...")
-        records = _load_real_cohort(cache_dir)
-        if not records:
-            print("[run] no real records available; cohort is empty.")
-        return records
-
-    # auto
-    print(f"[run] auto mode: attempting real cohort from {cache_dir!r} ...")
-    records = _load_real_cohort(cache_dir)
-    if records:
-        print(f"[run] using {len(records)} real records.")
-        return records
-    print("[run] NOTICE: real data unavailable/empty — falling back to "
-          f"synthetic (n={n}, seed={seed}).")
-    return generate_synthetic_cohort(n=n, seed=seed)
-
-
-def cmd_run(args: argparse.Namespace) -> int:
-    """Build a cohort, run the Stage-0 experiment, and write a report."""
-    from tmesim.sim.engine import simulate_response
-    from tmesim.validation.experiment import run_stage0_experiment
-    from tmesim.viz.report import build_report
-
-    out_dir = args.out
-    os.makedirs(out_dir, exist_ok=True)
-
-    records = _build_cohort(args.data, args.n, args.seed, args.cache_dir)
-    if not records:
-        print("[run] ERROR: empty cohort — nothing to evaluate. "
-              "Try --data synthetic or run `acquire` first.")
-        return 1
-
-    cfg = _build_sim_config(args.seed, total_time=args.total_time,
-                            drug_name=args.drug)
-
-    print(f"[run] running Stage-0 experiment on {len(records)} patients "
-          f"(total_time={cfg.pde.total_time:.0f}s) ...")
-    exp = run_stage0_experiment(records, cfg, out_dir=out_dir)
-
-    # Build the report using the first record's simulation + microenvironment as
-    # the worked example figure set.
-    example = records[0]
-    print(f"[run] simulating example patient {example.patient_id} for report ...")
-    sim_example = simulate_response(example.micro, cfg)
-    report_path = build_report(exp, sim_example, example.micro, out_dir=out_dir)
-
-    print("\n=== run results ===")
-    print(f"  cohort size    : {len(records)}")
-    print(f"  primary metric : {getattr(exp, 'primary_metric', 'roc_auc')}")
-    print(f"  beat_baseline  : {getattr(exp, 'beat_baseline', False)}")
-    print(f"  VERDICT        : {getattr(exp, 'verdict', '(none)')}")
-    print(f"\n[run] report written: {os.path.abspath(report_path)}")
     return 0
 
 
@@ -222,8 +190,7 @@ def cmd_acquire(args: argparse.Namespace) -> int:
         from tmesim.data.acquire import acquire_all
     except Exception as exc:
         print(f"[acquire] data-acquisition module unavailable: {exc}")
-        print("[acquire] nothing downloaded. (This is optional; synthetic data "
-              "works without it.)")
+        print("[acquire] nothing downloaded. (This step is optional.)")
         return 0  # optional module missing is not a hard failure
 
     out_dir = args.out
@@ -257,20 +224,19 @@ def cmd_acquire(args: argparse.Namespace) -> int:
 
 
 # --------------------------------------------------------------------------- #
-# molecular layer (optional): molecules / molecular-run
+# molecular layer: molecules / molecular-run
 # --------------------------------------------------------------------------- #
 def _import_molecular_library():
     """Lazily import the molecular library, degrading gracefully.
 
     Returns ``(GBM_DRUGS, get_molecule, all_molecules)`` or ``None`` (with a
-    printed notice) if the optional ``tmesim.molecular`` layer is unavailable, so
-    the rest of the CLI keeps working.
+    printed notice) if the optional ``tmesim.molecular`` layer is unavailable.
     """
     try:
         from tmesim.molecular.library import GBM_DRUGS, all_molecules, get_molecule
     except Exception as exc:  # module not built / RDKit / import error
         print(f"[molecular] molecular layer unavailable: {exc}")
-        print("[molecular] (this is optional; demo/run/acquire work without it.)")
+        print("[molecular] (this is optional; the other commands work without it.)")
         return None
     return GBM_DRUGS, get_molecule, all_molecules
 
@@ -321,20 +287,6 @@ def cmd_molecules(args: argparse.Namespace) -> int:
     return 0
 
 
-def _compile_drug(get_molecule, molecule_to_drugparams, name: str):
-    """Resolve a library molecule by ``name`` and compile it to ``DrugParams``.
-
-    Returns ``(molecule, drugparams)``. Raises ``SystemExit`` with a clear
-    message on an unknown drug name.
-    """
-    try:
-        molecule = get_molecule(name)
-    except KeyError as exc:
-        raise SystemExit(f"[molecular-run] {exc}")
-    dp = molecule_to_drugparams(molecule)
-    return molecule, dp
-
-
 def _print_compiled_drugparams(dp) -> None:
     """Print the compiled DrugParams so the molecule->params bridge is visible."""
     print("\n=== compiled DrugParams (molecule -> engine params bridge) ===")
@@ -349,14 +301,13 @@ def _print_compiled_drugparams(dp) -> None:
 
 
 def cmd_molecular_run(args: argparse.Namespace) -> int:
-    """Compile a library molecule to DrugParams, then simulate with it.
+    """Compile a library molecule to DrugParams, then simulate it on a REAL patient.
 
     The named GBM library molecule is compiled to a ``core.DrugParams`` via the
     molecular layer's ``molecule_to_drugparams`` bridge (Stokes-Einstein free D ->
     Brownian-dynamics hindrance -> permeability/BBB -> binding/clearance). The
-    compiled params are printed, then either a single-patient ``demo``-style
-    simulation (``--n 1``) or the Stage-0 cohort experiment (``--n > 1``) is run
-    with that molecularly-compiled drug, writing figures / a report.
+    compiled params are printed, then the drug is simulated on a REAL reconstructed
+    microenvironment (:func:`reconstruct_real`), writing figures.
     """
     # Optional molecular layer — lazy import so the rest of the CLI still works.
     try:
@@ -364,97 +315,83 @@ def cmd_molecular_run(args: argparse.Namespace) -> int:
         from tmesim.molecular.library import get_molecule
     except Exception as exc:
         print(f"[molecular-run] molecular layer unavailable: {exc}")
-        print("[molecular-run] (this is optional; demo/run/acquire work without it.)")
+        print("[molecular-run] (this is optional; the other commands work without it.)")
         return 1
+
+    from tmesim.reconstruct.real_pipeline import (
+        reconstruct_real,
+        reconstruction_report,
+    )
+    from tmesim.sim.engine import simulate_response
+    from tmesim.viz.plots import plot_microenvironment, plot_simulation
 
     out_dir = args.out
     os.makedirs(out_dir, exist_ok=True)
 
     print(f"[molecular-run] compiling library molecule {args.drug!r} "
           "-> DrugParams (Stokes-Einstein -> Brownian hindrance -> BBB/binding) ...")
-    molecule, dp = _compile_drug(get_molecule, molecule_to_drugparams, args.drug)
+    try:
+        molecule = get_molecule(args.drug)
+    except KeyError as exc:
+        raise SystemExit(f"[molecular-run] {exc}")
+    dp = molecule_to_drugparams(molecule)
     _print_compiled_drugparams(dp)
 
+    print(f"\n[molecular-run] reconstructing REAL microenvironment "
+          f"(source={args.source}, sample={args.sample}, dx={args.dx} um) ...")
+    micro = reconstruct_real(source=args.source, sample=args.sample, dx_um=args.dx)
+    report = reconstruction_report(micro)
+    _print_report(report)
+
     # Build a CLI-fast config and inject the molecularly-compiled drug directly
-    # (bypassing DRUG_LIBRARY — this IS the molecule->params bridge output).
+    # (this IS the molecule->params bridge output).
     cfg = _build_sim_config(args.seed, total_time=args.total_time)
     cfg.drug = dp
     if args.plasma is not None:
         cfg.pk.plasma_peak = float(args.plasma)
 
-    if args.n <= 1:
-        # ---- single-patient, demo-style simulation ----
-        from tmesim.data.synthetic import generate_synthetic_patient
-        from tmesim.sim.engine import simulate_response
-        from tmesim.viz.plots import plot_microenvironment, plot_simulation
+    print(f"\n[molecular-run] simulating (drug={cfg.drug.name}, "
+          f"total_time={cfg.pde.total_time:.0f}s, "
+          f"plasma_peak={cfg.pk.plasma_peak:.1f} uM) ...")
+    result = simulate_response(micro, cfg)
 
-        print(f"\n[molecular-run] single-patient simulation "
-              f"(seed={args.seed}, drug={cfg.drug.name}, "
-              f"total_time={cfg.pde.total_time:.0f}s, "
-              f"plasma_peak={cfg.pk.plasma_peak:.1f} uM) ...")
-        record = generate_synthetic_patient(patient_id="MOL-000", seed=args.seed)
-        micro = record.micro
-        result = simulate_response(micro, cfg)
+    micro_png = os.path.join(out_dir, "molecular_microenvironment.png")
+    sim_png = os.path.join(out_dir, f"molecular_{args.drug}.png")
+    plot_microenvironment(micro, micro_png)
+    plot_simulation(result, sim_png)
 
-        micro_png = os.path.join(out_dir, "molecular_microenvironment.png")
-        sim_png = os.path.join(out_dir, "molecular_simulation.png")
-        plot_microenvironment(micro, micro_png)
-        plot_simulation(result, sim_png)
-
-        pen = getattr(getattr(result, "transport", None),
-                      "penetration_index", float("nan"))
-        print("\n=== molecular-run results (single patient) ===")
-        print(f"  drug (molecule)     : {molecule.name}")
-        print(f"  patient_id          : {record.patient_id}")
-        print(f"  observed_response   : {record.observed_response:.3f}  (ground truth)")
-        print(f"  predicted_response  : {result.predicted_response:.3f}")
-        print(f"  kill_fraction       : {result.kill_fraction:.3f}")
-        print(f"  penetration_index   : {pen:.3f}")
-        print("\n[molecular-run] figures written:")
-        print(f"  {os.path.abspath(micro_png)}")
-        print(f"  {os.path.abspath(sim_png)}")
-        return 0
-
-    # ---- cohort Stage-0 experiment ----
-    from tmesim.sim.engine import simulate_response
-    from tmesim.validation.experiment import run_stage0_experiment
-    from tmesim.viz.report import build_report
-
-    records = _build_cohort(args.data, args.n, args.seed, "data_cache")
-    if not records:
-        print("[molecular-run] ERROR: empty cohort — nothing to evaluate. "
-              "Try --data synthetic.")
-        return 1
-
-    print(f"\n[molecular-run] Stage-0 experiment on {len(records)} patients "
-          f"(drug={cfg.drug.name}, total_time={cfg.pde.total_time:.0f}s) ...")
-    exp = run_stage0_experiment(records, cfg, out_dir=out_dir)
-
-    example = records[0]
-    print(f"[molecular-run] simulating example patient {example.patient_id} "
-          "for report ...")
-    sim_example = simulate_response(example.micro, cfg)
-    report_path = build_report(exp, sim_example, example.micro, out_dir=out_dir)
-
-    print("\n=== molecular-run results (cohort) ===")
-    print(f"  drug (molecule): {molecule.name}")
-    print(f"  cohort size    : {len(records)}")
-    print(f"  primary metric : {getattr(exp, 'primary_metric', 'roc_auc')}")
-    print(f"  beat_baseline  : {getattr(exp, 'beat_baseline', False)}")
-    print(f"  VERDICT        : {getattr(exp, 'verdict', '(none)')}")
-    print(f"\n[molecular-run] report written: {os.path.abspath(report_path)}")
+    pen = result.extras.get("penetration_index", float("nan"))
+    print("\n=== molecular-run results ===")
+    print(f"  drug (molecule)     : {molecule.name}")
+    print(f"  patient_id          : {micro.patient_id}")
+    print(f"  predicted_response  : {result.predicted_response:.3f}  (= kill fraction)")
+    print(f"  kill_fraction       : {result.kill_fraction:.3f}")
+    print(f"  penetration_index   : {pen:.3f}")
+    print("\n[molecular-run] figures written:")
+    print(f"  {os.path.abspath(micro_png)}")
+    print(f"  {os.path.abspath(sim_png)}")
     return 0
 
 
 # --------------------------------------------------------------------------- #
 # argparse plumbing
 # --------------------------------------------------------------------------- #
+def _add_real_source_args(p: argparse.ArgumentParser) -> None:
+    """Common real-reconstruction args: --source / --sample / --dx."""
+    p.add_argument("--source", choices=["xenium", "visium"], default="xenium",
+                   help="real spatial data source")
+    p.add_argument("--sample", default=None,
+                   help="sample id / cache path (default: loader default)")
+    p.add_argument("--dx", type=float, default=30.0,
+                   help="continuum grid spacing in micrometers")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct the top-level argument parser with all subcommands."""
     parser = argparse.ArgumentParser(
         prog="tmesim",
         description="tmesim — glioblastoma tumor-microenvironment drug-response "
-                    "simulator and honest Stage-0 kill-test.",
+                    "simulator (REAL data only).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--seed", type=int, default=0,
@@ -462,35 +399,32 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(
         dest="command",
-        metavar="{demo,run,acquire,molecules,molecular-run}")
+        metavar="{reconstruct,simulate,molecules,molecular-run,acquire}")
     sub.required = True
 
-    # demo
-    p_demo = sub.add_parser(
-        "demo", help="simulate ONE synthetic patient and write figures",
+    # reconstruct
+    p_rec = sub.add_parser(
+        "reconstruct",
+        help="reconstruct a REAL microenvironment and print the report",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    p_demo.add_argument("--out", default="results", help="output directory")
-    p_demo.add_argument("--drug", default=None,
-                        help="drug name from DRUG_LIBRARY (default: config default)")
-    p_demo.add_argument("--total-time", dest="total_time", type=float, default=None,
-                        help="PDE exposure window in seconds (default: fast CLI window)")
-    p_demo.set_defaults(func=cmd_demo)
+    _add_real_source_args(p_rec)
+    p_rec.add_argument("--out", default="results", help="output directory")
+    p_rec.set_defaults(func=cmd_reconstruct)
 
-    # run
-    p_run = sub.add_parser(
-        "run", help="run the Stage-0 cohort experiment and write a report",
+    # simulate
+    p_sim = sub.add_parser(
+        "simulate",
+        help="reconstruct + compile a REAL drug + simulate transport/kill",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    p_run.add_argument("--n", type=int, default=40, help="cohort size (synthetic)")
-    p_run.add_argument("--data", choices=["synthetic", "real", "auto"],
-                       default="synthetic", help="data source")
-    p_run.add_argument("--out", default="results", help="output directory")
-    p_run.add_argument("--cache-dir", dest="cache_dir", default="data_cache",
-                       help="where real data is cached (for real/auto)")
-    p_run.add_argument("--drug", default=None,
-                       help="drug name from DRUG_LIBRARY (default: config default)")
-    p_run.add_argument("--total-time", dest="total_time", type=float, default=None,
+    _add_real_source_args(p_sim)
+    p_sim.add_argument("--drug", default=None,
+                       help=f"library GBM drug name (default: {_DEFAULT_DRUG})")
+    p_sim.add_argument("--out", default="results", help="output directory")
+    p_sim.add_argument("--plasma", dest="plasma", type=float, default=None,
+                       help="override PK plasma_peak (uM) for the run")
+    p_sim.add_argument("--total-time", dest="total_time", type=float, default=None,
                        help="PDE exposure window in seconds (default: fast CLI window)")
-    p_run.set_defaults(func=cmd_run)
+    p_sim.set_defaults(func=cmd_simulate)
 
     # acquire
     p_acq = sub.add_parser(
@@ -512,16 +446,12 @@ def build_parser() -> argparse.ArgumentParser:
     # molecular-run
     p_mrun = sub.add_parser(
         "molecular-run",
-        help="compile a library molecule to DrugParams and simulate with it",
+        help="compile a library molecule to DrugParams and simulate on a REAL patient",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p_mrun.add_argument("--drug", required=True,
                         help="library molecule name from GBM_DRUGS "
                              "(e.g. temozolomide, doxorubicin)")
-    p_mrun.add_argument("--n", type=int, default=1,
-                        help="patients: 1 => demo-style single patient; "
-                             ">1 => Stage-0 cohort experiment")
-    p_mrun.add_argument("--data", choices=["synthetic", "real", "auto"],
-                        default="synthetic", help="data source (cohort mode)")
+    _add_real_source_args(p_mrun)
     p_mrun.add_argument("--out", default="results", help="output directory")
     p_mrun.add_argument("--plasma", dest="plasma", type=float, default=None,
                         help="override PK plasma_peak (uM) for the run")

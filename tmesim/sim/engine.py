@@ -327,20 +327,72 @@ def plasma_profile_safe(cfg: SimConfig, times: np.ndarray) -> np.ndarray:
     return plasma_profile(cfg.pk, times)
 
 
+def _build_selftest_micro() -> Microenvironment:
+    """A tiny hand-built Microenvironment (no data generator) for the self-test.
+
+    A central dense tumor mass on a poorly-perfused core, ringed by endothelial
+    cells feeding a peripheral vascular field, with denser ECM in the core — just
+    enough real structure to exercise oxygen -> pressure -> transport -> kill.
+    """
+    from ..core import (
+        CellPopulation,
+        CellState,
+        CellType,
+        Domain,
+        TissueFields,
+    )
+
+    rng = np.random.default_rng(0)
+    ny = nx = 48
+    dx = 15.0
+    domain = Domain(nx=nx, ny=ny, dx=dx)
+    X, Y = domain.coords_um()
+    cx, cy = X.mean(), Y.mean()
+    R = np.hypot(X - cx, Y - cy)
+    core_r = 0.35 * R.max()
+
+    # Vascular density: sparse in the core, richer at the periphery.
+    vascular = np.clip(0.7 * (1.0 - np.exp(-(R / (0.9 * core_r)) ** 2)) + 0.1, 0.0, 1.0)
+    # ECM: denser in the core.
+    ecm = np.clip(0.3 + 0.5 * np.exp(-(R / (1.0 * core_r)) ** 2), 0.0, 1.0)
+    fields = TissueFields(ecm_density=ecm, vascular_density=vascular)
+
+    # Cells: tumor mass in the core, endothelial cells at the periphery.
+    n_tumor, n_endo = 300, 80
+    ang = rng.uniform(0, 2 * np.pi, n_tumor)
+    rad = np.abs(rng.normal(0, 0.5 * core_r, n_tumor))
+    tx = np.clip(cx + rad * np.cos(ang), 0, domain.extent_um[0] - 1e-6)
+    ty = np.clip(cy + rad * np.sin(ang), 0, domain.extent_um[1] - 1e-6)
+    ex = rng.uniform(0, domain.extent_um[0] - 1e-6, n_endo)
+    ey = rng.uniform(0, domain.extent_um[1] - 1e-6, n_endo)
+
+    x = np.concatenate([tx, ex])
+    y = np.concatenate([ty, ey])
+    cell_type = np.concatenate([
+        np.full(n_tumor, int(CellType.TUMOR), dtype=np.int8),
+        np.full(n_endo, int(CellType.ENDOTHELIAL), dtype=np.int8),
+    ])
+    state = np.full(x.size, int(CellState.VIABLE), dtype=np.int8)
+    sensitivity = np.clip(0.5 + 0.1 * rng.standard_normal(x.size), 0.0, 1.0)
+    cells = CellPopulation(x=x, y=y, cell_type=cell_type, state=state,
+                           sensitivity=sensitivity)
+    return Microenvironment(domain=domain, fields=fields, cells=cells,
+                            patient_id="ENGINE-SELFTEST")
+
+
 if __name__ == "__main__":
     # -----------------------------------------------------------------------
-    # Self-test: run one synthetic 120x120 patient end to end and assert the
-    # integrator is well-formed, deterministic, and that stronger BBB penetrance
-    # (better delivery) yields at least as much kill as weak penetrance — the
-    # sanity check that transport is actually coupled into the kill.
+    # Self-test: run one tiny hand-built microenvironment end to end and assert
+    # the integrator is well-formed, deterministic, and that stronger BBB
+    # penetrance (better delivery) yields at least as much kill as weak
+    # penetrance — the sanity check that transport is actually coupled into the
+    # kill. No synthetic data generator is used.
     # -----------------------------------------------------------------------
     import time
 
     from ..core import PDEConfig
-    from ..data.synthetic import generate_synthetic_patient
 
-    rec = generate_synthetic_patient("ENGINE-SELFTEST", seed=0)
-    micro = rec.micro
+    micro = _build_selftest_micro()
     print("patient summary:", micro.summary())
 
     # Keep the transport solve to a few seconds: coarser dt than the fine default,

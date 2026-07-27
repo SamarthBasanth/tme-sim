@@ -3,7 +3,7 @@
 This module attempts, in order, to pull *real* open-access glioblastoma data
 from public APIs and file stores. Everything is wrapped in ``try/except`` with
 explicit ``requests`` timeouts and a single retry: a failed or partial download
-must NEVER crash the pipeline — the caller (``loaders.load_real_cohort``) falls
+must NEVER crash the pipeline — callers degrade gracefully and simply
 back to synthetic data if nothing usable landed on disk.
 
 Sources attempted (all verified live against their current URLs/APIs before this

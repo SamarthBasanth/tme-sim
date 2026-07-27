@@ -1,10 +1,8 @@
 """Ingest a REAL spatial-transcriptomics glioblastoma sample into a tmesim
 :class:`~tmesim.core.microenvironment.Microenvironment`.
 
-This closes the loop the rest of the package only *approximated*: instead of a
-synthetic 2-D layout parameterised by bulk features (see
-``tmesim/data/synthetic.py`` and ``docs/data_acquisition_plan.md`` section B),
-we place agents at the **measured spatial coordinates** of a 10x Visium spot
+This is the REAL spatial-transcriptomics ingest: we place agents at the
+**measured spatial coordinates** of a 10x Visium spot
 array and phenotype each spot from its **measured marker-gene expression**, then
 hand the result to the *unmodified* ``reconstruct`` package to build the ECM /
 vascular continuum fields the physics + sim stages consume.

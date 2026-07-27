@@ -28,7 +28,6 @@ from tmesim.molecular.brownian import simulate_effective_diffusivity
 from tmesim.molecular.types import Molecule
 from tmesim.core import DrugParams, PDEConfig, SimConfig, SimulationResult
 from tmesim.sim.engine import simulate_response
-from tmesim.data.synthetic import generate_synthetic_patient
 
 # Small Brownian settings: keep every simulation to a few hundredths of a second.
 # Deterministic given the seed, so these values are stable across runs.
@@ -208,18 +207,17 @@ def test_doxorubicin_lower_diffusivity_and_bbb_than_temozolomide():
     assert dox.bbb_penetrance <= tmz.bbb_penetrance
 
 
-def test_compiled_drug_runs_through_tissue_engine():
-    # Compile a real molecule into DrugParams and drive the FROZEN engine with it.
+def test_compiled_drug_runs_through_tissue_engine(real_micro):
+    # Compile a real molecule into DrugParams and drive the FROZEN engine with it
+    # on the REAL reconstructed microenvironment.
     dp = compile_drug.molecule_to_drugparams(
         library.get_molecule("temozolomide"), brownian_kw=_FAST_BROWNIAN)
 
-    rec = generate_synthetic_patient(
-        "SYN-MOL", seed=3, grid=(32, 32), dx=15.0)
     cfg = SimConfig(seed=0)
     cfg.drug = dp
     cfg.pde = PDEConfig(dt=20.0, total_time=800.0, convection=True, save_every=10)
 
-    result = simulate_response(rec.micro, cfg)
+    result = simulate_response(real_micro, cfg)
 
     assert isinstance(result, SimulationResult)
     assert 0.0 <= float(result.predicted_response) <= 1.0

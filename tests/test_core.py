@@ -190,12 +190,12 @@ def test_microenvironment_summary_fields():
     assert s["metadata_keys"] == ["subtype"]
 
 
-def test_summary_on_real_synthetic_patient(small_patient):
-    """summary() on a genuine reconstructed microenvironment is well-formed."""
-    s = small_patient.micro.summary()
+def test_summary_on_real_microenvironment(real_micro):
+    """summary() on a genuine REAL reconstructed microenvironment is well-formed."""
+    s = real_micro.summary()
     assert s["n_cells"] > 0
     assert s["n_tumor"] > 0
     assert s["n_tumor"] <= s["n_cells"]
     assert 0.0 <= s["mean_ecm"] <= 1.0
     assert 0.0 <= s["mean_vascular"] <= 1.0
-    assert s["grid"] == small_patient.micro.domain.shape
+    assert s["grid"] == real_micro.domain.shape

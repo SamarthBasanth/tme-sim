@@ -339,7 +339,7 @@ def all_baselines() -> Dict[str, BaselineSpec]:
 # Self-test
 # --------------------------------------------------------------------------- #
 if __name__ == "__main__":
-    # Build a tiny synthetic cohort of PatientRecords inline (no data.synthetic).
+    # Build a tiny hand-built cohort of PatientRecords inline (no data generator).
     from tmesim.core import (
         CellPopulation,
         CellType,

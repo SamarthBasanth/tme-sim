@@ -1,8 +1,20 @@
-"""Shared fixtures and small-microenvironment builders for the tmesim test suite.
+"""Shared fixtures for the tmesim test suite — REAL-ONLY (no synthetic data).
 
-The whole suite is deliberately kept fast (small grids, short PDE windows). These
-helpers build *real* pipeline objects (via ``data.synthetic`` and the ``core``
-containers) so the tests exercise genuine signatures, not mocks.
+The suite is deliberately fast. Two kinds of fixtures live here:
+
+* **Real pipeline fixtures** — ``real_micro`` (a whole-niche microenvironment
+  reconstructed from an open 10x Xenium GBM section via
+  :func:`tmesim.reconstruct.real_pipeline.reconstruct_real`) and ``real_drug``
+  (a calibrated + binding-site-barrier ``core.DrugParams`` for temozolomide).
+  ``real_micro`` is session-scoped and built at a coarse grid so it assembles in
+  a fraction of a second; ``simulate_response`` never mutates it (it works on a
+  private copy), so it is safe to share across tests.
+
+* **Physics-numerics builders** — ``flat_micro_factory`` / ``radial_micro_factory``
+  and the ``inert_drug`` tracer. These construct ``Microenvironment`` objects
+  directly from the frozen ``core`` containers (no synthetic patient generator)
+  purely to exercise the transport / oxygen / pressure solvers on controlled
+  geometry. They contain no invented "ground truth" or outcome labels.
 """
 from __future__ import annotations
 
@@ -16,43 +28,52 @@ from tmesim.core import (
     Domain,
     DrugParams,
     Microenvironment,
-    PDEConfig,
     TissueFields,
 )
-from tmesim.data.synthetic import generate_synthetic_patient
+from tmesim.molecular import library
+from tmesim.molecular.binding_site_barrier import apply_barrier_to_drugparams
+from tmesim.reconstruct.real_pipeline import reconstruct_real
+from tmesim.validation.calibration import calibrated_drugparams
 
-# Small, fast defaults used across the suite.
-SMALL_GRID = (48, 48)
-SMALL_DX = 15.0
-
-
-def make_small_patient(seed: int = 1, grid=SMALL_GRID, dx: float = SMALL_DX,
-                       subtype=None):
-    """A small but fully-populated synthetic ``PatientRecord`` (fast to build)."""
-    return generate_synthetic_patient(
-        patient_id=f"SYN-T{seed:03d}", seed=seed, grid=grid, dx=dx, subtype=subtype)
+# Coarse grid keeps the real reconstruction (and any simulation on it) fast.
+REAL_SOURCE = "xenium"
+REAL_DX_UM = 80.0
 
 
-def make_small_cohort(n: int = 6, seed: int = 0, grid=(40, 40), dx: float = SMALL_DX):
-    """A small deterministic cohort spanning subtypes, on a small grid for speed.
+# --------------------------------------------------------------------------- #
+# Real pipeline fixtures
+# --------------------------------------------------------------------------- #
+@pytest.fixture(scope="session")
+def real_micro() -> Microenvironment:
+    """A REAL whole-niche microenvironment from an open 10x Xenium GBM section.
 
-    We build it directly (rather than via ``generate_synthetic_cohort``, which is
-    hard-wired to a 120x120 grid) so the end-to-end pipeline tests stay well under
-    the time budget.
+    Built once per session at a coarse grid (dx=80 um) so it assembles in a
+    fraction of a second. Real cells at real positions with REAL vascular / ECM /
+    oxygen fields — no synthetic data anywhere in the path. Retries once on a
+    transient load error.
     """
-    subtypes = ("proneural", "classical", "mesenchymal")
-    master = np.random.default_rng(seed)
-    records = []
-    for i in range(n):
-        pseed = int(master.integers(0, 2**31 - 1))
-        rec = generate_synthetic_patient(
-            patient_id=f"SYN-{i:03d}", seed=pseed, grid=grid, dx=dx,
-            subtype=subtypes[i % len(subtypes)])
-        rec.micro.metadata["drug"] = "temozolomide-like"
-        records.append(rec)
-    return records
+    try:
+        return reconstruct_real(source=REAL_SOURCE, dx_um=REAL_DX_UM)
+    except Exception:
+        import time
+
+        time.sleep(3)
+        return reconstruct_real(source=REAL_SOURCE, dx_um=REAL_DX_UM)
 
 
+@pytest.fixture(scope="session")
+def real_drug() -> DrugParams:
+    """A REAL, engine-ready drug: temozolomide, calibrated (perivascular-sink
+    alpha fit on the doxorubicin anchor) with the binding-site barrier applied.
+    """
+    dp = calibrated_drugparams("temozolomide")
+    tmz = library.get_molecule("temozolomide")
+    return apply_barrier_to_drugparams(dp, tmz)
+
+
+# --------------------------------------------------------------------------- #
+# Physics-numerics builders (controlled geometry, no synthetic ground truth)
+# --------------------------------------------------------------------------- #
 def make_flat_micro(ny: int = 40, nx: int = 40, dx: float = 15.0,
                     ecm_value: float = 0.3, tissue_mask=None) -> Microenvironment:
     """Minimal homogeneous microenvironment for transport numerics tests."""
@@ -108,19 +129,6 @@ def make_radial_tumor_micro(ny: int = 60, nx: int = 60, dx: float = 15.0,
 
 
 @pytest.fixture
-def small_patient():
-    return make_small_patient(seed=1)
-
-
-@pytest.fixture
-def small_cohort():
-    return make_small_cohort(n=6, seed=0)
-
-
-# --------------------------------------------------------------------------- #
-# Factory fixtures (import-mode independent access to the builders above)
-# --------------------------------------------------------------------------- #
-@pytest.fixture
 def flat_micro_factory():
     return make_flat_micro
 
@@ -131,21 +139,6 @@ def radial_micro_factory():
 
 
 @pytest.fixture
-def cohort_factory():
-    return make_small_cohort
-
-
-@pytest.fixture
-def patient_factory():
-    return make_small_patient
-
-
-@pytest.fixture
 def inert_drug():
     """A conservative tracer: no clearance, no binding (mass must be conserved)."""
     return DrugParams(name="inert", diffusivity=300.0, clearance=0.0, binding=0.0)
-
-
-@pytest.fixture
-def short_pde():
-    return PDEConfig(dt=10.0, total_time=600.0, convection=False, save_every=10)

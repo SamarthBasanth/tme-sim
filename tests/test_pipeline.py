@@ -1,15 +1,16 @@
-"""End-to-end smoke + determinism tests for the simulation engine and the
-Stage 0 validation experiment.
+"""End-to-end tests on the REAL microenvironment (no synthetic data).
 
-These exercise the *integrator* wave (``tmesim.sim.engine.simulate_response``)
-and the *validation harness* (``tmesim.validation.experiment.run_stage0_experiment``)
-against real small synthetic microenvironments.
+These exercise the two load-bearing halves of the pipeline against a real,
+open 10x Xenium GBM section reconstructed by
+:func:`tmesim.reconstruct.real_pipeline.reconstruct_real`:
 
-NOTE: at the time of writing, ``tmesim/sim/engine.py`` and
-``tmesim/validation/experiment.py`` are not yet implemented (only stub package
-``__init__.py`` files exist). Each test therefore ``importorskip``s its target so
-the suite stays green until those wave-2 modules land, at which point these tests
-activate automatically and assert the real contract.
+1. **Reconstruction** — ``reconstruct_real`` yields a well-formed
+   :class:`~tmesim.core.Microenvironment` with real cells at real positions,
+   shaped tissue fields, and realistic cell-type fractions (including a sane,
+   single-digit-to-low-teens endothelial fraction).
+2. **Simulation** — :func:`tmesim.sim.engine.simulate_response` runs on that
+   real microenvironment and returns a valid, populated
+   :class:`~tmesim.core.SimulationResult`, deterministically.
 """
 from __future__ import annotations
 
@@ -17,33 +18,79 @@ import numpy as np
 import pytest
 
 from tmesim.core import (
-    ExperimentResult,
+    CellType,
+    Microenvironment,
     PDEConfig,
     SimConfig,
     SimulationResult,
 )
-from tmesim.data.synthetic import generate_synthetic_patient
+from tmesim.reconstruct.real_pipeline import reconstruction_report
+from tmesim.sim.engine import simulate_response
 
 
-def _fast_sim_config(seed: int = 0) -> SimConfig:
+def _fast_sim_config(drug, seed: int = 0) -> SimConfig:
     """A SimConfig with a deliberately short PDE window for a fast smoke test."""
     cfg = SimConfig(seed=seed)
+    cfg.drug = drug
     cfg.pde = PDEConfig(dt=20.0, total_time=1200.0, convection=True, save_every=10)
     return cfg
 
 
 # --------------------------------------------------------------------------- #
-# simulate_response: single-patient smoke test
+# Reconstruction: reconstruct_real yields a valid real microenvironment
 # --------------------------------------------------------------------------- #
-def test_simulate_response_smoke():
-    engine = pytest.importorskip(
-        "tmesim.sim.engine",
-        reason="tmesim.sim.engine.simulate_response not implemented yet (wave 2)",
-    )
-    rec = generate_synthetic_patient("SYN-SMOKE", seed=3, grid=(40, 40), dx=15.0)
-    cfg = _fast_sim_config(seed=0)
+def test_reconstruct_real_is_valid_microenvironment(real_micro):
+    assert isinstance(real_micro, Microenvironment)
 
-    result = engine.simulate_response(rec.micro, cfg)
+    # Real cells at real positions.
+    n = int(real_micro.cells.n)
+    assert n > 0
+    assert real_micro.cells.x.shape == (n,)
+    assert real_micro.cells.y.shape == (n,)
+
+    # Tumor cells present and a strict subset of all cells.
+    ct = np.asarray(real_micro.cells.cell_type)
+    n_tumor = int((ct == int(CellType.TUMOR)).sum())
+    assert 0 < n_tumor <= n
+
+    # Fields are shaped to the domain and finite.
+    shape = real_micro.domain.shape
+    f = real_micro.fields
+    for name, arr in (("ecm_density", f.ecm_density),
+                      ("vascular_density", f.vascular_density),
+                      ("oxygen", f.oxygen)):
+        assert arr is not None, name
+        assert np.asarray(arr).shape == shape, name
+        assert np.all(np.isfinite(np.asarray(arr))), name
+
+
+def test_reconstruct_real_celltype_fractions_realistic(real_micro):
+    report = reconstruction_report(real_micro)
+    fr = report["celltype_fractions"]
+
+    # Fractions form a proper distribution over the cell-type enum.
+    assert all(0.0 <= v <= 1.0 for v in fr.values())
+    assert sum(fr.values()) == pytest.approx(1.0, abs=1e-6)
+
+    # This is a GBM tumor section: malignant cells dominate but do not saturate.
+    assert 0.3 <= fr["TUMOR"] <= 0.95
+
+    # Endothelium is genuinely reconstructed and sits in a biologically sane
+    # single-digit-to-low-teens percentage range (not absent, not implausible).
+    assert 0.02 <= fr["ENDOTHELIAL"] <= 0.20, fr
+
+    # Immune + stromal compartments are present (whole-niche, not tumor-only).
+    assert fr["IMMUNE"] > 0.0
+    assert fr["STROMAL"] > 0.0
+
+
+# --------------------------------------------------------------------------- #
+# simulate_response on the REAL micro: valid, populated result
+# --------------------------------------------------------------------------- #
+def test_simulate_response_on_real_micro(real_micro, real_drug):
+    cfg = _fast_sim_config(real_drug, seed=0)
+
+    result = simulate_response(real_micro, cfg)
 
     assert isinstance(result, SimulationResult)
     # predicted_response is a probability.
@@ -57,63 +104,26 @@ def test_simulate_response_smoke():
     assert np.asarray(result.viable_history).ndim == 1
     assert len(result.viable_history) == len(result.times)
     assert len(result.times) >= 1
-    # visualization fields populated (contract: oxygen/ifp/auc/vascular).
+    # visualization fields populated and shaped to the real domain.
     assert isinstance(result.fields, dict) and len(result.fields) > 0
     for name, arr in result.fields.items():
-        assert np.asarray(arr).shape == rec.micro.domain.shape, name
+        assert np.asarray(arr).shape == real_micro.domain.shape, name
+    # extras carry the diagnostics the engine documents.
+    assert 0.0 <= float(result.extras["bbb_penetrance"]) <= 1.0
+    assert float(result.extras["n_tumor"]) > 0.0
 
 
 # --------------------------------------------------------------------------- #
-# simulate_response: determinism
+# simulate_response: determinism (same seed -> identical result)
 # --------------------------------------------------------------------------- #
-def test_simulate_response_deterministic():
-    engine = pytest.importorskip(
-        "tmesim.sim.engine",
-        reason="tmesim.sim.engine.simulate_response not implemented yet (wave 2)",
-    )
-    cfg = _fast_sim_config(seed=7)
+def test_simulate_response_deterministic(real_micro, real_drug):
+    cfg = _fast_sim_config(real_drug, seed=7)
 
-    # Regenerate identical inputs each run (simulate_response mutates cells).
-    rec_a = generate_synthetic_patient("SYN-DET", seed=5, grid=(40, 40), dx=15.0)
-    rec_b = generate_synthetic_patient("SYN-DET", seed=5, grid=(40, 40), dx=15.0)
-
-    r_a = engine.simulate_response(rec_a.micro, cfg)
-    r_b = engine.simulate_response(rec_b.micro, cfg)
+    # simulate_response works on a private copy, so the same shared micro is safe.
+    r_a = simulate_response(real_micro, cfg)
+    r_b = simulate_response(real_micro, cfg)
 
     assert float(r_a.predicted_response) == float(r_b.predicted_response)
     assert float(r_a.viable_tumor_fraction) == float(r_b.viable_tumor_fraction)
-
-
-# --------------------------------------------------------------------------- #
-# run_stage0_experiment: cohort-level smoke test
-# --------------------------------------------------------------------------- #
-def test_run_stage0_experiment_smoke(tmp_path, cohort_factory):
-    experiment = pytest.importorskip(
-        "tmesim.validation.experiment",
-        reason="tmesim.validation.experiment.run_stage0_experiment not implemented "
-               "yet (wave 2)",
-    )
-    records = cohort_factory(n=6, seed=0, grid=(36, 36))
-    cfg = _fast_sim_config(seed=0)
-
-    exp = experiment.run_stage0_experiment(records, cfg, out_dir=str(tmp_path))
-
-    assert isinstance(exp, ExperimentResult)
-    # Model scores present and finite.
-    assert isinstance(exp.model_scores, dict) and exp.model_scores
-    for metric, val in exp.model_scores.items():
-        assert np.isfinite(val), f"model score {metric} is not finite: {val}"
-    # Baselines scored.
-    assert isinstance(exp.baseline_scores, dict) and exp.baseline_scores
-    for bname, scores in exp.baseline_scores.items():
-        assert isinstance(scores, dict) and scores
-        for metric, val in scores.items():
-            assert np.isfinite(val), f"baseline {bname}/{metric} not finite: {val}"
-    # Primary metric is scored for the model.
-    assert exp.primary_metric in exp.model_scores
-    # Verdict is a non-empty human-readable string; beat_baseline is a bool.
-    assert isinstance(exp.verdict, str) and exp.verdict.strip()
-    assert isinstance(exp.beat_baseline, bool)
-    # Per-patient rows, if present, align with the cohort.
-    if exp.per_patient:
-        assert len(exp.per_patient) == len(records)
+    np.testing.assert_array_equal(
+        np.asarray(r_a.viable_history), np.asarray(r_b.viable_history))

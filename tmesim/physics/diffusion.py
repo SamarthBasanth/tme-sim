@@ -334,7 +334,7 @@ def simulate_drug_transport(
 # Self-tests
 # ---------------------------------------------------------------------------
 def _make_micro(ny, nx, dx, ecm_value, tissue_mask=None):
-    """Minimal Microenvironment for self-tests (no dependency on data.synthetic)."""
+    """Minimal hand-built Microenvironment for self-tests (no data generator)."""
     from ..core import Domain, TissueFields
 
     domain = Domain(nx=nx, ny=ny, dx=dx, tissue_mask=tissue_mask)

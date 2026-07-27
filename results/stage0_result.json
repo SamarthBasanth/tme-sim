@@ -1,57 +1,129 @@
 {
   "primary_metric": "roc_auc",
   "beat_baseline": false,
-  "verdict": "Sim AUC 1.00 vs best baseline (intrinsic_sensitivity) 1.00 -> DOES NOT beat baseline (delta +0.00 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=3).",
+  "verdict": "Sim AUC 1.00 vs best baseline (intrinsic_sensitivity) 1.00 -> DOES NOT beat baseline (delta +0.00 < 0.02 margin); transport modeling adds no measurable value beyond the baseline on this cohort (n=12).",
   "pass_margin": 0.02,
-  "n_patients": 3,
-  "cv_folds": 3,
+  "n_patients": 12,
+  "cv_folds": 5,
   "best_baseline": "intrinsic_sensitivity",
   "model_scores": {
     "roc_auc": 1.0,
-    "brier": 0.1999722360879718,
-    "spearman": 1.0
+    "brier": 0.07211805555555556,
+    "spearman": 0.8721028496007165
   },
   "baseline_scores": {
     "mean": {
       "roc_auc": 0.5,
-      "brier": 0.22388058774197914,
+      "brier": 0.25,
       "spearman": 0.0
     },
     "intrinsic_sensitivity": {
       "roc_auc": 1.0,
-      "brier": 0.11654809124971828,
-      "spearman": 1.0
+      "brier": 0.0008092904666675722,
+      "spearman": 0.8690481892534817
     },
     "expression_logreg": {
       "roc_auc": 1.0,
-      "brier": 0.21215406366908898,
-      "spearman": 1.0
+      "brier": 0.020606507174181363,
+      "spearman": 0.8690481892534817
     }
   },
   "per_patient": [
     {
-      "patient_id": "SYN-000",
-      "observed": 0.4408614285695601,
-      "sim_pred": 0.4835742444152431,
-      "mean": 0.29261029906822866,
-      "intrinsic_sensitivity": 1.0,
-      "expression_logreg": 0.21836259021017168
+      "patient_id": "FIXTURE-00",
+      "observed": 0.0,
+      "sim_pred": 0.25,
+      "mean": 0.5,
+      "intrinsic_sensitivity": 0.011582134842630088,
+      "expression_logreg": 0.12195495947759216
     },
     {
-      "patient_id": "SYN-001",
-      "observed": 0.2149432387978469,
-      "sim_pred": 0.36687028386633125,
-      "mean": 0.29261029906822866,
+      "patient_id": "FIXTURE-01",
+      "observed": 1.0,
+      "sim_pred": 0.7416666666666667,
+      "mean": 0.5,
+      "intrinsic_sensitivity": 0.967823194696839,
+      "expression_logreg": 0.8497106835780353
+    },
+    {
+      "patient_id": "FIXTURE-02",
+      "observed": 0.0,
+      "sim_pred": 0.2666666666666667,
+      "mean": 0.5,
       "intrinsic_sensitivity": 0.0,
-      "expression_logreg": 0.0
+      "expression_logreg": 0.17368247482051816
     },
     {
-      "patient_id": "SYN-002",
-      "observed": 0.22202622983727896,
-      "sim_pred": 0.44567627494456763,
-      "mean": 0.29261029906822866,
-      "intrinsic_sensitivity": 0.5913072583261217,
-      "expression_logreg": 0.15970332064273132
+      "patient_id": "FIXTURE-03",
+      "observed": 1.0,
+      "sim_pred": 0.7333333333333334,
+      "mean": 0.5,
+      "intrinsic_sensitivity": 1.0,
+      "expression_logreg": 0.8594002183969578
+    },
+    {
+      "patient_id": "FIXTURE-04",
+      "observed": 0.0,
+      "sim_pred": 0.25,
+      "mean": 0.5,
+      "intrinsic_sensitivity": 0.0012703356062417075,
+      "expression_logreg": 0.1257421482703552
+    },
+    {
+      "patient_id": "FIXTURE-05",
+      "observed": 1.0,
+      "sim_pred": 0.7083333333333333,
+      "mean": 0.5,
+      "intrinsic_sensitivity": 0.9662764093727454,
+      "expression_logreg": 0.8670666589203019
+    },
+    {
+      "patient_id": "FIXTURE-06",
+      "observed": 0.0,
+      "sim_pred": 0.2416666666666667,
+      "mean": 0.5,
+      "intrinsic_sensitivity": 0.006657208850964583,
+      "expression_logreg": 0.09903342824209727
+    },
+    {
+      "patient_id": "FIXTURE-07",
+      "observed": 1.0,
+      "sim_pred": 0.7166666666666667,
+      "mean": 0.5,
+      "intrinsic_sensitivity": 0.9681481195373056,
+      "expression_logreg": 0.8980620630943098
+    },
+    {
+      "patient_id": "FIXTURE-08",
+      "observed": 0.0,
+      "sim_pred": 0.29166666666666663,
+      "mean": 0.5,
+      "intrinsic_sensitivity": 0.04818294249189458,
+      "expression_logreg": 0.2045288866269305
+    },
+    {
+      "patient_id": "FIXTURE-09",
+      "observed": 1.0,
+      "sim_pred": 0.7416666666666667,
+      "mean": 0.5,
+      "intrinsic_sensitivity": 0.9682070165064451,
+      "expression_logreg": 0.8517491543524784
+    },
+    {
+      "patient_id": "FIXTURE-10",
+      "observed": 0.0,
+      "sim_pred": 0.2833333333333333,
+      "mean": 0.5,
+      "intrinsic_sensitivity": 0.04556380062789989,
+      "expression_logreg": 0.18856749067560133
+    },
+    {
+      "patient_id": "FIXTURE-11",
+      "observed": 1.0,
+      "sim_pred": 0.725,
+      "mean": 0.5,
+      "intrinsic_sensitivity": 0.9694093438664596,
+      "expression_logreg": 0.9173265851689059
     }
   ]
 }
