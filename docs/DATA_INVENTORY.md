@@ -237,8 +237,8 @@ Tier B is survey material.
 |---|---|---|
 | `autoradiography_microdialysis/` | `validation.glioma_regional_pk` | **runs** → `results/glioma_regional_pk.md` |
 | `maldi_msi_drug/` + `verified_0/` | `validation.gist_imatinib` | **runs** → `results/gist_imatinib.md` |
-| `geomx_dsp/` | `validation.moncayo_explant` | module **INCOMPLETE** (no driver, writes nothing) |
-| `geo_organoid_screens/` | `validation.gbm_tmz_exvivo` | module **INCOMPLETE** (no driver, writes nothing) |
+| `geo_organoid_screens/` | `validation.gbm_tmz_exvivo` | **runs** → `results/gbm_tmz_exvivo.md` |
+| `geomx_dsp/` | `validation.moncayo_explant` | **runs** → `results/moncayo_explant.md` |
 
 ---
 
@@ -345,7 +345,13 @@ supplement `41598_2019_47089_MOESM1_ESM.docx`.
 
 ## B4. `geo_organoid_screens/` — 72 MB — **MANUAL**
 
-Read by the (incomplete) `validation.gbm_tmz_exvivo`.
+Read by `validation.gbm_tmz_exvivo` → `results/gbm_tmz_exvivo.{md,png}`. **GSE232173
+is the only cached asset that is the right disease, the right drug and a measured
+response at once**: patient-derived GSC cultures under temozolomide with ATP
+viability (Ntafoulis et al., *Br J Cancer* 2023;129:1327-1338, **PMID 37620410**,
+doi `10.1038/s41416-023-02402-y`; Erasmus MC / GLIOTRAIN). It scores the potency
+axis only — no drug concentration was measured, and dissociated cultures have no
+microenvironment.
 
 | File | Accession |
 |---|---|

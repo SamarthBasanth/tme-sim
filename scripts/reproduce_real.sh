@@ -414,17 +414,37 @@ stage_external() {
   run "GIST imatinib MSI (6 matched human tumour/normal pairs)" "5 min" -- \
       "${PY}" -m tmesim.validation.gist_imatinib
 
+  # Right disease, right drug, measured response: GSE232173 patient-derived GSC
+  # cultures under temozolomide (Ntafoulis 2023, PMID 37620410). Potency axis only
+  # — no drug concentration was measured, and dissociated cultures have no
+  # microenvironment.
+  if [ -d "${HUNT}/geo_organoid_screens" ] || [ "${DRY_RUN}" -eq 1 ]; then
+    run "GBM + temozolomide measured ex-vivo response (GSE232173)" "3 min" -- \
+        "${PY}" -m tmesim.validation.gbm_tmz_exvivo
+  else
+    skip "validation.gbm_tmz_exvivo" "data_cache/hunt/geo_organoid_screens/ not present"
+  fi
+
+  # Moncayo HGSOC explants: the only open asset with a per-pixel measured drug
+  # field AND a molecular state on the same tissue. Ovarian, bath-dosed ex vivo —
+  # it validates diffusion + uptake + sequestration, never vascular delivery.
+  if [ -d "${HUNT}/geomx_dsp" ] || [ "${DRY_RUN}" -eq 1 ]; then
+    run "HGSOC explant MALDI-MSI (376,736 pixels + 114 GeoMx ROIs)" "15 min" -- \
+        "${PY}" -m tmesim.validation.moncayo_explant
+  else
+    skip "validation.moncayo_explant" "data_cache/hunt/geomx_dsp/ not present"
+  fi
+
   # ---- NOT RUN, and why. Do not "fix" these by adding them: the modules have no
   # ---- entry point and exit without writing anything. Their docstrings advertise
-  # ---- commands that are currently no-ops.
-  skip "validation.moncayo_explant  (HGSOC MALDI-MSI, 376,736 pixels + 114 GeoMx ROIs)" \
-       "INCOMPLETE — only analysis1() exists; no driver, no __main__, no report writer."
-  skip "validation.gbm_tmz_exvivo   (GSE232173 glioma + TMZ ex-vivo response)" \
-       "INCOMPLETE — the four test functions exist; no driver, no __main__, no report writer."
+  # ---- commands that are currently no-ops. Check for `if __name__ == "__main__":`
+  # ---- before trusting a docstring here.
   skip "validation.cellstate_validation (oxygen-banded states vs measured MKI67/TOP2A)" \
        "INCOMPLETE — run()/make_figure() exist; no write_report, no __main__."
   skip "validation.ranking_robustness  (is the top-1 drug call decision-grade?)" \
        "INCOMPLETE — only run_ranking_mc(); no writer, no __main__. Until it lands, report cisplatin/doxorubicin as a TIE."
+  skip "validation.vessel_network_impact (KDE source vs discrete vessel network)" \
+       "INCOMPLETE — declares vessel_network_impact.{md,png} but has no __main__ yet."
   skip "hypoxia vs measured VEGFA/HIF1A on the 480-gene IO panel" \
        "NOT WRITTEN — marker_panels points at validation/hypoxia_validation.py, which does not exist."
 

@@ -276,16 +276,18 @@ All are runnable as `python -m tmesim.validation.<name>`.
 | `pharmacology_real` | measured GDSC2 vs measured HGCC, no model in the loop | runnable → `results/pharmacology_real.md` |
 | `glioma_regional_pk` | 125 human glioma samples / 42 patients + 27 PMID-anchored regional PK rows | runnable → `results/glioma_regional_pk.{md,png}` |
 | `gist_imatinib` | imatinib MALDI-MSI in 6 matched human GIST tumour/normal pairs | runnable → `results/gist_imatinib.{md,png}` |
-| `moncayo_explant` | HGSOC explants: 376,736-pixel MALDI-MSI drug map + 114 GeoMx ROIs | **INCOMPLETE** — only `analysis1` exists; no driver, no `__main__`, writes nothing |
-| `gbm_tmz_exvivo` | GSE232173, glioma + TMZ + measured ex-vivo response | **INCOMPLETE** — the four test functions are written; no driver, no `__main__`, writes nothing |
+| `gbm_tmz_exvivo` | GSE232173 — glioma + temozolomide + measured ex-vivo ATP viability (Ntafoulis 2023, PMID 37620410) | runnable → `results/gbm_tmz_exvivo.{md,png}` |
+| `moncayo_explant` | HGSOC explants: 376,736-pixel MALDI-MSI drug map + 114 GeoMx ROIs | runnable |
 | `cellstate_validation` | oxygen-banded cell states vs measured per-cell MKI67/TOP2A | **INCOMPLETE** — `run()`/`make_figure()` exist, no `write_report`, no `__main__` |
 | `ranking_robustness` | is the top-1 drug call decision-grade under parameter uncertainty? | **INCOMPLETE** — only `run_ranking_mc()`; no writer, no `__main__` |
+| `vessel_network_impact` | what changes if the KDE source is swapped for the discrete vessel network (§7.5a) | **INCOMPLETE** — declares `vessel_network_impact.{md,png}`, no `__main__` yet |
 | *(hypoxia vs VEGFA/HIF1A)* | simulated oxygen vs the IO panel's measured VEGFA/HIF1A | **NOT WRITTEN** — `marker_panels` already carries `HYPOXIA_RESPONSE_GENES` and points at a `validation/hypoxia_validation.py` that does not exist |
 
-> **Two traps.** (1) The four INCOMPLETE modules above have docstrings advertising
+> **Two traps.** (1) The INCOMPLETE modules above have docstrings advertising
 > `python -m tmesim.validation.<name>` and output files. Those commands are
 > **no-ops** — they exit without writing. Do not put them in a harness expecting
-> output. (2) `results/pk_reality.md` has **no producer** in the current
+> output. Check for an `if __name__ == "__main__":` block before believing a
+> docstring. (2) `results/pk_reality.md` has **no producer** in the current
 > `pk_reality.py`, whose `__main__` only prints a table. Re-running the module
 > will *not* refresh that file; treat the on-disk copy as stale.
 
@@ -556,11 +558,32 @@ roughly constant increment. Implemented in `reconstruct.barrier` as
 `treatment.drugs.delivery_source(..., bbb_disruption=...)`, **opt-in and off by
 default.**
 
-A second, separate defect sits in `bbb_penetrance` itself: it takes the **mean** of
-four desirability scores, so a molecule with two disqualifying properties is
-rescued by two favourable ones. *A mean cannot express a veto.* That is what
-produced a 66× outlier (eribulin) in the regional-PK scorecard. Diagnosed, **not
-fixed**.
+### (c) …and `bbb_penetrance` could not express a veto — now fixed
+
+A separate defect sat in `bbb_penetrance` itself: it took the **arithmetic mean**
+of four desirability scores, so a molecule with two disqualifying properties was
+rescued by two favourable ones. *An arithmetic mean cannot express a veto.* That
+produced a 66× outlier in the regional-PK scorecard — eribulin, a 730 Da
+macrocycle with MW desirability 0.009 and TPSA desirability 0.009 but a
+favourable logP (0.859) and 2 HBD (0.777), scored **0.334** against a measured
+peritumoral brain:plasma ratio of **0.0051**.
+
+Crossing the barrier is a **conjunction** — small enough AND lipophilic enough AND
+not too polar AND not too H-bonding — so `molecular.permeability.bbb_penetrance`
+now combines the four desirabilities with a **geometric** mean (equivalently a sum
+of log desirabilities), where any single near-zero term drives the product to
+zero. It adds **no tunable parameter**: for equal desirabilities the geometric and
+arithmetic means coincide, so the two forms differ only for heterogeneous
+descriptor profiles — exactly the veto behaviour that was missing. Eribulin drops
+to 0.035 (6.9×), the worst-case error over the 6 drugs falls **65.6× → 6.9×**, and
+all 6 move inside the order-of-magnitude band (was 5/6).
+
+It is not free: methotrexate (TPSA 210, 5 HBD) and cefazolin (TPSA 156) carry
+disqualifying descriptors too and get *worse* against their measured pooled
+values — which pool contrast-enhancing tissue, where the barrier is disrupted.
+Against the intact-barrier subset the vetoed scores are much closer, which is
+what the additive leak in (b) supplies. A structure-only score still cannot see
+active efflux or carrier-mediated uptake.
 
 ---
 

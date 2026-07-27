@@ -180,7 +180,19 @@ Two fixes were implemented from the numbers above. **The pre-fix numbers in sect
 
 ## P1. FIX 1 — which aggregation, and why
 
-Both candidates the audit named were evaluated against the same 6-drug measured scorecard. `pure min` and a `0.7*min + 0.3*mean` variant were evaluated too and were worse than both; the two finalists are below.
+Both candidates the audit named — a geometric mean and a min-weighted form — were evaluated against the same 6-drug measured scorecard, at `w = 0.5` and `w = 0.7` for `w*min + (1-w)*mean`, plus a pure `min`. The min-weighted forms and the pure min are summarised in prose below rather than shipped, since only the chosen path is recomputed live.
+
+| aggregation (structure-only) | eribulin fold | worst \|fold\| | within 10x | within 3x | GM \|fold error\| |
+|---|---|---|---|---|---|
+| arithmetic mean (pre-fix) | 65.63x | 65.63x | 5/6 | 4/6 | 3.660x |
+| **geometric mean (CHOSEN)** | 6.94x | 7.91x | 6/6 | 2/6 | 3.451x |
+| 0.5*min + 0.5*mean | 17.76x | 17.76x | 5/6 | 3/6 | 3.475x |
+| 0.7*min + 0.3*mean | 9.72x | 11.74x | 5/6 | 2/6 | 4.711x |
+| pure min | 3.80x | 23.39x | 5/6 | 0/6 | 7.955x |
+
+With the FIX 2 leak also active — the model as it actually ships — the two finalists separate cleanly: geometric mean gives GM |fold error| **1.995x**, worst case **6.94x**, 6/6 within 10x and 4/6 within 3x; `0.5*min + 0.5*mean` gives 2.284x, worst case 17.76x, 5/6 within 10x and 4/6 within 3x. Pure `min` is far too aggressive — it vetoes on the single worst descriptor and drives every drug to near-zero, losing the 3x band entirely.
+
+The three rows recomputed live on every run:
 
 | aggregation | eribulin | worst \|fold\| | within 10x | within 3x | GM signed bias | GM \|fold error\| |
 |---|---|---|---|---|---|---|
@@ -226,7 +238,7 @@ Three columns, because the two fixes must be separable. *pre-fix* is the arithme
 - Antibody (bevacizumab-like) penetrance = 0.0000 — still a hard 0, both via the `is_antibody` gate and the MW >= 1000 gate.
 - Least- to most-penetrant among the six small molecules (structure-only): methotrexate 0.023 < eribulin 0.035 < cefazolin 0.049 < temozolomide 0.125 < adavosertib 0.459 < levetiracetam 0.840.
 - Methotrexate is the least penetrant small molecule: **True** (it was also least pre-fix, so the veto preserves this).
-- BBB-penetrant vs BBB-excluded probe separation (Oh 2026, same tissue samples, measured 4.66x pooled / 9.3x in intact-barrier tissue): model now predicts 17.20x (levetiracetam 0.840 / cefazolin 0.049), up from 3.65x pre-fix — the veto widens the gap toward the measured intact-barrier value, which is the right direction.
+- BBB-penetrant vs BBB-excluded probe separation (Oh 2026, same tissue samples, measured 4.66x pooled / 9.3x in intact-barrier tissue): model now predicts 17.20x (levetiracetam 0.840 / cefazolin 0.049), up from 3.65x pre-fix. Direction right, magnitude now **over**shot: the pre-fix 3.65x under-stated the intact-barrier 9.3x by 2.5x, the post-fix 17.2x over-states it by 1.8x. The veto swapped an under-separation for an over-separation of similar size; it did not eliminate the error.
 
 ### Temozolomide — reported, not targeted
 

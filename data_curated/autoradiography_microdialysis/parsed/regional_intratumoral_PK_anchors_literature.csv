@@ -1,0 +1,28 @@
+source_pmid,source_doi,study,species,drug,subject_id,region,plasma_cmax,plasma_auc,tissue_cmax,tissue_auc,tissue_to_plasma_auc_pct,units_conc,units_auc,method,notes
+19861433,10.1158/1078-0432.CCR-09-1349,Portnow 2009 Clin Cancer Res,human,temozolomide,1,peritumoral_brain,5.2,20.9,0.9,3.4,16.4,ug/mL,ug/mL*hr,intracerebral_microdialysis,150 mg/m2 single oral dose
+19861433,10.1158/1078-0432.CCR-09-1349,Portnow 2009 Clin Cancer Res,human,temozolomide,2,peritumoral_brain,11.8,18.9,0.2,2.9,15.5,ug/mL,ug/mL*hr,intracerebral_microdialysis,
+19861433,10.1158/1078-0432.CCR-09-1349,Portnow 2009 Clin Cancer Res,human,temozolomide,3,peritumoral_brain,6.4,20.6,0.4,1.7,8.1,ug/mL,ug/mL*hr,intracerebral_microdialysis,
+19861433,10.1158/1078-0432.CCR-09-1349,Portnow 2009 Clin Cancer Res,human,temozolomide,4,peritumoral_brain,6.8,21.0,0.6,2.2,10.6,ug/mL,ug/mL*hr,intracerebral_microdialysis,
+19861433,10.1158/1078-0432.CCR-09-1349,Portnow 2009 Clin Cancer Res,human,temozolomide,5,peritumoral_brain,6.5,27.0,0.4,1.5,5.7,ug/mL,ug/mL*hr,intracerebral_microdialysis,
+19861433,10.1158/1078-0432.CCR-09-1349,Portnow 2009 Clin Cancer Res,human,temozolomide,7,peritumoral_brain,1.4,11.4,0.3,2.6,23.3,ug/mL,ug/mL*hr,intracerebral_microdialysis,
+19861433,10.1158/1078-0432.CCR-09-1349,Portnow 2009 Clin Cancer Res,human,temozolomide,9,peritumoral_brain,3.3,9.5,1.1,4.3,44.9,ug/mL,ug/mL*hr,intracerebral_microdialysis,
+18787762,10.1007/s11060-008-9678-2,Blakeley 2008 J Neurooncol,human,methotrexate,A,contrast_enhancing,1407,7553,380,2121,28.1,uM,uM*h,intracerebral_microdialysis,MTX 12 g/m2 4h IV; probe in CE tumor (BBB disrupted)
+18787762,10.1007/s11060-008-9678-2,Blakeley 2008 J Neurooncol,human,methotrexate,B,contrast_enhancing,1367,6850,407,2086,30.5,uM,uM*h,intracerebral_microdialysis,probe in CE tumor (BBB disrupted)
+18787762,10.1007/s11060-008-9678-2,Blakeley 2008 J Neurooncol,human,methotrexate,C,nonenhancing,1321,5766,22,186,3.2,uM,uM*h,intracerebral_microdialysis,probe in nonenhancing tissue (BBB intact)
+18787762,10.1007/s11060-008-9678-2,Blakeley 2008 J Neurooncol,human,methotrexate,D,nonenhancing,1325,7686,24,721,9.4,uM,uM*h,intracerebral_microdialysis,probe in nonenhancing tissue (BBB intact)
+29332604,10.1186/s12987-017-0088-8,Jackson 2018 Fluids Barriers CNS,human,temozolomide,1,noncontrast_enhancing,2.0,16.8,0.79,5.3,31.5,ug/mL,hr*ug/mL,intracerebral_microdialysis,TMZ alone arm; AUC0-18h
+29332604,10.1186/s12987-017-0088-8,Jackson 2018 Fluids Barriers CNS,human,temozolomide,2,noncontrast_enhancing,5.7,18.4,0.13,0.6,3.3,ug/mL,hr*ug/mL,intracerebral_microdialysis,TMZ alone arm
+29332604,10.1186/s12987-017-0088-8,Jackson 2018 Fluids Barriers CNS,human,temozolomide,3,noncontrast_enhancing,2.7,11.9,0.64,3.1,26.1,ug/mL,hr*ug/mL,intracerebral_microdialysis,TMZ alone arm
+29332604,10.1186/s12987-017-0088-8,Jackson 2018 Fluids Barriers CNS,human,temozolomide,4,noncontrast_enhancing,4.8,18.3,0.71,3.2,17.5,ug/mL,hr*ug/mL,intracerebral_microdialysis,TMZ alone arm
+29332604,10.1186/s12987-017-0088-8,Jackson 2018 Fluids Barriers CNS,human,temozolomide,5,noncontrast_enhancing,2.3,17.5,0.49,3.0,17.1,ug/mL,hr*ug/mL,intracerebral_microdialysis,TMZ alone arm
+29332604,10.1186/s12987-017-0088-8,Jackson 2018 Fluids Barriers CNS,human,temozolomide,1,contrast_enhancing,,,0.79,4.4,26.2,ug/mL,hr*ug/mL,intracerebral_microdialysis,TMZ alone arm; second catheter in CE tissue
+29332604,10.1186/s12987-017-0088-8,Jackson 2018 Fluids Barriers CNS,human,temozolomide,3,contrast_enhancing,,,0.54,3.2,26.9,ug/mL,hr*ug/mL,intracerebral_microdialysis,TMZ alone arm; second catheter in CE tissue
+23649683,10.1007/s00280-013-2172-3,Grossman 2013 Cancer Chemother Pharmacol,rat,temozolomide,pooled_pre_cediranib,U87_intratumoral_ECF,,,0.59,1.82,,ug/mL,ug*h/mL,intratumoral_microdialysis,TMZ 50 mg/kg PO; n=7 nude rats
+23649683,10.1007/s00280-013-2172-3,Grossman 2013 Cancer Chemother Pharmacol,rat,temozolomide,pooled_post_cediranib,U87_intratumoral_ECF,,,0.83,3.72,,ug/mL,ug*h/mL,intratumoral_microdialysis,after cediranib 6 mg/kg
+22644796,10.1007/s00280-012-1867-1,Grossman 2012 Cancer Chemother Pharmacol,rat,temozolomide,pooled_pre_bev,U87_intratumoral_ECF,,,,3.35,,ug/mL,ug*h/mL,intratumoral_microdialysis,tumor probe
+22644796,10.1007/s00280-012-1867-1,Grossman 2012 Cancer Chemother Pharmacol,rat,temozolomide,pooled_pre_bev,contralateral_normal_brain_ECF,,,,3.22,,ug/mL,ug*h/mL,intratumoral_microdialysis,contralateral brain probe (paired)
+22644796,10.1007/s00280-012-1867-1,Grossman 2012 Cancer Chemother Pharmacol,rat,temozolomide,pooled_post_bev,U87_intratumoral_ECF,,,,3.98,,ug/mL,ug*h/mL,intratumoral_microdialysis,after bevacizumab 10 mg/kg IV
+22644796,10.1007/s00280-012-1867-1,Grossman 2012 Cancer Chemother Pharmacol,rat,temozolomide,pooled_post_bev,contralateral_normal_brain_ECF,,,,3.34,,ug/mL,ug*h/mL,intratumoral_microdialysis,after bevacizumab
+39820282,10.1158/1078-0432.CCR-24-2311,Lee 2025 Clin Cancer Res (ABTC adavosertib),human,adavosertib,cohort_mean,contrast_enhancing,,,,,418,ratio_x100,,tissue_homogenate_LCMS,intratumoral:plasma ratio 4.18 +/- 3.36
+39820282,10.1158/1078-0432.CCR-24-2311,Lee 2025 Clin Cancer Res (ABTC adavosertib),human,adavosertib,cohort_mean,nonenhancing,,,,,74,ratio_x100,,tissue_homogenate_LCMS,intratumoral:plasma ratio 0.74 +/- 0.63
+39422741,10.1007/s00280-024-04711-2,Eroglu 2024 Cancer Chemother Pharmacol,human,eribulin,cohort_range,peritumoral_brain,,,,,0.13-1.99,pct,,intracerebral_microdialysis,brain:plasma ratio range; BBB-disrupted vs intact differ by log-mean 3.37

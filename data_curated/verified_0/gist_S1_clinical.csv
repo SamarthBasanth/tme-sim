@@ -1,0 +1,28 @@
+patient_id,organ,met_or_primary,sex,age,imatinib_regime,plasma_conc_ng_ml,kit_mut,pdgfra_mut,mitotic_activity
+A,Liver,m,female,44,91400,135,Ex9;11;13;17,Ex18,50/50 HPF
+C,Liver,m,male,56,15/11/62400/600/800,1384,Ex17,---,n.i.
+G,Liver,m,female,47,17800,---,Ex9;11;13;17,Ex18,n.i.
+J,Liver,m,male,50,82800,1442,Ex11;17,Ex18,36/50 HPF
+K,Liver,m,male,45,45400,973,Ex11;13,---,11/10 HPF
+L,Liver,m,female,49,7/15400/800,900,Ex11,---,1/50 HPF < 7/1 HPF
+M,Liver,m,male,56,33/25400/600,2733,n.i.,n.i.,38/50 HPF
+U,Liver,m,male,62,n.i.n.i.,687,Ex11,---,3/50 HPF
+V,Liver,m,female,67,31400,---,Ex9;11;13;17,Ex12;14;18,92/50 HPF
+W,Liver,m,male,73,89400,185,Ex9;11;13;17,Ex18,33/50 HPF
+Z,Liver,m,male,49,n.in.i.,1040,Ex11;13,Ex18,65/50 HPF
+I,Peritoneum,m,female,42,11400,421,Ex11,---,12/50 HPF
+N,Peritoneum,m,male,84,72400,324,Ex13,---,85/50 HPF
+P,Peritoneum,m,male,62,62400,359,Ex12,---,4/50 HPF
+Q,Peritoneum,m,male,45,8400,524,Ex11,---,147/50 HPFPFHPF
+R,Peritoneum,m,male,76,36400,---,Ex9;11;13;17,Ex18,30/50 HPF
+D,Stomach,p,female,76,10400,245,Ex11,---,Not vital
+F,Stomach,p,male,52,6400,429,Ex11,---,<1/50 HPF
+T,Stomach,p,male,69,13n.i.,363,---,---,90/50 HPF
+X,Stomach,p,female,87,7400,---,Ex9;11;13;17,Ex18,10/50 HPF
+E,Thorax wall,m,male,76,26/5400/800,---,Ex11;117,Ex12;14;18,115/50 HPF
+Y,Abdomen,p,male,43,n.i.400,583,---,Ex15,10/50 HPF
+B,Intestine,p,male,66,10400,---,Ex13,---,5/50 HPF
+AA,Intestine,p,male,44,10800,404,Ex9,---,4/50 HPF
+AB,Intestine,m,male,63,50400,1526,Ex9;11;117,Ex12;14;18,17/50 HPF
+S,Lung,m,male,74,28400,---,Ex11,---,40/50 HPF
+O,Colon,p,female,80,12400,500,Ex9;11;13;17,---,>5/50 HPF

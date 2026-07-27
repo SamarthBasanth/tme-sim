@@ -1215,8 +1215,11 @@ def build_post_fix(regional: Dict) -> Dict:
         f"BBB-penetrant vs BBB-excluded probe separation (Oh 2026, same tissue "
         f"samples, measured 4.66x pooled / 9.3x in intact-barrier tissue): model now "
         f"predicts {lev / cef:.2f}x (levetiracetam {lev:.3f} / cefazolin {cef:.3f}), "
-        "up from 3.65x pre-fix — the veto widens the gap toward the measured "
-        "intact-barrier value, which is the right direction.")
+        f"up from 3.65x pre-fix. Direction right, magnitude now **over**shot: the "
+        f"pre-fix 3.65x under-stated the intact-barrier 9.3x by 2.5x, the post-fix "
+        f"{lev / cef:.1f}x over-states it by {lev / cef / 9.3:.1f}x. The veto swapped "
+        "an under-separation for an over-separation of similar size; it did not "
+        "eliminate the error.")
 
     # --- permeability ceiling, before/after -------------------------------
     perm_rows: List[Dict] = []
@@ -1278,9 +1281,28 @@ def _write_post_fix(A, pf: Dict) -> None:
     # ---- FIX 1: aggregation bake-off ---------------------------------------
     A("## P1. FIX 1 — which aggregation, and why")
     A("")
-    A("Both candidates the audit named were evaluated against the same 6-drug "
-      "measured scorecard. `pure min` and a `0.7*min + 0.3*mean` variant were "
-      "evaluated too and were worse than both; the two finalists are below.")
+    A("Both candidates the audit named — a geometric mean and a min-weighted form — "
+      "were evaluated against the same 6-drug measured scorecard, at "
+      "`w = 0.5` and `w = 0.7` for `w*min + (1-w)*mean`, plus a pure `min`. "
+      "The min-weighted forms and the pure min are summarised in prose below rather "
+      "than shipped, since only the chosen path is recomputed live.")
+    A("")
+    A("| aggregation (structure-only) | eribulin fold | worst \\|fold\\| | within 10x | within 3x | GM \\|fold error\\| |")
+    A("|---|---|---|---|---|---|")
+    A("| arithmetic mean (pre-fix) | 65.63x | 65.63x | 5/6 | 4/6 | 3.660x |")
+    A("| **geometric mean (CHOSEN)** | 6.94x | 7.91x | 6/6 | 2/6 | 3.451x |")
+    A("| 0.5*min + 0.5*mean | 17.76x | 17.76x | 5/6 | 3/6 | 3.475x |")
+    A("| 0.7*min + 0.3*mean | 9.72x | 11.74x | 5/6 | 2/6 | 4.711x |")
+    A("| pure min | 3.80x | 23.39x | 5/6 | 0/6 | 7.955x |")
+    A("")
+    A("With the FIX 2 leak also active — the model as it actually ships — the two "
+      "finalists separate cleanly: geometric mean gives GM |fold error| **1.995x**, "
+      "worst case **6.94x**, 6/6 within 10x and 4/6 within 3x; `0.5*min + 0.5*mean` "
+      "gives 2.284x, worst case 17.76x, 5/6 within 10x and 4/6 within 3x. Pure `min` "
+      "is far too aggressive — it vetoes on the single worst descriptor and drives "
+      "every drug to near-zero, losing the 3x band entirely.")
+    A("")
+    A("The three rows recomputed live on every run:")
     A("")
     A("| aggregation | eribulin | worst \\|fold\\| | within 10x | within 3x | GM signed bias | GM \\|fold error\\| |")
     A("|---|---|---|---|---|---|---|")

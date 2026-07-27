@@ -278,12 +278,18 @@ that work.
 
 ### Also honest about
 
-* **`bbb_penetrance` ordering is only partially concordant** with measured
-  brain:plasma ratios (Spearman 0.50) — methotrexate is correctly least penetrant
-  but cisplatin/temozolomide invert. It is also **structurally incapable of a veto**:
-  it takes the *mean* of four desirability scores, so a molecule with two
-  disqualifying properties is rescued by two favourable ones. That is what produced
-  a 66× outlier (eribulin) in the regional-PK validation. Diagnosed, **not fixed**.
+* **`bbb_penetrance` is a structure-only score with no efflux or carrier
+  transport**, so it is only partially concordant with measured brain:plasma
+  ratios. The audit's "a mean cannot express a veto" defect **has since been
+  fixed**: crossing the barrier is a *conjunction* (small enough AND lipophilic
+  enough AND not too polar AND not too H-bonding), so the four desirabilities are
+  now combined by a **geometric** mean, where any single near-zero desirability
+  drives the product to zero. It adds no tunable parameter — for equal
+  desirabilities the two means coincide. On the 6-drug human-glioma scorecard the
+  worst-case error falls from **65.6× to 6.9×** (the eribulin outlier: 0.334 →
+  0.035 against a measured 0.0051) and all 6 drugs move inside the
+  order-of-magnitude band. It makes two drugs *worse* — methotrexate and cefazolin
+  carry disqualifying descriptors too — and the module says so.
 * **The top-1 drug call is probably not decision-grade.** Cisplatin (0.241) and
   doxorubicin (0.231) differ by ~4%, well inside plausible parameter uncertainty.
   Report it as a tie until shown otherwise.
@@ -317,7 +323,7 @@ data/real/  ─►  reconstruct/real_*  ─►  Microenvironment  ─►  physic
 | `tmesim.cells` | `agents` (oxygen → cell state), `pkpd` (local drug AUC → Hill kill probability, modulated by sensitivity and state). |
 | `tmesim.treatment` | `drugs` — drug lookup, plasma PK profile, and the spatial delivery source (`vascular_density × bbb_penetrance × plasma`). |
 | `tmesim.sim` | `engine.simulate_response` — the deterministic per-tissue integrator. |
-| `tmesim.validation` | The honesty layer, and where this project spends most of its code. **Internal:** `calibration` (the single α), `numerical_rigor`, `uncertainty`, `reconstruction_fidelity`, `vascular_validation`, `cellstate_validation`, `delivery_metrics` (the defensible replacements for `penetration_index`), `vessel_profile`, `ranking_robustness`. **Against real external measurements:** `pk_anchors` / `pk_multidrug` / `pk_reality` (tissue PK), `glioma_regional_pk` (human glioma partition), `gist_imatinib` (human GIST MSI), `moncayo_explant` (HGSOC MALDI-MSI + GeoMx), `gbm_tmz_exvivo` (GSE232173), `pharmacology_real` (GDSC vs HGCC). **Retired:** `experiment`, `baselines`, `metrics` — the synthetic-cohort harness. |
+| `tmesim.validation` | The honesty layer, and where this project spends most of its code. **Internal:** `calibration` (the single α), `numerical_rigor`, `uncertainty`, `reconstruction_fidelity`, `vascular_validation`, `cellstate_validation`, `delivery_metrics` (the defensible replacements for `penetration_index`), `vessel_profile`, `ranking_robustness`. **Against real external measurements:** `pk_anchors` / `pk_multidrug` / `pk_reality` (tissue PK), `glioma_regional_pk` (human glioma partition), `gist_imatinib` (human GIST MSI), `gbm_tmz_exvivo` (GSE232173 — glioma + TMZ + measured ex-vivo response), `moncayo_explant` (HGSOC MALDI-MSI + GeoMx), `pharmacology_real` (GDSC vs HGCC). **Under construction:** `cellstate_validation`, `ranking_robustness`, `vessel_network_impact` — these have no entry point yet and produce nothing; see [`docs/REPRODUCE.md`](docs/REPRODUCE.md) §3. **Retired:** `experiment`, `baselines`, `metrics` — the synthetic-cohort harness. |
 | `tmesim.viz` | `plots`, `molecular_plots`, `explainer`, `patient_report`. |
 | `tmesim.cli` | argparse entry point: `reconstruct`, `simulate`, `molecules`, `molecular-run`, `acquire`. |
 | `experiments/` | Runnable real-data studies: flagship simulation, drug panel, cross-tissue, niche response, combination, dose/schedule, per-patient report. |

@@ -33,9 +33,9 @@ The molecular layer's structure-only `bbb_penetrance` (CNS-MPO-style rules on MW
 
 | drug | real ratio | quantity (measured) | bbb_penetrance | real rank | bbb rank | PMID |
 |---|---:|---|---:|:--:|:--:|---|
-| methotrexate | 0.013 | csf_to_plasma_ratio | 0.115 | 1 | 1 | 3855310 |
-| cisplatin | 0.025–0.029 | csf_to_plasma_ratio | 0.893 | 2 | 3 | 8548876 |
-| temozolomide | 0.178 | tissue_to_plasma_ratio | 0.558 | 3 | 2 | 19861433 |
+| methotrexate | 0.013 | csf_to_plasma_ratio | 0.023 | 1 | 1 | 3855310 |
+| cisplatin | 0.025–0.029 | csf_to_plasma_ratio | 0.858 | 2 | 3 | 8548876 |
+| temozolomide | 0.178 | tissue_to_plasma_ratio | 0.125 | 3 | 2 | 19861433 |
 
 Real partition anchors: temozolomide — Portnow et al., *Clin Cancer Res* 2009;15(22):7092–8, PMID 19861433 (brain-ECF:plasma AUC 0.178); methotrexate — Morse et al., *J Clin Oncol* 1985;3(1):19–24, PMID 3855310 (CSF:plasma 0.013); cisplatin — Nakagawa et al., *Cancer Chemother Pharmacol* 1996;37(4):317–26, PMID 8548876 (peak CSF:plasma total-Pt 0.025–0.029).
 

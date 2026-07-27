@@ -230,8 +230,8 @@ Only **four** directories are read by code today:
 |---|---|---|
 | `hunt/autoradiography_microdialysis/` | `validation.glioma_regional_pk` | the `external` stage |
 | `hunt/maldi_msi_drug/` + `hunt/verified_0/` | `validation.gist_imatinib` | the `external` stage |
-| `hunt/geomx_dsp/` | `validation.moncayo_explant` | *(module incomplete — nothing runs)* |
-| `hunt/geo_organoid_screens/` | `validation.gbm_tmz_exvivo` | *(module incomplete — nothing runs)* |
+| `hunt/geomx_dsp/` | `validation.moncayo_explant` | the `external` stage |
+| `hunt/geo_organoid_screens/` | `validation.gbm_tmz_exvivo` | the `external` stage |
 
 `hunt/maldi_msi_drug/` ships its own harvest scripts
 (`harvest_gist_imatinib.py`, `harvest_gist_quantitative.py`) against the METASPACE
@@ -291,7 +291,7 @@ full run gives exact numbers for your machine.
 | 4 | `panel` | `experiments/real_drug_panel.py`; `validation.delivery_metrics` | `real_drug_panel.{md,png}`, `delivery_metrics.{md,png}` |
 | 5 | `cross` | `experiments/cross_tissue.py` (5 tumours at matched dx=12 µm + the dx=100 µm control) | `cross_tissue.{md,png}` |
 | 6 | `validate` | `calibration`, `pk_multidrug`, `pharmacology_real`, **`vascular_validation`**, `vessel_profile`, `numerical_rigor`, `uncertainty`, `pk_anchors` (prints only) | `calibration.md`, `pk_multidrug.md`, `pharmacology_real.md`, `vascular_validation.{md,png}`, `vessel_profile.{md,png}`, `numerical_rigor.md`, `uncertainty.{md,png}` |
-| 7 | `external` | **`glioma_regional_pk`**, **`gist_imatinib`**, `reconstruct.vessel_network` self-test | `glioma_regional_pk.{md,png}`, `gist_imatinib.{md,png}` |
+| 7 | `external` | **`glioma_regional_pk`**, **`gist_imatinib`**, **`gbm_tmz_exvivo`**, **`moncayo_explant`**, `reconstruct.vessel_network` self-test | `glioma_regional_pk.{md,png}`, `gist_imatinib.{md,png}`, `gbm_tmz_exvivo.{md,png}`, `moncayo_explant.{md,png}` |
 | — | `deep` (opt-in) | `niche_response`, `combination`, `dose_schedule`, `patient_report` ×2 | `niche_response.{md,png}`, `combination.{md,png}`, `dose_schedule.{md,png}`, `patient_report_{xenium,visium}.{md,png}` |
 
 ### Steps the harness deliberately does NOT run
@@ -302,12 +302,16 @@ back** — their docstrings advertise `python -m …` commands that are currentl
 
 | module | state |
 |---|---|
-| `validation.moncayo_explant` | only `analysis1()` exists; no driver, no `__main__`, no report writer |
-| `validation.gbm_tmz_exvivo` | the four test functions exist; no driver, no `__main__`, no report writer |
 | `validation.cellstate_validation` | `run()`/`make_figure()` exist; no `write_report`, no `__main__` |
-| `validation.ranking_robustness` | only `run_ranking_mc()`; no writer, no `__main__` |
+| `validation.ranking_robustness` | only `run_ranking_mc()`; no writer, no `__main__`. **Until it lands, report cisplatin (0.241) vs doxorubicin (0.231) as a TIE** — they differ by ~4%, inside plausible parameter uncertainty |
+| `validation.vessel_network_impact` | declares `vessel_network_impact.{md,png}`; no `__main__` yet |
 | *(hypoxia vs VEGFA/HIF1A)* | `marker_panels` points at `validation/hypoxia_validation.py`, which does not exist |
 | `validation.pk_reality` | `__main__` only **prints**. `results/pk_reality.md` has **no producer** — re-running will not refresh it, and the on-disk copy is stale |
+
+**Before trusting a docstring here, check for `if __name__ == "__main__":`.**
+Several of these modules advertise a `python -m …` invocation and an output file
+in their docstring while having neither. `moncayo_explant` and `gbm_tmz_exvivo`
+were in this list until they gained entry points; the harness now runs both.
 
 ---
 
@@ -340,6 +344,8 @@ Wall-clock on an Apple Silicon laptop, single process, warm data cache.
 | `validation.uncertainty` | 24.4 min | reported in `results/uncertainty.md` |
 | `validation.glioma_regional_pk` | ~5 min | estimate (20,000-permutation within-patient test) |
 | `validation.gist_imatinib` | ~5 min | estimate |
+| `validation.gbm_tmz_exvivo` | ~3 min | estimate |
+| `validation.moncayo_explant` | ~15 min | estimate (376,736 MSI pixels + a per-slice diffusion solve) |
 | `experiments/patient_report.py --source xenium` | 11 min 18 s | reported in `results/patient_report_xenium.md` |
 | **core pipeline (stages 0–7)** | **~2 h 15 m** | sum of the above |
 | **`--with-deep`** | **~3 h 45 m** | sum of the above |
@@ -382,9 +388,12 @@ dx-confounded "kill spans 2% → 24%" headline.
 
 **External validation** — `glioma_regional_pk.{md,png}` (partition magnitude
 passes at 1.01× bias excluding one outlier; cross-drug ordering passes at 3.65×
-predicted vs 4.66× measured; **regional ordering FAILS** at exactly 1.00×) and
-`gist_imatinib.{md,png}` (transport-only **falsified** as a sufficient explanation:
-7.9× fold error vs a 13.0× null).
+predicted vs 4.66× measured; **regional ordering FAILS** at exactly 1.00×),
+`gist_imatinib.{md,png}` (transport-only **falsified** as a sufficient
+explanation: 7.9× fold error vs a 13.0× null),
+`gbm_tmz_exvivo.{md,png}` (GSE232173 — right disease, right drug, measured ATP
+viability in patient-derived GSC cultures; potency axis only, no drug
+concentration and no microenvironment) and `moncayo_explant.{md,png}`.
 
 ### Five corrections you should see reflected
 
@@ -449,7 +458,7 @@ predicted vs 4.66× measured; **regional ordering FAILS** at exactly 1.00×) and
 | `WARN: only N/3 GSE194329 Visium sections cached` | the cross-tissue stage needs GBM1/2/3; fetch them in §2b |
 | `WARN: N/3 required data_cache/hunt/ caches present` | the `external` stage will fail; see `DATA_INVENTORY.md` Tier B, or skip that stage |
 | Ivy GAP loader raises "extract gene_expression_matrix.zip into data_cache/ivygap/" | run the `unzip` in §2a |
-| `python -m tmesim.validation.moncayo_explant` exits silently, writes nothing | expected — the module is incomplete (§3, "Steps the harness deliberately does NOT run"). Same for `gbm_tmz_exvivo`, `cellstate_validation`, `ranking_robustness` |
+| `python -m tmesim.validation.<name>` exits silently, writes nothing | the module has no `__main__` — see §3, "Steps the harness deliberately does NOT run". Currently `cellstate_validation`, `ranking_robustness`, `vessel_network_impact` |
 | `results/pk_reality.md` never updates | expected — no producer exists in the current `pk_reality.py`; the file is stale |
 | `NotOpenSSLWarning` from urllib3 | harmless; system LibreSSL vs urllib3 v2 |
 | RDKit `SMILES Parse Error: ANTIBODY:bevacizumab` | expected — bevacizumab is an antibody with no SMILES; it falls back to a tabulated descriptor row |

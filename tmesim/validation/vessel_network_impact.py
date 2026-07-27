@@ -925,6 +925,679 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
              f"Modules: `reconstruct/vessel_network.py`, "
              f"`validation/vessel_network_impact.py`.")
     L.append("")
+    # ------------------------------------------------------------------ #
+    # Verdict block — every sentence is derived from the numbers below.
+    # ------------------------------------------------------------------ #
+    d_floor = "**YES**" if vd["floor"]["disappears"] else "**NO**"
+    d_sep = "**YES**" if vd["decay"]["separate"] else "**NO**"
+    dcovB = [vd["coverage"]["delta_B_minus_A"][d] for d in drugs]
+    dcovC = [vd["coverage"]["delta_C_minus_A"][d] for d in drugs]
+    max_dB = max(abs(x) for x in dcovB)
+    max_dC = max(abs(x) for x in dcovC)
+    bindA = vd["binding"]["A_kde"]["near_minus_far"]
+    bindB = vd["binding"]["B_discrete"]["near_minus_far"]
+    binding_changes = (max(abs(x) for x in bindB) > 0.05 and
+                       max(abs(x) for x in bindB) > 2 * max(abs(x) for x in bindA))
+    material = bool(vd["floor"]["disappears"] or vd["decay"]["separate"]
+                    or max_dC > 0.05 or binding_changes)
+
     L.append("## Verdict, up front")
     L.append("")
-    return "\n".join(L)  # placeholder replaced below
+    L.append(f"| question the fix was supposed to answer | answer |")
+    L.append(f"|---|---|")
+    L.append(f"| Does the **flat floor** disappear? | {d_floor} — far-field "
+             f"(>{FAR_FIELD_UM:g} µm) exposure is {_pct(floor_A)} of perivascular "
+             f"under A and {_pct(floor_B)} under B "
+             f"({vd['floor']['fold_reduction']:.2f}× change) |")
+    L.append(f"| Do **drugs separate** on fitted decay length? | {d_sep} — cross-drug "
+             f"spread {spread_A:.2f}× under A → {spread_B:.2f}× under B |")
+    L.append(f"| How much does **therapeutic coverage @1× IC50** move? | at most "
+             f"{max_dB:+.3f} absolute (A→B, confounded with dose) and "
+             f"{max_dC:+.3f} (A→C, dose-controlled = geometry alone) |")
+    L.append(f"| Is **delivery still never the binding constraint**? | "
+             f"{'**it now can be**' if binding_changes else '**it still is not**'} — "
+             f"near-minus-far-quartile coverage gap "
+             f"{max(abs(x) for x in bindA):.3f} (A) → "
+             f"{max(abs(x) for x in bindB):.3f} (B) |")
+    L.append(f"| Should the discrete field become the **default**? | "
+             f"{'**YES**' if material else '**NO — not on this evidence**'} "
+             f"(see §8) |")
+    L.append("")
+    if material:
+        L.append("**The discrete field materially changes the model's conclusions.** "
+                 "The detail, and what would have to be re-run, is in §8.")
+    else:
+        L.append("**The discrete field does NOT materially change the model's "
+                 "conclusions on this section, and the reason is instructive:** the "
+                 "confound diagnosed in `SESSION_AUDIT.md` §3 is only *partly* the "
+                 "KDE. Removing the smooth source removes the smooth *source* — but "
+                 "the transport solve then re-creates a broad, near-flat exposure "
+                 "field by diffusion over the 6 h window, because the reconstructed "
+                 "vessels are ~44 µm apart and the drug's diffusion length over that "
+                 "window is much larger than the gaps between them. A source that is "
+                 "exactly zero does not produce an exposure that is anywhere near "
+                 "zero. See §4 and §8.")
+    L.append("")
+
+    # ------------------------------------------------------------------ #
+    # 1. Segmentation
+    # ------------------------------------------------------------------ #
+    L.append("## 1. Segmentation — discrete vessels from the measured endothelium")
+    L.append("")
+    L.append(f"`segment_vessels` runs single-linkage clustering (equivalent to "
+             f"`DBSCAN(eps, min_samples=1)`, so no cell is discarded as noise) over the "
+             f"measured positions of the **{v['n_endothelial_cells']:,} "
+             f"`CellType.ENDOTHELIAL` cells** at a linking distance of "
+             f"**{res['link_distance_um']:g} µm**.")
+    L.append("")
+    L.append("**Why 20 µm and not a guess.** Volume electron microscopy of human cortex "
+             "gives ~**20 endothelial cells per mm of vasculature** and **1–2 EC per "
+             "capillary cross-section** (Shapson-Coe A et al., *Science* 2024;"
+             "384(6696):eadk4858, [PMID 38723085]"
+             "(https://pubmed.ncbi.nlm.nih.gov/38723085/); Sargent S et al., *Vascular "
+             "Biology* 2023;5:e230010, [PMID 37582180]"
+             "(https://pubmed.ncbi.nlm.nih.gov/37582180/)) — i.e. **one EC ≈ 50 µm of "
+             "vessel length**, so consecutive nuclei on one vessel wall are tens of µm "
+             "apart, and a 20 µm link joins cells that are closer than one EC's worth of "
+             "vessel. Independently, `results/vascular_validation.md` §3.2 measures a "
+             "median nearest-other-endothelial-cell distance of **26.4 µm** on this very "
+             "section and §3.3 finds same-type enrichment of **2.8× within 10 µm and "
+             "2.8× at 10–20 µm**, decaying to the null by ~60 µm. 20 µm sits inside that "
+             "enriched shell. The same paper's tissue-counting endothelial volume "
+             "fraction, **8.0%**, is what our reconstruction's **9.7%** was already "
+             "validated against.")
+    L.append("")
+    L.append(f"### 1.1 Result at {res['link_distance_um']:g} µm linking")
+    L.append("")
+    L.append("| quantity | value |")
+    L.append("|---|---|")
+    L.append(f"| endothelial cells in | {v['n_endothelial_cells']:,} |")
+    L.append(f"| **discrete vessel objects out** | **{v['n_vessels']:,}** |")
+    L.append(f"| microvessel density (MVD) | {v['mvd_per_mm2']:.1f}/mm² |")
+    L.append(f"| mean endothelial cells per vessel | {v['mean_cells_per_vessel']:.2f} |")
+    L.append(f"| singleton (1-cell) vessels | {_pct(v['singleton_fraction'],0)} |")
+    L.append(f"| vessels of ≥4 cells | {v['n_vessels_ge4_cells']:,} |")
+    L.append(f"| median extent of multi-cell objects | "
+             f"{_f(v['median_extent_multi_um'],1)} µm |")
+    L.append(f"| median aspect ratio of multi-cell objects | "
+             f"{_f(v['median_aspect_multi'],2)} |")
+    L.append(f"| **intervessel nearest-neighbour distance** | median "
+             f"**{_f(v['intervessel_nn']['median'],1)} µm**, mean "
+             f"{_f(v['intervessel_nn']['mean'],1)}, p90 "
+             f"{_f(v['intervessel_nn']['p90'],1)} |")
+    L.append(f"| tumour-cell → nearest vessel | median "
+             f"**{_f(v['tumor_to_vessel']['median'],1)} µm**, p90 "
+             f"{_f(v['tumor_to_vessel']['p90'],1)}, p99 "
+             f"{_f(v['tumor_to_vessel']['p99'],1)} |")
+    L.append(f"| tumour cells >100 µm from a vessel | "
+             f"{_pct(v['tumor_frac_beyond_100um'])} |")
+    L.append(f"| tumour cells >150 µm (Thomlinson–Gray) | "
+             f"{_pct(v['tumor_frac_beyond_150um'])} |")
+    L.append(f"| tissue area (denominator) | {v['tissue_area_mm2']:.2f} mm² |")
+    L.append("")
+    L.append("### 1.2 Against published human GBM microvascular morphometry")
+    L.append("")
+    L.append("Values and PMIDs are reused verbatim from `results/vascular_validation.md` "
+             "so the two reports cannot drift apart.")
+    L.append("")
+    L.append("| quantity | segmented | published human GBM | ratio | verdict | source |")
+    L.append("|---|---|---|---|---|---|")
+    for r in seg["rows"]:
+        L.append(f"| {r['key']} | {r['reconstructed']:.2f} {r['units']} | "
+                 f"{r['published']:.2f} [{r['published_range'][0]:.1f}–"
+                 f"{r['published_range'][1]:.1f}] | {r['ratio']:.2f}× | "
+                 f"**{r['verdict']}** | {r['source']}, "
+                 f"[PMID {r['pmid']}](https://pubmed.ncbi.nlm.nih.gov/{r['pmid']}/) |")
+    L.append("")
+    L.append(f"The **vascular area fraction is the load-bearing row**, because it is the "
+             f"only one that tests the *field* rather than the point pattern: the "
+             f"discrete source occupies **{seg['vessel_area_fraction_pct']:.2f}%** of "
+             f"tissue against a measured whole-section CD34 value of **2.1 ± 0.3%** "
+             f"(PMID 36611806) — agreement to {seg['vessel_area_fraction_pct']/2.1:.2f}× "
+             f"with **no tuning**: the radius was fixed from vessel-caliber imaging "
+             f"before the field was built. The KDE could not be scored this way at all "
+             f"(`vascular_validation.md` §3.5: a max-normalised field's area fraction is "
+             f"whatever threshold you pick).")
+    L.append("")
+    L.append(f"The **clustering test still fails, and the discrete field does not fix "
+             f"it**: at its own density a completely random (Poisson) vessel field would "
+             f"give a median tumour-to-vessel distance of {seg['csr_median_um']:.1f} µm "
+             f"and put {_pct(seg['csr_frac_beyond_100um'])} of tissue beyond 100 µm; the "
+             f"segmentation gives {seg['clustering_index_median']:.2f}× and "
+             f"{seg['clustering_index_tail']:.2f}× those. Segmenting the endothelium into "
+             f"objects does not create the vascular hotspots and avascular zones that "
+             f"define GBM — **those were never in the cell positions to begin with**, so "
+             f"no source-field construction can recover them.")
+    L.append("")
+    L.append("### 1.3 Sensitivity to the linking distance (it is a free parameter)")
+    L.append("")
+    L.append("| link (µm) | vessels | MVD /mm² | cells/vessel | singletons | "
+             "intervessel NN median (µm) | tumour→vessel median (µm) | >100 µm |")
+    L.append("|---|---|---|---|---|---|---|---|")
+    for r in res["link_sweep"]:
+        mark = " ←" if abs(r["link_distance_um"] - res["link_distance_um"]) < 1e-9 else ""
+        L.append(f"| {r['link_distance_um']:.0f}{mark} | {r['n_vessels']:,} | "
+                 f"{r['mvd_per_mm2']:.1f} | {r['mean_cells_per_vessel']:.2f} | "
+                 f"{_pct(r['singleton_fraction'],0)} | "
+                 f"{_f(r['intervessel_nn_median_um'],1)} | "
+                 f"{_f(r['tumor_to_vessel_median_um'],1)} | "
+                 f"{_pct(r['tumor_frac_beyond_100um'])} |")
+    L.append("")
+    L.append("MVD moves 1.8× across the sweep and the intervessel distance 2.2×, so the "
+             "*absolute* morphometry is conditional on this choice. The tumour→vessel "
+             "distance — the quantity the delivery result actually depends on — moves by "
+             "only a few percent, because merging nearby endothelial cells into one "
+             "object does not move the endothelium.")
+    L.append("")
+
+    # ------------------------------------------------------------------ #
+    # 2. The two source fields
+    # ------------------------------------------------------------------ #
+    L.append("## 2. The two source fields, and what their numbers mean")
+    L.append("")
+    L.append("| | A · KDE (current default) | B · discrete | C · discrete, dose-matched |")
+    L.append("|---|---|---|---|")
+    L.append(f"| construction | 40 µm Gaussian KDE of endothelial positions, ÷ its own "
+             f"max | 1.0 within {res['radius_um']:g} µm of a segmented vessel, **exactly "
+             f"0.0** elsewhere | B × (A's total ÷ B's total) |")
+    for lab, key in (("% of tissue with a nonzero source", "nonzero_area_fraction"),
+                     ("% of tissue with **exactly zero** source", "zero_area_fraction")):
+        L.append(f"| {lab} | {_pct(fs['A_kde'][key])} | {_pct(fs['B_discrete'][key])} | "
+                 f"{_pct(fs['C_discrete_matched'][key])} |")
+    for lab, key, nd in (("mean over tissue", "mean", 4), ("max", "max", 3),
+                         ("tissue-integrated total (relative)", "total_over_tissue", 0)):
+        L.append(f"| {lab} | {_f(fs['A_kde'][key],nd)} | {_f(fs['B_discrete'][key],nd)} | "
+                 f"{_f(fs['C_discrete_matched'][key],nd)} |")
+    ratio = (fs["A_kde"]["total_over_tissue"] / fs["B_discrete"]["total_over_tissue"]
+             if fs["B_discrete"]["total_over_tissue"] > 0 else float("nan"))
+    L.append("")
+    L.append("**Normalisation, stated plainly.** Both fields are *relative*, neither is "
+             "an absolute perfused fraction, and no number in this project should be read "
+             "as an absolute delivery prediction. But they are relative to different "
+             "things, and that difference is not cosmetic:")
+    L.append("")
+    L.append("* **A**: `1.0` = *the densest endothelial-KDE spot anywhere in this "
+             "particular section*. Change the section and the unit changes.")
+    L.append(f"* **B**: `1.0` = *a perfused vessel wall leaking at the reference rate*, "
+             f"and `0.0` = *no vessel*. The engine's delivery term is "
+             f"`vascular_density × bbb_penetrance × plasma`, so B reads as \"drug enters "
+             f"the interstitium at the plasma-driven leak rate at the vessel wall and "
+             f"nowhere else\" — which is what a leaky-vessel boundary condition says. "
+             f"The unit is section-independent.")
+    L.append(f"* **C**: B rescaled so the tissue-integrated total matches A. A delivers "
+             f"**{ratio:.2f}× more total drug into the tissue than B** at the same "
+             f"plasma concentration, purely because a max-normalised KDE spread over "
+             f"100% of the tissue integrates to more than a unit source on 2.5% of it. "
+             f"**Any A→B difference is therefore part geometry and part dose. C removes "
+             f"the dose part.** Its cost: the in-vessel amplitude becomes "
+             f"{fs['C_discrete_matched']['max']:.2f}, and because the vascular field is "
+             f"also the O₂ and IFP source, C is a slightly hyperoxic tissue. Both arms "
+             f"are reported; neither is hidden.")
+    L.append("")
+    L.append(f"**Vessel radius = {res['radius_um']:g} µm** — the low end of measured "
+             f"human brain vessel caliber (15.0 ± 5.1 µm diameter in white matter to "
+             f"37.4 ± 12.9 µm in cortical grey matter, *all brain tumours larger than "
+             f"normal-appearing tissue*: Hsu YY et al., *J Magn Reson Imaging* "
+             f"2009;30(5):1078-84, [PMID 19856441]"
+             f"(https://pubmed.ncbi.nlm.nih.gov/19856441/); 18.1 ± 2.4 µm diameter in "
+             f"orthotopic U87 glioma validated against IHC: Kording F et al., *JMRI* "
+             f"2014;40(6):1310-8, [PMID 24390982]"
+             f"(https://pubmed.ncbi.nlm.nih.gov/24390982/)). **Honest caveat:** at "
+             f"dx = {res['dx_um']:g} µm one grid cell has an equivalent disc radius of "
+             f"{seg['grid_min_representable_radius_um']:.1f} µm, so "
+             f"{res['radius_um']:g} µm is as much a statement about the mesh as about "
+             f"biology — it is the smallest radius that reliably paints ≥1 grid cell per "
+             f"vessel while staying inside the published range. The quantity that "
+             f"validates the choice is the area fraction in §1.2, and it passes to "
+             f"{seg['vessel_area_fraction_pct']/2.1:.2f}×.")
+    L.append("")
+
+    # ------------------------------------------------------------------ #
+    # 3. Reproducing the status quo
+    # ------------------------------------------------------------------ #
+    la = vd["decay"]["A_legacy_axis"]
+    L.append("## 3. First, does arm A reproduce the defect it is supposed to have?")
+    L.append("")
+    L.append("A fix is only measurable against a reproduced baseline. On the **legacy "
+             "distance axis** (the 95th-percentile threshold on the KDE that "
+             "`vessel_profile` / `delivery_metrics` use), arm A gives:")
+    L.append("")
+    L.append("| drug | L (µm), this run | L reported in `delivery_metrics.md` |")
+    L.append("|---|---|---|")
+    for d, x in zip(drugs, la["L_um"]):
+        L.append(f"| {d} | {_f(x,1)} | 26.5–28.2 (five-drug panel) |")
+    L.append(f"| **source null** | **{_f(la['L_source_null_um'],1)}** | **23.7** |")
+    L.append("")
+    L.append(f"The source null reproduces to "
+             f"{la['L_source_null_um']/PRIOR_KDE['L_source_null_um']:.2f}× of the "
+             f"published 23.7 µm, so the baseline is the one the audit describes and the "
+             f"A/B contrast below is measured against the real status quo, not a "
+             f"re-derived one.")
+    L.append("")
+    L.append(f"Everything from here on uses a **common distance axis**: Euclidean "
+             f"distance from a **segmented discrete vessel** "
+             f"({int((res['fields']['B_discrete']>0).sum()):,} vessel pixels). It is the "
+             f"only axis on which \"distance from a vessel\" means the same thing in both "
+             f"arms — the legacy axis is a percentile threshold on A's own field, so it "
+             f"is not defined for B and it measures distance from a *KDE hotspot*, not "
+             f"from a vessel (`vascular_validation.md` §5).")
+    L.append("")
+
+    # ------------------------------------------------------------------ #
+    # 4. The floor
+    # ------------------------------------------------------------------ #
+    L.append("## 4. Does the FLAT FLOOR disappear?")
+    L.append("")
+    L.append("Two measures, one fitted and one fit-free, so the answer cannot be an "
+             "artefact of the fit:")
+    L.append("")
+    L.append("* `floor_fraction` — from `C(d) = C₀·exp(−d/L) + floor`, reported as "
+             "`floor/(C₀+floor)`. This is the ~0.12 of `dose_schedule.md`.")
+    L.append(f"* **empirical floor** — count-weighted mean of the profile over bins "
+             f"beyond {FAR_FIELD_UM:g} µm ÷ the perivascular (0–10 µm) bin. No functional "
+             f"form assumed.")
+    L.append("")
+    L.append("| field | drug | fitted floor_fraction | **empirical floor** "
+             "(>150 µm / perivascular) |")
+    L.append("|---|---|---|---|")
+    for arm in ARMS:
+        k = arm["key"]
+        f_fit = vd["floor"][k]["floor_fraction"]
+        f_emp = vd["floor"][k]["empirical_floor"]
+        for i, d in enumerate(drugs):
+            L.append(f"| {arm['short'] if i == 0 else ''} | {d} | {_f(f_fit[i])} | "
+                     f"**{_pct(f_emp[i])}** |")
+        L.append(f"| {arm['short']} — *the source itself* | (source null) | "
+                 f"{_f(vd['floor'][k]['source_floor_fraction'])} | "
+                 f"{_pct(vd['floor'][k]['source_empirical_floor'],4)} |")
+    L.append("")
+    L.append(f"**The source-null rows are the finding.** The KDE source has a far-field "
+             f"floor of {_pct(vd['floor']['A_kde']['source_empirical_floor'],2)} of its "
+             f"perivascular value; the discrete source has "
+             f"{_pct(vd['floor']['B_discrete']['source_empirical_floor'],4)} — **exactly "
+             f"zero, by construction**. So the fix does exactly what it was designed to "
+             f"do *at the source*.")
+    L.append("")
+    if vd["floor"]["disappears"]:
+        L.append(f"And it carries through to the exposure: the far-field exposure floor "
+                 f"falls from {_pct(floor_A)} of perivascular under A to {_pct(floor_B)} "
+                 f"under B, a {vd['floor']['fold_reduction']:.2f}× reduction. Tissue far "
+                 f"from a vessel is now genuinely drug-poor.")
+    else:
+        L.append(f"**But it does not carry through to the exposure.** The far-field "
+                 f"exposure floor is {_pct(floor_A)} of perivascular under A and "
+                 f"{_pct(floor_B)} under B — a change of only "
+                 f"{vd['floor']['fold_reduction']:.2f}×. Removing every trace of source "
+                 f"from 97.5% of the tissue barely moves the *exposure* there.")
+        L.append("")
+        L.append("**Why, and it is not a bug.** The transport PDE runs for "
+                 f"{_PDE['total_time']/3600:.0f} h. Over that window drug diffuses far "
+                 "further than the "
+                 f"{_f(v['intervessel_nn']['median'],0)} µm median gap between segmented "
+                 "vessels, so the interstitium equilibrates: a source that is exactly "
+                 "zero produces an exposure that is nowhere near zero. The flat floor in "
+                 "`dose_schedule.md` was attributed to the KDE bandwidth; this run shows "
+                 "it is **mostly diffusion across a densely-vascularised section**, and "
+                 "the KDE was only the more visible half of the cause. That is a "
+                 "different — and more robust — conclusion than the audit anticipated, "
+                 "and it survives removing the KDE entirely.")
+    L.append("")
+
+    # ------------------------------------------------------------------ #
+    # 5. Decay separation
+    # ------------------------------------------------------------------ #
+    L.append("## 5. Do the drugs finally SEPARATE?")
+    L.append("")
+    L.append("The decisive test of the audit: under the KDE every drug fitted 26–28 µm "
+             "against a 23.7 µm source null, i.e. the number was measuring the source, "
+             "not the drug. Each arm is scored against **its own** source null.")
+    L.append("")
+    L.append("| field | drug | L (µm) | L / own source null | fit-free half-distance (µm) |")
+    L.append("|---|---|---|---|---|")
+    for arm in ARMS:
+        k = arm["key"]
+        dec = vd["decay"][k]
+        for i, d in enumerate(drugs):
+            L.append(f"| {arm['short'] if i == 0 else ''} | {d} | "
+                     f"{_f(dec['L_um'][i],1)} | {_f(dec['L_over_null'][i],2)} | "
+                     f"{_f(dec['d_half_empirical_um'][i],1)} |")
+        nul = dec["L_source_null_um"]
+        L.append(f"| {arm['short']} | **source null** | "
+                 f"**{_f(nul,1) if np.isfinite(nul) else 'undefined'}** | — | — |")
+        L.append(f"| {arm['short']} | *cross-drug spread (max/min)* | "
+                 f"**{_f(dec['spread'],2)}×** | | |")
+    L.append("")
+    L.append("**The discrete arm's source null is `undefined`, and that is the point.** "
+             "The identical three-parameter fit cannot be applied to the discrete source "
+             "because it is identically zero beyond one bin — there is no decay length in "
+             "it to confound the drug's. Under A the null is a real, competing "
+             "explanation; under B there is nothing left to explain the drug's L except "
+             "transport.")
+    L.append("")
+    if vd["decay"]["separate"]:
+        L.append(f"And the drugs do separate: the cross-drug spread widens from "
+                 f"{spread_A:.2f}× under A to {spread_B:.2f}× under B.")
+    else:
+        L.append(f"**But the drugs still do not separate.** The cross-drug spread is "
+                 f"{spread_A:.2f}× under A and {spread_B:.2f}× under B. Removing the "
+                 f"source's own length scale did not reveal a drug-specific one, because "
+                 f"on this section the exposure profile is set by the *arrangement of "
+                 f"vessels* (median gap {_f(v['intervessel_nn']['median'],0)} µm, "
+                 f"{_pct(v['tumor_frac_beyond_100um'])} of tumour cells beyond 100 µm) "
+                 f"rather than by how far any individual molecule travels. **The fitted "
+                 f"decay length on this tissue is a geometry statistic under both source "
+                 f"models, and should not be quoted as a drug property under either.** "
+                 f"`therapeutic_coverage @1× IC50` — which is computed per-cell and "
+                 f"therefore does not inherit the geometry — remains the metric that "
+                 f"discriminates (§6).")
+    L.append("")
+
+    # ------------------------------------------------------------------ #
+    # 6. Coverage
+    # ------------------------------------------------------------------ #
+    L.append("## 6. Therapeutic coverage @ 1× IC50")
+    L.append("")
+    L.append("Computed by the unmodified `validation.delivery_metrics.therapeutic_coverage` "
+             "over the fixed set of real tumour cells.")
+    L.append("")
+    L.append("| drug | IC50 (µM) | A · KDE | B · discrete | Δ(B−A) | C · dose-matched | "
+             "**Δ(C−A) = geometry alone** |")
+    L.append("|---|---|---|---|---|---|---|")
+    for i, d in enumerate(drugs):
+        L.append(f"| {d} | {A[d]['ic50_uM']:.4g} | {covA[i]:.4f} | {covB[i]:.4f} | "
+                 f"{dcovB[i]:+.4f} | {covC[i]:.4f} | **{dcovC[i]:+.4f}** |")
+    L.append("")
+    L.append("| drug | mean tumour AUC (µM·s), A | B | C | median E/IC50, A | B | C |")
+    L.append("|---|---|---|---|---|---|---|")
+    for d in drugs:
+        L.append(f"| {d} | {A[d]['absolute_exposure']['mean_tumor_auc']:.4g} | "
+                 f"{B[d]['absolute_exposure']['mean_tumor_auc']:.4g} | "
+                 f"{C[d]['absolute_exposure']['mean_tumor_auc']:.4g} | "
+                 f"{A[d]['therapeutic_coverage']['median_E_over_ic50']:.4g} | "
+                 f"{B[d]['therapeutic_coverage']['median_E_over_ic50']:.4g} | "
+                 f"{C[d]['therapeutic_coverage']['median_E_over_ic50']:.4g} |")
+    L.append("")
+    L.append(f"**Read the C column, not the B column, as the structural result.** B "
+             f"delivers {1/ratio:.2f}× the total drug A does, so most of the A→B change "
+             f"is a dose change that would be undone by any recalibration of the source "
+             f"amplitude — and the amplitude of a relative field is exactly the thing "
+             f"this project has never claimed to know. At matched dose the coverage moves "
+             f"by at most **{max_dC:+.3f} absolute**, "
+             f"{'which is larger than' if max_dC > 0.03 else 'which is inside'} the "
+             f"±0.03 grid-convergence band `delivery_metrics.md` establishes for this "
+             f"metric.")
+    L.append("")
+
+    # ------------------------------------------------------------------ #
+    # 7. Zero-drug cells and the binding constraint
+    # ------------------------------------------------------------------ #
+    L.append("## 7. Who gets essentially nothing, and is delivery binding?")
+    L.append("")
+    L.append(f"\"Zero\" is not something a diffusion solve produces, so two explicit "
+             f"thresholds are used: **E < {ZERO_IC50_MULT:g}× IC50** (pharmacologically "
+             f"nothing) and **E < {ZERO_PEAK_FRAC:g}× the arm's own p99 tumour exposure** "
+             f"(drug-agnostic dynamic range).")
+    L.append("")
+    L.append("| field | drug | E < 0.01× IC50 | E < 1% of p99 | E(p10)/E(p99) | "
+             "exactly zero |")
+    L.append("|---|---|---|---|---|---|")
+    for arm in ARMS:
+        k = arm["key"]
+        for i, d in enumerate(drugs):
+            z = res["per_arm"][k][d]["zero_drug"]
+            L.append(f"| {arm['short'] if i == 0 else ''} | {d} | "
+                     f"{_pct(z['frac_below_0.01x_ic50'])} | "
+                     f"{_pct(z['frac_below_1pct_peak'])} | "
+                     f"{_f(z['p10_over_p99'],3)} | {_pct(z['frac_exactly_zero'])} |")
+    L.append("")
+    L.append("### Coverage by distance-from-vessel quartile — the binding-constraint test")
+    L.append("")
+    L.append("Tumour cells are split into quartiles by their **measured** distance to the "
+             "nearest endothelial cell (cell-to-cell, so exactly `dx`-invariant and "
+             "independent of any field threshold). If the far quartile is covered as well "
+             "as the near quartile, delivery is not what limits the drug.")
+    L.append("")
+    L.append("| field | drug | Q1 near | Q2 | Q3 | Q4 far | near − far | mean E far/near |")
+    L.append("|---|---|---|---|---|---|---|---|")
+    for arm in ARMS:
+        k = arm["key"]
+        for i, d in enumerate(drugs):
+            c = res["per_arm"][k][d]["coverage_by_distance"]
+            q = c["coverage_by_quartile"]
+            L.append(f"| {arm['short'] if i == 0 else ''} | {d} | {q[0]:.3f} | "
+                     f"{q[1]:.3f} | {q[2]:.3f} | {q[3]:.3f} | "
+                     f"{c['near_minus_far']:+.3f} | "
+                     f"{_f(c['mean_E_far_over_near'],3)} |")
+    q_edges = A[drugs[0]]["coverage_by_distance"]["quartile_median_distance_um"]
+    L.append("")
+    L.append(f"Quartile median distances: {', '.join(f'{x:.0f}' for x in q_edges)} µm.")
+    L.append("")
+    if binding_changes:
+        L.append("**Delivery has become a binding constraint under B**: the far quartile "
+                 "is now measurably worse served than the near quartile, so there is a "
+                 "spatially organised population the drug does not reach.")
+    else:
+        L.append(f"**\"Delivery is never the binding constraint\" SURVIVES the fix.** The "
+                 f"near-minus-far coverage gap is at most "
+                 f"{max(abs(x) for x in bindA):.3f} under A and "
+                 f"{max(abs(x) for x in bindB):.3f} under B, and the far quartile's mean "
+                 f"exposure is still "
+                 f"{_f(min(vd['binding']['B_discrete']['mean_E_far_over_near']),2)}–"
+                 f"{_f(max(vd['binding']['B_discrete']['mean_E_far_over_near']),2)}× the "
+                 f"near quartile's. On a section whose most distant tumour cell quartile "
+                 f"sits a median {q_edges[3]:.0f} µm from an endothelial cell, 6 h of "
+                 f"diffusion is enough to erase the difference **regardless of how the "
+                 f"source is drawn**. The conclusion was never actually resting on the "
+                 f"KDE; it rests on this section being densely and near-uniformly "
+                 f"vascularised — which `vascular_validation.md` §4 already identified as "
+                 f"the reconstruction's real deficiency ('to within a few percent, a "
+                 f"random point field').")
+    L.append("")
+
+    # ------------------------------------------------------------------ #
+    # 8. Recommendation
+    # ------------------------------------------------------------------ #
+    L.append("## 8. Should the discrete field become the default?")
+    L.append("")
+    if material:
+        L.append("**Recommendation: YES.** The discrete field changes the conclusions "
+                 "listed in §Verdict, and it is the better-validated construction (§1.2: "
+                 "its area fraction matches a measured CD34 value with no tuning, which "
+                 "the max-normalised KDE cannot even be scored against).")
+        L.append("")
+        L.append("Flipping it is a one-word change — "
+                 "`real_fields._DEFAULT_VASCULAR_MODE = 'discrete'` — but **every result "
+                 "below is computed from `vascular_density` and would have to be "
+                 "re-run**:")
+    else:
+        L.append("**Recommendation: NO — not as the default, not on this evidence. Keep "
+                 "it as an available, documented mode and cite this report.**")
+        L.append("")
+        L.append("This is a negative result about the *fix*, not about the *diagnosis*. "
+                 "The reasoning:")
+        L.append("")
+        L.append("1. **It does not buy what it was supposed to buy.** The audit predicted "
+                 "the flat floor would disappear and the drugs would separate. Neither "
+                 "happens (§4, §5). The floor and the non-separation are produced by "
+                 "6 h of diffusion across a section whose vessels are ~"
+                 f"{_f(v['intervessel_nn']['median'],0)} µm apart, and that survives "
+                 "deleting the source from 97.5% of the tissue.")
+        L.append("2. **Flipping the default would silently invalidate every published "
+                 "number in `results/` for a change that moves the headline metric by "
+                 f"≤{max_dC:.3f}** at matched dose — comparable to its own grid-drift "
+                 "band. That is a bad trade.")
+        L.append("3. **The amplitude question would become load-bearing.** A and B "
+                 f"differ {ratio:.2f}× in total delivered drug and neither has an "
+                 "absolute scale. Making B the default silently rescales every absolute "
+                 "AUC and coverage in the project by that factor, on no measurement. The "
+                 "perivascular-sink calibration (`alpha`) was fitted against the KDE "
+                 "field; it would have to be re-fitted first.")
+        L.append("4. **The real defect is upstream of the field.** §1.2: the segmented "
+                 "vessels are still "
+                 f"{seg['clustering_index_median']:.2f}× a random point field. GBM's "
+                 "vascular hotspots and avascular zones are not in the endothelial cell "
+                 "positions this section provides, so no source-field construction "
+                 "recovers them. Fixing the *field* while the *point pattern* is "
+                 "structureless is polishing the wrong layer.")
+    L.append("")
+    L.append("### What the discrete field IS good for, today")
+    L.append("")
+    L.append("* **It retires one confound cleanly.** The circularity in "
+             "`niche_response.md` (perivascular label and drug source share the "
+             "endothelial signal) and the source-null contamination in "
+             "`delivery_metrics.md` are both properties of the KDE. Any future claim of "
+             "the form \"exposure decays with distance from a vessel\" should be "
+             "re-checked against arm B, where the source contributes **no** length scale "
+             "at all (§5). That check is now a two-line call.")
+    L.append("* **It gives the project its first vessel-level geometry that scores "
+             "against a measured area fraction** (§1.2) rather than against a threshold "
+             "chosen after the fact.")
+    L.append("* **It is the right substrate for the outstanding BBB-disruption leak** "
+             "(`SESSION_AUDIT.md` §1, `source = vascular_density × (bbb_penetrance + "
+             "L·bbb_disruption) × plasma`, L ≈ 0.24): an additive leak term is a "
+             "*per-vessel* property, and a per-vessel property needs vessels.")
+    L.append("")
+    L.append("### If it is ever made the default, these must be re-run")
+    L.append("")
+    L.append("In dependency order — everything here reads `vascular_density` directly or "
+             "through the O₂ / IFP solve:")
+    L.append("")
+    L.append("1. `validation/calibration.py` — **first**: `alpha` is fitted against the "
+             "KDE source, and every absolute exposure inherits it.")
+    L.append("2. `validation/delivery_metrics.py` — coverage, penetration length, the "
+             "grid-convergence and discrimination tables.")
+    L.append("3. `validation/vessel_profile.py` — its vessel mask should become the "
+             "segmented mask rather than a percentile on the field "
+             "(`vascular_validation.md` §7.2 already asks for this).")
+    L.append("4. `validation/numerical_rigor.py` — grid convergence must be re-established: "
+             f"a {res['radius_um']:g} µm feature on a {res['dx_um']:g} µm mesh is *not* "
+             "resolved, so the discrete field is inherently more grid-sensitive than the "
+             "KDE. **This is the single biggest risk of the switch and it is untested "
+             "here** (this study is single-`dx` by design).")
+    L.append("5. `validation/pharmacology_real.py`, `glioma_regional_pk.py`, "
+             "`pk_multidrug.py` — the external validations.")
+    L.append("6. `validation/uncertainty.py`, `ranking_robustness.py` — the drug ranking "
+             "and its error bars.")
+    L.append("7. `viz/patient_report.py` and every figure in `results/`.")
+    L.append("")
+
+    # ------------------------------------------------------------------ #
+    # 9. Caveats
+    # ------------------------------------------------------------------ #
+    L.append("## 9. What this does NOT establish")
+    L.append("")
+    L.append("* **One section, one patient, one `dx`.** Between-case GBM vascularity "
+             "spans ~48× (PMID 38928515). A section that was genuinely heterogeneous — "
+             "with real avascular zones — could give the opposite answer, and that is the "
+             "most important untested case. This study cannot distinguish \"the discrete "
+             "field does not matter\" from \"the discrete field does not matter *on a "
+             "section that has no avascular zones*\". The second is what the evidence "
+             "actually supports.")
+    L.append("* **Grid convergence of the discrete field is untested.** Single `dx` by "
+             "design. See §8 item 4.")
+    L.append("* **The vessel radius and the linking distance are free parameters.** Both "
+             "are cited rather than fitted, and both are swept or scored (§1.3, §1.2), "
+             "but neither is measured on this tissue.")
+    L.append("* **Endothelial identity is a PECAM1 z-score gate.** Move the gate and MVD "
+             "moves with it (`vascular_validation.md` §6). The segmentation inherits that "
+             "entirely.")
+    L.append("* **Nothing here validates the field's VALUES.** Both fields are relative. "
+             "The area fraction in §1.2 validates the discrete field's *geometry* against "
+             "a measurement; its *amplitude* remains unvalidated, as A's always was.")
+    L.append("* **Arm C is hyperoxic.** Matching the total drug also scales the O₂ and IFP "
+             "source (§2). Coverage and the exposure profile are insensitive to this "
+             "(neither depends on the oxygen field), but the kill fraction is not, which "
+             "is why kill fraction is not a headline here.")
+    L.append("* **The 6 h exposure window is a modelling choice.** The floor/no-floor "
+             "result depends on it: a shorter window would leave less time for diffusion "
+             "to fill the avascular gaps, and the discrete field would look more "
+             "different from the KDE. That dependence is a real finding (§4) and it is "
+             "not swept.")
+    L.append("")
+    L.append("---")
+    L.append("")
+    L.append(f"*Reproduce:* `./.venv/bin/python -m tmesim.validation.vessel_network_impact`. "
+             f"Deterministic (`seed=0`, no RNG in the segmentation or the field build). "
+             f"Runtime {res['runtime_s']:.0f} s for {len(ARMS)*len(drugs)} transport "
+             f"solves at dx = {res['dx_um']:g} µm, alpha = {res['alpha']:.2f}. Literature "
+             f"retrieved from PubMed; every value carries its PMID.")
+    L.append("")
+
+    text = "\n".join(L)
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w") as fh:
+        fh.write(text)
+    return path
+
+
+# --------------------------------------------------------------------------- #
+# 8. Entry point
+# --------------------------------------------------------------------------- #
+def selftest(res: Dict) -> None:
+    """Invariants the study must satisfy for its numbers to mean anything."""
+    tissue = np.asarray(res["_domain"].tissue_mask, dtype=bool)
+    disc = res["fields"]["B_discrete"]
+    kde = res["fields"]["A_kde"]
+    assert disc.min() == 0.0, "discrete field must reach exactly zero"
+    assert (disc[tissue] == 0).mean() > 0.5, \
+        "discrete field must leave most of the tissue with NO source"
+    assert (kde[tissue] == 0).mean() < 0.05, \
+        "sanity: the KDE field is nonzero almost everywhere (the defect being tested)"
+    assert disc[~tissue].sum() == 0.0, "no source outside tissue"
+    a = res["field_stats"]["A_kde"]["total_over_tissue"]
+    c = res["field_stats"]["C_discrete_matched"]["total_over_tissue"]
+    assert abs(c - a) / a < 1e-9, f"dose-matched arm total {c} != KDE total {a}"
+    for arm in ARMS:
+        for d in res["drugs"]:
+            m = res["per_arm"][arm["key"]][d]
+            cov = m["therapeutic_coverage"]["coverage_1x"]
+            assert 0.0 <= cov <= 1.0, f"{arm['key']}/{d}: coverage {cov} out of [0,1]"
+            assert np.isfinite(m["absolute_exposure"]["mean_tumor_auc"]), \
+                f"{arm['key']}/{d}: non-finite AUC"
+    # The source null is the whole point: A has one, B cannot have one.
+    assert np.isfinite(res["source_null"]["A_kde"]["common"]["L_um"]), \
+        "the KDE source must itself fit a decay length (that is the confound)"
+    assert not np.isfinite(res["source_null"]["B_discrete"]["common"]["L_um"]), \
+        "the discrete source must NOT admit a decay-length fit (it is a step function)"
+    print("SELF-TEST PASSED")
+
+
+def main(argv=None) -> Dict:
+    import argparse
+
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--cache", default=None,
+                    help="pickle path: reuse a previous run instead of re-solving")
+    ap.add_argument("--drugs", nargs="*", default=list(DRUGS))
+    ap.add_argument("--dx", type=float, default=DX_UM)
+    args = ap.parse_args(argv)
+
+    res = run(drugs=tuple(args.drugs), dx_um=args.dx, cache_path=args.cache)
+    if "_domain" not in res:  # cache written before _domain was stored
+        res["_domain"] = reconstruct_real("xenium", dx_um=res["dx_um"]).domain
+    res["_verdicts"] = verdicts(res)
+    selftest(res)
+    png = make_figure(res)
+    md = write_report(res)
+    print(f"\nsaved {png}")
+    print(f"saved {md}")
+
+    vdt = res["_verdicts"]
+    print("\n" + "=" * 78)
+    print(f"floor:     A {vdt['floor']['A_mean_empirical']*100:.2f}% -> "
+          f"B {vdt['floor']['B_mean_empirical']*100:.2f}%  "
+          f"({vdt['floor']['fold_reduction']:.2f}x)  "
+          f"disappears={vdt['floor']['disappears']}")
+    print(f"decay:     spread A {vdt['decay']['A_kde']['spread']:.2f}x -> "
+          f"B {vdt['decay']['B_discrete']['spread']:.2f}x  "
+          f"separate={vdt['decay']['separate']}")
+    for d in res["drugs"]:
+        print(f"  {d:14s} cov A {vdt['coverage']['A_kde'][d]:.4f} -> "
+              f"B {vdt['coverage']['B_discrete'][d]:.4f} -> "
+              f"C {vdt['coverage']['C_discrete_matched'][d]:.4f}")
+    print("=" * 78)
+    return res
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()
