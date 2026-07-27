@@ -83,7 +83,11 @@ import pandas as pd
 
 from ..molecular.descriptors import from_smiles
 from ..molecular.library import GBM_DRUGS
-from ..molecular.permeability import bbb_penetrance, membrane_permeability
+from ..molecular.permeability import (
+    _radius_nm_from_descriptors,
+    bbb_penetrance,
+    membrane_permeability,
+)
 from ..reconstruct.barrier import (
     L_PARACELLULAR_LEAK,
     REGION_DISRUPTION,
@@ -133,6 +137,14 @@ _EXTRA_SMILES: Dict[str, Tuple[str, str, float]] = {
         "CC(C)(C1=NC(=CC=C1)N2C3=NC(=NC=C3C(=O)N2CC=C)NC4=CC=C(C=C4)N5CCN(CC5)C)O",
         "C27H32N8O2",
         500.60,
+    ),
+    # Not a glioma drug; carried only so the permeability-ceiling before/after
+    # table in the post-fix section can be computed rather than quoted. Imatinib
+    # is the molecule that surfaced the defect (results/gist_imatinib.md).
+    "imatinib": (
+        "CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5",
+        "C29H31N7O",
+        493.60,
     ),
     "eribulin": (
         "C[C@@H]1C[C@@H]2CC[C@H]3C(=C)C[C@@H](O3)CC[C@]45C[C@@H]6[C@H](O4)[C@H]7"
@@ -213,6 +225,30 @@ _AGGREGATIONS = {
     "arithmetic": _bbb_penetrance_arithmetic,
     "geometric": bbb_penetrance,
 }
+
+
+def _membrane_permeability_unbounded(descriptors: Dict[str, float],
+                                     temperature_K: float = 310.0) -> float:
+    """FROZEN reference implementation of the **pre-fix** ``membrane_permeability``.
+
+    ``P = Kp * Dm / d`` with logP clamped only at 5 and a membrane viscosity of
+    0.1 Pa*s, and NO ceiling of any kind. Returned 4.23e+07 um/s (42 m/s) for
+    imatinib. Kept here purely so the before/after table is computed rather than
+    quoted. Do NOT call this from model code.
+    """
+    if descriptors.get("is_antibody"):
+        return 0.0
+    logp = max(-3.0, min(5.0, float(descriptors.get("logp", 0.0))))
+    kp = 10.0 ** logp
+    r_m = max(_radius_nm_from_descriptors(descriptors), 0.1) * 1e-9
+    dm = (1.380649e-23 * temperature_K) / (6.0 * math.pi * 0.10 * r_m)
+    return max(0.0, (kp * dm / (4.0 * 1e-9)) * 1e6)
+
+
+#: Drugs to show in the permeability-ceiling before/after table, with the SMILES
+#: needed for any that are outside ``molecular.library``.
+_PERM_CHECK = ["temozolomide", "cisplatin", "methotrexate", "doxorubicin",
+               "lomustine", "imatinib", "bevacizumab"]
 
 
 def molecular_profile(drug: str, aggregation: str = "geometric") -> Dict:
@@ -557,6 +593,15 @@ def run_scorecard(aggregation: str = "geometric", apply_leak: bool = False) -> D
     worst_abs = max((abs(r["fold_error"]) if r["fold_error"] >= 1.0
                      else 1.0 / r["fold_error"]) for r in rows) if rows else float("nan")
 
+    # Explicitly ex-ERIBULIN, which is NOT always the same as ex-worst: eribulin
+    # is the worst drug pre-fix, but under the geometric mean alone methotrexate
+    # overtakes it. The narrative is about eribulin, so it needs its own figure
+    # rather than silently switching which drug got dropped.
+    def _ex(drug: str, absolute: bool):
+        v = [(abs(r["log10_fold"]) if absolute else r["log10_fold"]) for r in rows
+             if r["drug"] != drug and math.isfinite(r["log10_fold"])]
+        return 10.0 ** (sum(v) / len(v)) if v else float("nan")
+
     return {
         "rows": rows,
         "aggregation": aggregation,
@@ -569,6 +614,8 @@ def run_scorecard(aggregation: str = "geometric", apply_leak: bool = False) -> D
         "geometric_mean_fold_error_ex_worst": gm_x,
         "geometric_mean_abs_fold_error": gma,
         "geometric_mean_abs_fold_error_ex_worst": gma_x,
+        "geometric_mean_fold_error_ex_eribulin": _ex("eribulin", False),
+        "geometric_mean_abs_fold_error_ex_eribulin": _ex("eribulin", True),
         "worst_abs_fold_error": worst_abs,
         "worst_drug": worst["drug"] if worst else None,
         "worst_fold": worst["fold_error"] if worst else float("nan"),
@@ -1129,8 +1176,443 @@ def _fmt(x: float, n: int = 3) -> str:
     return f"{x:.{n}f}"
 
 
+def build_post_fix(regional: Dict) -> Dict:
+    """Assemble everything the POST-FIX report section needs.
+
+    Three scorecards (pre-fix / FIX 1 only / FIX 1+2), the aggregation bake-off,
+    the ordering sanity checks, and the re-run regional test.
+    """
+    score_pre = run_scorecard(aggregation="arithmetic", apply_leak=False)
+    score_post_structure = run_scorecard(aggregation="geometric", apply_leak=False)
+    score_post = run_scorecard(aggregation="geometric", apply_leak=True)
+
+    bakeoff = [
+        ("arithmetic mean (pre-fix defect)", score_pre),
+        ("geometric mean, structure-only", score_post_structure),
+        ("**geometric mean + leak (CHOSEN)**", score_post),
+    ]
+
+    # --- ordering sanity ---------------------------------------------------
+    orderings: List[str] = []
+    ab = {"mw": 149000.0, "logp": -1.0, "tpsa": 6000.0, "hbd": 200,
+          "hba": 400, "is_antibody": True}
+    orderings.append(
+        f"Antibody (bevacizumab-like) penetrance = {bbb_penetrance(ab):.4f} — "
+        "still a hard 0, both via the `is_antibody` gate and the MW >= 1000 gate.")
+    sm = {r["drug"]: r["structure_only_partition"] for r in score_post_structure["rows"]}
+    ranked = sorted(sm, key=sm.get)
+    orderings.append(
+        "Least- to most-penetrant among the six small molecules (structure-only): "
+        + " < ".join(f"{d} {sm[d]:.3f}" for d in ranked) + ".")
+    orderings.append(
+        f"Methotrexate is the least penetrant small molecule: "
+        f"**{ranked[0] == 'methotrexate'}** (it was also least pre-fix, so the veto "
+        "preserves this).")
+    # cross-drug separation, the strongest pre-fix positive result
+    lev = sm.get("levetiracetam", float("nan"))
+    cef = sm.get("cefazolin", float("nan"))
+    orderings.append(
+        f"BBB-penetrant vs BBB-excluded probe separation (Oh 2026, same tissue "
+        f"samples, measured 4.66x pooled / 9.3x in intact-barrier tissue): model now "
+        f"predicts {lev / cef:.2f}x (levetiracetam {lev:.3f} / cefazolin {cef:.3f}), "
+        "up from 3.65x pre-fix — the veto widens the gap toward the measured "
+        "intact-barrier value, which is the right direction.")
+
+    # --- permeability ceiling, before/after -------------------------------
+    perm_rows: List[Dict] = []
+    for name in _PERM_CHECK:
+        if name in GBM_DRUGS:
+            mol = from_smiles(name, GBM_DRUGS[name])
+        else:
+            _verify_smiles(name)
+            mol = from_smiles(name, _EXTRA_SMILES[name][0])
+        d = mol.descriptors
+        perm_rows.append({
+            "drug": name,
+            "mw": float(d["mw"]),
+            "logp": float(d.get("logp", 0.0)),
+            "before": _membrane_permeability_unbounded(d),
+            "after": float(membrane_permeability(d)),
+        })
+
+    return {
+        "score_pre": score_pre,
+        "score_post_structure": score_post_structure,
+        "score_post": score_post,
+        "bakeoff": bakeoff,
+        "orderings": orderings,
+        "regional_post": run_post_fix_regional(regional),
+        "permeability": perm_rows,
+        "leak": L_PARACELLULAR_LEAK,
+    }
+
+
+def _write_post_fix(A, pf: Dict) -> None:
+    """Append the clearly-marked POST-FIX section. ``A`` is a line-appender."""
+    pre, post_s, post = pf["score_pre"], pf["score_post_structure"], pf["score_post"]
+    reg = pf["regional_post"]
+    by = {r["drug"]: r for r in pre["rows"]}
+    by_s = {r["drug"]: r for r in post_s["rows"]}
+    by_p = {r["drug"]: r for r in post["rows"]}
+
+    A("")
+    A("# POST-FIX — the same tests, re-run after both fixes")
+    A("")
+    A("Two fixes were implemented from the numbers above. **The pre-fix numbers in "
+      "sections 1-6 are deliberately kept: the before/after IS the evidence.**")
+    A("")
+    A("- **FIX 1 — `bbb_penetrance` can now express a veto.** "
+      "`tmesim/molecular/permeability.py` combines the four CNS-MPO desirabilities "
+      "with a **geometric** mean instead of an arithmetic one. No new parameter; for "
+      "a molecule with four equal desirabilities the two forms are identical, so the "
+      "change bites only on HETEROGENEOUS descriptor profiles — which is exactly the "
+      "veto that was missing.")
+    A(f"- **FIX 2 — a barrier-integrity term now exists.** New module "
+      f"`tmesim/reconstruct/barrier.py`: "
+      f"`effective_penetrance = clip(bbb_penetrance + L * bbb_disruption, 0, 1)` with "
+      f"`L = {pf['leak']:.3f}` (mean of the three fitted values 0.211 / 0.230 / 0.272 "
+      f"from section 5). Wired through `treatment/drugs.py::delivery_source` behind a "
+      f"default-off argument; `core`, `physics` and `sim/engine.py` are untouched.")
+    A("")
+
+    # ---- FIX 1: aggregation bake-off ---------------------------------------
+    A("## P1. FIX 1 — which aggregation, and why")
+    A("")
+    A("Both candidates the audit named were evaluated against the same 6-drug "
+      "measured scorecard. `pure min` and a `0.7*min + 0.3*mean` variant were "
+      "evaluated too and were worse than both; the two finalists are below.")
+    A("")
+    A("| aggregation | eribulin | worst \\|fold\\| | within 10x | within 3x | GM signed bias | GM \\|fold error\\| |")
+    A("|---|---|---|---|---|---|---|")
+    for label, s in pf["bakeoff"]:
+        er = {r["drug"]: r for r in s["rows"]}["eribulin"]
+        A(f"| {label} | {er['fold_error']:.2f}x | {s['worst_abs_fold_error']:.2f}x | "
+          f"{s['n_pass_10x']}/{s['n_drugs']} | {s['n_pass_3x']}/{s['n_drugs']} | "
+          f"{s['geometric_mean_fold_error']:.3f}x | "
+          f"{s['geometric_mean_abs_fold_error']:.3f}x |")
+    A("")
+    A("Read the last two columns together. **GM signed bias** lets over- and "
+      "under-prediction cancel; **GM |fold error|** does not, and is the honest "
+      "accuracy number. The pre-fix model's flattering *ex-eribulin* bias of 1.01x "
+      "was precisely such a cancellation — temozolomide +2.86x and cefazolin +1.66x "
+      "annihilating adavosertib 0.26x — while its unsigned error over the same five "
+      "drugs was 2.06x.")
+    A("")
+    A("**Chosen: the geometric mean.** Against the full post-fix model it gives the "
+      "lowest unsigned error (1.99x vs 2.28x for min-weighted), the lowest worst-case "
+      "(6.9x vs 17.8x), and it is the only form that brings all 6 drugs inside the "
+      "order-of-magnitude band. It also adds no tunable parameter, whereas every "
+      "min-weighted form introduces a weight `w` that would have to be fitted to "
+      "these same six drugs.")
+    A("")
+
+    # ---- FIX 1: before/after scorecard -------------------------------------
+    A("## P2. The 6-drug scorecard, BEFORE and AFTER")
+    A("")
+    A("Three columns, because the two fixes must be separable. *pre-fix* is the "
+      "arithmetic mean with no barrier term (what sections 1-6 scored). "
+      "*FIX 1 only* is the geometric mean, still with no barrier term. *FIX 1 + 2* is "
+      "the model as it now stands, with the additive leak weighted by each drug's "
+      "**own measured regional composition** (`measured_sample_disruption`) — because "
+      "each measured mean pools whatever regions that study sampled, and scoring a "
+      "region-aware model at the wrong regional mix would penalise it for sampling, "
+      "not physics.")
+    A("")
+    A("| drug | measured | modality | disrupted-region fraction of samples | pre-fix pred | pre-fix fold | FIX 1 pred | FIX 1 fold | FIX 1+2 pred | **FIX 1+2 fold** |")
+    A("|---|---|---|---|---|---|---|---|---|---|")
+    order = ["eribulin", "cefazolin", "methotrexate", "temozolomide",
+             "levetiracetam", "adavosertib"]
+    for dn in order:
+        a, b, c = by[dn], by_s[dn], by_p[dn]
+        mod = "microdialysis (free)" if a["free_drug_comparator"] else "homogenate (total)"
+        A(f"| {dn} | {a['measured_mean']:.4f} | {mod} | "
+          f"{c['sample_mean_bbb_disruption']:.2f} | "
+          f"{a['predicted_partition']:.3f} | {a['fold_error']:.2f}x | "
+          f"{b['predicted_partition']:.3f} | {b['fold_error']:.2f}x | "
+          f"{c['predicted_partition']:.3f} | **{c['fold_error']:.2f}x** |")
+    A("")
+    A("| aggregate | pre-fix | FIX 1 only | FIX 1 + 2 |")
+    A("|---|---|---|---|")
+    A(f"| within 10x | {pre['n_pass_10x']}/6 | {post_s['n_pass_10x']}/6 | "
+      f"{post['n_pass_10x']}/6 |")
+    A(f"| within 3x | {pre['n_pass_3x']}/6 | {post_s['n_pass_3x']}/6 | "
+      f"{post['n_pass_3x']}/6 |")
+    A(f"| worst \\|fold error\\| | {pre['worst_abs_fold_error']:.2f}x | "
+      f"{post_s['worst_abs_fold_error']:.2f}x | {post['worst_abs_fold_error']:.2f}x |")
+    A(f"| GM signed bias | {pre['geometric_mean_fold_error']:.3f}x | "
+      f"{post_s['geometric_mean_fold_error']:.3f}x | "
+      f"{post['geometric_mean_fold_error']:.3f}x |")
+    A(f"| GM signed bias, ex-eribulin | "
+      f"{pre['geometric_mean_fold_error_ex_eribulin']:.3f}x | "
+      f"{post_s['geometric_mean_fold_error_ex_eribulin']:.3f}x | "
+      f"{post['geometric_mean_fold_error_ex_eribulin']:.3f}x |")
+    A(f"| **GM \\|fold error\\|** | **{pre['geometric_mean_abs_fold_error']:.3f}x** | "
+      f"**{post_s['geometric_mean_abs_fold_error']:.3f}x** | "
+      f"**{post['geometric_mean_abs_fold_error']:.3f}x** |")
+    A(f"| GM \\|fold error\\|, ex-eribulin | "
+      f"{pre['geometric_mean_abs_fold_error_ex_eribulin']:.3f}x | "
+      f"{post_s['geometric_mean_abs_fold_error_ex_eribulin']:.3f}x | "
+      f"{post['geometric_mean_abs_fold_error_ex_eribulin']:.3f}x |")
+    A("")
+    A("**Honest reading of the middle column.** FIX 1 *alone* does not simply "
+      "improve things. It fixes the outlier — eribulin 65.6x -> 6.9x, worst case "
+      "65.6x -> 7.9x, and 6/6 drugs inside 10x for the first time — but it converts "
+      "the model from an over-predictor into an under-predictor: the ex-eribulin "
+      "signed bias moves from 1.01x to 0.36x and the tight 3x band drops from 4/6 to "
+      "2/6. That is a real cost and it is not hidden here.")
+    A("")
+    A("**Why the third column recovers it.** The veto pushes methotrexate and "
+      "cefazolin down because both genuinely carry disqualifying descriptors "
+      "(TPSA 210 / 156). But their measured means POOL contrast-enhancing tissue "
+      "where the barrier is broken — about half the samples for methotrexate, 44% "
+      "for cefazolin. The structure-only score cannot represent that tissue at all. "
+      "Once the additive leak supplies it, cefazolin lands at 1.02x and methotrexate "
+      "at 0.79x. The two fixes are not independent improvements; **FIX 1 is only "
+      "correct in the presence of FIX 2**, because the veto is a statement about the "
+      "*intact* barrier and most of the measurements are not.")
+    A("")
+    A("**Requirement check, stated plainly.** The brief required that aggregate "
+      "fold-bias not worsen against the pre-fix 2.02x / 1.01x-ex-eribulin. On the "
+      "signed measure the full model gives "
+      f"{post['geometric_mean_fold_error']:.2f}x (better than 2.02x) but "
+      f"{post['geometric_mean_fold_error_ex_eribulin']:.2f}x ex-eribulin, which is "
+      "farther from 1.0 than the pre-fix 1.01x. **That requirement is not met on the "
+      "signed ex-eribulin measure.** It is met on every non-cancelling measure: "
+      f"unsigned error {pre['geometric_mean_abs_fold_error']:.2f}x -> "
+      f"{post['geometric_mean_abs_fold_error']:.2f}x overall and "
+      f"{pre['geometric_mean_abs_fold_error_ex_eribulin']:.2f}x -> "
+      f"{post['geometric_mean_abs_fold_error_ex_eribulin']:.2f}x ex-eribulin, worst case "
+      f"{pre['worst_abs_fold_error']:.1f}x -> {post['worst_abs_fold_error']:.1f}x, "
+      f"10x band {pre['n_pass_10x']}/6 -> {post['n_pass_10x']}/6. The pre-fix 1.01x "
+      "was two large errors cancelling, so it is the wrong thing to protect.")
+    A("")
+
+    # ---- orderings ---------------------------------------------------------
+    A("### Orderings preserved")
+    A("")
+    for line in pf["orderings"]:
+        A(f"- {line}")
+    A("")
+
+    # ---- temozolomide ------------------------------------------------------
+    tz_pre, tz_s, tz_p = by["temozolomide"], by_s["temozolomide"], by_p["temozolomide"]
+    A("### Temozolomide — reported, not targeted")
+    A("")
+    A(f"TMZ was **not** tuned for, and nothing in either fix mentions it. It moves "
+      f"from {tz_pre['predicted_partition']:.3f} ({tz_pre['fold_error']:.2f}x, a 2.9x "
+      f"OVER-prediction of the measured {tz_pre['measured_mean']:.3f}) to "
+      f"{tz_s['predicted_partition']:.3f} ({tz_s['fold_error']:.2f}x) under FIX 1 "
+      f"alone, and to {tz_p['predicted_partition']:.3f} "
+      f"({tz_p['fold_error']:.2f}x) with the leak. **The reshaping improves it**, from "
+      f"{max(tz_pre['fold_error'], 1 / tz_pre['fold_error']):.2f}x error to "
+      f"{max(tz_p['fold_error'], 1 / tz_p['fold_error']):.2f}x. This is a "
+      "consequence of the veto (TMZ's logP -2.08 gives it a desirability of 0.027, "
+      "which the arithmetic mean was averaging away), not a TMZ-specific "
+      "adjustment.")
+    A("")
+
+    # ---- FIX 2: regional ---------------------------------------------------
+    A("## P3. FIX 2 — the regional test, re-run")
+    A("")
+    A(f"Model side is now `R_region = clip(bbb_penetrance + {pf['leak']:.3f} * "
+      f"D_region, 0, 1)` with "
+      f"`D = 1.00` for contrast-enhancing, `0.48` for necrosis, `0.00` for "
+      "non-enhancing. Pre-fix every model ratio in this table was exactly **1.00x**.")
+    A("")
+    A("**What is circular and what is not.** `L` was fitted to the "
+      "CE-vs-non-enhancing *differences* of these same drugs, so the model "
+      "reproducing a difference near 0.24 is a consistency check, not a prediction. "
+      "The **ratios** are not circular: they depend on the base `bbb_penetrance` the "
+      "leak is added to, and that was fitted to nothing.")
+    A("")
+    A("| drug | contrast | measured ratio | model ratio (pre-fix) | **model ratio (post-fix)** | ratio error | measured diff | model diff | p (within-case) |")
+    A("|---|---|---|---|---|---|---|---|---|")
+    for drug in _DRUG_COL:
+        for c in reg["drugs"].get(drug, {}).get("contrasts", []):
+            A(f"| {drug} | {c['region_a']} vs {c['region_b']} | "
+              f"{c['measured_ratio']:.2f}x | 1.00x | "
+              f"**{c['model_ratio_postfix']:.2f}x** | "
+              f"{c['ratio_error_postfix']:.2f}x | "
+              f"{c['measured_difference']:+.3f} | "
+              f"{c['model_difference_postfix']:+.3f} | "
+              f"{c['p_perm_within_case']:.4f} |")
+    A("")
+    A("Absolute per-region levels (the harder test — these are not differences, so "
+      "the fitted `L` cannot rescue them):")
+    A("")
+    A("| drug | region | n | measured mean | model | fold error |")
+    A("|---|---|---|---|---|---|")
+    for drug in _DRUG_COL:
+        e = reg["drugs"].get(drug, {})
+        for r in ("contrast_enhancing", "necrosis", "non_enhancing"):
+            s = e.get("by_region", {}).get(r)
+            if s:
+                A(f"| {drug} | {r} | {s['n']} | {s['measured_mean']:.3f} | "
+                  f"{s['predicted']:.3f} | {s['fold_error']:.2f}x |")
+    A("")
+    A("Independent literature replication (different patients, different assay, and "
+      "`L` was fitted on only one of these three):")
+    A("")
+    A("| drug | measured CE/non-enh | model CE/non-enh (post-fix) | measured diff | model diff | method | PMID |")
+    A("|---|---|---|---|---|---|---|")
+    for r in reg["literature"]:
+        A(f"| {r['drug']} | {r['measured_ratio']:.2f}x | "
+          f"{r['model_ratio_postfix']:.2f}x | {r['measured_difference']:+.3f} | "
+          f"{r['model_difference_postfix']:+.3f} | {r['method']} | {r['pmid']} |")
+    A("")
+
+    # ---- honest verdict ----------------------------------------------------
+    head = {c["drug"]: c for c in reg["headline"]}
+    lev, cef = head.get("levetiracetam"), head.get("cefazolin")
+    A("### Honest verdict on FIX 2")
+    A("")
+    A("**The model can now express the answer, and it lands the right order of "
+      "magnitude — but it does not hit either anchor.**")
+    A("")
+    if lev:
+        A(f"- **levetiracetam CE/non-enhancing: measured 1.45x, model "
+          f"{lev['model_ratio_postfix']:.2f}x — UNDERSHOOT "
+          f"({lev['ratio_error_postfix']:.2f}x).** The cause is the ceiling, and it "
+          f"is diagnosable rather than mysterious: levetiracetam's base penetrance is "
+          f"{reg['drugs']['levetiracetam']['bbb_penetrance']:.3f}, so "
+          f"{reg['drugs']['levetiracetam']['bbb_penetrance']:.3f} + 0.238 = "
+          f"{reg['drugs']['levetiracetam']['bbb_penetrance'] + 0.238:.3f} is clipped "
+          f"to 1.0 by the free-drug ceiling. The model delivers a difference of "
+          f"{lev['model_difference_postfix']:+.3f} where the measurement says "
+          f"{lev['measured_difference']:+.3f}. Note the measured CE mean is 0.875 and "
+          "the max is 2.05 — a *homogenate* (total-drug) assay that legitimately "
+          "exceeds 1, which assumption A1 structurally cannot. This is the same "
+          "ceiling artefact that sinks adavosertib in section 6, not a new failure.")
+    if cef:
+        A(f"- **cefazolin CE/non-enhancing: measured 4.26x, model "
+          f"{cef['model_ratio_postfix']:.2f}x — OVERSHOOT "
+          f"({cef['ratio_error_postfix']:.2f}x).** Here the difference is right "
+          f"({cef['model_difference_postfix']:+.3f} vs measured "
+          f"{cef['measured_difference']:+.3f}, 1.13x) and the ratio is inflated "
+          "because the geometric-mean veto puts cefazolin's intact-barrier base at "
+          f"{reg['drugs']['cefazolin']['bbb_penetrance']:.3f} against a measured "
+          "non-enhancing mean of 0.065 — i.e. the *denominator* is 25% low. The "
+          "regional error is inherited from the partition error, not from `L`.")
+    mtx = next((r for r in reg["literature"] if r["drug"] == "methotrexate"), None)
+    if mtx:
+        A(f"- **methotrexate (independent, Blakeley 2008): measured "
+          f"{mtx['measured_ratio']:.2f}x, model {mtx['model_ratio_postfix']:.2f}x — "
+          f"OVERSHOOT {mtx['model_ratio_postfix'] / mtx['measured_ratio']:.1f}x.** "
+          "Same mechanism as cefazolin and worse, because the veto drives "
+          f"methotrexate's base to {reg['drugs'].get('methotrexate', {}).get('bbb_penetrance', 0.0225):.4f} "
+          "against a measured non-enhancing 0.063. When the denominator is 3x too "
+          "small, a correct numerator still gives a 2-3x wrong ratio.")
+    A(f"- **Necrosis, the one contrast nothing was fitted to as a ratio.** Measured "
+      "necrosis/non-enhancing is 1.12x (levetiracetam) and 3.40x (cefazolin); the "
+      "model gives "
+      + ", ".join(
+          f"{c['model_ratio_postfix']:.2f}x ({d})"
+          for d in _DRUG_COL
+          for c in reg["drugs"].get(d, {}).get("contrasts", [])
+          if c["region_a"] == "necrosis" and c["region_b"] == "non_enhancing")
+      + ". The single `D = 0.48` reproduces both, which is the strongest "
+        "evidence in this section that the additive form generalises — it was "
+        "derived from the necrosis *differences* and it lands the *ratios* for two "
+        "drugs 3x apart in penetrance.")
+    A("")
+    A(f"Aggregate: geometric-mean absolute error on the two anchor CE/non-enhancing "
+      f"ratios is **{reg['headline_geometric_mean_abs_ratio_error']:.2f}x**, against "
+      f"a pre-fix error of "
+      f"{10.0 ** ((abs(math.log10(1.0 / lev['measured_ratio'])) + abs(math.log10(1.0 / cef['measured_ratio']))) / 2):.2f}x "
+      "(the pre-fix model predicted 1.00x for everything). The direction, the sign, "
+      "the drug-dependence and the necrosis ordering are all now correct; the "
+      "magnitudes are off by 1.2-1.4x on the anchors and ~2.5x on the independent "
+      "methotrexate replication.")
+    A("")
+    # ---- FIX 3: the permeability ceiling -----------------------------------
+    if pf.get("permeability"):
+        pr = pf["permeability"]
+        A("## P4. A third defect in the same file — `membrane_permeability` had no ceiling")
+        A("")
+        A("Surfaced by the GIST imatinib validation (`results/gist_imatinib.md` item 7), "
+          "fixed in this pass because it is the **same root pathology** as the eribulin "
+          "veto bug: unbounded or unshaped use of a single descriptor. "
+          "`membrane_permeability` computed `P = Kp * Dm / d` with "
+          "`Kp = 10**logP` clamped only at logP 5, so it returned "
+          f"**{next(r['before'] for r in pr if r['drug'] == 'imatinib'):.3g} um/s for "
+          "imatinib** — 42 metres per second.")
+        A("")
+        A("Three bounds, all physical:")
+        A("")
+        A("1. **logP driving `Kp` clamped at 3.0** (was 5.0). Bilayer/water partitioning "
+          "plateaus above logP ~3 while octanol/water keeps climbing — the bilayer is a "
+          "more ordered, more polar solvent than bulk octanol. Independent support: "
+          "RDKit's Crippen logP for imatinib is 4.59 against an experimental ~3.0, i.e. "
+          "the estimator runs ~1.6 log units lipophilic exactly where the clamp bites.")
+        A("2. **Unstirred aqueous boundary layer in SERIES** — "
+          "`1/P = 1/P_membrane + 1/P_aqueous` with `P_aqueous = D_water / h_UWL`, "
+          "`h_UWL = 30 um`. A solute must cross the stagnant water film before it "
+          "reaches the bilayer, so this is the *real* physical ceiling on passive "
+          "permeability, and it is why measured Caco-2/PAMPA permeabilities saturate. "
+          "30 um is the THIN end of the reported 30-1500 um range, i.e. the most "
+          "permissive ceiling the literature allows.")
+        A("3. **Membrane viscosity 0.1 -> 1.0 Pa*s**, the top of the 0.1-1 Pa*s range "
+          "the module already cited. At 0.1 the prefactor `Dm/d` alone was ~2.5e3 um/s, "
+          "so every drug with `Kp >= 1` already exceeded any achievable permeability and "
+          "the boundary layer would have flattened the whole library to one value.")
+        A("")
+        A("| drug | logP | MW | BEFORE (um/s) | AFTER (um/s) | physically absurd before? |")
+        A("|---|---|---|---|---|---|")
+        for r in pr:
+            A(f"| {r['drug']} | {r['logp']:.2f} | {r['mw']:.1f} | {r['before']:.4g} | "
+              f"{r['after']:.4g} | {'**YES**' if r['before'] > 1e3 else 'no'} |")
+        A("")
+        mx = max(r["after"] for r in pr)
+        A(f"Maximum over the set after the fix: **{mx:.1f} um/s**. Nothing is absurd; "
+          "the antibody stays a hard 0.")
+        A("")
+        A("**Honest limitation — the ceiling binds, and the top of the ranking is now "
+          "compressed.** Cisplatin (22.2), imatinib (21.0) and methotrexate (19.6 um/s) "
+          "sit within 15% of each other because all three are boundary-layer limited "
+          "under this parameterisation, whereas physically they differ by ORDERS of "
+          "magnitude in measured apparent permeability — cisplatin is famously almost "
+          "membrane-impermeant. Two residual defects cause this and neither is fixed "
+          "here: the membrane term is still too permissive in absolute terms (real "
+          "Caco-2 Papp for these drugs is 0.001-1 um/s, 1-4 orders below what this "
+          "returns), and Crippen logP is simply wrong for some species (cisplatin +0.20 "
+          "vs experimental ~-2.2). The output is a bounded, correctly-ordered-at-the-"
+          "bottom RANKING, not a calibrated rate. That is a smaller error than 42 m/s, "
+          "but it is not zero.")
+        A("")
+        A("**A gap left deliberately open.** Both functions in `permeability.py` are "
+          "neutral-species estimates with no pKa term, so neither can express "
+          "pH-partitioning or acidic-compartment ion-trapping. Two independent "
+          "validations now converge on that same gap: the GIST run found measured "
+          "imatinib tumour:normal liver ratios of 0.023-0.142 lying BELOW the transport "
+          "model's structural floor of 0.208 — unreachable at ANY parameterisation, with "
+          "hepatic uptake transporters and lysosomal ion-trapping of a weak base named "
+          "as the missing mechanisms — and the Moncayo explant run is independently "
+          "testing the same effect (weak bases niraparib/rucaparib sequester, neutral "
+          "olaparib does not). It is NOT implemented: there is no measured tumour "
+          "acidic-phospholipid content in usable units and no tumour-specific lysosomal "
+          "parameters in any published PBPK model, so it must be designed rather than "
+          "parameterised. Neither fix above forecloses it — a neutral-fraction factor "
+          "multiplies `Kp` and a compartment term composes downstream of the series "
+          "resistance. The limitation is recorded in the module docstring so it is "
+          "visible where the code is read.")
+        A("")
+
+    A("**What FIX 2 does NOT fix.** It does not move the model's free-drug ceiling of "
+      "1.0, so homogenate ratios above 1 (adavosertib 4.18, levetiracetam CE max "
+      "2.05) remain unreachable — that needs the separate total-vs-free bookkeeping "
+      "named in section 5 item 3. It does not model efflux, which is still the "
+      "largest residual on eribulin. And the disruption FIELD is a documented proxy: "
+      "`REGION_DISRUPTION` maps Ivy GAP transcriptional zones onto MRI enhancement by "
+      "an anatomic argument (microvascular proliferation is what enhances; leading "
+      "edge is what does not), and **no study has assayed Ivy GAP zone labels and "
+      "drug partition in the same tissue**. The `core` zone weight of 0.50 is an "
+      "unmeasured interpolation and is the weakest number in the module.")
+    A("")
+
+
 def write_report(score: Dict, regional: Dict, disruption: Dict,
-                 png: str, path: str = REPORT_MD) -> str:
+                 png: str, path: str = REPORT_MD,
+                 post_fix: Optional[Dict] = None) -> str:
     L: List[str] = []
     A = L.append
 
@@ -1556,11 +2038,15 @@ def main(n_perm: int = 20000, seed: int = 0) -> Dict:
     for name in _EXTRA_SMILES:
         _verify_smiles(name)
 
-    score = run_scorecard()
+    # Sections 1-6 are the PRE-FIX run, recomputed live from the frozen
+    # arithmetic aggregation so the "before" side of the evidence cannot rot.
+    score = run_scorecard(aggregation="arithmetic")
     regional = run_regional_test(n_perm=n_perm, seed=seed)
     disruption = required_bbb_disruption(regional)
+
+    post_fix = build_post_fix(regional)
     png = make_figure(score, regional, disruption)
-    md = write_report(score, regional, disruption, png)
+    md = write_report(score, regional, disruption, png, post_fix=post_fix)
 
     print("=" * 92)
     print("VALIDATION RUN #1 -- predicted vs MEASURED drug partition in human glioma")
@@ -1603,9 +2089,52 @@ def main(n_perm: int = 20000, seed: int = 0) -> Dict:
     print(f"\nMISSING MECHANISM: additive leak spread {disruption['additive_spread']:.1f}x "
           f"vs multiplicative {disruption['multiplicative_spread']:.1f}x -> "
           f"{disruption['winner']} (mean L = {disruption['additive_mean']:.3f})")
+
+    # ---------------- POST-FIX ------------------------------------------
+    print("\n" + "=" * 92)
+    print("POST-FIX -- geometric-mean veto (FIX 1) + additive barrier leak (FIX 2)")
+    print("=" * 92)
+    sp, ss, so = (post_fix["score_pre"], post_fix["score_post_structure"],
+                  post_fix["score_post"])
+    bp = {r["drug"]: r for r in sp["rows"]}
+    bs = {r["drug"]: r for r in ss["rows"]}
+    bo = {r["drug"]: r for r in so["rows"]}
+    print(f"\n{'drug':15s}{'measured':>10s}{'pre-fix':>10s}{'fold':>8s}"
+          f"{'FIX1':>9s}{'fold':>8s}{'FIX1+2':>9s}{'fold':>8s}")
+    print("-" * 92)
+    for dn in ("eribulin", "cefazolin", "methotrexate", "temozolomide",
+               "levetiracetam", "adavosertib"):
+        a, b, c = bp[dn], bs[dn], bo[dn]
+        print(f"{dn:15s}{a['measured_mean']:>10.4f}"
+              f"{a['predicted_partition']:>10.3f}{a['fold_error']:>7.2f}x"
+              f"{b['predicted_partition']:>9.3f}{b['fold_error']:>7.2f}x"
+              f"{c['predicted_partition']:>9.3f}{c['fold_error']:>7.2f}x")
+    print("-" * 92)
+    for label, s in (("pre-fix ", sp), ("FIX1    ", ss), ("FIX1+2  ", so)):
+        print(f"{label} 10x:{s['n_pass_10x']}/6  3x:{s['n_pass_3x']}/6  "
+              f"worst:{s['worst_abs_fold_error']:6.2f}x  "
+              f"GM-signed:{s['geometric_mean_fold_error']:.3f}x "
+              f"(ex-eri {s['geometric_mean_fold_error_ex_eribulin']:.3f}x)  "
+              f"GM-|err|:{s['geometric_mean_abs_fold_error']:.3f}x "
+              f"(ex-eri {s['geometric_mean_abs_fold_error_ex_eribulin']:.3f}x)")
+
+    rp = post_fix["regional_post"]
+    print(f"\nREGIONAL, POST-FIX (L = {rp['leak_constant']}):")
+    print("-" * 92)
+    for c in rp["headline"]:
+        print(f"  {c['drug']:15s} CE/non-enh  measured {c['measured_ratio']:5.2f}x   "
+              f"model pre-fix 1.00x -> post-fix {c['model_ratio_postfix']:5.2f}x   "
+              f"({c['ratio_error_postfix']:.2f}x off"
+              f"{', CEILING-CLIPPED' if c['ceiling_clipped'] else ''})")
+    for r in rp["literature"]:
+        print(f"  {r['drug']:15s} CE/non-enh  measured {r['measured_ratio']:5.2f}x   "
+              f"model post-fix {r['model_ratio_postfix']:5.2f}x   [independent]")
+    print(f"  anchor GM |ratio error| = "
+          f"{rp['headline_geometric_mean_abs_ratio_error']:.2f}x")
+
     print(f"\nwrote {md}\nwrote {png}")
     return {"scorecard": score, "regional": regional, "disruption": disruption,
-            "md": md, "png": png}
+            "post_fix": post_fix, "md": md, "png": png}
 
 
 if __name__ == "__main__":
