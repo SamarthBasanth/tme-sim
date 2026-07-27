@@ -48,15 +48,15 @@ Per-cell drug sensitivity can be set two ways (`reconstruct.real_pipeline.apply_
 
 | drug | sensitivity (uniform) | sensitivity (determinant) | determinant gene | kill (uniform) | kill (determinant) | comparable across drugs? |
 |---|---:|---:|:--|---:|---:|:--|
-| temozolomide | 1.000 | 1.000 | — (none on panel) | 0.4173 | 0.4173 | ❌ **UPPER BOUND** — no resistance modelled |
+| temozolomide | 1.000 | 1.000 | — (none on panel) | 0.1151 | 0.1151 | ❌ **UPPER BOUND** — no resistance modelled |
 | lomustine | 1.000 | 0.590 | MKI67 | 0.7228 | 0.4234 | scaled by its own determinant |
-| cisplatin | 1.000 | 0.590 | MKI67 | 0.9152 | 0.5404 | scaled by its own determinant |
-| methotrexate | 1.000 | 0.590 | MKI67 | 0.4526 | 0.2644 | scaled by its own determinant |
-| doxorubicin | 1.000 | 0.585 | TOP2A | 0.8839 | 0.5158 | scaled by its own determinant |
+| cisplatin | 1.000 | 0.590 | MKI67 | 0.9125 | 0.5387 | scaled by its own determinant |
+| methotrexate | 1.000 | 0.590 | MKI67 | 0.1205 | 0.0726 | scaled by its own determinant |
+| doxorubicin | 1.000 | 0.585 | TOP2A | 0.7531 | 0.4390 | scaled by its own determinant |
 
-**Ranking under `mode='uniform'` (FAIR — this is the ranking):** **cisplatin** (0.9152) > **doxorubicin** (0.8839) > **lomustine** (0.7228) > **methotrexate** (0.4526) > **temozolomide** (0.4173)
+**Ranking under `mode='uniform'` (FAIR — this is the ranking):** **cisplatin** (0.9125) > **doxorubicin** (0.7531) > **lomustine** (0.7228) > **methotrexate** (0.1205) > **temozolomide** (0.1151)
 
-**Ranking under `mode='determinant'` (CONFOUNDED — reported for comparison only, do not cite as a ranking):** **cisplatin** (0.5404) > **doxorubicin** (0.5158) > **lomustine** (0.4234) > **temozolomide** (0.4173) > **methotrexate** (0.2644)
+**Ranking under `mode='determinant'` (CONFOUNDED — reported for comparison only, do not cite as a ranking):** **cisplatin** (0.5387) > **doxorubicin** (0.4390) > **lomustine** (0.4234) > **temozolomide** (0.1151) > **methotrexate** (0.0726)
 
 Read the difference plainly: in `determinant` mode every drug except temozolomide is multiplied by ≈0.585, so their kills drop by roughly that factor while TMZ's does not move at all. Any place TMZ climbs is **entirely** attributable to that, and would reverse the moment MGMT were measurable. `determinant` mode is legitimate for a *within-drug* spatial question ("where on this section does doxorubicin work?"); it is not legitimate for ranking drugs against each other on a panel that measures some of their determinants and not others.
 
@@ -66,19 +66,19 @@ Read the difference plainly: in `determinant` mode every drug except temozolomid
 
 | drug | MW (Da) | real IC50 (µM) | bbb_penetrance | D_eff (µm²/s) | penetration_index | mean AUC (µM·s) | predicted kill |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | 194 | 606 | 0.558 | 265.3 | 0.451 | 1.03e+07 | 0.4173 |
+| temozolomide | 194 | 606 | 0.125 | 265.3 | 0.451 | 2.31e+06 | 0.1151 |
 | lomustine | 234 | 50 | 0.973 | 247.4 | 0.364 | 2.81e+06 | 0.7228 |
-| cisplatin | 298 | 24.6 | 0.893 | 225.4 | 0.404 | 5.7e+06 | 0.9152 |
-| methotrexate | 454 | 12 | 0.115 | 189.8 | 0.332 | 2.42e+05 | 0.4526 |
-| doxorubicin | 544 | 0.5 | 0.051 | 176.3 | 0.317 | 8.59e+04 | 0.8839 |
+| cisplatin | 298 | 24.6 | 0.858 | 225.4 | 0.404 | 5.48e+06 | 0.9125 |
+| methotrexate | 454 | 12 | 0.023 | 189.8 | 0.332 | 4.75e+04 | 0.1205 |
+| doxorubicin | 544 | 0.5 | 0.021 | 176.3 | 0.317 | 3.48e+04 | 0.7531 |
 
 IC50 values are the real GDSC/literature potencies that flow in through the molecular layer; MW is from the verified molecular structure; `bbb_penetrance` and `D_eff` are structure-derived (`D_eff = D · (1 − 0.6·ECM)` at the tumor mean ECM = 0.076).
 
 ## Which drug wins on THIS real tumor, and why
 
 - **Penetration does NOT separate these drugs at converged resolution.** `penetration_index` spans only 0.317–0.451 across the whole panel — a spread of 0.134, which is not a meaningful ranking. This is a **correction**: an earlier, unconverged dx = 30 µm run of the same panel appeared to span 0.266–0.396 and was reported as 'temozolomide penetrates best, doxorubicin barely reaches the tumor bulk'. **That ranking was a grid artifact and is retracted.** The reason is definitional: `penetration_index = mean(AUC) / p99(AUC)` over tissue is a *scale-invariant shape* statistic — it measures how uniform the exposure field is, not how much drug arrives. Once the perivascular boundary layer is actually resolved, that shape is set by the **vascular geometry**, which is identical for all five drugs, and these drugs' D_eff values differ by only ~1.5× (175–263 µm²/s) — far too little to reshape the field.
-- **Delivery differences are real, but they live in the AUC, not the index.** Mean exposure spans 8.59e+04–1.03e+07 µM·s (~120×), driven by BBB penetrance and the calibrated perivascular sink. Doxorubicin really is delivery-starved on this section — its mean AUC is ~120× below temozolomide's — but that shows up as a *lower absolute exposure*, not as a flatter spatial profile. **Quote mean AUC, not penetration_index, when comparing drugs.**
-- **Best predicted kill (mode = `uniform`):** **cisplatin** (kill_fraction 0.9152, penetration_index 0.404, IC50 24.6 µM, mean AUC 5.7e+06 µM·s, bbb 0.893). Kill is **delivery × potency**, discounted by whatever oxygen-driven resistance the tissue carries: a drug wins only when it both reaches the cells AND is potent enough at the exposure it achieves. Full ranking: **cisplatin** (0.9152) > **doxorubicin** (0.8839) > **lomustine** (0.7228) > **methotrexate** (0.4526) > **temozolomide** (0.4173). Because every drug carries the same sensitivity in this mode, none of this ordering is a sensitivity artifact — it is delivery and potency only.
+- **Delivery differences are real, but they live in the AUC, not the index.** Mean exposure spans 3.48e+04–5.48e+06 µM·s (~157×), driven by BBB penetrance and the calibrated perivascular sink. Doxorubicin really is delivery-starved on this section — its mean AUC is ~120× below temozolomide's — but that shows up as a *lower absolute exposure*, not as a flatter spatial profile. **Quote mean AUC, not penetration_index, when comparing drugs.**
+- **Best predicted kill (mode = `uniform`):** **cisplatin** (kill_fraction 0.9125, penetration_index 0.404, IC50 24.6 µM, mean AUC 5.48e+06 µM·s, bbb 0.858). Kill is **delivery × potency**, discounted by whatever oxygen-driven resistance the tissue carries: a drug wins only when it both reaches the cells AND is potent enough at the exposure it achieves. Full ranking: **cisplatin** (0.9125) > **doxorubicin** (0.7531) > **lomustine** (0.7228) > **methotrexate** (0.1205) > **temozolomide** (0.1151). Because every drug carries the same sensitivity in this mode, none of this ordering is a sensitivity artifact — it is delivery and potency only.
 
 ## Honesty and caveats
 

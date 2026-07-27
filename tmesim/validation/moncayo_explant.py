@@ -1662,22 +1662,26 @@ def make_figure(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
     mvals = [a2["measured"][c]["excess_cv_mean"] for c in comps]
     pvals = [max(a2["predicted"]["transport+lysosomal_seq"][c]["cv_mean"], 1e-9)
              for c in comps]
-    ax.bar(xs - 0.20, mvals, width=0.36, color=MEAS_COLOR, zorder=3,
-           label="measured (IS-noise-corrected)")
-    ax.bar(xs + 0.20, pvals, width=0.36, color=PRED_COLOR, zorder=3,
-           label="predicted (transport + lysosomal trap)")
+    ax.bar(xs - 0.20, mvals, width=0.36, color=MEAS_COLOR, zorder=3)
+    ax.bar(xs + 0.20, pvals, width=0.36, color=PRED_COLOR, zorder=3)
     ax.set_yscale("log")
     ax.set_ylim(1e-9, 1e5)
-    for x, v in zip(xs - 0.20, mvals):
-        ax.text(x, v * 1.5, f"{v:.2f}", ha="center", fontsize=8, color=MEAS_COLOR)
-    for x, v in zip(xs + 0.20, pvals):
-        ax.text(x, v * 1.5, f"{v:.1e}", ha="center", fontsize=8, color=PRED_COLOR)
+    # Direct labels instead of a legend box: the first group names the series,
+    # the rest carry values only. Nothing to collide with the annotation.
+    for i, (x, v) in enumerate(zip(xs - 0.20, mvals)):
+        lab = f"measured,\nIS-corrected\n{v:.2f}" if i == 0 else f"{v:.2f}"
+        ax.text(x, v * 2.0, lab, ha="center", va="bottom", fontsize=8.5,
+                color=MEAS_COLOR, linespacing=1.35)
+    for i, (x, v) in enumerate(zip(xs + 0.20, pvals)):
+        lab = f"predicted,\n+lysosomal trap\n{v:.1e}" if i == 0 else f"{v:.1e}"
+        ax.text(x, v * 2.0, lab, ha="center", va="bottom", fontsize=8.5,
+                color=PRED_COLOR, linespacing=1.35)
     ax.set_xticks(xs)
     ax.set_xticklabels([f"{c}\npKa {chem[c].pka_structure:.1f}"
                         f"{'  (base)' if chem[c].n_basic_centres else '  (neutral)'}"
                         for c in comps], fontsize=8.5)
     _style(ax, "", "coefficient of variation across the section (log)",
-           "b  Heterogeneity: the model is 2-3 decades short")
+           "b  Heterogeneity per compound: the model is 2-3 decades short")
     gapf = a2["magnitude_gap"]["fold_under_prediction_seq_only"]
     ax.text(0.02, 0.97,
             f"weak base / olaparib, predicted: "
@@ -1689,7 +1693,6 @@ def make_figure(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
             f"(indistinguishable)",
             transform=ax.transAxes, va="top", ha="left", fontsize=8.4, color=INK2,
             bbox=dict(boxstyle="round,pad=0.45", fc="#f3f2ee", ec="#e0dfd9", lw=0.8))
-    ax.legend(fontsize=8.5, frameon=False, loc="upper right", labelcolor=INK2)
 
     # ---- (c) measured exposure -> apoptosis signature ---------------------
     ax = axes[0, 2]

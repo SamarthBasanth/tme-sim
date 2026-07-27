@@ -204,6 +204,21 @@ def _single_linkage_labels(xy: np.ndarray, eps: float) -> np.ndarray:
     return np.asarray(labels, dtype=int)
 
 
+def _median_finite_or_inf(a: np.ndarray) -> float:
+    """Median over the finite entries; ``+inf`` when every entry is infinite.
+
+    Used for the cluster aspect ratio, where a perfectly collinear object gives
+    ``sv[1] == 0`` and therefore an infinite ratio. Returning ``nan`` there would
+    be wrong twice over: it is not missing data, and the case it describes
+    (perfectly straight vessels) is the most elongated one possible.
+    """
+    a = np.asarray(a, dtype=np.float64)
+    finite = a[np.isfinite(a)]
+    if finite.size:
+        return float(np.median(finite))
+    return float("inf") if a.size else float("nan")
+
+
 def segment_vessels(
     cells: CellPopulation,
     domain: Domain,
@@ -332,8 +347,14 @@ def segment_vessels(
         "n_vessels_ge4_cells": int((counts >= 4).sum()),
         "median_extent_multi_um": (float(np.median(extent[multi])) if multi.any()
                                    else float("nan")),
-        "median_aspect_multi": (float(np.median(aspect[multi][np.isfinite(aspect[multi])]))
-                                if multi.any() else float("nan")),
+        # Aspect ratio is taken over the FINITE values only, because any 2-point
+        # object is exactly collinear (sv[1] == 0 -> inf) and carries no shape
+        # information; this keeps the statistic comparable to the "median aspect
+        # ratio of multi-cell objects" in results/vascular_validation.md §3.3.
+        # If EVERY multi-cell object is perfectly collinear the finite subset is
+        # empty, and the honest answer is +inf (maximally elongated), not nan.
+        "median_aspect_multi": _median_finite_or_inf(aspect[multi]) if multi.any()
+                               else float("nan"),
         "intervessel_nn_um": inter_nn,
         "intervessel_nn": _pct(inter_nn),
         "tumor_to_vessel_um": tumor_d,

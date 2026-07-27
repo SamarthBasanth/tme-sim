@@ -85,7 +85,7 @@ The reason is dimensional. The Fourier number Fo = D_eff t / L^2 at the 24 h end
 | R2 conditional | 0.160 | 0.135 | 0.017 |
 | singular fit | no | no | **yes** |
 
-### 3.3 And why that p-value does not survive
+### 3.3 What that p-value looks like under the correct null
 
 The parametric LRT above treats 112 ROIs as if they carried 112 units of information. They do not: **our predictor is constant within a slice**, so the exchangeable unit is the slice, of which there are 11. A slice random intercept with a small variance component (5.0% of total) does not absorb a slice-constant regressor, and the ROI count leaks straight into the standard error. Permuting the slice->prediction assignment *within compound* (preserving the compound split, the slice means and the ROI counts) and refitting 961 times gives the honest reference:
 
@@ -115,7 +115,7 @@ Under `transport+shipped_loss` the model's slice-to-slice prediction is almost e
 | section max distance-to-edge (um) | -0.000455 | 0.000224 | 0.070 | 4.4% |
 | section area (mm^2) | -0.035448 | 0.030603 | 0.263 | 2.1% |
 
-**Verdict, analysis 1.** *Variance explained beyond the patient/slice random effects: nominally 6.7% under `transport+shipped_loss`, against a slice-permutation null whose median is 1.2% and 95th percentile 7.5% (p = 0.074); exactly 0.0% under `transport_only`, by construction.* Rounded honestly: **between zero and a few percent, not separable from chance with 11 exchangeable slices, and what little there is is a section-thickness effect rather than a transport prediction.** This model does not predict per-ROI drug accumulation in bath-dosed explants. It is not close, and §3.1 explains why it cannot be.
+**Verdict, analysis 1.** *Variance explained beyond the patient/slice random effects: nominally 6.7% under `transport+shipped_loss`, against a slice-permutation null whose median is 1.2% and 95th percentile 7.5% (p = 0.074); exactly 0.0% under `transport_only`, by construction.* Rounded honestly: **between zero and a few percent, not separable from chance with 11 exchangeable slices, and what little there is is a section-thickness effect rather than a transport prediction.** A trivial one-number geometric covariate — the section's mean distance to its own edge — reaches 4.3% in the same frame with no simulator at all. §3.1 explains why it cannot be otherwise.
 
 ## 4. Analysis 2 — the compound-specificity falsification test
 
@@ -156,6 +156,9 @@ Predicted coefficient of variation of accumulation across each section, averaged
 | 0.05 | 16.8 | 5.62e-02 |
 
 Even at phi_lys = 0.05 — 5% of tissue volume as acidic compartment, at or above every value in the cell-biology literature — the mean predicted weak-base CV reaches only 5.62e-02 (largest single section 1.78e-01), still 8.6x short of the measured value.
+
+
+The other uncalibrated knob, the ECM volume fraction that sets the tortuosity, is equally powerless. Sweeping it over (0.2, 0.4, 0.6) (with sequestration on) moves the predicted weak-base CV only across 1.53e-03 / 2.75e-03 / 5.09e-03 while mean saturation stays at 0.998 / 0.997 / 0.994. No setting of either free parameter brings the model within two decades of the measurement.
 
 **And this is structural, not a tuning problem.** With `phi_lys` *uniform in space*, R is uniform, so at equilibrium C_total = R x C_bath **everywhere** and the dispersion goes to zero however large R becomes. Uniform sequestration buys a longer time constant, never an equilibrium pattern. To produce the observed hotspots the model would need a **spatial field of lysosomal / acidic-phospholipid content**. A literature pass for this project established that **no measured mg/g or mol% acidic-phospholipid content exists for tumour tissue and no published PBPK model carries tumour-specific lysosomal parameters** — so this is not a parameter we declined to fit, it is a parameter that does not exist in the literature. That makes it unexplored territory rather than an oversight, and it is the single most useful thing this run identifies.
 
@@ -249,7 +252,7 @@ That is same-dataset, independent evidence that the mechanism missing from §4 i
 
 | # | test | verdict |
 |---|---|---|
-| 1 | per-ROI accumulation fit, authors' mixed-effects frame | **FAIL.** 0.0% beyond REs by construction under `transport_only`; 6.7% nominal under `transport+shipped_loss`, permutation p = 0.074 on dR2 and 0.044 on abs(t) against a slice-exchangeable null, unweighted slice-level Spearman 0.01, and the predictor is a section-thickness proxy. Not separable from chance. |
+| 1 | per-ROI accumulation fit, authors' mixed-effects frame | **FAIL.** 0.0% beyond REs by construction under `transport_only`; 6.7% nominal under `transport+shipped_loss`, permutation p = 0.074 on dR2 and 0.044 on abs(t) against a slice-exchangeable null, unweighted slice-level Spearman 0.01, and the predictor is a section-thickness proxy that a bare geometric covariate matches (4.3%) with no simulator. Not separable from chance. |
 | 2 | compound-specificity falsification | **PARTIAL / effectively negative.** Ordering right (46,209x weak base : olaparib, recovered from SMILES), magnitude 175x too small, the two weak bases indistinguishable, gradient of the wrong sign on 14/18 sections. |
 | 3 | exposure -> apoptosis coupling | **Measured: PASS** (beta = 0.0567, p = 0.012; within-slice rank-enrichment z = 4.2, p < 0.001, replicating the paper's NES 2.278 in direction — though the ROI-level random-gene-set null is not cleared, see §5.2). **Ours: FAIL** (beta = -0.906, wrong sign; slice-permutation p = 0.091). |
 

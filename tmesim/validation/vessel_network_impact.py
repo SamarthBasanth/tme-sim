@@ -1058,6 +1058,8 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     dcovC = [vd["coverage"]["delta_C_minus_A"][d] for d in drugs]
     max_dB = max(abs(x) for x in dcovB)
     max_dC = max(abs(x) for x in dcovC)
+    _signed_dB = max(dcovB, key=abs)
+    _overstate = (max_dB / max_dC) if max_dC > 0 else float("inf")
     bindA = vd["binding"]["A_kde"]["near_minus_far"]
     bindC = vd["binding"]["C_discrete_matched"]["near_minus_far"]
     binding_changes = vd["binding"]["changes"]
@@ -1075,9 +1077,9 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     L.append("**Every structural claim below is scored on arm C, not arm B.** B and A "
              f"do not deliver the same total drug ({ratio:.2f}×), so an A→B difference "
              "is part geometry and part dose. C holds the total fixed and changes only "
-             "*where* the drug enters. Reporting A→B as the structural effect would have "
-             "overstated it by a factor of 35 on the headline metric (§6) — this is the "
-             "single most important methodological point in the report.")
+             f"*where* the drug enters. Reporting A→B as the structural effect would "
+             f"have overstated it **{_overstate:.0f}×** on the headline metric (§6) — "
+             f"this is the single most important methodological point in the report.")
     L.append("")
     L.append("| question | answer |")
     L.append("|---|---|")
@@ -1085,17 +1087,19 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
              f"(>{FAR_FIELD_UM:g} µm) exposure is {_pct(floor_A)} of perivascular "
              f"under A and {_pct(floor_B)} under B, a change of only "
              f"{vd['floor']['fold_reduction']:.2f}× |")
-    L.append(f"| Do **drugs separate** on fitted decay length? | {d_sep}, and by more "
-             f"than expected — cross-drug spread {spread_A:.2f}× under A → "
-             f"{spread_C:.2f}× under C. Doxorubicin's L falls "
-             f"{vd['decay']['A_kde']['L_um'][drugs.index('doxorubicin')]:.0f} → "
-             f"{vd['decay']['C_discrete_matched']['L_um'][drugs.index('doxorubicin')]:.0f} µm "
-             f"if doxorubicin is in the panel |"
-             if "doxorubicin" in drugs else
-             f"| Do **drugs separate**? | {d_sep} — {spread_A:.2f}× → {spread_C:.2f}× |")
+    _sep_row = (f"| Do **drugs separate** on fitted decay length? | {d_sep}, and by more "
+                f"than the audit hoped — cross-drug spread {spread_A:.2f}× under A → "
+                f"{spread_C:.2f}× under C")
+    if "doxorubicin" in drugs:
+        _i = drugs.index("doxorubicin")
+        _sep_row += (f", concentrated in doxorubicin (L "
+                     f"{vd['decay']['A_kde']['L_um'][_i]:.0f} → "
+                     f"{vd['decay']['C_discrete_matched']['L_um'][_i]:.0f} µm)")
+    L.append(_sep_row + " |")
     L.append(f"| How much does **therapeutic coverage @1× IC50** move? | at most "
              f"**{max_dC:+.4f}** absolute (A→C, geometry alone) — inside the ±0.03 "
-             f"grid-convergence band. The naive A→B number is {max_dB:+.4f}, and it is "
+             f"grid-convergence band. The naive A→B number is {_signed_dB:+.4f} — "
+             f"{_overstate:.0f}× larger, and "
              f"{'almost entirely' if max_dB > 10 * max_dC else 'largely'} a dose "
              f"artefact |")
     L.append(f"| Is **delivery still never the binding constraint**? | "
@@ -1242,11 +1246,14 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
                  f"{_f(r['tumor_to_vessel_median_um'],1)} | "
                  f"{_pct(r['tumor_frac_beyond_100um'])} |")
     L.append("")
-    L.append("MVD moves 1.8× across the sweep and the intervessel distance 2.2×, so the "
-             "*absolute* morphometry is conditional on this choice. The tumour→vessel "
-             "distance — the quantity the delivery result actually depends on — moves by "
-             "only a few percent, because merging nearby endothelial cells into one "
-             "object does not move the endothelium.")
+    L.append("MVD moves 1.8× across the sweep and the intervessel nearest-neighbour "
+             "distance 2.2×, so the *absolute* morphometry is conditional on this "
+             "choice. **The tumour→vessel distance does not move at all** — it is "
+             "identical at every linking distance, because it is measured to the nearest "
+             "endothelial CELL and merging cells into objects does not move the "
+             "endothelium. Since the discrete source is painted around those same cells, "
+             "the delivery result below is essentially independent of the linking "
+             "distance: that parameter moves the morphometry table, not the physics.")
     L.append("")
 
     # ------------------------------------------------------------------ #
@@ -1391,14 +1398,6 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
              f"from a vessel (`vascular_validation.md` §5, which measures the two "
              f"definitions to disagree by 3.0×).")
     L.append("")
-    L.append(f"Everything from here on uses a **common distance axis**: Euclidean "
-             f"distance from a **segmented discrete vessel** "
-             f"({int((res['fields']['B_discrete']>0).sum()):,} vessel pixels). It is the "
-             f"only axis on which \"distance from a vessel\" means the same thing in both "
-             f"arms — the legacy axis is a percentile threshold on A's own field, so it "
-             f"is not defined for B and it measures distance from a *KDE hotspot*, not "
-             f"from a vessel (`vascular_validation.md` §5).")
-    L.append("")
 
     # ------------------------------------------------------------------ #
     # 4. The floor
@@ -1409,10 +1408,16 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
              "artefact of the fit:")
     L.append("")
     L.append("* `floor_fraction` — from `C(d) = C₀·exp(−d/L) + floor`, reported as "
-             "`floor/(C₀+floor)`. This is the ~0.12 of `dose_schedule.md`.")
+             "`floor/(C₀+floor)`. This is the statistic `dose_schedule.md` quotes as "
+             "~0.12 (on the legacy KDE-hotspot axis). **On the vessel-based axis it "
+             "collapses to ~0 for almost every drug/arm, and that is a fit failure, not "
+             "a finding**: the profile decays gently over the whole available range, so "
+             "the three-parameter form absorbs the plateau into a long `L` instead of "
+             "into `floor`. Reported for continuity; do not read it.")
     L.append(f"* **empirical floor** — count-weighted mean of the profile over bins "
-             f"beyond {FAR_FIELD_UM:g} µm ÷ the perivascular (0–10 µm) bin. No functional "
-             f"form assumed.")
+             f"beyond {FAR_FIELD_UM:g} µm ÷ the perivascular (0–10 µm) bin. No "
+             f"functional form assumed, so nothing to mis-fit. **This is the number to "
+             f"read.**")
     L.append("")
     L.append("| field | drug | fitted floor_fraction | **empirical floor** "
              "(>150 µm / perivascular) |")
@@ -1488,9 +1493,12 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     # ------------------------------------------------------------------ #
     L.append("## 5. Do the drugs finally SEPARATE?")
     L.append("")
-    L.append("The decisive test of the audit: under the KDE every drug fitted 26–28 µm "
-             "against a 23.7 µm source null, i.e. the number was measuring the source, "
-             "not the drug. Each arm is scored against **its own** source null.")
+    L.append("The decisive test the audit specified: under the KDE every drug fitted "
+             "26–28 µm against a 23.7 µm source null, i.e. the number was measuring the "
+             "source, not the drug. **§3 has already shown that premise no longer "
+             "holds** — it was a property of the retired tissue mask — so what follows "
+             "measures the residual effect of source geometry on top of that. Each arm "
+             "is scored against **its own** source null.")
     L.append("")
     L.append("| field | drug | L (µm) | L / own source null | fit-free half-distance (µm) |")
     L.append("|---|---|---|---|---|")
@@ -1588,8 +1596,8 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
              f"delivers {1/ratio:.2f}× the total drug A does, so most of the A→B change "
              f"is a dose change that would be undone by any recalibration of the source "
              f"amplitude — and the amplitude of a relative field is exactly the thing "
-             f"this project has never claimed to know. At matched dose the coverage moves "
-             f"by at most **{max_dC:+.3f} absolute**, "
+             f"this project has never claimed to know. At matched dose the coverage "
+             f"moves by at most **{max(dcovC, key=abs):+.4f} absolute**, "
              f"{'which is larger than' if max_dC > 0.03 else 'which is inside'} the "
              f"±0.03 grid-convergence band `delivery_metrics.md` establishes for this "
              f"metric.")
@@ -1840,11 +1848,18 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
              "source (§2). Coverage and the exposure profile are insensitive to this "
              "(neither depends on the oxygen field), but the kill fraction is not, which "
              "is why kill fraction is not a headline here.")
-    L.append("* **The 6 h exposure window is a modelling choice.** The floor/no-floor "
-             "result depends on it: a shorter window would leave less time for diffusion "
-             "to fill the avascular gaps, and the discrete field would look more "
-             "different from the KDE. That dependence is a real finding (§4) and it is "
-             "not swept.")
+    L.append(f"* **The {_PDE['total_time']/3600:.0f} h exposure window is a modelling "
+             f"choice**, and the floor result is partly conditional on it: a much "
+             f"shorter window would leave less time for diffusion to fill the avascular "
+             f"gaps and the two fields would look more different. It is **not** simply a "
+             f"transient artefact, though — the *steady-state* reaction-diffusion length "
+             f"`L_rd` in §4 is 2–7× the intervessel gap on its own, so the floor would "
+             f"survive at infinite time too. The window is not swept here.")
+    L.append("* **The `L` values in §5 are far longer than the isolated-single-vessel "
+             "control** in `results/vessel_profile.md` would suggest, on both arms. They "
+             "are section-scale statistics of a densely vascularised tissue, not "
+             "single-vessel gradients, and the two should not be quoted "
+             "interchangeably.")
     L.append("")
     L.append("---")
     L.append("")
