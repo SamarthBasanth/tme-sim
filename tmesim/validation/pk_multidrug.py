@@ -132,7 +132,9 @@ def run_penetration(ecm_density: float = DEFAULT_ECM) -> Dict:
     dox_target = 0.5 * (dox_lequiv[0] + dox_lequiv[1])  # ~65 um midpoint
 
     # THE single fit (to the L-equivalent midpoint, consistent with pk_anchors).
-    alpha = calibrate_alpha(target_um=dox_target, drug="doxorubicin", ecm_density=ecm_density)
+    alpha = calibrate_alpha(
+        target_efold_um=dox_target, drug="doxorubicin", ecm_density=ecm_density
+    )
 
     rows: List[Dict] = []
     for a in A.penetration_anchors():

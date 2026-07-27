@@ -6,29 +6,52 @@ from tmesim.molecular import library
 from tmesim.molecular.binding_site_barrier import (
     apply_barrier_to_drugparams, binding_site_barrier_factor)
 from tmesim.validation.calibration import (
-    calibrate_alpha, calibrated_drugparams, penetration_length_um)
+    DOX_EFOLD_BAND_UM, DOX_TARGET_EFOLD_UM, calibrate_alpha, calibrated_drugparams,
+    penetration_length_um)
 
 
 def test_alpha_calibration_hits_anchor():
-    alpha = calibrate_alpha(target_um=45.0, drug="doxorubicin")
+    # The published doxorubicin anchor is a 40-50 um HALF-distance; the sim's L is an
+    # E-FOLDING length, so the fit target is d_half/ln2 (band ~58-72 um, mid ~64.9 um).
+    # calibrate_alpha defaults to exactly that converted target.
+    alpha = calibrate_alpha(drug="doxorubicin")
     assert alpha > 0 and np.isfinite(alpha)
-    # order of magnitude matches the "~300x too slow" diagnosis
+    # order of magnitude matches the "~2 orders too slow" diagnosis
     assert 50 < alpha < 2000
     dp = calibrated_drugparams("doxorubicin", alpha=alpha)
     L = penetration_length_um(dp)
-    assert 40 <= L <= 50  # doxorubicin sits at its calibration anchor by construction
+    # sits at its calibration anchor by construction: the e-fold-equivalent band
+    assert DOX_EFOLD_BAND_UM[0] <= L <= DOX_EFOLD_BAND_UM[1]
+
+
+def test_calibrate_alpha_target_is_an_efold_length():
+    # Explicit guard on the convention: passing the RAW half-distance (45 um) as if it
+    # were an e-folding length inflates alpha by exactly 1/ln(2)^2 = 2.081x. This is
+    # the historical 309.6-vs-148.6 inconsistency.
+    a_efold = calibrate_alpha(drug="doxorubicin")
+    a_raw_half = calibrate_alpha(target_efold_um=45.0, drug="doxorubicin")
+    # Each calibration lands on its own target by construction, and the two targets
+    # differ by exactly ln2 (so the alphas differ by ~1/ln^2(2), up to the tiny
+    # un-amplified passive floor).
+    L_efold = penetration_length_um(calibrated_drugparams("doxorubicin", alpha=a_efold))
+    L_raw = penetration_length_um(calibrated_drugparams("doxorubicin", alpha=a_raw_half))
+    assert L_efold == pytest.approx(DOX_TARGET_EFOLD_UM, rel=1e-6)
+    assert L_raw == pytest.approx(45.0, rel=1e-6)
+    assert L_efold / L_raw == pytest.approx(1.0 / np.log(2.0), rel=1e-6)
+    assert a_raw_half / a_efold == pytest.approx(1.0 / np.log(2.0) ** 2, rel=1e-2)
+    assert DOX_TARGET_EFOLD_UM == pytest.approx(45.0 / np.log(2.0), rel=1e-9)
 
 
 def test_calibration_generalizes_direction_to_temozolomide():
     # out-of-sample: weakly-bound TMZ must penetrate much further than doxorubicin
-    alpha = calibrate_alpha(target_um=45.0, drug="doxorubicin")
+    alpha = calibrate_alpha(drug="doxorubicin")
     L_dox = penetration_length_um(calibrated_drugparams("doxorubicin", alpha=alpha))
     L_tmz = penetration_length_um(calibrated_drugparams("temozolomide", alpha=alpha))
     assert L_tmz > 3 * L_dox
 
 
 def test_binding_site_barrier_traps_antibody_only():
-    alpha = calibrate_alpha(target_um=45.0, drug="doxorubicin")
+    alpha = calibrate_alpha(drug="doxorubicin")
     bev = library.get_molecule("bevacizumab")
     tmz = library.get_molecule("temozolomide")
     dp_bev = calibrated_drugparams("bevacizumab", alpha=alpha)

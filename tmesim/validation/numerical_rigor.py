@@ -88,7 +88,12 @@ from ..reconstruct.real_pipeline import (
     _load_xenium_retry,
     reconstruct_real,
 )
-from ..reconstruct.real_xenium import _provisional_sensitivity, phenotype_cells
+from ..reconstruct.real_xenium import (
+    TISSUE_DISC_RADIUS_UM,
+    TISSUE_MASK_MODE,
+    phenotype_cells,
+    tissue_mask_from_cells,
+)
 from ..sim.engine import simulate_response
 from ..treatment.drugs import delivery_source
 from .calibration import calibrate_alpha, calibrated_drugparams
@@ -126,12 +131,19 @@ def reconstruct_knobs(
     dx_um: float = BASE_DX,
     typing_threshold: float = BASE_THRESHOLD,
     bandwidth_um: float = BASE_BANDWIDTH,
+    tissue_mask_mode: str = TISSUE_MASK_MODE,
+    tissue_disc_radius_um: float = TISSUE_DISC_RADIUS_UM,
 ) -> Microenvironment:
     """Reconstruct the REAL Xenium microenvironment with explicit reconstruction
     knobs. At ``(typing_threshold=1.0, bandwidth_um=40)`` this reproduces
     :func:`reconstruct.real_pipeline.reconstruct_real('xenium', dx_um)` byte-for-
     byte; the extra arguments expose the endothelial typing gate and the vascular
     / ECM KDE bandwidth for the sensitivity sweep.
+
+    The tissue mask is built by the SAME shared
+    :func:`reconstruct.real_xenium.tissue_mask_from_cells` the production
+    pipeline uses (geometric / dx-independent by default), so this audit cannot
+    silently drift from the geometry it is auditing.
     """
     data = _data()
     xy = np.asarray(data["cell_xy_um"], dtype=np.float64)
@@ -139,16 +151,18 @@ def reconstruct_knobs(
     genes = np.asarray(data["genes"], dtype=str)
 
     cell_type, _, _ = phenotype_cells(expression, genes, threshold=typing_threshold)
-    sensitivity = _provisional_sensitivity(expression, genes, cell_type)
+    # Uniform 1.0, matching reconstruct_from_xenium: no per-cell intrinsic-
+    # resistance information is asserted (see real_xenium.SENSITIVITY_DETERMINANTS).
+    sensitivity = np.ones(len(xy), dtype=np.float64)
 
     x = xy[:, 0] - xy[:, 0].min()
     y = xy[:, 1] - xy[:, 1].min()
     nx = int(np.ceil(x.max() / dx_um)) + 1
     ny = int(np.ceil(y.max() / dx_um)) + 1
-    tissue_mask = np.zeros((ny, nx), dtype=bool)
-    col = np.clip((x / dx_um).astype(int), 0, nx - 1)
-    row = np.clip((y / dx_um).astype(int), 0, ny - 1)
-    tissue_mask[row, col] = True
+    tissue_mask = tissue_mask_from_cells(
+        x, y, nx, ny, dx_um,
+        mode=tissue_mask_mode, radius_um=tissue_disc_radius_um,
+    )
     domain = Domain(nx=nx, ny=ny, dx=dx_um, tissue_mask=tissue_mask)
 
     state = np.full(len(x), int(CellState.VIABLE), dtype=np.int8)
@@ -482,6 +496,10 @@ def sensitivity(rel: float = 0.2) -> Dict:
 # ===========================================================================
 # Reporting.
 # ===========================================================================
+def _by_name(sens: Dict, name: str) -> Dict:
+    return next(k for k in sens["knobs"] if k["knob"] == name)
+
+
 def _fmt(x, nd=4):
     if x is None:
         return "—"
@@ -504,6 +522,34 @@ def write_report(mass: Dict, grid: Dict, dt: Dict, sens: Dict,
       "positions, real endothelial-KDE vascular field, real matrix-transcript ECM "
       "field, physics-solved oxygen. **Drug:** the α-calibrated **doxorubicin** "
       "(perivascular-sink model from `validation.calibration`). **Advection OFF** "
+      )
+    A("")
+    A(f"> **Provenance of this run — two things changed since the previous "
+      f"revision of this file, and both move the numbers.**")
+    A(">")
+    A(f"> 1. **α = {sens['alpha0']:.1f}**, the e-folding-length convention "
+      "(`L = d_half / ln 2`). An earlier revision of this report ran with "
+      "α = 309.6, which came from fitting the raw 45 µm half-distance *as if it "
+      "were* an e-fold length and is inflated by exactly `1/ln²2 = 2.081×`. "
+      "**Every α = 309.6 number in the previous version of this file is "
+      "superseded.**")
+    A("> 2. **The tissue mask is now GEOMETRIC and grid-independent.** "
+      "`Domain.tissue_mask` used to be \"grid cells containing ≥ 1 segmented "
+      "cell\", whose coverage collapsed 50.6% → 32.7% → 13.9% at "
+      "dx = 30 → 20 → 12 µm. Since `real_fields._kde_on_grid` masks the vascular "
+      "field to tissue, that made the total O₂ *supply* — and hence the oxygen "
+      "field, the hypoxic fraction and the oxygen-gated kill — a function of the "
+      "mesh, which contaminated **this very grid-refinement study**. The mask is "
+      "now the union of 30 µm discs around the measured centroids "
+      "(`real_xenium.tissue_mask_from_cells`), covering 67.2/67.4/67.7% over the "
+      "same grids, so the simulated tissue domain is a property of the measured "
+      "cells rather than of dx. **Section 2 below is the first grid study on this "
+      "section that is not confounded by a shrinking domain.** Note the "
+      "consequence: the transport domain is now ~4.9× larger at dx = 12 µm than "
+      "it was, so the absolute mass/AUC/kill levels are not comparable with the "
+      "previous revision.")
+    A("")
+    A("Continued: **Advection OFF** "
       "(interstitial speeds < 0.7 µm/s change the penetration index by < 3e-4), so "
       "these audits isolate the implicit diffusion–reaction scheme; all solves are "
       "deterministic. `kill_fraction` is averaged over seeds "
@@ -545,8 +591,9 @@ def write_report(mass: Dict, grid: Dict, dt: Dict, sens: Dict,
     # --- 2. grid convergence ---
     A("## 2. Grid-refinement convergence")
     A("")
-    A("Same real section, reconstructed at decreasing dx. If the prediction were a "
-      "grid artifact these would drift; instead they converge.")
+    A("Same real section, reconstructed at decreasing dx. A grid artifact would "
+      "drift without settling; here the metrics decelerate toward a finite limit "
+      "(kill fast, penetration only once the ~45 µm boundary layer is resolved).")
     A("")
     A("| dx (µm) | grid (ny×nx) | tissue cells | penetration_index | Δpen (rel) | "
       "kill_fraction | Δkill (rel) |")
@@ -631,17 +678,33 @@ def write_report(mass: Dict, grid: Dict, dt: Dict, sens: Dict,
           f"{k['kill_low']:.4f}→{k['kill_high']:.4f} | **{abs(k['elasticity_kill']):.3f}** |")
     A("")
     top = sens["ranked"][0]
-    A(f"**Sensitivity ranking (by |E_pen|):** " +
+    kill_ranked = sorted(sens["knobs"], key=lambda k: abs(k["elasticity_kill"]),
+                         reverse=True)
+    A(f"**Ranking by |E_pen|:** " +
       " > ".join(f"`{k['knob']}` ({abs(k['elasticity_pen']):.2f})" for k in sens["ranked"]))
+    A(f"**Ranking by |E_kill|:** " +
+      " > ".join(f"`{k['knob']}` ({abs(k['elasticity_kill']):.2f})" for k in kill_ranked))
     A("")
-    A(f"**Dominant uncertainty driver:** `{top['knob']}` "
-      f"(|E_pen| ≈ {abs(top['elasticity_pen']):.2f}). "
-      "Physically: the calibration constant α sets the perivascular sink strength "
-      "and therefore the penetration length L = √(D_eff/k) directly, so the "
-      "prediction rides hardest on the single doxorubicin anchor behind α. The "
-      "endothelial typing threshold moves which cells seed the vascular delivery "
-      "field (and thus how much drug enters); the KDE bandwidth smooths that field; "
-      "grid dx is the discretisation knob already bounded in §2.")
+    A("**What the numbers actually say (honest, data-driven):**")
+    A("")
+    A(f"* The **penetration index** is most sensitive to the **endothelial typing "
+      f"threshold** (|E_pen| ≈ {abs(top['elasticity_pen']):.2f}): that gate decides "
+      "which cells become ENDOTHELIAL and therefore where the vascular delivery "
+      "source (and the O₂ field) sits — moving it reshapes the whole perivascular "
+      "geometry the gradient is measured against.")
+    A(f"* The **kill fraction** is instead most sensitive to the **KDE bandwidth** "
+      f"(|E_kill| ≈ {abs(kill_ranked[0]['elasticity_kill']):.2f}) and **grid dx** "
+      f"(|E_kill| ≈ {abs(kill_ranked[1]['elasticity_kill']):.2f}): both control how "
+      "concentrated vs. smeared the delivered dose is, which is what the Hill kill "
+      "integrates.")
+    A(f"* **Surprisingly, the calibration α has the *smallest* LOCAL elasticity** "
+      f"(|E_pen| ≈ {abs(_by_name(sens,'calibration_alpha')['elasticity_pen']):.2f}, "
+      f"|E_kill| ≈ {abs(_by_name(sens,'calibration_alpha')['elasticity_kill']):.2f}) "
+      "over ±20%. But this UNDERSTATES its importance: α is pinned to a *single* "
+      "doxorubicin anchor whose own uncertainty is plausibly ±50–100%, far wider "
+      "than the ±20% probed here, and it enters the penetration length "
+      "L = √(D_eff/k) as k ∝ α. So α is a low-*sensitivity*, high-*prior-uncertainty* "
+      "knob: modest per-unit effect, but the widest credible range.")
     A("")
     A("---")
     A("")
@@ -664,19 +727,22 @@ def write_report(mass: Dict, grid: Dict, dt: Dict, sens: Dict,
       "genuine resolution requirement, reported honestly, not a solver defect: quote "
       f"penetration at dx ≲ 12 µm (≈{grid['pen_asymptote']:.3f}).")
     A("")
-    A("3. **Physical uncertainty ≫ numerical uncertainty.** The dominant driver of "
-      f"prediction spread is **`{top['knob']}`** (|E_pen| ≈ "
-      f"{abs(top['elasticity_pen']):.2f}), followed by "
-      + ", ".join(f"`{k['knob']}`" for k in sens["ranked"][1:]) + ". "
-      "In plain terms: the answer is limited by *what we assume about the biology / "
-      "calibration* (the single α anchor, the endothelial gate), NOT by the solver. "
-      "A defensible prediction therefore needs error bars driven by α and the "
-      "reconstruction gates — the mesh is not the bottleneck.")
+    A("3. **Reconstruction knobs dominate the local sensitivity; α dominates the "
+      "prior uncertainty.** Over a ±20% perturbation the biggest movers are the "
+      f"**endothelial typing threshold** (|E_pen| ≈ {abs(top['elasticity_pen']):.2f}) "
+      "for penetration and the **KDE bandwidth / grid dx** for kill — all "
+      "reconstruction choices, not the solver. The calibration α has the *smallest* "
+      "local elasticity, but it is fit to one anchor with a much wider credible "
+      "range, so it remains a leading *global* uncertainty. Either way the limiting "
+      "factor is the biology/reconstruction assumptions, NOT the numerics.")
     A("")
     A("**Bottom line:** the physics engine is numerically sound on the real "
-      "microenvironment (conservative, stable, converged); the honest uncertainty "
-      "lives in the calibration constant and the reconstruction typing knobs, which "
-      "should carry the reported error bars.")
+      "microenvironment — mass-conservative to round-off, unconditionally stable, "
+      "and dt-converged, with kill_fraction grid-converged (the penetration index "
+      "needs dx ≲ 12 µm to resolve the ~45 µm boundary layer). The honest prediction "
+      "uncertainty lives in the reconstruction gates (endothelial threshold, KDE "
+      "bandwidth) and the single-anchor calibration α — those are what the error "
+      "bars should be built from; the mesh is not the bottleneck once dx ≲ 12 µm.")
     A("")
 
     text = "\n".join(L)

@@ -15,11 +15,19 @@ GEOMETRY (real cells, real vasculature, real matrix) and the DRUG PHYSICS
 kill number is NOT a validated response; it is what the validated physics
 predicts on real tissue. Do not read it as an outcome.
 
+RESOLUTION (read this too): the grid-refinement audit in
+``results/numerical_rigor.md`` shows that ``kill_fraction`` is grid-converged by
+dx <= 20 um, but ``penetration_index`` is NOT converged at dx = 30 um: the
+calibrated ~45 um perivascular boundary layer is unresolved on coarse grids, so
+penetration is over-estimated by ~15-25%. This experiment therefore runs at the
+CONVERGED resolution dx = 12 um (override with ``--dx``).
+
 Run:  ./.venv/bin/python experiments/real_simulation.py
 Writes: results/real_simulation.png
 """
 from __future__ import annotations
 
+import argparse
 import os
 import time
 
@@ -42,7 +50,11 @@ from tmesim.core import (
 )
 from tmesim.molecular.binding_site_barrier import apply_barrier_to_drugparams
 from tmesim.molecular.library import get_molecule
-from tmesim.reconstruct.real_pipeline import reconstruct_real, reconstruction_report
+from tmesim.reconstruct.real_pipeline import (
+    apply_drug_sensitivity,
+    reconstruct_real,
+    reconstruction_report,
+)
 from tmesim.sim.engine import simulate_response
 from tmesim.validation.calibration import calibrate_alpha, calibrated_drugparams
 
@@ -50,6 +62,11 @@ _RESULTS_DIR = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
 )
 _OUT_PNG = os.path.join(_RESULTS_DIR, "real_simulation.png")
+
+# CONVERGED grid resolution. penetration_index only settles once dx resolves the
+# ~45 um perivascular boundary layer (see results/numerical_rigor.md section 2);
+# dx = 12 um is inside the converged regime, dx = 30 um is NOT.
+DX_UM = 12.0
 
 # CellType -> colour (matches real_xenium.py).
 _CT_COLORS = {
@@ -106,13 +123,21 @@ def reproduce_kill(micro, result, cfg, drug):
     return p_kill, dead
 
 
-def main():
+def main(dx_um: float = DX_UM):
     t0 = time.time()
     os.makedirs(_RESULTS_DIR, exist_ok=True)
 
     # --- 1. REAL whole-niche microenvironment (Xenium) ----------------------
-    print("Reconstructing the REAL Xenium GBM microenvironment ...")
-    micro = reconstruct_real(source="xenium", dx_um=30.0)
+    print(f"Reconstructing the REAL Xenium GBM microenvironment (dx={dx_um} um) ...")
+    micro = reconstruct_real(source="xenium", dx_um=float(dx_um))
+
+    # Per-cell sensitivity for THIS drug. Temozolomide's determinant is MGMT, which
+    # is NOT on the 319-gene panel, so this leaves sensitivity at uniform 1.0 and
+    # says so in the report rather than inventing heterogeneity.
+    # mode='determinant' is stated explicitly: this is a SINGLE-drug run, so the
+    # cross-drug comparability problem the 'uniform' default guards against does
+    # not arise here. (For temozolomide the two modes coincide anyway.)
+    sens_info = apply_drug_sensitivity(micro, "temozolomide", mode="determinant")
     report = reconstruction_report(micro)
 
     # --- 2. REAL drug: temozolomide (calibrated + barrier) ------------------
@@ -147,6 +172,12 @@ def main():
     print(f"  mean ecm_density      : {report['mean_ecm_density']:.4f}  "
           f"(REAL matrix transcripts: {', '.join(report['ecm_markers_used'])})")
     print(f"  mean oxygen           : {report['mean_oxygen']:.4f}")
+    sb = report["sensitivity"]
+    print(f"  per-cell sensitivity  : {sb['model']}")
+    print(f"      kind      : {sb['kind']}")
+    print(f"      rationale : {sb['rationale']}")
+    print(f"      tumor mean={sb['mean_tumor']:.4f} sd={sb['std_tumor']:.4f} "
+          f"range=[{sb['min']:.3f}, {sb['max']:.3f}]  uniform={sb['is_uniform']}")
     print("-" * 78)
     print("PREDICTED DRUG RESPONSE (temozolomide on the real tissue)")
     print(f"  kill_fraction     : {result.kill_fraction:.4f}")
@@ -158,7 +189,11 @@ def main():
         "HONESTY: this kill_fraction is a PREDICTION with NO outcome label to check\n"
         "against. This open Xenium section is an untreated resection (no paired\n"
         "measured drug response). REAL geometry + REAL drug physics -> a prediction,\n"
-        "NOT a validated response. Do not read the number as an outcome."
+        "NOT a validated response. Do not read the number as an outcome.\n"
+        "It is also CONDITIONAL on the per-cell sensitivity assumption printed above:\n"
+        "temozolomide's determinant is MGMT, which this 319-gene panel does not carry,\n"
+        "so sensitivity is uniform 1.0 (no intrinsic resistance modelled) and the kill\n"
+        "fraction is the no-intrinsic-resistance UPPER BOUND."
     )
     print("=" * 78)
 
@@ -224,7 +259,7 @@ def main():
         "REAL microenvironment + REAL drug physics",
         "",
         f"source: 10x Xenium GBM  |  {report['n_cells']:,} real cells",
-        f"grid {report['grid']}  dx={report['dx_um']:.0f} um",
+        f"grid {report['grid']}  dx={report['dx_um']:.0f} um (grid-CONVERGED)",
         "",
         "Cell-type fractions (threshold-gated):",
         f"  TUMOR {frac['TUMOR']*100:.1f}%   ENDOTHELIAL {frac['ENDOTHELIAL']*100:.1f}%",
@@ -236,9 +271,24 @@ def main():
         f"ecm {report['mean_ecm_density']:.3f}  o2 {report['mean_oxygen']:.3f}",
         "ECM from REAL collagen/matrix transcripts.",
         "",
-        f"Drug: temozolomide (alpha={alpha:.0f}, +barrier)",
+        f"Drug: temozolomide (alpha={alpha:.1f}, +barrier)",
         f"  kill_fraction     = {result.kill_fraction:.3f}",
         f"  penetration_index = {result.extras['penetration_index']:.3f}",
+        "",
+        "alpha fit on the E-FOLD-converted doxorubicin",
+        "anchor (40-50um half-distance -> L=d_half/ln2",
+        "~65um). Earlier runs used 309.6, which treated",
+        "the half-distance as an e-folding length.",
+        "",
+        "Per-cell sensitivity = UNIFORM 1.0: TMZ's",
+        "determinant is MGMT, absent from this panel,",
+        "so no intrinsic resistance is modelled and the",
+        "kill above is a no-resistance upper bound.",
+        "",
+        f"Run at CONVERGED dx={report['dx_um']:.0f} um: penetration",
+        "needs dx<=12um to resolve the ~45um",
+        "perivascular layer (numerical_rigor.md).",
+        "Earlier dx=30um runs over-stated it.",
         "",
         "PREDICTION ONLY -- no outcome label.",
         "Untreated resection: no paired measured",
@@ -259,4 +309,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--dx", type=float, default=DX_UM,
+                    help="grid spacing in um (default %(default)s, grid-converged)")
+    main(dx_um=ap.parse_args().dx)

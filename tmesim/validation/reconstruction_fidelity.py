@@ -635,10 +635,14 @@ def write_report(
     L.append("\n**These checks DO NOT establish:**")
     L.append(
         "- They do **NOT** validate drug-response / kill prediction. This open "
-        "section carries **no paired patient outcome label**; the per-cell "
-        "`sensitivity` is a documented PROVISIONAL placeholder, not a measured "
-        "response (see `docs/REAL_BUILD_PLAN.md` L4 and the Xenium reconstructor "
-        "docstring)."
+        "section carries **no paired patient outcome label**. The per-cell "
+        "`sensitivity` is now an explicit, deterministic modelling assumption — "
+        "uniform 1.0 by default (no intrinsic resistance asserted), or a "
+        "drug-specific determinant where the panel carries one (TOP2A for TOP2 "
+        "poisons, MKI67 for cell-cycle-dependent cytotoxics) — but it is still "
+        "**not a measured drug response**, and every absolute kill fraction is "
+        "conditional on it (see `reconstruct/real_xenium.py` "
+        "`SENSITIVITY_DETERMINANTS`)."
     )
     L.append(
         "- Cross-platform agreement is **concordance, not ground truth**: both "

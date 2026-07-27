@@ -23,6 +23,53 @@ sparse direct solve gives the exact steady state (no iteration/CFL concerns).
 
 Units follow the project convention: length um, diffusivity um^2/s. The oxygen
 field is dimensionless relative saturation in [0, 1] (1 = fully oxygenated).
+
+GRID INDEPENDENCE OF THE SINK (fixed; read this)
+------------------------------------------------
+``rho_tum`` must be a *density* (cells per unit AREA), not a raw per-grid-cell
+COUNT. An earlier revision binned tumor cells and fed the raw count straight into
+the sink; a count scales as ``dx^2``, so halving the grid spacing quartered the
+consumption term and the hypoxic fraction moved by almost an order of magnitude
+(measured on the real Xenium reconstruction: hypoxic tumor fraction 0.937 / 0.364
+/ 0.134 at dx = 30 / 20 / 12 um). :func:`_tumor_density` now divides the binned
+count by the grid-cell area and re-expresses it against a fixed reference tile
+(:data:`TUMOR_REFERENCE_AREA_UM2`), so the sink is an areal density and no longer
+carries a ``dx^2`` factor.
+
+THE SECOND HALF -- the tissue mask was also grid-dependent (now FIXED elsewhere)
+---------------------------------------------------------------------------------
+Fixing the sink was necessary but not sufficient for a grid-invariant oxygen field
+on the real reconstruction. ``reconstruct.real_xenium`` used to define
+``Domain.tissue_mask`` as "grid cells that contain at least one segmented cell",
+which is itself a function of ``dx``: that mask covers 50.6% / 32.7% / 13.9% of the
+rectangle at dx = 30 / 20 / 12 um. ``real_fields._kde_on_grid`` multiplies the
+vascular field by that mask, so the total O2 SUPPLY shrank as the grid was
+refined. Measured mean O2 at the (fixed, dx-independent) real cell positions:
+
+    dx (um)                    30      20      12     max/min
+    legacy count sink        0.154   0.214   0.251     1.63x
+    areal sink, legacy mask  0.522   0.426   0.251     2.08x
+    areal sink + GEOMETRIC mask (both fixes, current default)
+                             0.570   0.565   0.558     1.02x
+
+i.e. the two grid errors used to partially CANCEL, which is why the legacy spread
+looked smaller. ``reconstruct.real_xenium.tissue_mask_from_cells`` now defines the
+mask geometrically by default (a grid cell is tissue if its centre lies within a
+fixed 30 um of a measured cell, so the mask is a union of fixed physical discs;
+coverage 67.2 / 67.4 / 67.7% over the same grids), and with both fixes in place the
+oxygen field on the REAL section is grid-invariant to ~2%. Nothing in THIS module
+changed for that fix -- the mask lives in the reconstruction layer.
+
+HONEST CAVEAT ON THE ABSOLUTE LEVEL (now the dominant uncertainty)
+-------------------------------------------------------------------
+``OxygenConfig.consumption`` has never been calibrated against a measured oxygen
+tension. With the supply no longer artificially starved by a shrinking mask, mean
+O2 on the real GBM section is ~0.56 and the predicted HYPOXIC TUMOR FRACTION IS 0.0
+at every dx -- which, for a tumor type partly defined by pseudopalisading necrosis,
+is no more credible than the 0.94 the coarse grid used to report. Both the old
+ladder (0.94 -> 0.07 over dx = 30 -> 8 um) and the new 0.0 are un-calibrated model
+output. What these fixes establish is that the answer no longer depends on the
+numerical grid -- NOT that its level is right.
 """
 from __future__ import annotations
 
@@ -32,14 +79,50 @@ from scipy.sparse.linalg import spsolve
 
 from ..core import CellState, Microenvironment, OxygenConfig
 
+#: Reference tissue area (um^2) against which the tumor-cell areal density is
+#: expressed, making ``rho_tum`` the dimensionless number of tumor cells per
+#: reference tile instead of a grid-dependent per-cell count.
+#:
+#: Value = 144 um^2 = (12 um)^2. Two reasons:
+#:   1. 12 um is the grid-converged production spacing the flagship runs at
+#:      (``results/numerical_rigor.md``), so re-expressing the sink this way is a
+#:      pure re-parameterisation there -- it changes nothing at dx = 12 um and
+#:      removes the spurious dx^2 scaling at every other resolution. That keeps
+#:      this a defect fix rather than a silent re-tuning of the model.
+#:   2. It is close to the cross-sectional footprint of a single glioma cell in a
+#:      2-D section (~100 um^2 for an ~11 um diameter cell), so ``rho_tum ~ 1``
+#:      reads as "roughly one tumor cell per cell-sized tile" -- a physically
+#:      interpretable occupancy.
+#:
+#: HONEST CAVEAT: ``OxygenConfig.consumption`` was never calibrated against a
+#: measured oxygen tension, so the product ``consumption * TUMOR_REFERENCE_AREA_UM2``
+#: is a single un-calibrated lumped constant. The ABSOLUTE hypoxic fraction is very
+#: sensitive to it (a +/-40% change swings the real-section hypoxic tumor fraction
+#: between ~0.0 and ~0.6). What this fix establishes is that the answer no longer
+#: depends on the numerical grid -- not that the absolute level is calibrated.
+TUMOR_REFERENCE_AREA_UM2 = 144.0
+
 
 def _tumor_density(micro: Microenvironment) -> np.ndarray:
-    """Bin tumor cells onto the grid, returning per-cell tumor counts (ny, nx).
+    """Local tumor-cell AREAL density on the grid (ny, nx), grid-spacing independent.
 
     Uses ``Domain.to_index`` to map each tumor cell's (x, y) in micrometers to its
-    (col, row) grid index and accumulates counts with ``np.add.at`` (vectorized).
-    The raw count per grid cell is the local tumor-cell density that drives the
-    oxygen sink.
+    (col, row) grid index, accumulates counts with ``np.add.at`` (vectorized), then
+    converts the count to a density::
+
+        rho_tum = (count per grid cell) / dx^2 * TUMOR_REFERENCE_AREA_UM2
+                = tumor cells per TUMOR_REFERENCE_AREA_UM2 of tissue
+
+    The division by ``dx^2`` is the fix: a raw count scales as ``dx^2`` and made the
+    oxygen sink -- hence the hypoxic fraction and every downstream hypoxia-gated
+    resistance term -- depend on the numerical grid. An areal density does not.
+    Multiplying by the fixed reference area keeps ``rho_tum`` a dimensionless
+    occupancy of order 1 so ``OxygenConfig.consumption`` retains its meaning and
+    magnitude (see :data:`TUMOR_REFERENCE_AREA_UM2`).
+
+    Note this is a *point* density estimate (no smoothing): the oxygen diffusion
+    length ``sqrt(D / (consumption * rho_tum))`` is O(100 um) >> dx, so the solver
+    itself averages the field over many grid cells.
     """
     domain = micro.domain
     cells = micro.cells
@@ -49,6 +132,8 @@ def _tumor_density(micro: Microenvironment) -> np.ndarray:
         return density
     col, row = domain.to_index(cells.x[tum], cells.y[tum])
     np.add.at(density, (row, col), 1.0)
+    # count -> cells per um^2 -> cells per reference tile (grid-independent).
+    density *= TUMOR_REFERENCE_AREA_UM2 / (float(domain.dx) ** 2)
     return density
 
 
@@ -99,7 +184,9 @@ def solve_oxygen(micro: Microenvironment, cfg: OxygenConfig) -> np.ndarray:
     Solves ``D*lap(O) + supply*vasc*(1-O) - consumption*rho_tum*O = 0`` on the
     domain grid with no-flux boundaries, where ``vasc`` is
     ``micro.fields.vascular_density`` (the O2 source) and ``rho_tum`` is the local
-    tumor-cell density binned onto the grid (the O2 sink). The linear system
+    tumor-cell AREAL density from :func:`_tumor_density` (the O2 sink) -- cells per
+    :data:`TUMOR_REFERENCE_AREA_UM2`, which is independent of the grid spacing.
+    The linear system
 
         (-D*L + diag(supply*vasc + consumption*rho_tum)) @ O = supply*vasc
 
@@ -218,8 +305,11 @@ if __name__ == "__main__":
     fields = TissueFields(ecm_density=ecm, vascular_density=vasc)
 
     # Tumor cells packed densely into the central core (strong O2 sink); a few
-    # scattered stromal cells elsewhere.
-    n_tumor = 12000
+    # scattered stromal cells elsewhere. The count is set so the core reaches an
+    # areal density of ~8 tumor cells per TUMOR_REFERENCE_AREA_UM2, which is what
+    # it takes to drive a genuinely hypoxic core at the (un-calibrated) default
+    # OxygenConfig.consumption -- see the note on TUMOR_REFERENCE_AREA_UM2.
+    n_tumor = 24000
     ang = rng.uniform(0, 2 * np.pi, n_tumor)
     rad = core_radius * np.sqrt(rng.uniform(0, 1, n_tumor))
     tx = np.clip(cx + rad * np.cos(ang), 0, domain.extent_um[0] - 1e-3)
@@ -274,5 +364,36 @@ if __name__ == "__main__":
     print(f"hypoxia_threshold   = {cfg.hypoxia_threshold}")
     print(f"n hypoxic cells     = {n_hypoxic} / {micro.cells.n}")
     assert n_hypoxic > 0, "label_hypoxia marked no cells"
+
+    # ------------------------------------------------------------------
+    # GRID INDEPENDENCE of the sink: the SAME physical tissue solved on
+    # grids spanning a 4x range of dx must give the same oxygen field.
+    # (With the legacy raw-COUNT sink the hypoxic fraction ran 1.00 -> 0.00
+    # over this same sweep.)
+    # ------------------------------------------------------------------
+    print("\ngrid-independence sweep (same physical tissue, same cells):")
+    means = []
+    for dx_test in (30.0, 20.0, 15.0, 7.5):
+        n_test = int(round(domain.extent_um[0] / dx_test))
+        dom_t = Domain(nx=n_test, ny=n_test, dx=dx_test)
+        Xt, Yt = dom_t.coords_um()
+        rt = np.sqrt((Xt - cx) ** 2 + (Yt - cy) ** 2)
+        vt = np.clip(0.6 - 0.59 * np.exp(-(rt ** 2) / (2 * (0.5 * core_radius) ** 2)),
+                     0.005, 1.0)
+        micro_t = Microenvironment(
+            domain=dom_t,
+            fields=TissueFields(ecm_density=dom_t.ones() * 0.4, vascular_density=vt),
+            cells=cells, patient_id="oxygen-dx-sweep",
+        )
+        o_t = solve_oxygen(micro_t, cfg)
+        ct, rt_i = dom_t.to_index(cells.x, cells.y)
+        local = o_t[rt_i, ct]
+        means.append(float(local.mean()))
+        print(f"  dx = {dx_test:5.1f} um  grid {dom_t.shape}  "
+              f"mean O2 @ cells = {local.mean():.4f}  "
+              f"hypoxic frac = {float((local < cfg.hypoxia_threshold).mean()):.4f}")
+    spread = max(means) - min(means)
+    print(f"  mean-O2 spread across a 4x dx range = {spread:.4f}")
+    assert spread < 0.01, f"oxygen field is still grid-dependent (spread {spread:.4f})"
 
     print("\nself-test PASSED")

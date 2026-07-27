@@ -47,8 +47,15 @@ Physical reading of the proxy and alpha
 
 Because ``L = sqrt(D_eff / k_eff)`` and ``k_eff`` is *linear* in alpha, the
 calibration is a single closed-form solve (no iteration, no optimizer): given the
-doxorubicin anchor ``L* = 45 um`` we invert to ``k_eff* = D_eff / L*^2`` and read
-off the one alpha. That is the ONLY fit in this module.
+doxorubicin anchor we invert to ``k_eff* = D_eff / L*^2`` and read off the one
+alpha. That is the ONLY fit in this module.
+
+UNIT CONVENTION (corrected): the published anchor is a HALF-distance (40-50 um to
+50% of perivascular intensity), while ``L`` is an E-FOLDING length. They differ by
+``ln2``: ``L = d_half / ln2``, so ``L* = 45/ln2 ~= 64.9 um``, NOT 45 um. Fitting
+to the raw half-distance inflates alpha by ``1/ln^2(2) = 2.081x`` (it gave 309.6
+instead of the correct 148.6). ``calibrate_alpha`` now takes an e-folding target
+and every anchor band is converted before comparison. See the constant block below.
 
 The honest test (out-of-sample)
 -------------------------------
@@ -85,6 +92,7 @@ from ..molecular import descriptors as _descriptors
 from ..molecular import library
 from ..molecular.compile_drug import molecule_to_drugparams
 from ..physics.diffusion import ALPHA_TORTUOSITY
+from .pk_anchors import half_distance_to_efold_length
 from .pk_reality import (
     DEFAULT_ECM,
     DOX_CITATION,
@@ -98,7 +106,33 @@ from .pk_reality import (
 # Anchors.
 # ---------------------------------------------------------------------------
 # THE fit anchor (doxorubicin, Primeau et al. 2005; re-used from pk_reality).
-DOX_TARGET_UM = DOX_PENETRATION_MID  # 45 um
+#
+# UNIT CONVENTION (this is the one that used to be got wrong -- read it).
+# The published anchor is a HALF-DISTANCE: the distance from a vessel at which
+# doxorubicin immunofluorescence falls to 50% of its perivascular value, 40-50 um
+# (midpoint 45 um). The simulator's ``penetration_length_um`` is an E-FOLDING
+# length L, defined by C(r) ~ exp(-r/L). For an exponential profile the two are
+# NOT the same number:
+#
+#     d_half = L * ln2        =>      L = d_half / ln2 = 1.4427 * d_half
+#
+# so the 40-50 um half-distance anchor is an L-equivalent of ~58-72 um, midpoint
+# ~64.9 um (:func:`pk_anchors.half_distance_to_efold_length`). Calibrating against
+# the raw 45 um treats a half-distance as if it were an e-folding length and
+# inflates alpha by exactly 1/ln^2(2) = 2.081x (it produced alpha = 309.6 instead
+# of 148.6). This module now standardises on the E-FOLD convention throughout:
+# alpha is fit to DOX_TARGET_EFOLD_UM and every out-of-sample band is converted
+# with the same rule before comparison.
+DOX_TARGET_UM = DOX_PENETRATION_MID  # 45 um -- the raw published HALF-distance
+#: The fit target actually used: the doxorubicin half-distance midpoint converted
+#: to an e-folding length (45 / ln2 ~= 64.9 um), directly comparable to the sim's
+#: ``penetration_length_um``.
+DOX_TARGET_EFOLD_UM = half_distance_to_efold_length(DOX_PENETRATION_MID)
+#: The 40-50 um published half-distance band as an L-equivalent (~58-72 um).
+DOX_EFOLD_BAND_UM = (
+    half_distance_to_efold_length(DOX_PENETRATION_UM[0]),
+    half_distance_to_efold_length(DOX_PENETRATION_UM[1]),
+)
 
 # THE out-of-sample anchor (a SECOND drug we never fit to).
 # Mitoxantrone is not in the GBM library, so we compile it from a verified SMILES
@@ -106,13 +140,20 @@ DOX_TARGET_UM = DOX_PENETRATION_MID  # 45 um
 # MW ~444), the same molecular pipeline the library drugs use.
 MITOXANTRONE_NAME = "mitoxantrone"
 MITOXANTRONE_SMILES = "OCCNCCNc1ccc(NCCNCCO)c2c1C(=O)c1c(O)ccc(O)c1C2=O"
-MITOX_PENETRATION_UM = (25.0, 75.0)
+MITOX_PENETRATION_UM = (25.0, 75.0)        # raw published HALF-distances
 MITOX_PENETRATION_MID = 50.0
+#: Same half -> e-fold conversion applied to the out-of-sample band (~36-108 um)
+#: so the prediction is compared like-for-like with the sim's L.
+MITOX_EFOLD_BAND_UM = (
+    half_distance_to_efold_length(MITOX_PENETRATION_UM[0]),
+    half_distance_to_efold_length(MITOX_PENETRATION_UM[1]),
+)
+MITOX_EFOLD_MID_UM = half_distance_to_efold_length(MITOX_PENETRATION_MID)
 MITOX_CITATION = (
     "Tannock lab, 'Distribution of the anticancer drugs doxorubicin, mitoxantrone "
     "and topotecan in tumors and normal tissues,' Cancer Chemother Pharmacol 2013; "
     "72(3):591-601, PMID 23680920 (mitoxantrone intensity falls to half within "
-    "~25-75 um of tumor blood vessels)"
+    "~25-75 um of tumor blood vessels; e-fold equivalent ~36-108 um)"
 )
 
 
@@ -182,17 +223,29 @@ def _d_eff_tortuous(drug: DrugParams, ecm_density: float) -> float:
 # THE single fit: solve for alpha on doxorubicin.
 # ---------------------------------------------------------------------------
 def calibrate_alpha(
-    target_um: float = DOX_TARGET_UM,
+    target_efold_um: float = DOX_TARGET_EFOLD_UM,
     drug: str = "doxorubicin",
     ecm_density: float = DEFAULT_ECM,
 ) -> float:
     """Solve for the ONE scaling constant ``alpha`` so the compiled drug's analytic
-    penetration length ``L = sqrt(D_eff / k_eff)`` equals ``target_um`` (default
-    45 um, the doxorubicin anchor). This is the ONLY fit in the module.
+    penetration length ``L = sqrt(D_eff / k_eff)`` equals ``target_efold_um``.
+
+    ``target_efold_um`` is an **E-FOLDING length**, i.e. the r in ``C(r) ~ exp(-r/L)``
+    -- the same quantity :func:`pk_reality.penetration_length_um` returns. It is NOT
+    a published half-distance. The default is the doxorubicin 40-50 um half-distance
+    anchor (Primeau et al. 2005, PMID 16361566) CONVERTED with
+    :func:`pk_anchors.half_distance_to_efold_length`::
+
+        L = d_half / ln2 = 45 / 0.6931 ~= 64.9 um     (band ~58-72 um)
+
+    Passing the raw 45 um half-distance instead treats a half-distance as an
+    e-folding length and inflates alpha by exactly ``1/ln^2(2) = 2.081x``; that is
+    the historical inconsistency (alpha 309.6 vs the correct 148.6) this signature
+    change removes. This is the ONLY fit in the module.
 
     Closed form (``k_eff`` is linear in alpha, ``L`` monotone in ``k_eff``)::
 
-        k_eff*  = D_eff / target_um^2
+        k_eff*  = D_eff / target_efold_um^2
         alpha   = (k_eff* - k_passive) / uptake_proxy
 
     Returns the (dimensionless) alpha; raises if the proxy is non-positive or the
@@ -200,9 +253,9 @@ def calibrate_alpha(
     """
     dp = _compile(drug, ecm_reference=ecm_density)
     d_eff = _d_eff_tortuous(dp, ecm_density)
-    if target_um <= 0:
-        raise ValueError(f"target_um must be > 0, got {target_um}")
-    k_target = d_eff / (float(target_um) ** 2)
+    if target_efold_um <= 0:
+        raise ValueError(f"target_efold_um must be > 0, got {target_efold_um}")
+    k_target = d_eff / (float(target_efold_um) ** 2)
     proxy = uptake_proxy(dp)
     if proxy <= 0.0:
         raise ValueError(f"{drug}: uptake_proxy is non-positive ({proxy}); cannot calibrate")
@@ -210,7 +263,7 @@ def calibrate_alpha(
     if alpha <= 0.0:
         raise ValueError(
             f"{drug}: required k_eff={k_target:.3e} is at/below the passive floor "
-            f"k_passive={k_passive(dp):.3e}; target_um={target_um} unreachable"
+            f"k_passive={k_passive(dp):.3e}; target_efold_um={target_efold_um} unreachable"
         )
     return float(alpha)
 
@@ -245,21 +298,28 @@ def revalidate(
     """With ``alpha`` FIXED from doxorubicin, PREDICT a second drug's penetration
     and compare to its independent literature anchor. Nothing is refit here.
 
-    Returns a dict with: the doxorubicin post-calibration check (should hit ~45 um
-    by construction), the out-of-sample second-drug prediction vs. the mitoxantrone
-    ~25-75 um band, and the opposite-regime qualitative check (temozolomide, small
-    + weakly bound, must penetrate much further than doxorubicin). Reports the
-    ratio and an honest pass/fail for each.
+    E-FOLD CONVENTION (see :func:`calibrate_alpha`): every published anchor here is
+    a HALF-distance and is converted to an e-folding length (``d_half / ln2``)
+    before it is compared to the sim's ``L``. The doxorubicin fit target is
+    ~64.9 um (not the raw 45 um) and the mitoxantrone band is ~36-108 um (not the
+    raw 25-75 um).
+
+    Returns a dict with: the doxorubicin post-calibration check (should hit
+    ~64.9 um by construction), the out-of-sample second-drug prediction vs. the
+    mitoxantrone e-fold-equivalent band, and the opposite-regime qualitative check
+    (temozolomide, small + weakly bound, must penetrate much further than
+    doxorubicin). Reports the ratio and an honest pass/fail for each.
     """
-    # --- doxorubicin sanity (by construction ~45 um) ---
+    # --- doxorubicin sanity (by construction ~64.9 um e-folding length) ---
     dox_cal = calibrated_drugparams("doxorubicin", alpha)
     dox_L = penetration_length_um(dox_cal, ecm_density=ecm_density)
 
-    # --- OUT-OF-SAMPLE second drug (mitoxantrone) ---
+    # --- OUT-OF-SAMPLE second drug (mitoxantrone), compared on the SAME
+    #     (e-fold-converted) footing the fit used. ---
     sec_cal = calibrated_drugparams(second_drug, alpha)
     sec_L = penetration_length_um(sec_cal, ecm_density=ecm_density)
-    lo, hi = MITOX_PENETRATION_UM
-    ratio_mid = sec_L / MITOX_PENETRATION_MID
+    lo, hi = MITOX_EFOLD_BAND_UM
+    ratio_mid = sec_L / MITOX_EFOLD_MID_UM
     in_band = bool(lo <= sec_L <= hi)
     # Two verdict lenses: strict (inside the published range) and the same
     # order-of-magnitude (3x) band pk_reality uses.
@@ -269,8 +329,11 @@ def revalidate(
     second = {
         "drug": second_drug,
         "predicted_L_um": sec_L,
-        "anchor_um": MITOX_PENETRATION_UM,
-        "anchor_mid_um": MITOX_PENETRATION_MID,
+        # ``anchor_um`` is the e-fold-CONVERTED band (the like-for-like comparison);
+        # the raw published half-distances are kept alongside for traceability.
+        "anchor_um": MITOX_EFOLD_BAND_UM,
+        "anchor_mid_um": MITOX_EFOLD_MID_UM,
+        "half_distance_band_um": MITOX_PENETRATION_UM,
         "citation": MITOX_CITATION,
         "ratio_to_mid": ratio_mid,
         "inside_published_band": in_band,
@@ -304,13 +367,17 @@ def revalidate(
 
 def _verdict_text(alpha, dox_L, second, qualitative, generalizes) -> str:
     parts = [
-        f"Single fitted constant alpha={alpha:.1f} (the ~300x amplification of the "
-        f"structure-only binding prior up to the true perivascular sink).",
-        f"In-sample: doxorubicin post-calibration L={dox_L:.1f} um vs 40-50 um anchor "
-        f"(hits ~45 um by construction -- this is the fit, not a test).",
+        f"Single fitted constant alpha={alpha:.1f} (the ~150x amplification of the "
+        f"structure-only binding prior up to the true perivascular sink), fit on the "
+        f"E-FOLD-converted doxorubicin anchor L=d_half/ln2={DOX_TARGET_EFOLD_UM:.1f} um.",
+        f"In-sample: doxorubicin post-calibration L={dox_L:.1f} um vs the "
+        f"{DOX_EFOLD_BAND_UM[0]:.0f}-{DOX_EFOLD_BAND_UM[1]:.0f} um e-fold-equivalent of "
+        f"the published 40-50 um half-distance (hits the target by construction -- this "
+        f"is the fit, not a test).",
         f"OUT-OF-SAMPLE: {second['drug']} PREDICTED L={second['predicted_L_um']:.1f} um "
-        f"vs published {second['anchor_um'][0]:.0f}-{second['anchor_um'][1]:.0f} um "
-        f"({second['ratio_to_mid']:.2f}x the ~{MITOX_PENETRATION_MID:.0f} um midpoint) "
+        f"vs the e-fold-equivalent {second['anchor_um'][0]:.0f}-{second['anchor_um'][1]:.0f} um "
+        f"(published half-distance {MITOX_PENETRATION_UM[0]:.0f}-{MITOX_PENETRATION_UM[1]:.0f} um; "
+        f"{second['ratio_to_mid']:.2f}x the ~{MITOX_EFOLD_MID_UM:.0f} um midpoint) "
         f"=> {second['verdict']}"
         + (" (inside the published band)." if second["inside_published_band"]
            else " (outside band but within 3x)." if second["within_3x"]
@@ -369,8 +436,10 @@ def write_report(result: Dict, path: str = "results/calibration.md") -> str:
         "The frozen transport PDE loses drug at a first-order rate "
         "`k = clearance + binding`, giving penetration length `L = sqrt(D_eff / k)`. "
         "The structure-only priors give `k ≈ 3e-4 /s` (a ~1-hour timescale) → `L ≈ 700 µm`. "
-        "Reproducing a ~45 µm boundary layer needs `k = D_eff / L² ≈ 7e-2 /s` "
-        "(a ~15-second timescale) — about **300× faster**. The missing physics is not "
+        f"Reproducing the {DOX_TARGET_EFOLD_UM:.0f} µm boundary layer (the e-fold "
+        "equivalent of the published 40–50 µm half-distance — see the convention "
+        "section below) needs `k = D_eff / L² ≈ 3e-2 /s` (a ~30-second timescale) — "
+        "about **150× faster**. The missing physics is not "
         "slow metabolic clearance; it is **rapid cellular uptake + high-capacity "
         "intracellular / DNA binding**, a near-irreversible perivascular sink that is "
         "what actually carves the steep gradient.",
@@ -403,39 +472,72 @@ def write_report(result: Dict, path: str = "results/calibration.md") -> str:
         "",
         "---",
         "",
+        "## Unit convention: half-distance vs e-folding length (CORRECTED)",
+        "",
+        "The published anchors are **half-distances** `d_half` — the distance from a "
+        "vessel at which drug intensity falls to 50 % of its perivascular value. The "
+        "simulator's `penetration_length_um` is an **e-folding length** `L`, defined by "
+        "`C(r) ~ exp(−r/L)`. For an exponential profile these are different numbers:",
+        "",
+        "```",
+        "d_half = L · ln2        =>        L = d_half / ln2 = 1.4427 · d_half",
+        "```",
+        "",
+        f"So doxorubicin's published **40–50 µm half-distance** is an L-equivalent of "
+        f"**{DOX_EFOLD_BAND_UM[0]:.0f}–{DOX_EFOLD_BAND_UM[1]:.0f} µm**, midpoint "
+        f"**{DOX_TARGET_EFOLD_UM:.1f} µm** "
+        f"(`pk_anchors.half_distance_to_efold_length`). `calibrate_alpha` now takes its "
+        "target as an **e-folding length** and defaults to that converted midpoint.",
+        "",
+        "> **Correction notice.** An earlier revision of this file reported "
+        "**alpha = 309.6**, obtained by fitting to the raw 45 µm half-distance *as if it "
+        "were* an e-folding length. That is the wrong convention, and it inflates alpha "
+        "by exactly `1/ln²(2) = 2.081×`. The corrected, e-fold-converted fit gives "
+        f"**alpha = {result['alpha']:.1f}** — the value `results/pk_multidrug.md` already "
+        "used, so the two files are now consistent. Any figure or table still quoting "
+        "α = 309.6 predates this correction.",
+        "",
+        "---",
+        "",
         "## The single calibrated constant",
         "",
-        f"Fit on doxorubicin against the **45 µm** anchor "
+        f"Fit on doxorubicin against the **{DOX_TARGET_EFOLD_UM:.1f} µm e-fold-equivalent** "
+        f"of the 40–50 µm half-distance anchor "
         f"(Primeau et al., Clin Cancer Res 2005; 11(24):8782–8788, PMID 16361566):",
         "",
-        f"> **alpha = {result['alpha']:.1f}**   (dimensionless; the ~300× amplification "
-        f"the diagnosis predicted)",
+        f"> **alpha = {result['alpha']:.1f}**   (dimensionless; a ~150× amplification of "
+        f"the structure-only binding prior)",
         "",
         "This is the **only** fit. Everything below uses this same alpha.",
         "",
         "### In-sample check (doxorubicin) — this is the fit, not a test",
         "",
         f"Doxorubicin post-calibration `L = {result['doxorubicin_post_cal_L_um']:.1f} µm` "
-        f"vs the 40–50 µm anchor → hits ~45 µm **by construction**.",
+        f"vs the {DOX_EFOLD_BAND_UM[0]:.0f}–{DOX_EFOLD_BAND_UM[1]:.0f} µm e-fold-equivalent "
+        f"band → hits ~{DOX_TARGET_EFOLD_UM:.0f} µm **by construction**.",
         "",
         "---",
         "",
         "## The real test: out-of-sample second drug (NOT fit)",
         "",
         f"With alpha **fixed at {result['alpha']:.1f}**, predict **{sd['drug']}** and "
-        f"compare to an independent, same-method literature measurement:",
+        f"compare to an independent, same-method literature measurement — converted to "
+        f"an e-folding length with the same `d_half/ln2` rule used for the fit:",
         "",
         f"> {sd['citation']}",
         "",
-        "| drug (out-of-sample) | predicted L | published band | ratio to mid | verdict |",
-        "|---|---:|---:|---:|:--:|",
-        f"| {sd['drug']} | **{sd['predicted_L_um']:.1f} µm** | {lo:.0f}–{hi:.0f} µm | "
+        "| drug (out-of-sample) | predicted L | published half-distance | e-fold-equivalent band | ratio to mid | verdict |",
+        "|---|---:|---:|---:|---:|:--:|",
+        f"| {sd['drug']} | **{sd['predicted_L_um']:.1f} µm** | "
+        f"{sd['half_distance_band_um'][0]:.0f}–{sd['half_distance_band_um'][1]:.0f} µm | "
+        f"{lo:.0f}–{hi:.0f} µm | "
         f"{sd['ratio_to_mid']:.2f}× | **{sd['verdict']}** |",
         "",
-        ("The predicted penetration falls **inside** the published 25–75 µm band — the "
-         "one constant transfers to a second drug it was never fit to."
+        (f"The predicted penetration falls **inside** the {lo:.0f}–{hi:.0f} µm "
+         "e-fold-equivalent band — the one constant transfers to a second drug it was "
+         "never fit to."
          if sd["inside_published_band"] else
-         "The prediction is **outside** the published band; reported honestly, not refit."),
+         "The prediction is **outside** the converted band; reported honestly, not refit."),
         "",
         "### Opposite-regime qualitative check (temozolomide)",
         "",
@@ -455,6 +557,11 @@ def write_report(result: Dict, path: str = "results/calibration.md") -> str:
         "",
         "- **One anchor sets the scale.** alpha is fit to a single doxorubicin number; "
         "the absolute penetration of *every* drug rides on that one measurement.",
+        "- **The anchor is a half-distance, converted.** `L = d_half/ln2` assumes the "
+        "perivascular profile is a single exponential. Real immunofluorescence profiles "
+        "are only approximately exponential, so the conversion carries its own (modest) "
+        "error — but applying it is strictly better than the previous convention, which "
+        "silently equated the two lengths and mis-scaled alpha by 2.08×.",
         "- **Mitoxantrone is chemically related to doxorubicin** (both anthracenedione "
         "DNA-intercalators). The measurement is genuinely independent, but this is a "
         "strong *magnitude-transfer* test within the strongly-bound class, not a "
@@ -484,15 +591,19 @@ def _print(result: Dict) -> None:
     print("tmesim CALIBRATION -- one mechanistic constant for perivascular drug consumption")
     print("=" * 88)
     print(f"Mechanism: k_eff = k_passive(clearance) + alpha * uptake_proxy(tissue binding)")
-    print(f"THE single fit (doxorubicin -> 45 um anchor):  alpha = {result['alpha']:.2f}")
+    print(f"Convention: anchors are HALF-distances; fit target is the e-folding length "
+          f"L = d_half/ln2")
+    print(f"THE single fit (doxorubicin 40-50 um half-dist -> L = "
+          f"{DOX_TARGET_EFOLD_UM:.1f} um):  alpha = {result['alpha']:.2f}")
     print("-" * 88)
     print(f"In-sample  doxorubicin  L = {result['doxorubicin_post_cal_L_um']:6.1f} um "
-          f"(anchor 40-50 um; by construction)")
+          f"(e-fold band {DOX_EFOLD_BAND_UM[0]:.0f}-{DOX_EFOLD_BAND_UM[1]:.0f} um; "
+          f"by construction)")
     print("-" * 88)
     print("OUT-OF-SAMPLE (alpha fixed, NOT refit):")
     lo, hi = sd["anchor_um"]
     print(f"  {sd['drug']:13s} predicted L = {sd['predicted_L_um']:6.1f} um   "
-          f"published {lo:.0f}-{hi:.0f} um   ratio={sd['ratio_to_mid']:.2f}x   "
+          f"e-fold band {lo:.0f}-{hi:.0f} um   ratio={sd['ratio_to_mid']:.2f}x   "
           f"[{sd['verdict']}]")
     print(f"    anchor: {sd['citation']}")
     print(f"  temozolomide  L = {q['temozolomide_L_um']:.0f} um is "
@@ -509,7 +620,7 @@ if __name__ == "__main__":
     import time as _time
 
     t0 = _time.time()
-    alpha = calibrate_alpha(target_um=DOX_TARGET_UM, drug="doxorubicin")
+    alpha = calibrate_alpha(target_efold_um=DOX_TARGET_EFOLD_UM, drug="doxorubicin")
     result = revalidate(alpha)
     _print(result)
     out = write_report(result)

@@ -2,7 +2,8 @@
 
 For each drug: structure -> (Stokes-Einstein + Brownian + Ogston-Renkin mesh)
 effective diffusivity -> measured GDSC IC50 -> calibrated tissue-uptake loss
-(alpha fit ONCE on doxorubicin's 45 um anchor) -> binding-site barrier (antibodies)
+(alpha fit ONCE on doxorubicin's 40-50 um half-distance anchor,
+converted to the e-folding length L = d_half/ln2 ~= 65 um) -> binding-site barrier (antibodies)
 -> predicted tissue penetration length. Shows the panel now reproduces realistic,
 literature-consistent penetration instead of the uncalibrated ~700 um overshoot.
 """
@@ -17,8 +18,9 @@ from tmesim.validation.calibration import calibrate_alpha, calibrated_drugparams
 
 PANEL = ["temozolomide", "lomustine", "cisplatin", "methotrexate", "doxorubicin", "bevacizumab"]
 
-alpha = calibrate_alpha(target_um=45.0, drug="doxorubicin")
-print(f"calibrated alpha (fit once on doxorubicin@45um) = {alpha:.1f}\n")
+alpha = calibrate_alpha(drug="doxorubicin")  # e-fold target 45/ln2 ~= 64.9 um
+print(f"calibrated alpha (fit once on doxorubicin, 40-50um half-distance "
+      f"-> e-fold L~=64.9um) = {alpha:.1f}\n")
 
 rows = []
 for name in PANEL:

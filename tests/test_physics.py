@@ -102,6 +102,30 @@ def test_oxygen_is_deterministic(radial_micro_factory):
     assert np.array_equal(o1, o2)
 
 
+def test_oxygen_sink_is_grid_independent(radial_micro_factory):
+    """The O2 sink must be an areal DENSITY, not a per-grid-cell COUNT.
+
+    Same physical tissue (identical 900x900 um extent, identical 12,000 tumor cells
+    at identical positions) solved on four grids spanning a 4x range of dx. A raw
+    count sink scales as dx^2 and used to swing the hypoxic fraction from 0.998 at
+    dx = 30 um to 0.000 at dx = 10 um; the areal density is invariant.
+    """
+    cfg = OxygenConfig()
+    hypoxic, mean_o2 = [], []
+    for dx, n in ((30.0, 30), (15.0, 60), (10.0, 90), (7.5, 120)):
+        micro, _, _ = radial_micro_factory(ny=n, nx=n, dx=dx, n_tumor=12000, seed=0)
+        assert micro.domain.extent_um == (900.0, 900.0)  # same physical tissue
+        oxygen = solve_oxygen(micro, cfg)
+        # Sample at the (grid-independent) real cell positions.
+        col, row = micro.domain.to_index(micro.cells.x, micro.cells.y)
+        local = oxygen[row, col]
+        hypoxic.append(float((local < cfg.hypoxia_threshold).mean()))
+        mean_o2.append(float(local.mean()))
+
+    assert max(mean_o2) - min(mean_o2) < 0.01, f"mean O2 varies with dx: {mean_o2}"
+    assert max(hypoxic) - min(hypoxic) < 0.02, f"hypoxic fraction varies with dx: {hypoxic}"
+
+
 def test_label_hypoxia_marks_core_cells(radial_micro_factory):
     # Dense tumor core so oxygen genuinely drops below the hypoxia threshold.
     micro, _, _ = radial_micro_factory(ny=60, nx=60, n_tumor=12000, seed=0)

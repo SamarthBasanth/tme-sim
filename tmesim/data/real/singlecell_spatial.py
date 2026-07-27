@@ -17,6 +17,18 @@ Xenium Analyzer v1.3.0). One adult human GBM FFPE section (Avaden Biosciences),
 Panel: Xenium Human Brain base panel (hBrain_254g, 254 genes) + custom 65-gene
 add-on = 319 gene-expression targets (plus negative-control / codeword features).
 
+A SECOND real GBM section in the identical on-disk format is also supported --
+10x **Xenium_V1_Human_Brain_GBM_FFPE** (Xenium v2.0.0), cached in
+``data_cache/xenium_gbm_io``. It carries the Human Immuno-Oncology Profiling
+panel (hImmune_v1, 380 genes) + a 100-gene Add-on B = **480 gene targets** over
+**816,769 cells** -- ~20x the cells and a far deeper immune/vascular readout
+(CD3E, FOXP3, PDCD1, CD274, CTLA4, LAG3, TIGIT, IDO1, VEGFA, HIF1A, VWF, RGS5),
+at the cost of the neural-lineage markers (SOX2, OLIG2, AQP4, MOG, PECAM1,
+TOP2A) that only the brain panel carries. Neither panel measures **MGMT** or
+**ABCB1**, so TMZ methylation status and P-gp efflux stay UNMEASURED on both.
+Select with ``load(path="data_cache/xenium_gbm_io")``; provenance in the
+returned ``source`` follows the cached ``gene_panel.json``, not the argument.
+
 What is real here
 -----------------
 REAL (measured bytes on disk):
@@ -35,7 +47,9 @@ Parsed with stdlib + scipy/pandas only (no scanpy/anndata/h5py needed).
 from __future__ import annotations
 
 import gzip
+import json
 import os
+import sys
 import tarfile
 from typing import Dict, List, Optional
 
@@ -62,13 +76,114 @@ XENIUM_GBM_LANDING = (
     "https://www.10xgenomics.com/datasets/xenium-human-brain-preview-data-1-standard"
 )
 
+# Sibling GBM section, SAME on-disk format, richer immuno-oncology panel
+# (verified reachable 2026-07-27; individual files all HTTP 200, byte-exact on
+# download). Cache it in ``data_cache/xenium_gbm_io`` under the SAME local
+# basenames and ``load(path=...)`` ingests it unchanged.
+XENIUM_GBM_IO_BASE = (
+    "https://cf.10xgenomics.com/samples/xenium/2.0.0/"
+    "Xenium_V1_Human_Brain_GBM_FFPE/"
+    "Xenium_V1_Human_Brain_GBM_FFPE"
+)
+XENIUM_GBM_IO_FILES = {
+    # local basename -> (url suffix, verified content-length bytes)
+    "Xenium_GBM_cells.csv.gz": ("_cells.csv.gz", 44_907_408),
+    "Xenium_GBM_cell_feature_matrix.tar.gz": ("_cell_feature_matrix.tar.gz", 242_459_483),
+    "Xenium_GBM_gene_panel.json": ("_gene_panel.json", 256_404),
+}
+XENIUM_GBM_IO_LANDING = (
+    "https://www.10xgenomics.com/datasets/"
+    "ffpe-human-brain-cancer-data-with-human-immuno-oncology-profiling-panel"
+    "-and-custom-add-on-1-standard"
+)
+
 _DEFAULT_CACHE = os.path.join("data_cache", "xenium_gbm")
 _CELLS_FILE = "Xenium_GBM_cells.csv.gz"
 _MATRIX_TAR = "Xenium_GBM_cell_feature_matrix.tar.gz"
 _MATRIX_DIR = "cell_feature_matrix"
+_PANEL_FILE = "Xenium_GBM_gene_panel.json"
 
 # Feature-type strings in the Xenium features.tsv third column.
 _GENE_TYPE = "Gene Expression"
+
+# ---------------------------------------------------------------------------
+# Provenance registry.
+#
+# The two cached sections share an identical on-disk format but are DIFFERENT
+# experiments on DIFFERENT panels. ``source`` is stamped into downstream result
+# metadata (see ``tmesim/reconstruct/real_xenium.py``), so it must follow the
+# bytes actually loaded rather than being hardcoded. Datasets are identified by
+# the base-panel name recorded inside the shipped ``gene_panel.json``; an
+# unrecognised cache gets an explicitly-unregistered source rather than
+# inheriting someone else's provenance.
+# ---------------------------------------------------------------------------
+_DATASETS = {
+    "hBrain_254g": {
+        "dataset": "10x Xenium Human Brain — Glioblastoma section (v1.3.0)",
+        "accession": "10x Genomics Xenium Human Brain Preview Data",
+        "sample": "Xenium_V1_FFPE_Human_Brain_Glioblastoma_With_Addon",
+        "assay": "Xenium In Situ (single-cell-resolution spatial)",
+        "panel": "hBrain_254g base + 65-gene add-on (319 gene targets)",
+        "license": "CC BY 4.0 (open, no login/DUA)",
+        "landing_page": XENIUM_GBM_LANDING,
+        "has_outcome_label": False,
+    },
+    "Xenium Human Immuno-Oncology Profiling": {
+        "dataset": "10x Xenium Human Brain Cancer (GBM) FFPE — IO panel (v2.0.0)",
+        "accession": "10x Genomics FFPE Human Brain Cancer, Immuno-Oncology panel",
+        "sample": "Xenium_V1_Human_Brain_GBM_FFPE",
+        "assay": "Xenium In Situ (single-cell-resolution spatial)",
+        "panel": (
+            "Human Immuno-Oncology Profiling base (hImmune_v1, 380 genes) + "
+            "Add-on B (100 genes) = 480 gene targets"
+        ),
+        "license": "CC BY 4.0 (open, no login/DUA)",
+        "landing_page": XENIUM_GBM_IO_LANDING,
+        "has_outcome_label": False,
+    },
+}
+
+
+def _read_panel_identity(path: str) -> Optional[dict]:
+    """Return the ``payload.panel`` block of the shipped gene_panel.json, if any."""
+    panel_path = os.path.join(path, _PANEL_FILE)
+    if not os.path.exists(panel_path):
+        return None
+    try:
+        with open(panel_path, "r") as fh:
+            return json.load(fh)["payload"]["panel"]
+    except (ValueError, KeyError, OSError):
+        return None
+
+
+def _source_for(path: str, n_genes: int) -> Dict[str, object]:
+    """Resolve provenance for the cache at ``path`` from its own panel spec."""
+    panel = _read_panel_identity(path)
+    base_name = None
+    if panel:
+        base_name = (
+            panel.get("type", {}).get("data", {}).get("base_panel_identity", {}).get("name")
+        )
+    src = dict(_DATASETS.get(base_name, {}))
+    if not src:
+        # Unrecognised cache: say so plainly instead of borrowing a provenance.
+        addon = (panel or {}).get("identity", {}).get("name", "unknown")
+        src = {
+            "dataset": f"UNREGISTERED Xenium cache at {path}",
+            "accession": "unregistered",
+            "sample": "unregistered",
+            "assay": "Xenium In Situ (single-cell-resolution spatial)",
+            "panel": (
+                f"base panel {base_name or 'unknown'} + add-on {addon} "
+                f"({n_genes} gene targets measured)"
+            ),
+            "license": "unknown — verify before redistribution",
+            "landing_page": None,
+            "has_outcome_label": False,
+        }
+    src["cache_dir"] = path
+    src["n_panel_genes"] = int(n_genes)
+    return src
 
 
 def _read_mex(matrix_dir: str):
@@ -192,22 +307,16 @@ def load(
         "cell_ids": cells["cell_id"].to_numpy().astype(str),
         "cell_meta": cells,
         "coordinate_units": "micrometer",
-        "source": {
-            "dataset": "10x Xenium Human Brain — Glioblastoma section (v1.3.0)",
-            "accession": "10x Genomics Xenium Human Brain Preview Data",
-            "sample": "Xenium_V1_FFPE_Human_Brain_Glioblastoma_With_Addon",
-            "assay": "Xenium In Situ (single-cell-resolution spatial)",
-            "panel": "hBrain_254g base + 65-gene add-on (319 gene targets)",
-            "license": "CC BY 4.0 (open, no login/DUA)",
-            "landing_page": XENIUM_GBM_LANDING,
-            "has_outcome_label": False,
-        },
+        "source": _source_for(path, len(genes)),
     }
 
 
 if __name__ == "__main__":  # pragma: no cover - smoke test
-    d = load()
+    # Optional cache dir, e.g. `python -m ... data_cache/xenium_gbm_io`.
+    d = load(sys.argv[1]) if len(sys.argv) > 1 else load()
     xy = d["cell_xy_um"]
+    print(f"dataset       : {d['source']['dataset']}")
+    print(f"panel         : {d['source']['panel']}")
     print(f"n_cells       : {xy.shape[0]:,}")
     print(f"coord units   : {d['coordinate_units']}")
     print(f"x range um    : {xy[:, 0].min():.1f} .. {xy[:, 0].max():.1f}")
