@@ -1,7 +1,7 @@
 # Rigor Audit — what the verification pass found, and what still stands
 
 This session put the real-data build through an adversarial verification pass. It found
-**nine distinct defects**, several of which were mutually cancelling, and produced the
+**eleven distinct defects** (nine at first writing, two more since), several of which were mutually cancelling, and produced the
 project's **first validation against measured drug concentrations in human tissue**.
 
 Every headline number reported before this audit was wrong in at least one way. The
@@ -25,11 +25,15 @@ the model — and the validation **derived the fix from the data**: a multiplica
 factor cannot work (3.2x spread across drugs), but an **additive leak is drug-independent
 to within 1.3x** (L = 0.211 / 0.230 / 0.272 across three independent studies), giving
 `source = vascular_density * (bbb_penetrance + L * bbb_disruption) * plasma`, L ~ 0.24.
-That is the signature of size-nonselective paracellular opening. **Not yet implemented.**
+That is the signature of size-nonselective paracellular opening. **NOW IMPLEMENTED** in
+`tmesim/reconstruct/barrier.py` (L=0.238): regional ratios go from a flat 1.00x to 1.19x and
+5.87x against measured 1.45x and 4.26x; anchor error 2.49x -> 1.30x. Unfitted necrosis
+ratios land at 1.02x/0.98x.
 
 It also traced a 66x outlier (eribulin) to a genuine code defect: `bbb_penetrance` takes
 the **mean** of four desirability scores, so a molecule with two disqualifying properties
-is rescued by two favourable ones. *A mean cannot express a veto.* **Not yet fixed.**
+is rescued by two favourable ones. *A mean cannot express a veto.* **NOW FIXED** (geometric
+mean): eribulin 65.6x -> 6.9x, within-10x 5/6 -> 6/6, GM fold error 3.66x -> 2.00x.
 
 ---
 
@@ -43,9 +47,11 @@ is rescued by two favourable ones. *A mean cannot express a veto.* **Not yet fix
 | 4 | alpha off by exactly 1/ln^2(2) — half-distance vs e-fold convention (309.6 -> **148.6**) | fixed + guarded by test |
 | 5 | Per-cell sensitivity a placeholder suppressing all kills ~5x | fixed (drug-specific, real markers) |
 | 6 | Grid-dependent oxygen sink (raw count, scales as dx^2) | fixed |
-| 7 | Grid-dependent tissue mask — **was partially cancelling #6** | diagnosed, prototype validated, **not applied** |
-| 8 | Unfair cross-drug comparison: TMZ advantaged because its resistance determinant is *unmeasured* | diagnosed, **not fixed** |
-| 9 | `bbb_penetrance` mean cannot express a veto | diagnosed, **not fixed** |
+| 7 | Grid-dependent tissue mask — **was partially cancelling #6** | **FIXED** (geometric 30um-disc mask; coverage spread 3.64x -> 1.007x; legacy mask was corrupting production kill 2.25x) |
+| 8 | Unfair cross-drug comparison: TMZ advantaged because its resistance determinant is *unmeasured* | **FIXED** (uniform/determinant modes; plus a measured per-patient MGMT scalar that returns TMZ to #5) |
+| 9 | `bbb_penetrance` mean cannot express a veto | **FIXED** (geometric mean; eribulin 65.6x -> 6.9x; within-10x 5/6 -> 6/6) |
+| 10 | `membrane_permeability` returned 4.2e7 um/s for imatinib (tens of m/s) — unbounded logP | **FIXED** (logP clamp + unstirred aqueous boundary layer in series) |
+| 11 | Oxygen PDE **falsified as value-add** — beaten by distance-to-nearest-vessel (rho -0.150 vs -0.113), and by its own undiffused source (-0.127) | open; hypoxia should come from measured markers |
 
 **#7 is the most instructive.** Two grid-dependence bugs pulled in opposite directions, so
 the output looked *more* stable than it was. Compensating errors that produce plausible
