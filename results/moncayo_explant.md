@@ -100,9 +100,22 @@ The parametric LRT above treats 112 ROIs as if they carried 112 units of informa
 | permutation null 95th pct dR2 | 7.5% |
 | **permutation p for dR2** | 0.074 |
 
-Slice-level agreement, the same information viewed directly (n = 11 slices): Spearman rho = 0.009 (p = 0.979), Pearson r = 0.239 (p = 0.478); within-compound slice permutation p = 0.981.
+Slice-level agreement, the same information viewed directly, one point per slice and no ROI-count weighting (n = 11): Spearman rho = 0.009 (p = 0.979), Pearson r = 0.239 (p = 0.478); within-compound slice permutation p = 0.981.
 
-**Verdict, analysis 1.** *Variance explained beyond the patient/slice random effects: nominally 6.7%, but the permutation null median under a random slice ordering is 1.2% and the permutation p is 0.074.* With 11 exchangeable slices, a few percent of marginal R2 is what chance delivers. **The honest number is zero: this model does not predict per-ROI drug accumulation in bath-dosed explants.** Under `transport_only` it is zero by construction; under `transport+shipped_loss` it is zero after calibration against the correct null.
+**The two permutation statistics disagree, and that disagreement is the finding.** On |t| the observed value clears the null 95th percentile (2.56 vs 2.44, p = 0.044); on dR2 it does not (6.7% vs 7.5%, p = 0.074); and the unweighted slice-level Spearman is 0.009. An effect that appears or vanishes depending on whether slices are weighted by ROI count is not a validated prediction; it is 11 points arranged so that one weighting scheme finds a trend.
+
+### 3.4 And the effect that does appear is a thickness proxy
+
+Under `transport+shipped_loss` the model's slice-to-slice prediction is almost exactly a monotone function of how thick the section is: Spearman(prediction, mean distance-to-edge) = -0.948 (p = 9.4e-06, n = 11). That is the whole mechanism — a first-order sink lets a thin section equilibrate closer to the bath than a thick one. So the fair question is whether the simulator beats the one-number geometric covariate it is standing in for. Same frame, same ROIs:
+
+| fixed effect | beta | SE | LRT p | dR2 beyond REs |
+|---|---:|---:|---:|---:|
+| **our prediction** | 1.521 | 0.594 | 0.029 | 6.7% |
+| section mean distance-to-edge (um) | -0.001368 | 0.000656 | 0.094 | 4.3% |
+| section max distance-to-edge (um) | -0.000455 | 0.000224 | 0.070 | 4.4% |
+| section area (mm^2) | -0.035448 | 0.030603 | 0.263 | 2.1% |
+
+**Verdict, analysis 1.** *Variance explained beyond the patient/slice random effects: nominally 6.7% under `transport+shipped_loss`, against a slice-permutation null whose median is 1.2% and 95th percentile 7.5% (p = 0.074); exactly 0.0% under `transport_only`, by construction.* Rounded honestly: **between zero and a few percent, not separable from chance with 11 exchangeable slices, and what little there is is a section-thickness effect rather than a transport prediction.** This model does not predict per-ROI drug accumulation in bath-dosed explants. It is not close, and §3.1 explains why it cannot be.
 
 ## 4. Analysis 2 — the compound-specificity falsification test
 
@@ -142,7 +155,7 @@ Predicted coefficient of variation of accumulation across each section, averaged
 | 0.014 | 5.4 | 2.74e-03 |
 | 0.05 | 16.8 | 5.62e-02 |
 
-Even at phi_lys = 0.05 — 5% of tissue volume as acidic compartment, at or above every value in the cell-biology literature — the predicted CV reaches only 1.78e-01, still 2.7x short.
+Even at phi_lys = 0.05 — 5% of tissue volume as acidic compartment, at or above every value in the cell-biology literature — the mean predicted weak-base CV reaches only 5.62e-02 (largest single section 1.78e-01), still 8.6x short of the measured value.
 
 **And this is structural, not a tuning problem.** With `phi_lys` *uniform in space*, R is uniform, so at equilibrium C_total = R x C_bath **everywhere** and the dispersion goes to zero however large R becomes. Uniform sequestration buys a longer time constant, never an equilibrium pattern. To produce the observed hotspots the model would need a **spatial field of lysosomal / acidic-phospholipid content**. A literature pass for this project established that **no measured mg/g or mol% acidic-phospholipid content exists for tumour tissue and no published PBPK model carries tumour-specific lysosomal parameters** — so this is not a parameter we declined to fit, it is a parameter that does not exist in the literature. That makes it unexplored territory rather than an oversight, and it is the single most useful thing this run identifies.
 
@@ -157,7 +170,11 @@ Even at phi_lys = 0.05 — 5% of tissue volume as acidic compartment, at or abov
 - Weak bases vs olaparib on **excess_gini**: 0.118 vs 0.127, Mann-Whitney one-sided p = 0.554 (n = 12 vs 6 sections).
 - Weak bases vs olaparib on **excess_moran**: 0.099 vs -0.176, Mann-Whitney one-sided p = 0.005 (n = 12 vs 6 sections).
 
+The two metrics say different things, and both readings are given. On **dispersion** (Gini, CV) olaparib looks *as* heterogeneous as the weak bases. On **spatial autocorrelation** (Moran's I) it does not: the weak-base fields are positively autocorrelated (contiguous patches, 0.090 / 0.113 above their internal-standard floor) while olaparib's is *negatively* autocorrelated (-0.176), i.e. salt-and-pepper — the signature of a field dominated by detection noise rather than structure. That is qualitatively what the authors describe. But:
+
 olaparib sections carry a mean 51% exact-zero pixel fraction (below the MALDI detection floor) against 10-38% for the weak bases, which inflates every dispersion metric for olaparib. The measured side of this contrast is therefore confounded and we do not claim it in either direction; the falsification is run on the PREDICTED side, where no such confound exists.
+
+A negative Moran's I is exactly what a 51%-zero field produces, so the autocorrelation contrast cannot be cleanly separated from the detection confound either. We report both metrics and claim neither.
 
 Two further reasons not to read the measured columns as a replication of the authors' claim: **olaparib contributes zero GeoMx ROIs** (its drug hotspots were too small to hit the nuclei minimum, so it is absent from analyses 1 and 3 entirely), and the paper's compound-specificity evidence rests on FACS-sorted reculture and hotspot morphology, not on section-level dispersion. Our metric is not their metric.
 
@@ -198,9 +215,11 @@ Whole-panel rank enrichment, the fast analogue of the authors' GSEA: all 11224 g
 | apoptosis | 0.394 | 4.20 | 1.0e-03 | 0.074 |
 | lysosome | 0.335 | 5.66 | 1.0e-03 | 0.131 |
 
-The paper's benchmark is GSEA **APOPTOSIS NES = 2.278, FDR q = 0**. Our statistic is a rank-enrichment z, not a permutation NES, so the numbers are not directly comparable — but the **direction and significance replicate**: apoptosis genes sit high among the drug-correlated genes (z = 4.2, p < 0.001) even after absorbing slice identity as a fixed effect. **Measured drug level does predict the apoptotic signature, as it should.** The dataset's response axis is real and our reading of it agrees with the authors'.
+The paper's benchmark is GSEA **APOPTOSIS NES = 2.278, FDR q = 0**. Our statistic is a rank-enrichment z, not a permutation NES, so the numbers are not directly comparable — but the **direction and significance replicate**: apoptosis genes sit high among the drug-correlated genes (z = 4.2, p < 0.001) even after absorbing slice identity as a fixed effect. **Measured drug level does predict the apoptotic signature, as it should.**
 
-### 5.3 Does OUR predicted exposure predict them? No.
+One caveat that must travel with that sentence. The two null models disagree for apoptosis. Against random gene sets *in the ROI-level mixed model* the apoptosis score's |t| = 2.53 sits inside the random-set distribution (p = 0.155); against random gene sets *in the within-slice ranking* it is far outside (z = 4.2, p < 0.001). The lysosome signature clears both (p = 0.005 and p < 0.001). The reading we stand behind: a broad slice-level expression axis co-varies with drug level, so any large gene set picks up *some* association at ROI level; the apoptosis-specific part of it is only demonstrable once slice identity is absorbed, and there it is unambiguous. Direction and specificity agree with the authors; we do not claim their effect size.
+
+### 5.3 Does OUR predicted exposure predict them? Only backwards.
 
 | signature | subset | beta | SE | LRT p | dR2 beyond REs | singular |
 |---|---|---:|---:|---:|---:|---|
@@ -211,7 +230,14 @@ The paper's benchmark is GSEA **APOPTOSIS NES = 2.278, FDR q = 0**. Our statisti
 | lysosome | Niraparib | -0.2457 | 0.6410 | 0.700 | 1.1% | no |
 | lysosome | Rucaparib | -0.9966 | 0.3340 | 1.000 | 57.9% | **yes** |
 
-Pooled apoptosis against our predicted exposure: beta = -0.906 (**negative** — the wrong sign), LRT p = 0.027. Under `transport_only` the predictor is constant and the question does not arise at all. This is a **clean negative**, and it is the expected consequence of §3: a predictor that is constant within a slice can only ever address the 5.0% between-slice stratum, while the measured drug-to-apoptosis coupling lives *within* slices, which is exactly where the authors' design put it.
+Pooled apoptosis against our predicted exposure: beta = -0.906 — **negative, the opposite sign to the measured relationship** — with a nominal LRT p = 0.027 and an inflated-looking dR2 of 33.1%. Do not read that as a result. It is the same pseudo-replication artefact as §3.3, and the same slice-exchangeable permutation dissolves it:
+
+| signature | observed abs(t) | null median | null 95th pct | permutation p |
+|---|---:|---:|---:|---:|
+| apoptosis | 2.52 | 1.38 | 2.84 | 0.091 |
+| lysosome | 2.09 | 1.01 | 3.08 | 0.164 |
+
+Under `transport_only` the predictor is constant and the question does not arise at all. So: **our predicted exposure does not predict the apoptotic signature**; the only nominal association runs backwards and does not survive the correct null. This is a clean negative and it is the expected consequence of §3 — a predictor that is constant within a slice can only ever address the 5.0% between-slice stratum, while the measured drug-to-apoptosis coupling lives *within* slices, which is exactly where the authors' design put it.
 
 ### 5.4 The bridge back to analysis 2
 
@@ -223,13 +249,13 @@ That is same-dataset, independent evidence that the mechanism missing from §4 i
 
 | # | test | verdict |
 |---|---|---|
-| 1 | per-ROI accumulation fit, authors' mixed-effects frame | **FAIL.** 0.0% beyond REs by construction under `transport_only`; 6.7% nominal under `transport+shipped_loss`, permutation p = 0.074 against a slice-exchangeable null. Not distinguishable from chance. |
+| 1 | per-ROI accumulation fit, authors' mixed-effects frame | **FAIL.** 0.0% beyond REs by construction under `transport_only`; 6.7% nominal under `transport+shipped_loss`, permutation p = 0.074 on dR2 and 0.044 on abs(t) against a slice-exchangeable null, unweighted slice-level Spearman 0.01, and the predictor is a section-thickness proxy. Not separable from chance. |
 | 2 | compound-specificity falsification | **PARTIAL / effectively negative.** Ordering right (46,209x weak base : olaparib, recovered from SMILES), magnitude 175x too small, the two weak bases indistinguishable, gradient of the wrong sign on 14/18 sections. |
-| 3 | exposure -> apoptosis coupling | **Measured: PASS** (beta = 0.0567, p = 0.012; rank-enrichment z = 4.2, replicating the paper's NES 2.278 in direction). **Ours: FAIL** (p = 0.027, negative sign). |
+| 3 | exposure -> apoptosis coupling | **Measured: PASS** (beta = 0.0567, p = 0.012; within-slice rank-enrichment z = 4.2, p < 0.001, replicating the paper's NES 2.278 in direction — though the ROI-level random-gene-set null is not cleared, see §5.2). **Ours: FAIL** (beta = -0.906, wrong sign; slice-permutation p = 0.091). |
 
 **What this run establishes.**
 
-1. On the *only* open dataset that pairs a measured spatial drug field with molecular state on the same rows, **this simulator's transport layer explains none of the measured per-ROI drug accumulation** beyond patient and slice identity. Not a small effect — zero, after the correct null.
+1. On the *only* open dataset that pairs a measured spatial drug field with molecular state on the same rows, **this simulator's transport layer explains essentially none of the measured per-ROI drug accumulation** beyond patient and slice identity: exactly zero under `transport_only`, and under `transport+shipped_loss` a nominal 6.7% that a slice-exchangeable null cannot distinguish from chance and that is, mechanically, a section-thickness effect.
 2. The reason is diagnosable and is not a bug: a 24 h bath-dosed explant is at diffusive equilibrium (Fo median 7.4), so a uniform-tissue diffusion model *must* predict a flat field. Everything the measurement sees is heterogeneity the model has no term for.
 3. The pH-partitioning / lysosomal-trapping mechanism, implemented here in the analysis layer as an exact linear-equilibrium retardation, **recovers the weak-base/non-base split from chemical structure alone** — but with a spatially uniform lysosomal volume fraction it cannot generate spatial structure at equilibrium at any parameter value. The missing ingredient is a *spatial field* of acidic-compartment content, for which **no measurement and no PBPK parameterisation exists in tumour tissue**.
 4. The dataset's response axis is real and we reproduce it: measured drug level predicts the apoptotic transcriptional signature within slices, concordant with the authors' GSEA. Our predicted exposure does not.

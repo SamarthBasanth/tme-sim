@@ -1737,8 +1737,8 @@ def make_figure(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
            "d  Why: the explant equilibrates long before 24 h")
     ax.text(0.03, 0.35,
             f"Fourier number Fo = D t / L$^2$ at 24 h:\n"
-            f"  median {a2['fourier']['median_with_seq']:.0f}, "
-            f"min {a2['fourier']['min_with_seq']:.0f} (with trapping)\n"
+            f"  median {a2['fourier']['median_with_seq']:.1f}, "
+            f"min {a2['fourier']['min_with_seq']:.2f} (with trapping)\n"
             f"Fo >> 1 on {a2['fourier']['n_slices'] - a2['fourier']['n_slices_Fo_lt_1_with_seq']}"
             f"/{a2['fourier']['n_slices']} sections -> diffusive equilibrium,\n"
             f"so a uniform-tissue model must predict a FLAT field.",
@@ -2055,7 +2055,7 @@ def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
     w("")
     mp = C[cond].get("mixedlm_permutation", {})
     sl = C[cond]["slice_level"]
-    w("### 3.3 And why that p-value does not survive")
+    w("### 3.3 What that p-value looks like under the correct null")
     w("")
     w("The parametric LRT above treats 112 ROIs as if they carried 112 units of "
       "information. They do not: **our predictor is constant within a slice**, so "
@@ -2135,8 +2135,11 @@ def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
       "`transport_only`, by construction.* Rounded honestly: **between zero and a "
       "few percent, not separable from chance with 11 exchangeable slices, and what "
       "little there is is a section-thickness effect rather than a transport "
-      "prediction.** This model does not predict per-ROI drug accumulation in "
-      "bath-dosed explants. It is not close, and §3.1 explains why it cannot be.")
+      "prediction.** A trivial one-number geometric covariate — the section's mean "
+      "distance to its own edge — reaches "
+      f"{_f(b.get('mean_depth_um', {}).get('var_explained_beyond_re'), 1, pct=True)} "
+      "in the same frame with no simulator at all. §3.1 explains why it cannot be "
+      "otherwise.")
     w("")
 
     # ---- analysis 2 -------------------------------------------------------
@@ -2461,7 +2464,10 @@ def write_report(a1: dict, a2: dict, a3: dict, meas: pd.DataFrame,
       f"under `{cond}`, permutation p = {_p(mp.get('p_perm_var_explained'))} on dR2 "
       f"and {_p(mp.get('p_perm_t'))} on abs(t) against a slice-exchangeable null, "
       f"unweighted slice-level Spearman {_f(sl['spearman_rho'], 2)}, and the "
-      "predictor is a section-thickness proxy. Not separable from chance. |")
+      "predictor is a section-thickness proxy that a bare geometric covariate "
+      f"matches "
+      f"({_f(b.get('mean_depth_um', {}).get('var_explained_beyond_re'), 1, pct=True)}) "
+      "with no simulator. Not separable from chance. |")
     w(f"| 2 | compound-specificity falsification | **PARTIAL / effectively "
       f"negative.** Ordering right ({seqp['weak_base_over_olaparib_cv']:,.0f}x weak "
       f"base : olaparib, recovered from SMILES), magnitude "

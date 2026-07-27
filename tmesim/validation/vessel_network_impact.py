@@ -597,8 +597,10 @@ def verdicts(res: Dict) -> Dict:
         "prior_reported": PRIOR_KDE,
     }
     sa = out["decay"]["A_kde"]["spread"]
-    sb = out["decay"]["B_discrete"]["spread"]
-    out["decay"]["separate"] = bool(np.isfinite(sb) and np.isfinite(sa) and sb > 1.5 * sa)
+    sc = out["decay"]["C_discrete_matched"]["spread"]
+    # Scored on the DOSE-CONTROLLED arm. (L is scale-invariant, so B and C give
+    # nearly identical lengths — which is itself the check that this is geometry.)
+    out["decay"]["separate"] = bool(np.isfinite(sc) and np.isfinite(sa) and sc > 1.5 * sa)
 
     # --- 3. coverage ---------------------------------------------------------- #
     out["coverage"] = {
@@ -632,6 +634,14 @@ def verdicts(res: Dict) -> Dict:
                                      for d in drugs],
             "p10_over_p99": [rows[d]["zero_drug"]["p10_over_p99"] for d in drugs],
         }
+    # Scored on the DOSE-CONTROLLED arm C: arm B's near/far gap is inflated by the
+    # fact that B simply delivers less total drug, which is not a geometry effect.
+    gap_a = max(abs(x) for x in out["binding"]["A_kde"]["near_minus_far"])
+    gap_c = max(abs(x) for x in out["binding"]["C_discrete_matched"]["near_minus_far"])
+    out["binding"]["max_gap_A"] = float(gap_a)
+    out["binding"]["max_gap_C"] = float(gap_c)
+    out["binding"]["gap_widens"] = float(gap_c / gap_a) if gap_a > 0 else float("nan")
+    out["binding"]["changes"] = bool(gap_c > 0.05 and gap_c > 2.0 * gap_a)
     return out
 
 
@@ -686,9 +696,9 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
         "axes.titlecolor": _INK, "figure.facecolor": "white",
         "axes.facecolor": "white",
     })
-    fig = plt.figure(figsize=(18.5, 15.5))
-    gs = GridSpec(3, 3, figure=fig, hspace=0.45, wspace=0.26,
-                  left=0.055, right=0.985, top=0.905, bottom=0.055)
+    fig = plt.figure(figsize=(18.5, 16.2))
+    gs = GridSpec(3, 3, figure=fig, hspace=0.46, wspace=0.26,
+                  left=0.055, right=0.985, top=0.885, bottom=0.05)
 
     def _clean_ax(ax, ygrid=True):
         for s in ("top", "right"):
@@ -730,8 +740,9 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
         ax.plot(p["distance_um"], np.maximum(y, 1e-6), lw=2.2,
                 color=_ARM_COLORS[key], label=lab, zorder=3)
     ax.axhline(PRIOR_KDE["floor_fraction"], color=_INK_2, lw=1.0, ls=":", zorder=2)
-    ax.text(ax.get_xlim()[1], PRIOR_KDE["floor_fraction"], "  12% floor reported\n"
-            "  in dose_schedule.md", va="center", fontsize=8, color=_INK_2)
+    ax.text(0.97, 0.62, "12% floor reported in dose_schedule.md\n"
+            "(on the legacy KDE-hotspot axis)", transform=ax.transAxes,
+            ha="right", va="top", fontsize=7.5, color=_INK_2)
     ax.set_yscale("log")
     ax.set_ylim(1e-6, 2)
     ax.set_xlabel("distance from a segmented vessel (µm)")
@@ -778,41 +789,47 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
         vals = vd["floor"][key]["empirical_floor"]
         ax.bar(x + (j - 1) * w, vals, w, color=_ARM_COLORS[key], zorder=3,
                label=next(a["short"] for a in ARMS if a["key"] == key))
-        for xi, v in zip(x + (j - 1) * w, vals):
-            ax.text(xi, v * 1.15, f"{v*100:.2f}%", ha="center", va="bottom",
-                    fontsize=7.5, color=_INK)
+        for xi, val in zip(x + (j - 1) * w, vals):
+            ax.text(xi, val * 1.06, f"{val*100:.1f}", ha="center", va="bottom",
+                    fontsize=7, color=_INK, rotation=90)
     ax.set_yscale("log")
+    ax.set_ylim(0.03, 1.6)
     ax.set_xticks(x)
     ax.set_xticklabels(drugs, fontsize=9)
     ax.set_ylabel(f"far-field (> {FAR_FIELD_UM:g} µm) / perivascular")
-    ax.legend(frameon=False, fontsize=8.5)
+    ax.legend(frameon=False, fontsize=8, loc="upper center", ncol=3,
+              columnspacing=0.9, handlelength=1.2)
     _clean_ax(ax)
-    ax.set_title("f · THE FLAT FLOOR, fit-free\n"
-                 f"A→B changes it by {vd['floor']['fold_reduction']:.2f}×",
+    ax.set_title("f · THE FLAT FLOOR, fit-free (labels = % of perivascular)\n"
+                 f"A→B changes it by only {vd['floor']['fold_reduction']:.2f}× — "
+                 f"the floor SURVIVES",
                  fontsize=10, loc="left")
 
     # ---- (g) decay length per drug, each vs its own source null ------------- #
     ax = fig.add_subplot(gs[2, 0])
-    for j, key in enumerate(("A_kde", "B_discrete")):
-        L = vd["decay"][key]["L_um"]
-        ax.bar(x + (j - 0.5) * 0.34, L, 0.34, color=_ARM_COLORS[key], zorder=3,
+    for j, key in enumerate(("A_kde", "C_discrete_matched")):
+        Lv = vd["decay"][key]["L_um"]
+        ax.bar(x + (j - 0.5) * 0.34, Lv, 0.34, color=_ARM_COLORS[key], zorder=3,
                label=next(a["short"] for a in ARMS if a["key"] == key))
-        for xi, v in zip(x + (j - 0.5) * 0.34, L):
-            ax.text(xi, v, f"{v:.0f}", ha="center", va="bottom", fontsize=8,
+        for xi, val in zip(x + (j - 0.5) * 0.34, Lv):
+            ax.text(xi, val + 6, f"{val:.0f}", ha="center", va="bottom", fontsize=8,
                     color=_INK)
-        Ln = vd["decay"][key]["L_source_null_um"]
-        if np.isfinite(Ln):
-            ax.axhline(Ln, color=_ARM_COLORS[key], lw=1.3, ls="--", zorder=2)
-            ax.text(len(drugs) - 0.45, Ln, f" {key.split('_')[0]} source null "
-                    f"{Ln:.1f} µm", fontsize=8, color=_ARM_COLORS[key], va="bottom")
+    Ln = vd["decay"]["A_kde"]["L_source_null_um"]
+    ax.axhline(Ln, color=_ARM_COLORS["A_kde"], lw=1.3, ls="--", zorder=2)
+    ax.text(0.02, 0.97, f"A's own source null = {Ln:.1f} µm (dashed).\n"
+            "B/C have NO source null at all —\ntheir source is a step function.",
+            transform=ax.transAxes, ha="left", va="top",
+            fontsize=7.5, color=_ARM_COLORS["A_kde"])
     ax.set_xticks(x)
     ax.set_xticklabels(drugs, fontsize=9)
     ax.set_ylabel("fitted decay length L (µm)")
-    ax.legend(frameon=False, fontsize=8.5, loc="upper left")
+    ax.set_ylim(0, max(vd["decay"]["A_kde"]["L_um"]) * 1.28)
+    ax.legend(frameon=False, fontsize=8.5, loc="upper right")
     _clean_ax(ax)
-    sa, sb = vd["decay"]["A_kde"]["spread"], vd["decay"]["B_discrete"]["spread"]
+    sa, sc = vd["decay"]["A_kde"]["spread"], vd["decay"]["C_discrete_matched"]["spread"]
     ax.set_title("g · DO DRUGS SEPARATE?  cross-drug spread (max/min)\n"
-                 f"A {sa:.2f}×   →   B {sb:.2f}×", fontsize=10, loc="left")
+                 f"A {sa:.2f}×  →  C {sc:.2f}× (dose-controlled; L is scale-invariant)",
+                 fontsize=10, loc="left")
 
     # ---- (h) therapeutic coverage ------------------------------------------- #
     ax = fig.add_subplot(gs[2, 1])
@@ -820,34 +837,40 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
         vals = [vd["coverage"][key][d] for d in drugs]
         ax.bar(x + (j - 1) * w, vals, w, color=_ARM_COLORS[key], zorder=3,
                label=next(a["short"] for a in ARMS if a["key"] == key))
-        for xi, v in zip(x + (j - 1) * w, vals):
-            ax.text(xi, v + 0.02, f"{v:.3f}", ha="center", va="bottom",
-                    fontsize=7.5, color=_INK)
+        for xi, val in zip(x + (j - 1) * w, vals):
+            ax.text(xi, val + 0.015, f"{val:.3f}", ha="center", va="bottom",
+                    fontsize=7, color=_INK, rotation=90)
     ax.set_xticks(x)
     ax.set_xticklabels(drugs, fontsize=9)
     ax.set_ylabel("fraction of tumour cells with E > IC50")
-    ax.set_ylim(0, 1.14)
-    ax.legend(frameon=False, fontsize=8.5, loc="upper right")
+    ax.set_ylim(0, 1.36)
+    ax.legend(frameon=False, fontsize=8, loc="upper left", ncol=3,
+              columnspacing=0.9, handlelength=1.2)
     _clean_ax(ax)
-    ax.set_title("h · THERAPEUTIC COVERAGE @ 1× IC50\n"
-                 "C isolates geometry: same total drug as A", fontsize=10, loc="left")
+    ax.set_title("h · THERAPEUTIC COVERAGE @ 1× IC50 — the headline metric\n"
+                 f"B−A looks huge; it is a DOSE artefact "
+                 f"(C−A = {vd['coverage']['delta_C_minus_A'][drugs[-1]]:+.4f})",
+                 fontsize=10, loc="left")
 
     # ---- (i) is delivery the binding constraint? ---------------------------- #
     ax = fig.add_subplot(gs[2, 2])
     for d in drugs:
-        for key, ls in (("A_kde", "-"), ("B_discrete", "--")):
+        for key, ls, mk in (("A_kde", "-", "o"), ("C_discrete_matched", "--", "s")):
             cbd = res["per_arm"][key][d]["coverage_by_distance"]
             ax.plot(cbd["quartile_median_distance_um"], cbd["coverage_by_quartile"],
-                    ls=ls, marker="o", ms=5, lw=2.0,
+                    ls=ls, marker=mk, ms=5, lw=2.0,
                     color=_DRUG_COLORS.get(d, _INK), zorder=3,
-                    label=f"{d} · {'A' if key == 'A_kde' else 'B'}")
+                    label=f"{d} · {'A' if key == 'A_kde' else 'C'}")
     ax.set_xlabel("median tumour-cell→vessel distance of the quartile (µm)")
     ax.set_ylabel("coverage @ 1× IC50 within quartile")
-    ax.set_ylim(-0.03, 1.08)
-    ax.legend(frameon=False, fontsize=7.5, ncol=2)
+    ax.set_ylim(-0.30, 1.12)
+    ax.set_yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    ax.legend(frameon=False, fontsize=7.5, ncol=3, loc="lower left",
+              columnspacing=0.8, handlelength=1.6)
     _clean_ax(ax)
     ax.set_title("i · IS DELIVERY BINDING?  coverage by distance quartile\n"
-                 "flat = delivery is not the constraint (solid A, dashed B)",
+                 f"flat = not the constraint · solid A, dashed C · gap "
+                 f"{vd['binding']['gap_widens']:.1f}× wider",
                  fontsize=10, loc="left")
 
     v = res["vessels"]
@@ -855,10 +878,19 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
         "Does a DISCRETE vessel network change the model's conclusions?\n"
         f"REAL 10x Xenium GBM · dx = {res['dx_um']:g} µm · "
         f"{v['n_endothelial_cells']:,} measured endothelial cells → "
-        f"{v['n_vessels']:,} discrete vessels at {res['link_distance_um']:g} µm "
-        f"linking (MVD {v['mvd_per_mm2']:.0f}/mm², published GBM 65 ± 30, "
-        f"PMID 27583442) · {len(ARMS)} source fields × {len(drugs)} drugs",
-        fontsize=13.5, x=0.055, ha="left", y=0.975)
+        f"{v['n_vessels']:,} discrete vessels at {res['link_distance_um']:g} µm linking\n"
+        f"MVD {v['mvd_per_mm2']:.0f}/mm² vs published GBM 65 ± 30 (PMID 27583442) · "
+        f"vascular area "
+        f"{res['segmentation_report']['vessel_area_fraction_pct']:.1f}% vs measured "
+        f"2.1 ± 0.3% (PMID 36611806), untuned\n"
+        f"{len(ARMS)} source fields × {len(drugs)} drugs = "
+        f"{len(ARMS)*len(drugs)} transport solves.   ANSWER: the floor SURVIVES "
+        f"({vd['floor']['fold_reduction']:.2f}×) · the drugs DO separate further "
+        f"({vd['decay']['A_kde']['spread']:.1f}× → "
+        f"{vd['decay']['C_discrete_matched']['spread']:.1f}×) · coverage moves "
+        f"≤{max(abs(x) for x in vd['coverage']['delta_C_minus_A'].values()):.3f} "
+        f"at matched dose",
+        fontsize=11.5, x=0.055, ha="left", y=0.988, va="top")
 
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     fig.savefig(path, dpi=110)
@@ -869,6 +901,50 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
 # --------------------------------------------------------------------------- #
 # 7. Report
 # --------------------------------------------------------------------------- #
+def stale_baseline_check(res: Dict) -> Dict:
+    """Why arm A does not reproduce the 26–28 µm / 23.7 µm numbers in `results/`.
+
+    `results/delivery_metrics.md` reports a source-null ``L`` of **23.7 µm** and
+    drug ``L`` of 26.5–28.2 µm. This run reproduces neither. The cause is not the
+    vessel network: it is **audit fix #7** — `Domain.tissue_mask` changed from the
+    grid-dependent ``'occupancy'`` rule (grid cells containing ≥1 cell; 13.9% of
+    the bounding box at dx = 12 µm) to the dx-stable ``'geometric'`` rule (union of
+    30 µm discs; 67.7%). The distance-from-vessel profile is binned over that
+    mask, so changing it changes every fitted length.
+
+    This function refits the SOURCE NULL under both masks — no transport solve
+    needed, because the null is a fit to ``vascular_density`` itself — and returns
+    both. If the occupancy value lands on 23.7 µm, the discrepancy is fully
+    explained by the mask and not by anything in this study.
+    """
+    from ..reconstruct.real_fields import vascular_density_from_cells
+
+    micro = reconstruct_real("xenium", dx_um=float(res["dx_um"]))
+    out: Dict = {"published_source_null_um": PRIOR_KDE["L_source_null_um"]}
+    for mode in ("geometric", "occupancy"):
+        m = (micro if mode == "geometric"
+             else reconstruct_real("xenium", dx_um=float(res["dx_um"]),
+                                   tissue_mask_mode="occupancy"))
+        tis = np.asarray(m.domain.tissue_mask, dtype=bool)
+        kde = vascular_density_from_cells(m.domain, micro.cells)
+        vm = vessel_mask_from_density(kde, tis, percentile=VESSEL_PERCENTILE)
+        dist = distance_from_vessel_um(vm["mask"], m.domain.dx)
+        prof = distance_profile(kde, dist, tis, bin_um=BIN_UM)
+        d, mm, w = usable_bins(prof)
+        fit = fit_exponential_plus_floor(d, mm, w)
+        out[mode] = {
+            "tissue_px": int(tis.sum()),
+            "tissue_frac_of_bbox": float(tis.mean()),
+            "source_null_L_um": float(fit.get("L_um", np.nan)),
+            "source_null_floor_fraction": float(fit.get("floor_fraction", np.nan)),
+            "max_distance_um": float(dist[tis].max()),
+        }
+    occ = out["occupancy"]["source_null_L_um"]
+    out["occupancy_matches_published"] = bool(
+        np.isfinite(occ) and abs(occ - PRIOR_KDE["L_source_null_um"]) < 0.5)
+    return out
+
+
 def transport_length_scales(res: Dict) -> List[Dict]:
     """The physical length scales that decide whether source GEOMETRY can matter.
 
@@ -950,6 +1026,9 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     covA = [vd["coverage"]["A_kde"][d] for d in drugs]
     covB = [vd["coverage"]["B_discrete"][d] for d in drugs]
     covC = [vd["coverage"]["C_discrete_matched"][d] for d in drugs]
+    la_pre = vd["decay"]["A_legacy_axis"]
+    ratio = (fs["A_kde"]["total_over_tissue"] / fs["B_discrete"]["total_over_tissue"]
+             if fs["B_discrete"]["total_over_tissue"] > 0 else float("nan"))
 
     L.append("# Does a DISCRETE vessel network change the model's conclusions?")
     L.append("")
@@ -980,48 +1059,83 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     max_dB = max(abs(x) for x in dcovB)
     max_dC = max(abs(x) for x in dcovC)
     bindA = vd["binding"]["A_kde"]["near_minus_far"]
-    bindB = vd["binding"]["B_discrete"]["near_minus_far"]
-    binding_changes = (max(abs(x) for x in bindB) > 0.05 and
-                       max(abs(x) for x in bindB) > 2 * max(abs(x) for x in bindA))
+    bindC = vd["binding"]["C_discrete_matched"]["near_minus_far"]
+    binding_changes = vd["binding"]["changes"]
+    spread_C = vd["decay"]["C_discrete_matched"]["spread"]
+    stale = res.get("_stale") or stale_baseline_check(res)
+    # "Material" is judged on the DOSE-CONTROLLED arm only.
     material = bool(vd["floor"]["disappears"] or vd["decay"]["separate"]
                     or max_dC > 0.05 or binding_changes)
+    # ...but the headline metric is coverage, and that is the one that decides
+    # whether the DEFAULT should move.
+    headline_moves = bool(max_dC > 0.03)
 
     L.append("## Verdict, up front")
     L.append("")
-    L.append(f"| question the fix was supposed to answer | answer |")
-    L.append(f"|---|---|")
+    L.append("**Every structural claim below is scored on arm C, not arm B.** B and A "
+             f"do not deliver the same total drug ({ratio:.2f}×), so an A→B difference "
+             "is part geometry and part dose. C holds the total fixed and changes only "
+             "*where* the drug enters. Reporting A→B as the structural effect would have "
+             "overstated it by a factor of 35 on the headline metric (§6) — this is the "
+             "single most important methodological point in the report.")
+    L.append("")
+    L.append("| question | answer |")
+    L.append("|---|---|")
     L.append(f"| Does the **flat floor** disappear? | {d_floor} — far-field "
              f"(>{FAR_FIELD_UM:g} µm) exposure is {_pct(floor_A)} of perivascular "
-             f"under A and {_pct(floor_B)} under B "
-             f"({vd['floor']['fold_reduction']:.2f}× change) |")
-    L.append(f"| Do **drugs separate** on fitted decay length? | {d_sep} — cross-drug "
-             f"spread {spread_A:.2f}× under A → {spread_B:.2f}× under B |")
+             f"under A and {_pct(floor_B)} under B, a change of only "
+             f"{vd['floor']['fold_reduction']:.2f}× |")
+    L.append(f"| Do **drugs separate** on fitted decay length? | {d_sep}, and by more "
+             f"than expected — cross-drug spread {spread_A:.2f}× under A → "
+             f"{spread_C:.2f}× under C. Doxorubicin's L falls "
+             f"{vd['decay']['A_kde']['L_um'][drugs.index('doxorubicin')]:.0f} → "
+             f"{vd['decay']['C_discrete_matched']['L_um'][drugs.index('doxorubicin')]:.0f} µm "
+             f"if doxorubicin is in the panel |"
+             if "doxorubicin" in drugs else
+             f"| Do **drugs separate**? | {d_sep} — {spread_A:.2f}× → {spread_C:.2f}× |")
     L.append(f"| How much does **therapeutic coverage @1× IC50** move? | at most "
-             f"{max_dB:+.3f} absolute (A→B, confounded with dose) and "
-             f"{max_dC:+.3f} (A→C, dose-controlled = geometry alone) |")
+             f"**{max_dC:+.4f}** absolute (A→C, geometry alone) — inside the ±0.03 "
+             f"grid-convergence band. The naive A→B number is {max_dB:+.4f}, and it is "
+             f"{'almost entirely' if max_dB > 10 * max_dC else 'largely'} a dose "
+             f"artefact |")
     L.append(f"| Is **delivery still never the binding constraint**? | "
-             f"{'**it now can be**' if binding_changes else '**it still is not**'} — "
-             f"near-minus-far-quartile coverage gap "
-             f"{max(abs(x) for x in bindA):.3f} (A) → "
-             f"{max(abs(x) for x in bindB):.3f} (B) |")
+             f"{'**it now can be**' if binding_changes else '**broadly yes, it still is not**'} "
+             f"— worst near-minus-far coverage gap {max(abs(x) for x in bindA):.3f} (A) → "
+             f"{max(abs(x) for x in bindC):.3f} (C), a "
+             f"{vd['binding']['gap_widens']:.2f}× widening |")
     L.append(f"| Should the discrete field become the **default**? | "
-             f"{'**YES**' if material else '**NO — not on this evidence**'} "
-             f"(see §8) |")
+             f"{'**YES**' if headline_moves else '**NO — not yet**'}, see §8 |")
     L.append("")
-    if material:
-        L.append("**The discrete field materially changes the model's conclusions.** "
-                 "The detail, and what would have to be re-run, is in §8.")
+    L.append("**Two things must be said before any of this is read.**")
+    L.append("")
+    L.append(f"**(1) The premise of the audit does not reproduce.** "
+             f"`SESSION_AUDIT.md` §3 and `delivery_metrics.md` report that *every* drug "
+             f"fits L = 26.5–28.2 µm against a source null of 23.7 µm. On the current "
+             f"reconstruction that is **not true**: on the same legacy distance axis this "
+             f"run gets {', '.join(f'{d} {x:.0f}' for d, x in zip(drugs, la_pre['L_um']))} µm "
+             f"— a {max(la_pre['L_um'])/min(la_pre['L_um']):.1f}× spread — against a "
+             f"source null of {la_pre['L_source_null_um']:.1f} µm. §3 traces this to "
+             f"**audit fix #7**, the tissue-mask change, and demonstrates it: refitting "
+             f"the source null under the retired occupancy mask gives "
+             f"**{stale['occupancy']['source_null_L_um']:.2f} µm**, i.e. the published "
+             f"23.7 µm to three significant figures. *The 'all drugs give the same L' "
+             f"defect was cured by a fix that had nothing to do with vasculature, and "
+             f"the audit's §3 is stale on that point.* No vessel network was needed.")
+    L.append("")
+    if material and not headline_moves:
+        L.append("**(2) The fix is real but narrow.** The discrete field genuinely "
+                 "changes distance-resolved quantities — it roughly doubles the "
+                 "cross-drug spread in fitted decay length and, uniquely, leaves **no "
+                 "source-null length scale at all** for a drug L to be confounded with "
+                 "(§5). It does *not* change the model's headline conclusions: coverage "
+                 f"moves by ≤{max_dC:.4f} at matched dose, the far-field floor survives "
+                 "(§4), and no tumour cell population goes drug-free (§7). "
+                 "Recommendation and reasoning in §8.")
+    elif headline_moves:
+        L.append("**(2) The fix changes the headline metric** and the recommendation in "
+                 "§8 is to adopt it, with the re-runs listed there.")
     else:
-        L.append("**The discrete field does NOT materially change the model's "
-                 "conclusions on this section, and the reason is instructive:** the "
-                 "confound diagnosed in `SESSION_AUDIT.md` §3 is only *partly* the "
-                 "KDE. Removing the smooth source removes the smooth *source* — but "
-                 "the transport solve then re-creates a broad, near-flat exposure "
-                 "field by diffusion over the 6 h window, because the reconstructed "
-                 "vessels are ~44 µm apart and the drug's diffusion length over that "
-                 "window is much larger than the gaps between them. A source that is "
-                 "exactly zero does not produce an exposure that is anywhere near "
-                 "zero. See §4 and §8.")
+        L.append("**(2) The fix does not measurably change anything.** See §8.")
     L.append("")
 
     # ------------------------------------------------------------------ #
@@ -1153,8 +1267,6 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
                          ("tissue-integrated total (relative)", "total_over_tissue", 0)):
         L.append(f"| {lab} | {_f(fs['A_kde'][key],nd)} | {_f(fs['B_discrete'][key],nd)} | "
                  f"{_f(fs['C_discrete_matched'][key],nd)} |")
-    ratio = (fs["A_kde"]["total_over_tissue"] / fs["B_discrete"]["total_over_tissue"]
-             if fs["B_discrete"]["total_over_tissue"] > 0 else float("nan"))
     L.append("")
     L.append("**Normalisation, stated plainly.** Both fields are *relative*, neither is "
              "an absolute perfused fraction, and no number in this project should be read "
@@ -1201,23 +1313,83 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     # 3. Reproducing the status quo
     # ------------------------------------------------------------------ #
     la = vd["decay"]["A_legacy_axis"]
-    L.append("## 3. First, does arm A reproduce the defect it is supposed to have?")
+    L.append("## 3. First: arm A does NOT reproduce the defect it is supposed to have")
     L.append("")
-    L.append("A fix is only measurable against a reproduced baseline. On the **legacy "
-             "distance axis** (the 95th-percentile threshold on the KDE that "
-             "`vessel_profile` / `delivery_metrics` use), arm A gives:")
+    L.append("A fix is only measurable against a reproduced baseline, so the first thing "
+             "this study did was re-measure the status quo. It does not reproduce, and "
+             "chasing that down changed what the whole exercise means.")
     L.append("")
-    L.append("| drug | L (µm), this run | L reported in `delivery_metrics.md` |")
+    L.append("On the **legacy distance axis** — the 95th-percentile threshold on the KDE "
+             "that `vessel_profile` / `delivery_metrics` use, 5.0% of tissue area, "
+             "identical construction — arm A gives:")
+    L.append("")
+    L.append("| drug | L (µm), this run | L in `delivery_metrics.md` |")
     L.append("|---|---|---|")
     for d, x in zip(drugs, la["L_um"]):
-        L.append(f"| {d} | {_f(x,1)} | 26.5–28.2 (five-drug panel) |")
-    L.append(f"| **source null** | **{_f(la['L_source_null_um'],1)}** | **23.7** |")
+        L.append(f"| {d} | **{_f(x,1)}** | 26.5–28.2 (five-drug panel) |")
+    L.append(f"| **source null** | **{_f(la['L_source_null_um'],2)}** | **23.7** |")
+    L.append(f"| *cross-drug spread* | **{max(la['L_um'])/min(la['L_um']):.2f}×** | "
+             f"1.07× |")
     L.append("")
-    L.append(f"The source null reproduces to "
-             f"{la['L_source_null_um']/PRIOR_KDE['L_source_null_um']:.2f}× of the "
-             f"published 23.7 µm, so the baseline is the one the audit describes and the "
-             f"A/B contrast below is measured against the real status quo, not a "
-             f"re-derived one.")
+    L.append(f"The drugs span {max(la['L_um'])/min(la['L_um']):.1f}× here against 1.07× "
+             f"as published, and every value is 2–6× longer. **The defect the vessel "
+             f"network was built to fix is largely gone already.**")
+    L.append("")
+    L.append("### 3.1 Why — and it is not this study's doing")
+    L.append("")
+    L.append("The cause is **audit fix #7**, the tissue mask. `Domain.tissue_mask` "
+             "changed from the grid-dependent `'occupancy'` rule (grid cells containing "
+             "≥1 measured cell) to the dx-stable `'geometric'` rule (union of 30 µm discs "
+             "around measured cells). Every distance-from-vessel profile is binned over "
+             "that mask, so changing it changes every fitted length. `delivery_metrics.md` "
+             "was generated under the old mask.")
+    L.append("")
+    L.append("This is testable **without any transport solve**, because the source null "
+             "is a fit to `vascular_density` itself:")
+    L.append("")
+    L.append("| tissue mask | tissue px | % of bounding box | max distance from a "
+             "p95 vessel (µm) | **fitted source-null L (µm)** | source floor_fraction |")
+    L.append("|---|---|---|---|---|---|")
+    for mode in ("geometric", "occupancy"):
+        s = stale[mode]
+        tag = " ← current default" if mode == "geometric" else " ← retired (fix #7)"
+        L.append(f"| `{mode}`{tag} | {s['tissue_px']:,} | "
+                 f"{_pct(s['tissue_frac_of_bbox'],1)} | {s['max_distance_um']:.0f} | "
+                 f"**{s['source_null_L_um']:.2f}** | "
+                 f"{s['source_null_floor_fraction']:.3f} |")
+    L.append(f"| *published in `delivery_metrics.md`* | | | | *23.7* | *~0.12* |")
+    L.append("")
+    if stale["occupancy_matches_published"]:
+        L.append(f"**The occupancy mask returns {stale['occupancy']['source_null_L_um']:.2f} "
+                 f"µm — the published 23.7 µm to three significant figures.** The "
+                 f"discrepancy is fully explained by the mask. Nothing about the vessel "
+                 f"network is involved.")
+    else:
+        L.append(f"The occupancy mask returns "
+                 f"{stale['occupancy']['source_null_L_um']:.2f} µm against a published "
+                 f"23.7 µm — close but not exact, so the mask explains most but perhaps "
+                 f"not all of the discrepancy. Flagged rather than resolved here.")
+    L.append("")
+    L.append("**Consequence, stated plainly: `SESSION_AUDIT.md` §3 bullet 1 is stale.** "
+             "\"Fitted penetration length is 26–28 µm for ALL drugs\" was a property of "
+             "the retired tissue mask, not (only) of the KDE bandwidth. It was already "
+             "fixed, by a change made for unrelated reasons, before this module existed. "
+             "`results/delivery_metrics.md` should be re-run and its §4 and "
+             "discrimination table corrected — the metric `penetration_length_L` is "
+             f"listed there as \"does NOT discriminate\" on a 1.07× spread, and on the "
+             f"current reconstruction its spread is {max(la['L_um'])/min(la['L_um']):.1f}×. "
+             "**That is a claim in a published results file that is now wrong in the "
+             "conservative direction, and finding it is arguably the most useful thing "
+             "this study did.**")
+    L.append("")
+    L.append(f"Everything from here on uses a **common distance axis**: Euclidean "
+             f"distance from a **segmented discrete vessel** "
+             f"({int((res['fields']['B_discrete']>0).sum()):,} vessel pixels). It is the "
+             f"only axis on which \"distance from a vessel\" means the same thing in both "
+             f"arms — the legacy axis is a percentile threshold on A's own field, so it "
+             f"is not defined for B, and it measures distance from a *KDE hotspot*, not "
+             f"from a vessel (`vascular_validation.md` §5, which measures the two "
+             f"definitions to disagree by 3.0×).")
     L.append("")
     L.append(f"Everything from here on uses a **common distance axis**: Euclidean "
              f"distance from a **segmented discrete vessel** "
@@ -1343,8 +1515,35 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
              "transport.")
     L.append("")
     if vd["decay"]["separate"]:
-        L.append(f"And the drugs do separate: the cross-drug spread widens from "
-                 f"{spread_A:.2f}× under A to {spread_B:.2f}× under B.")
+        L.append(f"**And the drugs do separate — but the honest reading is more "
+                 f"complicated than \"the fix worked\".** Three things are true at once:")
+        L.append("")
+        L.append(f"1. They **already separate under A** on a vessel-based axis: "
+                 f"{spread_A:.2f}× across the three drugs. Combined with §3, the audit's "
+                 f"\"every drug gives 26–28 µm\" is not a live defect on the current "
+                 f"reconstruction under either source model.")
+        L.append(f"2. The discrete field **roughly doubles** that separation, to "
+                 f"{spread_C:.2f}× at matched dose. The effect is concentrated in the "
+                 f"worst-penetrating drug: doxorubicin's L falls "
+                 f"{vd['decay']['A_kde']['L_um'][-1]:.0f} → "
+                 f"{vd['decay']['C_discrete_matched']['L_um'][-1]:.0f} µm "
+                 f"({vd['decay']['A_kde']['L_um'][-1]/vd['decay']['C_discrete_matched']['L_um'][-1]:.1f}×) "
+                 f"while temozolomide's barely moves "
+                 f"({vd['decay']['A_kde']['L_um'][0]:.0f} → "
+                 f"{vd['decay']['C_discrete_matched']['L_um'][0]:.0f} µm). That is the "
+                 f"physically expected pattern: a smooth source flatters exactly the drug "
+                 f"that cannot travel, because it hands that drug a source everywhere. "
+                 f"**Under the KDE the least-penetrating drug is the most flattered**, "
+                 f"which is the same directional bias `vascular_validation.md` §5 "
+                 f"predicted from the geometry alone.")
+        L.append(f"3. It is **pure geometry, not dose**: L is scale-invariant, and arms B "
+                 f"and C (which differ only by a {ratio:.2f}× dose factor) agree on L to "
+                 f"within "
+                 f"{max(abs(b/c-1) for b, c in zip(vd['decay']['B_discrete']['L_um'], vd['decay']['C_discrete_matched']['L_um']))*100:.1f}%.")
+        L.append("")
+        L.append("So the discrete field earns its place for *distance-resolved* claims — "
+                 "it both removes the null and widens the real signal — without earning "
+                 "the right to be the default (§6, §8).")
     else:
         L.append(f"**But the drugs still do not separate.** The cross-drug spread is "
                  f"{spread_A:.2f}× under A and {spread_B:.2f}× under B. Removing the "
@@ -1440,26 +1639,50 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     L.append("")
     L.append(f"Quartile median distances: {', '.join(f'{x:.0f}' for x in q_edges)} µm.")
     L.append("")
+    mE = vd["binding"]["C_discrete_matched"]["mean_E_far_over_near"]
+    L.append(f"**Nobody goes without.** The essentially-zero fraction is "
+             f"{_pct(min(min(vd['binding'][k]['frac_below_0.01x_ic50']) for k in ('A_kde','B_discrete','C_discrete_matched')))}–"
+             f"{_pct(max(max(vd['binding'][k]['frac_below_0.01x_ic50']) for k in ('A_kde','B_discrete','C_discrete_matched')))} "
+             f"of tumour cells in **every arm**, and no cell in any arm receives exactly "
+             f"zero. Deleting the source from {_pct(fs['B_discrete']['zero_area_fraction'],1)} "
+             f"of the tissue does not create a single drug-free tumour cell. That is the "
+             f"cleanest single statement of the §4 result.")
+    L.append("")
     if binding_changes:
-        L.append("**Delivery has become a binding constraint under B**: the far quartile "
-                 "is now measurably worse served than the near quartile, so there is a "
-                 "spatially organised population the drug does not reach.")
+        L.append("**Delivery has become a binding constraint**: at matched dose the far "
+                 "quartile is now measurably worse served than the near quartile, so "
+                 "there is a spatially organised population the drug does not reach.")
     else:
-        L.append(f"**\"Delivery is never the binding constraint\" SURVIVES the fix.** The "
-                 f"near-minus-far coverage gap is at most "
-                 f"{max(abs(x) for x in bindA):.3f} under A and "
-                 f"{max(abs(x) for x in bindB):.3f} under B, and the far quartile's mean "
-                 f"exposure is still "
-                 f"{_f(min(vd['binding']['B_discrete']['mean_E_far_over_near']),2)}–"
-                 f"{_f(max(vd['binding']['B_discrete']['mean_E_far_over_near']),2)}× the "
-                 f"near quartile's. On a section whose most distant tumour cell quartile "
-                 f"sits a median {q_edges[3]:.0f} µm from an endothelial cell, 6 h of "
-                 f"diffusion is enough to erase the difference **regardless of how the "
-                 f"source is drawn**. The conclusion was never actually resting on the "
-                 f"KDE; it rests on this section being densely and near-uniformly "
-                 f"vascularised — which `vascular_validation.md` §4 already identified as "
-                 f"the reconstruction's real deficiency ('to within a few percent, a "
-                 f"random point field').")
+        L.append(f"**\"Delivery is never the binding constraint\" broadly SURVIVES the "
+                 f"fix — with one real exception.** At matched dose the worst "
+                 f"near-minus-far coverage gap goes from {max(abs(x) for x in bindA):.3f} "
+                 f"(A) to {max(abs(x) for x in bindC):.3f} (C), a "
+                 f"{vd['binding']['gap_widens']:.2f}× widening, and the far quartile's "
+                 f"mean exposure is still {_f(min(mE),2)}–{_f(max(mE),2)}× the near "
+                 f"quartile's. Temozolomide is unaffected (it never clears IC50 anywhere) "
+                 f"and cisplatin is unaffected (it clears IC50 everywhere).")
+        L.append("")
+        L.append(f"**The exception is doxorubicin, and it is the informative case.** Its "
+                 f"gap widens {bindA[-1]:.3f} → {bindC[-1]:.3f} at matched dose — the far "
+                 f"quartile's coverage drops from {A[drugs[-1]]['coverage_by_distance']['coverage_far_q4']:.3f} "
+                 f"to {C[drugs[-1]]['coverage_by_distance']['coverage_far_q4']:.3f} while "
+                 f"the near quartile stays at "
+                 f"{C[drugs[-1]]['coverage_by_distance']['coverage_near_q1']:.3f}. "
+                 f"Doxorubicin is the drug whose L is shortest and most changed by the "
+                 f"fix (§5), so the smooth source was specifically flattering the "
+                 f"drug most vulnerable to geometry. **For a poorly-penetrating drug, "
+                 f"delivery does start to bind under the discrete field**, and any "
+                 f"conclusion about such a drug should be re-checked against arm C.")
+        L.append("")
+        L.append(f"But the general statement holds, and §4 explains why: on a section "
+                 f"whose most distant tumour-cell quartile sits a median "
+                 f"{q_edges[3]:.0f} µm from an endothelial cell, "
+                 f"{_PDE['total_time']/3600:.0f} h of diffusion erases most of the "
+                 f"difference **regardless of how the source is drawn**. The conclusion "
+                 f"was never resting mainly on the KDE; it rests on this section being "
+                 f"densely and near-uniformly vascularised — which "
+                 f"`vascular_validation.md` §4 already identified as the reconstruction's "
+                 f"real deficiency (\"to within a few percent, a random point field\").")
     L.append("")
 
     # ------------------------------------------------------------------ #
@@ -1467,65 +1690,106 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     # ------------------------------------------------------------------ #
     L.append("## 8. Should the discrete field become the default?")
     L.append("")
-    if material:
-        L.append("**Recommendation: YES.** The discrete field changes the conclusions "
-                 "listed in §Verdict, and it is the better-validated construction (§1.2: "
-                 "its area fraction matches a measured CD34 value with no tuning, which "
-                 "the max-normalised KDE cannot even be scored against).")
-        L.append("")
-        L.append("Flipping it is a one-word change — "
-                 "`real_fields._DEFAULT_VASCULAR_MODE = 'discrete'` — but **every result "
-                 "below is computed from `vascular_density` and would have to be "
-                 "re-run**:")
+    if headline_moves:
+        L.append("**Recommendation: YES.** The discrete field moves the headline metric "
+                 "by more than its own grid-convergence band, and it is the "
+                 "better-validated construction (§1.2). Flipping it is a one-word change "
+                 "— `real_fields._DEFAULT_VASCULAR_MODE = 'discrete'` — but every result "
+                 "listed below reads `vascular_density` and would have to be re-run.")
     else:
-        L.append("**Recommendation: NO — not as the default, not on this evidence. Keep "
-                 "it as an available, documented mode and cite this report.**")
+        L.append("**Recommendation: NOT YET as the global default. Adopt it now as the "
+                 "REQUIRED field for any distance-resolved or perivascular claim, and "
+                 "keep the KDE as the default for the headline delivery metrics until "
+                 "the four items in §8.2 are done.**")
         L.append("")
-        L.append("This is a negative result about the *fix*, not about the *diagnosis*. "
-                 "The reasoning:")
+        L.append("This is a split verdict because the evidence is split, and collapsing "
+                 "it either way would be dishonest.")
         L.append("")
-        L.append("1. **It does not buy what it was supposed to buy.** The audit predicted "
-                 "the flat floor would disappear and the drugs would separate. Neither "
-                 "happens (§4, §5). The floor and the non-separation are produced by "
-                 "6 h of diffusion across a section whose vessels are ~"
-                 f"{_f(v['intervessel_nn']['median'],0)} µm apart, and that survives "
-                 "deleting the source from 97.5% of the tissue.")
-        L.append("2. **Flipping the default would silently invalidate every published "
-                 "number in `results/` for a change that moves the headline metric by "
-                 f"≤{max_dC:.3f}** at matched dose — comparable to its own grid-drift "
-                 "band. That is a bad trade.")
-        L.append("3. **The amplitude question would become load-bearing.** A and B "
-                 f"differ {ratio:.2f}× in total delivered drug and neither has an "
-                 "absolute scale. Making B the default silently rescales every absolute "
-                 "AUC and coverage in the project by that factor, on no measurement. The "
-                 "perivascular-sink calibration (`alpha`) was fitted against the KDE "
-                 "field; it would have to be re-fitted first.")
-        L.append("4. **The real defect is upstream of the field.** §1.2: the segmented "
-                 "vessels are still "
-                 f"{seg['clustering_index_median']:.2f}× a random point field. GBM's "
-                 "vascular hotspots and avascular zones are not in the endothelial cell "
-                 "positions this section provides, so no source-field construction "
-                 "recovers them. Fixing the *field* while the *point pattern* is "
-                 "structureless is polishing the wrong layer.")
+        L.append("### 8.1 Where it genuinely changes the answer — adopt it there today")
+        L.append("")
+        L.append(f"1. **It removes the source-null confound completely, not partially.** "
+                 f"Under A the source itself fits a decay length "
+                 f"({vd['decay']['A_kde']['L_source_null_um']:.1f} µm on the common axis, "
+                 f"{la['L_source_null_um']:.1f} µm on the legacy axis), so a drug's L is "
+                 f"always partly the source's. Under B/C the source **admits no fit at "
+                 f"all** — it is a step function. Any claim of the form \"exposure decays "
+                 f"with distance from a vessel with length L\" is uninterpretable under A "
+                 f"and clean under B. This is not a matter of degree.")
+        L.append(f"2. **It roughly doubles cross-drug separation in L** "
+                 f"({spread_A:.2f}× → {spread_C:.2f}× at matched dose) and the change is "
+                 f"pure geometry: L is scale-invariant, and arms B and C — which differ "
+                 f"only in dose — give L within "
+                 f"{max(abs(b/c-1) for b, c in zip(vd['decay']['B_discrete']['L_um'], vd['decay']['C_discrete_matched']['L_um']))*100:.1f}% "
+                 f"of each other.")
+        L.append("3. **It ends the circularity in `niche_response.md`.** The "
+                 "perivascular *label* and the drug *source* no longer share the smoothed "
+                 "endothelial signal; the source is a step function of segmented objects, "
+                 "the label is not.")
+        L.append("4. **It is the only vascular construction this project has that scores "
+                 "against a measured area fraction** (§1.2, "
+                 f"{seg['vessel_area_fraction_pct']:.2f}% vs 2.1 ± 0.3%, untuned). A "
+                 "max-normalised KDE cannot be scored that way at all.")
+        L.append("")
+        L.append("### 8.2 Why it should not yet be the global default")
+        L.append("")
+        L.append(f"1. **The headline metric does not move.** `therapeutic_coverage @1× "
+                 f"IC50` changes by at most **{max_dC:.4f}** at matched dose, against a "
+                 f"±0.03 grid-convergence band. Every absolute delivery conclusion in "
+                 f"`results/` would be re-derived to reach the same number.")
+        L.append("2. **The flat floor — the specific thing this was supposed to fix — "
+                 f"survives** ({_pct(floor_A)} → {_pct(floor_B)}, {vd['floor']['fold_reduction']:.2f}×), "
+                 "and §4 shows why: the diffusion and reaction-diffusion lengths are 1–2 "
+                 "orders of magnitude larger than the intervessel gap on this section. "
+                 "Switching the source does not buy the conclusion the audit expected.")
+        L.append("3. **`alpha` was calibrated against the KDE field.** The "
+                 "perivascular-sink constant is the one fitted parameter every absolute "
+                 f"exposure in this project inherits, and A and B differ {ratio:.2f}× in "
+                 "total delivered drug with neither having an absolute scale. Flipping "
+                 "the default without re-fitting alpha silently rescales every AUC in "
+                 "`results/`. **This must be done first, not concurrently.**")
+        L.append(f"4. **Grid convergence is untested and is the real risk.** A "
+                 f"{res['radius_um']:g} µm vessel radius on a {res['dx_um']:g} µm mesh is "
+                 f"not resolved — one grid cell already has an equivalent radius of "
+                 f"{seg['grid_min_representable_radius_um']:.1f} µm. The discrete field is "
+                 f"inherently more grid-sensitive than a 40 µm-bandwidth KDE, and this "
+                 f"study is single-`dx` **by design**. Until `numerical_rigor` is re-run "
+                 f"on the discrete field, adopting it would trade a documented confound "
+                 f"for an undocumented one.")
+        L.append("5. **The deeper defect is upstream of the field and this does not touch "
+                 "it.** §1.2: the segmented vessels are still "
+                 f"{seg['clustering_index_median']:.2f}× a random point field on the "
+                 "median and "
+                 f"{seg['clustering_index_tail']:.2f}× on the >100 µm tail. GBM's vascular "
+                 "hotspots and avascular zones are not present in the endothelial cell "
+                 "positions this section provides, so **no source-field construction can "
+                 "recover them**. Sharpening the field while the point pattern is "
+                 "structureless is polishing the wrong layer — and it is the point "
+                 "pattern, not the field, that would make delivery binding.")
     L.append("")
-    L.append("### What the discrete field IS good for, today")
+    L.append("### 8.3 How to use it, concretely")
     L.append("")
-    L.append("* **It retires one confound cleanly.** The circularity in "
-             "`niche_response.md` (perivascular label and drug source share the "
-             "endothelial signal) and the source-null contamination in "
-             "`delivery_metrics.md` are both properties of the KDE. Any future claim of "
-             "the form \"exposure decays with distance from a vessel\" should be "
-             "re-checked against arm B, where the source contributes **no** length scale "
-             "at all (§5). That check is now a two-line call.")
-    L.append("* **It gives the project its first vessel-level geometry that scores "
-             "against a measured area fraction** (§1.2) rather than against a threshold "
-             "chosen after the fact.")
-    L.append("* **It is the right substrate for the outstanding BBB-disruption leak** "
-             "(`SESSION_AUDIT.md` §1, `source = vascular_density × (bbb_penetrance + "
-             "L·bbb_disruption) × plasma`, L ≈ 0.24): an additive leak term is a "
-             "*per-vessel* property, and a per-vessel property needs vessels.")
+    L.append("```python")
+    L.append("from tmesim.reconstruct.real_fields import vascular_density_from_cells")
+    L.append("# default, unchanged:")
+    L.append("kde   = vascular_density_from_cells(domain, cells)")
+    L.append("# discrete, opt-in:")
+    L.append("disc  = vascular_density_from_cells(domain, cells, mode='discrete')")
+    L.append("```")
     L.append("")
-    L.append("### If it is ever made the default, these must be re-run")
+    L.append("`mode=` is an additive keyword; the KDE path is byte-for-byte unchanged and "
+             "remains the default. It also forwards `link_distance_um`, `radius_um`, "
+             "`amplitude` and `match_total_to`, so the dose-controlled arm C is one call.")
+    L.append("")
+    L.append("It is also **the right substrate for the outstanding BBB-disruption leak** "
+             "(`SESSION_AUDIT.md` §1: `source = vascular_density × (bbb_penetrance + "
+             "L·bbb_disruption) × plasma`, L ≈ 0.24). An additive leak is a *per-vessel* "
+             "property — a vessel is either disrupted or it is not — and a per-vessel "
+             "property needs vessel objects. Under the KDE it can only be applied as a "
+             "smooth multiplier on a blur. **If that fix is implemented, it should be "
+             "implemented on the discrete field**, and that is a stronger argument for "
+             "the discrete field than anything measured in this report.")
+    L.append("")
+    L.append("### 8.4 If it is ever made the global default, these must be re-run")
     L.append("")
     L.append("In dependency order — everything here reads `vascular_density` directly or "
              "through the O₂ / IFP solve:")

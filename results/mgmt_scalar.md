@@ -87,7 +87,51 @@ Note also that these sections are a different assay (3' spot-based Visium) from 
 
 ## 3. Impact on the REAL Xenium tumour at the converged dx = 12 um
 
-*(Not run in this pass — re-run `./.venv/bin/python -m tmesim.validation.mgmt_scalar` without `--quick`.)*
+Same tissue, same grid, same PDE, same perivascular-sink alpha, same seed. **Sensitivity is the only thing that changes.**
+
+> **Baseline note.** The five-drug baseline below is a *fresh* run of the current code, not a copy of any earlier table. Kill fractions quoted before commit `8182c7a` (temozolomide 0.4173, methotrexate 0.4526, doxorubicin 0.8839) predate that commit's three data-derived model fixes — in particular the geometric-mean BBB veto, which lowered several drugs' `bbb_penetrance` and therefore their delivery. Compare against the baseline column here, not against pre-`8182c7a` numbers.
+
+### Baseline: the five-drug panel, no MGMT
+
+| drug | kill (`uniform`) | kill (`determinant`) | determinant gene |
+|---|---:|---:|---|
+| temozolomide | 0.1151 | 0.1151 | — (none on panel) |
+| lomustine | 0.7228 | 0.4234 | MKI67 |
+| cisplatin | 0.9125 | 0.5387 | MKI67 |
+| methotrexate | 0.1205 | 0.0726 | MKI67 |
+| doxorubicin | 0.7531 | 0.4390 | TOP2A |
+
+Ranking, `uniform` (fair cross-drug): **cisplatin** (0.9125) > **doxorubicin** (0.7531) > **lomustine** (0.7228) > **methotrexate** (0.1205) > **temozolomide** (0.1151)
+
+Ranking, `determinant` (confounded — TMZ alone keeps 1.0): **cisplatin** (0.5387) > **doxorubicin** (0.4390) > **lomustine** (0.4234) > **temozolomide** (0.1151) > **methotrexate** (0.0726)
+
+### Temozolomide with an MGMT-informed sensitivity
+
+| MGMT input | scalar | predicted kill | Δ vs uniform (pp) | × vs uniform | TMZ rank in the 5-drug panel (vs `uniform` competitors / vs `determinant` competitors) |
+|---|---:|---:|---:|---:|---|
+| *none supplied (current model)* | 1.0000 | 0.1151 | 0.0 | 1.00× | 5 / 4 |
+| MGMT binary: methylated (clinically reported) | 1.0000 | 0.1151 | +0.0 | 1.00× | 5 / 4 |
+| MGMT binary: unmethylated (clinically reported) | 0.3923 | 0.0447 | -7.0 | 0.39× | 5 / 5 |
+| MGMT from Visium GBM2 (7.00 CPM) | 0.3575 | 0.0401 | -7.5 | 0.35× | 5 / 5 |
+| MGMT from Visium GBM1 (15.33 CPM) | 0.2512 | 0.0292 | -8.6 | 0.25× | 5 / 5 |
+| MGMT from Visium GBM3 (16.61 CPM) | 0.2420 | 0.0280 | -8.7 | 0.24× | 5 / 5 |
+| MGMT from Visium 10x_parent_gbm (25.52 CPM) | 0.1976 | 0.0230 | -9.2 | 0.20× | 5 / 5 |
+
+**The anchor, verified in the simulator.** A *methylated* (MGMT-silenced) patient gets scalar 1.0 and predicted kill 0.1151 — bit-identical to the no-MGMT run above. That is the design: the model's existing uniform-1.0 default is exactly the MGMT-null case, so this feature can only ever move a result in the resistant direction, and only when a measurement says so.
+
+**How much does predicted kill move?** Across the MGMT range our own four Visium sections actually span, TMZ's predicted kill goes from **0.1151** (uniform, the current model) to **0.0230–0.0401** — a drop of 7.5–9.2 percentage points, i.e. 2.9×–5.0× less kill. The MGMT term is not a rounding correction; it is the dominant uncertainty in TMZ's absolute number on this tissue.
+
+### Does it correct TMZ's artificially high rank?
+
+The concern was specific. In `mode='determinant'` every drug whose determinant IS on the panel is scaled down by its marker, while TMZ — whose determinant is MGMT and therefore unmeasurable there — keeps 1.0. If that asymmetry is doing work, TMZ should climb when the mode is switched on, for a purely technical reason.
+
+**It is, and this run measures it.** With no MGMT supplied, TMZ ranks **#5** under `uniform` (kill 0.1151) but climbs to **#4** under `determinant` — overtaking **methotrexate** (0.0726) without its own kill changing by a single digit (0.1151 vs 0.1151). The promotion is bought entirely by its competitors being scaled down and TMZ not being.
+
+**With a measured MGMT value from any of our four real sections, TMZ falls back to #5.** The artificial promotion is CORRECTED: the drug loses the rank it only held because nobody had measured its resistance gene, and it loses it to a *measurement*, not to a modelling choice.
+
+And the control behaves correctly: a *methylated* (MGMT-silenced) patient keeps rank **#4**, because for that patient the uniform-1.0 assumption happens to be true. The correction is driven by the measurement, not by the mere act of supplying one.
+
+Against the `uniform` panel TMZ stays at **#5**: it was already last there before any MGMT term, because its delivery x potency is the weakest of the five — though only barely (TMZ 0.1151 vs methotrexate 0.1205, a 0.5 pp gap). An MGMT-informed value opens that gap to 7–9 pp, so the placement stops being a coin-flip. What MGMT changes in `uniform` mode is the **magnitude** — and it removes the UPPER BOUND label, which is the substantive point. A number that used to be flagged 'no intrinsic resistance modelled' now carries the resistance value that was used, its CI, and where it came from.
 
 ## 4. Honest caveats
 

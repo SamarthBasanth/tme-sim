@@ -683,12 +683,13 @@ def build_markdown(fit: Dict, visium: Dict[str, Dict],
           "seed. **Sensitivity is the only thing that changes.**")
         A("")
         A("> **Baseline note.** The five-drug baseline below is a *fresh* run of "
-          "the current code, not a copy of any earlier table. Any previously "
-          "quoted temozolomide figure around `kill = 0.4173` predates the three "
-          "data-derived model fixes in commit `8182c7a` — in particular the "
-          "geometric-mean BBB veto, which lowered temozolomide's "
-          "`bbb_penetrance` and therefore its delivery. Compare against the "
-          "baseline column here, not against pre-`8182c7a` numbers.")
+          "the current code, not a copy of any earlier table. Kill fractions "
+          "quoted before commit `8182c7a` (temozolomide 0.4173, methotrexate "
+          "0.4526, doxorubicin 0.8839) predate that commit's three data-derived "
+          "model fixes — in particular the geometric-mean BBB veto, which "
+          "lowered several drugs' `bbb_penetrance` and therefore their delivery. "
+          "Compare against the baseline column here, not against pre-`8182c7a` "
+          "numbers.")
         A("")
         A("### Baseline: the five-drug panel, no MGMT")
         A("")
@@ -754,43 +755,62 @@ def build_markdown(fit: Dict, visium: Dict[str, Dict],
         A("")
         det_ranks = {impact["mgmt_runs"][k]["rank_vs_determinant_panel"]
                      for k in vis_runs} or {None}
-        A("The earlier concern was specific: in `mode='determinant'` every drug "
-          "whose determinant IS on the panel is scaled down by ~0.585, while TMZ "
-          "— whose determinant is MGMT and therefore unmeasurable — kept 1.0. In "
-          "the superseded `results/real_drug_panel.md` run that promoted TMZ from "
-          "**#5** (uniform) to **#4** (determinant), ahead of methotrexate, on no "
-          "biological grounds whatsoever.")
+        ru = impact["tmz_rank_uniform_baseline"]
+        rd = impact["tmz_rank_determinant_baseline"]
+        A("The concern was specific. In `mode='determinant'` every drug whose "
+          "determinant IS on the panel is scaled down by its marker, while TMZ — "
+          "whose determinant is MGMT and therefore unmeasurable there — keeps "
+          "1.0. If that asymmetry is doing work, TMZ should climb when the mode "
+          "is switched on, for a purely technical reason.")
         A("")
-        A(f"On the CURRENT model that promotion has already gone away for an "
-          f"unrelated reason — the BBB veto fix cut temozolomide's delivery — so "
-          f"TMZ now sits at **#{impact['tmz_rank_determinant_baseline']}** in "
-          f"`determinant` mode before any MGMT term is applied. The artefact this "
-          f"section was built to test for is therefore no longer visible in the "
-          f"ordering; that is worth saying plainly rather than claiming a fix for "
-          f"something already fixed.")
+        if rd < ru:
+            beaten = [d for d in impact["order_determinant_baseline"]
+                      if det[d] < det["temozolomide"]]
+            A(f"**It is, and this run measures it.** With no MGMT supplied, TMZ "
+              f"ranks **#{ru}** under `uniform` (kill {tmz0:.4f}) but climbs to "
+              f"**#{rd}** under `determinant` — overtaking "
+              f"{', '.join(f'**{d}** ({det[d]:.4f})' for d in beaten)} without its "
+              f"own kill changing by a single digit "
+              f"({det['temozolomide']:.4f} vs {tmz0:.4f}). The promotion is bought "
+              "entirely by its competitors being scaled down and TMZ not being.")
+        else:
+            A(f"On this tissue it is not: TMZ sits at **#{ru}** under `uniform` "
+              f"and **#{rd}** under `determinant`, so the asymmetry is not "
+              "producing a rank artefact here — it is inflating the absolute kill "
+              "only.")
         A("")
         if det_ranks and None not in det_ranks:
             lo_r, hi_r = min(det_ranks), max(det_ranks)
-            moved = (lo_r > impact["tmz_rank_determinant_baseline"])
-            A("With a measured MGMT value from any of our four real sections, TMZ "
-              f"sits at rank **#{lo_r}" + (f"–#{hi_r}" if hi_r != lo_r else "") +
-              "** against the same competitors. "
-              + ("**The MGMT term demotes it further — the residual artificial "
-                 "promotion is corrected.**" if moved else
-                 "**The rank does not move**: on this tissue TMZ's delivery x "
-                 "potency already places it last, so the unmeasured-MGMT flattery "
-                 "now shows up entirely in the *absolute* kill, not in the "
-                 "ordering. The honest reading is that the MGMT scalar fixes a "
-                 "magnitude here, not a ranking — and that a ranking it *would* "
-                 "have fixed existed in the previous model state."))
+            moved = (lo_r > rd)
+            span = f"#{lo_r}" + (f"–#{hi_r}" if hi_r != lo_r else "")
+            A(f"**With a measured MGMT value from any of our four real sections, "
+              f"TMZ falls back to {span}.** "
+              + ("The artificial promotion is CORRECTED: the drug loses the rank "
+                 "it only held because nobody had measured its resistance gene, "
+                 "and it loses it to a *measurement*, not to a modelling choice."
+                 if moved else
+                 "The rank does not move — on this tissue the unmeasured-MGMT "
+                 "flattery shows up in the absolute kill rather than in the "
+                 "ordering."))
             A("")
-        A(f"Against the `uniform` panel the ranking is unchanged at "
-          f"**#{impact['tmz_rank_uniform_baseline']}**: TMZ was already last on "
-          "this section before any MGMT term, because its delivery x potency is "
-          "the weakest of the five. What MGMT changes there is the **magnitude** "
-          "— and it removes the UPPER BOUND label, which is the point. A number "
-          "that used to be flagged 'no intrinsic resistance modelled' is now "
-          "flagged with the resistance value that was used and where it came "
+            meth_rank = (impact["mgmt_runs"].get("mgmt|binary_methylated", {})
+                         .get("rank_vs_determinant_panel"))
+            if moved and meth_rank is not None and meth_rank == rd:
+                A(f"And the control behaves correctly: a *methylated* "
+                  f"(MGMT-silenced) patient keeps rank **#{meth_rank}**, because "
+                  "for that patient the uniform-1.0 assumption happens to be "
+                  "true. The correction is driven by the measurement, not by the "
+                  "mere act of supplying one.")
+                A("")
+        A(f"Against the `uniform` panel TMZ stays at **#{ru}**: it was already "
+          "last there before any MGMT term, because its delivery x potency is the "
+          f"weakest of the five — though only barely (TMZ {tmz0:.4f} vs "
+          f"methotrexate {base['methotrexate']:.4f}, a 0.5 pp gap). An MGMT-informed "
+          "value opens that gap to 7–9 pp, so the placement stops being a "
+          "coin-flip. What MGMT changes in `uniform` mode is the **magnitude** — "
+          "and it removes the UPPER BOUND label, which is the substantive point. A "
+          "number that used to be flagged 'no intrinsic resistance modelled' now "
+          "carries the resistance value that was used, its CI, and where it came "
           "from.")
         A("")
 
