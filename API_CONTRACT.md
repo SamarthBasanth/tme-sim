@@ -43,6 +43,10 @@ This is diagnostic imaging software. Reference points are HALO, Visiopharm, Paig
   "sensitivity_mode": "uniform",   // "uniform" | "determinant"
   "vascular_mode": "discrete",     // "discrete" | "kde"
   "oxygen_mode": "pde",            // "pde" | "vessel_distance" | "markers"
+  "state_mode": "oxygen",          // "oxygen" | "vessel_distance" | "markers" — cell-state route.
+                                   // Mirrors oxygen_mode. NOT yet wired into the API; see
+                                   // results/cell_state_impact.md. On the 319 panel NO route
+                                   // clears the bar, so absolute kill must not be quoted there.
   "mgmt": null,                    // optional float, log2 CPM
   "pk": { "plasma_peak": 1.0, "half_life_s": 14400, "n_doses": 1, "dose_interval_s": 86400 },
   "total_time_s": 600.0 }
