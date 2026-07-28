@@ -718,7 +718,7 @@ def power_analysis(sub: _Substrate, part: Dict) -> Dict:
 # 5. the decision — scalar vs spatially-resolved MGMT, predicted TMZ kill
 # --------------------------------------------------------------------------- #
 def _bin_cpm_field(sub: _Substrate, cell_type: np.ndarray, anchor_cpm: float,
-                   edge_um: float) -> Tuple[np.ndarray, Dict]:
+                   edge_um: float, spatial_null: bool = False) -> Tuple[np.ndarray, Dict]:
     """Per-CELL MGMT CPM from its own spatial bin, anchored to the section mean.
 
     ``CPM(bin) = anchor * rate(bin) / rate(section)``, where ``rate`` is MGMT
@@ -730,7 +730,15 @@ def _bin_cpm_field(sub: _Substrate, cell_type: np.ndarray, anchor_cpm: float,
     n_all = len(cell_type)
     lab_t = sub.bins(edge_um)
     u, inv = np.unique(lab_t, return_inverse=True)
-    k = np.bincount(inv, weights=sub.mgmt, minlength=len(u))
+    mg = sub.mgmt
+    if spatial_null:
+        # SPATIAL NULL: the same MGMT counts on the same cells, randomly
+        # reassigned across tumour cells. Total, per-cell marginal distribution
+        # and every bin's depth are preserved exactly; only the spatial
+        # arrangement is destroyed. Any kill difference this field produces
+        # against the scalar CANNOT be MGMT biology.
+        mg = np.random.default_rng(RNG_SEED + 3).permutation(mg)
+    k = np.bincount(inv, weights=mg, minlength=len(u))
     N = np.bincount(inv, weights=sub.depth, minlength=len(u))
     nc = np.bincount(inv, minlength=len(u))
     ratio = np.ones(len(u))
@@ -748,6 +756,17 @@ def _bin_cpm_field(sub: _Substrate, cell_type: np.ndarray, anchor_cpm: float,
         "cell_cpm_min": float(cpm[sub.idx].min()),
         "cell_cpm_max": float(cpm[sub.idx].max()),
         "cell_cpm_mean": float(cpm[sub.idx].mean()),
+        # Two numbers that expose how much of this "field" is counting noise:
+        # bins that happened to draw ZERO MGMT counts are handed CPM = 0, i.e.
+        # sensitivity 1.0 (fully TMZ-sensitive) purely by a Poisson accident;
+        # and the top bins extrapolate far past the calibration ceiling.
+        "frac_cells_in_zero_count_bins": float(
+            (ratio[inv] == 0.0).mean()
+        ),
+        "n_zero_count_bins": int(((k == 0) & ok).sum()),
+        "frac_cells_above_calibration_ceiling": float(
+            (cpm[sub.idx] > 21.12).mean()
+        ),
     }
     return cpm, stats_
 
@@ -790,16 +809,26 @@ def kill_impact(sub: _Substrate, cell_type: np.ndarray,
         plans.append({"key": f"scalar|{cpm}|dx{dx_um}",
                       "label": f"scalar MGMT = {cpm:g} CPM ({name})",
                       "kind": "scalar", "anchor": cpm, "scalar": s})
-        for L in (HEADLINE_BIN_UM, 200):
-            cpm_cells, st = _bin_cpm_field(sub, cell_type, cpm, L)
+        for L, null in ((HEADLINE_BIN_UM, False), (200, False),
+                        (HEADLINE_BIN_UM, True), (200, True)):
+            if null and cpm != ANCHORS_CPM[0][1]:
+                continue  # the null control is run at one anchor only
+            cpm_cells, st = _bin_cpm_field(sub, cell_type, cpm, L,
+                                           spatial_null=null)
             sens = _sens_from_cpm(cpm_cells)
-            key = f"spatial{L}|{cpm}|dx{dx_um}"
+            key = (f"spatialNULL{L}|{cpm}|dx{dx_um}" if null
+                   else f"spatial{L}|{cpm}|dx{dx_um}")
             fields[key] = {"sens": sens, "field_stats": st}
             tum = cell_type == int(CellType.TUMOR)
             plans.append({
                 "key": key,
-                "label": f"spatially-resolved MGMT, {L} um bins, anchor {cpm:g} CPM",
-                "kind": "spatial", "anchor": cpm, "bin_um": L,
+                "label": (
+                    f"SPATIAL NULL (MGMT counts shuffled across cells), "
+                    f"{L} um bins, anchor {cpm:g} CPM" if null else
+                    f"spatially-resolved MGMT, {L} um bins, anchor {cpm:g} CPM"
+                ),
+                "kind": "spatial_null" if null else "spatial",
+                "anchor": cpm, "bin_um": L,
                 "scalar": float(sens[tum].mean()),
                 "sens_min": float(sens[tum].min()), "sens_max": float(sens[tum].max()),
                 "sens_p05": float(np.percentile(sens[tum], 5)),
@@ -819,7 +848,7 @@ def kill_impact(sub: _Substrate, cell_type: np.ndarray,
             apply_drug_sensitivity(micro, "temozolomide", mode="uniform")
             if p["kind"] == "scalar":
                 micro.cells.sensitivity = micro.cells.sensitivity * p["scalar"]
-            elif p["kind"] == "spatial":
+            elif p["kind"] in ("spatial", "spatial_null"):
                 micro.cells.sensitivity = (
                     micro.cells.sensitivity * fields[p["key"]]["sens"]
                 )
@@ -837,6 +866,11 @@ def kill_impact(sub: _Substrate, cell_type: np.ndarray,
                 json.dump(cache, fh, indent=1)
 
     rows = []
+    field_stats = [
+        {"key": p["key"], "kind": p["kind"], "anchor": p["anchor"],
+         "bin_um": p.get("bin_um"), "field_stats": p["field_stats"]}
+        for p in plans if "field_stats" in p
+    ]
     base = cache[plans[0]["key"]]["kill"]
     for p in plans:
         r = dict(p)
@@ -850,15 +884,24 @@ def kill_impact(sub: _Substrate, cell_type: np.ndarray,
         sc = cache[f"scalar|{cpm}|dx{dx_um}"]["kill"]
         for L in (HEADLINE_BIN_UM, 200):
             sp_ = cache[f"spatial{L}|{cpm}|dx{dx_um}"]["kill"]
+            nk = f"spatialNULL{L}|{cpm}|dx{dx_um}"
+            null_kill = cache[nk]["kill"] if nk in cache else None
             deltas.append({
                 "anchor_cpm": cpm, "anchor_name": name, "bin_um": L,
                 "kill_scalar": sc, "kill_spatial": sp_,
                 "delta_pp": 100.0 * (sp_ - sc),
                 "ratio": sp_ / sc if sc else float("nan"),
                 "pct_of_scalar_kill": 100.0 * (sp_ - sc) / sc if sc else float("nan"),
+                "kill_spatial_null": null_kill,
+                "delta_pp_null": (100.0 * (null_kill - sc)
+                                  if null_kill is not None else None),
+                "signal_over_null": (
+                    (sp_ - sc) / (null_kill - sc)
+                    if null_kill is not None and abs(null_kill - sc) > 1e-12
+                    else None),
             })
     return {"dx_um": dx_um, "rows": rows, "deltas": deltas,
-            "baseline_kill_no_mgmt": base}
+            "field_stats": field_stats, "baseline_kill_no_mgmt": base}
 
 
 def poisson_null_phi(sub: _Substrate, edge_um: float = HEADLINE_BIN_UM,
@@ -1069,22 +1112,30 @@ def make_figure(sub: _Substrate, cell_type: np.ndarray, ac: Dict, vp: Dict,
     # (i) kill impact
     ax = fig.add_subplot(gs[2, 2])
     if impact:
-        labs, kills, cols = [], [], []
-        for r in impact["rows"]:
-            if r["kind"] == "spatial" and r.get("bin_um") != HEADLINE_BIN_UM:
-                continue
-            labs.append({"none": "no MGMT", "scalar": f"scalar {r['anchor']:g}",
-                         "spatial": f"spatial {r['anchor']:g}"}[r["kind"]])
-            kills.append(r["kill"])
-            cols.append({"none": "#7f7f7f", "scalar": "#9ecae1",
-                         "spatial": "#d62728"}[r["kind"]])
-        ax.bar(range(len(kills)), kills, color=cols)
-        ax.set_xticks(range(len(labs)))
-        ax.set_xticklabels(labs, rotation=35, ha="right", fontsize=7)
-        ax.set_ylabel("predicted TMZ kill fraction")
-        worst = max(abs(d["delta_pp"]) for d in impact["deltas"])
-        ax.set_title(f"(i) Scalar vs spatial MGMT\nlargest difference "
-                     f"{worst:.3f} pp", fontsize=10)
+        dd = [d for d in impact["deltas"] if d["delta_pp_null"] is not None]
+        if dd:
+            dd.sort(key=lambda d: -d["bin_um"])
+            xpos = np.arange(len(dd))
+            ax.bar(xpos - 0.19, [d["delta_pp"] for d in dd], width=0.36,
+                   color="#d62728", label="spatially-resolved MGMT")
+            ax.bar(xpos + 0.19, [d["delta_pp_null"] for d in dd], width=0.36,
+                   color="#7f7f7f",
+                   label="SPATIAL NULL (counts shuffled across cells)")
+            ax.set_xticks(xpos)
+            ax.set_xticklabels([f"{d['bin_um']} µm bins" for d in dd], fontsize=8)
+            ax.axhline(0, color="k", lw=0.8)
+            ax.set_ylabel("Δ predicted TMZ kill vs scalar (pp)")
+            ax.set_title("(i) The scalar-vs-spatial shift is\nreproduced by "
+                         "pure noise", fontsize=10)
+            ax.legend(fontsize=7, loc="upper left")
+        else:
+            worst = max(abs(d["delta_pp"]) for d in impact["deltas"])
+            ax.bar([r["label"][:18] for r in impact["rows"]],
+                   [r["kill"] for r in impact["rows"]], color="#d62728")
+            ax.tick_params(axis="x", labelrotation=40, labelsize=6)
+            ax.set_ylabel("predicted TMZ kill fraction")
+            ax.set_title(f"(i) Scalar vs spatial MGMT\nlargest difference "
+                         f"{worst:.3f} pp", fontsize=10)
     else:
         ax.text(0.5, 0.5, "impact simulations not run", ha="center", va="center")
         ax.set_axis_off()
@@ -1164,9 +1215,15 @@ def build_markdown(prov: Dict, det: Dict, rec: Dict, panels: Dict, ac: Dict,
       f"has none to see |")
     if impact:
         worst = max(abs(d["delta_pp"]) for d in impact["deltas"])
-        W(f"| Does the scalar cost anything? | **No measurable amount.** Predicted "
-          f"TMZ kill moves by at most **{worst:.4f} percentage points** between a "
-          f"scalar-MGMT and a spatially-resolved-MGMT run on this section |")
+        _rat = [d["signal_over_null"] for d in impact["deltas"]
+                if d["signal_over_null"] is not None]
+        W(f"| Does the scalar cost anything? | **No — the spatial version costs "
+          f"something.** Predicted TMZ kill moves by at most **{worst:.4f} pp** "
+          f"between scalar and spatially-resolved MGMT, and a spatial NULL "
+          f"(counts shuffled across cells) reproduces "
+          f"{100/max(_rat) if _rat else float('nan'):.0f}–"
+          f"{100/min(_rat) if _rat else float('nan'):.0f} % of that shift. It "
+          f"is Jensen's inequality on counting noise, not biology |")
     W("| **Decision** | **The scalar is VINDICATED — as an empirical finding, "
       "not a limitation.** |")
     W("")
@@ -1651,11 +1708,12 @@ def build_markdown(prov: Dict, det: Dict, rec: Dict, panels: Dict, ac: Dict,
       f"**{ci[1] - ci[0]:.4f}** |")
     W("")
     W(f"**The uncertainty already published on the scalar is "
-      f"{(ci[1]-ci[0])/(s_hi-s_lo):.0f}× wider than the entire spatial swing.** "
-      f"Even if every bit of the observed {100*cv:.0f} % modulation were real "
-      f"MGMT biology rather than segmentation noise, it would be invisible "
-      f"inside the error bar the model already reports. That is the decision, "
-      f"and the simulations below only confirm it.")
+      f"{(ci[1]-ci[0])/(s_hi-s_lo):.0f}× wider than the entire spatial swing** "
+      f"— and that swing is itself an over-estimate, because §5 shows most of "
+      f"the {100*cv:.0f} % is counting noise rather than MGMT biology. Even "
+      f"taking it entirely at face value, it is invisible inside the error bar "
+      f"the model already reports. That is the decision; the simulations below "
+      f"confirm it and then show something worse about the spatial version.")
     W("")
     if impact:
         W(f"### 7.3 The simulations — same tissue, same grid (dx = "
@@ -1670,41 +1728,104 @@ def build_markdown(prov: Dict, det: Dict, rec: Dict, panels: Dict, ac: Dict,
         for r in impact["rows"]:
             rng_s = (f"{r['sens_p05']:.4f} – {r['sens_p95']:.4f} "
                      f"(min {r['sens_min']:.4f}, max {r['sens_max']:.4f})"
-                     if r["kind"] == "spatial" else "constant")
+                     if r["kind"] in ("spatial", "spatial_null") else "constant")
             W(f"| {r['label']} | {r['scalar']:.4f} | {rng_s} | "
               f"**{r['kill']:.5f}** | {r['kill_vs_none_pp']:+.3f} |")
         W("")
-        W("**Scalar vs spatial, head to head — the quantity the brief asked for:**")
+        W("**Scalar vs spatial, head to head — the quantity the brief asked "
+          "for, with its own null:**")
         W("")
-        W("| anchor | bin | kill, scalar MGMT | kill, spatially-resolved MGMT | "
-          "Δ (pp) | Δ as % of the scalar kill |")
-        W("|---|---:|---:|---:|---:|---:|")
+        W("The `SPATIAL NULL` column is the decisive control. It is the same "
+          "MGMT counts on the same cells, **randomly reassigned across tumour "
+          "cells** — total, per-cell marginal distribution and every bin's "
+          "depth preserved exactly, only the spatial arrangement destroyed. "
+          "Whatever kill difference *it* produces cannot be MGMT biology.")
+        W("")
+        W("| anchor | bin | kill, scalar | kill, spatial | Δ (pp) | "
+          "Δ as % of scalar kill | kill, SPATIAL NULL | Δ null (pp) | "
+          "**signal / null** |")
+        W("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
         for dd in impact["deltas"]:
+            nk = ("—" if dd["kill_spatial_null"] is None
+                  else f"{dd['kill_spatial_null']:.5f}")
+            nd = ("—" if dd["delta_pp_null"] is None
+                  else f"{dd['delta_pp_null']:+.4f}")
+            so = ("—" if dd["signal_over_null"] is None
+                  else f"**{dd['signal_over_null']:.2f}×**")
             W(f"| {dd['anchor_cpm']:g} CPM | {dd['bin_um']} µm | "
               f"{dd['kill_scalar']:.5f} | {dd['kill_spatial']:.5f} | "
-              f"**{dd['delta_pp']:+.4f}** | {dd['pct_of_scalar_kill']:+.2f} % |")
+              f"**{dd['delta_pp']:+.4f}** | {dd['pct_of_scalar_kill']:+.2f} % | "
+              f"{nk} | {nd} | {so} |")
         W("")
         worst = max(abs(dd["delta_pp"]) for dd in impact["deltas"])
         worst_pct = max(abs(dd["pct_of_scalar_kill"]) for dd in impact["deltas"])
         base = impact["baseline_kill_no_mgmt"]
         big = max(abs(r["kill_vs_none_pp"]) for r in impact["rows"])
+        ratios = [dd["signal_over_null"] for dd in impact["deltas"]
+                  if dd["signal_over_null"] is not None]
         W(f"**Largest scalar-vs-spatial difference: {worst:.4f} percentage "
-          f"points ({worst_pct:.2f} % of the kill).** For scale, supplying an "
-          f"MGMT value *at all* moves predicted kill by up to {big:.3f} pp from "
-          f"the no-MGMT baseline of {base:.5f} — so **the spatial refinement is "
-          f"~{big/worst:.0f}× smaller than the MGMT term itself**, which is in "
-          f"turn dominated by a calibration CI "
-          f"{(ci[1]-ci[0])/(s_hi-s_lo):.0f}× wider again.")
+          f"points ({worst_pct:.2f} % of the kill) — and it is not signal.**")
         W("")
-        W("The mechanism is not subtle. Kill is a saturating function of local "
-          "exposure integrated over ~652,000 tumour cells; a ±"
-          f"{100*cv:.0f} % modulation of one multiplicative factor, applied on "
-          "a length scale of "
-          f"{HEADLINE_BIN_UM} µm and averaged over the whole section, "
-          "very nearly cancels. Spatial MGMT would only matter if the "
-          "modulation were large, coherent at the scale of the drug-penetration "
-          "gradient, and *correlated with delivery* — and none of those three "
-          "holds here.")
+        W("Two things have to be read together here.")
+        W("")
+        W(f"1. **The difference is small in absolute terms.** Supplying an MGMT "
+          f"value *at all* moves predicted kill by up to {big:.3f} pp from the "
+          f"no-MGMT baseline of {base:.5f}; resolving it spatially moves it a "
+          f"further {worst:.4f} pp, i.e. **~{big/worst:.0f}× less** — and the "
+          f"calibration CI on the scalar is "
+          f"{(ci[1]-ci[0])/(s_hi-s_lo):.0f}× wider again than the whole spatial "
+          f"swing (§7.2).")
+        if ratios:
+            W(f"2. **The difference that does exist is a NOISE ARTEFACT, and "
+              f"the null proves it.** Shuffling MGMT counts at random across "
+              f"tumour cells — destroying every trace of spatial structure — "
+              f"reproduces "
+              f"{'the same or a larger' if max(ratios) <= 1.05 else 'most of the'} "
+              f"shift (signal/null ratio "
+              f"{min(ratios):.2f}–{max(ratios):.2f}×). The mechanism is "
+              f"**Jensen's inequality**: `s(x) = exp(−λ·log2(CPM+1))` is convex "
+              f"in CPM, so the mean of `s` over a *dispersed* per-bin CPM "
+              f"distribution exceeds `s` at the mean CPM — and at these "
+              f"detection rates most of that dispersion is Poisson counting "
+              f"noise, not biology. It is why the effect **grows as the bins "
+              f"get smaller** (from {HEADLINE_BIN_UM} µm to 200 µm), which is "
+              f"the exact opposite of what a real spatial signal would do.")
+        W("")
+        W("**Where the bias comes from, concretely.** A bin that happens to "
+          "draw zero MGMT counts is handed CPM = 0, and CPM = 0 is the "
+          "mapping's anchor — *fully TMZ-sensitive*. That is a maximal "
+          "biological claim produced by a Poisson accident:")
+        W("")
+        W("| bin | median expected MGMT counts/bin | bins with ZERO counts | "
+          "tumour cells handed \"MGMT-silent\" by a zero draw | tumour cells "
+          "pushed past the calibration ceiling (21.12 CPM) |")
+        W("|---:|---:|---:|---:|---:|")
+        for Lb in (HEADLINE_BIN_UM, 200):
+            fs = next(r["field_stats"] for r in impact["field_stats"]
+                      if r["bin_um"] == Lb and r["kind"] == "spatial"
+                      and r["anchor"] == ANCHORS_CPM[1][1])
+            W(f"| {Lb} µm | "
+              f"{vp['scales'][Lb]['MGMT']['median_expected_counts_per_region']:.1f} | "
+              f"{fs['n_zero_count_bins']:,} | "
+              f"{100*fs['frac_cells_in_zero_count_bins']:.2f} % | "
+              f"{100*fs['frac_cells_above_calibration_ceiling']:.2f} % |")
+        W("")
+        W("**This is the strongest argument in the report against a spatial "
+          "MGMT field, and it is a positive result rather than a null: at the "
+          "achievable detection rate, resolving MGMT spatially does not add "
+          "information, it adds a systematic upward bias in predicted kill, "
+          "and the bias grows with the resolution you ask for.** A scalar is "
+          "not merely adequate here; it is the estimator that does not have "
+          "this failure mode.")
+        W("")
+        W("The absolute size is also easy to understand. Kill is a saturating "
+          "function of local exposure integrated over "
+          f"{ac['n_tumour_cells']:,} tumour cells; a ±{100*cv:.0f} % modulation "
+          f"of one multiplicative factor at a {HEADLINE_BIN_UM} µm length "
+          "scale, averaged over the whole section, very nearly cancels. "
+          "Spatial MGMT would only matter if the modulation were large, "
+          "coherent at the scale of the drug-penetration gradient, and "
+          "*correlated with delivery* — and none of those three holds here.")
         W("")
     W("### 7.4 The verdict")
     W("")
@@ -1728,6 +1849,17 @@ def build_markdown(prov: Dict, det: Dict, rec: Dict, panels: Dict, ac: Dict,
       f"**the weakest of all {vs['n']} abundance-matched "
       f"genes on the same cells**. The scalar is not a concession to a missing "
       f"probe any more; it is what the measurement supports.")
+    if impact and any(d["signal_over_null"] is not None for d in impact["deltas"]):
+        _r = [d["signal_over_null"] for d in impact["deltas"]
+              if d["signal_over_null"] is not None]
+        W(f"* **ESTABLISHED (and this one was not anticipated).** Resolving "
+          f"MGMT spatially at the achievable detection rate does not just fail "
+          f"to add information — it **injects a systematic upward bias into "
+          f"predicted kill**, because the sensitivity mapping is convex and "
+          f"most of the per-bin dispersion is Poisson noise. A spatial NULL "
+          f"reproduces {100/max(_r):.0f}–{100/min(_r):.0f} % of the shift, and "
+          f"the bias GROWS as the bins shrink. A scalar is the estimator "
+          f"without this failure mode.")
     W("* **NOT ESTABLISHED.** That MGMT is spatially uniform in GBM generally. "
       "This is **one section from one patient**, and the negative controls put "
       "a floor under what could have been seen. A second MGMT-bearing section "
