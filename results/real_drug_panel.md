@@ -19,6 +19,20 @@
 > two independent paths — the static-export builder and `app/server/report.py` — both landing
 > on `0.4361666386695784`, and by re-running the CLI chain by hand on the current tree.
 >
+> **Which config that number belongs to.** `0.4361666386695784` is this file's config — the
+> **static source** (`time_resolved = false`). [`results/mechanism_attribution.md`](mechanism_attribution.md)
+> reports `0.43658659499412056` for the same drug and section, and the two are **not** in
+> conflict: that file runs **time-resolved PK** (`plasma_peak = 50 µM`, `half_life = 4 h`).
+> Both were re-run directly and reproduce to the last bit of the mantissa:
+>
+> | config | cisplatin | temozolomide |
+> |---|---|---|
+> | static source | `0.4361666386695784` | `0.01835209138249627` |
+> | time-resolved PK | `0.43658659499412056` | `0.01839408701495049` |
+>
+> The gap is ~0.1% of kill (≈10 of 23,812 tumour cells). Quote a kill with its PK mode
+> attached; the bare number is ambiguous across the repo.
+>
 > This is exactly the failure mode this project's own limits describe: **the ranking is
 > invariant, the level is not.** Regeneration is pending a tree in which
 > `tmesim/reconstruct/real_pipeline.py` is not being actively edited; regenerating against a

@@ -8,7 +8,7 @@
 
 **Module:** `tmesim/validation/numerical_rigor.py` (run: `python -m tmesim.validation.numerical_rigor`)
 
-**Geometry:** the REAL 40,887-cell 10x Xenium GBM section, reconstructed by `reconstruct.real_pipeline.reconstruct_real('xenium', dx_um=…)` — real cell positions, real endothelial-KDE vascular field, real matrix-transcript ECM field, physics-solved oxygen. **Drug:** the α-calibrated **doxorubicin** (perivascular-sink model from `validation.calibration`). **Advection OFF** 
+**Geometry:** the REAL 40,887-cell 10x Xenium GBM section, reconstructed by `reconstruct.real_pipeline.reconstruct_real('xenium', dx_um=…)` — real cell positions, real DISCRETE segmented-vessel vascular field (the shipping default since `results/vessel_promotion.md`; earlier revisions of this file used the 40 µm endothelial KDE), real matrix-transcript ECM field, physics-solved oxygen. **Drug:** the α-calibrated **doxorubicin** (perivascular-sink model from `validation.calibration`). **Advection OFF** 
 
 > **Provenance of this run — two things changed since the previous revision of this file, and both move the numbers.**
 >

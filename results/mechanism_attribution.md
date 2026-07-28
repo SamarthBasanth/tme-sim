@@ -71,6 +71,19 @@ Measured on the real Xenium 319 section, `dx = 12 um`, 6 h window, `dt = 10 s`, 
 
 Identical to the last bit of the mantissa, not to a tolerance.
 
+> **These are the time-resolved-PK numbers, and that matters when comparing files.** The runs
+> in this report use `time_resolved = true` with `plasma_peak = 50 µM`, `half_life = 4 h`
+> (stated in §3 below). Other files in `results/` report the **static-source** config for the
+> same drug and section — cisplatin `0.4361666386695784`, temozolomide `0.01835209138249627`.
+> Both pairs were re-run directly from `reconstruct_real('xenium', dx_um=12)` and each
+> reproduces to the last bit, so the ~0.1% gap (≈10 of 23,812 tumour cells) is a **config
+> difference, not a reproducibility failure**.
+>
+> Worth naming, because "reconciles bit-exactly" appears throughout this report and could be
+> misread: it is a claim that the *label array* rebuilds *this run's* `kill_fraction`. It is
+> **not** a claim that two runs of different configs agree. A kill quoted without its PK mode
+> is ambiguous.
+
 ---
 
 ## 3. The finding: temozolomide vs cisplatin on the flagship section
