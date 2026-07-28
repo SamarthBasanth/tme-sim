@@ -1,1 +1,8 @@
-["r_00021", "r_00022", "r_00023"]
+{
+ "runs_dir": "/Users/samarthbasanth/tme-sim/results/export_runs",
+ "run_ids": [
+  "r_00001",
+  "r_00002",
+  "r_00003"
+ ]
+}

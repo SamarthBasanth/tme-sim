@@ -190,6 +190,74 @@ function removeDeadControls() {
   }, 250);
 }
 
+/* -------------------------------------------- mechanism: unhidden notes -- */
+
+/**
+ * The mechanism legend prints the limiter roll-up as "the largest share is
+ * DELIVERY-limited", but UNREACHED and UNDERDOSED are two bands on ONE axis
+ * (E/IC50), so that sentence can read as a spatial-delivery claim when the
+ * cause is potency. tmesim.sim.mechanism ships the disclaimer itself, in the
+ * TMSM aggregate, under `exposure_axis_note` — the legend just does not render
+ * it, and it ships `exposure_shortfall_fold` with it.
+ *
+ * On temozolomide here that matters: every tumour cell sits at E/IC50 ~ 0.06
+ * against a 606 uM IC50, so 97% of survivors land in the "unreached" band while
+ * the cell-to-cell SPREAD is only ~2.4x. The shortfall is potency, not
+ * transport. This adds no interpretation of its own — it prints the backend's
+ * own text and its own numbers, which is the whole point of an export that
+ * claims not to hide caveats.
+ */
+function surfaceMechanismNotes() {
+  const note = () => document.querySelector('.mechleg .m-note');
+  let shownFor = null;
+  let agg = null;
+
+  const paint = () => {
+    const el = note();
+    if (!el || !agg || el.querySelector('.x-axisnote')) return;
+    const p = agg.exposure_ratio_percentiles_tumor || {};
+    const fold = agg.exposure_shortfall_fold;
+    const box = h('div.x-axisnote');
+    if (Number.isFinite(fold) && Number.isFinite(p.p05) && Number.isFinite(p.p95)) {
+      box.appendChild(h('div',
+        h('b', 'exposure vs potency: '),
+        `the median tumour cell needs ${fmtx(fold)} its exposure to reach IC50 `
+        + `(${agg.drug && agg.drug.ic50_uM ? nsig(agg.drug.ic50_uM) + ' uM' : 'IC50'}). `
+        + `Cell-to-cell spread in E/IC50 is ${fmtx(p.p95 / p.p05)} `
+        + `(p05 ${nsig(p.p05)} → p95 ${nsig(p.p95)}).`));
+    }
+    if (agg.exposure_axis_note) {
+      box.appendChild(h('div', { style: null }, agg.exposure_axis_note));
+    }
+    if (box.childNodes.length) el.appendChild(box);
+  };
+
+  const fmtx = (v) => (v >= 10 ? Math.round(v) : v.toFixed(2)) + '\u00d7';
+  const nsig = (v) => (v >= 100 ? String(Math.round(v))
+    : v >= 1 ? v.toFixed(2) : v.toPrecision(2));
+
+  // The legend re-fills its note element on every render, which drops whatever
+  // we appended; put it back rather than racing it.
+  const host = document.querySelector('.mechleg');
+  if (host) {
+    new MutationObserver(paint).observe(host, { childList: true, subtree: true });
+  }
+
+  setInterval(async () => {
+    const st = window.__tmesim && window.__tmesim.store && window.__tmesim.store.get();
+    const id = st && st.activeRunId;
+    if (!id || id === shownFor) return;
+    shownFor = id;
+    agg = null;
+    try {
+      agg = (await window.__tmesim.api.getMechanism(id)).aggregate;
+    } catch {
+      return;   // this run has no attribution; main.js already says so
+    }
+    paint();
+  }, 400);
+}
+
 /* ----------------------------------------------------------- keyboard --- */
 
 function patchHelpDialog() {
@@ -223,6 +291,7 @@ function install() {
   removeDeadControls();
   removeProtocolEntryPoint();
   patchHelpDialog();
+  surfaceMechanismNotes();
   // Set from the baked value so document.title and the <title> element the
   // Artifact publisher reads can never disagree.
   if (M.document_title) document.title = M.document_title;

@@ -16,3 +16,6 @@ app/runs/
 app/projects/
 # tmesim Studio generated therapy reports (assembled from app/runs/, regenerable)
 app/reports/
+
+# Private build store for the static export (regenerate: scripts/studio_export/export_studio_runs.py)
+results/export_runs/

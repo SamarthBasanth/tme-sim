@@ -120,3 +120,15 @@
   border: 1px solid var(--line-1);
   white-space: pre;
 }
+
+/* The engine's own exposure-axis disclaimer, appended to the mechanism legend.
+   Backend text, not ours — see surfaceMechanismNotes() in static_shell.js. */
+.x-axisnote {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line-1);
+  color: var(--fg-2);
+  line-height: 1.4;
+}
+.x-axisnote > div + div { margin-top: 3px; }
+.x-axisnote b { color: var(--fg-1); }
