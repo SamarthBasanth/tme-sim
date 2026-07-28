@@ -1,5 +1,31 @@
 # Real drug panel on the real Xenium glioblastoma microenvironment
 
+> ## ⚠ STALE — the absolute numbers in this file no longer match the engine
+>
+> **Do not quote an absolute kill, AUC or coverage from this file.** The engine has moved
+> since it was generated. The *ranking* is unaffected and still reproduces exactly.
+>
+> | | this file | current engine |
+> |---|---|---|
+> | tumour cells typed | 30,174 | **23,812** |
+> | mean O₂ | 0.295 | **0.352** |
+> | cisplatin `kill_fraction` | 0.3699 | **0.4361666386695784** (~18% higher) |
+>
+> **Cause:** the endothelial classifier fix (`matched_null_z` aggregation, which removed an
+> arity bias in marker-gated phenotyping). Fewer cells are typed as tumour and the survivors
+> sit in better-perfused tissue, so mean O₂ rises and kill rises with it.
+>
+> **This is not a report-layer bug.** The current value was reproduced *bit-identically* by
+> two independent paths — the static-export builder and `app/server/report.py` — both landing
+> on `0.4361666386695784`, and by re-running the CLI chain by hand on the current tree.
+>
+> This is exactly the failure mode this project's own limits describe: **the ranking is
+> invariant, the level is not.** Regeneration is pending a tree in which
+> `tmesim/reconstruct/real_pipeline.py` is not being actively edited; regenerating against a
+> half-applied engine change would bake in a state that never existed.
+>
+> The same staleness applies to [`results/patient_report_xenium.md`](patient_report_xenium.md).
+
 > **Regenerated under the discrete vessel source.** `vascular_mode = discrete`
 > (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
 > [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the

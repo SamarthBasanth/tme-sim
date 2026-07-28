@@ -1,5 +1,18 @@
 # Virtual drug panel — one real 10x Xenium single-cell glioblastoma section
 
+> ## ⚠ STALE — the absolute numbers in this file no longer match the engine
+>
+> **Do not quote an absolute kill, AUC or coverage from this file.** The endothelial
+> classifier fix (`matched_null_z`) changed tumour typing 30,174 → **23,812** cells and mean
+> O₂ 0.295 → **0.352**, raising absolute kills by ~18% (cisplatin 0.3699 →
+> **0.4361666386695784**, reproduced bit-identically by three independent paths).
+>
+> **The attribution decades and the ranking are unaffected** — `app/server/report.py`
+> reproduces the decomposition in this file to ±0.01 with the same dominant driver per drug
+> and ρ(net, kill) = 1.000. The ranking is invariant; the level is not.
+>
+> Regeneration is pending, together with [`results/real_drug_panel.md`](real_drug_panel.md).
+
 > **Regenerated under the discrete vessel source.** `vascular_mode = discrete`
 > (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
 > [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the
