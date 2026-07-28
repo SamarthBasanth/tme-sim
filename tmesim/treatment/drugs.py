@@ -103,6 +103,7 @@ def delivery_source(
     drug: DrugParams,
     plasma_conc: float,
     bbb_disruption: "np.ndarray | float | None" = None,
+    efflux: bool = False,
 ) -> np.ndarray:
     """Instantaneous (ny, nx) drug delivery-rate source into the tissue.
 
@@ -143,6 +144,31 @@ def delivery_source(
     values exactly, since ``x + L*0.0 == x`` in IEEE-754 and the clip is a no-op
     for ``bbb_penetrance`` already in [0, 1]. Both are covered by tests.
 
+    Active efflux (optional, OFF by default, and OFF is the RECOMMENDATION)
+    ----------------------------------------------------------------------
+    ``efflux=True`` multiplies the TRANSCELLULAR penetrance by a literature-
+    sourced P-gp/BCRP factor from :mod:`tmesim.molecular.efflux`, looked up by
+    ``drug.name``::
+
+        S = vascular_density
+            * clip(bbb_penetrance * efflux_factor(drug.name)
+                   + L * bbb_disruption, 0, 1)
+            * plasma_conc
+
+    Efflux multiplies only the transcellular term because a disrupted tight
+    junction is a paracellular shunt AROUND the pump. Drugs that are not in the
+    efflux table, or that have no published efflux ratio, get a factor of exactly
+    1.0, so ``efflux=True`` is a no-op for most of the library.
+
+    **This defaults to False on evidence, not on caution.** Re-scoring the
+    six-drug measured human glioma partition scorecard with the term active makes
+    it WORSE (geometric-mean absolute fold error 1.99x -> 2.43x, order-of-
+    magnitude band 6/6 -> 5/6), and the term is structurally incapable of moving
+    the GIST tumour:normal target at all because a scalar per-drug factor cancels
+    out of a within-drug tissue ratio. See ``results/efflux_impact.md`` for the
+    full before/after and the reasons. The mechanism is implemented, cited and
+    available; it is not enabled because it does not validate.
+
     Engine usage
     ------------
     The transport engine calls ``plasma_profile`` once to get C_plasma(t) over
@@ -165,6 +191,11 @@ def delivery_source(
         disrupted). ``None`` (default) disables the barrier term entirely and
         reproduces the pre-fix source exactly. Build a field with
         :func:`tmesim.reconstruct.barrier.bbb_disruption_field`.
+    efflux : bool
+        ``False`` (default) leaves the function bit-for-bit as it was. ``True``
+        applies the P-gp/BCRP penetrance factor for ``drug.name`` from
+        :mod:`tmesim.molecular.efflux`. Default-off is the validated
+        recommendation, not a placeholder — see above.
 
     Returns
     -------
@@ -173,13 +204,18 @@ def delivery_source(
         same shape as the vascular density field.
     """
     vascular = np.asarray(micro.fields.vascular_density, dtype=np.float64)
+    penetrance = drug.bbb_penetrance
+    if efflux:
+        # Imported lazily so the default path touches no extra module.
+        from tmesim.molecular.efflux import efflux_factor
+        penetrance = penetrance * efflux_factor(drug.name)
     if bbb_disruption is None:
-        return vascular * drug.bbb_penetrance * float(plasma_conc)
+        return vascular * penetrance * float(plasma_conc)
 
     # Imported lazily: reconstruct depends on treatment, not the other way round.
     from tmesim.reconstruct.barrier import effective_penetrance
 
-    p_eff = effective_penetrance(drug.bbb_penetrance, bbb_disruption)
+    p_eff = effective_penetrance(penetrance, bbb_disruption)
     return vascular * p_eff * float(plasma_conc)
 
 

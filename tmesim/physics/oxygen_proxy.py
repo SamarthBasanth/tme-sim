@@ -82,8 +82,9 @@ published anchor rather than fitted:
 * Diagnostic, not calibration — and it does NOT agree: the PDE's own effective
   diffusion length is ``sqrt(D / (consumption * rho_tum))``
   (:func:`pde_diffusion_length_um`). At the default ``OxygenConfig`` and the real
-  sections' measured tumour density that is ~500-800 um, i.e. **5-9x the published
-  oxygen-diffusion distance**. The uncalibrated ``OxygenConfig.consumption``
+  sections' measured tumour density that is ~310 um on the IO section and ~800 um
+  on the brain section, i.e. **2-5x the published oxygen-diffusion distance**.
+  The uncalibrated ``OxygenConfig.consumption``
   therefore makes the solved field far smoother than tissue oxygen is measured to
   be, which is a mechanistic account of §1.2's finding that the diffusion step
   DESTROYS predictive information: it low-pass-filters the source at a length scale
