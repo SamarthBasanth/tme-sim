@@ -1030,7 +1030,11 @@ class JobManager:
             job.body = {k: v for k, v in stored.items()
                         if k in ("report", "metrics", "metric_reasons",
                                  "extra_metrics", "provenance", "drug_params",
-                                 "mechanism", "mechanism_reason", "timelapse")}
+                                 "mechanism", "mechanism_reason", "timelapse",
+                                 # a TPL sweep's grid, rows and provenance —
+                                 # without this a restored protocol run would
+                                 # come back with an empty result grid
+                                 "protocol")}
             job._log.clear()
             for line in (stored.get("log_tail") or []):
                 job._log.append(line)
@@ -1044,7 +1048,14 @@ class JobManager:
                 except ValueError:
                     pass
 
-    def _persist(self, job: Job, payloads: Optional[Dict[str, bytes]]) -> None:
+    def _persist(self, job: Job, payloads: Optional[Dict[str, bytes]],
+                 status: Optional[str] = None) -> None:
+        """Write every binary payload, then the result document, atomically.
+
+        ``status`` stamps the document with a terminal state the in-memory job
+        has not been given yet. That is what lets :meth:`_execute` finish ALL
+        the writes before it announces ``done`` — see the note there.
+        """
         d = self._dir(job.run_id)
         os.makedirs(d, exist_ok=True)
         for name, blob in (payloads or {}).items():
@@ -1053,6 +1064,10 @@ class JobManager:
                 fh.write(blob)
             os.replace(tmp, os.path.join(d, name + ".bin"))
         doc = job.result_view()
+        if status is not None:
+            doc["status"] = status
+            doc["stage"] = status
+            doc["progress"] = 1.0
         doc["log_tail"] = job.log_tail(_LOG_MAXLEN)
         tmp = os.path.join(d, "result.json.tmp")
         with open(tmp, "w") as fh:
@@ -1138,12 +1153,21 @@ class JobManager:
             body = execute_run(job.spec, ctx, cache=self.cache)
             payloads = body.pop("_payloads", None)
             job.body = body
+            job.finished_at = time.time()
+            job.log(f"done in {job.elapsed_s:.1f}s")
+            # Persist BEFORE announcing done. ``done`` is the signal the UI (and
+            # a restarting server) treat as "the payloads are there": the poller
+            # sees it and immediately GETs /geometry, /mechanism, /timelapse. If
+            # the flag were flipped first, every one of those would race the
+            # writes and 409 on a run that had in fact succeeded — a window that
+            # was narrow while a run wrote ~1 MB and is not narrow now that a
+            # time-lapse is tens of megabytes. The document is stamped with the
+            # terminal status it is about to be given, so what lands on disk is
+            # a finished run, not a snapshot mid-write.
+            self._persist(job, payloads, status="done")
             job.status = "done"
             job.stage = "done"
             job.progress = 1.0
-            job.finished_at = time.time()
-            job.log(f"done in {job.elapsed_s:.1f}s")
-            self._persist(job, payloads)
         except RunCancelled as exc:
             job.status = "cancelled"
             job.stage = "cancelled"

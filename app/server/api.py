@@ -330,6 +330,13 @@ def validate_spec(spec: Dict) -> Dict:
                 f"{section_row.get('reason')}"
             )
 
+    # Only ever look a section up by a STRING id. The code editor can POST
+    # "section": ["x"] or {"a": 1}, and ``lookup_section`` does a dict ``get``,
+    # which raises ``TypeError: unhashable type`` — a 500 out of a validation
+    # endpoint whose whole job is to turn bad input into a readable message. The
+    # error naming the bad type is already recorded above.
+    if not isinstance(section_id, str) or not section_id:
+        section_id = None
     source = (lookup_section(section_id) or {}).get("source") if section_id else None
 
     # --- modes ------------------------------------------------------------- #
@@ -844,13 +851,35 @@ def _validate_state_mode(spec: Dict, section_id, source,
     elif state_mode == "vessel_distance":
         warnings.append(
             "state_mode='vessel_distance' bands a geometric SURROGATE "
-            "(exp(-d/L) in distance to the nearest measured endothelial cell, L "
-            "from Thomlinson & Gray, PMID 13304213) through the unmodified "
-            "cells.agents.update_cell_states. The vessel POSITIONS are measured; "
-            "the state is not. On the sections tested it calls 91-100% of tumour "
-            "cells VIABLE, so its dx-stability is partly the stability of a "
-            "near-constant (results/cell_state_impact.md §4)."
+            "(exp(-d/L) in distance to the nearest endothelial cell, L from "
+            "Thomlinson & Gray, PMID 13304213) through the unmodified "
+            "cells.agents.update_cell_states. Whatever the positions are, the "
+            "STATE is not measured. On the three Xenium sections scored in "
+            "results/cell_state_impact.md §2.1 it called 91-100% of tumour cells "
+            "VIABLE, so its dx-stability was there partly the stability of a "
+            "near-constant — that figure is a property of those sections, not a "
+            "prediction for this one."
         )
+        if source == "visium":
+            warnings.append(
+                "state_mode='vessel_distance' on a Visium section measures "
+                "distance to SYNTHESISED endothelial pseudo-cells: "
+                "reconstruct.real_visium places round(fraction * 12) cells per "
+                "spot at the spot centroid with a seeded jitter. The distance is "
+                "therefore to a deconvolved 100 um spot grid, NOT to a measured "
+                "vessel, and the resulting band occupancies inherit the spot "
+                "pitch. Xenium sections carry measured centroids; this one does "
+                "not."
+            )
+        elif support.get("genes_known") and not support.get("endothelial_present"):
+                errors.append(
+                    "state_mode='vessel_distance' is unavailable on section "
+                    f"{section_id!r}: its panel carries no endothelial marker, so "
+                    "no cell can be typed ENDOTHELIAL and the distance transform "
+                    "has no point to measure from. Every cell would be labelled "
+                    "HYPOXIC by construction — an artefact of an empty input, not "
+                    "a state. reconstruct_real raises with this reason."
+                )
 
     # The conclusion of results/cell_state_impact.md §5, applied to whichever
     # route was chosen: a panel with no hypoxia-response gene cannot support an

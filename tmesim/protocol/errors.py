@@ -56,6 +56,13 @@ class Diagnostic:
     severity: str = "error"
     code: str = "error"
     hint: Optional[str] = None
+    #: TPL the editor may offer to insert VERBATIM to fix this (e.g.
+    #: ``allow runs 100``). ``None`` when the fix is not a single line of TPL —
+    #: never a guess, because an editor that inserts a wrong line is worse than
+    #: one that inserts nothing.
+    remedy_text: Optional[str] = None
+    #: Line the ``remedy_text`` should be inserted at (defaults to ``line``).
+    remedy_line: int = 0
 
     def __post_init__(self) -> None:
         self.line = int(self.line or 0)
@@ -74,6 +81,8 @@ class Diagnostic:
             "code": self.code,
             "message": self.message,
             "hint": self.hint,
+            "remedy_text": self.remedy_text,
+            "remedy_line": self.remedy_line or self.line,
         }
 
     def __str__(self) -> str:  # pragma: no cover - convenience only
@@ -162,8 +171,10 @@ class collect:
 
     def error(self, message: str, node=None, code: str = "error",
               hint: Optional[str] = None, line: int = 0, col: int = 0,
-              end_col: int = 0) -> None:
-        self._add("error", message, node, code, hint, line, col, end_col)
+              end_col: int = 0, remedy_text: Optional[str] = None,
+              remedy_line: int = 0) -> None:
+        self._add("error", message, node, code, hint, line, col, end_col,
+                  remedy_text, remedy_line)
 
     def warn(self, message: str, node=None, code: str = "warning",
              hint: Optional[str] = None, line: int = 0, col: int = 0,
@@ -177,7 +188,8 @@ class collect:
         self.items.append(diag)
 
     def _add(self, severity: str, message: str, node, code: str,
-             hint: Optional[str], line: int, col: int, end_col: int) -> None:
+             hint: Optional[str], line: int, col: int, end_col: int,
+             remedy_text: Optional[str] = None, remedy_line: int = 0) -> None:
         if node is not None:
             line = line or int(getattr(node, "line", 0) or 0)
             col = col or int(getattr(node, "col", 0) or 0)
@@ -185,6 +197,7 @@ class collect:
         self.items.append(Diagnostic(
             message=message, line=line, col=col, end_col=end_col,
             severity=severity, code=code, hint=hint,
+            remedy_text=remedy_text, remedy_line=remedy_line,
         ))
 
     # -- views -------------------------------------------------------------- #

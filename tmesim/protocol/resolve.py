@@ -31,9 +31,13 @@ The identity problem, and why it is solved rather than papered over
 ``ic50 from gdsc`` needs a NAME to look up; ``drug TMZ from smiles "CN1C(=O)..."``
 supplies a structure and a local alias. :func:`resolve_identity` recovers the
 generic name by canonicalising the SMILES with RDKit and matching it against
-:data:`tmesim.molecular.library.GBM_DRUGS`, falling back to the GDSC alias table.
-The match, and which route found it, is recorded. If no identity is found the
-lookup is not guessed — ``ic50 from gdsc`` refuses.
+:data:`tmesim.molecular.library.GBM_DRUGS` — a STRUCTURAL match, not a name
+match. When a structure is supplied and matches nothing curated, the identity is
+unknown and the GDSC synonym table is deliberately NOT consulted: a TPL
+identifier is a local alias, and letting ``drug TMZ from smiles "<anything>"``
+inherit temozolomide's measured potency would be exactly the silent substitution
+this package exists to prevent. The route that established the identity is
+always recorded, and ``ic50 from gdsc`` refuses when there is none.
 """
 from __future__ import annotations
 
@@ -42,7 +46,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-from .errors import Diagnostic, ResolutionError, collect
+from .errors import ResolutionError, collect
 
 __all__ = [
     "PROVENANCE_TAGS", "ResolvedDrug", "resolve_identity", "resolve_drug",
@@ -360,15 +364,22 @@ def resolve_identity(alias: str, smiles: Optional[str],
     """Recover a generic drug name. Returns ``(identity_or_None, how)``.
 
     Order: an explicit library name; a canonical-SMILES match against the
-    curated GBM library; the GDSC alias table keyed on the TPL identifier; the
-    TPL identifier itself if it is already a library name.
+    curated GBM library; and — **only when no structure was supplied** — the
+    GDSC alias table keyed on the TPL identifier.
+
+    The last restriction is the point of this function. A TPL identifier is a
+    LOCAL ALIAS: ``drug TMZ from smiles "<something else>"`` is a compound the
+    author chose to call TMZ, and matching that label against the GDSC synonym
+    list would attach a measured temozolomide potency to a molecule that is not
+    temozolomide. When a structure is given, the STRUCTURE is the claim; if it
+    matches nothing curated, the identity is unknown and says so.
     """
     if library_name:
         return library_name.strip().lower(), "declared `from library`"
 
-    if smiles:
-        from ..molecular.library import GBM_DRUGS
+    from ..molecular.library import GBM_DRUGS
 
+    if smiles:
         canon = _canonical(smiles)
         if canon:
             for name, lib_smiles in GBM_DRUGS.items():
@@ -377,18 +388,23 @@ def resolve_identity(alias: str, smiles: Optional[str],
                     return name, ("canonical-SMILES match against "
                                   "molecular.library.GBM_DRUGS (structural "
                                   "identity, not a name match)")
+        return None, (
+            f"no identity established: the supplied structure matches no drug "
+            f"in molecular.library.GBM_DRUGS. The identifier {alias!r} is a "
+            "LOCAL ALIAS and is deliberately NOT matched against the drug "
+            "synonym table when a structure is given — a name cannot certify "
+            "the identity of a molecule that differs from it.")
 
     key = (alias or "").strip().lower()
-    from ..molecular.library import GBM_DRUGS
-
     if key in GBM_DRUGS:
         return key, "the TPL identifier is a curated library drug name"
     rev = _alias_reverse_map()
     if key in rev:
         return rev[key], (f"GDSC alias table: {alias!r} is a recognised "
-                          f"synonym for {rev[key]!r}")
-    return None, ("no identity established — the structure matches no curated "
-                  "library drug and the name is not a recognised synonym")
+                          f"synonym for {rev[key]!r} (no structure was "
+                          "supplied to check it against)")
+    return None, ("no identity established — no structure was supplied and the "
+                  "name is not a recognised drug synonym")
 
 
 # --------------------------------------------------------------------------- #
@@ -502,7 +518,7 @@ def resolve_drug(node, compile_params: bool = True,
         ic50_value, record = overrides["ic50"]
         out.ic50_resolution = {
             "ic50_uM": ic50_value, "confidence": "user-supplied",
-            "source": "written in the script", "note": record}
+            "source": f"written in the script: {record}", "note": record}
         if wants_gdsc is not None:
             raise ResolutionError(
                 f"drug {node.name}: both `ic50 from gdsc` and an explicit "
@@ -553,6 +569,20 @@ def resolve_drug(node, compile_params: bool = True,
                      "flagged 25 uM default is used. Potency is NOT derivable "
                      "from structure.")}
 
+    # A parameter file with no structure has nothing for the molecular layer to
+    # compute from, so the fields it cannot derive must be present. Checked
+    # BEFORE the compile gate so `POST /api/protocol/validate` catches it too.
+    if mol is None:
+        missing = [k for k in ("diffusivity", "molecular_weight")
+                   if k not in file_params and k not in overrides]
+        if missing:
+            raise ResolutionError(
+                f"drug {node.name}: this source supplies no structure, so "
+                f"{', '.join(missing)} cannot be computed and must be given "
+                "explicitly (in the file or in the drug block). No default is "
+                "invented for a compound this pipeline has never seen.",
+                line=line, col=col, code="incomplete-parameters")
+
     if not compile_params:
         return out
 
@@ -581,16 +611,6 @@ def resolve_drug(node, compile_params: bool = True,
         base_tag = "computed"
     else:
         # A pure parameter file: nothing was computed, everything is the user's.
-        needed = ("diffusivity", "molecular_weight")
-        missing = [k for k in needed
-                   if k not in file_params and k not in overrides]
-        if missing:
-            raise ResolutionError(
-                f"drug {node.name}: the parameter file supplies no structure, "
-                f"so {', '.join(missing)} cannot be computed and must be given "
-                "explicitly (in the file or in the drug block). No default is "
-                "invented for a compound this pipeline has never seen.",
-                line=line, col=col, code="incomplete-parameters")
         dp = DrugParams(
             name=node.name,
             diffusivity=float(file_params.get("diffusivity",
@@ -604,7 +624,7 @@ def resolve_drug(node, compile_params: bool = True,
             bbb_penetrance=float(file_params.get(
                 "bbb_penetrance", DrugParams(name="x").bbb_penetrance)),
         )
-        computed_src = ""
+        computed_src = "engine dataclass default"
         base_tag = "user-supplied"
         out.notes.append(
             "this drug has NO structure, so nothing was computed by the "

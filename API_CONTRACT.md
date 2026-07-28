@@ -157,9 +157,150 @@ This is diagnostic imaging software. Reference points are HALO, Visiopharm, Paig
 | `GET`  | `/api/reports/{id}` | → `Report` (the full JSON document; also the poll target) |
 | `GET`  | `/api/reports/{id}/html` | → `text/html` — the rendered document, self-contained; **409** until every arm is `done` |
 | `DELETE` | `/api/reports/{id}` | cancel a queued/running report (cancels every arm) |
+| `POST` | `/api/protocol/validate` | `{source}` → `{ok, diagnostics[], n_runs, max_runs}` — parse only, no compute |
+| `POST` | `/api/protocol/plan` | `{source}` → the expanded run list, run count and estimated cost; **executes nothing** |
+| `POST` | `/api/protocol/run` | `{source}` → `{run_id, n_runs, warnings[], estimated_cost}` — **202**, enqueues the whole sweep as ONE job |
+| `GET`  | `/api/protocol/runs/{id}` | → results + the sweep grid; safe to poll while running |
+| `GET`  | `/api/protocol/sweeps/{id}` | → the same job in the editor's projection (alias) |
+| `DELETE` | `/api/protocol/sweeps/{id}` | cancel a queued/running sweep |
+| `POST` | `/api/protocol/upload` | `{filename, content \| content_base64}` or multipart `file` → `{path, preview}` |
 
 `status` ∈ `queued | running | done | failed | cancelled`. On `failed`, `RunResult.error`
 carries the message; the UI must surface it, never swallow it.
+
+### TPL — `POST /api/protocol/*`
+
+The Tumour Protocol Language (`PROTOCOL_LANGUAGE.md`, frozen). Backend:
+`tmesim/protocol/`; editor: `app/web/js/ui/protocol.js`. Both code to that document.
+
+**Every route takes the same body**, and a bare `text/plain` script is accepted too:
+
+```jsonc
+{ "source": "drug TMZ from smiles \"...\"\n...",
+  "max_runs": 64,          // optional; the sweep budget for this request
+  "max_window_s": 86400 }  // optional; longest transport window per run
+```
+
+**Diagnostic** — the only error shape these routes ever return. `line` and `col` are
+1-based, `end_col` exclusive; `line: 0` means the message is not attributable to a
+position (a backend fault). A user mistake is **never** a 500 and never a traceback.
+
+```jsonc
+{ "severity": "error",          // "error" | "warning"
+  "line": 7, "col": 8, "end_col": 11,
+  "code": "missing-unit",       // stable, keyable by the UI
+  "message": "protocol stupp_adjuvant: dose: a unit is REQUIRED ...",
+  "hint": "write `dose 150 mg/m2`" }
+```
+
+`POST /api/protocol/validate` → `{ok, diagnostics[], n_runs, max_runs}`. Parse, units,
+name resolution, specimen capability and the run budget. It does **not** compile a
+molecule or touch the solver, so it is fast enough for keystroke-level use. `ok: false`
+still returns 200 — a rejected script is a normal answer, not a transport error.
+
+`POST /api/protocol/plan` → everything `/validate` returns **plus**:
+
+```jsonc
+{ "runs": [ { "index": 0, "label": "TMZ/stupp_adjuvant@xenium_319 [dose=150 mg/m2]",
+              "axes": {"dose": "150 mg/m2"}, "dx_um": 30.0,
+              "spec": { ...RunSpec... },
+              "dose_conversion": { "pk": {"plasma_peak", "half_life_s",
+                                          "n_doses", "dose_interval_s"},
+                                   "amount_mg", "bioavailability",
+                                   "volume_of_distribution_L", "formula",
+                                   "conversions": ["150 mg/m2 x 1.73 m2 = 259.5 mg", ...],
+                                   "assumptions": [ {quantity, value, unit,
+                                                     provenance, source} ],
+                                   "infusion": null,
+                                   "window_s", "protocol_duration_s",
+                                   "n_administrations_outside_window",
+                                   "time_resolved": true, "time_resolved_reason" },
+              "reconstruction_key": ["xenium_319", 30.0, "discrete", "pde", "oxygen"] } ],
+  "drugs": { "TMZ": { "identity": "temozolomide", "identity_route": "...",
+                      "drug_params": {...},
+                      "provenance": { "ic50": {"value", "unit",
+                                               "provenance": "measured",
+                                               "source": "GDSC glioma screen, ..."},
+                                      "hill": {"provenance": "flagged-default", ...} } } },
+  "capability": { "xenium_319:oxygen:uniform": { ...panel support report... } },
+  "sweep_axes": [ {"param": "dose", "n_points": 4, "values": [...]} ],
+  "expects": [ {"metric": "kill", "comparator": ">", "value": 0.05} ],
+  "estimated_cost": { "n_runs", "n_reconstructions", "reconstructions_cached",
+                      "total_pde_timesteps", "approx_grid_cells",
+                      "wall_time_s": null, "wall_time_reason": "..." } }
+```
+
+`provenance` is per **field**, and the tag is one of `measured` / `computed` /
+`user-supplied` / `flagged-default`. `estimated_cost.wall_time_s` is deliberately
+`null` with a reason — the backend does not benchmark in advance and will not guess.
+
+`POST /api/protocol/run` — **202**, or **400** with
+`detail: {message, ok: false, diagnostics[]}` for a rejected script. A whole sweep is
+**one** job on the same `JobManager` and the same `RECON_CACHE` as `/api/runs`, so the
+runs are serialised on one worker and a dose sweep on one specimen **reconstructs once**.
+
+`GET /api/protocol/runs/{id}` → `{run_id, status, stage, progress, elapsed_s, error,
+source, n_runs, grid[], rows[], ranking, sweep_axes[], expects[], diagnostics[],
+reconstructions, plan, log_tail[]}`. **409** if `{id}` is a `RunSpec` run rather than a
+protocol run. `grid` is the progress grid and fills in live:
+
+```jsonc
+{ "index": 0, "label": "...", "axes": {"dose": "150 mg/m2"},
+  "status": "queued|running|done|failed|cancelled",
+  "metrics": {"kill_fraction", "therapeutic_coverage_1x", "mean_tumor_auc",
+              "penetration_length_um"},
+  "error": null, "runtime_s": 41.2, "reconstruction_cache_hit": true }
+```
+
+`rows[]` carries the full result per run: `metrics`, `reported` (just the metrics the
+script asked for), `extra_metrics`, `expectations` (each `expect` scored pass/fail —
+**reported, never enforced**), `report`, and `provenance` with `drug`, `dose_to_pk`,
+`sensitivity`, `capability`, `cell_state`, `solver` and `caveats`.
+`reconstructions` reports `{built[], n_built, n_cache_hits}` so the caching claim is
+checkable from the response.
+
+`POST /api/protocol/upload` → `{ok, path, bytes, use_in_script, preview}`. `path` is
+what a `drug X from file "<path>"` statement should use, verbatim. Structures
+(`.smi`, `.mol`, `.sdf`) preview as `{kind: "structure", smiles, descriptors}`;
+parameter files (`.json`, `.yaml`) as `{kind: "parameters", parameters}`. The body is
+JSON rather than multipart so no new dependency enters this checkout. Filenames are
+basenamed and sanitised; anything that will not parse is **400** and is not kept.
+
+#### Two projections in one payload
+
+`app/web/js/protocol/api.js` froze its own wire shape for these routes before this
+backend landed, and the two do not agree: it wants `errors[]` / `warnings[]` with
+**0-based, half-open** columns, `run_count`, `estimated_cost_s`, `axes`, `refusal`, and a
+sweep under `/api/protocol/sweeps/{id}`. Rather than break one client, **every response
+carries both projections under disjoint keys**, and `app/server/protocol_wire.py` owns the
+second one:
+
+| this contract | the editor's | note |
+|---|---|---|
+| `diagnostics[]` — `col`/`end_col` **1-based** | `errors[]` + `warnings[]` — `col`/`end_col` **0-based, half-open** | the two conventions never share a key |
+| `n_runs` | `run_count` | same number |
+| `estimated_cost.wall_time_s` = `null` | `estimated_cost_s` + `cost_note` | the editor's is an ESTIMATE from throughput constants measured once on this repo; the contract's stays null on purpose |
+| `sweep_axes[]` (`values` as strings) | `axes[]` (`values` as numbers) + `runs[].coords[]` | `coords` are indices into `axes[i].values` |
+| the first budget error in `diagnostics[]` | `refusal: {code, line, message, remedy, remedy_text, remedy_line}` | `remedy_text` is TPL to insert verbatim, or `null` |
+| `GET /api/protocol/runs/{id}` | `GET /api/protocol/sweeps/{id}` | the same job; `/runs/{id}` returns both |
+
+`POST /api/protocol/run` also accepts `confirm_run_count` and answers **409** if the
+program now expands to a different number — plan-before-run means the operator confirmed
+a *specific* count. `POST /api/protocol/upload` accepts `multipart/form-data` with a
+`file` part as well as JSON; multipart is parsed in-process rather than by
+`python-multipart`, which is not in this checkout and must not be added.
+
+`runs[].run_id` in a sweep payload is always `null`, with `run_id_reason` alongside: a TPL
+sweep is **one** job whose points share a cached reconstruction and must be serialised on
+the single worker, so there is no per-point run to open in the viewer. The point's
+metrics, provenance and caveats travel in the sweep payload instead.
+
+**TPL runs always set `PDEConfig.time_resolved = True`** and say so in
+`provenance.dose_to_pk.time_resolved_reason`. With the engine default (`False`) the
+solver replaces the plasma curve by its window mean, which makes `every`, `repeat`,
+`cycles` and `over` bit-identical inputs — the artefact `results/dose_schedule.md` was
+regenerated to remove. This is the one solver setting the protocol path changes
+relative to `/api/runs`.
 
 ### Generic sample ingestion — `POST /api/sections/scan`
 

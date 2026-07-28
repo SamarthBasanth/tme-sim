@@ -31,11 +31,19 @@ import json
 import os
 import re
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException, Request
 
 from .jobs import JobManager, jsonable
+from .protocol_wire import (
+    NO_RUN_ID_REASON,
+    editor_diagnostics,
+    editor_plan,
+    editor_validate,
+    sweep_snapshot,
+)
+from .protocol_wire import _refusal as editor_refusal
 
 __all__ = ["build_protocol_router", "execute_protocol_job", "PROTOCOL_JOB_KIND"]
 
@@ -107,7 +115,10 @@ def execute_protocol_job(spec: Dict, ctx, cache=None) -> Dict:
     return {
         "protocol": jsonable({
             "source": source,
-            "plan": p.to_dict(),
+            # The editor projection is stored, not just the contract one, so
+            # GET /sweeps/{id} can serve axes / coords / caveats / assumptions
+            # from a finished job without re-planning it.
+            "plan": editor_plan(p.to_dict(), p),
             **result,
         }),
         # Keys the generic RunResult view expects, so a protocol job is not a
@@ -131,16 +142,19 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
     @router.post("/validate")
     async def post_validate(request: Request) -> Dict:
         """Parse + static checks only. No compilation, no compute."""
-        from tmesim.protocol import validate_source
+        from tmesim.protocol import plan as make_plan
         from tmesim.protocol.errors import TplError
 
         source = await _source(request)
         try:
-            return jsonable(validate_source(source))
+            p = make_plan(source, compile_drugs=False)
+            body = {"ok": p.ok, "diagnostics": p.diagnostics.to_dicts(),
+                    "n_runs": p.n_runs, "max_runs": p.max_runs}
+            return jsonable(editor_validate(body, p))
         except TplError as exc:
-            return {"ok": False, "diagnostics": exc.to_dicts()}
+            return _diag_only(exc.to_dicts())
         except Exception as exc:  # noqa: BLE001 - never a bare traceback
-            return {"ok": False, "diagnostics": [_internal(exc)]}
+            return _diag_only([_internal(exc)])
 
     @router.post("/plan")
     async def post_plan(request: Request) -> Dict:
@@ -159,14 +173,12 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
         try:
             p = make_plan(source, compile_drugs=True, **kwargs)
         except TplError as exc:
-            return {"ok": False, "diagnostics": exc.to_dicts(), "runs": [],
-                    "n_runs": 0}
+            return _diag_only(exc.to_dicts(), plan_shape=True)
         except Exception as exc:  # noqa: BLE001
-            return {"ok": False, "diagnostics": [_internal(exc)], "runs": [],
-                    "n_runs": 0}
+            return _diag_only([_internal(exc)], plan_shape=True)
         out = p.to_dict()
         out["plan_time_s"] = round(time.time() - t0, 3)
-        return jsonable(out)
+        return jsonable(editor_plan(out, p))
 
     @router.post("/run", status_code=202)
     async def post_run(request: Request) -> Dict:
@@ -194,9 +206,22 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
                 "message": "protocol rejected", "ok": False,
                 "diagnostics": [_internal(exc)]}) from None
         if not p.ok:
+            errors, warnings = editor_diagnostics(p.diagnostics.to_dicts())
             raise HTTPException(status_code=400, detail={
                 "message": "protocol rejected", "ok": False,
-                "diagnostics": p.diagnostics.to_dicts()})
+                "diagnostics": p.diagnostics.to_dicts(),
+                "errors": errors, "warnings": warnings,
+                "refusal": editor_refusal(p)})
+
+        # Plan-before-run: the operator confirmed a specific number, so a
+        # program that now expands to a different one must NOT quietly launch.
+        confirm = body.get("confirm_run_count")
+        if confirm is not None and int(confirm) != p.n_runs:
+            raise HTTPException(status_code=409, detail={
+                "message": (f"plan/confirm mismatch: you confirmed "
+                            f"{int(confirm)} runs, this program now expands to "
+                            f"{p.n_runs}. Re-plan before running."),
+                "confirmed": int(confirm), "run_count": p.n_runs})
 
         spec = {"kind": PROTOCOL_JOB_KIND, "source": source}
         for key in ("max_runs", "max_window_s"):
@@ -205,17 +230,19 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
         job = jobs.submit(spec)
         return jsonable({
             "run_id": job.run_id,
+            "sweep_id": job.run_id,          # the editor's name for the same id
             "status": job.status,
             "n_runs": p.n_runs,
+            "run_count": p.n_runs,
             "max_runs": p.max_runs,
             "allow_runs": p.allow_runs,
             "warnings": [d.to_dict() for d in p.diagnostics.warnings],
             "estimated_cost": p.estimated_cost,
+            "runs": [{"index": r.index, "run_id": None, "status": "queued",
+                      "run_id_reason": NO_RUN_ID_REASON} for r in p.runs],
         })
 
-    @router.get("/runs/{run_id}")
-    def get_protocol_run(run_id: str) -> Dict:
-        """Results + the sweep grid. Safe to poll while the job is running."""
+    def _protocol_job(run_id: str):
         job = jobs.get(run_id)
         if job is None:
             raise HTTPException(status_code=404,
@@ -225,7 +252,12 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
                 "message": f"run {run_id!r} is not a protocol run",
                 "kind": job.spec.get("kind"),
                 "reason": "use GET /api/runs/{id} for a RunSpec run"})
-        body = (job.body or {}).get("protocol") or {}
+        return job, ((job.body or {}).get("protocol") or {})
+
+    @router.get("/runs/{run_id}")
+    def get_protocol_run(run_id: str) -> Dict:
+        """Results + the sweep grid. Safe to poll while the job is running."""
+        job, body = _protocol_job(run_id)
         grid = body.get("grid") or getattr(job, "protocol_grid", None) or []
         return jsonable({
             "run_id": run_id,
@@ -245,7 +277,35 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
             "reconstructions": body.get("reconstructions"),
             "plan": body.get("plan"),
             "log_tail": job.log_tail(40),
+            # The editor's projection of the same job, under its own key names
+            # (app/web/js/protocol/api.js). See app/server/protocol_wire.py for
+            # why both live in one payload.
+            **sweep_snapshot(job, body),
         })
+
+    @router.get("/sweeps/{sweep_id}")
+    def get_sweep(sweep_id: str) -> Dict:
+        """The editor's alias of ``GET /runs/{id}``. A TPL sweep IS one job."""
+        job, body = _protocol_job(sweep_id)
+        return jsonable(sweep_snapshot(job, body))
+
+    @router.delete("/sweeps/{sweep_id}")
+    def cancel_sweep(sweep_id: str) -> Dict:
+        """Cancel a sweep.
+
+        Cooperative, exactly like ``DELETE /api/runs/{id}``: a queued sweep dies
+        at once, a running one stops at the next run boundary, and a point
+        already inside ``simulate_response`` finishes that solve first — the
+        engine is not modified to accept an interrupt.
+        """
+        job, body = _protocol_job(sweep_id)
+        jobs.cancel(sweep_id)
+        out = sweep_snapshot(job, (job.body or {}).get("protocol") or body)
+        out["cancelled"] = job.status not in ("done", "failed")
+        out["reason"] = (
+            "cancel flag set. The sweep stops at the next run boundary; a run "
+            "already inside simulate_response finishes that solve first.")
+        return jsonable(out)
 
     @router.post("/upload")
     async def post_upload(request: Request) -> Dict:
@@ -264,6 +324,9 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
 
         body = await _body(request)
         raw_name = str(body.get("filename") or "").strip()
+        if not raw_name and body.get("_multipart_error"):
+            raise HTTPException(status_code=400, detail={
+                "message": body["_multipart_error"]})
         if not raw_name:
             raise HTTPException(status_code=400, detail={
                 "message": "filename is required",
@@ -318,6 +381,19 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
             "bytes": len(data),
             "use_in_script": f'drug MYCPD from file "{rel}"',
             "preview": preview,
+            # --- the editor's projection (app/web/js/protocol/api.js) ------ #
+            "file": {"name": name, "size": len(data),
+                     "format": ext.lstrip(".")},
+            "drug": _upload_drug_block(rel, name, preview),
+            "warnings": [],
+            "caveats": [
+                "These are the fields the pipeline can derive from what you "
+                "uploaded. A field marked flagged-default is a placeholder, not "
+                "a property of your compound.",
+                "Potency is NOT derivable from structure. Unless you supply an "
+                "ic50 or the structure matches a drug in the GDSC glioma "
+                "screen, the IC50 here is a flagged low-confidence default.",
+            ],
         })
 
     return router
@@ -327,10 +403,20 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
 # Body helpers
 # --------------------------------------------------------------------------- #
 async def _body(request: Request) -> Dict:
-    """Parse the request body as JSON, or wrap raw text as ``{"source": ...}``."""
+    """Parse the request body as JSON, multipart, or raw text.
+
+    Multipart is parsed HERE rather than with ``request.form()`` because that
+    needs ``python-multipart``, which this checkout does not have and which the
+    contract says must not be added ("it must run from a clean checkout with
+    only the existing venv plus fastapi"). One file part is all these routes
+    ever receive, so the ~20 lines below are cheaper than a dependency.
+    """
     raw = await request.body()
     if not raw:
         return {}
+    ctype = request.headers.get("content-type") or ""
+    if ctype.startswith("multipart/form-data"):
+        return _parse_multipart(raw, ctype)
     text = raw.decode("utf-8", errors="replace")
     try:
         doc = json.loads(text)
@@ -349,6 +435,82 @@ def _source_from(body: Dict) -> str:
 
 async def _source(request: Request) -> str:
     return _source_from(await _body(request))
+
+
+def _parse_multipart(raw: bytes, content_type: str) -> Dict:
+    """Extract the first file part of a multipart body -> ``{filename, content_base64}``."""
+    marker = "boundary="
+    if marker not in content_type:
+        return {"_multipart_error": "multipart body with no boundary in the "
+                                    "Content-Type header"}
+    boundary = content_type.split(marker, 1)[1].split(";")[0].strip().strip('"')
+    sep = b"--" + boundary.encode()
+    for part in raw.split(sep):
+        if b"\r\n\r\n" not in part:
+            continue
+        head, _, payload = part.partition(b"\r\n\r\n")
+        headers = head.decode("utf-8", errors="replace")
+        if "filename=" not in headers:
+            continue
+        filename = headers.split("filename=", 1)[1].split("\r\n")[0]
+        filename = filename.strip().strip('"').strip("'")
+        # Drop the ONE CRLF the encoder puts before the next boundary. Exactly
+        # one: a loop would eat a trailing blank line that is part of the file.
+        if payload.endswith(b"\r\n"):
+            payload = payload[:-2]
+        return {"filename": filename,
+                "content_base64": base64.b64encode(payload).decode()}
+    return {"_multipart_error": "multipart body carried no file part "
+                                "(expected a part with a filename)"}
+
+
+def _upload_drug_block(path: str, name: str, preview: Dict) -> Dict:
+    """Per-field provenance for an uploaded file, as the editor's `drug` block.
+
+    Resolved through the REAL resolver, so what the upload panel shows is what a
+    `drug X from file "<path>"` statement would actually compile to — including
+    every flagged default. A file that cannot be compiled on its own (a bare
+    parameter set missing diffusivity, say) reports the reason instead of a row
+    of invented numbers.
+    """
+    from tmesim.protocol.ast import DrugDef
+    from tmesim.protocol.errors import TplError
+    from tmesim.protocol.resolve import resolve_drug
+
+    node = DrugDef(line=1, col=1, end_col=2, name=os.path.splitext(name)[0],
+                   source_kind="file", source_value=path)
+    try:
+        resolved = resolve_drug(node, compile_params=True)
+    except TplError as exc:
+        return {"name": node.name, "source": path, "fields": {},
+                "unresolved": [d.to_dict() for d in exc.diagnostics]}
+    except Exception as exc:  # noqa: BLE001
+        return {"name": node.name, "source": path, "fields": {},
+                "unresolved": [_internal(exc)]}
+    fields = {
+        k: {"value": v["value"], "unit": v["unit"],
+            "provenance": v["provenance"], "source": v["source"],
+            "note": v["source"]}
+        for k, v in resolved.provenance.items() if not k.startswith("_")
+    }
+    return {"name": resolved.alias, "source": path, "fields": fields,
+            "identity": resolved.identity,
+            "identity_route": resolved.identity_route,
+            "smiles": resolved.smiles, "notes": resolved.notes}
+
+
+def _diag_only(diags: List[Dict], plan_shape: bool = False) -> Dict:
+    """A failure body that still has the SHAPE both clients expect."""
+    errors, warnings = editor_diagnostics(diags)
+    out: Dict = {"ok": False, "diagnostics": diags, "errors": errors,
+                 "warnings": warnings, "n_runs": 0, "run_count": 0,
+                 "max_runs": 0,
+                 "symbols": {"drugs": [], "protocols": [], "sweeps": []}}
+    if plan_shape:
+        out.update({"runs": [], "axes": [], "metrics": [], "assumptions": [],
+                    "caveats": [], "estimated_cost_s": 0, "cost_note": None,
+                    "refusal": None, "expects": []})
+    return out
 
 
 def _internal(exc: Exception) -> Dict:

@@ -22,6 +22,18 @@ Layout
                and the specimen capability check
 ``executor``   sweep expansion, the run budget, and the wrapped engine call
 ``errors``     positioned diagnostics; every refusal has a line number
+
+One deliberate dependency
+-------------------------
+``resolve.check_capability`` and ``executor.execute_plan`` import from
+``app.server.cache`` (the section registry and the process-wide reconstruction
+cache). That is an inversion of the usual ``app -> tmesim`` direction and it is
+intentional: the brief for this layer is to REUSE the existing queue and cache
+rather than build a second one, and a sweep whose whole point is that it
+reconstructs once cannot own a private cache. The imports are function-local, so
+importing this package costs nothing, and nothing in ``tmesim.core``,
+``tmesim.physics``, ``tmesim.sim`` or ``tmesim.reconstruct`` is touched — this
+package only wraps them.
 """
 from __future__ import annotations
 

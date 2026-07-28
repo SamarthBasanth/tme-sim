@@ -36,8 +36,8 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
 from . import ast as A
-from .dosing import DEFAULT_MAX_WINDOW_S, DoseConversion, convert_dose
-from .errors import BudgetError, Diagnostic, ResolutionError, TplError, collect
+from .dosing import DoseConversion, convert_dose
+from .errors import BudgetError, ResolutionError, TplError, collect
 from .parser import parse
 from .resolve import ResolvedDrug, check_capability, resolve_drug
 from .units import Quantity, _fmt
@@ -555,7 +555,8 @@ def _check_budget(p: Plan) -> None:
                f"`allow runs {n}` to say you meant it, or shrink the sweep.")
         code = "over-budget"
     p.diagnostics.error(msg, line=node_line, col=node_col, code=code,
-                        hint=f"allow runs {n}")
+                        hint=f"allow runs {n}", remedy_text=f"allow runs {n}",
+                        remedy_line=node_line)
 
 
 # --------------------------------------------------------------------------- #

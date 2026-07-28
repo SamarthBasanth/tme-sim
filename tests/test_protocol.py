@@ -152,27 +152,42 @@ class TestParserErrors:
         assert dose.line == 7 and dose.col == 3
         assert dose.amount.unit == "mg/m2" and dose.amount.value == 150.0
 
-    @pytest.mark.parametrize("bad,code,line", [
-        (STUPP.replace("dose 150 mg/m2", "dose 150"), "missing-unit", 7),
-        (STUPP.replace("dose 150 mg/m2", "dose 150 mg/m3"), "unknown-unit", 7),
-        (STUPP.replace("every 24 h", "every 24 um"), "wrong-dimension", 8),
-        (STUPP.replace("repeat 5", "repeat 5 h"), "unexpected-unit", 9),
-        (STUPP.replace("route oral", "route inhaled"), "unknown-route", 6),
+    @pytest.mark.parametrize("bad,code,marker", [
+        (STUPP.replace("dose 150 mg/m2", "dose 150"), "missing-unit",
+         "dose 150"),
+        (STUPP.replace("dose 150 mg/m2", "dose 150 mg/m3"), "unknown-unit",
+         "mg/m3"),
+        (STUPP.replace("every 24 h", "every 24 um"), "wrong-dimension",
+         "every 24 um"),
+        (STUPP.replace("repeat 5", "repeat 5 h"), "unexpected-unit",
+         "repeat 5 h"),
+        (STUPP.replace("route oral", "route inhaled"), "unknown-route",
+         "inhaled"),
         (STUPP.replace("  dx 30 um", "  dx 30 um\n  bogus 1"),
-         "unknown-option", 17),
-        (STUPP.replace("report coverage", "report bogus"), "unknown-metric", 19),
+         "unknown-option", "bogus 1"),
+        (STUPP.replace("report coverage", "report bogus"), "unknown-metric",
+         "report bogus"),
         (STUPP.replace("state_mode oxygen", "state_mode aura"),
-         "unknown-state-mode", 17),
-        (STUPP.replace("from smiles", "from inchi"), "unknown-drug-source", 1),
-        (STUPP.replace("  ic50 from gdsc", "  potency 1 uM"), "unknown-field", 2),
-        (STUPP.replace("\nend\n\nrun", "\n\nrun"), "unclosed-block", 15),
+         "unknown-state-mode", "state_mode aura"),
+        (STUPP.replace("from smiles", "from inchi"), "unknown-drug-source",
+         "from inchi"),
+        (STUPP.replace("  ic50 from gdsc", "  potency 1 uM"), "unknown-field",
+         "potency 1 uM"),
     ])
-    def test_bad_syntax_is_one_positioned_error(self, bad, code, line):
+    def test_bad_syntax_is_one_positioned_error(self, bad, code, marker):
+        expected_line = next(i for i, ln in enumerate(bad.split("\n"), 1)
+                             if marker in ln)
         d = first_error(bad)
         assert d["code"] == code, d
-        assert d["line"] == line, d
+        assert d["line"] == expected_line, d
         assert d["col"] > 0
+        assert d["end_col"] > d["col"]
         assert d["message"] and not d["message"].startswith("Traceback")
+
+    def test_an_unclosed_block_is_reported(self):
+        d = first_error(STUPP.replace("  cycles 6\nend\n", "  cycles 6\n"))
+        assert d["code"] == "unclosed-block"
+        assert d["line"] > 0
 
     def test_a_second_statement_still_parses_after_a_bad_one(self):
         src = ('protocol broken\n  dose 5 furlongs\nend\n\n'
@@ -440,7 +455,8 @@ class TestSweepExpansion:
             "run TMZ", "sweep dose from 10 to 1000 mg/m2 step 10\nrun TMZ")
         d = first_error(src)
         assert d["code"] == "over-budget"
-        assert d["line"] == 15                 # the `sweep` line
+        assert d["line"] == next(i for i, ln in enumerate(src.split("\n"), 1)
+                                 if ln.startswith("sweep dose"))
         assert "100 runs" in d["message"]
         assert str(DEFAULT_MAX_RUNS) in d["message"]
         assert d["hint"] == "allow runs 100"
@@ -480,9 +496,11 @@ class TestSweepExpansion:
 # --------------------------------------------------------------------------- #
 class TestCapability:
     def test_marker_state_mode_on_the_319_panel_is_an_error(self):
-        d = first_error(STUPP.replace("state_mode oxygen", "state_mode markers"))
+        src = STUPP.replace("state_mode oxygen", "state_mode markers")
+        d = first_error(src)
         assert d["code"] == "capability"
-        assert d["line"] == 17
+        assert d["line"] == next(i for i, ln in enumerate(src.split("\n"), 1)
+                                 if "state_mode markers" in ln)
         assert "hypoxia" in d["message"]
         assert "cell_state_impact" in d["message"]
 
@@ -535,7 +553,7 @@ class TestDrugSources:
         src = STUPP.replace(f'smiles "{TMZ_SMILES}"', 'library "doxorubicin"')
         d = first_error(src)
         assert d["code"] == "gdsc-absent"
-        assert d["line"] == 2
+        assert d["line"] == 2               # the `ic50 from gdsc` line
         assert "literature" in d["message"]     # names what it refused to accept
 
     def test_ic50_from_gdsc_errors_when_no_identity_can_be_established(self):
@@ -636,6 +654,7 @@ class TestDrugSources:
             d = first_error(src)
             assert d["code"] == "incomplete-parameters"
             assert "diffusivity" in d["message"]
+            assert "molecular_weight" in d["message"]
         finally:
             os.remove(path)
 
@@ -812,6 +831,173 @@ class TestRoutes:
         assert r.status_code == 200
         assert r.json()["path"].startswith("uploads/")
         assert ".." not in r.json()["path"]
+
+
+# --------------------------------------------------------------------------- #
+class TestEditorWire:
+    """The second projection: `app/web/js/protocol/api.js`'s frozen wire shape.
+
+    Both projections ride in one payload under disjoint keys (see
+    ``app/server/protocol_wire.py``); these pin the mapping so a change to one
+    cannot silently break the other client.
+    """
+
+    @pytest.fixture(scope="class")
+    def client(self):
+        from fastapi.testclient import TestClient
+
+        from app.server.api import create_app
+        from app.server.jobs import JobManager
+
+        manager = JobManager(root=tempfile.mkdtemp(prefix="tpl-wire-"),
+                             start_worker=False)
+        with TestClient(create_app(manager)) as c:
+            yield c
+
+    def test_validate_carries_both_projections(self, client):
+        body = client.post("/api/protocol/validate",
+                           json={"source": STUPP}).json()
+        assert body["ok"] is True
+        assert body["n_runs"] == body["run_count"] == 1
+        assert body["symbols"] == {"drugs": ["TMZ"],
+                                   "protocols": ["stupp_adjuvant"],
+                                   "sweeps": []}
+        assert body["errors"] == []
+        assert body["warnings"] and all("line" in w for w in body["warnings"])
+
+    def test_the_two_column_conventions_differ_by_exactly_one(self, client):
+        bad = STUPP.replace("dose 150 mg/m2", "dose 150")
+        body = client.post("/api/protocol/validate", json={"source": bad}).json()
+        contract = [d for d in body["diagnostics"] if d["severity"] == "error"][0]
+        editor = body["errors"][0]
+        assert contract["line"] == editor["line"]
+        assert editor["col"] == contract["col"] - 1        # 1-based -> 0-based
+        assert editor["end_col"] == contract["end_col"] - 1
+        assert editor["remedy"] == contract["hint"]
+
+    def test_plan_axes_and_coords_index_the_grid(self, client):
+        src = STUPP.replace("run TMZ",
+                            "sweep dose from 100 to 200 mg/m2 step 50\nrun TMZ")
+        body = client.post("/api/protocol/plan", json={"source": src}).json()
+        assert body["run_count"] == 3
+        assert body["axes"] == [{"name": "dose", "unit": "mg/m2",
+                                 "values": [100.0, 150.0, 200.0]}]
+        assert [r["coords"] for r in body["runs"]] == [[0], [1], [2]]
+        assert [m["key"] for m in body["metrics"]] == [
+            "coverage", "kill", "mean_auc", "penetration_length"]
+        assert body["refusal"] is None
+        assert body["estimated_cost_s"] > 0
+        assert "ESTIMATE, not a measurement" in body["cost_note"]
+        # the contract's own field still refuses to guess
+        assert body["estimated_cost"]["wall_time_s"] is None
+
+    def test_a_fixed_sweep_is_not_a_grid_dimension(self, client):
+        src = STUPP.replace("run TMZ", "sweep dx 12 um\nrun TMZ")
+        body = client.post("/api/protocol/plan", json={"source": src}).json()
+        assert body["axes"] == []          # one point is not an axis
+        assert body["run_count"] == 1
+
+    def test_the_dose_to_pk_assumptions_are_renderable_sentences(self, client):
+        body = client.post("/api/protocol/plan", json={"source": STUPP}).json()
+        assumptions = body["assumptions"]
+        assert assumptions and all(isinstance(a, str) for a in assumptions)
+        joined = " ".join(assumptions)
+        assert "1.73 m2" in joined                     # the BSA conversion
+        assert "PMID" in joined                        # a citation travels
+        assert "time_resolved" in joined
+        assert body["caveats"] and all(isinstance(c, str) for c in body["caveats"])
+
+    def test_over_budget_becomes_a_refusal_with_insertable_tpl(self, client):
+        src = STUPP.replace(
+            "run TMZ", "sweep dose from 10 to 1000 mg/m2 step 10\nrun TMZ")
+        body = client.post("/api/protocol/plan", json={"source": src}).json()
+        ref = body["refusal"]
+        assert body["ok"] is False
+        assert ref["code"] == "max_runs_exceeded"
+        assert ref["run_count"] == 100 and ref["max_runs"] == DEFAULT_MAX_RUNS
+        assert ref["remedy_text"] == "allow runs 100"
+        assert ref["remedy_line"] == ref["line"] > 0
+
+    def test_a_rejected_plan_still_has_the_shape_of_a_plan(self, client):
+        body = client.post("/api/protocol/plan",
+                           json={"source": "drug\n"}).json()
+        assert body["ok"] is False
+        for key in ("runs", "axes", "metrics", "assumptions", "caveats",
+                    "errors", "warnings", "diagnostics"):
+            assert isinstance(body[key], list), key
+        assert body["run_count"] == 0
+
+    def test_confirm_run_count_mismatch_is_a_409(self, client):
+        r = client.post("/api/protocol/run",
+                        json={"source": STUPP, "confirm_run_count": 7})
+        assert r.status_code == 409
+        assert "confirmed 7 runs" in r.json()["detail"]["message"]
+        assert r.json()["detail"]["run_count"] == 1
+
+    def test_confirm_run_count_that_agrees_is_accepted(self, client):
+        r = client.post("/api/protocol/run",
+                        json={"source": STUPP, "confirm_run_count": 1,
+                              "max_window_s": 300})
+        assert r.status_code == 202
+        body = r.json()
+        assert body["sweep_id"] == body["run_id"]
+        assert body["run_count"] == 1
+        assert body["runs"][0]["run_id"] is None
+        assert "one job" in body["runs"][0]["run_id_reason"].lower()
+
+    def test_the_sweeps_alias_serves_the_same_job(self, client):
+        rid = client.post("/api/protocol/run",
+                          json={"source": STUPP, "max_window_s": 300}
+                          ).json()["run_id"]
+        sweep = client.get(f"/api/protocol/sweeps/{rid}").json()
+        assert sweep["sweep_id"] == rid
+        assert sweep["status"] in ("queued", "running", "done")
+        assert set(sweep["counts"]) >= {"queued", "running", "done", "failed",
+                                        "cancelled"}
+        # /runs/{id} carries BOTH projections
+        both = client.get(f"/api/protocol/runs/{rid}").json()
+        assert both["run_id"] == both["sweep_id"] == rid
+        assert "grid" in both and "runs" in both
+
+    def test_cancelling_a_sweep_is_cooperative_and_says_so(self, client):
+        rid = client.post("/api/protocol/run",
+                          json={"source": STUPP, "max_window_s": 300}
+                          ).json()["run_id"]
+        out = client.delete(f"/api/protocol/sweeps/{rid}").json()
+        assert out["cancelled"] is True
+        assert "next run boundary" in out["reason"]
+        assert client.delete("/api/protocol/sweeps/r_99999").status_code == 404
+
+    def test_multipart_upload_is_parsed_without_python_multipart(self, client):
+        import importlib
+
+        with pytest.raises(ImportError):
+            importlib.import_module("multipart")     # the dependency is absent
+        body = (b'--BND\r\nContent-Disposition: form-data; name="file"; '
+                b'filename="tpl_mp.smi"\r\n\r\n'
+                + TMZ_SMILES.encode() + b" temozolomide\n\r\n--BND--\r\n")
+        r = client.post("/api/protocol/upload", content=body,
+                        headers={"content-type":
+                                 "multipart/form-data; boundary=BND"})
+        assert r.status_code == 200
+        out = r.json()
+        assert out["file"] == {"name": "tpl_mp.smi",
+                               "size": len(TMZ_SMILES) + len(" temozolomide\n"),
+                               "format": "smi"}
+        fields = out["drug"]["fields"]
+        assert set(fields) == {"ic50", "hill", "diffusivity", "binding",
+                               "clearance", "bbb_penetrance",
+                               "molecular_weight"}
+        assert fields["ic50"]["provenance"] == "measured"
+        assert fields["hill"]["provenance"] == "flagged-default"
+        assert out["drug"]["identity"] == "temozolomide"
+        assert out["caveats"]
+
+    def test_a_multipart_body_with_no_file_part_is_a_400(self, client):
+        r = client.post("/api/protocol/upload", content=b"--BND--\r\n",
+                        headers={"content-type":
+                                 "multipart/form-data; boundary=BND"})
+        assert r.status_code == 400
 
 
 # --------------------------------------------------------------------------- #

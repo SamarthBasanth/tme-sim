@@ -382,17 +382,27 @@ class Parser:
                     code="expected-field")
             fld = self.drug_field(name_tok.text)
             if fld.name in seen:
+                prev_line, prev_gdsc = seen[fld.name]
+                if fld.name == "ic50" and (prev_gdsc or fld.source is not None):
+                    raise self._fail(
+                        tok, f"drug {name_tok.text}: both `ic50 from gdsc` and "
+                             f"an explicit `ic50` value are given (line "
+                             f"{prev_line} and line {tok.line}). Pick one — a "
+                             "measurement and an override cannot both be the "
+                             "provenance of one number.",
+                        code="conflicting-ic50")
                 raise self._fail(
                     tok, f"drug {name_tok.text}: field {fld.name!r} is set "
-                         f"twice (first on line {seen[fld.name]}).",
+                         f"twice (first on line {prev_line}).",
                     code="duplicate-field")
-            seen[fld.name] = tok.line
+            seen[fld.name] = (tok.line, fld.source is not None)
             node.fields.append(fld)
 
     def drug_field(self, drug_name: str) -> A.DrugField:
         tok = self.next()
         fname = tok.text
         if fname not in A.OVERRIDABLE_FIELDS:
+            _unclosed_if_top_keyword(self, tok, f"drug {drug_name}")
             raise self._fail(
                 tok, f"drug {drug_name}: {fname!r} is not an overridable "
                      f"field. Overridable: "
@@ -531,6 +541,7 @@ class Parser:
                 tok, f"{label}: a rest period is written `then rest {'{N}'} d`.",
                 code="expected-keyword", hint="add the `then`")
         else:
+            _unclosed_if_top_keyword(self, tok, label)
             raise self._fail(
                 tok, f"{label}: unknown protocol statement {word!r}. Valid: "
                      "route, dose, every, repeat, then rest, cycles.",
@@ -723,6 +734,7 @@ class Parser:
                 opts.rank_by_line, opts.rank_by_col = m.line, m.col
                 self.expect_newline("rank by")
             else:
+                _unclosed_if_top_keyword(self, tok, label)
                 raise self._fail(
                     tok, f"{label}: unknown option {word!r}. Valid options: "
                          f"{', '.join(valid)}.", code="unknown-option")
@@ -767,6 +779,20 @@ class Parser:
 # --------------------------------------------------------------------------- #
 # helpers
 # --------------------------------------------------------------------------- #
+def _unclosed_if_top_keyword(parser: Parser, tok: Token, label: str) -> None:
+    """A top-level keyword inside a block means the block was never closed.
+
+    Reporting "unknown protocol statement 'run'" would send the reader looking
+    for a typo in a line that is perfectly valid; the actual mistake is the
+    missing `end` above it.
+    """
+    if tok.kind == "WORD" and tok.text in TOP_KEYWORDS:
+        raise parser._fail(
+            tok, f"{label}: block is never closed — `end` is missing before "
+                 f"this `{tok.text}` statement.",
+            code="unclosed-block", hint="add `end` above this line")
+
+
 def _metric(parser: Parser, tok: Token) -> str:
     name = tok.text
     if name in A.METRICS:
