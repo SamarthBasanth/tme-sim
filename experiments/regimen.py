@@ -1244,6 +1244,7 @@ def write_report(out: Dict, path: str) -> None:
     rows = out["regimen_rows"]
     combo = out["combination"]
     tau = tmzp["tau_tissue_s"]
+    out.setdefault("tmz_kernel_key", f"temozolomide@{TMZ_HALF_LIFE_H}")
 
     w("# REAL TEMOZOLOMIDE REGIMENS, AND COMBINATION SCHEDULING, ON ONE REAL TUMOR")
     w("")
@@ -1365,7 +1366,8 @@ def write_report(out: Dict, path: str) -> None:
     w("### 1.1 One solve per single dose, then EXACT superposition")
     w("")
     w("A 28-day cycle at `dt = 10 s` is 241,920 steps per shape, and there are "
-      "nine regimen shapes. Solving each directly is not affordable. It is also "
+      f"{len(REGIMENS)} regimen shapes. Solving each directly is not affordable. It "
+      "is also "
       "not necessary, and the reason is exact rather than approximate.")
     w("")
     w("The discrete solve is **linear** in the plasma profile (the operator "
@@ -1404,14 +1406,25 @@ def write_report(out: Dict, path: str) -> None:
     w("")
     w("| single-dose kernel | plasma t1/2 (h) | windows solved (h) | saturation "
       "window S (h) | un-delivered plasma at S | tissue still holding at S | "
-      "**certified error** |")
-    w("|---|---:|---|---:|---:|---:|---:|")
+      "certified error | substitution USED? |")
+    w("|---|---:|---|---:|---:|---:|---:|---|")
     for key, km in out["kernel_meta"].items():
         name, hl = key.split("@")
+        used = key == out["tmz_kernel_key"]
         w(f"| {name} | {float(hl):.2f} | "
           f"{', '.join(f'{g:.0f}' for g in km['grid_h'])} | {km['sat_h']:.0f} | "
           f"{km['plasma_residual']:.2e} | {km['tissue_residual']:.2e} | "
-          f"**{km['residual']:.2e}** |")
+          f"{'**' if used else ''}{km['residual']:.2e}{'**' if used else ''} | "
+          f"{'**YES** (28-day regimen leg)' if used else 'no — exact grid only'} |")
+    w("")
+    w("Read the last column before the second-to-last. Only the "
+      "temozolomide kernel that drives the 28-day regimen leg ever *uses* the "
+      "saturated field, and its certified error is the one that matters. Every "
+      "other kernel is read at exact grid points, so its 'certified error' "
+      "column is informational — the doxorubicin 30 h row in particular shows a "
+      "large number precisely because a 30 h half-life has NOT washed out by 24 "
+      "h, which is exactly why the code refuses to substitute there and solves "
+      "each window it needs.")
     w("")
     tmz_km = out["kernel_meta"][out["tmz_kernel_key"]]
     w(f"The substitution is only ever *used* for the temozolomide kernel driving "
@@ -1703,7 +1716,7 @@ def write_report(out: Dict, path: str) -> None:
           f"**{r['mean_auc_tumor']:.10g}** | "
           f"{r['auc_rel_to_best']*100:+.6f}% | {e:.10g} | "
           f"{(e-ref_eff)/ref_eff*100:+.6f}% | {r['kill_expected']:.8f} | "
-          f"{r['ic50_coverage']*100:.2f}% | {r['residual']*100:.4f}% |")
+          f"{r['ic50_coverage']*100:.2f}% | {r['residual']*100:.3e}% |")
     w("")
     w(f"**Total spread in mean tumour exposure: "
       f"{_pct(out['matched_exposure_spread'], 6)}.** The analytic bound is "
@@ -1760,21 +1773,33 @@ def write_report(out: Dict, path: str) -> None:
     w("    A = M^-1 ( S_total - C(T) )")
     w("```")
     w("")
-    w("`S_total` is **identical** for any two schedules at matched cumulative "
-      "exposure — that is what matched means, and the implementation guarantees "
-      "it exactly (the plasma curve is sampled on the solver's own step grid). "
-      "So the entire schedule effect is the **terminal residual `C(T)`**: drug "
-      "delivered but still in flight when the window closes. Read the last two "
-      "columns of the table above together — every regimen whose exposure differs "
-      "from the best is a regimen with a non-negligible terminal residual, and "
-      "they are precisely the ones that are still dosing near day 28.")
+    pure = (ref_eff - min(eff)) / ref_eff
+    plasma_term = out["matched_exposure_spread"] - pure
+    w("`S_total` — the drug the solver actually injects over `[0, T]` — is "
+      "**identical** for any two schedules at matched *counted* exposure, and "
+      "when it is, the entire schedule effect is the terminal residual `C(T)`. "
+      "That is the pure-transport term, and here it is "
+      f"**{_pct(pure, 6)}**.")
     w("")
-    w("Concretely: the 5/28, 21/28 and 7/7 regimens all finish dosing at least "
-      "seven days before the window closes, so their drug has washed out "
-      "completely and they realise the **full** steady-state exposure field — "
-      "they are identical to each other to the last stored digit. Only the "
-      "continuous daily regimens, which dose on day 28 itself, lose anything, "
-      "and what they lose is one day's terminal residual out of 28 days of dosing.")
+    w("Matching *administered* mg/m2 rather than counted exposure adds the "
+      f"second term, and on a 28-day window that second term **dominates**: "
+      f"{_pct(plasma_term, 6)} of the total "
+      f"{_pct(out['matched_exposure_spread'], 6)} is drug whose plasma curve had "
+      f"not finished running when the window closed, versus {_pct(pure, 6)} of "
+      f"genuine terminal residual — a ratio of about {plasma_term / pure:.0f} to "
+      "1. **The larger of the two effects is therefore a bookkeeping artefact of "
+      "where the window edge falls, not physics.** Both are reported so that "
+      "neither can be quoted as the other, and section 4.3 re-measures the pure "
+      "term alone at three window lengths.")
+    w("")
+    w("Concretely, the mechanism is visible in the table: the 5/28, 21/28, 7/7 "
+      "and single-bolus arms all finish dosing at least seven days before the "
+      "window closes, so their drug has washed out completely, they realise the "
+      "**full** steady-state exposure field, and they are identical to one "
+      "another **to every stored digit** — four schedule families ranging from 1 "
+      "to 21 fractions, indistinguishable. Only the two continuous-daily arms, "
+      "which dose on day 28 itself, differ at all, and only in the last dose\'s "
+      "tail.")
     w("")
     w("### 4.2 The same comparison up the dose axis")
     w("")
@@ -1813,8 +1838,9 @@ def write_report(out: Dict, path: str) -> None:
     w("")
     w("`tau_tissue / T_window` is the whole story, which means the size of the "
       "measured schedule effect is a **reporting choice** as much as a physical "
-      "one. The same burst-vs-continuous contrast, at matched cumulative dose, "
-      "re-measured over three windows:")
+      "one. The same burst-vs-continuous contrast — now matched on **counted "
+      "plasma exposure**, so this is the PURE transport term of section 4.1 with "
+      "the window-truncation artefact removed — re-measured over three windows:")
     w("")
     w("| window | burst 5/28 mean tumour AUC | continuous daily mean tumour AUC | "
       "single bolus | measured spread | bound tau/T |")
@@ -1874,6 +1900,19 @@ def write_report(out: Dict, path: str) -> None:
                        for l, _ in INTRADAY_SCHEDULES)
           + f" | **{row['spread_expected']:.2e}** |")
     w("")
+    amps = [r["spread_expected"] for r in idy["amplitude"]]
+    if len(amps) >= 2 and amps[-1] < max(amps):
+        top = idy["amplitude"][int(np.argmax(amps))]
+        w(f"Note that the absolute kill spread **peaks and then falls** — it is "
+          f"largest at {top['mult']:.0f}x ({max(amps):.2e}) and smaller again at "
+          f"{idy['amplitude'][-1]['mult']:.0f}x ({amps[-1]:.2e}). A fixed "
+          f"*relative* change in exposure produces the largest *absolute* change "
+          f"in kill where the Hill curve is steepest, and the top amplitude here "
+          f"is already pressed against the kill ceiling "
+          f"({out['kill_ceiling']:.4f}), where every schedule converges on the "
+          f"same saturated answer. **Escalating dose does not amplify a schedule "
+          f"difference indefinitely; it eventually erases it.**")
+        w("")
     w("---")
     w("")
 
@@ -2131,11 +2170,13 @@ def write_report(out: Dict, path: str) -> None:
     w("")
     w("> **1. At matched cumulative dose over a real 28-day cycle, this model "
       "cannot tell the real temozolomide regimens apart.** The spread in mean "
-      f"tumour exposure is {_pct(out['matched_exposure_spread'], 6)} across nine "
-      f"arms spanning 1 to 28 fractions, against the derived bound "
-      f"{_pct(out['matched_bound_tau_over_T'], 6)}. Regimens that finish dosing "
-      "more than a day before the window closes are identical to each other to "
-      "the stored digit.")
+      f"tumour exposure is {_pct(out['matched_exposure_spread'], 6)} across "
+      f"{len(REGIMENS)} arms spanning 1 to 28 fractions, against the derived bound "
+      f"{_pct(out['matched_bound_tau_over_T'], 6)} — and of that spread, only "
+      f"{_pct(pure, 6)} is transport at all; the rest is the window edge cutting "
+      "off the last dose's plasma tail. Every regimen that finishes dosing more "
+      "than a day before the window closes — 1 fraction, 5, 14, 21 — is "
+      "identical to every other one **to the last stored digit**.")
     w(">")
     w("> **2. That indistinguishability is a structural fact about transport, "
       "not a finding about temozolomide.** The entire schedule channel in a "
