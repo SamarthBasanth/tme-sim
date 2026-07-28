@@ -23,3 +23,6 @@ results/export_runs/
 # Runtime upload directory for TPL "drug ... from file" (contents are user data)
 app/uploads/*
 !app/uploads/.gitkeep
+
+# Regenerable stage cache for the immune-sink sweep (delete to force recompute)
+results/immune_sink_impact_cache.pkl

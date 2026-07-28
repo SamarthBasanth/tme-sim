@@ -1043,6 +1043,43 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
           f"{100 * (m['coverage_1.0x'] - z['coverage_1.0x']):+.2f} | "
           f"{100 * (m['kill_fraction'] - z['kill_fraction']):+.2f} |")
     a("")
+    a("**Read the three drugs against each other — the asymmetry is the useful "
+      "part, and it is not about the sink.** The AUC column is nearly identical "
+      "across drugs, because the sink is applied with the same `S` to all three "
+      "and the transport is close to linear in it. What differs is how that same "
+      "fractional exposure loss TRANSLATES, and the translator is each drug's "
+      "position on its own Hill curve:")
+    a("")
+    tbl = []
+    for name in DRUGS:
+        sub = [x for x in sw["rows"] if x["drug"] == name]
+        z = next(x for x in sub if x["strength"] == 0.0)
+        m = max(sub, key=lambda x: x["strength"])
+        auc_rel = m["mean_auc_uM_s"] / z["mean_auc_uM_s"] if z["mean_auc_uM_s"] else float("nan")
+        kill_rel = m["kill_fraction"] / z["kill_fraction"] if z["kill_fraction"] else float("nan")
+        tbl.append((name, z["mean_exposure_uM"] / z["ic50_uM"] if z["ic50_uM"] else float("nan"),
+                    auc_rel, kill_rel, z["coverage_1.0x"], m["coverage_1.0x"]))
+    a("| drug | mean exposure / IC50 at S=0 | AUC retained at S_max | "
+      "**kill retained** at S_max | coverage @1x IC50, S=0 -> S_max |")
+    a("|---|---|---|---|---|")
+    for name, ratio, auc_rel, kill_rel, c0, c1 in tbl:
+        a(f"| {name} | {_f(ratio, 4)} | {_f(auc_rel, 4)}x | "
+          f"**{_f(kill_rel, 4)}x** | {_f(c0)} -> {_f(c1)} |")
+    a("")
+    a("A drug sitting FAR BELOW its IC50 is on the steep, near-proportional part "
+      "of the Hill curve, so a given fractional exposure loss costs it nearly the "
+      "same fraction of its kill. A drug sitting AT or ABOVE its IC50 for much of "
+      "the tissue is partly saturated, so the same fractional exposure loss costs "
+      "it proportionally less kill — but costs it a great deal of COVERAGE, "
+      "because coverage is a threshold count and the threshold is exactly where "
+      "its cells are. Temozolomide is the extreme of the first case (its "
+      "coverage at 1x IC50 is 0.0000 at every strength — 606 uM is simply "
+      "unreachable in this tissue, so the metric cannot move) and doxorubicin of "
+      "the second (coverage collapses while kill is comparatively defended). "
+      "**The practical consequence: which metric is sensitive to a delivery "
+      "insult depends on the drug, and reporting only one of AUC / coverage / "
+      "kill would have hidden two-thirds of this effect.**")
+    a("")
     a("### 4.1 The cross-drug ranking")
     a("")
     a("| S | ranking by predicted kill | by coverage @1x IC50 | by mean tumour AUC |")
@@ -1121,6 +1158,23 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
         hi = "inf" if not np.isfinite(d["hi_um"]) else f"{d['hi_um']:.0f}"
         a(f"| {d['lo_um']:.0f}-{hi} um | {d['n']:,} | "
           f"{_f(d['auc_base_mean'], 1)} | **{_f(d['attenuation_mean'], 4)}** |")
+    a("")
+    a("**This table is NOT independent corroboration of Miller's length scale, "
+      "and must not be read as such.** The kernel bandwidth was CHOSEN as "
+      f"{IMMUNE_KERNEL_BANDWIDTH_UM:.0f} um from that same measurement (§2.1), "
+      "so the model was told what length scale to have and the fact that it has "
+      "it is arithmetic, not evidence. What the table does show that is not "
+      "circular is the SHAPE: the deficit is monotone over every bin, it does "
+      "not saturate until well beyond the bandwidth (because drug also diffuses "
+      "in from further away, which is exactly the non-local effect an AUC "
+      "rescale could not have produced), and the worst-off cells are a small "
+      "minority — "
+      f"{sp['distance_bins'][0]['n']:,} of {sp['n_tumor']:,} tumour cells lie "
+      "within 10 um of a macrophage. Note also that the sink-OFF AUC column "
+      "falls monotonically with distance too: cells near macrophages are in "
+      "denser, better-perfused tissue and started with MORE drug, so the "
+      "attenuation column is the right comparison and the raw exposure column "
+      "would point the other way.")
     a("")
     a("### 5.3 The permutation null")
     a("")
