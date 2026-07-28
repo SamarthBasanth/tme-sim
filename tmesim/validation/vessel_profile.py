@@ -433,16 +433,7 @@ def _d_half(value, nd: int = 1, never: str = D_HALF_NEVER) -> str:
     return never if not np.isfinite(v) else f"{v:.{nd}f}"
 
 
-def _d_half_u(value, nd: int = 1, unit: str = " µm") -> str:
-    """:func:`_d_half` with the UNIT inside, so a missing half-distance never
-    renders as ``"n/a (never halves) µm"`` — which reads like a quantity that has
-    units, i.e. exactly the misreading this whole guard exists to prevent."""
-    text = _d_half(value, nd)
-    return text if text == D_HALF_NEVER else f"{text}{unit}"
-
-
-def _d_half_range(a, b, nd: int = 0, never: str = D_HALF_NEVER,
-                  unit: str = " µm") -> str:
+def _d_half_range(a, b, nd: int = 0, never: str = D_HALF_NEVER) -> str:
     """``lo-hi`` across two arms, or :data:`D_HALF_NEVER` if either arm never halves."""
     vals = []
     for x in (a, b):
@@ -453,7 +444,7 @@ def _d_half_range(a, b, nd: int = 0, never: str = D_HALF_NEVER,
         if not np.isfinite(v):
             return never
         vals.append(v)
-    return f"{min(vals):.{nd}f}–{max(vals):.{nd}f}{unit}"
+    return f"{min(vals):.{nd}f}–{max(vals):.{nd}f}"
 
 
 def _clean(distance_um, value, weight):
@@ -1448,9 +1439,9 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         f"{_d_half(dhalf(dx30,'doxorubicin'))} µm vs temozolomide "
         f"{_d_half(dhalf(dx30,'temozolomide'))} µm. **Honest range across the two "
         "physically-sane arms: doxorubicin d½ ≈ "
-        f"{_d_half_range(dhalf(prim,'doxorubicin'), dhalf(dx30,'doxorubicin'))}, "
+        f"{_d_half_range(dhalf(prim,'doxorubicin'), dhalf(dx30,'doxorubicin'))} µm, "
         "temozolomide d½ ≈ "
-        f"{_d_half_range(dhalf(prim,'temozolomide'), dhalf(dx30,'temozolomide'))}.**",
+        f"{_d_half_range(dhalf(prim,'temozolomide'), dhalf(dx30,'temozolomide'))} µm.**",
         "",
         "---",
         "",
@@ -1499,8 +1490,8 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     L += [
         "",
         "The **final-concentration** field gives essentially the same profile "
-        f"(doxorubicin empirical d½ {_d_half_u(dox['conc']['empirical_d_half_um']) if dox else 'n/a'}, "
-        f"temozolomide {_d_half_u(tmz['conc']['empirical_d_half_um']) if tmz else 'n/a'}) — "
+        f"(doxorubicin empirical d½ {_d_half(dox['conc']['empirical_d_half_um']) if dox else 'n/a'} µm, "
+        f"temozolomide {_d_half(tmz['conc']['empirical_d_half_um']) if tmz else 'n/a'} µm) — "
         "expected, because with a constant-source window the field is quasi-steady, so "
         "`AUC ≈ C_steady · Δt` and the two share a spatial shape. It is *not* an "
         "independent check, but it does rule out the profile being an artefact of "
@@ -1516,8 +1507,7 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         "measures what that alone buys: an apparent half-distance of "
         f"**{_d_half(sn['empirical_d_half_um'])} µm** with no drug physics at all. On the "
         f"primary arm the drugs sit clearly above it "
-        f"({_d_half_u(dhalf(prim,'doxorubicin'))} and "
-        f"{_d_half_u(dhalf(prim,'temozolomide'))}, "
+        f"({_d_half(dhalf(prim,'doxorubicin'))} and {_d_half(dhalf(prim,'temozolomide'))} µm, "
         f"correlations {dox['corr_with_source']:.2f} and {tmz['corr_with_source']:.2f}), "
         "so transport is doing real work — but a meaningful part of the profile is still "
         "vessel/KDE geometry, and that share must be subtracted mentally before reading "

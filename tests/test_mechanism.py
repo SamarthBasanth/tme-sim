@@ -423,8 +423,10 @@ def test_validate_accepts_the_new_fields_and_warns_about_the_static_plateau():
 
 @pytest.fixture(scope="module")
 def client(tmp_path_factory):
-    jobs = JobManager(root=str(tmp_path_factory.mktemp("mech_runs")))
+    root = str(tmp_path_factory.mktemp("mech_runs"))
+    jobs = JobManager(root=root)
     with TestClient(create_app(jobs)) as c:
+        c._manager_root = root      # type: ignore[attr-defined]
         yield c
     jobs.shutdown()
 
@@ -534,3 +536,46 @@ def test_quiescent_cells_sit_exactly_on_the_threshold_and_are_kept():
     diag = _diag(ratio=[4.0, 4.0], modulation=[0.5, 0.35], p_kill=[0.4, 0.28])
     got = classify(np.full(2, int(CellType.TUMOR)), diag, th)
     assert list(got) == [SURVIVED_RESISTANT, SURVIVED_RESISTANT]
+
+
+def test_done_is_not_announced_before_the_payloads_are_on_disk(client):
+    """`done` is the signal the UI acts on, so it must not precede the writes.
+
+    The poller flips to `done` and immediately fetches geometry, mechanism and
+    time-lapse. A run that announces completion mid-write would 409 on payloads
+    it had in fact produced — and the window is no longer narrow now that a
+    time-lapse is tens of megabytes.
+    """
+    import app.server.jobs as jobs_mod
+
+    seen = {}
+    real_persist = jobs_mod.JobManager._persist
+
+    def spy(self, job, payloads, status=None):
+        # What an observer would see the instant before the writes begin.
+        seen["status_at_persist"] = job.status
+        seen["names"] = sorted(payloads or {})
+        return real_persist(self, job, payloads, status)
+
+    jobs_mod.JobManager._persist = spy
+    try:
+        run_id = client.post("/api/runs", json=_SPEC).json()["run_id"]
+        assert _await(client, run_id)["status"] == "done"
+    finally:
+        jobs_mod.JobManager._persist = real_persist
+
+    assert seen["status_at_persist"] != "done", (
+        "the job was already advertising 'done' while its payloads were still "
+        "being written")
+    assert "timelapse" in seen["names"] and "mechanism" in seen["names"]
+
+    # And the document that landed says done, not running.
+    import json as _json
+    import os as _os
+    doc = _json.load(open(_os.path.join(
+        client._manager_root, run_id, "result.json")))
+    assert doc["status"] == "done" and doc["progress"] == 1.0
+
+    # The payloads a UI would ask for the instant it sees `done` are all there.
+    for path in ("geometry", "mechanism", "timelapse"):
+        assert client.get(f"/api/runs/{run_id}/{path}").status_code == 200

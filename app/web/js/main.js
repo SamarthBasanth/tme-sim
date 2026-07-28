@@ -694,6 +694,14 @@ async function loadMechanism(id, run) {
       && err.payload.detail.reason)
       || (run && run.mechanism_reason) || (err && err.message);
     msg.textContent = 'no mechanism attribution: ' + reason;
+    // A run that simply has no attribution is an ordinary state and the line
+    // above is enough. A payload that does not LINE UP with the geometry is
+    // not: it would be a map of the wrong cells, so it is escalated rather
+    // than left in the status bar. setLabels throws before installing
+    // anything, so nothing misaligned is ever on screen when this fires.
+    if (err instanceof Error && /refusing to render a misaligned/.test(err.message)) {
+      notifyError('Mechanism payload does not match the geometry', err);
+    }
   }
 }
 

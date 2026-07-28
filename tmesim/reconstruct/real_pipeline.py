@@ -296,6 +296,7 @@ def _install_states(
     genes=None,
     state_kwargs: Optional[Dict] = None,
     cfg: Optional[OxygenConfig] = None,
+    source: str = "xenium",
 ) -> Dict:
     """Optionally overwrite ``micro.cells.state`` and describe where it came from.
 
@@ -350,36 +351,75 @@ def _install_states(
         # from that one analysis module.
         ocfg = cfg if cfg is not None else OxygenConfig()
         field, info = oxygen_from_vessel_distance(micro, ocfg, detail=True, **kw)
+
+        # REFUSE rather than silently label. With no vessel point the distance
+        # transform is +inf everywhere, the field collapses to all-zero, and
+        # update_cell_states would call EVERY cell HYPOXIC — a 100% hypoxic
+        # section that looks like a result and is actually an empty input.
+        n_points = info.get("n_points")
+        if not n_points:
+            raise ValueError(
+                "state_mode='vessel_distance' is unavailable on this "
+                "reconstruction: it found NO vessel point to measure distance "
+                f"from (n_points={n_points!r}, source={info.get('source')!r}). "
+                "Every cell would be labelled HYPOXIC by construction, which is "
+                "an artefact of an empty input and not a state. This section's "
+                "panel carries no usable endothelial marker — use "
+                "state_mode='oxygen', or 'markers' if the panel supports it."
+            )
+
         update_cell_states(micro, np.asarray(field, dtype=np.float64), ocfg)
         tumor = np.asarray(micro.cells.cell_type) == int(CellType.TUMOR)
+        # On a Visium reconstruction the ENDOTHELIAL "cells" are not measured
+        # cells at all: reconstruct.real_visium._place_cells SYNTHESISES
+        # round(frac * 12) pseudo-cells per spot at the spot centroid with a
+        # seeded uniform-disc jitter. Distance to them is therefore distance to a
+        # deconvolved 100 um spot grid, not to a measured vessel, and the caveat
+        # must say so rather than inheriting the Xenium wording.
+        source_is_measured = str(source).strip().lower() == "xenium"
+        positions = (
+            "the endothelial positions are MEASURED cell centroids"
+            if source_is_measured else
+            "the endothelial 'cells' are SYNTHESISED pseudo-cells placed by "
+            "deconvolution at the spot centroids with a seeded jitter "
+            "(reconstruct.real_visium._place_cells), NOT measured positions, so "
+            "this distance is a distance to a spot grid"
+        )
         return {
             "state_mode": "vessel_distance",
             "state_source": (
                 "cells.agents.update_cell_states banding the SURROGATE field "
-                f"exp(-d/L) in distance to the nearest {info['source']} vessel "
-                f"point (L = {info['diffusion_length_um']:.2f} um), at "
-                f"hypoxia_threshold = {ocfg.hypoxia_threshold:g}"
+                f"exp(-d/L) in distance to the nearest of {int(n_points)} "
+                f"{info['source']} vessel points (L = "
+                f"{info['diffusion_length_um']:.2f} um), at hypoxia_threshold = "
+                f"{ocfg.hypoxia_threshold:g}"
             ),
-            # The vessel POSITIONS are measured; the field banded from them is not
-            # an oxygen tension, so this route is not a measurement of a state.
+            # Even where the positions are measured, what is banded from them is
+            # not an oxygen tension, so this route never measures a STATE.
             "state_is_measured": False,
             "state_caveat": (
-                "NOT A MEASUREMENT OF A STATE, but traceable further than the "
-                "default: the endothelial positions are MEASURED and the length "
-                "scale is the published Thomlinson & Gray oxygen-diffusion "
-                "distance (PMID 13304213), yet the field itself is a monotone "
-                "GEOMETRIC proxy and its absolute level is uncalibrated. On the "
-                "sections tested in results/cell_state_impact.md it calls 91-100% "
-                "of tumour cells VIABLE, so its dx-stability (1.00x) is partly the "
-                "stability of a near-constant. Its band OCCUPANCIES differ from "
-                "the default's enough to move absolute kill by up to 0.3252 "
+                "NOT A MEASUREMENT OF A STATE. It is traceable further than the "
+                f"default — {positions}, and the length scale is the published "
+                "Thomlinson & Gray oxygen-diffusion distance (PMID 13304213) — "
+                "but the field itself is a monotone GEOMETRIC proxy and its "
+                "absolute level is uncalibrated. On the three Xenium sections "
+                "scored in results/cell_state_impact.md §2.1 it called 91-100% of "
+                "tumour cells VIABLE, so its 1.00x dx-stability was there partly "
+                "the stability of a near-constant; that figure is a property of "
+                "those sections and is NOT a prediction for this one — read the "
+                "fractions in this block instead. Its band OCCUPANCIES differ "
+                "from the default's enough to move absolute kill by up to 0.3252 "
                 "absolute (results/cell_state_impact.md §3.2)."
             ),
             "state_detail": {
                 "route": "vessel_distance",
-                "diffusion_length_um": info.get("diffusion_length_um"),
-                "vessel_source": info.get("source"),
                 "hypoxia_threshold": float(ocfg.hypoxia_threshold),
+                "positions_are_measured": bool(source_is_measured),
+                # The whole info block, as _install_oxygen does for its routes —
+                # it carries n_points / n_endothelial_cells / median_distance_um,
+                # which is what makes a degenerate labelling diagnosable.
+                "vessel_distance": {k: v for k, v in info.items()
+                                    if not hasattr(v, "shape")},
                 "fractions": {
                     "all": state_fractions_from_states(micro.cells.state),
                     "tumor": state_fractions_from_states(micro.cells.state, tumor),
@@ -484,7 +524,7 @@ def _reconstruct_xenium(
     state_info = _install_states(
         micro, state_mode,
         expression=data["expression"], genes=data["genes"],
-        state_kwargs=state_kwargs, cfg=OxygenConfig(),
+        state_kwargs=state_kwargs, cfg=OxygenConfig(), source="xenium",
     )
 
     micro.metadata = dict(micro.metadata)
@@ -545,7 +585,7 @@ def _reconstruct_visium(
     # Visium has no per-cell transcripts, so state_mode='markers' is refused here
     # rather than silently degrading (_install_states raises with the reason).
     state_info = _install_states(micro, state_mode, state_kwargs=state_kwargs,
-                                 cfg=OxygenConfig())
+                                 cfg=OxygenConfig(), source="visium")
     micro.metadata = dict(micro.metadata)
     micro.metadata["real_pipeline"] = {
         "source": "visium",

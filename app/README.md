@@ -342,7 +342,11 @@ solver step `dt` (which would take zero steps and report every exposure as 0);
 is *unmeasured*);
 `state_mode='markers'` on Visium (no per-cell transcripts) or on a panel carrying
 neither a proliferation nor a hypoxia-response transcript (nothing would be measured
-at all); `pk.plasma_peak <= 0`, `pk.half_life_s <= 0`, `pk.n_doses < 1`
+at all); `state_mode='vessel_distance'` on a panel with no endothelial marker in any
+registered panel map — no cell can then be typed ENDOTHELIAL, the distance transform
+has no point to measure from, and **every** cell would be labelled HYPOXIC by
+construction, so `reconstruct_real` refuses rather than returning a 100%-hypoxic
+section that looks like a result; `pk.plasma_peak <= 0`, `pk.half_life_s <= 0`, `pk.n_doses < 1`
 or fractional, `pk.dose_interval_s <= 0` with multiple doses; a non-numeric,
 negative, or non-`methylated`/`unmethylated` `mgmt`.
 

@@ -586,17 +586,44 @@ def state_route_support(section_id: str) -> Dict:
     (``results/cell_state_impact.md`` §1.1). ``genes_known`` says whether any
     verdict here is evidence at all.
 
+    ``endothelial_present`` is the equivalent gate for ``state_mode='vessel_
+    distance'``: without an endothelial marker no cell can be typed ENDOTHELIAL,
+    the distance transform has no point to measure from, and every cell would be
+    labelled HYPOXIC by construction. It is checked across EVERY registered panel
+    map, because which map is used is chosen from the panel that was actually
+    loaded (``marker_panels.select_marker_map``).
+
     Returns ``{genes_known, source, proliferation_present, proliferation_missing,
-    hypoxia_present, hypoxia_missing, cycle_specific_present}``.
+    hypoxia_present, hypoxia_missing, cycle_specific_present,
+    endothelial_present, endothelial_missing}``. Never raises — a malformed
+    ``section_id`` (the code editor can POST a list or an object) degrades to
+    "nothing is known", so ``POST /api/validate`` cannot 500 on it.
     """
+    from tmesim.core import CellType
     from tmesim.reconstruct.cell_state import (
         CELL_CYCLE_SPECIFIC_MARKERS,
         HYPOXIA_MARKERS,
         PROLIFERATION_MARKERS,
     )
+    from tmesim.reconstruct.marker_panels import PANEL_REGISTRY
+
+    if not isinstance(section_id, str):
+        return {
+            "genes_known": False, "source": None,
+            "proliferation_present": [], "proliferation_missing": [],
+            "cycle_specific_present": [],
+            "hypoxia_present": [], "hypoxia_missing": [],
+            "endothelial_present": [], "endothelial_missing": [],
+            "reason": (
+                f"section must be a string id, got {type(section_id).__name__}"),
+        }
 
     rec = lookup_section(section_id) or {}
     genes = set(section_genes(section_id))
+    endo_markers = sorted({
+        g for _name, mmap in PANEL_REGISTRY
+        for g in (mmap.get(CellType.ENDOTHELIAL) or ())
+    })
     present = lambda ms: [g for g in ms if g in genes]      # noqa: E731
     missing = lambda ms: [g for g in ms if g not in genes]  # noqa: E731
     return {
@@ -607,6 +634,8 @@ def state_route_support(section_id: str) -> Dict:
         "cycle_specific_present": present(CELL_CYCLE_SPECIFIC_MARKERS),
         "hypoxia_present": present(HYPOXIA_MARKERS),
         "hypoxia_missing": missing(HYPOXIA_MARKERS),
+        "endothelial_present": present(endo_markers),
+        "endothelial_missing": missing(endo_markers),
     }
 
 
@@ -986,12 +1015,39 @@ class ReconstructionCache:
             pass
 
     def known_speed(self, key: ReconKey) -> Optional[float]:
-        """Measured peak Darcy speed for this exact key, or ``None``."""
+        """Measured peak Darcy speed for this exact key, or ``None``.
+
+        ``state_mode`` is ignored when matching. ``physics.pressure.solve_ifp``
+        reads ``fields.vascular_density`` and the domain and never reads
+        ``cells.state``, so a speed recorded under one state route is an EXACT
+        measurement of the same quantity under another at the same
+        ``(section, dx, vascular_mode, oxygen_mode)``. Requiring the state route
+        to match too would throw that exact evidence away and fall back to the
+        cross-mesh tier, which takes the MAXIMUM speed over every recorded dx and
+        would then reject a dx the exact measurement says is fine.
+
+        The same is not true of the other four fields, which all change the
+        pressure solve or the mesh it runs on, so they are matched exactly.
+        """
         with self._lock:
             entry = self._entries.get(key)
             if entry is not None and entry.get("max_darcy_speed_um_s") is not None:
                 return float(entry["max_darcy_speed_um_s"])
-            return self._load_speeds().get(self._speed_key(key))
+            speeds = self._load_speeds()
+            exact = speeds.get(self._speed_key(key))
+            if exact is not None:
+                return float(exact)
+            # Any state route at the same section/dx/vascular/oxygen key.
+            prefix = "|".join(str(k) for k in tuple(key)[:4]) + "|"
+            for k, v in speeds.items():
+                if k.startswith(prefix):
+                    return float(v)
+            # Sidecar entries written before state_mode joined the key have only
+            # four parts; they are the same measurement and are still valid.
+            legacy = "|".join(str(k) for k in tuple(key)[:4])
+            if legacy in speeds:
+                return float(speeds[legacy])
+            return None
 
     def speeds_for_section(self, section_id: str,
                            vascular_mode: Optional[str] = None
