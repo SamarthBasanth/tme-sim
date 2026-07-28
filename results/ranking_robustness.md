@@ -1,12 +1,18 @@
 # Ranking robustness — is the per-patient drug ranking DECISION-GRADE?
 
-> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
-> figure below was generated with the **KDE** vascular source, which was the default until
-> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
-> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
-> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
-> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
-> `mode='kde'` to recover exactly these numbers.
+> **Regenerated under the discrete vessel source.** `vascular_mode = discrete`
+> (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
+> [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the
+> e-folding-length convention `L = d_half / ln 2` · per-cell sensitivity mode =
+> **`uniform` (identical across drugs, so the ranking is a fair delivery x potency contest)** · **dx = 15 µm (Monte-Carlo grid) with a dx = 12 µm production-grid resolution check**.
+>
+> Every absolute exposure / AUC / coverage / kill below is on the **discrete-source
+> unit** and is NOT comparable with the KDE-era numbers this file carried before this
+> regeneration (the tissue-integrated source total is 3.36x smaller; that is a change
+> of *unit*, not of physics — the dose-matched, geometry-only effect on coverage is
+> <= 0.0166). To recover the old numbers, re-run with `mode='kde'`.
+>
+> **The conclusion of this report is essentially invariant to the promotion, which is the informative result.** P(cisplatin = rank 1) **0.927 -> 0.931**, P(cisplatin > doxorubicin) **0.955 -> 0.958**, P(top-2 set = {cisplatin, doxorubicin}) **0.565 -> 0.563**; most destabilising input still `IC50 x (cisplatin)` (swing 0.167 -> 0.161). The ordering **cisplatin > doxorubicin > lomustine > methotrexate > temozolomide** is identical at both dx = 15 and dx = 12 µm and in all 40 outer draws. This is what the ranking being dose-invariant looks like: a 3.36x change in the absolute exposure unit moves the decision probabilities by <= 0.004. **Caveat on the prose:** `KDE bandwidth` is still listed as a swept input; that label is now inaccurate (the run used the discrete segmented source) but it is baked into `tmesim/validation/ranking_robustness.py`, which this pass was not permitted to edit. Its influence is nil either way (swing 0.005).
 
 **Module:** `tmesim/validation/ranking_robustness.py` (run: `python -m tmesim.validation.ranking_robustness`)
 
@@ -16,19 +22,19 @@
 
 ## 0. The verdict, first
 
-On the real 10x Xenium GBM section, propagating the reconstruction, calibration and IC50 priors through **36 tissue draws × 256 IC50 draws = 9,216 complete re-rankings**:
+On the real 10x Xenium GBM section, propagating the reconstruction, calibration and IC50 priors through **40 tissue draws × 256 IC50 draws = 10,240 complete re-rankings**:
 
-* **P(cisplatin is rank 1) = 0.927 ± 0.002** (cluster-bootstrap 90% CI 0.924–0.931)
-* **P(doxorubicin is rank 1) = 0.044 ± 0.002** (90% CI 0.042–0.047)
-* **P(cisplatin > doxorubicin) = 0.955 ± 0.002** (90% CI 0.952–0.957)
-* **P(top-2 set = {cisplatin, doxorubicin}) = 0.565 ± 0.003** (90% CI 0.560–0.571)
-* **P(the full published order holds) = 0.286 ± 0.003**
+* **P(cisplatin is rank 1) = 0.931 ± 0.002** (cluster-bootstrap 90% CI 0.929–0.934)
+* **P(doxorubicin is rank 1) = 0.041 ± 0.001** (90% CI 0.039–0.043)
+* **P(cisplatin > doxorubicin) = 0.958 ± 0.001** (90% CI 0.955–0.960)
+* **P(top-2 set = {cisplatin, doxorubicin}) = 0.563 ± 0.003** (90% CI 0.558–0.568)
+* **P(the full published order holds) = 0.288 ± 0.003**
 
-> **The top-1 call IS decision-grade.** `cisplatin` holds rank 1 with probability 0.927 (90% CI 0.924–0.931), the runner-up `doxorubicin` never gets within reach (0.044, CI ≤ 0.047), and the two intervals do not overlap. The pre-declared bar (leader CI entirely above 0.90, runner-up entirely below 0.10) is met.
+> **The top-1 call IS decision-grade.** `cisplatin` holds rank 1 with probability 0.931 (90% CI 0.929–0.934), the runner-up `doxorubicin` never gets within reach (0.041, CI ≤ 0.043), and the two intervals do not overlap. The pre-declared bar (leader CI entirely above 0.90, runner-up entirely below 0.10) is met.
 
-**The top-2 SET is also not decision-grade at the 0.90 bar** (0.565, 90% CI 0.560–0.571). See §4 for which set competes.
+**The top-2 SET is also not decision-grade at the 0.90 bar** (0.563, 90% CI 0.558–0.568). See §4 for which set competes.
 
-**Most destabilising input:** `IC50 × (cisplatin)` — moving it across its prior quartiles swings P(cisplatin = rank 1) by **0.167** (bootstrap 90% CI 0.155–0.178). §5.
+**Most destabilising input:** `IC50 × (cisplatin)` — moving it across its prior quartiles swings P(cisplatin = rank 1) by **0.161** (bootstrap 90% CI 0.150–0.172). §5.
 
 ---
 
@@ -54,26 +60,26 @@ The expensive object is the tissue + transport solve; the cheap object is the ki
 
 | | |
 |---|---|
-| outer (tissue) draws achieved | **36** |
+| outer (tissue) draws achieved | **40** |
 | IC50 draws per outer draw | 256 (Latin hypercube, 5-dimensional) |
-| complete re-rankings | **9,216** per scenario |
+| complete re-rankings | **10,240** per scenario |
 | grid / scheme | dx = 15 µm, dt = 20 s, convection off, 6 h exposure |
 | α₀ (fitted, e-fold convention) | **148.6** |
-| runtime | 42.4 min (~71 s per outer draw), single process |
+| runtime | 103.7 min (~156 s per outer draw), single process |
 
-**n is modest and that is stated rather than hidden.** The effective sample size for every probability in this report is the number of *independent tissue draws*, **36**, not the 9,216 rows — see §3. All intervals are quoted, none of the probabilities is presented as a bare point estimate.
+**n is modest and that is stated rather than hidden.** The effective sample size for every probability in this report is the number of *independent tissue draws*, **40**, not the 10,240 rows — see §3. All intervals are quoted, none of the probabilities is presented as a bare point estimate.
 
 **The kill kernel IS the frozen model, not a re-implementation.** On the first draw the engine is re-run for one drug and `cells.pkpd.apply_drug_kill` is called on the oxygen-labelled pre-kill cells; the mean of ITS returned per-tumour-cell kill probability is compared with the analytic kernel:
 
 | check (cisplatin) | value |
 |---|---:|
-| frozen `pkpd.apply_drug_kill` mean p | 0.8681343439 |
-| analytic `KillKernel.expected_kill` | 0.8681343439 |
+| frozen `pkpd.apply_drug_kill` mean p | 0.5062455160 |
+| analytic `KillKernel.expected_kill` | 0.5062455160 |
 | absolute difference | **0.00e+00** |
-| engine single-seed Bernoulli `kill_fraction` | 0.8714 |
-| Bernoulli sampling sd of that realisation | ±0.0017 (29,290 tumour cells) |
+| engine single-seed Bernoulli `kill_fraction` | 0.5053 |
+| Bernoulli sampling sd of that realisation | ±0.0031 (22,850 tumour cells) |
 
-The ranking uses the **expectation** E[kill] = mean(p_kill), not one Bernoulli realisation. That matters: the single-seed coin-flip noise is ±0.0017 absolute, against a nominal cisplatin-vs-doxorubicin gap of only ~0.183 — sampling noise is a non-trivial fraction of the very margin under test, and it is *not* parameter uncertainty, so it is removed rather than counted as instability.
+The ranking uses the **expectation** E[kill] = mean(p_kill), not one Bernoulli realisation. That matters: the single-seed coin-flip noise is ±0.0031 absolute, against a nominal cisplatin-vs-doxorubicin gap of only ~0.167 — sampling noise is a non-trivial fraction of the very margin under test, and it is *not* parameter uncertainty, so it is removed rather than counted as instability.
 
 ---
 
@@ -83,14 +89,14 @@ The ranking uses the **expectation** E[kill] = mean(p_kill), not one Bernoulli r
 
 The four transport-side priors are **imported from `tmesim.validation.uncertainty`** (`build_priors`, `sample_priors`) so the two modules cannot drift apart. Full justifications: `results/uncertainty.md` §1.
 
-| knob | prior | 5% / 50% / 95% | realised min–max (36 draws) |
+| knob | prior | 5% / 50% / 95% | realised min–max (40 draws) |
 |---|---|:--:|:--:|
-| `endothelial_typing_threshold` | truncated normal: N(1.00, 0.15) truncated to [0.70, 1.40] | 0.78 / 1 / 1.24 | 0.709 – 1.33 |
-| `kde_bandwidth_um` | uniform: U(25, 60) um | 26.8 / 42.5 / 58.2 | 26 – 59.2 |
-| `calibration_alpha` | lognormal: LogNormal(median=148.6, sigma_log=0.421) -> 90% CI = [74, 297] (0.5x-2x) | 74.3 / 149 / 297 | 56.4 – 364 |
-| `ecm_tortuosity_alpha` | uniform: U(0.40, 0.80) | 0.42 / 0.6 / 0.78 | 0.407 – 0.796 |
+| `endothelial_typing_threshold` | truncated normal: N(1.00, 0.15) truncated to [0.70, 1.40] | 0.78 / 1 / 1.24 | 0.743 – 1.34 |
+| `kde_bandwidth_um` | uniform: U(25, 60) um | 26.8 / 42.5 / 58.2 | 25.8 – 59.8 |
+| `calibration_alpha` | lognormal: LogNormal(median=148.6, sigma_log=0.421) -> 90% CI = [74, 297] (0.5x-2x) | 74.3 / 149 / 297 | 61.5 – 354 |
+| `ecm_tortuosity_alpha` | uniform: U(0.40, 0.80) | 0.42 / 0.6 / 0.78 | 0.401 – 0.796 |
 
-> *Read the last column against the third.* A Latin hypercube puts exactly one draw in each of 36 equal-probability strata, so the outermost strata of an UNBOUNDED prior get sampled every time. The α prior is lognormal with a 90% CI of 0.5×–2× ([74, 297]), but its realised range here is **56–364** (0.38×–2.45×) — the tail, not a bug. Those extreme draws are ~2/36 of the mass and they are kept: a probability that survives them is worth more than one computed on a truncated prior. §5 reports what α actually does to the decision.
+> *Read the last column against the third.* A Latin hypercube puts exactly one draw in each of 40 equal-probability strata, so the outermost strata of an UNBOUNDED prior get sampled every time. The α prior is lognormal with a 90% CI of 0.5×–2× ([74, 297]), but its realised range here is **62–354** (0.41×–2.38×) — the tail, not a bug. Those extreme draws are ~2/40 of the mass and they are kept: a probability that survives them is worth more than one computed on a truncated prior. §5 reports what α actually does to the decision.
 
 **α is the single-anchor scale for the whole penetration model.** α = **148.6** (the e-folding convention `L = d_half/ln 2`; the retired α = 309.6 fitted the raw half-distance as if it were an e-fold length and is superseded — audit defect #4). It is fitted in closed form against **ONE doxorubicin immunofluorescence anchor** (Primeau 2005, PMID 16361566), and the *absolute* penetration of all five drugs rides on that single measurement. Its prior here is correspondingly the widest of the four (90% CI 0.5×–2×), which is the honest treatment of a one-study anchor transferred to human GBM — and note what that implies for a *ranking*: because α is shared by every drug in a draw, it moves all five kills together, so a wide α prior costs the marginal intervals a lot and costs the ORDER comparatively little. Some of the ranking's stability below is bought by exactly that shared-nuisance structure, and that is a real property of the decision, not a trick.
 
@@ -118,34 +124,34 @@ Potency is what actually separates these drugs (D_eff spans ~1.5×; IC50 spans ~
 
 ### 3.3 Why the error bars are CLUSTER, not binomial
 
-The design is **nested**: 256 IC50 draws sit inside each of 36 tissue draws, and rows inside one tissue draw share a reconstruction, an α and a tortuosity. They are not independent Bernoulli trials. The naive binomial SE √(p(1−p)/9,216) is therefore an **under-estimate** — and the size of the under-estimate is itself a finding, because it measures how much of the ranking uncertainty lives on the tissue axis.
+The design is **nested**: 256 IC50 draws sit inside each of 40 tissue draws, and rows inside one tissue draw share a reconstruction, an α and a tortuosity. They are not independent Bernoulli trials. The naive binomial SE √(p(1−p)/10,240) is therefore an **under-estimate** — and the size of the under-estimate is itself a finding, because it measures how much of the ranking uncertainty lives on the tissue axis.
 
-| probability (scenario B) | p | naive binomial SE @ n=9,216 | **cluster SE** @ n_outer=36 | design effect | effective n |
+| probability (scenario B) | p | naive binomial SE @ n=10,240 | **cluster SE** @ n_outer=40 | design effect | effective n |
 |---|---:|---:|---:|---:|---:|
-| P(cisplatin = rank 1) | 0.9274 | 0.0027 | **0.0020** | 0.7× | 17224 |
-| P(doxorubicin = rank 1) | 0.0443 | 0.0021 | **0.0016** | 0.8× | 15598 |
-| P(lomustine = rank 1) | 0.0283 | 0.0017 | **0.0013** | 0.8× | 15698 |
+| P(cisplatin = rank 1) | 0.9314 | 0.0025 | **0.0016** | 0.6× | 25916 |
+| P(doxorubicin = rank 1) | 0.0410 | 0.0020 | **0.0014** | 0.7× | 21165 |
+| P(lomustine = rank 1) | 0.0275 | 0.0016 | **0.0012** | 0.8× | 17340 |
 | P(methotrexate = rank 1) | 0.0000 | 0.0000 | **0.0000** | — | — |
 | P(temozolomide = rank 1) | 0.0000 | 0.0000 | **0.0000** | — | — |
-| P(cisplatin > doxorubicin) | 0.9546 | 0.0022 | **0.0016** | 0.8× | 16211 |
-| P(top-2 set = {cisplatin, doxorubicin}) | 0.5652 | 0.0052 | **0.0034** | 0.7× | 21689 |
-| P(full published order) | 0.2858 | 0.0047 | **0.0030** | 0.6× | 22686 |
+| P(cisplatin > doxorubicin) | 0.9576 | 0.0020 | **0.0015** | 0.7× | 18599 |
+| P(top-2 set = {cisplatin, doxorubicin}) | 0.5628 | 0.0049 | **0.0030** | 0.6× | 27261 |
+| P(full published order) | 0.2884 | 0.0045 | **0.0030** | 0.7× | 22517 |
 
-**Read the design-effect column** (cluster SE ÷ binomial SE). Where it is **> 1** the binomial SE is fiction: the probability is driven by *which tissue you drew*, and adding more IC50 draws inside the same tissues would shrink the binomial SE without learning anything. Where it is **< 1** the nested Latin hypercube has actually beaten iid sampling — the inner design stratifies each drug's IC50 marginal, so the within-draw proportion is less noisy than a binomial — and the cluster SE is still the one to quote, because it is the one that reflects the axis we are short of draws on. Every headline number in this report is quoted with the cluster SE and a cluster-bootstrap 90% CI (resampling whole outer draws, 4,000 replicates). Where a probability is exactly 0 or 1 the cluster SE collapses and is meaningless; the rule-of-three one-sided 95% bound on the cluster unit, 3/36 = 0.083, is reported instead.
+**Read the design-effect column** (cluster SE ÷ binomial SE). Where it is **> 1** the binomial SE is fiction: the probability is driven by *which tissue you drew*, and adding more IC50 draws inside the same tissues would shrink the binomial SE without learning anything. Where it is **< 1** the nested Latin hypercube has actually beaten iid sampling — the inner design stratifies each drug's IC50 marginal, so the within-draw proportion is less noisy than a binomial — and the cluster SE is still the one to quote, because it is the one that reflects the axis we are short of draws on. Every headline number in this report is quoted with the cluster SE and a cluster-bootstrap 90% CI (resampling whole outer draws, 4,000 replicates). Where a probability is exactly 0 or 1 the cluster SE collapses and is meaningless; the rule-of-three one-sided 95% bound on the cluster unit, 3/40 = 0.075, is reported instead.
 
 ---
 
 ## 4. The full drug × rank probability matrix
 
-Scenario **B (B. + IC50 sampling error (PRIMARY))**, 9,216 re-rankings. Cell = P(that drug lands at that rank) ± cluster SE. Rows sum to 1 by construction.
+Scenario **B (B. + IC50 sampling error (PRIMARY))**, 10,240 re-rankings. Cell = P(that drug lands at that rank) ± cluster SE. Rows sum to 1 by construction.
 
 | drug | rank 1 | rank 2 | rank 3 | rank 4 | rank 5 | E[rank] | median kill (90% CI) |
 |---|---:|---:|---:|---:|---:|---:|:--:|
-| **cisplatin** | 0.927 ± 0.002 | 0.070 ± 0.002 | 0.003 ± 0.001 | — | — | 1.08 | 0.9166 [0.7887, 0.9798] |
-| **doxorubicin** | 0.044 ± 0.002 | 0.524 ± 0.004 | 0.432 ± 0.003 | 0.000 ± 0.000 | — | 2.39 | 0.7572 [0.4174, 0.9449] |
-| **lomustine** | 0.028 ± 0.001 | 0.406 ± 0.003 | 0.565 ± 0.003 | 0.000 ± 0.000 | — | 2.54 | 0.7265 [0.3690, 0.9348] |
-| **methotrexate** | — | — | 0.000 ± 0.000 | 0.551 ± 0.003 | 0.449 ± 0.003 | 4.45 | 0.1233 [0.0402, 0.3274] |
-| **temozolomide** | — | — | 0.000 ± 0.000 | 0.449 ± 0.003 | 0.551 ± 0.003 | 4.55 | 0.1145 [0.0423, 0.2883] |
+| **cisplatin** | 0.931 ± 0.002 | 0.065 ± 0.002 | 0.003 ± 0.001 | — | — | 1.07 | 0.4158 [0.3004, 0.5140] |
+| **doxorubicin** | 0.041 ± 0.001 | 0.525 ± 0.003 | 0.434 ± 0.003 | 0.000 ± 0.000 | — | 2.39 | 0.2490 [0.0922, 0.4293] |
+| **lomustine** | 0.028 ± 0.001 | 0.410 ± 0.003 | 0.563 ± 0.003 | 0.000 ± 0.000 | — | 2.54 | 0.2269 [0.0773, 0.4149] |
+| **methotrexate** | — | — | 0.000 ± 0.000 | 0.555 ± 0.003 | 0.444 ± 0.003 | 4.44 | 0.0178 [0.0063, 0.0493] |
+| **temozolomide** | — | — | 0.000 ± 0.000 | 0.444 ± 0.003 | 0.556 ± 0.003 | 4.56 | 0.0168 [0.0072, 0.0396] |
 
 ![ranking robustness](ranking_robustness.png)
 
@@ -153,20 +159,20 @@ Scenario **B (B. + IC50 sampling error (PRIMARY))**, 9,216 re-rankings. Cell = P
 
 | drug | A. transport only | B. + IC50 SE (**primary**) | C. + cell-line spread |
 |---|:--:|:--:|:--:|
-| cisplatin | 1.000 | 0.927 ± 0.002 | 0.582 ± 0.002 |
-| doxorubicin | 0.000 | 0.044 ± 0.002 | 0.214 ± 0.003 |
+| cisplatin | 1.000 | 0.931 ± 0.002 | 0.587 ± 0.002 |
+| doxorubicin | 0.000 | 0.041 ± 0.001 | 0.211 ± 0.002 |
 | lomustine | 0.000 | 0.028 ± 0.001 | 0.179 ± 0.003 |
-| methotrexate | 0.000 | 0.000 | 0.024 ± 0.001 |
+| methotrexate | 0.000 | 0.000 | 0.023 ± 0.001 |
 | temozolomide | 0.000 | 0.000 | 0.001 ± 0.000 |
 
 | statistic | A. transport only | B. primary | C. stress |
 |---|:--:|:--:|:--:|
-| P(cisplatin > doxorubicin) | 1.000 (9216/9216 rows; rule-of-three 95% bound < 0.917) | 0.955 ± 0.002 | 0.715 ± 0.003 |
-| P(top-2 = {cisplatin, doxorubicin}) | 1.000 (9216/9216 rows; rule-of-three 95% bound < 0.917) | 0.565 ± 0.003 | 0.414 ± 0.004 |
-| P(full published order) | 1.000 (9216/9216 rows; rule-of-three 95% bound < 0.917) | 0.286 ± 0.003 | 0.087 ± 0.003 |
-| distinct orders observed | 1 of 120 | 15 of 120 | 94 of 120 |
-| modal order probability | 1.000 | 0.286 | 0.122 |
-| normalised order entropy | -0.000 | 0.344 | 0.685 |
+| P(cisplatin > doxorubicin) | 1.000 (10240/10240 rows; rule-of-three 95% bound < 0.925) | 0.958 ± 0.001 | 0.719 ± 0.003 |
+| P(top-2 = {cisplatin, doxorubicin}) | 1.000 (10240/10240 rows; rule-of-three 95% bound < 0.925) | 0.563 ± 0.003 | 0.412 ± 0.003 |
+| P(full published order) | 1.000 (10240/10240 rows; rule-of-three 95% bound < 0.925) | 0.288 ± 0.003 | 0.088 ± 0.002 |
+| distinct orders observed | 1 of 120 | 15 of 120 | 99 of 120 |
+| modal order probability | 1.000 | 0.288 | 0.122 |
+| normalised order entropy | -0.000 | 0.342 | 0.685 |
 
 Scenario A holds every IC50 at its resolved value, so it isolates how much instability the **reconstruction + calibration knobs alone** can cause; B adds the sampling error of the potency statistic the model actually consumes; C asks the harder question — *this Xenium section is ONE tumour, and nothing tells us it sits at the median of the glioma cell-line distribution*. C is reported as a stress test, not as the headline, because a cell-line panel's spread is a population statistic, not a credible interval for a specific tumour. The primary answer is B.
 
@@ -174,50 +180,50 @@ Scenario A holds every IC50 at its resolved value, so it isolates how much insta
 
 | top-2 set | probability |
 |---|:--:|
-| {cisplatin, doxorubicin} ← **headline** | 0.565 ± 0.003 |
-| {cisplatin, lomustine} | 0.432 ± 0.003 |
+| {cisplatin, doxorubicin} ← **headline** | 0.563 ± 0.003 |
+| {cisplatin, lomustine} | 0.434 ± 0.003 |
 | {doxorubicin, lomustine} | 0.003 ± 0.001 |
 
 ### 4.3 Every pairwise comparison (scenario B)
 
 | comparison | P(left > right) | decided at 90%? |
 |---|:--:|:--:|
-| cisplatin > doxorubicin | 0.955 ± 0.002 | yes |
-| cisplatin > lomustine | 0.970 ± 0.001 | yes |
-| cisplatin > methotrexate | 1.000 (9216/9216 rows; rule-of-three 95% bound < 0.917) | yes |
-| cisplatin > temozolomide | 1.000 (9216/9216 rows; rule-of-three 95% bound < 0.917) | yes |
-| doxorubicin > lomustine | 0.567 ± 0.003 | **NO** |
-| doxorubicin > methotrexate | 1.000 (9216/9216 rows; rule-of-three 95% bound < 0.917) | yes |
+| cisplatin > doxorubicin | 0.958 ± 0.001 | yes |
+| cisplatin > lomustine | 0.971 ± 0.001 | yes |
+| cisplatin > methotrexate | 1.000 (10240/10240 rows; rule-of-three 95% bound < 0.925) | yes |
+| cisplatin > temozolomide | 1.000 (10240/10240 rows; rule-of-three 95% bound < 0.925) | yes |
+| doxorubicin > lomustine | 0.565 ± 0.003 | **NO** |
+| doxorubicin > methotrexate | 1.000 (10240/10240 rows; rule-of-three 95% bound < 0.925) | yes |
 | doxorubicin > temozolomide | 1.000 ± 0.000 | yes |
 | lomustine > methotrexate | 1.000 ± 0.000 | yes |
-| lomustine > temozolomide | 1.000 (9216/9216 rows; rule-of-three 95% bound < 0.917) | yes |
-| methotrexate > temozolomide | 0.551 ± 0.003 | **NO** |
+| lomustine > temozolomide | 1.000 (10240/10240 rows; rule-of-three 95% bound < 0.925) | yes |
+| methotrexate > temozolomide | 0.556 ± 0.003 | **NO** |
 
-**The cisplatin–doxorubicin margin itself.** Median E[kill](cisplatin) − E[kill](doxorubicin) = **+0.1454** (90% of rows in [+0.0022, +0.4489]); averaged within a tissue draw the gap ranges +0.0620 to +0.2901 across the 36 draws.
+**The cisplatin–doxorubicin margin itself.** Median E[kill](cisplatin) − E[kill](doxorubicin) = **+0.1588** (90% of rows in [+0.0067, +0.3098]); averaged within a tissue draw the gap ranges +0.1093 to +0.1993 across the 40 draws.
 
 ---
 
 ## 5. Which parameter destabilises the ranking
 
-Outcome: the binary event *`cisplatin` holds rank 1* (baseline 0.927 ± 0.002). Each sampled input is cut into 4 quartiles and the conditional probability is recomputed; the **swing** is max − min across quartiles, cluster-bootstrapped over outer draws. A quartile conditional needs no linearity assumption, which matters because the typing threshold acts as a step (integer Xenium counts quantise the PECAM1 z-score) and the IC50 effect is a ratio.
+Outcome: the binary event *`cisplatin` holds rank 1* (baseline 0.931 ± 0.002). Each sampled input is cut into 4 quartiles and the conditional probability is recomputed; the **swing** is max − min across quartiles, cluster-bootstrapped over outer draws. A quartile conditional needs no linearity assumption, which matters because the typing threshold acts as a step (integer Xenium counts quantise the PECAM1 z-score) and the IC50 effect is a ratio.
 
 | input | Q1 | Q2 | Q3 | Q4 | **swing** | swing 90% CI | Spearman(ρ, win) |
 |---|:--:|:--:|:--:|:--:|---:|:--:|---:|
-| `IC50 × (cisplatin)` | 0.989 | 0.968 | 0.930 | 0.822 | **0.167** | [0.155, 0.178] | -0.250 |
-| `IC50 × (doxorubicin)` | 0.806 | 0.961 | 0.972 | 0.970 | **0.166** | [0.155, 0.180] | +0.255 |
-| `IC50 × (lomustine)` | 0.849 | 0.961 | 0.953 | 0.946 | **0.112** | [0.102, 0.123] | +0.151 |
-| `KDE bandwidth` | 0.930 | 0.928 | 0.934 | 0.918 | **0.016** | [0.010, 0.024] | -0.013 |
-| `IC50 × (temozolomide)` | 0.918 | 0.932 | 0.930 | 0.930 | **0.013** | [0.006, 0.028] | +0.011 |
-| `calibration α` | 0.921 | 0.928 | 0.931 | 0.930 | **0.011** | [0.006, 0.021] | +0.013 |
-| `endothelial typing thr.` | 0.927 | 0.932 | 0.922 | 0.928 | **0.010** | [0.005, 0.019] | -0.002 |
-| `ECM tortuosity` | 0.932 | 0.925 | 0.925 | 0.928 | **0.007** | [0.005, 0.018] | -0.008 |
-| `IC50 × (methotrexate)` | 0.931 | 0.926 | 0.929 | 0.924 | **0.006** | [0.004, 0.021] | -0.006 |
+| `IC50 × (cisplatin)` | 0.990 | 0.972 | 0.934 | 0.829 | **0.161** | [0.150, 0.172] | -0.248 |
+| `IC50 × (doxorubicin)` | 0.817 | 0.964 | 0.974 | 0.971 | **0.157** | [0.146, 0.170] | +0.246 |
+| `IC50 × (lomustine)` | 0.855 | 0.963 | 0.958 | 0.950 | **0.108** | [0.098, 0.119] | +0.154 |
+| `IC50 × (methotrexate)` | 0.936 | 0.926 | 0.932 | 0.932 | **0.010** | [0.005, 0.023] | -0.001 |
+| `calibration α` | 0.929 | 0.935 | 0.932 | 0.930 | **0.007** | [0.003, 0.016] | +0.002 |
+| `IC50 × (temozolomide)` | 0.928 | 0.934 | 0.934 | 0.931 | **0.006** | [0.004, 0.020] | +0.003 |
+| `ECM tortuosity` | 0.929 | 0.935 | 0.932 | 0.929 | **0.005** | [0.004, 0.015] | +0.002 |
+| `KDE bandwidth` | 0.929 | 0.932 | 0.934 | 0.930 | **0.005** | [0.003, 0.014] | +0.006 |
+| `endothelial typing thr.` | 0.931 | 0.932 | 0.930 | 0.932 | **0.002** | [0.003, 0.012] | +0.004 |
 
-**Most destabilising: `IC50 × (cisplatin)`** — swing 0.167 [0.155, 0.178].
+**Most destabilising: `IC50 × (cisplatin)`** — swing 0.161 [0.150, 0.172].
 
-Runner-up `IC50 × (doxorubicin)` (swing 0.166 [0.155, 0.180]).
+Runner-up `IC50 × (doxorubicin)` (swing 0.157 [0.146, 0.170]).
 
-**A swing whose bootstrap CI reaches 0 is not distinguishable from noise at this n.** With 36 independent tissue draws the quartile conditionals for the four transport knobs rest on ~9 draws each, so read the RANKING of the swings, not their third decimal. Note also that the lower bound of a max−min statistic is bounded below by 0 and biased *upward* under noise, so small swings should be treated as upper bounds.
+**A swing whose bootstrap CI reaches 0 is not distinguishable from noise at this n.** With 40 independent tissue draws the quartile conditionals for the four transport knobs rest on ~10 draws each, so read the RANKING of the swings, not their third decimal. Note also that the lower bound of a max−min statistic is bounded below by 0 and biased *upward* under noise, so small swings should be treated as upper bounds.
 
 ---
 
@@ -227,10 +233,10 @@ The Monte Carlo runs at dx = 15 µm / dt = 20 s / convection off for affordabili
 
 | dx (µm) | dt (s) | conv. | grid | cisplatin | doxorubicin | lomustine | methotrexate | temozolomide | gap(cisplatin−doxorubicin) |
 |---:|---:|:--:|:--:|---:|---:|---:|---:|---:|---:|
-| 15 | 20 | off | 339×541 | 0.9226 | 0.7647 | 0.7336 | 0.1241 | 0.1181 | +0.1579 |
-| 12 | 10 | on | 424×675 | 0.9120 | 0.7527 | 0.7213 | 0.1195 | 0.1136 | +0.1593 |
+| 15 | 20 | off | 339×541 | 0.4087 | 0.2441 | 0.2220 | 0.0175 | 0.0164 | +0.1646 |
+| 12 | 10 | on | 424×675 | 0.4382 | 0.2647 | 0.2407 | 0.0192 | 0.0181 | +0.1735 |
 
-**The order is identical at both resolutions** (cisplatin > doxorubicin > lomustine > methotrexate > temozolomide), and the cisplatin−doxorubicin gap moves from +0.1579 to +0.1593. The instability reported above is therefore *parameter* uncertainty, not a mesh artifact — which is the point: refining the grid will not fix it.
+**The order is identical at both resolutions** (cisplatin > doxorubicin > lomustine > methotrexate > temozolomide), and the cisplatin−doxorubicin gap moves from +0.1646 to +0.1735. The instability reported above is therefore *parameter* uncertainty, not a mesh artifact — which is the point: refining the grid will not fix it.
 
 ---
 
@@ -245,7 +251,7 @@ The Monte Carlo runs at dx = 15 µm / dt = 20 s / convection off for affordabili
 
 ## 8. What measurement would actually settle the top-1 call
 
-The top-1 call already clears the bar in scenario B. The measurement that would make it robust to the STRESS scenario (C), where P(cisplatin = rank 1) falls to 0.582, is the same one listed below: a patient-specific potency readout.
+The top-1 call already clears the bar in scenario B. The measurement that would make it robust to the STRESS scenario (C), where P(cisplatin = rank 1) falls to 0.587, is the same one listed below: a patient-specific potency readout.
 
 The ranking is decided by **delivery × potency**, and the two candidates sit at opposite ends of both axes — cisplatin has ~157× the mean AUC and ~49× the IC50 of doxorubicin. So the useful measurements are, in order of decisiveness:
 

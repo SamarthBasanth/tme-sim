@@ -219,8 +219,12 @@ used by `real_visium` for shape-checked bundling).
 
 ### `tmesim.physics` — continuum fields
 
-- **`diffusion.simulate_drug_transport(micro, drug, source, pde, velocity=None) -> TransportResult`**
-  — the core numerics; see §4.1.
+- **`diffusion.simulate_drug_transport(micro, drug, source, pde, velocity=None,
+  source_profile=None) -> TransportResult`** — the core numerics; see §4.1.
+  `source_profile` is an optional per-step scalar plasma(t) multiplying `source`
+  (time-resolved delivery); `None`, the default, is the static source and is
+  bit-for-bit identical to the historical behaviour. Driven from
+  `PDEConfig.time_resolved`.
 - **`oxygen.solve_oxygen(micro, cfg) -> np.ndarray`** — steady-state
   reaction–diffusion O₂ field in `[0,1]`.
   **`oxygen.label_hypoxia(micro, oxygen, cfg)`** — flags `CellState.HYPOXIC` in place.
@@ -638,9 +642,17 @@ bands.
 - **`bbb_penetrance` is a structure-only ordering**, not a partition ratio — only
   partially concordant with measured brain:plasma ratios (Spearman 0.50), because
   there is no efflux or carrier transport in the model.
-- **Simplified systemic PK.** A single time-averaged sustained plasma level drives
-  the transport solve; it preserves total delivered drug and relative ranking but
-  is not a time-resolved infusion.
+- **Systemic PK: averaged by default, time-resolved on request.** By default a
+  single time-averaged sustained plasma level drives the transport solve; it
+  preserves total delivered drug and relative ranking, but it makes any two
+  schedules with the same cumulative exposure *bit-identical inputs*, so
+  fractionation and infusion duration are unresolvable in that mode.
+  `PDEConfig.time_resolved=True` drives the source with the real `plasma(t)` at
+  matched total dose and no measurable runtime cost (the operator is source-free,
+  so the LU factorisation is still reused). Results predating that option — and any
+  "schedule has no effect" claim in them — were produced in averaged mode; see
+  `results/dose_schedule.md` §4-5 for the corrected analysis and the
+  `τ_tissue/T_window` bound on how large the schedule effect can be.
 - **Reduced biology.** No adaptive resistance, no immune dynamics, no explicit
   drug-combination synergy beyond spatial complementarity.
 - **One section per tumor, no replicates.** Where a claim rests on a single

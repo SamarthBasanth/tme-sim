@@ -381,6 +381,10 @@ statable physical condition. The promotion adopts the better-defined convention;
 
 ### 7.3 Regeneration debt — files whose ABSOLUTE numbers are now stale
 
+> **STATUS: mostly PAID DOWN in a later pass. See §7.4 for what was regenerated, what could
+> not be, and why.** The list below is the original debt as recorded at promotion time and is
+> kept verbatim so the two passes can be compared.
+
 Not regenerated in this pass. Every one of these was generated on the KDE source and its
 absolute exposures/AUC/coverage/kill carry the old 3.36× unit. Ordering follows
 `vessel_network_impact.md` §8.4:
@@ -399,6 +403,80 @@ absolute exposures/AUC/coverage/kill carry the old 3.36× unit. Ordering follows
 **Not stale** (verified field-free in §3, §4, §6): `results/calibration.md`,
 `results/pk_multidrug.md`, `results/pk_reality.md`, `results/glioma_regional_pk.md`,
 `results/mgmt_scalar.md`.
+
+### 7.4 Regeneration pass — what was actually re-run, and what could not be
+
+Every file below was re-run from its own producer under `_DEFAULT_VASCULAR_MODE = 'discrete'`,
+`alpha = 148.6`, on the same measured Xenium section. Each regenerated file now carries its
+own header block stating `vascular_mode`, `alpha`, sensitivity mode and `dx`. The KDE-era
+"STALE ABSOLUTE NUMBERS" banner was removed **only** from files that were actually re-run.
+
+**Regenerated (11 reports + 3 figure-only artefacts):**
+
+| file | producer | note |
+|---|---|---|
+| `real_drug_panel.{md,png}` | `experiments/real_drug_panel.py` | headline panel; ordering held |
+| `patient_report_xenium.{md,png}` | `experiments/patient_report.py --source xenium` | agrees drug-for-drug with the panel |
+| `patient_report_visium.{md,png}` | `experiments/patient_report.py --source visium` | Visium path never read the switch — see below |
+| `heldout_patient.{md,png}` | `tmesim/validation/heldout_patient.py` | **was stale and un-bannered**; ordering replicates on section 2 |
+| `delivery_metrics.{md,png}` | `tmesim/validation/delivery_metrics.py` | corrects a published-wrong claim — see below |
+| `cross_tissue.{md,png}` | `experiments/cross_tissue.py` | needed a producer bug fixed first |
+| `dose_schedule.{md,png}` | `experiments/dose_schedule.py` | p95 vessel mask now resolves to 2.7% of tissue |
+| `niche_response.{md,png}` | `experiments/niche_response.py` | |
+| `combination.{md,png}` | `experiments/combination.py` | |
+| `uncertainty.{md,png}` | `tmesim/validation/uncertainty.py` | 80 LHS draws, 66.5 min |
+| `ranking_robustness.{md,png}` | `tmesim/validation/ranking_robustness.py` | 40 outer draws, 112.5 min |
+| `real_simulation.png` | `experiments/real_simulation.py` | figure only |
+| `pharmacology_real.md` | `tmesim/validation/pharmacology_real.py` | **byte-identical** — see below |
+
+**The unit change is now auditable, and the ordering held.** On the flagship panel
+(`real_drug_panel.md`, dx = 12 µm, sensitivity `uniform`), cisplatin's mean tumour AUC moved
+**5.48e+06 → 1.63e+06 µM·s** and its `kill_fraction` **0.9125 → 0.3699**. The five-drug kill
+ordering is **unchanged** — cisplatin > doxorubicin > lomustine > methotrexate > temozolomide
+— on the development section, on the 816,769-cell held-out section, at dx = 15 and dx = 12 µm,
+and in **all 40** Monte-Carlo draws of `ranking_robustness`, whose decision probabilities
+moved by ≤ 0.004 (P(cisplatin = rank 1) 0.927 → 0.931). §7.1's claim that the promotion is a
+change of *unit* rather than of *ranking* is therefore now measured, not asserted.
+
+**Two files were over-flagged and are structurally immune.** `pharmacology_real.md` imports
+nothing from `tmesim.reconstruct` — no domain, no field, no PDE — and re-running it reproduced
+the file byte-for-byte. `patient_report_visium.md` (and the four Visium arms of
+`cross_tissue.md`) go through `reconstruct.real_visium.reconstruct_from_visium`, which builds
+vascular density from spot deconvolution and never calls `vascular_density_from_cells`, so
+`_DEFAULT_VASCULAR_MODE` does not reach it; its vascular-field statistics are identical before
+and after promotion. Both banners have been replaced with an explanation rather than a refresh.
+
+**One file was stale and was NOT flagged.** `heldout_patient.md` was produced ~30 min before
+the default was flipped and the banner sweep missed it. It has been re-run in full.
+
+**Two files CANNOT be regenerated without a code change, and keep permanent banners.** Both
+are latent reporting-path bugs that the sharper source exposed, not physics failures:
+
+* `numerical_rigor.md` — `numerical_rigor.py:273` picks mass-conservation injection points as
+  `vasc > np.percentile(vasc[tissue], 99.0)`. The discrete field is binary and exactly 1.0 on
+  2.50% of tissue, so `p99 == max` and the strict `>` selects **zero** cells;
+  `injected == 0` and line 280 raises `ZeroDivisionError`. Under the KDE the same expression
+  selected 1,938 cells. One-line fix: take the top-N by value instead of `> p99`.
+* `vessel_profile.md` — `vessel_profile.py:799` formats `empirical_d_half_um` with `:6.1f`, but
+  `empirical_half_distance_um` returns `None` by design when a profile never halves, and under
+  the discrete source **temozolomide's profile never halves** (`L` ≈ 296 µm against a 43 µm
+  median tumour-to-vessel distance). Fix: guard the three formatted reads (`:790`, `:799`,
+  `:961`). Its partial run did establish that the p95 vessel mask now resolves to 2.6% of
+  tissue and the source null's empirical d½ is 10.0 µm.
+
+Both fixes live under `tmesim/`, which the regeneration pass was not permitted to modify.
+
+**One producer bug had to be fixed to regenerate at all.** `experiments/cross_tissue.py:842`
+referenced an undefined `alpha` inside `_verdict()`, so the script wrote its figure and then
+died with `NameError` before writing markdown — i.e. the file had *no working producer*.
+`_verdict` now takes `alpha` as a parameter (two lines, `experiments/` only).
+
+**Regenerating fixed a claim that was wrong in the conservative direction.**
+`delivery_metrics.md` listed `penetration_length_L` as *does NOT discriminate* on a 1.07×
+five-drug spread against a source null of 23.7 µm. On the discrete source the spread is
+**6.91× (39.6–273.3 µm)**, separation **12.2×** its own grid drift, and the source field admits
+**no null fit at all**. The metric now reads **YES, discriminates** — exactly as §5 predicted
+and as `vessel_network_impact.md` §3 demanded.
 
 ---
 

@@ -32,6 +32,21 @@ step and an explicit first-order upwind advection step** (an IMEX scheme):
   interstitial velocities are tiny (~<1 um/s), this is satisfied with room to
   spare; we nonetheless *check it and raise* a clear error if it is violated.
 
+Time-resolved sources
+---------------------
+``S`` may be either **static** (a single ``(ny, nx)`` field applied unchanged at
+every step — the historical behaviour and still the default) or **time-resolved**
+via the optional ``source_profile`` argument, a per-step scalar multiplier so
+that ``S(x, y, t_n) = source_profile[n] * source(x, y)``. This is what lets the
+engine drive the solver with the real multi-dose plasma curve ``plasma(t)``
+instead of its time-average, which is the only way concentration can genuinely
+rise and fall and therefore the only way *when* a drug is given can change the
+answer.
+
+It costs essentially nothing: the operator ``A = I - dt*L + dt*K`` is
+time-independent, so the LU factorization is still computed once and reused; a
+time-varying source only changes the RHS by one extra scalar multiply per step.
+
 Why mass is conserved exactly (clearance=binding=0, no source): ``L`` has zero
 row/column sums, so ``1^T L = 0`` and hence ``1^T A = 1^T``. From ``A C^{n+1} =
 C^n`` this gives ``1^T C^{n+1} = 1^T A^{-1} C^n = 1^T C^n``. Upwind advection uses
@@ -174,6 +189,7 @@ def simulate_drug_transport(
     source: np.ndarray,
     pde: PDEConfig,
     velocity: Optional[np.ndarray] = None,
+    source_profile: Optional[np.ndarray] = None,
 ) -> TransportResult:
     """Solve convection-diffusion-reaction for drug concentration ``C(x, y, t)``.
 
@@ -192,18 +208,55 @@ def simulate_drug_transport(
         ``D_eff = diffusivity * (1 - 0.6 * ecm_density)`` floored positive.
     source : np.ndarray, shape (ny, nx)
         Base spatial delivery-rate field (uM/s), e.g. from vasculature *
-        bbb_penetrance * plasma. **Time profile:** we treat the plasma level as
-        constant over the window (``plasma(t) = 1``), i.e. ``S(x,y,t) =
-        source(x,y)`` applied every step. A caller wanting a time-varying
-        infusion should pre-scale ``source`` by the (constant) plasma level for
-        this window; the engine drives the full multi-dose profile by calling
-        this solver per dose window. Source is zeroed outside the tissue mask.
+        bbb_penetrance * plasma. **Time profile:** with ``source_profile=None``
+        (the default) the plasma level is held constant over the window
+        (``plasma(t) = 1``), i.e. ``S(x,y,t) = source(x,y)`` applied every step,
+        and the caller is expected to have pre-scaled ``source`` by a single
+        representative plasma level. Pass ``source_profile`` to drive a genuine
+        time-varying infusion (see below). Source is zeroed outside the tissue
+        mask.
     pde : PDEConfig
-        ``dt``, ``total_time``, ``convection``, ``save_every``.
+        ``dt``, ``total_time``, ``convection``, ``save_every``. Note this solver
+        does NOT read ``pde.time_resolved`` — time resolution is requested here by
+        passing ``source_profile``. The flag lives one level up, in
+        :func:`tmesim.sim.engine.simulate_response`, which is what turns
+        ``cfg.pk`` into a profile and passes it down.
     velocity : np.ndarray, optional, shape (2, ny, nx)
         Interstitial velocity ``(vx, vy)`` in um/s. Advection is included only
         when ``pde.convection`` is True and ``velocity`` is not None (otherwise
         it falls back to ``micro.fields.velocity`` if present).
+    source_profile : np.ndarray, optional, shape (n_steps,) or longer
+        **Time-resolved delivery.** A dimensionless per-step scale factor applied
+        to ``source``, so the PDE actually integrated becomes
+
+            S(x, y, t_n) = source_profile[n] * source(x, y)
+
+        with ``t_n = n*dt``, ``n = 0 .. n_steps-1``. Typically
+        ``source`` is the *unit* delivery field (``delivery_source(..., 1.0)``)
+        and ``source_profile`` is ``plasma_profile(pk, t)`` in uM, so the product
+        is the true instantaneous delivery rate. Only the first ``n_steps``
+        entries are used; a longer array is accepted (and truncated) so callers
+        may pass a profile sampled on a finer/longer grid. Must be finite and
+        non-negative.
+
+        The source enters the RHS, so it is evaluated at the OLD time level
+        ``t_{n}`` for the step ``t_n -> t_{n+1}`` — the same explicit convention
+        the upwind advection term already uses. Consequence: the total drug
+        injected over the window is ``dt * sum(source_profile[:n_steps]) *
+        sum(source)``, which is *exactly* the static-source total when
+        ``source_profile`` has mean 1 on those same sample points. That identity
+        is what makes "matched cumulative exposure" comparisons meaningful.
+
+        **Backward compatibility is exact.** ``source_profile=None`` runs the
+        original statement ``rhs += dt * src`` untouched, so the default path is
+        bit-for-bit what it was. ``source_profile`` of all ones is *also*
+        bit-identical (``dt * 1.0 == dt`` in IEEE-754); both are covered by
+        tests.
+
+        Note the operator ``A = I - dt*L + dt*K`` does not depend on the source,
+        so the single LU factorization is still built once and reused for every
+        step: a time-varying source costs one extra scalar multiply per step and
+        nothing else.
 
     Returns
     -------
@@ -214,8 +267,9 @@ def simulate_drug_transport(
     Raises
     ------
     ValueError
-        On shape mismatches, non-positive ``dt``/``total_time``, or if an
-        explicit advection step would violate the upwind CFL condition.
+        On shape mismatches, non-positive ``dt``/``total_time``, a
+        ``source_profile`` that is not 1-D or is shorter than ``n_steps``, or if
+        an explicit advection step would violate the upwind CFL condition.
     """
     domain = micro.domain
     ny, nx = domain.shape
@@ -280,6 +334,32 @@ def simulate_drug_transport(
     n_steps = int(round(pde.total_time / dt))
     save_every = max(1, int(pde.save_every))
 
+    # --- optional time-resolved source scaling (None => original static path) ---
+    if source_profile is None:
+        src_scale = None
+    else:
+        src_scale = np.asarray(source_profile, dtype=np.float64)
+        if src_scale.ndim != 1:
+            raise ValueError(
+                f"source_profile must be 1-D, got shape {src_scale.shape}"
+            )
+        if src_scale.size < n_steps:
+            raise ValueError(
+                f"source_profile has {src_scale.size} samples but the solve takes "
+                f"{n_steps} steps; supply at least one scale factor per step."
+            )
+        used = src_scale[:n_steps]
+        if not np.all(np.isfinite(used)):
+            raise ValueError("source_profile contains non-finite values")
+        # A negative plasma level is meaningless, and because the step clamps C at
+        # zero it would silently break mass balance rather than fail loudly.
+        if float(used.min()) < 0.0:
+            raise ValueError(
+                f"source_profile must be non-negative (min {float(used.min()):.4g}): "
+                f"a negative plasma level would silently break mass conservation, "
+                f"because the solver clamps concentration at zero each step."
+            )
+
     c = domain.zeros()  # initial condition: no drug in tissue
     auc = domain.zeros()
 
@@ -289,7 +369,11 @@ def simulate_drug_transport(
     src_flat = src.ravel()
     for step in range(1, n_steps + 1):
         rhs = c.copy()
-        rhs += dt * src
+        if src_scale is None:
+            rhs += dt * src
+        else:
+            # Source at the OLD time level, matching the explicit advection term.
+            rhs += (dt * src_scale[step - 1]) * src
         if use_convection:
             rhs -= dt * _advective_divergence(c, vx, vy, tissue, dx)
         c_new = solve(rhs.ravel()).reshape(ny, nx)
@@ -466,6 +550,74 @@ def DRUG_LIBRARY_get():
     return DRUG_LIBRARY["temozolomide-like"]
 
 
+def _test_time_resolved_source():
+    """The ``source_profile`` path: inert by default, exact when it acts.
+
+    (a) an all-ones profile is BIT-identical to ``source_profile=None``;
+    (b) mass balance still holds exactly with a strongly time-varying source;
+    (c) two profiles with the same window MEAN inject the same total drug, but
+        produce a different exposure field — i.e. the schedule reaches the answer;
+    (d) an early (bolus-like) profile realises MORE exposure inside the window
+        than a late one at identical total dose, because less drug is left in
+        flight at T. This is the direction the terminal-residual argument
+        predicts (see the module docstring of ``tmesim.sim.engine``).
+    """
+    ny = nx = 40
+    dx = 15.0
+    micro = _make_micro(ny, nx, dx, ecm_value=0.3)
+    inert = DrugParams(name="inert", diffusivity=300.0, clearance=0.0, binding=0.0)
+    reactive = DrugParams(name="rx", diffusivity=300.0, clearance=2e-3, binding=0.0)
+    pde = PDEConfig(dt=10.0, total_time=3600.0, convection=False, save_every=50)
+    n_steps = int(round(pde.total_time / pde.dt))
+    source = micro.domain.zeros()
+    source[ny // 2, nx // 2] = 2.0
+
+    # (a) inert default path
+    base = simulate_drug_transport(micro, reactive, source, pde)
+    ones = simulate_drug_transport(micro, reactive, source, pde,
+                                   source_profile=np.ones(n_steps))
+    identical = (np.array_equal(base.auc, ones.auc)
+                 and np.array_equal(base.final_concentration,
+                                    ones.final_concentration))
+    print(f"[test4a] ones-profile bit-identical to None: {identical}")
+    assert identical, "an all-ones source_profile must reproduce the static path exactly"
+
+    # A ramp and its mirror: same window mean, opposite ordering in time.
+    early = np.linspace(2.0, 0.0, n_steps)
+    late = early[::-1].copy()
+    assert abs(early.mean() - late.mean()) < 1e-12
+
+    # (b) + (c) mass balance and non-degeneracy, on the conservative tracer
+    r_early = simulate_drug_transport(micro, inert, source, pde,
+                                      source_profile=early)
+    r_late = simulate_drug_transport(micro, inert, source, pde,
+                                     source_profile=late)
+    injected = pde.dt * float(early.sum()) * float(source.sum())
+    m_e = float(r_early.final_concentration.sum())
+    m_l = float(r_late.final_concentration.sum())
+    err = max(abs(m_e - injected), abs(m_l - injected)) / injected
+    print(f"[test4b] time-varying source mass balance: injected={injected:.6f} "
+          f"early={m_e:.6f} late={m_l:.6f} rel_err={err:.2e}")
+    assert err < 1e-9, f"mass not conserved with a time-varying source: {err:.2e}"
+    assert not np.allclose(r_early.auc, r_late.auc), (
+        "same total dose, different timing -> the exposure field must differ"
+    )
+
+    # (d) direction, on the reactive drug (a loss term is what makes exposure
+    #     depend on WHEN, via the residual left un-eliminated at T).
+    a_early = simulate_drug_transport(micro, reactive, source, pde,
+                                      source_profile=early).auc.sum()
+    a_late = simulate_drug_transport(micro, reactive, source, pde,
+                                     source_profile=late).auc.sum()
+    print(f"[test4d] exposure: early-weighted={a_early:.6g} "
+          f"late-weighted={a_late:.6g}  ratio={a_early/a_late:.6f}")
+    assert a_early > a_late, (
+        "front-loaded delivery must realise more exposure inside the window than "
+        "back-loaded delivery at identical total dose"
+    )
+    return err, float(a_early / a_late)
+
+
 if __name__ == "__main__":
     print("Running diffusion.py self-tests...\n")
     e1 = _test_mass_conservation()
@@ -473,8 +625,12 @@ if __name__ == "__main__":
     p_low, p_high = _test_penetration_monotonicity()
     print()
     rt = _test_runtime_120()
+    print()
+    tr_err, tr_ratio = _test_time_resolved_source()
     print("\nAll self-tests PASSED.")
     print(f"  mass-conservation rel err : {e1:.2e}")
     print(f"  penetration low/high ECM  : {p_low:.4f} / {p_high:.4f} "
           f"(monotone decreasing: {p_high < p_low})")
     print(f"  120x120 runtime           : {rt:.2f}s")
+    print(f"  time-resolved mass err    : {tr_err:.2e}  "
+          f"early/late exposure ratio: {tr_ratio:.4f}")

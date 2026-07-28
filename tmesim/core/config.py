@@ -61,6 +61,15 @@ class PDEConfig:
     total_time: float = 3600.0 * 12  # simulated exposure window, seconds
     convection: bool = True      # include interstitial-flow advection
     save_every: int = 200        # store history every N steps
+    #: Drive the transport source with the full time-resolved plasma curve
+    #: ``plasma(t)`` instead of its window time-average. ``False`` (default)
+    #: preserves the historical Stage-0 plasma-averaging behaviour BIT-FOR-BIT;
+    #: ``True`` lets tissue concentration genuinely rise and fall, which is what
+    #: makes dosing SCHEDULE (fractionation, infusion duration) resolvable at
+    #: all. See :func:`tmesim.sim.engine.simulate_response` and the
+    #: ``source_profile`` argument of
+    #: :func:`tmesim.physics.diffusion.simulate_drug_transport`.
+    time_resolved: bool = False
 
 
 @dataclass

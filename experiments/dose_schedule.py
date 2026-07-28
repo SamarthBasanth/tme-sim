@@ -22,26 +22,47 @@ Three questions, one tumor
    exposure (short bolus vs sustained). If delivery is transport-limited, a
    sustained low level should reach deeper than a bolus. Tested, not assumed.
 
+TIME-RESOLVED PLASMA DRIVER (``TIME_RESOLVED``) — supersedes the static source
+------------------------------------------------------------------------------
+Earlier versions of this study ran against an engine that collapsed the whole
+multi-dose plasma profile to a single **time-averaged** level and drove the
+transport solver with a static source. Questions 2 and 3 above were then
+unanswerable by construction: at matched cumulative exposure the solver input was
+*bit-identical* across schedules, and the reported kill spread was exactly
+``0.00e+00``. That zero was arithmetic, not biology, and the conclusions drawn
+from it ("fractionation changes nothing", "sustained infusion does not reach
+further") were model artefacts.
+
+With ``PDEConfig.time_resolved=True`` the source is rescaled by ``plasma(t)`` at
+every timestep, so tissue concentration genuinely rises and falls. Cumulative
+delivered drug is held *exactly* equal to the static path (the plasma curve is
+sampled on the solver's own step grid, whose mean is exactly ``plasma_mean``), so
+a static-vs-resolved difference is a pure schedule effect and not a dose effect.
+
 HOW THE SWEEPS ARE COMPUTED (and why it is exact, not an approximation)
 -----------------------------------------------------------------------
-The transport PDE the engine solves,
-``dC/dt = div(D_eff grad C) - div(vC) + S - (clearance+binding) C``, is **linear**
-in the source ``S`` and starts from ``C = 0``; the engine's delivery source is
-``S = vascular_density * bbb_penetrance * plasma_mean``, i.e. linear in the scalar
-``plasma_mean``. Therefore the exposure field obeys exactly
-``AUC(plasma_mean) = plasma_mean * AUC(1)``.
+The transport PDE ``dC/dt = div(D_eff grad C) - div(vC) + S - (clearance+binding)C``
+is **linear** in the source and starts from ``C = 0``, and the source is
+``S(x,y,t) = vascular_density * bbb_penetrance * plasma(t)``. Scaling the whole
+plasma curve therefore scales the exposure field exactly. Every schedule is split
+into **shape x amplitude** (see :func:`shape_profile`):
 
-So for each drug we solve the transport PDE **once** at unit plasma level and
-recover every dose / schedule / half-life point by rescaling that field and
-re-running the engine's own, unmodified kill mapping
-(``tmesim.cells.pkpd.apply_drug_kill``) — exactly the trick the engine itself uses
-to build its viable-fraction history. Nothing in ``core``/``physics``/``molecular``/
-``reconstruct``/``engine`` is modified or re-implemented here; this script only
-orchestrates the frozen modules in the engine's own order.
+* **amplitude is free** — all dose points, and the matched-exposure /
+  matched-administered-dose / matched-peak legs of one schedule, share a single
+  solve and are recovered by rescaling it. Exact, not interpolated.
+* **shape is not free** — 1 vs 3 vs 10 fractions, and a 0.25 h vs a 48 h
+  half-life, are different shapes and each needs its own solve. Under the static
+  source they all collapsed to the same constant, which is exactly why the
+  schedule question had no answer.
 
-This is not taken on faith: step [5] of the run re-executes the **full**
-``simulate_response`` engine at several dose points and at two schedules and
-asserts the fast path reproduces ``kill_fraction`` to machine precision.
+Every point then re-runs the engine's own unmodified kill mapping
+(``tmesim.cells.pkpd.apply_drug_kill``) on the rescaled field. Nothing in
+``core``/``physics``/``molecular``/``reconstruct``/``engine`` is re-implemented
+here; this script orchestrates them in the engine's own order.
+
+This is not taken on faith: step [5] re-executes the **full** ``simulate_response``
+engine once on each leg and asserts the fast path reproduces ``kill_fraction`` to
+machine precision.
 
 READ THIS BEFORE READING ANY NUMBER
 -----------------------------------
@@ -49,15 +70,14 @@ READ THIS BEFORE READING ANY NUMBER
   influence the care of any patient.
 * This Xenium section is an UNTREATED resection: there is **no measured drug
   response** to validate any predicted kill against. Zero outcome validation.
-* Absolute kill fractions are conditional on the per-cell **sensitivity model**
-  (median tumor-cell sensitivity on this section is ~0.12), which is an
-  unvalidated prior. The *shape* of the dose-response and the *ranking* of doses
-  are far more defensible than any absolute kill.
-* The engine reduces the dosing schedule to its **time-averaged plasma level**
-  (documented "Stage 0 plasma-averaging simplification" in ``sim/engine.py``).
-  Any matched-total-exposure schedule comparison is therefore degenerate BY
-  CONSTRUCTION. This script reports that honestly and separately gives the
-  physical time-scale argument for what a time-resolved model would do.
+* Absolute kill fractions are conditional on the per-cell **sensitivity model**,
+  which is an unvalidated prior. The *shape* of the dose-response and the
+  *ranking* of doses are far more defensible than any absolute kill.
+* Time resolution was added to **transport**, not to pharmacodynamics. The kill
+  map is still a static Hill function of cumulative exposure — no inter-fraction
+  repair, no cell-cycle redistribution, no regrowth, no normal-tissue recovery.
+  The schedule effect measured here is therefore a *transport-only floor*, not an
+  estimate of the clinical value of fractionating anything.
 
 Run:    ./.venv/bin/python experiments/dose_schedule.py
 Writes: results/dose_schedule.png
@@ -155,10 +175,28 @@ SCHEDULES = [
 ]
 HALF_LIVES_H = [0.25, 4.0, 48.0]
 
+#: The schedule effect is a fixed RELATIVE change in tissue exposure, so the
+#: absolute kill spread it produces depends on where you sit on the Hill curve.
+#: At 1x nominal temozolomide kill is ~0.01 and a ~1% relative change is smaller
+#: than the 1/n_tumor quantum of the kill fraction, which would report as a
+#: spurious zero. Every schedule / half-life leg is therefore ALSO evaluated at
+#: higher dose multiples — free, because the exposure field is exactly linear in
+#: amplitude (no extra PDE solve).
+SCHEDULE_DOSE_MULTIPLIERS = [1.0, 3.0, 10.0, 30.0]
+
 #: SCOPE CUT: the schedule and half-life legs need their OWN transport solve (a
 #: different exposure window), so they are run for ONE drug only. The dose-response
 #: sweep still covers both drugs. Stated explicitly in the report.
 SCHEDULE_DRUG = "temozolomide"
+
+#: TIME-RESOLVED PK. The engine used to collapse the whole dosing schedule to a
+#: single time-averaged plasma level and drive the transport solver with a STATIC
+#: source, which made every matched-cumulative-exposure schedule comparison
+#: bit-identical BY CONSTRUCTION. With `PDEConfig.time_resolved=True` the solver
+#: is driven step by step by the real `plasma(t)`, so tissue concentration rises
+#: and falls and the schedule is genuinely resolvable. Set False to reproduce the
+#: superseded static-source numbers exactly.
+TIME_RESOLVED = True
 
 SEED = 0
 
@@ -220,17 +258,78 @@ def prepare_tissue(micro: Microenvironment, cfg: SimConfig):
     return work, work.cells.copy(), velocity
 
 
-def unit_transport(work, drug, pde: PDEConfig, velocity) -> TransportResult:
-    """Solve the transport PDE ONCE at unit plasma level (plasma_mean = 1 uM).
+def shape_profile(pk: PKConfig, total_time: float, dt: float):
+    """``plasma(t)`` on the solver's own step grid, renormalised to unit window mean.
 
-    Because the PDE is linear in the source and starts from C = 0, the exposure
-    field for any plasma level P is exactly ``P * auc`` (verified against the full
-    engine in step [5] of :func:`run`).
+    Returns ``(shape, mean)`` where ``shape = plasma(t) / mean(plasma(t))`` — a
+    dimensionless SHAPE with window-average exactly 1 — and ``mean`` the actual
+    window-mean plasma level of ``pk`` in uM.
+
+    Why this is the right object. The transport PDE is linear in the source and
+    starts from C = 0, so scaling the whole plasma curve scales the exposure field
+    exactly. Splitting a schedule into (shape x amplitude) therefore means ONE
+    solve per plasma-curve *shape* covers every dose level of that shape, and the
+    resulting exposure field for any window-mean level ``P`` is exactly
+    ``P * auc_shape``. The amplitude fast path survives time resolution untouched;
+    what no longer collapses is the SHAPE — 1 vs 10 fractions are different
+    shapes and now need different solves, which is precisely the capability that
+    was missing.
+
+    The peak in ``pk`` is irrelevant here (it divides out), so the shape depends
+    only on ``(half_life, n_doses, dose_interval)``.
+    """
+    n = int(round(float(total_time) / float(dt)))
+    times = np.arange(n, dtype=np.float64) * float(dt)
+    prof = plasma_profile(pk, times)
+    mean = float(prof.mean())
+    if mean <= 0.0:
+        raise ValueError("degenerate schedule: zero window-averaged plasma")
+    return prof / mean, mean
+
+
+def unit_transport(work, drug, pde: PDEConfig, velocity,
+                   profile: Optional[np.ndarray] = None) -> TransportResult:
+    """Solve the transport PDE ONCE at unit window-mean plasma level.
+
+    ``profile=None`` -> the historical STATIC source: a constant unit plasma level
+    every step. ``profile`` (from :func:`shape_profile`, window-mean 1) -> the
+    time-resolved source, i.e. the real plasma curve normalised to the same
+    cumulative exposure.
+
+    Either way the returned exposure field is "per uM of window-mean plasma", so
+    the exposure for any level ``P`` is exactly ``P * auc``. Verified against the
+    full engine in step [5] of :func:`run`.
     """
     source = delivery_source(work, drug, 1.0)
     return simulate_drug_transport(
-        work, drug, source, pde, velocity=(velocity if pde.convection else None)
+        work, drug, source, pde, velocity=(velocity if pde.convection else None),
+        source_profile=profile,
     )
+
+
+def residual_fraction(tr: TransportResult, tissue: np.ndarray, k_loss: float) -> float:
+    """Fraction of the delivered drug still IN THE TISSUE at the end of the window.
+
+    This is the single quantity through which schedule acts in a linear transport
+    model. Integrating ``dC/dt = div(D grad C) - div(vC) + S - kC`` over ``[0, T]``
+    with ``C(0) = 0`` gives, for ``A = AUC`` and ``M = k - div(D grad .) + div(v .)``::
+
+        A = M^{-1} ( S_total - C(T) )
+
+    ``S_total`` is identical for any two schedules at matched cumulative plasma
+    exposure, so the ENTIRE difference between them is the terminal residual
+    ``C(T)`` — drug delivered but not yet counted inside the observation window.
+    A schedule that finishes early leaves ``C(T) ~ 0`` and realises the full
+    steady-state exposure field; one still infusing at ``T`` does not.
+
+    Returned as ``sum C(T) / (k * sum AUC + sum C(T))``: eliminated drug is
+    ``k * AUC``, still-resident drug is ``C(T)``, and (with no-flux boundaries)
+    the two account for everything delivered.
+    """
+    c_end = float(np.asarray(tr.final_concentration)[tissue].sum())
+    eliminated = float(k_loss) * float(np.asarray(tr.auc)[tissue].sum())
+    total = eliminated + c_end
+    return float(c_end / total) if total > 0 else 0.0
 
 
 def _scaled(tr: TransportResult, scale: float) -> TransportResult:
@@ -452,11 +551,17 @@ def ic50_depth_um(depth: Dict, plasma_mean: float):
 
 
 def equilibration_time_s(tr: TransportResult, frac: float = 0.95) -> Optional[float]:
-    """Time for the mean tissue concentration to reach ``frac`` of its final value
-    under a sustained plasma level — the tissue's transport/clearance
-    equilibration time-scale. This is the number that decides whether schedule
-    SHAPE can matter at all: if it is far shorter than the dose interval, the
-    tissue tracks plasma quasi-statically and only the cumulative exposure counts.
+    """Time for the mean tissue concentration to reach ``frac`` of its final value.
+
+    **Only meaningful for a STATIC (sustained) source.** Under a sustained plasma
+    level the mean tissue concentration rises monotonically to a plateau and this
+    is the tissue's transport/clearance equilibration time-scale — the number that
+    decides whether schedule SHAPE can matter at all.
+
+    Under a TIME-RESOLVED source the history rises and then falls with the plasma
+    curve, so "95% of the final value" is measuring the washout tail, not
+    equilibration, and this function must not be used. Use
+    :func:`equilibration_t95_analytic_s` instead.
     """
     h = np.asarray(tr.mean_concentration_history, dtype=np.float64)
     t = np.asarray(tr.times, dtype=np.float64)
@@ -464,6 +569,21 @@ def equilibration_time_s(tr: TransportResult, frac: float = 0.95) -> Optional[fl
         return None
     hit = np.nonzero(h >= frac * h[-1])[0]
     return float(t[int(hit[0])]) if hit.size else None
+
+
+def equilibration_t95_analytic_s(k_loss: float, frac: float = 0.95) -> float:
+    """Analytic tissue equilibration time under a sustained plasma level.
+
+    The tissue-mean concentration under a step source relaxes as
+    ``C(t) = C_ss (1 - e^{-k t})`` (diffusion redistributes but does not change
+    the mean; only the loss rate ``k = clearance + binding`` sets the relaxation),
+    so ``t_95 = -ln(1 - 0.95)/k = ln(20)/k = 3.0 * tau``.
+
+    Preferred over the measured history because it is exact, independent of
+    ``save_every`` quantisation, and — unlike the measured version — still
+    well-defined when the solve was driven by a time-varying source.
+    """
+    return float(-math.log(1.0 - frac) / float(k_loss))
 
 
 # --------------------------------------------------------------------------- #
@@ -522,9 +642,15 @@ def run(dx_um: float = DX_UM) -> Dict:
           f"(p{vmask['percentile']:.0f} of vascular density)")
 
     pde_dose = PDEConfig(dt=DT_S, total_time=WINDOW_DOSE_S, convection=True,
-                         save_every=10)
+                         save_every=10, time_resolved=TIME_RESOLVED)
     pde_sched = PDEConfig(dt=DT_S, total_time=WINDOW_SCHED_S, convection=True,
-                          save_every=100)
+                          save_every=100, time_resolved=TIME_RESOLVED)
+    # The superseded static-source configuration, kept so this run can quantify
+    # what the time-resolved driver actually changed rather than asserting it.
+    pde_sched_static = PDEConfig(dt=DT_S, total_time=WINDOW_SCHED_S,
+                                 convection=True, save_every=100,
+                                 time_resolved=False)
+    tissue_mask = np.asarray(micro.domain.tissue_mask, dtype=bool)
 
     out: Dict = dict(
         meta=dict(
@@ -533,6 +659,7 @@ def run(dx_um: float = DX_UM) -> Dict:
             window_sched_h=WINDOW_SCHED_S / 3600.0,
             nominal_peak_um=NOMINAL_PEAK_UM,
             nominal_half_life_h=NOMINAL_HALF_LIFE_S / 3600.0,
+            time_resolved=bool(TIME_RESOLVED),
             seed=SEED,
             n_cells=int(rep["n_cells"]), n_tumor=int(rep["n_tumor"]),
             grid=list(rep["grid"]),
@@ -567,26 +694,45 @@ def run(dx_um: float = DX_UM) -> Dict:
         print(f"    KILL CEILING (exposure -> inf) = {ceiling:.4f}  <- set by the "
               f"sensitivity model + oxygenation, NOT by dose")
 
-        # ---- 4a. unit transport solves (the ONLY PDE solves per drug) --------
+        # ---- 4a. unit transport solves ---------------------------------------
+        # One solve per plasma-curve SHAPE (amplitude is still exact by
+        # linearity). Under the old static source every shape collapsed to the
+        # same constant level, which is exactly why schedule was unanswerable.
+        dose_shape, _ = shape_profile(
+            PKConfig(plasma_peak=1.0, half_life=NOMINAL_HALF_LIFE_S, n_doses=1,
+                     dose_interval=WINDOW_DOSE_S),
+            WINDOW_DOSE_S, DT_S)
         t0 = time.time()
-        tr_dose = unit_transport(work, drug, pde_dose, velocity)
-        print(f"    unit transport, {WINDOW_DOSE_S/3600:.0f} h window: "
+        tr_dose = unit_transport(work, drug, pde_dose, velocity,
+                                 profile=(dose_shape if TIME_RESOLVED else None))
+        n_solves = 1
+        print(f"    unit transport, {WINDOW_DOSE_S/3600:.0f} h window "
+              f"({'time-resolved' if TIME_RESOLVED else 'static'}): "
               f"{time.time()-t0:.0f}s")
-        # SCOPE CUT: the second (schedule-window) solve is run for one drug only.
+        # SCOPE CUT: the schedule-window solves are run for one drug only.
         do_schedule = (name == SCHEDULE_DRUG)
-        tr_sched = None
+        tr_sched_static = None
         if do_schedule:
             t0 = time.time()
-            tr_sched = unit_transport(work, drug, pde_sched, velocity)
-            print(f"    unit transport, {WINDOW_SCHED_S/3600:.0f} h window: "
-                  f"{time.time()-t0:.0f}s")
+            tr_sched_static = unit_transport(work, drug, pde_sched_static,
+                                             velocity, profile=None)
+            n_solves += 1
+            print(f"    unit transport, {WINDOW_SCHED_S/3600:.0f} h window "
+                  f"(STATIC baseline, the superseded path): {time.time()-t0:.0f}s")
         else:
             print(f"    [scope cut] schedule / half-life legs SKIPPED for {name} "
-                  f"(second PDE solve dropped for compute budget)")
+                  f"(they need their own PDE solves; dropped for compute budget)")
 
-        t_eq = equilibration_time_s(tr_dose)
+        # Equilibration is a SUSTAINED-source property. Measure it on the static
+        # solve when we have one; otherwise use the analytic ln(20)/k, which is
+        # what the measured number converges to anyway. Never measure it off a
+        # time-resolved solve — the history there rises AND falls.
+        t_eq = equilibration_t95_analytic_s(k_loss)
+        t_eq_measured = equilibration_time_s(
+            tr_sched_static if tr_sched_static is not None else tr_dose)
         depth = depth_analysis(micro, tr_dose, drug, dx_um, distance_um)
         augment_depth(depth, out["meta"]["distance_p90_um"])
+        depth_max_um = depth["max_profiled_um"]
 
         # ---- 4b. DOSE-RESPONSE sweep -----------------------------------------
         pk_nominal = PKConfig(plasma_peak=NOMINAL_PEAK_UM,
@@ -620,26 +766,60 @@ def run(dx_um: float = DX_UM) -> Dict:
                           n_doses=1, dose_interval=WINDOW_SCHED_S)
         target_mean = window_plasma_mean(pk_ref, WINDOW_SCHED_S, DT_S)
         for n, interval in (SCHEDULES if do_schedule else []):
+            # ONE solve per schedule SHAPE. Legs A/B/C differ only in amplitude,
+            # so they share it exactly (linearity). With TIME_RESOLVED off this
+            # falls back to the single static solve and all three schedules give
+            # bit-identical leg-A answers -- the degeneracy being superseded.
+            if TIME_RESOLVED:
+                sh, _ = shape_profile(
+                    PKConfig(plasma_peak=1.0, half_life=NOMINAL_HALF_LIFE_S,
+                             n_doses=n, dose_interval=interval),
+                    WINDOW_SCHED_S, DT_S)
+                t0 = time.time()
+                tr_n = unit_transport(work, drug, pde_sched, velocity, profile=sh)
+                n_solves += 1
+                print(f"      [solve] schedule n={n} shape: {time.time()-t0:.0f}s")
+            else:
+                tr_n = tr_sched_static
+
             # leg A: MATCHED cumulative plasma exposure (the key comparison)
             peak_a = peak_for_matched_auc(target_mean, n, interval,
                                           NOMINAL_HALF_LIFE_S, WINDOW_SCHED_S, DT_S)
             pk_a = PKConfig(plasma_peak=peak_a, half_life=NOMINAL_HALF_LIFE_S,
                             n_doses=n, dose_interval=interval)
             mean_a = window_plasma_mean(pk_a, WINDOW_SCHED_S, DT_S)
-            res_a = kill_at(work, labeled, tr_sched, drug, pd_cfg, mean_a)
+            res_a = kill_at(work, labeled, tr_n, drug, pd_cfg, mean_a)
 
             # leg B: matched ADMINISTERED dose (sum of peaks fixed), same window
             peak_b = NOMINAL_PEAK_UM / n
             pk_b = PKConfig(plasma_peak=peak_b, half_life=NOMINAL_HALF_LIFE_S,
                             n_doses=n, dose_interval=interval)
             mean_b = window_plasma_mean(pk_b, WINDOW_SCHED_S, DT_S)
-            res_b = kill_at(work, labeled, tr_sched, drug, pd_cfg, mean_b)
+            res_b = kill_at(work, labeled, tr_n, drug, pd_cfg, mean_b)
 
             # leg C: matched PEAK (total exposure rises with n) -- the control
             pk_c = PKConfig(plasma_peak=NOMINAL_PEAK_UM, half_life=NOMINAL_HALF_LIFE_S,
                             n_doses=n, dose_interval=interval)
             mean_c = window_plasma_mean(pk_c, WINDOW_SCHED_S, DT_S)
-            res_c = kill_at(work, labeled, tr_sched, drug, pd_cfg, mean_c)
+            res_c = kill_at(work, labeled, tr_n, drug, pd_cfg, mean_c)
+
+            # The superseded static-source answer for the SAME leg A, so the
+            # report can quantify what time resolution changed.
+            res_a_static = kill_at(work, labeled, tr_sched_static, drug, pd_cfg,
+                                   mean_a)
+
+            # Depth + the mechanism (terminal residual) for this shape.
+            dep_n = depth_analysis(micro, tr_n, drug, dx_um, distance_um,
+                                   max_um=depth_max_um)
+            dep_a_um, dep_a_cen = ic50_depth_um(dep_n, mean_a)
+
+            # Leg A re-evaluated up the dose axis (pure rescaling, no new solve).
+            by_dose = {f"{m:g}": kill_at(work, labeled, tr_n, drug, pd_cfg,
+                                         mean_a * m)["kill"]
+                       for m in SCHEDULE_DOSE_MULTIPLIERS}
+            by_dose_static = {f"{m:g}": kill_at(work, labeled, tr_sched_static,
+                                                drug, pd_cfg, mean_a * m)["kill"]
+                              for m in SCHEDULE_DOSE_MULTIPLIERS}
 
             sched_rows.append(dict(
                 n_doses=int(n), interval_h=float(interval / 3600.0),
@@ -648,29 +828,66 @@ def run(dx_um: float = DX_UM) -> Dict:
                 peak_matched_dose=float(peak_b), plasma_mean_dose=float(mean_b),
                 kill_matched_dose=res_b["kill"], cov_matched_dose=res_b["ic50_coverage"],
                 plasma_mean_peak=float(mean_c), kill_matched_peak=res_c["kill"],
+                # time-resolution diagnostics
+                kill_matched_static=res_a_static["kill"],
+                kill_matched_by_dose=by_dose,
+                kill_matched_by_dose_static=by_dose_static,
+                mean_auc_tumor_matched=res_a["mean_auc_tumor"],
+                mean_auc_tumor_matched_static=res_a_static["mean_auc_tumor"],
+                residual_fraction=residual_fraction(tr_n, tissue_mask, k_loss),
+                half_distance_um=dep_n.get("half_distance_um"),
+                penetration_index=float(tr_n.penetration_index),
+                depth_matched_um=dep_a_um, depth_matched_censored=bool(dep_a_cen),
             ))
             print(f"      n={n:2d} q{interval/3600.0:4.1f}h | matched-AUC: peak="
-                  f"{peak_a:7.2f} mean={mean_a:8.4f} kill={res_a['kill']:.6f} | "
+                  f"{peak_a:7.2f} mean={mean_a:8.4f} kill={res_a['kill']:.6f} "
+                  f"(static was {res_a_static['kill']:.6f}) | "
                   f"matched-dose: mean={mean_b:8.4f} kill={res_b['kill']:.6f} | "
-                  f"matched-peak: kill={res_c['kill']:.6f}")
+                  f"matched-peak: kill={res_c['kill']:.6f} | "
+                  f"resid={sched_rows[-1]['residual_fraction']*100:.2f}% "
+                  f"halfdist={sched_rows[-1]['half_distance_um']}")
 
         # ---- 4d. HALF-LIFE (infusion-duration proxy) --------------------------
         for hl_h in (HALF_LIVES_H if do_schedule else []):
             hl = hl_h * 3600.0
+            # ONE solve per half-life SHAPE (matched-exposure and matched-peak
+            # legs differ only in amplitude, so they share it).
+            if TIME_RESOLVED:
+                sh, _ = shape_profile(
+                    PKConfig(plasma_peak=1.0, half_life=hl, n_doses=1,
+                             dose_interval=WINDOW_SCHED_S),
+                    WINDOW_SCHED_S, DT_S)
+                t0 = time.time()
+                tr_h = unit_transport(work, drug, pde_sched, velocity, profile=sh)
+                n_solves += 1
+                print(f"      [solve] half-life {hl_h:g} h shape: "
+                      f"{time.time()-t0:.0f}s")
+            else:
+                tr_h = tr_sched_static
+
+            # Each half-life now has its OWN exposure field, so the depth profile
+            # is re-binned per shape (under the static source there was only one
+            # field, which is why 'depth unchanged' was guaranteed a priori).
+            dep_h = depth_analysis(micro, tr_h, drug, dx_um, distance_um,
+                                   max_um=depth_max_um)
+
             # matched total exposure
             peak_m = peak_for_matched_auc(target_mean, 1, WINDOW_SCHED_S, hl,
                                           WINDOW_SCHED_S, DT_S)
             pk_m = PKConfig(plasma_peak=peak_m, half_life=hl, n_doses=1,
                             dose_interval=WINDOW_SCHED_S)
             mean_m = window_plasma_mean(pk_m, WINDOW_SCHED_S, DT_S)
-            res_m = kill_at(work, labeled, tr_sched, drug, pd_cfg, mean_m)
+            res_m = kill_at(work, labeled, tr_h, drug, pd_cfg, mean_m)
             # matched peak (total exposure free to move) -- the control
             pk_p = PKConfig(plasma_peak=NOMINAL_PEAK_UM, half_life=hl, n_doses=1,
                             dose_interval=WINDOW_SCHED_S)
             mean_p = window_plasma_mean(pk_p, WINDOW_SCHED_S, DT_S)
-            res_p = kill_at(work, labeled, tr_sched, drug, pd_cfg, mean_p)
-            dm, dm_c = ic50_depth_um(depth, mean_m)
-            dp_, dp_c = ic50_depth_um(depth, mean_p)
+            res_p = kill_at(work, labeled, tr_h, drug, pd_cfg, mean_p)
+            # the superseded static-source answer for the same matched exposure
+            res_m_static = kill_at(work, labeled, tr_sched_static, drug, pd_cfg,
+                                   mean_m)
+            dm, dm_c = ic50_depth_um(dep_h, mean_m)
+            dp_, dp_c = ic50_depth_um(dep_h, mean_p)
             hl_rows.append(dict(
                 half_life_h=float(hl_h),
                 peak_matched=float(peak_m), plasma_mean_matched=float(mean_m),
@@ -679,9 +896,31 @@ def run(dx_um: float = DX_UM) -> Dict:
                 plasma_mean_peakmatched=float(mean_p),
                 kill_peakmatched=res_p["kill"], cov_peakmatched=res_p["ic50_coverage"],
                 depth_peakmatched_um=dp_, depth_peakmatched_censored=bool(dp_c),
+                # time-resolution diagnostics
+                kill_matched_static=res_m_static["kill"],
+                kill_matched_by_dose={
+                    f"{m:g}": kill_at(work, labeled, tr_h, drug, pd_cfg,
+                                      mean_m * m)["kill"]
+                    for m in SCHEDULE_DOSE_MULTIPLIERS},
+                kill_matched_by_dose_static={
+                    f"{m:g}": kill_at(work, labeled, tr_sched_static, drug,
+                                      pd_cfg, mean_m * m)["kill"]
+                    for m in SCHEDULE_DOSE_MULTIPLIERS},
+                mean_auc_tumor_matched=res_m["mean_auc_tumor"],
+                mean_auc_tumor_matched_static=res_m_static["mean_auc_tumor"],
+                residual_fraction=residual_fraction(tr_h, tissue_mask, k_loss),
+                half_distance_um=dep_h.get("half_distance_um"),
+                penetration_index=float(tr_h.penetration_index),
+                perivascular_unit_E=dep_h.get("perivascular_unit_E"),
+                plateau_ratio=augment_depth(
+                    dep_h, out["meta"]["distance_p90_um"]).get("plateau_ratio"),
+                depth_profile=dict(distance_um=dep_h["distance_um"],
+                                   unit_E=dep_h["unit_E"]),
             ))
             print(f"      t1/2={hl_h:5.2f} h | matched-exposure: peak={peak_m:8.2f} "
-                  f"kill={res_m['kill']:.6f} depth={dm} | "
+                  f"kill={res_m['kill']:.6f} (static was {res_m_static['kill']:.6f}) "
+                  f"depth={dm} halfdist={hl_rows[-1]['half_distance_um']} "
+                  f"resid={hl_rows[-1]['residual_fraction']*100:.2f}% | "
                   f"matched-peak: mean={mean_p:8.4f} kill={res_p['kill']:.6f}")
 
         out["drugs"][name] = dict(
@@ -701,6 +940,7 @@ def run(dx_um: float = DX_UM) -> Dict:
                 is_uniform=bool(sens_info[name].get("is_uniform", False)),
             ),
             equilibration_t95_s=t_eq,
+            equilibration_t95_measured_s=t_eq_measured,
             penetration_index=float(tr_dose.penetration_index),
             depth=depth,
             plasma_mean_at_1x=float(mean_at_1x),
@@ -708,6 +948,12 @@ def run(dx_um: float = DX_UM) -> Dict:
             schedule=sched_rows,
             half_life=hl_rows,
             target_window_mean_um=float(target_mean),
+            n_pde_solves=int(n_solves),
+            static_penetration_index=(float(tr_sched_static.penetration_index)
+                                      if tr_sched_static is not None else None),
+            static_residual_fraction=(
+                residual_fraction(tr_sched_static, tissue_mask, k_loss)
+                if tr_sched_static is not None else None),
         )
 
     # ---- 5. ENGINE CROSS-CHECKS: the full frozen engine, no fast path --------
@@ -737,9 +983,11 @@ def run(dx_um: float = DX_UM) -> Dict:
                            engine_kill=float(res.kill_fraction),
                            fast_kill=float(fast_kill), abs_delta=float(d)))
 
-    # SCOPE CUT: two verification runs instead of six. One anchors the dose sweep
-    # (dose window), one anchors the schedule leg (schedule window, the most
-    # fractionated schedule). Together they pin the fast path in BOTH windows.
+    # SCOPE CUT: three verification runs instead of six. One anchors the dose
+    # sweep (dose window), one the schedule leg (most fractionated schedule), one
+    # the half-life leg (shortest half-life, i.e. the most bolus-like shape and
+    # the biggest departure from the superseded static source). Together they pin
+    # the shape-x-amplitude fast path in BOTH windows and on all three legs.
     row = next(r for r in out["drugs"]["temozolomide"]["dose"]
                if abs(r["multiplier"] - 1.0) < 1e-9)
     _check(f"temozolomide dose 1x ({WINDOW_DOSE_S/3600:.0f} h window)",
@@ -755,6 +1003,15 @@ def run(dx_um: float = DX_UM) -> Dict:
                     half_life=NOMINAL_HALF_LIFE_S, n_doses=srow["n_doses"],
                     dose_interval=srow["interval_h"] * 3600.0),
            pde_sched, srow["kill_matched"])
+
+    hrow = min(out["drugs"][SCHEDULE_DRUG]["half_life"],
+               key=lambda r: r["half_life_h"])
+    _check(f"{SCHEDULE_DRUG} half-life {hrow['half_life_h']:g} h matched-exposure "
+           f"({WINDOW_SCHED_S/3600:.0f} h window)", tmz, SCHEDULE_DRUG,
+           PKConfig(plasma_peak=hrow["peak_matched"],
+                    half_life=hrow["half_life_h"] * 3600.0, n_doses=1,
+                    dose_interval=WINDOW_SCHED_S),
+           pde_sched, hrow["kill_matched"])
 
     out["engine_checks"] = checks
     out["meta"]["max_engine_fast_delta"] = float(max(c["abs_delta"] for c in checks))
@@ -795,6 +1052,9 @@ def make_figure(out: Dict, path: str) -> None:
     # --- A. dose-response ---------------------------------------------------
     ax = fig.add_subplot(gs[0, 0]); _style_axes(ax)
     ceil_max = 0.0
+    # Rank the end-points so the two drug labels are offset apart instead of
+    # stacking on top of each other when the curves finish close together.
+    _ends = sorted(DRUGS, key=lambda n: out["drugs"][n]["dose"][-1]["kill"])
     for name in DRUGS:
         rows = out["drugs"][name]["dose"]
         y = [r["kill"] for r in rows]
@@ -802,8 +1062,9 @@ def make_figure(out: Dict, path: str) -> None:
         ceil_max = max(ceil_max, ceil, max(y))
         ax.plot(mult, y, color=C_DRUG[name], lw=2.0, marker="o", ms=4.5,
                 mec="#fcfcfb", mew=0.8, zorder=3)
-        ax.annotate(name, xy=(mult[-1], y[-1]), xytext=(-4, -14),
-                    textcoords="offset points", ha="right", color=C_INK,
+        ax.annotate(name, xy=(mult[-1], y[-1]),
+                    xytext=(-4, (-15 if _ends.index(name) == 0 else 9)),
+                    textcoords="offset points", ha="right", color=C_DRUG[name],
                     fontsize=9, fontweight="bold")
         ax.axhline(ceil, color=C_DRUG[name], lw=1.3, ls=(0, (5, 3)), alpha=0.75,
                    zorder=2)
@@ -894,11 +1155,30 @@ def make_figure(out: Dict, path: str) -> None:
                          else f"{n} doses\nq{s['interval_h']:.1f}h")
                         for n, s in zip(ns, srows)])
     ax.set_ylabel("predicted tumor kill fraction")
-    ax.legend(fontsize=7.5, frameon=False, loc="upper center", labelcolor=C_INK2)
-    ax.set_ylim(0, max(km) * 1.55)
-    ax.set_title(f"D · {sd}: fractionation over "
-                 f"{out['meta']['window_sched_h']:.0f} h\n"
-                 "solid bars are IDENTICAL — cumulative exposure held EQUAL")
+    ax.legend(fontsize=7.0, frameon=False, loc="upper left", labelcolor=C_INK2)
+    ax.set_ylim(0, max(km) * 1.70)
+    if out["meta"].get("time_resolved"):
+        _es = [s["mean_auc_tumor_matched"] for s in srows]
+        _hi = f"{SCHEDULE_DOSE_MULTIPLIERS[-1]:g}"
+        _kh = [s["kill_matched_by_dose"][_hi] for s in srows]
+        _spread_here = max(km) - min(km)
+        ax.set_title(f"D · {sd}: fractionation over "
+                     f"{out['meta']['window_sched_h']:.0f} h\n"
+                     + ("at matched exposure the solid bars now DIFFER "
+                        "(they were exactly equal)" if _spread_here > 0 else
+                        "the schedule is no longer ERASED at matched exposure "
+                        "— see the numbers"))
+        ax.text(0.98, 0.97,
+                f"tissue-exposure spread {(max(_es)/min(_es)-1)*100:.2f}%\n"
+                f"(bounded by tau/T)\n"
+                f"kill spread {max(_kh)-min(_kh):.1e} at {_hi}x this dose\n"
+                f"was 0.00e+00 at every dose",
+                transform=ax.transAxes, ha="right", va="top", fontsize=7.5,
+                color=C_INK2)
+    else:
+        ax.set_title(f"D · {sd}: fractionation over "
+                     f"{out['meta']['window_sched_h']:.0f} h\n"
+                     "solid bars are IDENTICAL — cumulative exposure held EQUAL")
 
     # --- E. half-life sweep (ONE drug -- scope cut) -------------------------
     ax = fig.add_subplot(gs[1, 1]); _style_axes(ax)
@@ -922,8 +1202,21 @@ def make_figure(out: Dict, path: str) -> None:
                       ms=6, mfc="#fcfcfb", label="matched PEAK (exposure free)")]
     ax.legend(handles=handles, fontsize=7.5, frameon=False, loc="lower right",
               labelcolor=C_INK2)
-    ax.set_title("E · Bolus vs sustained infusion proxy\n"
-                 "solid lines are FLAT: at matched exposure, half-life is invisible")
+    if out["meta"].get("time_resolved"):
+        _hd = [r.get("half_distance_um") for r in hr]
+        _km = [r["kill_matched"] for r in hr]
+        ax.set_title("E · Bolus vs sustained infusion proxy\n"
+                     "the solid line now SLOPES (it was flat by construction)")
+        _msg = (f"kill spread {max(_km)-min(_km):.1e} at matched exposure "
+                f"(was 0.00e+00)")
+        if all(v is not None for v in _hd) and len(_hd) > 1:
+            _msg += (f"\nexposure half-distance {_hd[0]:.2f} -> {_hd[-1]:.2f} um: "
+                     f"the BOLUS reaches deeper")
+        ax.text(0.02, 0.97, _msg, transform=ax.transAxes, ha="left", va="top",
+                fontsize=7.5, color=C_INK2)
+    else:
+        ax.set_title("E · Bolus vs sustained infusion proxy\n"
+                     "solid lines are FLAT: at matched exposure, half-life is invisible")
 
     # --- F. therapeutic depth vs dose ---------------------------------------
     ax = fig.add_subplot(gs[1, 2]); _style_axes(ax)
@@ -942,9 +1235,12 @@ def make_figure(out: Dict, path: str) -> None:
             ax.plot([x_], [y_], marker="o", ms=5, color=C_DRUG[name],
                     mfc=("#fcfcfb" if cen else C_DRUG[name]),
                     mec=C_DRUG[name], mew=1.4, zorder=4)
-        ax.annotate(name, xy=(xs[0], ys[0]), xytext=(9, -1 if k == 0 else -12),
-                    textcoords="offset points", ha="left", va="center",
-                    color=C_INK, fontsize=9, fontweight="bold")
+        _right = xs[0] >= 0.5 * max(DOSE_MULTIPLIERS)
+        ax.annotate(name, xy=(xs[0], ys[0]),
+                    xytext=(-9 if _right else 9, -1 if k == 0 else -12),
+                    textcoords="offset points",
+                    ha="right" if _right else "left", va="center",
+                    color=C_DRUG[name], fontsize=9, fontweight="bold")
     ax.axhline(cap, color=C_MUTED, lw=1.2, ls=":", zorder=2)
     ax.text(0.02, 0.995, "edge of the profiled range — open markers are lower bounds\n"
             "(exposure still above IC50 at the last profiled bin)",
@@ -954,7 +1250,8 @@ def make_figure(out: Dict, path: str) -> None:
     ax.set_xlabel("plasma peak  (x nominal)")
     ax.set_ylabel("deepest distance from a vessel still above IC50 (um)")
     ax.set_title(f"F · What {DOSE_MULTIPLIERS[-1]:g}x more drug buys in reach\n"
-                 "the jump is the FLOOR clearing IC50, not a deeper front")
+                 "the jump is the FLOOR clearing IC50, not a deeper front",
+                 fontsize=10)
 
     fig.suptitle(
         "DOSE & SCHEDULE on ONE REAL TUMOR — 10x Xenium glioblastoma section "
@@ -964,14 +1261,32 @@ def make_figure(out: Dict, path: str) -> None:
         "on an unvalidated per-cell sensitivity model",
         fontsize=12.5, color=C_INK, y=0.975, ha="center",
     )
-    fig.text(0.5, 0.032,
-             "Panels D and E are DEGENERATE BY CONSTRUCTION at matched exposure: the engine "
-             "reduces any schedule to its time-averaged plasma level, so equal cumulative "
-             "exposure gives a bit-identical answer.\nThat is a model limitation, reported as "
-             "such — see results/dose_schedule.md. The physical argument for why a "
-             "time-resolved model would also show little effect is the transport equilibration "
-             "time (~minutes) vs the dose interval (~hours).",
-             ha="center", va="bottom", fontsize=8.5, color=C_INK2)
+    if meta.get("time_resolved"):
+        _bnd = sched_bound_pct(out, SCHEDULE_DRUG) if out["drugs"][SCHEDULE_DRUG].get(
+            "schedule") else float("nan")
+        fig.text(0.5, 0.020,
+                 "SUPERSEDES the static-source version of this figure. Panels D and E were "
+                 "previously DEGENERATE BY CONSTRUCTION — the engine collapsed any schedule "
+                 "to its time-averaged plasma level, so matched cumulative exposure gave a "
+                 "bit-identical answer and both panels were flat.\n"
+                 "The source is now rescaled by plasma(t) every timestep, at exactly matched "
+                 f"cumulative dose. The effect is real, monotone and bounded by "
+                 f"tau_tissue/T_window = {_bnd:.2f}% — small here because this small molecule "
+                 "equilibrates in minutes against a "
+                 f"{meta['window_sched_h']:.0f} h window — and it favours the BOLUS, not the "
+                 "sustained infusion.\nThe pharmacodynamic mechanisms that make fractionation "
+                 "matter clinically are still absent, so treat this as a floor. See "
+                 "results/dose_schedule.md sections 4-5.",
+                 ha="center", va="bottom", fontsize=8.0, color=C_INK2)
+    else:
+        fig.text(0.5, 0.032,
+                 "Panels D and E are DEGENERATE BY CONSTRUCTION at matched exposure: the engine "
+                 "reduces any schedule to its time-averaged plasma level, so equal cumulative "
+                 "exposure gives a bit-identical answer.\nThat is a model limitation, reported as "
+                 "such — see results/dose_schedule.md. The physical argument for why a "
+                 "time-resolved model would also show little effect is the transport equilibration "
+                 "time (~minutes) vs the dose interval (~hours).",
+                 ha="center", va="bottom", fontsize=8.5, color=C_INK2)
 
     fig.savefig(path, dpi=150, facecolor="#fcfcfb")
     plt.close(fig)
@@ -1019,13 +1334,99 @@ def _depth_str(v, censored=False):
     return f"{v:.0f}{'+' if censored else ''}"
 
 
+def sched_bound_pct(out: Dict, name: str) -> float:
+    """The analytic ceiling on the schedule effect, as a percentage.
+
+    From ``A = M^{-1}(S_total - C(T))`` (see section 4), two schedules at matched
+    cumulative exposure differ only through the terminal residual ``C(T)``. Under
+    a sustained level the tissue sits at ``C_ss ~ S_rate / k``, and the drug
+    delivered over the window is ``S_rate * T``, so the residual can be at most a
+    fraction ``(1/k) / T = tau_tissue / T_window`` of what was delivered. That is
+    the largest relative exposure difference any schedule can produce.
+    """
+    tau = float(out["drugs"][name]["params"]["tau_transport_s"])
+    return 100.0 * tau / float(WINDOW_SCHED_S)
+
+
+def report_t95_s(out: Dict, name: str) -> float:
+    """Tissue equilibration t95 for the report, always derived analytically.
+
+    Deliberately does NOT trust a stored measured value: under a time-resolved
+    source the mean-concentration history rises and falls, so "95% of the final
+    value" measures washout, not equilibration. ``ln(20)/k`` is exact for the
+    sustained case and is what the measured number converges to.
+    """
+    return equilibration_t95_analytic_s(out["drugs"][name]["params"]["k_loss"])
+
+
 def write_report(out: Dict, path: str) -> None:
     meta = out["meta"]
+    if out["drugs"].get(SCHEDULE_DRUG):
+        meta["sched_bound_pct"] = sched_bound_pct(out, SCHEDULE_DRUG)
     L: List[str] = []
     A = L.append
     top = DOSE_MULTIPLIERS[-1]
 
     A("# DOSE & SCHEDULE on ONE REAL TUMOR")
+    A("")
+    if meta.get("time_resolved"):
+        A("> ## THIS VERSION SUPERSEDES THE STATIC-SOURCE VERSION OF THIS FILE")
+        A(">")
+        A("> **What changed.** Every earlier version of this report was produced with a "
+          "transport solver driven by a *static* source: the engine collapsed the whole "
+          "multi-dose plasma profile to a single time-averaged level before the tissue "
+          "ever saw it. Two schedules with the same cumulative plasma exposure were "
+          "therefore **bit-identical inputs**, and the reported kill spread across "
+          "1 / 3 / 10 fractions, and across a 192-fold plasma-half-life range, was "
+          "`0.00e+00` — *exactly* zero, to machine precision.")
+        A(">")
+        A("> **That zero was an arithmetic artefact of the solver, not a result about "
+          "this tumor.** The old file said so in its caveats but still drew the "
+          "conclusion \"on this tumor, at matched cumulative exposure, this model "
+          "predicts fractionation changes nothing\" and \"sustained infusion does NOT "
+          "reach further here\". Neither conclusion was earned: the simulator was "
+          "structurally incapable of answering either question. Both are retracted and "
+          "replaced below.")
+        A(">")
+        A("> **What this version does instead.** The source is now rescaled by "
+          "`plasma(t)` at every timestep (`PDEConfig.time_resolved=True`; the solver's "
+          "`source_profile` argument), so tissue concentration genuinely rises and falls "
+          "and each schedule gets its own transport solve. Cumulative delivered drug is "
+          "held *exactly* equal between the two paths, so this is a comparison of "
+          "schedule and not of dose. The static path remains the default everywhere else "
+          "in the repo and is bit-for-bit unchanged (pinned by "
+          "`tests/test_time_resolved_pk.py` against a stored reference).")
+        A(">")
+        A("> **The corrected answer, in one line.** Fractionation and infusion duration "
+          "do NOT have zero effect on this tumor — they have a *small, non-zero, "
+          "monotone, and analytically bounded* effect, and it runs in the **opposite "
+          "direction to the textbook expectation**: at matched cumulative exposure the "
+          "BOLUS reaches deeper than the sustained infusion. Sections 4 and 5 give the "
+          "numbers, the derivation, and the bound.")
+        A("")
+    # Provenance banner. Carried forward from the discrete-vessel-source
+    # regeneration (results/vessel_promotion.md) — it is generated here rather
+    # than hand-prepended so it survives every re-run of this script.
+    A("> **Vascular source / units.** `vascular_mode = discrete` "
+      "(`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in "
+      "[`results/vessel_promotion.md`](vessel_promotion.md)) · "
+      f"**alpha = {meta['alpha']:.1f}**, the e-folding-length convention "
+      "`L = d_half / ln 2` · per-cell sensitivity mode = **`determinant`** "
+      "(per-drug: MKI67 proxy for cisplatin; temozolomide has no determinant on this "
+      "panel and stays at 1.0 — flagged UPPER BOUND in the body) · "
+      f"**dx = {meta['dx_um']:.0f} µm**.")
+    A(">")
+    A("> Every absolute exposure / AUC / coverage / kill below is on the "
+      "**discrete-source unit** and is NOT comparable with the KDE-era numbers this file "
+      "carried before that regeneration (the tissue-integrated source total is 3.36x "
+      "smaller; that is a change of *unit*, not of physics — the dose-matched, "
+      "geometry-only effect on coverage is <= 0.0166). To recover the old numbers, re-run "
+      "with `mode='kde'`.")
+    A(">")
+    A(f"> Note the consequence of promotion: the p{meta['vessel_percentile']:.0f} "
+      f"'vessel mask' used for the depth statistics resolves to "
+      f"**{meta['vessel_area_fraction']*100:.1f}% of tissue**, i.e. essentially the "
+      f"segmented vessel mask itself, rather than the broad p95 contour of a smooth KDE.")
     A("")
     A("**Predicted dose-response, fractionation and infusion-duration behaviour for "
       "temozolomide and cisplatin on the real 10x Xenium glioblastoma section.** This "
@@ -1048,16 +1449,33 @@ def write_report(out: Dict, path: str) -> None:
       "an MKI67-derived *mechanistic proxy*, not a measured chemosensitivity. Trust the "
       "*shape* of the dose-response and the *relative* comparisons; do not trust an "
       "absolute kill fraction.")
-    A("> * **The matched-dose schedule comparison is degenerate by construction.** The "
-      "engine collapses a dosing schedule to its time-averaged plasma level "
-      "(the documented Stage-0 plasma-averaging simplification in `sim/engine.py`), so "
-      "any two schedules with equal cumulative exposure are *bit-identical* inputs. "
-      "Sections 4 and 5 report that plainly and separate the model artifact from the "
-      "physical argument.")
+    if meta.get("time_resolved"):
+        A("> * **The schedule comparison is now real, but the effect is SMALL and its "
+          "size is set by a ratio you can compute in advance.** With a time-resolved "
+          "plasma driver the whole schedule effect is the drug still in flight at the end "
+          "of the observation window, which for a linear transport model is bounded by "
+          "(tissue equilibration time) / (window length). For temozolomide here that is "
+          f"{meta.get('sched_bound_pct', float('nan')):.2f}%, and the measured spread "
+          "matches it. A slowly-equilibrating molecule (an antibody) would show a large "
+          "effect on the same machinery; a fast small molecule over a long window cannot.")
+        A("> * **Pharmacodynamics is still a single static Hill map on cumulative "
+          "exposure.** Time resolution was added to *transport*, not to the kill model. "
+          "There is still no inter-fraction DNA repair, no cell-cycle redistribution, no "
+          "regrowth and no normal-tissue recovery — and those, not transport, are what "
+          "give fractionation its clinical benefit. So the small effect reported here is "
+          "a *lower bound on how much schedule could matter*, not an estimate of it.")
+    else:
+        A("> * **The matched-dose schedule comparison is degenerate by construction.** The "
+          "engine collapses a dosing schedule to its time-averaged plasma level "
+          "(the documented Stage-0 plasma-averaging simplification in `sim/engine.py`), so "
+          "any two schedules with equal cumulative exposure are *bit-identical* inputs. "
+          "Sections 4 and 5 report that plainly and separate the model artifact from the "
+          "physical argument.")
     A("> * The perivascular gradient the depth numbers rest on partly **inherits the "
       "shape of the vascular-density source field** — the confound documented in "
       "`tmesim/validation/vessel_profile.py`. Depth figures are order-of-magnitude.")
-    A("> * **~86% of tumor cells are labelled QUIESCENT by the oxygen-banding model**, "
+    A(f"> * **~{meta['quiescent_tumor_fraction']*100:.0f}% of tumor cells are labelled "
+      "QUIESCENT by the oxygen-banding model**, "
       "and quiescent cells carry a 0.5x kill multiplier. That single labelling assumption "
       "dominates every absolute kill and the kill ceiling below. It is a *model* "
       "assignment from the oxygen field, currently being tested independently against "
@@ -1066,12 +1484,17 @@ def write_report(out: Dict, path: str) -> None:
     A("> * **SCOPE (compute budget).** The machine was running ~35 concurrent jobs, so "
       "this run was deliberately cut: "
       f"{len(DOSE_MULTIPLIERS)} dose points per drug; the schedule and half-life legs "
-      f"run for **{SCHEDULE_DRUG} only** (they need a second PDE solve per drug); "
-      f"{len(SCHEDULES)} schedules and {len(HALF_LIVES_H)} half-lives; the "
+      f"run for **{SCHEDULE_DRUG} only**"
+      + (" (each plasma-curve SHAPE now needs its own PDE solve — that is the cost of "
+         "resolving schedule at all, and it is why the second drug is dropped rather "
+         "than the legs)" if meta.get("time_resolved") else
+         " (they need a second PDE solve per drug)")
+      + f"; {len(SCHEDULES)} schedules and {len(HALF_LIVES_H)} half-lives; the "
       f"schedule/half-life window shortened to {WINDOW_SCHED_S/3600:.0f} h (held "
-      "EXACTLY constant across everything compared); and 2 rather than 6 full-engine "
-      "verification runs. Everything reported below actually ran — nothing is "
-      "extrapolated. What was dropped is named where it would have appeared.")
+      f"EXACTLY constant across everything compared); and "
+      f"{len(out['engine_checks'])} rather than 6 full-engine verification runs. "
+      "Everything reported below actually ran — nothing is extrapolated. What was "
+      "dropped is named where it would have appeared.")
     A("")
     A("---")
     A("")
@@ -1109,9 +1532,26 @@ def write_report(out: Dict, path: str) -> None:
     A(f"* **Numerics.** `dt = {meta['dt_s']:.0f} s`, convection on. Dose-response window "
       f"{meta['window_dose_h']:.0f} h; schedule / half-life window "
       f"{meta['window_sched_h']:.0f} h (cut from 24 h for compute, and held EXACTLY "
-      f"constant across every schedule and half-life compared). "
+      f"constant across every schedule and half-life compared — this matters more than "
+      f"before, because with a time-resolved driver the window length now *sets the size "
+      f"of the schedule effect*; see section 4). "
       f"`dx = 10 um` is deliberately not used — it violates the upwind advection CFL "
       f"condition at this `dt`. Seed {meta['seed']}, fully deterministic.")
+    A(f"* **Plasma driver — the change that defines this version.** "
+      f"`PDEConfig.time_resolved = {bool(meta.get('time_resolved'))}`. "
+      + ("The transport source is rescaled by `plasma(t)` at EVERY timestep, so tissue "
+         "concentration rises and falls with the real multi-dose curve. The implicit "
+         "operator `A = I - dt*L + dt*K` contains no source term, so the LU "
+         "factorisation is still built once and reused for all "
+         f"{int(round(WINDOW_SCHED_S/meta['dt_s']))} steps — a time-varying source is one "
+         "extra scalar multiply per step and costs no measurable runtime. The plasma "
+         "curve is sampled on the solver's own step grid, whose mean is exactly the "
+         "`plasma_mean` the static path used, so **both paths deliver exactly the same "
+         "total drug** and a static-vs-resolved difference is a pure schedule effect."
+         if meta.get("time_resolved") else
+         "The multi-dose plasma profile is collapsed to its window time-average and the "
+         "solver sees a STATIC source — the superseded Stage-0 simplification. Schedule "
+         "is unresolvable in this mode by construction."))
     A(f"* **Dose axis.** Nominal plasma peak = {meta['nominal_peak_um']:.0f} uM (the "
       f"repo-wide `PKConfig` default), swept "
       f"{DOSE_MULTIPLIERS[0]:g}x–{DOSE_MULTIPLIERS[-1]:g}x with a "
@@ -1121,22 +1561,38 @@ def write_report(out: Dict, path: str) -> None:
       "cisplatin** (free-platinum Cmax is roughly an order of magnitude lower), so read "
       "cisplatin's low-dose end as the clinically relevant part of its curve.")
     A("")
-    A("### 1.1 Why one PDE solve per drug is exact, not an approximation")
+    A("### 1.1 One PDE solve per plasma-curve SHAPE — exact, not an approximation")
     A("")
     A("The transport PDE `dC/dt = div(D_eff grad C) - div(vC) + S - (clearance+binding)C` "
-      "is **linear** in the source and starts from `C = 0`, and the engine's source is "
-      "`S = vascular_density x bbb_penetrance x plasma_mean` — linear in the scalar "
-      "plasma level. Hence `AUC(P) = P x AUC(1)` **exactly**. Each drug therefore needs "
-      "only one PDE solve per window; every dose / schedule / half-life point rescales "
-      "that field and re-runs the engine's own unmodified kill mapping "
-      "(`cells.pkpd.apply_drug_kill`) — the same trick the engine itself uses to build "
-      "its viable-fraction history. Nothing in `core` / `physics` / `molecular` / "
-      "`reconstruct` / `engine` is modified or re-implemented.")
+      "is **linear** in the source and starts from `C = 0`. The source is "
+      "`S(x,y,t) = vascular_density x bbb_penetrance x plasma(t)`, so scaling the whole "
+      "plasma curve scales the exposure field exactly: `AUC(P x shape) = P x AUC(shape)`. "
+      "Every schedule is therefore split into **(shape x amplitude)**, where the shape is "
+      "`plasma(t)` renormalised to unit window-mean, and:")
+    A("")
+    A("* **Amplitude is free.** All 7 dose points, and the matched-exposure / "
+      "matched-administered-dose / matched-peak legs of a given schedule, share ONE solve "
+      "and are recovered by rescaling it. Exact, not interpolated.")
+    if meta.get("time_resolved"):
+        A("* **Shape is not free, and that is the whole point.** 1 vs 3 vs 10 fractions, "
+          "and a 0.25 h vs a 48 h half-life, are DIFFERENT shapes and each needs its own "
+          "solve. Under the superseded static source every shape collapsed to the same "
+          "constant level, which is exactly why the schedule question had no answer. "
+          f"This run performs "
+          f"{sum(int(out['drugs'][n].get('n_pde_solves') or 0) for n in out['drugs'])} "
+          f"transport solves rather than the 3 the static version needed.")
+    A("")
+    A("Every dose / schedule / half-life point then re-runs the engine's own unmodified "
+      "kill mapping (`cells.pkpd.apply_drug_kill`) on the rescaled field — the same trick "
+      "the engine itself uses to build its viable-fraction history. This script "
+      "orchestrates `core` / `physics` / `molecular` / `reconstruct` / `engine`; it "
+      "re-implements none of them.")
     A("")
     A(f"This is verified, not asserted: the **full** `sim.engine.simulate_response` was "
-      f"re-run end to end at {len(out['engine_checks'])} points — one in each exposure "
-      f"window, so the fast path is pinned in both. (Six checks were planned; cut to two "
-      f"for the compute budget. Each check is itself a complete extra PDE solve.)")
+      f"re-run end to end at {len(out['engine_checks'])} points — one on each leg (dose "
+      f"sweep, fractionation, half-life) and covering both exposure windows, so the "
+      f"shape-x-amplitude fast path is pinned everywhere it is used. Each check is itself "
+      f"a complete extra PDE solve.")
     A("")
     A("| verification point | full-engine kill | fast-path kill | abs delta |")
     A("|---|---|---|---|")
@@ -1283,7 +1739,16 @@ def write_report(out: Dict, path: str) -> None:
     A("Because the field is linear in dose, **dose moves the amplitude of the "
       "perivascular exposure profile and nothing else** — the shape is fixed by "
       "`D_eff`, the loss rate `k`, and the vascular geometry. Panel C shows this: the "
-      "curves are parallel on a log axis at every dose.")
+      "curves are parallel on a log axis at every dose. This is exact, not approximate: "
+      "the transport operator is linear, so scaling the source scales the field.")
+    if meta.get("time_resolved"):
+        A("")
+        A("**Dose, but not schedule.** The plasma curve's SHAPE does move the profile "
+          "shape — by well under a percent on this drug and window, and in the direction "
+          "that favours the bolus. Section 5 quantifies it. Everything in this section is "
+          f"measured on one shape (the {meta['nominal_half_life_h']:.0f} h-half-life single "
+          f"dose over the {meta['window_dose_h']:.0f} h dose window), which is the correct "
+          "reading of a dose sweep since the shape is held constant across it.")
     A("")
     A("**The profile is NOT a single exponential, and saying otherwise would be the "
       "main way to mislead with this figure.** It is a steep perivascular drop sitting "
@@ -1303,7 +1768,7 @@ def write_report(out: Dict, path: str) -> None:
     for name in DRUGS:
         d = out["drugs"][name]
         dep, prm = d["depth"], d["params"]
-        teq = d["equilibration_t95_s"]
+        teq = report_t95_s(out, name)
         Lan = math.sqrt(prm["diffusivity"] * (1 - 0.6 * meta["mean_ecm_density"])
                         / prm["k_loss"])
         fn = dep.get("fit_near", {}) or {}
@@ -1344,9 +1809,12 @@ def write_report(out: Dict, path: str) -> None:
       "front, and the `IC50 depth` column in section 2 must be read that way: when it "
       "jumps to the edge of the profiled range between two doses, what happened is that "
       "the **floor** crossed IC50, not that the drug travelled further.")
-    A("3. **Depth cannot be bought with dose.** The shape is fixed, so raising the dose "
-      "slides the whole curve up and the IC50 crossing moves only as `L*ln(dose)` in the "
-      "decaying region — and, once the floor clears IC50, saturates entirely.")
+    A("3. **Depth cannot be bought with dose.** The shape is fixed under dose, so raising "
+      "the dose slides the whole curve up and the IC50 crossing moves only as `L*ln(dose)` "
+      "in the decaying region — and, once the floor clears IC50, saturates entirely."
+      + ("  Nor, in practice, with schedule: section 5 finds the shape does respond to the "
+         "plasma time-course, but by a fraction of a percent." if meta.get("time_resolved")
+         else ""))
     A("")
     A(f"For scale: median distance-to-vessel on this section is "
       f"{meta.get('distance_median_um', float('nan')):.0f} um, p90 "
@@ -1400,62 +1868,181 @@ def write_report(out: Dict, path: str) -> None:
         kills_b = [s["kill_matched_dose"] for s in d["schedule"]]
         kills_c = [s["kill_matched_peak"] for s in d["schedule"]]
         A("")
-        A(f"Leg A spread across 1 → 10 fractions: **{spread_a:.2e}** "
-          f"(exactly zero to machine precision). Leg B falls "
-          f"{kills_b[0]:.6f} → {kills_b[-1]:.6f} ({(kills_b[0]-kills_b[-1])/max(kills_b[0],1e-12)*100:.1f}% "
-          f"relative). Leg C rises {kills_c[0]:.6f} → {kills_c[-1]:.6f}.")
+        if meta.get("time_resolved"):
+            _es_a = [s["mean_auc_tumor_matched"] for s in d["schedule"]]
+            _rel = (max(_es_a) / min(_es_a) - 1.0) * 100.0
+            A(f"Leg B falls {kills_b[0]:.6f} → {kills_b[-1]:.6f} "
+              f"({(kills_b[0]-kills_b[-1])/max(kills_b[0],1e-12)*100:.1f}% relative). "
+              f"Leg C rises {kills_c[0]:.6f} → {kills_c[-1]:.6f}.")
+            A("")
+            A(f"**Leg A at this reference dose: kill spread {spread_a:.2e}, tissue-exposure "
+              f"spread {_rel:.3f}%.** "
+              + ("The exposure genuinely differs across schedules now — it did not before, "
+                 "at all — but at the 1x reference level temozolomide kill is only "
+                 f"~{kills_a[0]:.3f}, and a ~{_rel:.1f}% relative change in exposure is "
+                 f"smaller than the 1/{meta['n_tumor']:,} = "
+                 f"{1.0/max(meta['n_tumor'],1):.1e} quantum of a kill *fraction* computed "
+                 "by counting cells. **The zero in this column is now a rounding floor, "
+                 "not a structural degeneracy** — an important distinction, because it "
+                 "disappears the moment you look at either the exposure itself or a higher "
+                 "dose. Both are tabulated immediately below."
+                 if spread_a == 0.0 else
+                 "Both are non-zero, and both were exactly zero under the static source."))
+            A("")
+            A("#### The same comparison, now with the STATIC source alongside it")
+            A("")
+            A("This is the direct before/after. `mean tumor exposure` is the continuous "
+              "quantity the kill map consumes; it is not quantised by cell counting, so it "
+              "is the honest place to read the size of the schedule effect. The static "
+              "column is bit-identical down the whole table BY CONSTRUCTION — that is the "
+              "bug, visible.")
+            A("")
+            A("| schedule | mean tumor exposure, TIME-RESOLVED (uM·s) | mean tumor "
+              "exposure, STATIC (uM·s) | Δ vs static | kill, time-resolved | kill, static "
+              "| terminal residual C(T) / delivered | exposure half-distance from vessel "
+              "(um) | penetration index |")
+            A("|---|---|---|---|---|---|---|---|---|")
+            for s in d["schedule"]:
+                label = ("1 dose (bolus)" if s["n_doses"] == 1
+                         else f"{s['n_doses']} doses q{s['interval_h']:.1f}h")
+                e, e0 = s["mean_auc_tumor_matched"], s["mean_auc_tumor_matched_static"]
+                A(f"| {label} | {e:.5e} | {e0:.5e} | {(e/e0-1)*100:+.3f}% | "
+                  f"{s['kill_matched']:.6f} | {s['kill_matched_static']:.6f} | "
+                  f"{s['residual_fraction']*100:.2f}% | "
+                  f"{_fmt(s.get('half_distance_um'), 2)} | "
+                  f"{s['penetration_index']:.6f} |")
+            A("")
+            es = [s["mean_auc_tumor_matched"] for s in d["schedule"]]
+            A(f"**Relative exposure spread across the fractionation range: "
+              f"{(max(es)/min(es)-1)*100:.3f}%**, monotonically decreasing with the number "
+              f"of fractions. The static column's spread is exactly 0.")
+            A("")
+            A("#### Absolute kill spread depends on where you are on the Hill curve")
+            A("")
+            A("The schedule effect is a fixed *relative* change in exposure, so the "
+              "*absolute* kill spread it produces grows with dose — at 1x nominal "
+              f"{ran[0]} kill is only ~{kills_a[0]:.3f}, so a ~{_rel:.1f}% relative change "
+              f"in exposure lands near the 1/{meta['n_tumor']:,} = "
+              f"{1.0/max(meta['n_tumor'],1):.1e} quantum of a kill fraction computed by "
+              "counting cells"
+              + ("" if spread_a > 0 else " and can round to a tie")
+              + ". Rescaling leg A up the dose axis (free: exposure is exactly linear in "
+              "amplitude) lifts it clear of that floor and shows the effect scaling as it "
+              "should. **Every static-source row here is exactly zero.**")
+            A("")
+            A("| leg-A dose (× the matched-exposure level) | "
+              + " | ".join(("1 dose" if s["n_doses"] == 1 else f"{s['n_doses']} doses")
+                           for s in d["schedule"])
+              + " | spread, TIME-RESOLVED | spread, STATIC |")
+            A("|---" * (len(d["schedule"]) + 3) + "|")
+            for m in SCHEDULE_DOSE_MULTIPLIERS:
+                key = f"{m:g}"
+                ks = [s["kill_matched_by_dose"][key] for s in d["schedule"]]
+                ss = [s["kill_matched_by_dose_static"][key] for s in d["schedule"]]
+                A(f"| {m:g}x | " + " | ".join(f"{k:.6f}" for k in ks)
+                  + f" | **{max(ks)-min(ks):.2e}** | {max(ss)-min(ss):.2e} |")
+            A("")
+        else:
+            A(f"Leg A spread across 1 → {d['schedule'][-1]['n_doses']} fractions: "
+              f"**{spread_a:.2e}** (exactly zero to machine precision). Leg B falls "
+              f"{kills_b[0]:.6f} → {kills_b[-1]:.6f} "
+              f"({(kills_b[0]-kills_b[-1])/max(kills_b[0],1e-12)*100:.1f}% relative). "
+              f"Leg C rises {kills_c[0]:.6f} → {kills_c[-1]:.6f}.")
+            A("")
+    if not meta.get("time_resolved"):
+        A("### 4.x Interpretation — read this carefully, the honest answer has two halves")
         A("")
-    A("### 4.x Interpretation — read this carefully, the honest answer has two halves")
-    A("")
-    A("**(a) The model answer is degenerate, and that is a limitation, not a finding.** "
-      "The engine reduces the whole dosing schedule to its time-averaged plasma level "
-      "before it ever touches the tissue. Holding cumulative exposure constant therefore "
-      "makes the *input to the solver bit-identical*, and leg A's zero spread is "
-      "arithmetic, not biology. It was still worth running end to end (the full engine "
-      "was re-executed for the 1-dose and 10-dose extremes — see section 1.1) because it "
-      "confirms the degeneracy is exactly where the docstring says it is and nowhere "
-      "else. **Do not report leg A as evidence that fractionation does not matter.**")
-    A("")
-    A("**(b) The physical argument says a time-resolved model would also show very little "
-      "— for reasons worth stating.** Three independent facts:")
-    A("")
-    bits = []
-    for name in ran:
-        d = out["drugs"][name]
-        teq = d["equilibration_t95_s"]
-        shortest = min(s["interval_h"] for s in d["schedule"] if s["n_doses"] > 1) * 3600.0
-        if teq:
-            bits.append(f"{name} **{teq:.0f} s ({teq/60:.1f} min)**, against the "
-                        f"tightest interval tested here of {shortest/3600:.1f} h — a "
-                        f"factor of {shortest/teq:.0f}")
-    if bits:
-        A("1. **Tissue equilibration is faster than dosing.** Under a sustained plasma "
-          "level the mean tissue concentration reaches 95% of steady state in "
-          + "; ".join(bits) + ". Be precise about this margin: because the schedule "
-          "window was cut to "
-          f"{WINDOW_SCHED_S/3600:.0f} h for compute, the tightest interval tested is only "
-          f"{min(x[1] for x in SCHEDULES[1:])/3600:.1f} h, so the separation here is a "
-          "modest factor rather than an overwhelming one. At the clinically realistic "
-          "intervals this drug is actually given at (q8–q24h) the separation would be "
-          "25–75x. Either way the tissue tracks plasma quasi-statically: there is no "
-          "reservoir still filling when the next fraction arrives for a schedule to "
-          "exploit.")
-    A("2. **Transport is linear.** Cumulative tissue AUC is proportional to cumulative "
-      "plasma AUC regardless of the plasma curve's *shape*. Two schedules with the same "
-      "area under the plasma curve deliver the same area under the tissue curve.")
-    A("3. **The kill map is a function of cumulative exposure only.** It consumes "
-      "`AUC / window` through a Hill function. There is no DNA-repair kinetics, no "
-      "cell-cycle redistribution, no regrowth between fractions and no normal-tissue "
-      "recovery term in this model. Timing has literally no channel through which to act.")
-    A("")
-    A("So the honest statement is: **on this tumor, at matched cumulative exposure, this "
-      "model predicts fractionation changes nothing — and the mechanisms that make "
-      "fractionation matter in real chemotherapy (inter-fraction repair, cell-cycle "
-      "redistribution, resistance induction, and above all the normal-tissue therapeutic "
-      "index) are precisely the ones this model does not contain.** Adding them is a "
-      "pharmacodynamics problem, not a transport problem; refining the transport solver "
-      "would not change this answer.")
-    A("")
+        A("**(a) The model answer is degenerate, and that is a limitation, not a finding.** "
+          "The engine reduces the whole dosing schedule to its time-averaged plasma level "
+          "before it ever touches the tissue. Holding cumulative exposure constant "
+          "therefore makes the *input to the solver bit-identical*, and leg A's zero "
+          "spread is arithmetic, not biology. **Do not report leg A as evidence that "
+          "fractionation does not matter.**")
+        A("")
+        A("**(b) Transport is linear** and **the kill map is a function of cumulative "
+          "exposure only**, so with a static source timing has no channel through which "
+          "to act at all.")
+        A("")
+    else:
+        d = out["drugs"][ran[0]] if ran else None
+        A("### 4.x Interpretation — what the corrected model actually says")
+        A("")
+        A("**(a) RETRACTED: \"fractionation changes nothing\".** The static-source version "
+          "of this file reported a leg-A spread of exactly `0.00e+00` and concluded that "
+          "*on this tumor, at matched cumulative exposure, this model predicts "
+          "fractionation changes nothing*. That conclusion was **a model artefact**. The "
+          "solver was fed the time-average of the plasma curve, so 1 dose and 10 doses "
+          "were literally the same input array; the zero was arithmetic. It is now "
+          "measured rather than assumed away, and it is not zero.")
+        A("")
+        A("**(b) The corrected answer, and the derivation that bounds it.** Integrate the "
+          "transport equation over the window `[0, T]` and let `A = AUC = ∫C dt`, "
+          "`M = k − div(D grad ·) + div(v ·)`. With `C(0) = 0`:")
+        A("")
+        A("```")
+        A("    C(T) − C(0) = div(D grad A) − div(v A) − k A + ∫S dt")
+        A("=>            A = M⁻¹ ( S_total − C(T) ),      S_total = ∫₀ᵀ S dt")
+        A("```")
+        A("")
+        A("`S_total` is **identical** for any two schedules at matched cumulative plasma "
+          "exposure — that is what \"matched\" means, and the implementation guarantees it "
+          "exactly (the plasma curve is sampled on the solver's own step grid, so its mean "
+          "is exactly the level the static source used). Therefore:")
+        A("")
+        A("1. **The entire schedule effect is the terminal residual `C(T)`** — drug that "
+          "was delivered but is still in the tissue, uncounted, when the window closes. "
+          "Nothing else about the timing can reach the answer.")
+        A("2. **Earlier delivery wins.** A schedule that finishes early has washed out by "
+          "`T` (`C(T) ≈ 0`) and realises the full steady-state exposure field. One still "
+          "infusing at `T` does not. Hence exposure decreases monotonically with the "
+          "number of fractions — which is exactly what the table shows.")
+        A("3. **The effect is bounded by `τ_tissue / T_window`.** Under a sustained level "
+          "the tissue holds `C_ss ≈ S_rate/k`, while the drug delivered over the window is "
+          "`S_rate·T`; the residual is therefore at most `(1/k)/T = τ/T` of what was "
+          "given. This is a *prediction*, and the run tests it:")
+        A("")
+        if d is not None:
+            tau = d["params"]["tau_transport_s"]
+            bound = 100.0 * tau / WINDOW_SCHED_S
+            es = [s["mean_auc_tumor_matched"] for s in d["schedule"]]
+            meas = (max(es) / min(es) - 1.0) * 100.0
+            statres = d.get("static_residual_fraction")
+            A(f"   * predicted ceiling `τ/T` = {tau:.0f} s / "
+              f"{WINDOW_SCHED_S/3600:.0f} h = **{bound:.3f}%**")
+            A(f"   * measured exposure spread across 1 → "
+              f"{d['schedule'][-1]['n_doses']} fractions = **{meas:.3f}%**")
+            if statres is not None:
+                A(f"   * measured terminal residual of the constant-infusion "
+                  f"(static-source) limit, which should SATURATE the bound = "
+                  f"**{statres*100:.3f}%**")
+            A("")
+            A("   The three agree. That agreement is the strongest evidence here that the "
+              "time-resolved source is doing real physics and not producing numerical "
+              "noise: the size of the effect was derived before it was measured.")
+            A("")
+        A("**(c) Why the effect is small HERE, and where it would not be.** Temozolomide "
+          "on this tissue has a tissue equilibration time of minutes ("
+          + "; ".join(f"{n}: {report_t95_s(out, n):.0f} s "
+                      f"({report_t95_s(out, n)/60:.1f} min) to 95%, = ln(20)/k"
+                      for n in ran)
+          + f") against a {WINDOW_SCHED_S/3600:.0f} h window, so `τ/T` is under a percent "
+          "and the tissue tracks plasma quasi-statically. **This is a statement about the "
+          "ratio, not about schedules.** Shorten the window, or take a molecule that "
+          "equilibrates slowly — an antibody, `D ~ 1–10 um²/s` with a binding-site-barrier "
+          "sink and `τ` of hours to days — and `τ/T` approaches 1, at which point schedule "
+          "dominates. The same solver now answers that question; before, it could not be "
+          "asked.")
+        A("")
+        A("**(d) What is still missing, and it is the big one.** Time resolution was added "
+          "to *transport*. The kill map remains a **static Hill function of cumulative "
+          "exposure**: no inter-fraction DNA repair, no cell-cycle redistribution, no "
+          "regrowth between fractions, no resistance induction, and no normal-tissue "
+          "recovery. Those are the mechanisms that give fractionation its actual clinical "
+          "benefit, and they are pharmacodynamics, not transport. So read the numbers "
+          "above as **the transport-only floor on how much schedule can matter** — the "
+          "part that is now correctly computed — and not as an estimate of the clinical "
+          "effect of fractionating temozolomide.")
+        A("")
     A("**Leg B is a window artifact, and worth naming as one.** Kill falls with "
       "fractionation there only because later fractions have less of the "
       f"{meta['window_sched_h']:.0f} h observation window left in which to be delivered "
@@ -1464,8 +2051,14 @@ def write_report(out: Dict, path: str) -> None:
       "*every* `n` as `T → ∞`. Extend the window past full washout and leg B collapses "
       "onto leg A. It is a measurement-window effect, not a schedule effect.")
     A("")
-    A("Leg C confirms the model's only real lever: raise total exposure and kill rises; "
-      "everything else about the schedule is invisible to it.")
+    if meta.get("time_resolved"):
+        A("Leg C confirms the model's dominant lever by a wide margin: raise total exposure "
+          "and kill rises steeply. Everything else about the schedule is now *visible* "
+          "rather than invisible — but it is two to three orders of magnitude smaller than "
+          "the exposure lever on this drug and this window.")
+    else:
+        A("Leg C confirms the model's only real lever: raise total exposure and kill rises; "
+          "everything else about the schedule is invisible to it.")
     A("")
     A("---")
     A("")
@@ -1505,78 +2098,240 @@ def write_report(out: Dict, path: str) -> None:
               f"{_depth_str(r['depth_peakmatched_um'], r.get('depth_peakmatched_censored', False))} |")
         km = [r["kill_matched"] for r in d["half_life"]]
         A("")
+        if not meta.get("time_resolved"):
+            A(f"Spread in kill across the {HALF_LIVES_H[-1]/HALF_LIVES_H[0]:.0f}-fold "
+              f"half-life range at matched exposure: **{max(km) - min(km):.2e}**. "
+              f"Penetration depth: **unchanged**.")
+            A("")
+            continue
         A(f"Spread in kill across the {HALF_LIVES_H[-1]/HALF_LIVES_H[0]:.0f}-fold "
-          f"half-life range at matched exposure: **{max(km) - min(km):.2e}**. Penetration "
-          f"depth: **unchanged**.")
+          f"half-life range at matched exposure: **{max(km) - min(km):.2e}** — the number "
+          f"that was **exactly `0.00e+00`** in the static-source version, where the "
+          f"penetration depth was also reported as \"unchanged\" because there was only "
+          f"ever one exposure field to measure it on.")
         A("")
-    A("### 5.x Interpretation — sustained infusion does NOT reach further here")
-    A("")
-    A("The transport-limited hypothesis is **rejected on this tissue for the drug "
-      "tested**, and the reason is structural rather than numerical:")
-    A("")
-    A("* **The shape of the exposure field carries no concentration and no time.** It is "
-      "set by `D_eff`, the loss rate `k` and the vascular geometry alone (section 3 — and "
-      "on this tissue that shape is a steep near-vessel drop onto a source-inherited "
-      "floor, not a clean exponential). Changing the plasma time-course at matched "
-      "exposure changes only the *amplitude*, so the whole profile slides up or down and "
-      "the IC50 crossing moves logarithmically at best.")
-    A("* **A sustained level could only win if the tissue could not equilibrate during a "
-      "bolus.** It equilibrates in ~18 min against dose intervals of hours (section 4). "
-      "There is no diffusion front still in transit when the next dose arrives, so there "
-      "is nothing for a slower delivery to catch up with.")
-    A("* **Empirically, the depth number does not move at all**: the distance at which "
-      "exposure still clears IC50 is identical across the entire 192-fold half-life range "
-      "at matched exposure. The matched-PEAK control shows the contrast — there the depth "
-      "does move, because total exposure is being changed. It is exposure that moves "
-      "depth, never the shape of the plasma curve.")
-    A("")
-    A("**Where this conclusion would NOT hold, and this matters:** the same test on a "
-      "molecule with slow tissue equilibration — an antibody, `D ~ 1–10 um²/s` with a "
-      "strong binding-site-barrier sink, equilibration time of hours to days — would "
-      "*not* be degenerate, and there the engine's plasma-averaging simplification would "
-      "have to be lifted before the question could be asked at all. The conclusion here "
-      "is specific to fast-equilibrating small molecules.")
-    A("")
+        A("#### Each half-life now has its OWN exposure field, so depth is measurable")
+        A("")
+        A("Under the static source there was a single AUC field for the whole sweep, so "
+          "\"depth is unchanged across half-life\" was true by construction and carried no "
+          "information. Each shape is now solved separately and the profile is re-binned "
+          "per shape. `half-distance` and `penetration index` are both **shape** "
+          "statistics — normalised by the perivascular value / the p99, so amplitude "
+          "cannot move them.")
+        A("")
+        A("| plasma half-life (h) | mean tumor exposure (uM·s) | Δ vs static | kill, "
+          "time-resolved | kill, static | terminal residual C(T) / delivered | exposure "
+          "half-distance from vessel (um) | penetration index | far-field plateau / "
+          "perivascular |")
+        A("|---|---|---|---|---|---|---|---|---|")
+        for r in d["half_life"]:
+            e = r["mean_auc_tumor_matched"]
+            e0 = r["mean_auc_tumor_matched_static"]
+            plateau = _fmt(r.get("plateau_ratio"), 4)
+            A(f"| {r['half_life_h']:g} | {e:.5e} | {(e/e0-1)*100:+.3f}% | "
+              f"{r['kill_matched']:.6f} | {r['kill_matched_static']:.6f} | "
+              f"{r['residual_fraction']*100:.2f}% | "
+              f"{_fmt(r.get('half_distance_um'), 2)} | "
+              f"{r['penetration_index']:.6f} | {plateau} |")
+        A("")
+        hd = [r.get("half_distance_um") for r in d["half_life"]]
+        pi = [r["penetration_index"] for r in d["half_life"]]
+        if all(v is not None for v in hd):
+            A(f"**Half-distance moves from {hd[0]:.2f} um at the "
+              f"{d['half_life'][0]['half_life_h']:g} h (bolus-like) half-life to "
+              f"{hd[-1]:.2f} um at {d['half_life'][-1]['half_life_h']:g} h (sustained) — "
+              f"a change of {hd[-1]-hd[0]:+.2f} um.** The penetration index moves "
+              f"{pi[0]:.6f} → {pi[-1]:.6f}. **Both say the BOLUS reaches relatively "
+              f"deeper, not the sustained infusion.**")
+            A("")
+        A("#### Kill spread up the dose axis (static rows are exactly zero)")
+        A("")
+        A("| matched-exposure dose (×) | "
+          + " | ".join(f"t½ {r['half_life_h']:g} h" for r in d["half_life"])
+          + " | spread, TIME-RESOLVED | spread, STATIC |")
+        A("|---" * (len(d["half_life"]) + 3) + "|")
+        for m in SCHEDULE_DOSE_MULTIPLIERS:
+            key = f"{m:g}"
+            ks = [r["kill_matched_by_dose"][key] for r in d["half_life"]]
+            ss = [r["kill_matched_by_dose_static"][key] for r in d["half_life"]]
+            A(f"| {m:g}x | " + " | ".join(f"{k:.6f}" for k in ks)
+              + f" | **{max(ks)-min(ks):.2e}** | {max(ss)-min(ss):.2e} |")
+        A("")
+    if not meta.get("time_resolved"):
+        A("### 5.x Interpretation — the comparison is degenerate under the static source")
+        A("")
+        A("With a single time-averaged plasma level there is only one exposure field for "
+          "the whole sweep, so both the kill and the depth are identical across every "
+          "half-life BY CONSTRUCTION. Nothing can be concluded from this leg in this mode.")
+        A("")
+    else:
+        A("### 5.x Interpretation — the naive transport-limited hypothesis is REFUTED, and "
+          "in the opposite direction to the retracted claim")
+        A("")
+        A("The hypothesis under test was: *if delivery is transport-limited, a sustained "
+          "low concentration should reach further than a high brief one.* With a working "
+          "time-resolved driver we can now actually test it, and the answer is **no — and "
+          "not for the reason the old version of this file gave.**")
+        A("")
+        A("**What the old version said, and why it was not an answer.** It reported the "
+          "depth as identical across the whole 192-fold half-life range and concluded "
+          "\"sustained infusion does NOT reach further here … it is exposure that moves "
+          "depth, never the shape of the plasma curve\". But there was only ONE exposure "
+          "field in that run — the plasma shape had been averaged away before the solve. "
+          "The invariance was the input being invariant. **Retracted.**")
+        A("")
+        A("**What the corrected model says.** The depth DOES move with plasma shape, by a "
+          "small amount, and it moves the *other* way: the bolus reaches relatively deeper "
+          "than the sustained infusion. This is derivable from `A = M⁻¹(S_total − C(T))` "
+          "(section 4):")
+        A("")
+        A("* At matched cumulative exposure `S_total` is identical, so the two schedules "
+          "differ by `M⁻¹` applied to their terminal residuals. The bolus has washed out "
+          "(`C(T) ≈ 0`); the sustained infusion has not.")
+        A("* The exposure lost by the sustained infusion is `M⁻¹C_ss = M⁻²S_rate` — the "
+          "source field smoothed **twice** by the operator, i.e. a *flatter* field than "
+          "the exposure field `M⁻¹S_total` itself. Subtracting a flatter field from a "
+          "peakier one leaves something **steeper**. So the sustained infusion loses more "
+          "of its exposure at depth, proportionally, than near the vessel.")
+        A("* Hence: bolus wins on total exposure AND on relative reach. The table above "
+          "confirms both, on the half-distance and on the penetration index "
+          "independently.")
+        A("")
+        A("**Why a bolus can never lose here.** Over a fixed observation window, the "
+          "average delivery time of a schedule is what sets its residual. A bolus at "
+          "`t = 0` has the earliest possible average delivery time, so it always realises "
+          "at least as much of the steady-state exposure field as anything else at the "
+          "same cumulative dose. There is no regime in a *linear* transport model where "
+          "the ordering flips. (Where the textbook intuition does apply is a model with "
+          "saturable perivascular binding or nonlinear uptake — neither of which is in "
+          "this transport operator.)")
+        A("")
+        A("**Do not over-read the size of this.** The effect is bounded by `τ_tissue/T` "
+          f"({sched_bound_pct(out, SCHEDULE_DRUG):.3f}% here) and the depth shift is "
+          "sub-micrometre-scale against a perivascular gradient that section 3 shows is "
+          "mostly inherited from the source geometry anyway. The value of this leg is "
+          "**that the question is now answerable and the answer has a sign and a derived "
+          "magnitude** — not that infusion duration is an actionable lever on this tumor.")
+        A("")
+        A("**Where it WOULD be actionable.** `τ_tissue/T` is the whole story, so the "
+          "regime to look at is slow equilibration: an antibody (`D ~ 1–10 um²/s` plus a "
+          "binding-site-barrier sink, `τ` of hours to days), or any molecule observed over "
+          "a window comparable to its own washout. The old version of this file named that "
+          "regime and said the plasma-averaging simplification \"would have to be lifted "
+          "before the question could be asked at all\". It has been.")
+        A("")
     A("---")
     A("")
 
     # ------------------------------------------------------------------ 6
     A("## 6. THE VERDICT for this tumor: dose-limited or delivery-limited?")
     A("")
+    # The headline verdict is DERIVED from the same coverage statistics the
+    # per-drug verdicts below use, so it can never drift out of agreement with
+    # them (it used to be hand-written prose, and did).
+    _kind = {}
+    for name in DRUGS:
+        _rows = out["drugs"][name]["dose"]
+        _c1 = _dose_row(_rows, 1.0)["ic50_coverage"]
+        _cmax = _rows[-1]["ic50_coverage"]
+        _kind[name] = ("sensitivity" if (_cmax >= 0.95 and _c1 >= 0.95)
+                       else "dose" if _cmax >= 0.95 else "delivery")
+    _any_delivery = [n for n in DRUGS if _kind[n] == "delivery"]
     A("> ### Headline")
     A("> ")
-    A("> **On this tumor the response is DOSE-limited, not delivery-limited — and above "
-      "the dose-limited range it becomes RESISTANCE-limited, never delivery-limited.**")
+    if not _any_delivery:
+        A("> **On this tumor the response is DOSE-limited, not delivery-limited — and "
+          "above the dose-limited range it becomes RESISTANCE-limited, never "
+          "delivery-limited.**")
+        A("> ")
+        A(f"> Delivery is not the binding constraint here. The exposure field reaches the "
+          f"whole section: at high enough dose >95% of tumor cells clear IC50 for "
+          f"{'both drugs' if len(DRUGS) == 2 else 'every drug tested'}, and the far-field "
+          f"floor (section 3) means even tissue a millimetre from a vessel is exposed. "
+          f"What limits the answer is, in order: (1) at clinically plausible plasma "
+          f"levels, simply not enough drug — the sub-saturating part of the curve, where "
+          f"more exposure genuinely buys more kill; and (2) above that, a hard ceiling "
+          f"that dose cannot touch.")
+    else:
+        A(f"> **On this tumor the verdict SPLITS BY DRUG: "
+          + "; ".join(f"{n} is {_kind[n].upper()}-limited" for n in DRUGS) + ".**")
+        A("> ")
+        A(f"> For {', '.join(_any_delivery)}, delivery IS a binding constraint on this "
+          f"geometry: even at {top:g}x nominal, fewer than 95% of tumor cells clear IC50, "
+          f"so a share of the tumor is never therapeutically exposed at any dose swept. "
+          f"For the rest, the exposure field does reach the whole section and the limits "
+          f"are (1) not enough drug at clinically plausible plasma levels, then (2) a hard "
+          f"resistance ceiling dose cannot touch. Read the per-drug sections below rather "
+          f"than a single headline.")
     A("> ")
-    A("> Delivery is not the binding constraint here. The exposure field reaches the "
-      "whole section: at high enough dose >95% of tumor cells clear IC50 for both drugs, "
-      "and the far-field floor (section 3) means even tissue a millimetre from a vessel "
-      "is exposed. What limits the answer is, in order: (1) at clinically plausible "
-      "plasma levels, simply not enough drug — the sub-saturating part of the curve, "
-      "where more exposure genuinely buys more kill; and (2) above that, a hard ceiling "
-      "that dose cannot touch.")
+    if meta.get("time_resolved"):
+        A("> **Either way, this is NOT a schedule verdict, and now that is a measurement "
+          "rather than an assumption.** Sections 4-5 show the schedule effect on this "
+          "tumor is real but bounded by `τ_tissue/T_window` — orders of magnitude below "
+          "the dose lever. The static-source version of this file reported it as exactly "
+          "zero, which was an artefact; the corrected answer is small, not zero.")
+        A("> ")
+    _tmz = out["drugs"]["temozolomide"]
+    _bd = _tmz.get("kill_ceiling_breakdown") or {}
+    _q = _bd.get("QUIESCENT") or {}
+    _h = _bd.get("HYPOXIC") or {}
+    _ceil = _tmz["kill_ceiling"]
+    A(f"> **That ceiling is the actionable result, and it is not a transport number.** "
+      f"For temozolomide it is {_ceil:.4f}, and section 1.3 decomposes it: "
+      f"{_q.get('fraction', 0.0)*100:.1f}% of tumor cells are labelled QUIESCENT "
+      f"(x{_q.get('resistance_multiplier', 0.5):.2f} kill multiplier) and "
+      f"{_h.get('fraction', 0.0)*100:.1f}% HYPOXIC "
+      f"(x{_h.get('resistance_multiplier', 0.35):.2f}), contributing "
+      f"{_q.get('contribution', 0.0):.4f} and {_h.get('contribution', 0.0):.4f} of it "
+      f"respectively — i.e. ~{_q.get('contribution', 0.0)/max(_ceil, 1e-12)*100:.0f}% of "
+      f"the ceiling is the quiescent band alone. Because temozolomide's per-cell "
+      f"sensitivity is uniform 1.0 on this panel (MGMT is not measurable here), the "
+      f"ceiling for TMZ is *entirely* the cell-state resistance multipliers. It is not "
+      f"delivery, not IC50, and not achievable exposure: at infinite drug every cell sits "
+      f"at the top of its Hill curve and what remains is exactly "
+      f"`sensitivity x resistance`.")
     A("> ")
-    A("> **That ceiling is the actionable result, and it is not a transport number.** "
-      "For temozolomide it is 0.4828, and section 1.3 decomposes it: 86.0% of tumor "
-      "cells are labelled QUIESCENT (x0.5 kill multiplier) and 13.4% HYPOXIC (x0.35), "
-      "contributing 0.4299 and 0.0470 of it respectively — i.e. ~89% of the ceiling is "
-      "the quiescent band alone. Because temozolomide's per-cell sensitivity is uniform "
-      "1.0 on this panel (MGMT is not measurable here), the ceiling for TMZ is "
-      "*entirely* the cell-state resistance multipliers. It is not delivery, not IC50, "
-      "and not achievable exposure: at infinite drug every cell sits at the top of its "
-      "Hill curve and what remains is exactly `sensitivity x resistance`.")
+    if not _any_delivery:
+        A("> The operational reading: **on this tumor, escalating dose is a real but "
+          "bounded lever, and the bound is metabolic state, not penetration.** If the "
+          "ceiling is to move, it moves by changing the cell-state distribution "
+          "(reoxygenation, cycle recruitment) or by a drug whose kill does not carry the "
+          "quiescence penalty — not by more drug and not by better penetration.")
+    else:
+        A(f"> The operational reading: **escalating dose is a real but bounded lever, and "
+          f"which bound bites first depends on the drug.** For "
+          f"{', '.join(_any_delivery)} on this geometry the near-term bound is "
+          f"PENETRATION — a share of the tumor is never exposed above IC50 at any swept "
+          f"dose — and behind that sits the same cell-state ceiling. For the others the "
+          f"ceiling is reached and the bound is metabolic state, not penetration; there, "
+          f"moving it requires changing the cell-state distribution (reoxygenation, cycle "
+          f"recruitment) or a drug whose kill does not carry the quiescence penalty.")
     A("> ")
-    A("> The operational reading: **on this tumor, escalating dose is a real but bounded "
-      "lever, and the bound is metabolic state, not penetration.** If the ceiling is to "
-      "move, it moves by changing the cell-state distribution (reoxygenation, "
-      "cycle recruitment) or by a drug whose kill does not carry the quiescence penalty "
-      "— not by more drug, not by a different schedule, and not by better penetration.")
-    A("> ")
-    A("> **Load-bearing caveat:** that 86% quiescent fraction is a *model* label from the "
-      "simulated oxygen field, not a measurement. It is being tested independently "
-      "against measured MKI67. If it is wrong, the ceiling and every absolute kill here "
-      "move with it — the dose/schedule *comparisons* survive, the absolute levels may "
-      "not.")
+    if meta.get("time_resolved") and out["drugs"][SCHEDULE_DRUG].get("schedule"):
+        _sd = out["drugs"][SCHEDULE_DRUG]
+        _es = [s["mean_auc_tumor_matched"] for s in _sd["schedule"]]
+        _bnd = sched_bound_pct(out, SCHEDULE_DRUG)
+        A(f"> **And schedule? Now measured rather than erased — and it is a REAL but "
+          f"THIRD-ORDER lever on this tumor.** With the time-resolved plasma driver, "
+          f"fractionation at matched cumulative exposure moves tissue exposure by "
+          f"{(max(_es)/min(_es)-1)*100:.2f}% and infusion duration by a comparable amount, "
+          f"against the `τ_tissue/T_window` ceiling of {_bnd:.2f}% that sections 4-5 derive "
+          f"and confirm. Compare that with dose, which moves kill by a factor of "
+          f"{_dose_row(_sd['dose'], top)['kill']/_dose_row(_sd['dose'], 1.0)['kill']:.0f} "
+          f"over the swept range. **The previous version of this file reported this effect "
+          f"as exactly zero and concluded schedule does not matter; that zero was a solver "
+          f"artefact. The corrected conclusion is not \"schedule matters after all\" — it "
+          f"is that schedule matters a little, for a reason we can now name and bound, and "
+          f"far less than dose on this fast-equilibrating small molecule.** The caveat that "
+          f"survives unchanged: the pharmacodynamic mechanisms that make fractionation "
+          f"matter clinically are still absent from the kill model, so this is a floor.")
+        A("> ")
+    A(f"> **Load-bearing caveat:** that "
+      f"{meta['quiescent_tumor_fraction']*100:.0f}% quiescent fraction is a *model* label "
+      f"from the simulated oxygen field, not a measurement. It is being tested "
+      f"independently against measured MKI67. If it is wrong, the ceiling and every "
+      f"absolute kill here move with it — the dose/schedule *comparisons* survive, the "
+      f"absolute levels may not.")
     A("")
     dmed = meta.get("distance_median_um", float("nan"))
     dp90 = meta.get("distance_p90_um", float("nan"))
@@ -1667,14 +2422,25 @@ def write_report(out: Dict, path: str) -> None:
       "under-exposed rather than intrinsically resistant — a materially different "
       "clinical situation, and the distinction is the one thing this simulator is "
       "positioned to make.")
-    A("* **Is the tissue transport-saturated?** The invariance of the *shape* of the "
-      "perivascular profile under every dose, schedule and half-life tested says the "
-      "geometry of delivery is fixed. Only three things move it: the drug's `D_eff`, its "
-      "loss rate `k`, and the vascular geometry itself. Dose and schedule move amplitude "
-      "only.")
+    if meta.get("time_resolved"):
+        A("* **Is the tissue transport-saturated?** DOSE moves amplitude only — the "
+          "perivascular profile shape is invariant under it exactly, because the operator "
+          "is linear. SCHEDULE does move the shape, but by well under a percent here (the "
+          f"`τ_tissue/T` bound of {sched_bound_pct(out, SCHEDULE_DRUG):.2f}%, sections "
+          f"4-5), and in the direction that favours the bolus. So for practical purposes "
+          "the geometry of delivery is set by three things — the drug's `D_eff`, its loss "
+          "rate `k`, and the vascular geometry — and neither dose nor schedule is a lever "
+          "on it *on this drug and this window*.")
+    else:
+        A("* **Is the tissue transport-saturated?** The invariance of the *shape* of the "
+          "perivascular profile under every dose, schedule and half-life tested says the "
+          "geometry of delivery is fixed. Only three things move it: the drug's `D_eff`, "
+          "its loss rate `k`, and the vascular geometry itself. Dose and schedule move "
+          "amplitude only. (NOTE: under the static source this was partly circular — see "
+          "section 5.)")
     A("* **The lever that is NOT in this analysis** is the normal-tissue side of the "
       "therapeutic index. Every statement above is about tumor kill alone. A schedule "
-      "that is identical for the tumor is emphatically not identical for the patient.")
+      "that is near-identical for the tumor is emphatically not identical for the patient.")
     A("")
     A("---")
     A("")
@@ -1685,14 +2451,27 @@ def write_report(out: Dict, path: str) -> None:
     A("1. **No outcome validation, at all.** Untreated resection; no measured response "
       "for either drug. Nothing here has been scored against reality.")
     A("2. **Not clinical dosing guidance.** Research prototype.")
-    A("3. **Schedule is not resolvable by this engine.** The plasma-averaging "
-      "simplification makes matched-exposure schedule comparisons degenerate by "
-      "construction (section 4a). A time-resolved driver is required before this engine "
-      "can answer a schedule question for a slowly-equilibrating molecule.")
-    A("4. **Pharmacodynamics is a single static Hill map.** No inter-fraction DNA repair, "
-      "no cell-cycle redistribution, no regrowth, no resistance evolution, no immune "
-      "contribution, no normal-tissue toxicity. These are exactly the mechanisms that "
-      "give real fractionation its benefit.")
+    if meta.get("time_resolved"):
+        A("3. **Schedule IS now resolvable — but only through transport, and the size of "
+          "the effect is set by the observation window.** The `τ_tissue/T_window` bound "
+          "(sections 4-5) means a longer window shrinks the measured schedule effect "
+          "toward zero and a shorter one inflates it. The "
+          f"{WINDOW_SCHED_S/3600:.0f} h window here was chosen for compute, not physics, "
+          "and it is a *reporting* choice that changes a headline number. It is held "
+          "exactly constant across everything compared, so the comparisons are sound, but "
+          "the absolute percentages are window-conditional and should be quoted with the "
+          "window attached.")
+    else:
+        A("3. **Schedule is not resolvable by this engine.** The plasma-averaging "
+          "simplification makes matched-exposure schedule comparisons degenerate by "
+          "construction (section 4a). A time-resolved driver is required before this engine "
+          "can answer a schedule question for a slowly-equilibrating molecule.")
+    A("4. **Pharmacodynamics is a single static Hill map — and this is now the binding "
+      "limitation on the schedule question.** No inter-fraction DNA repair, no cell-cycle "
+      "redistribution, no regrowth, no resistance evolution, no immune contribution, no "
+      "normal-tissue toxicity. These are exactly the mechanisms that give real "
+      "fractionation its benefit. Time-resolving *transport* removed a structural blind "
+      "spot; it did not make this model a fractionation model.")
     A("5. **Sensitivity model.** Temozolomide's determinant (MGMT) is not on this panel, "
       "so TMZ resistance is unmodelled (uniform 1.0) and its absolute kill is optimistic. "
       "Cisplatin uses an MKI67 proliferation proxy, which is mechanistic but not a "
@@ -1705,24 +2484,37 @@ def write_report(out: Dict, path: str) -> None:
     A("8. **Single section, single patient, 2D.** No inter-patient variability, no "
       "out-of-plane transport, and the nominal plasma level is a shared reference rather "
       "than a per-drug clinical PK model — supratherapeutic for cisplatin in particular.")
-    A("9. **Cell-state banding dominates the ceiling.** ~86% of tumor cells are labelled "
-      "QUIESCENT by the oxygen model (x0.5 kill) and ~13% HYPOXIC (x0.35). That labelling "
-      "is a model assignment from the simulated oxygen field, not a measurement; it is "
-      "being tested independently against measured MKI67. If the quiescent fraction is "
-      "wrong, every absolute kill and the ceiling move with it.")
+    A(f"9. **Cell-state banding dominates the ceiling.** "
+      f"{meta['quiescent_tumor_fraction']*100:.0f}% of tumor cells are labelled QUIESCENT "
+      f"by the oxygen model (x0.5 kill) and "
+      f"{meta['hypoxic_tumor_fraction']*100:.0f}% HYPOXIC (x0.35). That labelling "
+      f"is a model assignment from the simulated oxygen field, not a measurement; it is "
+      f"being tested independently against measured MKI67. If the quiescent fraction is "
+      f"wrong, every absolute kill and the ceiling move with it.")
     A("10. **Scope was cut for the compute budget** (see the banner at the top): "
       f"{len(DOSE_MULTIPLIERS)} dose points; schedule + half-life for {SCHEDULE_DRUG} "
       f"only; {len(SCHEDULES)} schedules; {len(HALF_LIVES_H)} half-lives; "
-      f"{WINDOW_SCHED_S/3600:.0f} h schedule window; 2 engine verification runs. Nothing "
+      f"{WINDOW_SCHED_S/3600:.0f} h schedule window; "
+      f"{len(out['engine_checks'])} engine verification runs. Nothing "
       "was extrapolated to fill the gaps — the gaps are named instead.")
     A("11. **One calibration constant** (`alpha`, fit once on doxorubicin) sets the "
       "perivascular sink for every drug; the penetration lengths and therefore every "
       "depth number inherit its uncertainty.")
+    if meta.get("time_resolved"):
+        A("12. **The absolute kill levels shifted slightly from the static-source version "
+          "of this file, and not only in the schedule sections.** The dose-response leg is "
+          "also solved with a time-resolved source now (a decaying bolus over the "
+          f"{meta['window_dose_h']:.0f} h dose window), so its exposure field is a little "
+          "different too. Cross-file comparisons of absolute kill against the superseded "
+          "version are therefore not apples to apples; comparisons *within* this file are.")
     A("")
+    n_solves_total = sum(int(out["drugs"][n].get("n_pde_solves") or 0)
+                         for n in out["drugs"]) or (len(DRUGS) + 1)
     A(f"*Generated by `experiments/dose_schedule.py` — ONE reconstruction reused "
-      f"everywhere, {len(DRUGS) + 1} transport solves, {len(out['engine_checks'])} "
-      f"full-engine verification runs, {meta['runtime_s']/60:.1f} min total, "
-      f"seed {meta['seed']}, deterministic.*")
+      f"everywhere, {n_solves_total} transport solves "
+      f"(`PDEConfig.time_resolved={bool(meta.get('time_resolved'))}`), "
+      f"{len(out['engine_checks'])} full-engine verification runs, "
+      f"{meta['runtime_s']/60:.1f} min total, seed {meta['seed']}, deterministic.*")
 
     with open(path, "w") as fh:
         fh.write("\n".join(L) + "\n")

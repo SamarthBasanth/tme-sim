@@ -1,0 +1,88 @@
+{
+  "default_1dose": {
+    "auc_sum": "0x1.9127422a88cfbp+38",
+    "final_c_sum": "0x1.45e9a492a2ccap+24",
+    "kill_fraction": "0x1.b851eb851eb86p-2",
+    "mean_auc": "0x1.6494ac97960dfp+27",
+    "penetration_index": "0x1.f71577c62c534p-1",
+    "plasma_mean": "0x1.f1851798fbc96p+4",
+    "viable_history": [
+      "0x1.0000000000000p+0",
+      "0x1.f258bf258bf26p-2",
+      "0x1.f258bf258bf26p-2",
+      "0x1.f258bf258bf26p-2",
+      "0x1.f258bf258bf26p-2",
+      "0x1.f258bf258bf26p-2"
+    ]
+  },
+  "real_xenium_dx80_tmz_3dose": {
+    "auc_sum": "0x1.19f53f83d2d58p+33",
+    "final_c_sum": "0x1.af18908b6c7b1p+17",
+    "kill_fraction": "0x1.af6950cdba980p-6",
+    "mean_auc": "0x1.09bd151a1af09p+21",
+    "plasma_mean": "0x1.98dcaae19894cp+5"
+  },
+  "solver_flat": {
+    "auc_max": "0x1.eeee76b90aff5p+13",
+    "auc_sum": "0x1.3afb70272dc28p+24",
+    "final_c_sum": "0x1.4057b589fea0bp+14",
+    "mean_hist": [
+      "0x0.0p+0",
+      "0x1.692cd86b10208p+1",
+      "0x1.54caf1ede69dap+2",
+      "0x1.e2ea7f3f498c3p+2",
+      "0x1.307fc4d93658fp+3",
+      "0x1.686cc76f8e2f8p+3",
+      "0x1.9a09de2145ec6p+3"
+    ],
+    "penetration_index": "0x1.d09c9014c213ap-1"
+  },
+  "weak_10dose_noconv": {
+    "auc_sum": "0x1.1b1a842d05cf4p+35",
+    "final_c_sum": "0x1.49dbef8756005p+21",
+    "kill_fraction": "0x1.3a06d3a06d3a0p-4",
+    "mean_auc": "0x1.f74b95a55fa95p+23",
+    "penetration_index": "0x1.e7e93dcf0da5fp-1",
+    "plasma_mean": "0x1.0dc17cfa62d39p+5",
+    "viable_history": [
+      "0x1.0000000000000p+0",
+      "0x1.fae147ae147aep-1",
+      "0x1.f258bf258bf26p-1",
+      "0x1.ed3a06d3a06d4p-1",
+      "0x1.e147ae147ae14p-1",
+      "0x1.d70a3d70a3d71p-1"
+    ]
+  },
+  "weak_1dose": {
+    "auc_sum": "0x1.8abe74fd15d9fp+35",
+    "final_c_sum": "0x1.302f6c1a37b58p+21",
+    "kill_fraction": "0x1.2c5f92c5f92c8p-4",
+    "mean_auc": "0x1.5ee22f19da88dp+24",
+    "penetration_index": "0x1.e58500d5aacf9p-1",
+    "plasma_mean": "0x1.f1851798fbc96p+4",
+    "viable_history": [
+      "0x1.0000000000000p+0",
+      "0x1.fc962fc962fc9p-1",
+      "0x1.f5c28f5c28f5cp-1",
+      "0x1.eeeeeeeeeeeefp-1",
+      "0x1.e9d0369d0369dp-1",
+      "0x1.da740da740da7p-1"
+    ]
+  },
+  "weak_3dose": {
+    "auc_sum": "0x1.b7758e30dfd88p+36",
+    "final_c_sum": "0x1.52b8d19a98591p+22",
+    "kill_fraction": "0x1.40da740da740cp-3",
+    "mean_auc": "0x1.86a161f28e15cp+25",
+    "penetration_index": "0x1.e585535a6d844p-1",
+    "plasma_mean": "0x1.1500f5d741809p+6",
+    "viable_history": [
+      "0x1.0000000000000p+0",
+      "0x1.f258bf258bf26p-1",
+      "0x1.e147ae147ae14p-1",
+      "0x1.d1eb851eb851fp-1",
+      "0x1.bd70a3d70a3d7p-1",
+      "0x1.b17e4b17e4b18p-1"
+    ]
+  }
+}

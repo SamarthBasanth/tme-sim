@@ -1,12 +1,44 @@
 # Perivascular drug gradient on the REAL tissue — predicted vs measured
 
-> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
-> figure below was generated with the **KDE** vascular source, which was the default until
-> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
-> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
-> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
-> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
-> `mode='kde'` to recover exactly these numbers.
+> **STALE, AND CANNOT CURRENTLY BE REGENERATED — the producer crashes under the new
+> default.** Every absolute exposure / AUC / coverage / kill figure below was generated with
+> the **KDE** vascular source, which was the default until
+> [`results/vessel_promotion.md`](vessel_promotion.md). The default is now the **discrete**
+> segmented-vessel source, whose tissue-integrated total is **3.36x smaller** (a change of
+> *unit*, not of physics — the dose-matched geometry-only effect on coverage is <= 0.0166).
+> Reproduce with `mode='kde'` to recover exactly these numbers.
+>
+> **Why it was not refreshed in the regeneration pass.** `python -m
+> tmesim.validation.vessel_profile` runs the first arms, then aborts in the final
+> `dx12_repaired` arm before any markdown is written:
+>
+> ```
+> File "tmesim/validation/vessel_profile.py", line 799, in run_arm
+>     print(f" d_half(emp)={r['auc']['empirical_d_half_um']:6.1f} um  "
+> TypeError: unsupported format string passed to NoneType.__format__
+> ```
+>
+> `empirical_half_distance_um` (line 389) returns `None` **by design** when a profile never
+> falls to half of its perivascular value — and under the discrete source **temozolomide's
+> exposure profile never halves** across this section's distance axis (median tumour-to-vessel
+> 43 µm, TMZ's fitted `L` ≈ 296 µm). The KDE source produced a shallower, always-halving
+> profile, so the `None` branch was never taken before promotion and the unguarded `:6.1f`
+> format never fired. Like the `numerical_rigor.py` failure, this is a latent
+> reporting-path bug exposed by the sharper source, not a physics failure.
+>
+> **What it would take.** Guard the three formatted reads of `empirical_d_half_um`
+> (`vessel_profile.py:790`, `:799`, `:961`) against `None` — print `n/a` when the profile
+> does not halve, which is itself the honest answer. After that the module runs to
+> completion in one pass and this file can be refreshed. That edit was **out of scope** for
+> this regeneration pass, which was not permitted to modify code under `tmesim/`.
+>
+> **What the partial run did establish**, before it died, on the discrete source at
+> dx = 12 µm (repaired mask): the p95 "vessel mask" now resolves to **2.6% of tissue area**
+> — i.e. essentially the segmented vessel mask itself, exactly as `vessel_promotion.md` §7.3
+> anticipated — the source-field null has an empirical d½ of **10.0 µm** (against 23.7 µm
+> under the retired occupancy mask), and doxorubicin fits d½ = **31.8 µm**, `L` = **34.0 µm**,
+> R² = 0.975. Those four numbers supersede their counterparts below; nothing else in this
+> file has been re-measured.
 
 **Module:** `tmesim/validation/vessel_profile.py` (run: `./.venv/bin/python -m tmesim.validation.vessel_profile`)
 

@@ -626,7 +626,7 @@ $\Pi \to 0$ when drug is confined to thin perivascular cuffs. The 99th percentil
 experimental counterpart; the physically comparable quantity is the penetration
 length $L$ of §7. $\Pi$ is also **resolution-sensitive** — see §10.2.
 
-### 3.9 The delivery source and the Stage-0 plasma-averaging simplification
+### 3.9 The delivery source: plasma-averaged (default) or time-resolved
 
 `treatment/drugs.py::plasma_profile` gives the systemic 1-compartment multi-dose
 profile,
@@ -645,19 +645,70 @@ S(x,y) = \rho_{\mathrm{vasc}}(x,y)\;\beta_{\mathrm{BBB}}\;C_{\mathrm{plasma}}
 \qquad [\mu M/s]
 $$
 
-**Simplification (documented in `sim/engine.py`):** the transport solver applies a
-*static* $S$ every step, i.e. $C_{\mathrm{plasma}}$ is replaced by its time-average
-over the window,
+**Default — plasma-averaging (`PDEConfig.time_resolved = False`).** The transport
+solver applies a *static* $S$ every step, i.e. $C_{\mathrm{plasma}}$ is replaced by
+its time-average over the window,
 
 $$
 \bar C_{\mathrm{plasma}} = \frac{1}{T}\int_0^T C_{\mathrm{plasma}}(t)\,\mathrm{d}t .
 $$
 
 This preserves the *total* delivered drug (mean level × window) and the relative
-ranking of drugs/patients, at the cost of the true within-window transient. A
-time-resolved driver is a deferred refinement. Note also that the source is a
-one-way leak, not a Starling gradient $(C_{\mathrm{plasma}} - C)$ — the tissue never
-back-fluxes into the vessel.
+ranking of drugs/patients, at the cost of the true within-window transient. Its
+sharp edge: **any two dosing schedules with the same cumulative plasma exposure
+become bit-identical inputs**, so fractionation and infusion duration are
+unresolvable *by construction* rather than as a finding. Historical results in
+`results/` predating the option below were produced in this mode and any
+"schedule has no effect" statement in them is an artefact of it.
+
+**Time-resolved (`PDEConfig.time_resolved = True`).** The source carries its true
+time dependence, evaluated on the solver's own step grid at the old time level of
+each step (matching the explicit convention already used for advection):
+
+$$
+S(x,y,t_n) = \rho_{\mathrm{vasc}}(x,y)\;\beta_{\mathrm{BBB}}\;C_{\mathrm{plasma}}(t_n),
+\qquad t_n = n\,\Delta t,\quad n = 0,\dots,N-1
+$$
+
+Implemented as the `source_profile` argument of
+`physics/diffusion.py::simulate_drug_transport`. The implicit operator
+$A = I - \Delta t\,L + \Delta t\,K$ contains no source term, so the LU
+factorisation is still computed once and reused — a time-varying source costs one
+extra scalar multiply per step. Because the profile is sampled on the step grid,
+$\frac{1}{N}\sum_n C_{\mathrm{plasma}}(t_n) = \bar C_{\mathrm{plasma}}$ exactly, so
+the two modes deliver **identical total drug** and differ only in timing.
+
+**What timing can and cannot change.** Integrating the transport PDE over $[0,T]$
+with $C(0)=0$, and writing $A = \int_0^T C\,\mathrm{d}t$ and
+$M = k - \nabla\!\cdot\!(D\nabla\,\cdot) + \nabla\!\cdot\!(v\,\cdot)$:
+
+$$
+A = M^{-1}\!\left(S_{\mathrm{total}} - C(T)\right),
+\qquad S_{\mathrm{total}} = \int_0^T S\,\mathrm{d}t
+$$
+
+$S_{\mathrm{total}}$ is identical across schedules at matched cumulative exposure,
+so the **entire** schedule effect is the terminal residual $C(T)$ — drug delivered
+but still in the tissue when the window closes. Three consequences:
+
+1. Earlier delivery realises more exposure (a bolus has washed out by $T$; an
+   infusion still running has not), so exposure decreases monotonically with the
+   number of fractions and with plasma half-life.
+2. The relative effect is bounded by $\tau_{\mathrm{tissue}}/T = 1/(kT)$, and the
+   constant-infusion limit saturates that bound.
+3. As $T \to \infty$ (window past full washout) the schedule effect vanishes and
+   the two modes coincide; they also coincide exactly for a constant plasma level.
+
+Note that the naive transport-limited expectation — a slow infusion penetrating
+deeper than a bolus — is *false* for this linear operator: the un-counted term
+$M^{-1}C(T)$ is a doubly-smoothed, flatter field, so removing it leaves a
+**steeper** profile and the bolus wins on relative reach as well as on total
+exposure. A saturable perivascular sink (not in this operator) would be needed to
+reverse that.
+
+Note also that the source is a one-way leak, not a Starling gradient
+$(C_{\mathrm{plasma}} - C)$ — the tissue never back-fluxes into the vessel. This is
+unchanged by time resolution.
 
 ---
 

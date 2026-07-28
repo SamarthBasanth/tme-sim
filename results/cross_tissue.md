@@ -1,5 +1,19 @@
 # Cross-tissue predicted drug behaviour on REAL GBM microenvironments
 
+> **Regenerated under the discrete vessel source.** `vascular_mode = discrete`
+> (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
+> [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the
+> e-folding-length convention `L = d_half / ln 2` · per-cell sensitivity mode =
+> **`uniform` (single drug — temozolomide — across five tissues)** · **dx = 12 µm (matched across all five tumours; plus a paired dx = 100 µm Visium control)**.
+>
+> Every absolute exposure / AUC / coverage / kill below is on the **discrete-source
+> unit** and is NOT comparable with the KDE-era numbers this file carried before this
+> regeneration (the tissue-integrated source total is 3.36x smaller; that is a change
+> of *unit*, not of physics — the dose-matched, geometry-only effect on coverage is
+> <= 0.0166). To recover the old numbers, re-run with `mode='kde'`.
+>
+> Only the Xenium section's vascular field goes through the discrete segmentation; the four Visium sections are reconstructed by `reconstruct_from_visium` (spot deconvolution) and never touch `_DEFAULT_VASCULAR_MODE`, so the promotion moves the Xenium arm of this comparison only. **A pre-existing bug blocked this regeneration and had to be fixed first:** `experiments/cross_tissue.py:842` referenced an undefined `alpha` inside `_verdict()`, so the script wrote the figure and then died with `NameError` before writing the markdown. `_verdict` now takes `alpha` as a parameter (2-line fix in `experiments/`, no `tmesim/` code touched).
+
 **All five real tumors are simulated on the SAME converged numerical grid (dx = 12 µm).** The same real drug (temozolomide: doxorubicin-calibrated perivascular-consumption physics, alpha = 149, plus the binding-site barrier) and the same validated transport → kill engine are used for every tissue; only the REAL microenvironment differs.
 
 This supersedes an earlier version of this page in which the Xenium section ran at dx = 12 µm and the four Visium sections ran at their 100 µm spot pitch. That comparison mixed biology with a numerical grid artifact. It also predates the calibration honesty pass, so it used the inflated alpha = 309.6 rather than the corrected alpha = 148.6. **Every headline number on the earlier page is superseded** — see **Retraction & correction** below before quoting any of them.

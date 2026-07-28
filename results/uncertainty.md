@@ -1,16 +1,22 @@
 # Uncertainty quantification — honest error bars on the REAL microenvironment
 
-> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
-> figure below was generated with the **KDE** vascular source, which was the default until
-> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
-> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
-> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
-> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
-> `mode='kde'` to recover exactly these numbers.
+> **Regenerated under the discrete vessel source.** `vascular_mode = discrete`
+> (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
+> [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the
+> e-folding-length convention `L = d_half / ln 2` · per-cell sensitivity mode =
+> **`uniform` (single drug — temozolomide)** · **dx = 15 µm (with a dx = 12 µm resolution-bias control)**.
+>
+> Every absolute exposure / AUC / coverage / kill below is on the **discrete-source
+> unit** and is NOT comparable with the KDE-era numbers this file carried before this
+> regeneration (the tissue-integrated source total is 3.36x smaller; that is a change
+> of *unit*, not of physics — the dose-matched, geometry-only effect on coverage is
+> <= 0.0166). To recover the old numbers, re-run with `mode='kde'`.
+>
+> Before -> after on this regeneration: temozolomide `kill_fraction` median **0.2637 [0.1638, 0.4187] -> 0.0231 [0.0108, 0.0407]**, `penetration_index` **0.2230 -> 0.5305**. The **sensitivity ranking is unchanged**: `calibration_alpha` dominates both outputs (S1 = 0.78 kill / 0.90 pen), with `endothelial_typing_threshold` the runner-up. **Caveat on the prose, not the numbers:** the module's own description text (written into `tmesim/validation/uncertainty.py`) still calls the field a "real endothelial-KDE vascular field", and `kde_bandwidth_um` is still swept as a knob. That wording is now inaccurate — the run used the discrete segmented source — but it is baked into code this pass was not permitted to edit. The numbers are discrete-source; the label is stale.
 
 **Module:** `tmesim/validation/uncertainty.py` (run: `python -m tmesim.validation.uncertainty`)
 
-**What this is.** A Monte-Carlo propagation of the knobs `results/numerical_rigor.md` identified as the real uncertainty drivers, through the FULL real pipeline — the 40,887-cell 10x Xenium GBM section is re-reconstructed from measured bytes for **every draw** (real positions, real marker phenotypes, real endothelial-KDE vascular field, real matrix-transcript ECM field, physics-solved oxygen), the drug is rebuilt from the calibration model, and the frozen engine is re-run. Drug: **temozolomide** (GBM standard of care), α-calibrated. n = **80** Latin-hypercube draws at dx = **15 µm**, total runtime **40.9 min**.
+**What this is.** A Monte-Carlo propagation of the knobs `results/numerical_rigor.md` identified as the real uncertainty drivers, through the FULL real pipeline — the 40,887-cell 10x Xenium GBM section is re-reconstructed from measured bytes for **every draw** (real positions, real marker phenotypes, real endothelial-KDE vascular field, real matrix-transcript ECM field, physics-solved oxygen), the drug is rebuilt from the calibration model, and the frozen engine is re-run. Drug: **temozolomide** (GBM standard of care), α-calibrated. n = **80** Latin-hypercube draws at dx = **15 µm**, total runtime **66.5 min**.
 
 ---
 
@@ -49,8 +55,8 @@
 
 * **Sampling:** Latin hypercube over the 4 priors (scipy `qmc.LatinHypercube`, seed 0), each column mapped through its inverse CDF. Dimensions independent — no correlation is asserted between the knobs because none is measured.
 * **Per draw:** full re-reconstruction at that draw's typing threshold + KDE bandwidth, drug rebuilt at that draw's α, `ALPHA_TORTUOSITY` patched for the transport solve (restored afterwards; no frozen file is edited).
-* **Kill de-noising:** `kill_fraction` is averaged over seeds [0, 1]; the residual across-seed sampling noise is ±0.0019 (mean), i.e. 0.7% of the median — **far smaller than the parameter spread reported below**, so the interval is parameter uncertainty, not MC noise.
-* **Cost:** 40.9 min for 80 draws (~30.7 s/draw), single process.
+* **Kill de-noising:** `kill_fraction` is averaged over seeds [0, 1]; the residual across-seed sampling noise is ±0.0005 (mean), i.e. 2.2% of the median — **far smaller than the parameter spread reported below**, so the interval is parameter uncertainty, not MC noise.
+* **Cost:** 66.5 min for 80 draws (~49.8 s/draw), single process.
 * **Provenance:** the α prior is centred on `calibration.calibrate_alpha()` evaluated at run time — α₀ = **148.6** for this run (the half-distance → e-folding convention). If the calibration module is re-fit, re-run this module: the interval moves with it.
 
 ---
@@ -59,15 +65,15 @@
 
 | prediction | median | 90% credible interval | rel. width | min–max | prior-driven std |
 |---|---:|:--:|---:|:--:|---:|
-| **kill_fraction** | **0.2637** | [0.1638, 0.4187] | 97% | 0.0867–0.6086 | 0.0865 |
-| **penetration_index** | **0.2230** | [0.1886, 0.2524] | 29% | 0.1838–0.2664 | 0.0213 |
+| **kill_fraction** | **0.0231** | [0.0108, 0.0407] | 129% | 0.0067–0.0975 | 0.0130 |
+| **penetration_index** | **0.5305** | [0.4835, 0.5650] | 15% | 0.4549–0.6173 | 0.0272 |
 
 **Visium-consistent conditional** (61/80 draws; rule: endothelial_typing_threshold >= 0.9 (endothelial fraction ~9.7%, matching the independent Visium deconvolution ~9.8%)) — dropping the draws whose endothelial fraction (17.4%) the independent Visium deconvolution (~9.8%) contradicts:
 
 | prediction | median | 90% credible interval |
 |---|---:|:--:|
-| kill_fraction | 0.2615 | [0.1574, 0.4004] |
-| penetration_index | 0.2157 | [0.1883, 0.2487] |
+| kill_fraction | 0.0219 | [0.0098, 0.0397] |
+| penetration_index | 0.5268 | [0.4782, 0.5615] |
 
 This is the interval to quote if you accept the Visium cross-check; the unconditional one above is the interval if you do not.
 
@@ -81,20 +87,20 @@ This is the interval to quote if you accept the Visium cross-check; the uncondit
 
 | knob | S₁ (kill) [90% boot] | SRRC (kill) | S₁ (pen) [90% boot] | SRRC (pen) |
 |---|:--:|---:|:--:|---:|
-| `endothelial_typing_threshold` | 0.11 [0.00, 0.27] | -0.09 | 0.19 [0.09, 0.40] | -0.23 |
-| `kde_bandwidth_um` | 0.73 [0.59, 0.83] | +0.84 | 0.84 [0.77, 0.96] | +0.89 |
-| `calibration_alpha` | 0.20 [0.12, 0.52] | -0.54 | 0.00 [0.00, 0.18] | -0.11 |
-| `ecm_tortuosity_alpha` | 0.09 [0.00, 0.31] | -0.00 | 0.00 [0.00, 0.26] | +0.07 |
-| *sum of first-order* | 1.132 | (rank-R² 0.94) | 1.036 | (rank-R² 0.85) |
+| `endothelial_typing_threshold` | 0.14 [0.00, 0.31] | -0.26 | 0.12 [0.00, 0.32] | -0.34 |
+| `kde_bandwidth_um` | 0.05 [0.00, 0.25] | -0.01 | 0.03 [0.00, 0.28] | -0.07 |
+| `calibration_alpha` | 0.78 [0.67, 1.01] | -0.98 | 0.90 [0.82, 0.98] | -0.94 |
+| `ecm_tortuosity_alpha` | 0.04 [0.00, 0.23] | +0.01 | 0.06 [0.00, 0.27] | -0.02 |
+| *sum of first-order* | 1.012 | (rank-R² 0.98) | 1.117 | (rank-R² 0.96) |
 
-**Dominant contributor — kill_fraction:** `kde_bandwidth_um` (S₁ ≈ 0.73); runner-up `calibration_alpha` (S₁ ≈ 0.20).
-**Dominant contributor — penetration_index:** `kde_bandwidth_um` (S₁ ≈ 0.84); runner-up `endothelial_typing_threshold` (S₁ ≈ 0.19).
+**Dominant contributor — kill_fraction:** `calibration_alpha` (S₁ ≈ 0.78); runner-up `endothelial_typing_threshold` (S₁ ≈ 0.14).
+**Dominant contributor — penetration_index:** `calibration_alpha` (S₁ ≈ 0.90); runner-up `endothelial_typing_threshold` (S₁ ≈ 0.12).
 
 With n = 80 draws these indices carry a Monte-Carlo error of order ±0.05–0.10; read the RANKING, not the third decimal. Shares below ~0.05 are indistinguishable from zero at this sample size.
 
-**The first-order shares sum to more than 1** (1.13 for kill, 1.04 for penetration). True first-order Sobol indices sum to ≤ 1, so the excess is estimator bias/noise at this sample size, not interaction structure — it is stated rather than normalised away. It is one more reason the ranking, and not the absolute share, is the reportable result.
+**The first-order shares sum to more than 1** (1.01 for kill, 1.12 for penetration). True first-order Sobol indices sum to ≤ 1, so the excess is estimator bias/noise at this sample size, not interaction structure — it is stated rather than normalised away. It is one more reason the ranking, and not the absolute share, is the reportable result.
 
-**Local sensitivity is NOT global uncertainty.** numerical_rigor's ±20% elasticities ranked `endothelial_typing_threshold` first for penetration and `kde_bandwidth_um` first for kill, with `calibration_alpha` last on both. This decomposition ranks `kde_bandwidth_um` first for penetration and `kde_bandwidth_um` first for kill. The two answer different questions: an elasticity is the per-unit response at one point, a variance share is response × **prior width**. Where the two disagree, the variance share is the one that belongs on an error bar.
+**Local sensitivity is NOT global uncertainty.** numerical_rigor's ±20% elasticities ranked `endothelial_typing_threshold` first for penetration and `kde_bandwidth_um` first for kill, with `calibration_alpha` last on both. This decomposition ranks `calibration_alpha` first for penetration and `calibration_alpha` first for kill. The two answer different questions: an elasticity is the per-unit response at one point, a variance share is response × **prior width**. α is the clean example — the SMALLEST local elasticity (|E| ≈ 0.1–0.2) but the widest prior (0.5×–2×), and it comes out as the single largest contributor to the kill-fraction spread. numerical_rigor predicted exactly this ('low-sensitivity, high-prior-uncertainty knob') and the Monte Carlo confirms it.
 
 ---
 
@@ -104,12 +110,12 @@ The MC runs at dx = 15 µm for affordability. numerical_rigor set the resolution
 
 | dx (µm) | grid | tissue cells | penetration_index | kill_fraction |
 |---:|:--:|---:|---:|---:|
-| 30 | 170×271 | 23,302 | 0.4215 | 0.5142 |
-| 20 | 255×406 | 33,819 | 0.3348 | 0.4395 |
-| 15 | 339×541 | 38,140 | 0.2099 | 0.2487 |
-| 12 | 424×675 | 39,756 | 0.1946 | 0.2148 |
+| 30 | 170×271 | 30,976 | 0.4844 | 0.0215 |
+| 20 | 255×406 | 69,769 | 0.4520 | 0.0239 |
+| 15 | 339×541 | 124,074 | 0.5269 | 0.0219 |
+| 12 | 424×675 | 193,752 | 0.5083 | 0.0247 |
 
-**Honest consequence.** At the MC grid (dx = 15 µm) the penetration index is **+7.8%** and the kill fraction **+15.8%** relative to the finest grid run here (dx = 12 µm). The kill fraction is grid-converged, so its interval is a genuine parameter interval. The **penetration index is resolution-biased** — coarse grids over-estimate it (the perivascular gradient is under-resolved), so the quoted penetration median should be read as a slight upper bound with a systematic offset of that size ON TOP of the credible interval. It is a BIAS, not a widening: it shifts every draw the same way, which is why it is reported separately instead of being folded into the CI.
+**Honest consequence.** At the MC grid (dx = 15 µm) the penetration index is **+3.7%** and the kill fraction **-11.0%** relative to the finest grid run here (dx = 12 µm). The kill fraction is grid-converged, so its interval is a genuine parameter interval. The **penetration index is resolution-biased** — coarse grids over-estimate it (the perivascular gradient is under-resolved), so the quoted penetration median should be read as a slight upper bound with a systematic offset of that size ON TOP of the credible interval. It is a BIAS, not a widening: it shifts every draw the same way, which is why it is reported separately instead of being folded into the CI.
 
 ---
 
@@ -123,4 +129,4 @@ The MC runs at dx = 15 µm for affordability. numerical_rigor set the resolution
 4. **Data-level uncertainty.** Segmentation error, transcript mis-assignment and the 319-gene panel's limited marker set are taken as given: one section, one segmentation, no replicate. Section-to-section and patient-to-patient variability is entirely absent — this is uncertainty *within one measured section*.
 5. **Prior mis-specification.** Every prior above is an expert range. A different (equally defensible) analyst prior gives a different interval; the widths scale roughly with the prior widths, so they are only as honest as §1's justifications.
 
-**Bottom line.** On the real Xenium GBM section, temozolomide is predicted to kill **26.4%** of viable tumour cells (90% CI **16.4–41.9%**) with a penetration index of **0.223** (90% CI **0.189–0.252**), where the interval comes from the reconstruction + calibration priors and the spread is dominated by `kde_bandwidth_um` (kill) and `kde_bandwidth_um` (penetration). The number to distrust most is not the width of these bars — it is the model structure and the missing outcome label they cannot see.
+**Bottom line.** On the real Xenium GBM section, temozolomide is predicted to kill **2.3%** of viable tumour cells (90% CI **1.1–4.1%**) with a penetration index of **0.531** (90% CI **0.484–0.565**), where the interval comes from the reconstruction + calibration priors and the spread is dominated by `calibration_alpha` (kill) and `calibration_alpha` (penetration). The number to distrust most is not the width of these bars — it is the model structure and the missing outcome label they cannot see.

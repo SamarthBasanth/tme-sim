@@ -64,6 +64,7 @@ from ..physics.oxygen_proxy import (
     hypoxia_from_markers,
     oxygen_from_vessel_distance,
 )
+from .cell_state import STATE_MODES, state_from_markers_micro
 from .real_fields import (
     _DEFAULT_VASCULAR_MODE,
     add_oxygen,
@@ -112,6 +113,35 @@ _DEFAULT_VISIUM_SAMPLE = "10x_parent_gbm"
 #:     rather than silently degrading, because on that section hypoxia is
 #:     UNMEASURED. Xenium only (Visium has no per-cell transcripts here).
 OXYGEN_MODE_DEFAULT = "pde"
+
+#: How ``cells.state`` is labelled. **The default is and stays ``'oxygen'``**, and
+#: under it this module does not touch ``cells.state`` at all, so the
+#: reconstruction is bit-identical to the pre-option pipeline
+#: (``tests/test_cell_state.py::test_default_state_mode_is_bit_identical``).
+#:
+#: ``'oxygen'`` (DEFAULT, unchanged)
+#:     States are left to ``cells.agents.update_cell_states``, which bands the
+#:     SIMULATED oxygen field at ``OxygenConfig.hypoxia_threshold``. **Not a
+#:     measurement**: ``results/state_validation.md`` §2.2 shows the tumour VIABLE
+#:     fraction it produces runs 0.60%-98.19% (165x) across two tissue-mask
+#:     conventions and three grid spacings, and under the shipping ``geometric``
+#:     mask its HYPOXIC band is EMPTY, so ``PDConfig.hypoxia_resistance`` acts on
+#:     no cells. Retained as the default only because flipping it silently would
+#:     invalidate every published kill number.
+#: ``'markers'``
+#:     :func:`reconstruct.cell_state.state_from_markers` — proliferative /
+#:     quiescent from measured proliferation transcripts and hypoxic from measured
+#:     hypoxia-response transcripts, with an explicit UNMEASURED verdict where the
+#:     panel cannot support the call. Xenium only (Visium has no per-cell
+#:     transcripts). Mesh-independent by construction.
+#:
+#: NOTE, exactly as for ``oxygen_mode``: ``sim.engine.simulate_response`` re-bands
+#: the cells from its own oxygen solve, so passing a marker-stated reconstruction
+#: straight into the engine does NOT change its kill. The supported route is to
+#: re-band and re-run ``cells.pkpd.apply_drug_kill`` on the engine's own transport
+#: result, which is what :mod:`validation.cell_state_impact` does (and it verifies
+#: that path reproduces the engine bit-for-bit in the ``'oxygen'`` arm).
+STATE_MODE_DEFAULT = "oxygen"
 
 
 def _load_xenium_retry(sample: Optional[str]):
@@ -245,6 +275,81 @@ def _install_oxygen(
     }
 
 
+def _install_states(
+    micro: Microenvironment,
+    state_mode: str,
+    expression=None,
+    genes=None,
+    state_kwargs: Optional[Dict] = None,
+) -> Dict:
+    """Optionally overwrite ``micro.cells.state`` and describe where it came from.
+
+    ADDITIVE and DEFAULT-PRESERVING: with ``state_mode='oxygen'`` (the default)
+    **nothing is called and nothing is written** — the states are exactly what the
+    cell reconstructor produced, so the pipeline is bit-identical to the
+    pre-option version. Returns a provenance block that
+    :func:`reconstruction_report` surfaces, so a marker-derived state can never be
+    carried silently.
+    """
+    mode = str(state_mode).strip().lower()
+    kw = dict(state_kwargs or {})
+    if mode not in STATE_MODES:
+        raise ValueError(
+            f"unknown state_mode {state_mode!r}; expected one of {STATE_MODES}"
+        )
+
+    if mode == "oxygen":
+        if kw:
+            raise TypeError(
+                f"unexpected state_kwargs {sorted(kw)} for state_mode='oxygen'")
+        return {
+            "state_mode": "oxygen",
+            "state_source": (
+                "cells.agents.update_cell_states bands the SIMULATED oxygen field "
+                "(applied by sim.engine.simulate_response, not here)"
+            ),
+            "state_is_measured": False,
+            "state_caveat": (
+                "NOT A MEASUREMENT (results/state_validation.md §2.2, "
+                "results/cell_state_impact.md §2.2): the tumour VIABLE fraction "
+                "this produces swings across two tissue-mask conventions and "
+                "three grid spacings, both of which are bookkeeping choices "
+                "rather than measurements — 0.60%-98.19% (165x) as measured under "
+                "the KDE-era vascular source, and 0.00%-10.04% (the band goes "
+                "EMPTY, so the ratio is unbounded) re-measured on the same grid "
+                "under the current discrete vessel source. The HYPOXIC band is "
+                "also empty on that section, so PDConfig.hypoxia_resistance acts "
+                "on no cells. Retained as the default so no published number "
+                "moves silently, NOT because it is the best available route."
+            ),
+            "state_detail": None,
+        }
+
+    # mode == 'markers'
+    if expression is None or genes is None:
+        raise ValueError(
+            "state_mode='markers' needs per-cell expression; it is only available "
+            "for source='xenium' (Visium carries no per-cell transcripts)"
+        )
+    out = state_from_markers_micro(micro, expression, genes, **kw)
+    micro.cells.state = np.asarray(out["states"], dtype=np.int8)
+    slim = {k: v for k, v in out.items() if k not in ("states", "per_cell")}
+    return {
+        "state_mode": "markers",
+        "state_source": out["provenance"],
+        "state_is_measured": True,
+        "state_caveat": (
+            "MEASURED, but read the coverage block: any state listed in "
+            "['coverage']['unmeasured_states'] is NOT assigned to any cell, a "
+            "'neighbourhood' call level means the label is a local ENRICHMENT "
+            "ordering rather than a per-cell index, and the HYPOXIC band's SIZE "
+            "is uncalibrated because hypoxia-RESPONSE transcripts have real "
+            "non-hypoxic expression."
+        ),
+        "state_detail": slim,
+    }
+
+
 def _reconstruct_xenium(
     sample: Optional[str],
     dx_um: float,
@@ -252,6 +357,8 @@ def _reconstruct_xenium(
     tissue_disc_radius_um: float = TISSUE_DISC_RADIUS_UM,
     oxygen_mode: str = OXYGEN_MODE_DEFAULT,
     oxygen_kwargs: Optional[Dict] = None,
+    state_mode: str = STATE_MODE_DEFAULT,
+    state_kwargs: Optional[Dict] = None,
 ) -> Microenvironment:
     """Assemble the real single-cell Xenium microenvironment with REAL fields.
 
@@ -305,6 +412,11 @@ def _reconstruct_xenium(
         expression=data["expression"], genes=data["genes"],
         oxygen_kwargs=oxygen_kwargs,
     )
+    state_info = _install_states(
+        micro, state_mode,
+        expression=data["expression"], genes=data["genes"],
+        state_kwargs=state_kwargs,
+    )
 
     micro.metadata = dict(micro.metadata)
     micro.metadata["real_pipeline"] = {
@@ -318,6 +430,7 @@ def _reconstruct_xenium(
             if str(tissue_mask_mode).lower() == "geometric" else None
         ),
         **oxy_info,
+        **state_info,
     }
     return micro
 
@@ -327,6 +440,8 @@ def _reconstruct_visium(
     dx_um: float,
     oxygen_mode: str = OXYGEN_MODE_DEFAULT,
     oxygen_kwargs: Optional[Dict] = None,
+    state_mode: str = STATE_MODE_DEFAULT,
+    state_kwargs: Optional[Dict] = None,
 ) -> Microenvironment:
     """Assemble the real spot-level Visium microenvironment and add oxygen.
 
@@ -358,6 +473,9 @@ def _reconstruct_visium(
         oxy_info = _install_oxygen(
             micro, mode, OxygenConfig(), oxygen_kwargs=oxygen_kwargs
         )
+    # Visium has no per-cell transcripts, so state_mode='markers' is refused here
+    # rather than silently degrading (_install_states raises with the reason).
+    state_info = _install_states(micro, state_mode, state_kwargs=state_kwargs)
     micro.metadata = dict(micro.metadata)
     micro.metadata["real_pipeline"] = {
         "source": "visium",
@@ -365,6 +483,7 @@ def _reconstruct_visium(
         "ecm_source": "STROMAL-fraction proxy (spot resolution; no per-cell ECM transcript)",
         "ecm_markers_used": [],
         **oxy_info,
+        **state_info,
     }
     return micro
 
@@ -377,6 +496,8 @@ def reconstruct_real(
     tissue_disc_radius_um: float = TISSUE_DISC_RADIUS_UM,
     oxygen_mode: str = OXYGEN_MODE_DEFAULT,
     oxygen_kwargs: Optional[Dict] = None,
+    state_mode: str = STATE_MODE_DEFAULT,
+    state_kwargs: Optional[Dict] = None,
 ) -> Microenvironment:
     """Reconstruct a whole-niche REAL microenvironment from open spatial data.
 
@@ -421,6 +542,22 @@ def reconstruct_real(
         ``{'source': 'vessel_network'}`` to measure distance to a SEGMENTED vessel
         rather than to any endothelial cell. Must be empty (or ``None``) for
         ``oxygen_mode='pde'``, which takes no options.
+    state_mode : {'oxygen', 'markers'}
+        **ADDITIVE, OPT-IN, DEFAULT UNCHANGED.** How ``cells.state`` is labelled —
+        see :data:`STATE_MODE_DEFAULT`. Under the default ``'oxygen'`` this
+        function does not touch ``cells.state`` at all, so the reconstruction is
+        BIT-IDENTICAL to the pre-option pipeline (asserted by
+        ``tests/test_cell_state.py::test_default_state_mode_is_bit_identical``).
+        ``'markers'`` installs
+        :func:`reconstruct.cell_state.state_from_markers` and records the full
+        coverage report — including which states are UNMEASURED on that panel — in
+        ``reconstruction_report()['cell_state']``.
+    state_kwargs : dict, optional
+        Extra keyword arguments forwarded to
+        :func:`reconstruct.cell_state.state_from_markers` (e.g.
+        ``{'hypoxia_markers': HYPOXIA_SPECIFIC_MARKERS}`` for the CA9-only
+        conservative hypoxia call). Must be empty (or ``None``) for
+        ``state_mode='oxygen'``, which takes no options.
 
     Returns
     -------
@@ -443,10 +580,12 @@ def reconstruct_real(
         return _reconstruct_xenium(
             sample, dx_um, tissue_mask_mode, tissue_disc_radius_um,
             oxygen_mode=oxygen_mode, oxygen_kwargs=oxygen_kwargs,
+            state_mode=state_mode, state_kwargs=state_kwargs,
         )
     if src == "visium":
         return _reconstruct_visium(
-            sample, dx_um, oxygen_mode=oxygen_mode, oxygen_kwargs=oxygen_kwargs
+            sample, dx_um, oxygen_mode=oxygen_mode, oxygen_kwargs=oxygen_kwargs,
+            state_mode=state_mode, state_kwargs=state_kwargs,
         )
     raise ValueError(f"unknown source {source!r}; expected 'xenium' or 'visium'")
 
@@ -823,6 +962,24 @@ def reconstruction_report(micro: Microenvironment) -> Dict:
         "detail": rp.get("oxygen_detail"),
     }
 
+    # --- which route labelled cells.state (never silent) ---------------------
+    state_block = {
+        "mode": rp.get("state_mode", STATE_MODE_DEFAULT),
+        "source": rp.get("state_source"),
+        "is_measured": bool(rp.get("state_is_measured", False)),
+        "caveat": rp.get("state_caveat"),
+        "detail": rp.get("state_detail"),
+        "unmeasured_states": (
+            (rp.get("state_detail") or {}).get("coverage", {}).get(
+                "unmeasured_states")
+            if rp.get("state_detail") else None
+        ),
+        "fractions_tumor": (
+            (rp.get("state_detail") or {}).get("fractions", {}).get("tumor")
+            if rp.get("state_detail") else None
+        ),
+    }
+
     f = micro.fields
     return {
         "patient_id": micro.patient_id,
@@ -839,6 +996,8 @@ def reconstruction_report(micro: Microenvironment) -> Dict:
         "mean_oxygen": _mean(f.oxygen),
         "oxygen": oxygen_block,
         "oxygen_mode": oxygen_block["mode"],
+        "cell_state": state_block,
+        "state_mode": state_block["mode"],
         "ecm_markers_used": rp.get("ecm_markers_used", []),
         "tissue_mask_mode": micro.metadata.get("tissue_mask_mode"),
         "tissue_disc_radius_um": micro.metadata.get("tissue_disc_radius_um"),

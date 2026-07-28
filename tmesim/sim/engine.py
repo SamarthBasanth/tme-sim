@@ -20,10 +20,10 @@ Pipeline / wiring order
    ``work.fields.velocity`` (the Jain-effect convective field).
 4. **Delivery source.** The systemic PK profile
    (:func:`~tmesim.treatment.drugs.plasma_profile`) over the exposure window is
-   reduced to a single **representative sustained plasma level** — its
-   time-average — and turned into a static spatial delivery source
-   (:func:`~tmesim.treatment.drugs.delivery_source`). See the "Stage 0
-   plasma-averaging simplification" note below.
+   turned into a spatial delivery source
+   (:func:`~tmesim.treatment.drugs.delivery_source`) — either **time-averaged**
+   into a static source (default) or driven **step by step** by ``plasma(t)``
+   when ``cfg.pde.time_resolved`` is set. See "Plasma driver" below.
 5. **Transport.** Convection-diffusion-reaction PDE
    (:func:`~tmesim.physics.diffusion.simulate_drug_transport`) integrates the
    drug field and returns the exposure ``auc`` (uM*s) at every grid point.
@@ -33,21 +33,43 @@ Pipeline / wiring order
 7. **Readouts.** Final viable tumor fraction, kill fraction, and the predicted
    response (see the response map below), plus a short viable-fraction trajectory.
 
-Stage 0 plasma-averaging simplification
----------------------------------------
-The transport solver applies a *static* spatial source every timestep (its plasma
-time-profile is held at 1). A fully time-resolved infusion would re-scale the
-source by ``plasma(t)`` each step. For Stage 0 we instead drive the solver with a
-single representative **sustained** plasma level equal to the time-average of the
-multi-dose plasma profile over the exposure window::
+Plasma driver: ``cfg.pde.time_resolved``
+----------------------------------------
+**Default (``time_resolved=False``) — Stage 0 plasma-averaging.** The multi-dose
+plasma profile over the exposure window is collapsed to a single representative
+**sustained** level, its time-average, and the solver is driven by the resulting
+*static* source::
 
     plasma_mean = mean_t plasma_profile(pk, times)
     source      = vascular_density * bbb_penetrance * plasma_mean   (uM/s)
 
 This preserves the *total* delivered drug (mean level x window duration) and the
-correct relative ranking of drugs/patients — which is all the Stage 0 kill-test
-scores — while keeping the solve to a single factorized PDE integration. A
-time-resolved driver is a Stage-1 refinement.
+correct relative ranking of drugs/patients. Its cost is that the schedule is
+erased before the solver ever sees it: any two schedules with the same cumulative
+plasma exposure become **bit-identical inputs**, so fractionation and infusion
+duration are unresolvable *by construction*, not as a finding.
+
+**``time_resolved=True`` — the real plasma curve drives the solve.** The unit
+delivery field is built once and rescaled by ``plasma(t_n)`` at every step::
+
+    source        = vascular_density * bbb_penetrance          (per uM of plasma)
+    S(x, y, t_n)  = plasma_profile(pk, t_n) * source(x, y)     (uM/s)
+
+Tissue concentration can then genuinely rise and fall, so *when* drug is given
+changes the answer. It costs essentially nothing: the implicit operator
+``A = I - dt*L + dt*K`` does not involve the source, so the LU factorization is
+still built once and reused (see :mod:`tmesim.physics.diffusion`).
+
+Both paths deliver the SAME total drug over the window (the profile is sampled on
+the solver's own step grid, whose mean is exactly ``plasma_mean``), which is what
+makes "matched cumulative exposure" comparisons between them meaningful. What
+differs is only the residual drug still in flight at the end of the window —
+which is precisely the channel through which schedule acts in a linear transport
+model. In the limit of a constant plasma level the two paths coincide.
+
+``time_resolved`` defaults to **False** so every stored result, calibration and
+regression in the repo reproduces bit-for-bit; a regression test pins that
+against a stored reference (``tests/data/static_source_reference.json``).
 
 predicted_response map
 ----------------------
@@ -252,12 +274,27 @@ def simulate_response(
     work.fields.ifp = ifp
     work.fields.velocity = velocity
 
-    # 4. Drug + delivery source (Stage 0 plasma-averaging simplification).
+    # 4. Drug + delivery source.
+    #    cfg.pde.time_resolved is False  -> Stage 0 plasma-averaging (default,
+    #                                       bit-identical to the historical path)
+    #    cfg.pde.time_resolved is True   -> the real plasma(t) drives the solver
     drug = _resolve_drug(cfg)
     times = np.arange(0.0, cfg.pde.total_time, cfg.pde.dt)
     plasma = plasma_profile_safe(cfg, times)
     plasma_mean = float(plasma.mean()) if plasma.size else 0.0
-    source = delivery_source(work, drug, plasma_mean)
+
+    time_resolved = bool(getattr(cfg.pde, "time_resolved", False))
+    if time_resolved:
+        # Unit delivery field; the plasma level is reapplied step by step.
+        source = delivery_source(work, drug, 1.0)
+        source_profile = _step_plasma_profile(cfg, plasma)
+        plasma_delivered_mean = (
+            float(source_profile.mean()) if source_profile.size else 0.0
+        )
+    else:
+        source = delivery_source(work, drug, plasma_mean)
+        source_profile = None
+        plasma_delivered_mean = plasma_mean
 
     # 5. Transport PDE -> exposure (AUC) field.
     transport = simulate_drug_transport(
@@ -266,6 +303,7 @@ def simulate_response(
         source,
         cfg.pde,
         velocity=(velocity if cfg.pde.convection else None),
+        source_profile=source_profile,
     )
 
     # 6. Pharmacodynamic kill over the treatment course.
@@ -308,7 +346,9 @@ def simulate_response(
         extras={
             "penetration_index": float(transport.penetration_index),
             "plasma_mean": plasma_mean,
+            "plasma_delivered_mean": float(plasma_delivered_mean),
             "plasma_peak": float(plasma.max()) if plasma.size else 0.0,
+            "time_resolved": float(time_resolved),
             "mean_auc": float(transport.auc[tissue].mean()) if tissue.any() else 0.0,
             "mean_oxygen": mean_oxygen,
             "hypoxic_tumor_fraction": hypoxic_tumor_frac,
@@ -316,6 +356,29 @@ def simulate_response(
             "n_tumor": float(n_tumor),
         },
     )
+
+
+def _step_plasma_profile(cfg: SimConfig, plasma: np.ndarray) -> np.ndarray:
+    """Plasma concentration (uM) sampled at the solver's own step times.
+
+    The transport solver takes ``n_steps = round(total_time / dt)`` steps and
+    applies the source at the OLD time level of each step, i.e. at
+    ``t_n = n*dt`` for ``n = 0 .. n_steps-1``. This helper returns
+    ``plasma_profile(cfg.pk, t_n)`` on exactly that grid.
+
+    ``plasma`` is the profile the engine has already evaluated on
+    ``np.arange(0, total_time, dt)``, which *is* that grid whenever
+    ``total_time`` is an exact multiple of ``dt`` (the normal case) — it is then
+    reused unchanged, so the delivered window-mean equals the ``plasma_mean``
+    the static path uses and the two paths deliver the SAME total drug. Only if
+    floating-point ``arange`` produced a different count do we re-evaluate on the
+    exact step grid.
+    """
+    n_steps = int(round(float(cfg.pde.total_time) / float(cfg.pde.dt)))
+    if plasma.size == n_steps:
+        return plasma
+    step_times = np.arange(n_steps, dtype=np.float64) * float(cfg.pde.dt)
+    return plasma_profile_safe(cfg, step_times)
 
 
 def plasma_profile_safe(cfg: SimConfig, times: np.ndarray) -> np.ndarray:
@@ -464,5 +527,44 @@ if __name__ == "__main__":
         f"higher BBB penetrance ({kill_hi:.4f}) should kill >= lower "
         f"({kill_lo:.4f}) — transport is not coupled into the kill"
     )
+
+    # --- time-resolved plasma driver -----------------------------------------
+    # (a) it delivers exactly the same TOTAL drug as the static path, so a
+    #     difference between them is a schedule effect and not a dose effect;
+    # (b) it actually changes the exposure field (the static path cannot);
+    # (c) with a constant plasma level the two paths coincide.
+    from ..core import PKConfig
+
+    pk_multi = PKConfig(plasma_peak=50.0, half_life=3600.0 * 2, n_doses=4,
+                        dose_interval=3600.0 * 1.5)
+    pde_tr = PDEConfig(dt=pde.dt, total_time=pde.total_time, convection=True,
+                       save_every=pde.save_every, time_resolved=True)
+    res_static = simulate_response(micro, SimConfig(pk=pk_multi, pde=pde, seed=0))
+    res_tr = simulate_response(micro, SimConfig(pk=pk_multi, pde=pde_tr, seed=0))
+    print(f"\ntime-resolved PK: mean_auc static={res_static.extras['mean_auc']:.6g}  "
+          f"time-resolved={res_tr.extras['mean_auc']:.6g}  "
+          f"(delivered plasma mean {res_static.extras['plasma_mean']:.6f} vs "
+          f"{res_tr.extras['plasma_delivered_mean']:.6f} uM)")
+    assert res_static.extras["time_resolved"] == 0.0
+    assert res_tr.extras["time_resolved"] == 1.0
+    assert abs(res_tr.extras["plasma_delivered_mean"]
+               - res_static.extras["plasma_mean"]) < 1e-9, "total dose not matched"
+    assert res_tr.extras["mean_auc"] != res_static.extras["mean_auc"], (
+        "time_resolved=True produced an identical exposure field — the plasma "
+        "profile is not reaching the solver"
+    )
+    # Constant plasma level (single dose, half-life astronomically longer than the
+    # window, so plasma(t) is flat to ~1e-14). The two paths are then analytically
+    # identical and must agree to round-off.
+    pk_flat = PKConfig(plasma_peak=50.0, half_life=1e18, n_doses=1,
+                       dose_interval=pde.total_time)
+    auc_flat_static = simulate_response(
+        micro, SimConfig(pk=pk_flat, pde=pde, seed=0)).extras["mean_auc"]
+    auc_flat_tr = simulate_response(
+        micro, SimConfig(pk=pk_flat, pde=pde_tr, seed=0)).extras["mean_auc"]
+    rel = abs(auc_flat_tr - auc_flat_static) / auc_flat_static
+    print(f"constant-plasma limit: static={auc_flat_static:.12g} "
+          f"time-resolved={auc_flat_tr:.12g}  rel diff={rel:.2e}")
+    assert rel < 1e-12, f"paths do not coincide at constant plasma: {rel:.2e}"
 
     print("\nengine self-test PASSED")
