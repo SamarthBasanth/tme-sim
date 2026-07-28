@@ -119,10 +119,19 @@ highest-value structural fix outstanding. Literature basis is established:
 ## 4. What survives the audit
 
 - **Reconstruction fidelity**: cross-platform Pearson 0.997; endothelial agrees to 0.03%
-  between two independent platforms. And an external check vindicates it — our **9.7%**
-  endothelial matches human cortex volume-EM tissue counting (**8.0%**, Shapson-Coe 2024),
-  *not* the 1-2% from dissociation-based scRNA-seq. Correcting toward scRNA-seq would have
-  introduced a 5x error into the delivery source term.
+  between two independent platforms on the SAME section.
+  **RETRACTED (held-out test, results/heldout_patient.md): the external agreement does NOT
+  replicate.** On a second real patient the endothelial fraction is 4.18% vs the 8.0%
+  volume-EM value (0.52x), against section 1's 9.74% — and the areal endothelial density
+  actually rose 2.67x, so the fraction fell only because section 2's tissue is 6.2x more
+  cellular. The vascular area fraction fails harder: 5.79% vs measured 2.1+-0.3% (2.76x),
+  against section 1's 2.50%. Cause is exact — area fraction = vessel count x a FIXED 7.5 um
+  painted disc / tissue area, and 7.5 um is GRID-IMPOSED (a dx=12 um cell already has a
+  6.8 um equivalent radius). Section 1's 1.19x agreement was partly a coincidence of its
+  endothelial density matching that grid constant. MVD is high on BOTH sections, i.e.
+  systematic rather than patient-specific. The two quantities this project cited as its
+  external validations are exactly the two that fail, and both fail through constants
+  entangled with the grid and with panel sparsity in a way one section could never expose.
 - **Numerics**: mass conserved to ~1e-13 on the real irregular mask; dt-converged; kill
   fraction grid-converged beyond dx<=20 um. Production resolution is **dx = 12 um** (also
   the finest grid satisfying the advection CFL at dt = 10 s).
