@@ -105,7 +105,7 @@ import os
 import shutil
 import sys
 import urllib.request
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd

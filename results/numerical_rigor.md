@@ -1,5 +1,13 @@
 # Numerical rigor — verification + sensitivity on the REAL microenvironment
 
+> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
+> figure below was generated with the **KDE** vascular source, which was the default until
+> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
+> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
+> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
+> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
+> `mode='kde'` to recover exactly these numbers.
+
 **Module:** `tmesim/validation/numerical_rigor.py` (run: `python -m tmesim.validation.numerical_rigor`)
 
 **Geometry:** the REAL 40,887-cell 10x Xenium GBM section, reconstructed by `reconstruct.real_pipeline.reconstruct_real('xenium', dx_um=…)` — real cell positions, real endothelial-KDE vascular field, real matrix-transcript ECM field, physics-solved oxygen. **Drug:** the α-calibrated **doxorubicin** (perivascular-sink model from `validation.calibration`). **Advection OFF** 

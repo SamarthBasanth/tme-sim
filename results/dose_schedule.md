@@ -1,5 +1,13 @@
 # DOSE & SCHEDULE on ONE REAL TUMOR
 
+> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
+> figure below was generated with the **KDE** vascular source, which was the default until
+> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
+> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
+> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
+> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
+> `mode='kde'` to recover exactly these numbers.
+
 **Predicted dose-response, fractionation and infusion-duration behaviour for temozolomide and cisplatin on the real 10x Xenium glioblastoma section.** This is the question the simulator exists to inform — not *which* drug, but *how much* and *how often* — asked of one real patient's tissue.
 
 ![dose & schedule](dose_schedule.png)

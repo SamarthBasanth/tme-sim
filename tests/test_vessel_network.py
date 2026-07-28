@@ -124,31 +124,58 @@ def test_match_total_to_preserves_the_integral():
     assert matched.min() == 0.0
 
 
-def test_kde_default_is_unchanged_by_the_new_mode_keyword():
-    """The additive `mode=` keyword must not perturb any existing caller."""
+def test_discrete_is_the_default_and_kde_is_still_reachable():
+    """The default vascular construction is the DISCRETE segmented-vessel source
+    (`results/vessel_promotion.md`), and `mode='kde'` still returns the historical
+    smooth field unchanged."""
     domain, cells = _population()
-    explicit = vascular_density_from_cells(domain, cells, mode="kde")
-    default = vascular_density_from_cells(domain, cells)
-    np.testing.assert_array_equal(default, explicit)
-    # The KDE is the smooth field the discrete one replaces: nonzero nearly
-    # everywhere, which is exactly the defect vessel_network.py addresses.
-    tissue = np.asarray(domain.tissue_mask, dtype=bool)
     disc = vascular_density_from_cells(domain, cells, mode="discrete")
-    assert (default[tissue] > 0).mean() > (disc[tissue] > 0).mean()
+    default = vascular_density_from_cells(domain, cells)
+    np.testing.assert_array_equal(default, disc)
+
+    # The KDE remains available and is still the smooth field: nonzero nearly
+    # everywhere, which is exactly the defect vessel_network.py addresses.
+    kde = vascular_density_from_cells(domain, cells, mode="kde")
+    tissue = np.asarray(domain.tissue_mask, dtype=bool)
+    assert (kde[tissue] > 0).mean() > (disc[tissue] > 0).mean()
     assert disc.min() == 0.0
     assert "kde" in VASCULAR_MODES and "discrete" in VASCULAR_MODES
 
-    # build_real_fields threads the mode through and defaults to KDE.
+    # build_real_fields threads the mode through and follows the same default.
     np.testing.assert_array_equal(
-        build_real_fields(domain, cells).vascular_density, default)
+        build_real_fields(domain, cells).vascular_density, disc)
     np.testing.assert_array_equal(
-        build_real_fields(domain, cells, vascular_mode="discrete").vascular_density,
-        disc)
+        build_real_fields(domain, cells, vascular_mode="kde").vascular_density,
+        kde)
 
     with pytest.raises(ValueError):
         vascular_density_from_cells(domain, cells, mode="nonsense")
     with pytest.raises(TypeError):
-        vascular_density_from_cells(domain, cells, radius_um=5.0)  # kde takes none
+        vascular_density_from_cells(domain, cells, mode="kde", radius_um=5.0)
+
+
+def test_sparse_source_does_not_degenerate_the_vessel_mask():
+    """A discrete source is exactly zero over most of the tissue, so a p95
+    threshold on it is 0.0 and `vasc >= 0` would call the WHOLE tissue a vessel.
+    `vessel_mask_from_density` must fall back to `field > 0` instead — while
+    leaving the (strictly positive) KDE path on its percentile rule."""
+    from tmesim.validation.vessel_profile import vessel_mask_from_density
+
+    domain, cells = _population()
+    tissue = np.asarray(domain.tissue_mask, dtype=bool)
+    disc = vascular_density_from_cells(domain, cells, mode="discrete")
+    kde = vascular_density_from_cells(domain, cells, mode="kde")
+
+    vd = vessel_mask_from_density(disc, tissue)
+    assert vd["threshold"] == 0.0
+    assert "field > 0" in vd["rule"]
+    assert vd["area_fraction"] < 0.5          # NOT the whole tissue
+    np.testing.assert_array_equal(vd["mask"], (disc > 0) & tissue)
+
+    vk = vessel_mask_from_density(kde, tissue)
+    assert vk["threshold"] > 0.0
+    assert "threshold on the field" in vk["rule"]
+    np.testing.assert_array_equal(vk["mask"], (kde >= vk["threshold"]) & tissue)
 
 
 def test_segmentation_report_scores_against_published_values():

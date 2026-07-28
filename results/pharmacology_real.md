@@ -1,5 +1,13 @@
 # Real-outcome validation: the drug-POTENCY axis
 
+> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
+> figure below was generated with the **KDE** vascular source, which was the default until
+> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
+> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
+> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
+> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
+> `mode='kde'` to recover exactly these numbers.
+
 First test of tmesim's molecular / pharmacology layer against a **real, measured** outcome: does structure-derived chemistry (and independently, measured GDSC potency) predict **real drug sensitivity in patient-derived glioblastoma cultures (HGCC, Johansson et al. 2020, *Cell Reports*)**?
 
 > **SCOPE / HONESTY.** This validates the **potency axis only**. Both HGCC and GDSC are *dissociated cells* -- no tissue architecture, no vasculature, no immune/stromal niche. Nothing here supports (or tests) tmesim's spatial-microenvironment premise. Potency is also notoriously hard to predict from structure alone -- which is exactly why `tmesim.molecular.potency` uses *measured* GDSC IC50s rather than a QSAR.

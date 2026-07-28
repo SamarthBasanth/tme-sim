@@ -1,5 +1,13 @@
 # Predicted drug response by anatomic niche region on real glioblastoma tissue
 
+> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
+> figure below was generated with the **KDE** vascular source, which was the default until
+> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
+> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
+> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
+> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
+> `mode='kde'` to recover exactly these numbers.
+
 **Experiment:** `experiments/niche_response.py` (run: `./.venv/bin/python experiments/niche_response.py`)
 
 **Figure:** `results/niche_response.png`

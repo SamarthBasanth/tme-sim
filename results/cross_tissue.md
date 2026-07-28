@@ -1,5 +1,13 @@
 # Cross-tissue predicted drug behaviour on REAL GBM microenvironments
 
+> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
+> figure below was generated with the **KDE** vascular source, which was the default until
+> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
+> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
+> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
+> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
+> `mode='kde'` to recover exactly these numbers.
+
 **All five real tumors are simulated on the SAME converged numerical grid (dx = 12 µm).** The same real drug (temozolomide: doxorubicin-calibrated perivascular-consumption physics, alpha = 149, plus the binding-site barrier) and the same validated transport → kill engine are used for every tissue; only the REAL microenvironment differs.
 
 This supersedes an earlier version of this page in which the Xenium section ran at dx = 12 µm and the four Visium sections ran at their 100 µm spot pitch. That comparison mixed biology with a numerical grid artifact. It also predates the calibration honesty pass, so it used the inflated alpha = 309.6 rather than the corrected alpha = 148.6. **Every headline number on the earlier page is superseded** — see **Retraction & correction** below before quoting any of them.

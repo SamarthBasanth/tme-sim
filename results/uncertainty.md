@@ -1,5 +1,13 @@
 # Uncertainty quantification — honest error bars on the REAL microenvironment
 
+> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
+> figure below was generated with the **KDE** vascular source, which was the default until
+> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
+> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
+> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
+> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
+> `mode='kde'` to recover exactly these numbers.
+
 **Module:** `tmesim/validation/uncertainty.py` (run: `python -m tmesim.validation.uncertainty`)
 
 **What this is.** A Monte-Carlo propagation of the knobs `results/numerical_rigor.md` identified as the real uncertainty drivers, through the FULL real pipeline — the 40,887-cell 10x Xenium GBM section is re-reconstructed from measured bytes for **every draw** (real positions, real marker phenotypes, real endothelial-KDE vascular field, real matrix-transcript ECM field, physics-solved oxygen), the drug is rebuilt from the calibration model, and the frozen engine is re-run. Drug: **temozolomide** (GBM standard of care), α-calibrated. n = **80** Latin-hypercube draws at dx = **15 µm**, total runtime **40.9 min**.

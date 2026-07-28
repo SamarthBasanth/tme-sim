@@ -90,9 +90,25 @@ structural effect 35x.
 First vascular quantity to score against a MEASUREMENT rather than a threshold: vascular
 area fraction 2.50% vs measured 2.1+-0.3% (PMID 36611806), 1.19x, untuned.
 
-Status: discrete vessels are NOT yet the global default (alpha was calibrated against the
-KDE and must be re-fitted; grid convergence of a 7.5 um vessel radius on a 12 um mesh is
-untested). They ARE required for any distance-resolved or perivascular claim.
+Status: **discrete vessels ARE now the global default** (`results/vessel_promotion.md`).
+Both blockers were tested and neither survived. **alpha was never calibrated against the
+KDE** — `calibrate_alpha` is a closed-form solve on the compiled drug plus the published
+anchor, contains no vascular field, and returns 148.608... under either source;
+`pk_multidrug` is byte-identical and still passes 2/2 out-of-sample. Forcing an *empirical*
+section-scale re-fit instead BREAKS that check under both fields (mitoxantrone falls out of
+band under the KDE-empirical alpha 455.2, topotecan under the discrete-empirical 77.6), so
+148.6 stands. **Grid convergence came out inverted**: the discrete source converges on
+coverage, AUC and kill by dx = 12 um and on fitted L by dx = 8 um, while the
+**max-normalised KDE's total delivered dose does NOT converge** (-6.4% from dx = 8 to
+dx = 6, outside the 5% tolerance) because it is divided by a grid-dependent maximum.
+
+Two real costs, both quantified: distance-resolved claims need **dx <= 8 um** (the fitted L
+of the shortest-L drug sits 24% low at dx = 12), and a concentrated source steepens the IFP
+gradient so the advection CFL needs **dt <= 5 s** at dx <= 8 (the historical dt = 10 s
+violates it). Promotion also changes the **unit** of every absolute exposure by 3.36x, so
+KDE-era absolute numbers across `results/` are stale — see `vessel_promotion.md` §7.3 for
+the list. §8.3's "the discrete field is the right substrate for the BBB leak" is WITHDRAWN:
+the additive leak is a scalar on the source and both substrates transmit it to within 0.19%.
 
 ---
 

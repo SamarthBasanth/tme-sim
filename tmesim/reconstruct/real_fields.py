@@ -18,8 +18,12 @@ finished population regardless of who built it.
 What is real vs. proxy (honest accounting)
 -------------------------------------------
 * ``vascular_density_from_cells`` — REAL. Vessel locations are the measured
-  positions of endothelial (PECAM1+ / FLT1+) cells, smoothed into a perfused-
-  vessel *fraction*. Vessels are real cell locations, not invented geometry.
+  positions of endothelial (PECAM1+ / FLT1+) cells. Since
+  ``results/vessel_promotion.md`` the DEFAULT construction is ``mode='discrete'``:
+  those cells are clustered into discrete vessel objects and painted as a source
+  that is exactly zero away from a vessel. The historical 40 um-bandwidth
+  Gaussian KDE is retained as ``mode='kde'``. Vessels are real cell locations in
+  either mode; no vessel geometry is invented.
 * ``ecm_density_from_cells`` — PROXY. ECM is not itself a cell, so we cannot bin
   it directly. We use the density of STROMAL / reactive-mesenchymal cells (the
   cells that DEPOSIT matrix: CAF-like fibroblasts, reactive astrocytes) as a
@@ -111,13 +115,51 @@ def _kde_on_grid(
     return np.clip(density, 0.0, 1.0)
 
 
-#: The vascular-source construction to use. ``'kde'`` is the historical default
-#: and is UNCHANGED; ``'discrete'`` routes to the segmented-vessel field of
-#: :mod:`reconstruct.vessel_network`, which is exactly zero away from a vessel.
-#: See ``results/vessel_network_impact.md`` for the A-vs-B quantification and for
-#: the (currently negative) recommendation on flipping this default.
+#: The vascular-source construction to use.
+#:
+#: ``'discrete'`` is the DEFAULT as of ``results/vessel_promotion.md``: the
+#: segmented-vessel field of :mod:`reconstruct.vessel_network`, exactly zero away
+#: from a vessel. ``'kde'`` is the historical 40 um-bandwidth endothelial KDE and
+#: is retained, unchanged, as an explicit option.
+#:
+#: The promotion settled the two blockers ``vessel_network_impact.md`` §8.2 left
+#: open, and both failed to survive measurement:
+#:
+#: * **alpha does not need re-fitting.** ``validation.calibration.calibrate_alpha``
+#:   is a closed-form solve on the compiled drug plus the published anchor; no
+#:   vascular field enters it. It returns 148.608... under either mode, and
+#:   ``validation.pk_multidrug.run()`` is byte-identical. Forcing an *empirical*
+#:   section-scale re-fit instead BREAKS the out-of-sample check under BOTH
+#:   fields, so 148.6 stands.
+#: * **grid convergence holds.** Coverage @1x IC50, mean tumour AUC and kill are
+#:   converged for the discrete source by dx = 12 um (dx 8 -> 6 changes 0.0010
+#:   abs / 0.18% / 0.0002 abs), and the source's own area fraction is ~4x MORE
+#:   dx-stable than the max-normalised KDE's.
+#:
+#: TWO REAL COSTS, both quantified in ``results/vessel_promotion.md``:
+#:
+#: 1. **Distance-resolved claims need dx <= 8 um.** The fitted penetration length
+#:    of the shortest-L drug runs 47.2 / 39.6 / 51.5 / 51.9 um at dx =
+#:    15 / 12 / 8 / 6, so the production dx = 12 um value sits ~24% below the
+#:    dx <= 8 asymptote. Bulk metrics are fine at dx = 12; quote ``L`` at
+#:    dx <= 8. (Under the KDE, ``L`` was already converged at dx = 12.)
+#: 2. **Tighter advection CFL.** A concentrated source steepens the IFP gradient,
+#:    so the max interstitial speed is ~1.6-2x the KDE's and dt_max falls to
+#:    20.5 / 15.4 / 9.5 / 6.9 s at dx = 15 / 12 / 8 / 6. The historical
+#:    dt = 10 s VIOLATES the CFL for this field at dx <= 8; use dt <= 5 s.
+#:
+#: NORMALISATION WARNING. The two fields integrate to different totals over
+#: tissue (mean 0.0250 vs 0.0840, i.e. 3.36x), because a max-normalised KDE
+#: spread over ~100% of the tissue integrates to more than a unit source on 2.5%
+#: of it. Neither amplitude is a validated absolute, but the referents differ:
+#: KDE 1.0 = "the densest endothelial-KDE spot in THIS section" (section-
+#: dependent); discrete 1.0 = "a perfused vessel wall leaking at the reference
+#: rate" (section-independent). Flipping the default therefore changes the UNIT
+#: of every absolute exposure by ~3.4x. Any absolute number in ``results/``
+#: generated before this change is stale; see the list in
+#: ``results/vessel_promotion.md`` §7.
 VASCULAR_MODES = ("kde", "discrete")
-_DEFAULT_VASCULAR_MODE = "kde"
+_DEFAULT_VASCULAR_MODE = "discrete"
 
 
 def vascular_density_from_cells(
@@ -129,25 +171,28 @@ def vascular_density_from_cells(
 ) -> np.ndarray:
     """Perfused-vessel-fraction field (ny, nx) in [0,1] from REAL endothelium.
 
-    ``mode='kde'`` (DEFAULT, unchanged) — KDE of the measured positions of
+    ``mode='discrete'`` (**DEFAULT** since ``results/vessel_promotion.md``) — the
+    measured endothelial cells clustered into DISCRETE putative vessel objects
+    and painted as a source that is nonzero only within a vessel radius and
+    EXACTLY zero elsewhere
+    (:func:`reconstruct.vessel_network.segment_vessels` +
+    :func:`~reconstruct.vessel_network.discrete_vascular_field`). Extra keyword
+    arguments (``link_distance_um``, ``radius_um``, ``amplitude``,
+    ``match_total_to``) are forwarded. ``bandwidth_um`` is ignored in this mode.
+    See :data:`VASCULAR_MODES` for the evidence, the two costs (dx <= 8 um for
+    distance-resolved claims; dt <= 5 s for the advection CFL) and the 3.36x
+    normalisation change.
+
+    ``mode='kde'`` (the historical default, byte-for-byte unchanged) — KDE of the
+    measured positions of
     ``CellType.ENDOTHELIAL`` cells (the PECAM1+/FLT1+ vessel-lining cells
     identified upstream). The value at each grid cell is the relative local
     density of endothelium — a real perfused-vessel fraction, high exactly where
     vessel cells actually cluster. No vessel geometry is invented. This field is
     SMOOTH: at the default 40 um bandwidth it is nonzero over ~99.7% of the
     tissue, which is the structural confound documented in
-    ``results/SESSION_AUDIT.md`` §3.
-
-    ``mode='discrete'`` — the same measured endothelial cells, but first clustered
-    into DISCRETE putative vessel objects and then painted as a source that is
-    nonzero only within a vessel radius and EXACTLY zero elsewhere
-    (:func:`reconstruct.vessel_network.segment_vessels` +
-    :func:`~reconstruct.vessel_network.discrete_vascular_field`). Extra keyword
-    arguments (``link_distance_um``, ``radius_um``, ``amplitude``,
-    ``match_total_to``) are forwarded. ``bandwidth_um`` is ignored in this mode.
-
-    This is an ADDITIVE option: the default is unchanged, and every existing
-    caller keeps the KDE field byte-for-byte.
+    ``results/SESSION_AUDIT.md`` §3, and the reason the default moved away from
+    it. Passing ``mode='kde'`` reproduces the historical field exactly.
 
     Returns an all-zero field if the population contains no endothelial cells.
     """
@@ -228,7 +273,8 @@ def build_real_fields(
     physics package). IFP is left for ``physics.pressure`` similarly.
 
     ``vascular_mode`` is forwarded to :func:`vascular_density_from_cells` and
-    defaults to the unchanged ``'kde'``.
+    defaults to ``'discrete'`` (see :data:`VASCULAR_MODES`); pass ``'kde'`` for
+    the historical smooth field.
     """
     ecm = ecm_density_from_cells(domain, cells, bandwidth_um)
     vascular = vascular_density_from_cells(domain, cells, bandwidth_um,

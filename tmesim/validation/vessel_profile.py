@@ -183,19 +183,36 @@ def vessel_mask_from_density(
     absolute level. Returns the boolean ``mask``, the absolute ``threshold``, and the
     resulting ``area_fraction`` of tissue.
 
-    NOT a measured vessel lumen: ``vascular_density`` is a 40 um-bandwidth Gaussian
-    KDE of measured ENDOTHELIAL cell positions (``reconstruct.real_fields``).
+    NOT a measured vessel lumen when the field is the smooth KDE: there
+    ``vascular_density`` is a 40 um-bandwidth Gaussian KDE of measured
+    ENDOTHELIAL cell positions (``reconstruct.real_fields``, ``mode='kde'``).
+
+    SPARSE-SOURCE PATH (the default field since ``results/vessel_promotion.md``).
+    The discrete source is exactly zero over ~97.5% of the tissue, so its
+    ``percentile``-th percentile is 0.0 and ``vasc >= 0`` would select the WHOLE
+    tissue as "vessel" — silently destroying the distance transform. When the
+    threshold comes out non-positive we therefore fall back to ``vasc > 0``,
+    which for a segmented field IS the vessel set (this is
+    ``vessel_network_impact.md`` §8.4 item 3: the mask becomes the segmented mask
+    rather than a percentile on the field). The KDE path is untouched — its p95
+    is strictly positive — so this changes no existing number.
     """
     vasc = np.asarray(vascular_density, dtype=np.float64)
     tissue = np.asarray(tissue_mask, dtype=bool)
     if not tissue.any():
         raise ValueError("empty tissue mask")
     thr = float(np.percentile(vasc[tissue], float(percentile)))
-    mask = (vasc >= thr) & tissue
+    if thr > 0.0:
+        mask = (vasc >= thr) & tissue
+        rule = f"p{float(percentile):g} threshold on the field"
+    else:
+        mask = (vasc > 0.0) & tissue
+        rule = "field > 0 (sparse/segmented source; p-threshold degenerate at 0)"
     return {
         "mask": mask,
         "threshold": thr,
         "percentile": float(percentile),
+        "rule": rule,
         "area_fraction": float(mask.sum()) / float(tissue.sum()),
         "n_vessel_px": int(mask.sum()),
     }

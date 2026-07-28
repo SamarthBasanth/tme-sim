@@ -230,10 +230,18 @@ def test_default_oxygen_mode_is_bit_identical(real_micro):
 
 
 def test_default_reconstruction_metadata_is_unchanged(real_micro):
-    """The historical metadata keys and values survive the additive change."""
+    """The historical metadata keys and values survive the additive change.
+
+    ``vascular_source`` DID change, once and deliberately: the default vascular
+    construction moved from the smooth endothelial KDE to the discrete segmented
+    vessel field (``results/vessel_promotion.md``). The metadata must say so
+    rather than keep claiming a KDE, which is what this line now pins.
+    """
     rp = real_micro.metadata["real_pipeline"]
     assert rp["source"] == "xenium"
-    assert rp["vascular_source"] == "KDE of REAL ENDOTHELIAL cell positions"
+    assert rp["vascular_source"] == (
+        "DISCRETE segmented vessels from REAL ENDOTHELIAL cell positions"
+    )
     assert rp["oxygen_source"] == (
         "physics.solve_oxygen driven by the real vascular field"
     )

@@ -65,6 +65,7 @@ from ..physics.oxygen_proxy import (
     oxygen_from_vessel_distance,
 )
 from .real_fields import (
+    _DEFAULT_VASCULAR_MODE,
     add_oxygen,
     ecm_density_from_cells,
     ecm_density_from_positions,
@@ -267,8 +268,16 @@ def _reconstruct_xenium(
     )
     domain, cells = micro.domain, micro.cells
 
-    # REAL vascular density: KDE of the measured ENDOTHELIAL cell positions.
+    # REAL vascular density from the measured ENDOTHELIAL cell positions. The
+    # DEFAULT construction is the DISCRETE segmented-vessel source since
+    # results/vessel_promotion.md (exactly zero away from a vessel); the
+    # historical 40 um KDE is real_fields.vascular_density_from_cells(mode='kde').
     vascular = vascular_density_from_cells(domain, cells)
+    vascular_source = (
+        "DISCRETE segmented vessels from REAL ENDOTHELIAL cell positions"
+        if _DEFAULT_VASCULAR_MODE == "discrete"
+        else "KDE of REAL ENDOTHELIAL cell positions"
+    )
 
     # REAL ECM: expression-weighted KDE of the panel's collagen / matrix genes.
     # Load once more (aligned row-for-row to the deterministic reconstruction) to
@@ -300,7 +309,7 @@ def _reconstruct_xenium(
     micro.metadata = dict(micro.metadata)
     micro.metadata["real_pipeline"] = {
         "source": "xenium",
-        "vascular_source": "KDE of REAL ENDOTHELIAL cell positions",
+        "vascular_source": vascular_source,
         "ecm_source": ecm_source,
         "ecm_markers_used": ecm_markers,
         "tissue_mask_mode": str(tissue_mask_mode),
