@@ -221,6 +221,19 @@ closed, several with answers opposite to the ones expected:
 - **Therapeutic coverage carries a second, larger error bar** — up to 0.137 absolute from the
   2-D-section assumption, ~7× its grid bar ([`dimensionality.md`](dimensionality.md)). Mean
   tumour AUC is unbiased analytically; the transport physics needs no fix.
+- **Schedule is structurally inert in this model — do not run regimen-optimisation on it.**
+  Across ten real temozolomide regimens at matched dose ([`regimen.md`](regimen.md)), the
+  total spread in mean tumour exposure is **0.000359%**, of which only **0.000013%** is
+  transport; the remainder is the observation window clipping the last plasma tail, an
+  artefact **27:1 larger than the physics**. All ten arms return *the same* drawn kill
+  fraction. Staggering cannot change combination overlap either (largest Jaccard change
+  0.014%), and the reason is structural rather than empirical: **the transport operator has
+  no drug–drug coupling and Bliss is timing-blind**, so a stagger acts only through
+  amplitude, never geometry. What would have to exist for schedule to matter — MGMT/AGAT
+  depletion, inter-fraction repair, redistribution, regrowth, immune effects — is absent by
+  construction. As-prescribed the ranking is monotone in cumulative dose and nothing else,
+  which is precisely the prediction **RTOG 0525 falsified in humans** (2.1× dose, no OS
+  benefit, double grade ≥3 toxicity).
 - **The mechanism labels conflate two axes.** `UNREACHED` and `UNDERDOSED` are bands on one
   variable (E/IC50), so a drug that is merely *weak* is reported as *undelivered* — which is
   exactly what temozolomide does ([`mechanism_attribution.md`](mechanism_attribution.md)).
