@@ -140,7 +140,10 @@ export function createOverlays(viewer) {
   }
 
   /* ------------------------------------------------------ empty state -- */
-  const empty = h('div.ov.ov-empty.interactive',
+  // NOT `.interactive`: the notice spans the full width of the top strip at
+  // z-index 3 and contains nothing clickable, so pointer-events:auto only
+  // meant it swallowed drags that started in that band.
+  const empty = h('div.ov.ov-empty',
     h('div.notice',
       h('h3', 'No geometry loaded'),
       h('p', 'Submit a RunSpec, or open a completed run from the history dock, to load its cell geometry over ',

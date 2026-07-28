@@ -96,7 +96,7 @@ input.inp[type="number"], input.inp.num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
-  padding-right: 4px;
+  padding-right: var(--sp-3);
 }
 input.inp[type="number"]::-webkit-outer-spin-button,
 input.inp[type="number"]::-webkit-inner-spin-button { opacity: 0.35; height: 16px; }
@@ -122,7 +122,7 @@ select.inp {
      the whole rail past its own width. */
   grid-template-columns: 96px minmax(0, 1fr);
   align-items: center;
-  gap: 3px var(--pad-2);
+  gap: var(--sp-2) var(--pad-2);
 }
 .fgrid > .lbl { justify-self: start; align-self: center; }
 .fgrid .span2 { grid-column: 1 / -1; }
@@ -191,7 +191,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--sp-2);
   height: var(--h-chip);
   padding: 0 var(--sp-3);
   border: 1px solid currentColor;
@@ -318,7 +318,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0 var(--pad-2);
-  padding: 4px 0;
+  padding: var(--sp-3) 0;
   border-bottom: 1px solid var(--line-0);
   align-items: baseline;
 }
@@ -474,7 +474,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   line-height: 15px;
   color: var(--fg-3);
   text-align: right;
-  padding: 5px 4px 5px 0;
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) 0;
   overflow: hidden;
   user-select: none;
   white-space: pre;
@@ -486,7 +486,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   height: 100%;
   resize: none;
   border: 0;
-  padding: 5px 6px;
+  padding: var(--sp-3) var(--sp-4);
   background: transparent;
   color: var(--fg-0);
   font-family: var(--font-mono);
@@ -511,8 +511,8 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .diag {
   display: grid;
   grid-template-columns: 11px minmax(0, 1fr);
-  gap: 5px;
-  padding: 3px var(--pad-2);
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--pad-2);
   overflow-wrap: anywhere;
   white-space: normal;
   font-size: var(--fs-xs);
@@ -567,7 +567,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   text-transform: uppercase;
   letter-spacing: var(--tr-wide);
   color: var(--fg-1);
-  margin-bottom: 3px;
+  margin-bottom: var(--sp-2);
 }
 .legend .l-title .unit { text-transform: none; letter-spacing: 0; margin: 0; }
 .legend .l-ramp {
@@ -633,7 +633,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   color: var(--fg-1);
   text-transform: uppercase;
   letter-spacing: var(--tr-wide);
-  margin-bottom: 4px;
+  margin-bottom: var(--sp-3);
   font-weight: 600;
 }
 .notice p { line-height: 1.45; }
@@ -672,7 +672,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   z-index: 120;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-3);
   /* An explicit width, not just a max-width: the stack is position:fixed with
      only `right` set, so shrink-to-fit would otherwise resolve against the
      zero min-content of the minmax(0,1fr) grid inside each toast and collapse
@@ -706,7 +706,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .badge-code {
   font-family: var(--font-mono);
   font-size: var(--fs-micro);
-  padding: 0 3px;
+  padding: 0 var(--sp-2);
   border: 1px solid var(--line-1);
   border-radius: 1px;
   background: var(--bg-2);
@@ -760,7 +760,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   font-size: var(--fs-micro);
   color: var(--fg-2);
   line-height: 1.4;
-  margin-top: 3px;
+  margin-top: var(--sp-2);
 }
 
 /* ========================================================== tools ======= */
@@ -796,7 +796,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .roi-sw {
   display: inline-block;
   width: 7px; height: 7px;
-  margin-right: 4px;
+  margin-right: var(--sp-3);
   vertical-align: 0;
   border: 1px solid color-mix(in srgb, var(--fg-0) 30%, transparent);
 }

@@ -338,6 +338,47 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     profileMark = null; paintPlot(); drawAnnot();
   });
 
+  /* ===================================================== distance panel = */
+  /* `distance` had a toolbar button, a keyboard shortcut and an on-canvas tag,
+     but no panel — the only one of the four tools without one, so its read-out
+     existed only as a label floating on the tissue and the only way to discard
+     it was Esc while that tool happened to be selected. It gets the same shape
+     as its two siblings: a bar with a clear, a read-out, a hint. */
+
+  const distStats = h('dl.kv');
+  const distHint = h('div.tool-hint');
+  const distClear = h('button.btn.ghost.sm', {
+    onclick: () => { distance = null; paintDistance(); drawAnnot(); if (onChange) onChange(); },
+    title: 'Discard the distance line',
+  }, 'clear');
+  const distanceEl = h('div.tool-panel',
+    h('div.frow.tool-bar', h('span.grow'), distClear),
+    distStats, distHint,
+  );
+
+  function paintDistance() {
+    distanceEl.classList.toggle('empty', !distance);
+    distClear.disabled = !distance;
+    clear(distStats);
+    if (!distance) {
+      distHint.textContent = 'No measurement. Press M, then drag between two points.';
+      return;
+    }
+    const dx = distance.x1 - distance.x0;
+    const dy = distance.y1 - distance.y0;
+    const L = Math.hypot(dx, dy);
+    fill(distStats,
+      h('dt', 'length'), h('dd', num(L, 1), h('span.unit', 'um')),
+      h('dt', 'dx'), h('dd', num(Math.abs(dx), 1), h('span.unit', 'um')),
+      h('dt', 'dy'), h('dd', num(Math.abs(dy), 1), h('span.unit', 'um')),
+      h('dt', 'from'), h('dd', `${num(distance.x0, 0)}, ${num(distance.y0, 0)}`, h('span.unit', 'um')),
+      h('dt', 'to'), h('dd', `${num(distance.x1, 0)}, ${num(distance.y1, 0)}`, h('span.unit', 'um')),
+      h('dt', 'source'), h('dd', chip('measured',
+        'A separation in the assay\'s own micrometre coordinates. No model, no grid, no interpolation — the only quantity in this rail that is measured outright.')),
+    );
+    distHint.textContent = 'Euclidean separation in section coordinates.';
+  }
+
   /* ======================================================= region panel = */
 
   const roiTblWrap = h('div.tblwrap');
@@ -379,8 +420,12 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
       if (onRoiChange) onRoiChange(null);
       return;
     }
+    // The old wording was `N regions is the limit — clear one to draw another`,
+    // which described a refusal. The code does not refuse: pointerUp does
+    // `rois.shift()`, so a fifth region silently evicts the first. Say what
+    // actually happens.
     roiHint.textContent = rois.length >= MAX_ROI
-      ? `${MAX_ROI} regions is the limit — clear one to draw another.`
+      ? `${MAX_ROI} regions held; drawing another drops the oldest.`
       : 'Composition is measured; every field statistic is computed on the served grid.';
 
     const fname = getFieldName();
@@ -486,6 +531,7 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
       paintProfile();
     } else if (tool === 'distance') {
       distance = geom;
+      paintDistance();
     } else if (tool === 'region') {
       if (rois.length >= MAX_ROI) rois.shift();
       const r = { ...geom, label: 'R' + (++roiSeq) };
@@ -510,7 +556,7 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     let did = false;
     if (pending) { pending = null; did = true; }
     if (tool === 'profile' && profile) { profile = null; profileData = null; profileMark = null; paintProfile(); did = true; }
-    if (tool === 'distance' && distance) { distance = null; did = true; }
+    if (tool === 'distance' && distance) { distance = null; paintDistance(); did = true; }
     if (tool === 'region' && rois.length) { rois.pop(); paintRois(); did = true; }
     if (did) drawAnnot();
     return did;
@@ -519,7 +565,7 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
   function clearAll() {
     profile = null; profileData = null; profileMark = null;
     distance = null; rois = []; roiSeq = 0; pending = null;
-    paintProfile(); paintRois(); drawAnnot();
+    paintProfile(); paintRois(); paintDistance(); drawAnnot();
   }
 
   const ro = new ResizeObserver(() => { paintPlot(); });
@@ -527,11 +573,13 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
 
   paintProfile();
   paintRois();
+  paintDistance();
 
   return {
     annot,
     profileEl,
     regionEl,
+    distanceEl,
     draw: drawAnnot,
     recompute,
     clearActive,
@@ -546,7 +594,7 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     },
     get rois() { return rois; },
     get hasProfile() { return !!profile; },
-    repaintPanels() { paintProfile(); paintRois(); },
+    repaintPanels() { paintProfile(); paintRois(); paintDistance(); },
     /** Only the profile plot — the one thing here that depends on the window.
      *  This runs on every frame of a window drag, so it must not rebuild the
      *  region table: that is a DOM rebuild under the operator's pointer, for a

@@ -42,6 +42,23 @@ function applyTheme(t) {
 function toggleTheme() {
   applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
 }
+/**
+ * Flip the theme and repaint everything that caches a colour.
+ *
+ * ONE routine, because there used to be two: the #btn-theme click handler and
+ * the `T` key case were parallel copies of the same five calls, and they had
+ * drifted — the click path called mechLegend.refresh() and the key path did
+ * not, so pressing T left the mechanism legend painted in the outgoing theme's
+ * colours until something else forced a re-render.
+ */
+function applyThemeChange() {
+  toggleTheme();
+  if (viewer) viewer.refreshTheme();
+  if (overlays) overlays.refreshRamp();
+  if (mechLegend) mechLegend.refresh();
+  if (wl) wl.draw();
+  if (tools) { tools.repaintPanels(); tools.draw(); }
+}
 
 /* ============================================================= boot ==== */
 
@@ -119,6 +136,7 @@ async function boot() {
     windowLevelEl: wl ? wl.el : null,
     profileEl: tools ? tools.profileEl : null,
     regionEl: tools ? tools.regionEl : null,
+    distanceEl: tools ? tools.distanceEl : null,
   });
   history = createHistoryPanel({ onOpen: openRun, onRefresh: refreshRuns });
   // Additive: the reports panel mounts as a third dock column and brings its
@@ -150,14 +168,7 @@ async function boot() {
   makeSplitter($('#split-h'), { axis: 'y', varName: '--dock-h', min: 90, max: 560, invert: true, onChange: onLayout });
 
   /* --- chrome --------------------------------------------------------- */
-  $('#btn-theme').addEventListener('click', () => {
-    toggleTheme();
-    if (viewer) { viewer.refreshTheme(); }
-    if (overlays) overlays.refreshRamp();
-    if (mechLegend) mechLegend.refresh();
-    if (wl) wl.draw();
-    if (tools) { tools.repaintPanels(); tools.draw(); }
-  });
+  $('#btn-theme').addEventListener('click', applyThemeChange);
   const dlg = $('#help-dlg');
   $('#btn-help').addEventListener('click', () => dlg.showModal());
   $('#help-close').addEventListener('click', () => dlg.close());
@@ -333,13 +344,21 @@ function cycleColourMode() {
 
 function syncColourControl() {
   const m = viewer ? viewer.colorMode : 0;
+  // ONE availability rule, applied to both surfaces. The rail used to carry a
+  // two-state checkbox with its own idea of the same setting; it now carries
+  // the same three-state control, so the two cannot disagree about which mode
+  // is even selectable.
+  const disabled = [
+    false,
+    !store.get().fieldName && !timelapseField,
+    !(viewer && viewer.labels),
+  ];
   for (const b of $('#tb-colour').children) {
     const mode = Number(b.dataset.mode);
     b.setAttribute('aria-pressed', String(mode === m));
-    b.disabled = (mode === COLOR_MODE.FIELD && !store.get().fieldName && !timelapseField)
-      || (mode === COLOR_MODE.LABEL && !(viewer && viewer.labels));
+    b.disabled = !!disabled[mode];
   }
-  if (inspect) inspect.setColorMode(m);
+  if (inspect) inspect.setColorMode(m, disabled);
 }
 
 function setTool(t) {
@@ -562,6 +581,15 @@ function wireKeys() {
     const t = e.target;
     const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
 
+    // Something nearer the event already claimed this key. The splitters
+    // (js/ui/splitter.js) bind Arrow/Home/End on the separator elements and
+    // preventDefault; this listener is on window and never saw that, so with a
+    // splitter focused an arrow key BOTH resized the pane and panned the
+    // viewer. defaultPrevented is the general form of that fix — any future
+    // element-level binding is covered without either side knowing about the
+    // other.
+    if (e.defaultPrevented) return;
+
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault(); submitRun(store.get().spec); return;
     }
@@ -587,11 +615,11 @@ function wireKeys() {
         break;
       case '?': $('#help-dlg').showModal(); break;
       case 't': case 'T':
-        toggleTheme();
-        if (viewer) viewer.refreshTheme();
-        if (overlays) overlays.refreshRamp();
-        if (wl) wl.draw();
-        if (tools) { tools.repaintPanels(); tools.draw(); }
+        // Routed through the same function as #btn-theme. The two used to be
+        // parallel copies of five calls, and the copies had drifted: the click
+        // path refreshed the mechanism legend and the key path did not, so
+        // pressing T left the legend painted in the previous theme's colours.
+        applyThemeChange();
         break;
       case 'v': case 'V': setTool('pick'); break;
       case 'l': setTool('profile'); break;
@@ -599,7 +627,20 @@ function wireKeys() {
       case 'r': case 'R': setTool('region'); break;
       case 'm': case 'M': setTool('distance'); break;
       case 'w': if (wl) wl.autoWindow(0.02, 0.98); break;
-      case 'W': if (viewer && viewer.field) { viewer.resetWindow(); wl.sync(); } break;
+      // `wl` is null when WebGL2 is unavailable. Every neighbouring branch
+      // null-checks it; this one dereferenced it and would throw.
+      case 'W': if (viewer && viewer.field) { viewer.resetWindow(); if (wl) wl.sync(); } break;
+      // The scrubber's play button has always advertised `(space)` in its
+      // tooltip and nothing registered it — scrubber.toggle() was dead code.
+      // Bound only while a time-lapse is actually loaded, so space keeps its
+      // native meaning everywhere else.
+      case ' ':
+        if (scrubber && scrubber.node && !scrubber.node.classList.contains('hidden')
+            && !(t && (t.tagName === 'BUTTON' || t.tagName === 'A'))) {
+          e.preventDefault();
+          scrubber.toggle();
+        }
+        break;
       case 'c': case 'C': cycleColourMode(); break;
       case '0':
         if (viewer) { CELL_TYPES.forEach((_, i) => viewer.setVisible(i, true)); inspect.buildChannels(viewer.counts, viewer.geom ? viewer.geom.n : 0); } break;

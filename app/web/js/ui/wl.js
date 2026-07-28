@@ -78,11 +78,20 @@ export function createWindowLevel({ viewer, onChange }) {
     title: 'Window = the 0.5th to 99.5th percentile — keeps more of the tail than p2–p98.',
     onclick: () => autoWindow(0.005, 0.995),
   }, 'p0.5–p99.5');
+  // The label states the STATE, not an ambiguous noun. It read `log count` with
+  // aria-pressed=true, from which a reader could not tell whether pressing it
+  // turns log on or off — the only toggle in this panel that did not restate
+  // its own state.
   const btnLog = h('button.btn.sm', {
     'aria-pressed': 'true',
-    title: 'Histogram count axis: log or linear. Log is the default because a field with a large zero spike hides its own tail on a linear count axis.',
-    onclick: () => { logScale = !logScale; btnLog.setAttribute('aria-pressed', String(logScale)); draw(); },
-  }, 'log count');
+    title: 'Histogram count axis. Log is the default because a field with a large zero spike hides its own tail on a linear count axis.',
+    onclick: () => {
+      logScale = !logScale;
+      btnLog.setAttribute('aria-pressed', String(logScale));
+      btnLog.textContent = logScale ? 'count: log' : 'count: linear';
+      draw();
+    },
+  }, 'count: log');
 
   const root = h('div.wl',
     h('div.wl-plot', cv),

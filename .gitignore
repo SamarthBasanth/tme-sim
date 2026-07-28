@@ -26,3 +26,6 @@ app/uploads/*
 
 # Regenerable stage cache for the immune-sink sweep (delete to force recompute)
 results/immune_sink_impact_cache.pkl
+
+# Local browser-verification screenshots (not build output, not for the repo)
+.export-drive/

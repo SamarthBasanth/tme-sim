@@ -229,7 +229,13 @@ export function createHistoryPanel({ onOpen, onRefresh }) {
         h('h2', 'Run history'),
         countEl,
         h('span.grow'),
-        h('button.btn.ghost.sm', { onclick: () => onRefresh && onRefresh(), title: 'GET /api/runs' }, 'refresh')),
+        h('button.btn.ghost.sm', {
+          onclick: () => onRefresh && onRefresh(),
+          // Named for its object, not its verb: the reports panel two
+          // columns to the right carried a button with the identical label
+          // `refresh` hitting a different endpoint.
+          title: 'Re-read the run list. GET /api/runs',
+        }, 'refresh runs')),
       h('div.panel-body.tblwrap', table)),
     h('div.dock-div'),
     h('div.panel',

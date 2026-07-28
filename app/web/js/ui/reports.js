@@ -189,7 +189,7 @@ export function createReportsPanel({ store, getSection }) {
     dlgHead.appendChild(h('button.btn.ghost.sm', {
       onclick: () => download(r.report_id),
       title: 'GET /api/reports/{id}/html — one self-contained file, no external requests',
-    }, 'download html'));
+    }, 'download'));
     dlgHead.appendChild(h('button.btn.ghost.sm', { onclick: () => dlg.close() }, 'close'));
 
     clear(dlgNote);
@@ -286,7 +286,10 @@ export function createReportsPanel({ store, getSection }) {
       h('h2', 'Therapy reports'),
       countEl,
       h('span.grow'),
-      h('button.btn.ghost.sm', { onclick: refresh, title: 'GET /api/reports' }, 'refresh'),
+      h('button.btn.ghost.sm', {
+        onclick: refresh,
+        title: 'Re-read the report list. GET /api/reports',
+      }, 'refresh reports'),
       btnNew),
     h('div.panel-body.rp-body',
       h('div.rp-lead',

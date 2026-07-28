@@ -92,7 +92,7 @@
 
 .pws-stub {
   display: flex; align-items: flex-start; gap: var(--pad-2);
-  padding: 4px var(--pad-3);
+  padding: var(--sp-3) var(--pad-3);
   background: var(--warn-bg);
   border-bottom: 1px solid var(--line-1);
   border-left: 2px solid var(--warn);
@@ -273,7 +273,7 @@
 .ce-key { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; }
 .ce-key kbd {
   display: inline-block;
-  padding: 0 3px;
+  padding: 0 var(--sp-2);
   border: 1px solid var(--line-2);
   border-bottom-width: 2px;
   border-radius: 2px;

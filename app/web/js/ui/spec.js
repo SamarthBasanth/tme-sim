@@ -14,6 +14,7 @@
 import { h, clear, fill, debounce } from '../util/dom.js';
 import * as api from '../api.js';
 import { toast, notifyError } from './toast.js';
+import { railGroup, railNav } from './rail.js';
 import { dur, num } from '../util/fmt.js';
 
 const MODES = {
@@ -84,9 +85,16 @@ export function createSpecPanel({ store, onSubmit }) {
     const errEl = h('div.field-err.hidden');
     // The control we mark aria-invalid on must be the focusable field itself,
     // not a wrapper: a div with aria-invalid tells assistive tech nothing.
+    // The target must be the field the error PATH names, not merely the first
+    // focusable descendant. In the MGMT row the first descendant is the "set"
+    // checkbox and the field is the number input beside it, so a backend error
+    // on path `mgmt` marked the checkbox invalid and left the offending value
+    // unmarked. Prefer an exact id match; fall back to first-focusable.
     const target = /^(INPUT|SELECT|TEXTAREA)$/.test(control.tagName)
       ? control
-      : (control.querySelector('input, select, textarea') || control);
+      : (control.querySelector('#' + CSS.escape(forId))
+        || control.querySelector('input, select, textarea')
+        || control);
     fieldEls.set(forId, { control: target, errEl });
     return [lbl(label, forId, title), holder, errEl];
   }
@@ -210,20 +218,38 @@ export function createSpecPanel({ store, onSubmit }) {
 
   /* -------------------------------------------------------------- root -- */
 
-  // A scrolling body with a fixed submit row pinned to the bottom.
+  // A scrolling body with a fixed commit row pinned to the bottom.
+  //
+  // Two groups, matching the READ rail opposite: DEFINE is everything that
+  // mutates the RunSpec, COMMIT is what happens to it afterwards. The commit
+  // row itself is outside the scroll on purpose — it is the one control whose
+  // reachability must not depend on scroll position.
+  // See docs/UI_ARCHITECTURE.md section 2.2.
   const body = h('div.rail-body',
-    h('details.sect', { open: true },
-      h('summary', 'RunSpec — form', h('span.hint', 'live')),
-      h('div.sect-body', formEl)),
-    h('details.sect', { open: true },
-      h('summary', 'RunSpec — source', h('span.hint', 'two-way sync')),
-      h('div.sect-body', { style: { padding: '0' } }, editorEl, diagList)),
-    h('details.sect', { open: true, id: 'sect-job' },
-      h('summary', 'Active job', h('span.hint', '/status poll')),
-      h('div.sect-body', jobEl)),
+    railGroup('define', 'Define', 'RunSpec v1',
+      h('details.sect', { open: true },
+        h('summary', 'Specimen, therapy, model', h('span.hint', 'form')),
+        h('div.sect-body', formEl)),
+      h('details.sect', { open: true },
+        h('summary', 'Source', h('span.hint', 'JSON · two-way sync')),
+        h('div.sect-body', { style: { padding: '0' } }, editorEl, diagList))),
+
+    railGroup('job', 'Commit', 'POST /api/runs',
+      h('details.sect', { open: true, id: 'sect-job' },
+        h('summary', 'Active job', h('span.hint', '/status poll')),
+        h('div.sect-body', jobEl))),
   );
+
+  const nav = railNav([
+    { id: 'define', label: 'Define' },
+    { id: 'job', label: 'Commit' },
+  ], body);
+
   const root = h('div.rail.rail-left',
-    h('div.panel-head', h('h2', 'Run control'), h('span.grow'), h('span.hint', 'RunSpec v1')),
+    h('div.panel-head', h('h2', 'Setup'), h('span.grow'),
+      h('span.hint', { title: 'This rail defines what will be simulated. It never interprets a result — that is the Read rail on the right.' },
+        'what will run')),
+    nav.el,
     body,
     h('div', { style: { borderTop: '1px solid var(--line-2)', background: 'var(--bg-2)' } }, submitRow),
   );
