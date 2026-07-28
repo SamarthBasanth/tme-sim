@@ -1,0 +1,297 @@
+/* layout.css — the workstation shell.
+   Fixed viewport, four regions, nothing scrolls the body. Rails and the dock
+   are resizable by drag; each pane owns its own overflow. */
+
+.shell {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: var(--bar-h) 1fr var(--status-h);
+  background: var(--bg-0);
+}
+
+/* ---------------------------------------------------------------- top bar */
+.topbar {
+  grid-row: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line-2);
+  min-width: 0;
+  white-space: nowrap;
+}
+.topbar > * { display: flex; align-items: center; }
+
+.brand {
+  padding: 0 var(--pad-3) 0 var(--pad-4);
+  gap: 7px;
+  border-right: 1px solid var(--line-1);
+  flex: 0 0 auto;
+}
+.brand .mark {
+  width: 13px; height: 13px;
+  border: 1.5px solid var(--accent);
+  position: relative;
+  flex: 0 0 auto;
+}
+.brand .mark::after {
+  content: ""; position: absolute; inset: 3px;
+  background: var(--accent);
+}
+.brand .name {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.brand .name b { font-weight: 600; }
+.brand .name span { color: var(--fg-2); font-weight: 400; }
+.brand .ver {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--fg-3);
+  padding-left: 2px;
+}
+
+.topbar-group {
+  gap: var(--pad-2);
+  padding: 0 var(--pad-3);
+  border-right: 1px solid var(--line-1);
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.topbar-group.last { border-right: 0; }
+.topbar-spacer { flex: 1 1 auto; min-width: var(--pad-2); }
+
+/* --------------------------------------------------------------- main body */
+.body {
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: var(--rail-l) 4px minmax(240px, 1fr) 4px var(--rail-r);
+  grid-template-rows: minmax(160px, 1fr) 4px var(--dock-h);
+  grid-template-areas:
+    "left  sl stage sr right"
+    "left  sl hh    sr right"
+    "left  sl dock  sr right";
+  min-height: 0;
+  min-width: 0;
+  background: var(--bg-0);
+}
+.rail-left  { grid-area: left;  }
+.rail-right { grid-area: right; }
+.stage      { grid-area: stage; }
+.dock       { grid-area: dock;  }
+.split-l    { grid-area: sl; }
+.split-r    { grid-area: sr; }
+.split-h    { grid-area: hh; }
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--bg-1);
+  overflow: hidden;
+}
+.rail-left  { border-right: 1px solid var(--line-2); }
+.rail-right { border-left:  1px solid var(--line-2); }
+.rail-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* -------------------------------------------------------------- splitters */
+.split {
+  background: var(--bg-0);
+  position: relative;
+  z-index: 4;
+}
+.split-l, .split-r { cursor: col-resize; }
+.split-h { cursor: row-resize; }
+.split::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  transition: background var(--dur) var(--ease);
+}
+.split:hover::after, .split.dragging::after { background: var(--accent-dim); }
+.split:focus-visible { outline-offset: -2px; }
+
+/* ------------------------------------------------------------------ stage */
+.stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--bg-void);
+}
+.stage-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--pad-2);
+  height: 26px;
+  padding: 0 var(--pad-2);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+.stage-toolbar > * { flex: 0 0 auto; }
+.stage-toolbar::-webkit-scrollbar { height: 0; }
+.canvas-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-void);
+}
+#gl {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+#gl.panning { cursor: grabbing; }
+
+/* stage overlays -- absolutely positioned, pointer-transparent by default */
+.ov { position: absolute; pointer-events: none; z-index: 2; }
+.ov.interactive { pointer-events: auto; }
+
+.ov-scalebar { left: 10px; bottom: 10px; }
+.ov-legend   { right: 10px; bottom: 10px; }
+.ov-readout  { left: 10px; top: 10px; }
+.ov-stats    { right: 10px; top: 10px; }
+.ov-empty {
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 3;
+}
+
+/* ------------------------------------------------------------------- dock */
+.dock {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.35fr) 1px minmax(300px, 1fr);
+  min-height: 0;
+  min-width: 0;
+  background: var(--bg-1);
+  border-top: 1px solid var(--line-2);
+}
+.dock > .panel { min-width: 0; min-height: 0; }
+.dock-div { background: var(--line-2); }
+
+/* ----------------------------------------------------------- status strip */
+.statusbar {
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: var(--status-h);
+  background: var(--bg-2);
+  border-top: 1px solid var(--line-2);
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  overflow: hidden;
+}
+.statusbar .cell {
+  display: flex; align-items: center; gap: 5px;
+  padding: 0 var(--pad-3);
+  height: 100%;
+  border-right: 1px solid var(--line-1);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.statusbar .cell.grow { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.statusbar .cell.last { border-right: 0; }
+.statusbar .num { color: var(--fg-1); }
+
+/* --------------------------------------------------------- generic panels */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-1);
+}
+.panel-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--pad-2);
+  height: 23px;
+  padding: 0 var(--pad-2) 0 var(--pad-3);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line-1);
+  user-select: none;
+}
+.panel-head h2, .panel-head h3 {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--fg-1);
+  white-space: nowrap;
+}
+.panel-head .hint {
+  font-size: var(--fs-micro);
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+}
+.panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.panel-body.pad { padding: var(--pad-2) var(--pad-3) var(--pad-3); }
+.panel + .panel { border-top: 1px solid var(--line-2); }
+
+/* section inside a rail — collapsible via <details> but OPEN by default and
+   never used to hide primary data. */
+.sect { border-bottom: 1px solid var(--line-2); }
+.sect > summary {
+  display: flex; align-items: center; gap: 6px;
+  height: 23px; padding: 0 var(--pad-2) 0 var(--pad-3);
+  background: var(--bg-2);
+  cursor: default;
+  user-select: none;
+  list-style: none;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--fg-1);
+}
+.sect > summary::-webkit-details-marker { display: none; }
+.sect > summary::before {
+  content: "";
+  width: 0; height: 0;
+  border-left: 4px solid var(--fg-3);
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transition: transform var(--dur) var(--ease);
+  flex: 0 0 auto;
+}
+.sect[open] > summary::before { transform: rotate(90deg) translateX(1px); }
+.sect > summary .hint {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fg-3);
+}
+.sect-body { padding: var(--pad-2) var(--pad-3) var(--pad-3); }
+
+/* no horizontal body scroll, ever: wide content gets its own container */
+.overflow-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}

@@ -1,0 +1,389 @@
+// inspect.js — the right rail. Channels, field overlay, render controls,
+// metrics with provenance, the provenance block itself, the caveats (NOT
+// collapsed, NOT truncated), and the reconstruction report.
+
+import { h, clear, fill } from '../util/dom.js';
+import { CELL_TYPES } from '../gl/viewer.js';
+import { FIELD_NAMES, fieldMeta } from '../fields.js';
+import { RAMP_NAMES, RAMP_META, gradientCss } from '../gl/ramps.js';
+import { METRICS, metricProvenance, reportProvenance, chip } from './provenance.js';
+import { auto, num, int, pct, sci, dur, NULL_GLYPH } from '../util/fmt.js';
+
+const CHAN_VARS = ['--ch-tumor', '--ch-stromal', '--ch-immune', '--ch-endothelial', '--ch-necrotic'];
+
+function fmtMetric(key, v) {
+  const m = METRICS[key];
+  if (v === null || v === undefined) return NULL_GLYPH;
+  switch (m && m.fmt) {
+    case 'pct': return pct(v, 2);
+    case 'sci': return sci(v, 3);
+    case 'num1': return num(v, 1);
+    default: return auto(v);
+  }
+}
+function metricUnit(key) {
+  const m = METRICS[key];
+  if (!m) return '';
+  return m.fmt === 'pct' ? '%' : m.unit;
+}
+
+export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView }) {
+  /* ------------------------------------------------------- channels ---- */
+  const chanList = h('div');
+  const chanRows = [];
+
+  function buildChannels(counts, total) {
+    clear(chanList);
+    chanRows.length = 0;
+    CELL_TYPES.forEach((name, i) => {
+      const cb = h('input', {
+        type: 'checkbox', checked: true,
+        'aria-label': `channel ${name}`,
+        onchange: (e) => { viewer.setVisible(i, e.target.checked); syncRow(i); onChange && onChange(); },
+      });
+      const c = counts ? counts[i] : null;
+      const row = h('label.chan', { title: `${name} — click to toggle, alt-click to solo` },
+        cb,
+        h('span.sw', { style: { background: `var(${CHAN_VARS[i]})` } }),
+        h('span.nm', name),
+        h('span.ct', c === null ? NULL_GLYPH : `${int(c)}  ${total ? pct(c / total, 1) : NULL_GLYPH}%`),
+      );
+      row.addEventListener('click', (e) => {
+        if (!e.altKey) return;
+        e.preventDefault();
+        CELL_TYPES.forEach((_, j) => {
+          viewer.setVisible(j, j === i);
+          chanRows[j].querySelector('input').checked = j === i;
+          syncRow(j);
+        });
+        onChange && onChange();
+      });
+      chanRows.push(row);
+      chanList.appendChild(row);
+    });
+  }
+  function syncRow(i) {
+    chanRows[i].classList.toggle('off', !viewer.visible[i]);
+  }
+  function setAll(on) {
+    CELL_TYPES.forEach((_, i) => {
+      viewer.setVisible(i, on);
+      chanRows[i].querySelector('input').checked = on;
+      syncRow(i);
+    });
+    onChange && onChange();
+  }
+
+  const chanHead = h('div.frow', { style: { marginBottom: '3px' } },
+    h('button.btn.ghost.sm', { onclick: () => setAll(true) }, 'all'),
+    h('button.btn.ghost.sm', { onclick: () => setAll(false) }, 'none'),
+    h('span.grow'),
+    h('span.dim', { style: { fontSize: 'var(--fs-micro)' } }, 'alt-click = solo'),
+  );
+
+  /* ---------------------------------------------------- field overlay -- */
+
+  const fieldSel = h('select.inp', {
+    id: 'f-overlay',
+    onchange: () => onFieldChange(fieldSel.value || null),
+  },
+    h('option', { value: '' }, '— none'),
+    FIELD_NAMES.map((n) => h('option', { value: n, title: fieldMeta(n).note },
+      `${fieldMeta(n).short} · ${fieldMeta(n).unit}`)),
+  );
+
+  const rampSel = h('select.inp', {
+    id: 'f-ramp',
+    onchange: () => { viewer.setRamp(rampSel.value); paintLegendSwatch(); onChange && onChange(); },
+  }, RAMP_NAMES.map((n) => h('option', { value: n, title: RAMP_META[n].note }, RAMP_META[n].label)));
+
+  const opacity = h('input', {
+    type: 'range', min: '0', max: '100', value: '55', id: 'f-opacity',
+    'aria-label': 'Field overlay opacity',
+    oninput: () => { viewer.fieldOpacity = opacity.valueAsNumber / 100; opacityVal.textContent = opacity.value; viewer.dirty = true; },
+  });
+  const opacityVal = h('span.mono', '55');
+
+  const gamma = h('input', {
+    type: 'range', min: '30', max: '250', value: '100', id: 'f-gamma',
+    'aria-label': 'Field ramp gamma',
+    oninput: () => { viewer.fieldGamma = gamma.valueAsNumber / 100; gammaVal.textContent = (gamma.valueAsNumber / 100).toFixed(2); viewer.dirty = true; },
+  });
+  const gammaVal = h('span.mono', '1.00');
+
+  const colorByField = h('input', {
+    type: 'checkbox', id: 'f-colorby',
+    onchange: () => { viewer.setColorMode(colorByField.checked ? 1 : 0); onChange && onChange(); },
+  });
+
+  const legendSwatch = h('div', {
+    style: { height: '9px', border: '1px solid var(--line-2)', marginTop: '3px' },
+  });
+  const fieldStats = h('dl.kv');
+  const fieldNote = h('div', { style: { fontSize: 'var(--fs-micro)', color: 'var(--fg-2)', lineHeight: '1.4', marginTop: '3px' } });
+
+  function paintLegendSwatch() {
+    legendSwatch.style.backgroundImage = gradientCss(viewer.rampName);
+  }
+
+  let onFieldChange = () => {};
+
+  function setFieldInfo(name, f) {
+    const meta = fieldMeta(name || '');
+    if (!name || !f) {
+      fill(fieldStats,
+        h('dt', 'state'), h('dd.dim', 'no overlay'));
+      fieldNote.textContent = '';
+      return;
+    }
+    fill(fieldStats,
+      h('dt', 'min'), h('dd', auto(f.min), h('span.unit', meta.unit)),
+      h('dt', 'max'), h('dd', auto(f.max), h('span.unit', meta.unit)),
+      h('dt', 'grid'), h('dd', `${f.rows} × ${f.cols}`),
+      h('dt', 'dx'), h('dd', num(f.dx, 2), h('span.unit', 'um')),
+      h('dt', 'provenance'), h('dd', chip(meta.provenance, meta.note)),
+    );
+    fieldNote.textContent = `${meta.source}. ${meta.note}`;
+  }
+
+  /* ---------------------------------------------------------- render -- */
+
+  const sizeBoost = h('input', {
+    type: 'range', min: '30', max: '400', value: '100', id: 'r-size',
+    'aria-label': 'Point size',
+    oninput: () => { viewer.sizeBoost = sizeBoost.valueAsNumber / 100; sizeVal.textContent = (sizeBoost.valueAsNumber / 100).toFixed(2); viewer.dirty = true; },
+  });
+  const sizeVal = h('span.mono', '1.00');
+  const alphaR = h('input', {
+    type: 'range', min: '10', max: '100', value: '100', id: 'r-alpha',
+    'aria-label': 'Cell opacity',
+    oninput: () => { viewer.pointAlpha = alphaR.valueAsNumber / 100; alphaVal.textContent = alphaR.value; viewer.dirty = true; },
+  });
+  const alphaVal = h('span.mono', '100');
+  const lodChk = h('input', {
+    type: 'checkbox', checked: true, id: 'r-lod',
+    onchange: () => { viewer.lodAuto = lodChk.checked; if (!lodChk.checked) viewer.lod = 1; viewer.dirty = true; },
+  });
+  const roundChk = h('input', {
+    type: 'checkbox', checked: true, id: 'r-round',
+    onchange: () => { viewer.roundPoints = roundChk.checked; viewer.dirty = true; },
+  });
+  const benchOut = h('div', { style: { fontSize: 'var(--fs-micro)', fontFamily: 'var(--font-mono)', color: 'var(--fg-2)', lineHeight: '1.45' } });
+
+  /* --------------------------------------------------------- metrics -- */
+
+  const metricsEl = h('div');
+  const provEl = h('dl.kv');
+  const caveatsEl = h('div.caveats');
+  const reportEl = h('dl.kv');
+  const errorEl = h('div.hidden');
+
+  function renderRun(run) {
+    /* metrics */
+    clear(metricsEl);
+    if (!run) {
+      metricsEl.appendChild(h('div.dim', { style: { fontSize: 'var(--fs-xs)', padding: '4px 0' } },
+        'No run selected. Metrics appear once a run reaches status=done.'));
+    } else if (run.status === 'failed') {
+      metricsEl.appendChild(h('div.caveat.crit', h('span', run.error || 'Run failed; the backend returned no error message.')));
+    } else if (!run.metrics) {
+      metricsEl.appendChild(h('div.dim', { style: { fontSize: 'var(--fs-xs)', padding: '4px 0' } },
+        `Run ${run.run_id} is ${run.status}; no metrics yet.`));
+    } else {
+      for (const key of Object.keys(METRICS)) {
+        const v = run.metrics[key];
+        const m = METRICS[key];
+        const p = metricProvenance(key, run);
+        const isNull = v === null || v === undefined;
+        metricsEl.appendChild(h('div.metric',
+          h('div.m-name', m.label),
+          h('div.m-val' + (isNull ? '.null' : ''),
+            fmtMetric(key, v),
+            isNull ? null : h('span.unit', metricUnit(key))),
+          h('div.m-meta',
+            chip(p.kind, p.why),
+            h('span.m-src', m.src)),
+        ));
+      }
+      const extra = Object.keys(run.metrics).filter((k) => !(k in METRICS));
+      for (const key of extra) {
+        const v = run.metrics[key];
+        metricsEl.appendChild(h('div.metric',
+          h('div.m-name', key),
+          h('div.m-val' + (v === null ? '.null' : ''), auto(v)),
+          h('div.m-meta', chip('computed', 'Metric not described by the front-end table; shown verbatim from the backend.')),
+        ));
+      }
+    }
+
+    /* error surface */
+    clear(errorEl);
+    if (run && run.error) {
+      errorEl.classList.remove('hidden');
+      errorEl.appendChild(h('div.caveat.crit', h('span', String(run.error))));
+    } else {
+      errorEl.classList.add('hidden');
+    }
+
+    /* provenance block */
+    const pv = (run && run.provenance) || null;
+    if (!pv) {
+      fill(provEl, h('dt', 'state'), h('dd.dim', NULL_GLYPH));
+    } else {
+      const ic50Measured = pv.ic50_source && /measured/i.test(pv.ic50_source);
+      fill(provEl,
+        h('dt', 'alpha'), h('dd', auto(pv.alpha), chip('assumed', 'Tortuosity calibration constant. Fitted once, then held fixed; it is not re-measured per section.')),
+        h('dt', 'IC50'), h('dd', pv.ic50_uM === null || pv.ic50_uM === undefined ? NULL_GLYPH : auto(pv.ic50_uM), h('span.unit', 'uM'),
+          chip(ic50Measured ? 'measured' : 'assumed', pv.ic50_source || 'no source given')),
+        h('dt', 'runtime'), h('dd', dur(run.runtime_s), chip('measured', 'Wall-clock time the backend spent on this job.')),
+      );
+      if (pv.ic50_source) {
+        provEl.appendChild(h('dt', 'IC50 src'));
+        provEl.appendChild(h('dd', { title: pv.ic50_source, style: { fontSize: 'var(--fs-micro)' } }, pv.ic50_source));
+      }
+      if (pv.sensitivity_note) {
+        provEl.appendChild(h('dt', 'sensitivity'));
+        provEl.appendChild(h('dd', {
+          title: pv.sensitivity_note,
+          style: { fontSize: 'var(--fs-micro)', whiteSpace: 'normal', textAlign: 'left', justifyContent: 'flex-start', lineHeight: '1.35', padding: '3px 0' },
+        }, pv.sensitivity_note));
+      }
+    }
+
+    /* caveats — always fully visible, never truncated, never behind a toggle */
+    clear(caveatsEl);
+    const cav = (pv && pv.caveats) || [];
+    if (!cav.length) {
+      caveatsEl.appendChild(h('div.caveat.info', h('span',
+        run ? 'The backend returned no caveats for this run. That is itself worth checking — a run with zero stated caveats is unusual.'
+          : 'Caveats appear here for the selected run.')));
+    } else {
+      for (const c of cav) caveatsEl.appendChild(h('div.caveat', h('span', String(c))));
+    }
+
+    /* reconstruction report */
+    const rep = (run && run.report) || null;
+    clear(reportEl);
+    if (!rep) {
+      fill(reportEl, h('dt', 'state'), h('dd.dim', NULL_GLYPH));
+    } else {
+      const kv = (k, label, value, unitTxt) => {
+        const p = reportProvenance(k, run);
+        reportEl.appendChild(h('dt', label));
+        reportEl.appendChild(h('dd', value, unitTxt ? h('span.unit', unitTxt) : null, chip(p.kind, p.why)));
+      };
+      kv('n_cells', 'cells', int(rep.n_cells));
+      kv('n_tumor', 'tumour', int(rep.n_tumor));
+      kv('grid', 'grid', Array.isArray(rep.grid) ? `${rep.grid[0]} × ${rep.grid[1]}` : NULL_GLYPH);
+      kv('dx_um', 'dx', num(rep.dx_um, 1), 'um');
+      kv('extent_um', 'extent', Array.isArray(rep.extent_um) ? `${num(rep.extent_um[0], 0)} × ${num(rep.extent_um[1], 0)}` : NULL_GLYPH, 'um');
+      kv('mean_vascular_density', 'vasc', auto(rep.mean_vascular_density), 'frac');
+      kv('mean_ecm_density', 'ECM', auto(rep.mean_ecm_density), 'frac');
+      kv('mean_oxygen', 'O2', auto(rep.mean_oxygen), 'norm');
+      kv('tissue_coverage_fraction', 'coverage', pct(rep.tissue_coverage_fraction, 1), '%');
+      if (rep.oxygen) {
+        reportEl.appendChild(h('dt', 'O2 mode'));
+        reportEl.appendChild(h('dd', rep.oxygen.mode || NULL_GLYPH,
+          chip(rep.oxygen.is_surrogate ? 'assumed' : 'computed', rep.oxygen.caveat || rep.oxygen.source || '')));
+      }
+      if (rep.sensitivity) {
+        const s = rep.sensitivity;
+        reportEl.appendChild(h('dt', 'sens mode'));
+        reportEl.appendChild(h('dd', s.mode || NULL_GLYPH,
+          chip(s.is_uniform ? 'assumed' : 'computed', s.caveat || '')));
+        if (s.mgmt_applied) {
+          reportEl.appendChild(h('dt', 'MGMT scalar'));
+          reportEl.appendChild(h('dd', auto(s.mgmt_scalar), chip('computed', 'Derived from the supplied per-patient MGMT log2 CPM through the calibrated logistic.')));
+        }
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------ root -- */
+
+  const root = h('div.rail.rail-right',
+    h('div.panel-head', h('h2', 'Inspect'), h('span.grow'), h('span.hint', 'RunResult')),
+    h('div.rail-body',
+      h('details.sect', { open: true },
+        h('summary', 'Channels', h('span.hint', 'cell type')),
+        h('div.sect-body', chanHead, chanList)),
+
+      h('details.sect', { open: true },
+        h('summary', 'Field overlay', h('span.hint', '/field/{name}')),
+        h('div.sect-body',
+          h('div.fgrid',
+            h('label.lbl', { for: 'f-overlay' }, 'Field'), fieldSel,
+            h('label.lbl', { for: 'f-ramp' }, 'Ramp'), rampSel,
+            h('label.lbl', { for: 'f-opacity' }, 'Opacity'),
+            h('div.with-unit', opacity, h('span.unit', opacityVal, '%')),
+            h('label.lbl', { for: 'f-gamma' }, 'Gamma'),
+            h('div.with-unit', gamma, h('span.unit', gammaVal)),
+            h('label.lbl', { for: 'f-colorby' }, 'Colour cells'),
+            h('label.chk', colorByField, h('span.lbl', 'by field value, not type')),
+          ),
+          legendSwatch,
+          fieldStats,
+          fieldNote)),
+
+      h('details.sect', { open: true },
+        h('summary', 'Metrics', h('span.hint', 'provenance on every value')),
+        h('div.sect-body', errorEl, metricsEl)),
+
+      h('details.sect', { open: true },
+        h('summary', 'Caveats', h('span.hint', 'not collapsible for a reason')),
+        h('div.sect-body', { style: { padding: '0' } }, caveatsEl)),
+
+      h('details.sect', { open: true },
+        h('summary', 'Provenance', h('span.hint', 'RunResult.provenance')),
+        h('div.sect-body', provEl)),
+
+      h('details.sect', { open: true },
+        h('summary', 'Reconstruction report', h('span.hint', 'RunResult.report')),
+        h('div.sect-body', reportEl)),
+
+      h('details.sect', { open: false },
+        h('summary', 'Render', h('span.hint', 'WebGL2')),
+        h('div.sect-body',
+          h('div.fgrid',
+            h('label.lbl', { for: 'r-size' }, 'Point size'),
+            h('div.with-unit', sizeBoost, h('span.unit', sizeVal, '×')),
+            h('label.lbl', { for: 'r-alpha' }, 'Cell alpha'),
+            h('div.with-unit', alphaR, h('span.unit', alphaVal, '%')),
+            h('label.lbl', { for: 'r-round' }, 'Round'),
+            h('label.chk', roundChk, h('span.lbl', 'circular sprites')),
+            h('label.lbl', { for: 'r-lod' }, 'Adaptive LOD'),
+            h('label.chk', lodChk, h('span.lbl', 'subsample while panning')),
+          ),
+          h('div.frow', { style: { marginTop: '5px' } },
+            h('button.btn.sm', { onclick: () => onResetView && onResetView() }, 'Fit view'),
+            h('button.btn.sm', { onclick: () => onBenchmark && onBenchmark(benchOut) }, 'Benchmark'),
+          ),
+          benchOut)),
+    ),
+  );
+
+  paintLegendSwatch();
+  buildChannels(null, 0);
+  renderRun(null);
+  setFieldInfo(null, null);
+
+  return {
+    el: root,
+    buildChannels,
+    renderRun,
+    setFieldInfo,
+    set onFieldSelect(fn) { onFieldChange = fn; },
+    get fieldName() { return fieldSel.value || null; },
+    selectField(name) { fieldSel.value = name || ''; },
+    setRampFor(name) {
+      const meta = fieldMeta(name || '');
+      if (meta.ramp && RAMP_NAMES.includes(meta.ramp)) {
+        rampSel.value = meta.ramp;
+        viewer.setRamp(meta.ramp);
+        paintLegendSwatch();
+      }
+    },
+    get rampName() { return rampSel.value; },
+    benchOut,
+  };
+}

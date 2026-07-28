@@ -1,0 +1,241 @@
+/* ============================================================================
+   tmesim Studio — design tokens
+   ============================================================================
+
+   TYPEFACE
+   --------
+   Identity face is a Swiss neo-grotesque: Helvetica Neue / Neue Haas Grotesk,
+   falling back to Arimo / Liberation Sans / Arial. This is the lineage of
+   instrument and wayfinding lettering (Siemens Healthineers, Barco, Sectra
+   consoles) — it has no voice of its own, holds its counters at 10-11px, and
+   its tight, even colour lets a table of forty numbers read as one block
+   rather than forty words. Deliberately NOT Inter (its large x-height and
+   loose default tracking read as product-marketing at small sizes) and NOT
+   any geometric or humanist face with personality.
+
+   Every numeral, identifier, code path, and unit is set in a monospace:
+   SF Mono / IBM Plex Mono / Roboto Mono / Menlo / Consolas, with
+   font-variant-numeric: tabular-nums so digits sit in fixed columns and a
+   changing value never reflows the row it lives in. This is the single most
+   important legibility decision in the whole interface.
+
+   NEUTRAL
+   -------
+   The neutral is biased cool: hue 210-214, chroma held to 8-16% saturation.
+   Tissue imagery is warm (H&E purples and pinks, DAPI blue-white, warm
+   colour ramps), so a cool low-chroma chrome recedes behind the data and
+   never competes with it for hue. A truly achromatic grey looks dead next to
+   rendered tissue; a warm grey pollutes the reading of a warm ramp. 210deg at
+   low chroma is the compromise the imaging vendors all converge on.
+
+   LIGHT IS NOT AN INVERSION. In light mode the panels go to paper white, but
+   the viewport surround stays a deliberate mid-grey (hsl 210 20% 88%) because
+   a white surround around rendered tissue destroys apparent contrast — every
+   light-mode imaging workstation puts the specimen on mid-grey. Semantic hues
+   are re-picked (darker, more saturated) for contrast on white rather than
+   reused from dark mode.
+
+   ACCENT
+   ------
+   ONE accent: a desaturated instrument cyan. It marks interactive affordance,
+   selection, and focus — nothing else. It is deliberately far in hue from all
+   three semantic states (green / amber / red) so that "this is selected" can
+   never be confused with "this is healthy". Semantic colour is reserved
+   exclusively for state and is never used as decoration.
+   ============================================================================ */
+
+:root {
+  /* --- type ------------------------------------------------------------- */
+  --font-ui:
+    "Helvetica Neue", "Neue Haas Grotesk Text", "Nimbus Sans", Arimo,
+    "Liberation Sans", Arial, sans-serif;
+  --font-mono:
+    "SF Mono", "IBM Plex Mono", "Roboto Mono", "DejaVu Sans Mono", Menlo,
+    Consolas, "Courier New", monospace;
+
+  --fs-micro: 9.5px;   /* provenance chips, unit suffixes */
+  --fs-xs:   10.5px;   /* field labels, column heads */
+  --fs-sm:   11.5px;   /* body, table cells, form controls */
+  --fs-md:   12.5px;   /* panel titles, emphasised values */
+  --fs-lg:   15px;     /* metric values */
+  --fs-xl:   19px;     /* headline metric */
+
+  --lh-tight: 1.2;
+  --lh-body:  1.35;
+
+  --tr-wide: 0.06em;   /* for uppercase micro-labels only */
+
+  /* --- metrics ----------------------------------------------------------- */
+  --row-h: 22px;          /* dense table row */
+  --ctl-h: 22px;          /* input / button height */
+  --bar-h: 30px;          /* top bar */
+  --status-h: 21px;       /* bottom status strip */
+  --pad-1: 3px;
+  --pad-2: 6px;
+  --pad-3: 9px;
+  --pad-4: 13px;
+  --radius: 2px;          /* the ceiling. never exceed. */
+
+  --rail-l: 316px;
+  --rail-r: 348px;
+  --dock-h: 214px;
+
+  /* --- motion ------------------------------------------------------------ */
+  --dur: 90ms;
+  --ease: cubic-bezier(0.2, 0, 0.3, 1);
+}
+
+/* ------------------------------------------------------------------------ */
+/* DARK — the primary theme.                                                 */
+/* ------------------------------------------------------------------------ */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-void:  hsl(213 18%  5%);   /* the WebGL viewport background */
+  --bg-0:     hsl(212 16%  8%);   /* app shell */
+  --bg-1:     hsl(212 14% 11%);   /* panel body */
+  --bg-2:     hsl(212 13% 14%);   /* panel header, raised row */
+  --bg-3:     hsl(212 12% 18%);   /* input, hover */
+  --bg-4:     hsl(212 12% 23%);   /* active, pressed, selected row */
+
+  --line-0:   hsl(212 12% 16%);   /* faintest rule — inside a table */
+  --line-1:   hsl(212 11% 22%);   /* standard hairline */
+  --line-2:   hsl(212 10% 31%);   /* panel boundary, emphasis */
+
+  --fg-0:     hsl(208 15% 93%);   /* primary text + numbers */
+  --fg-1:     hsl(208 10% 73%);   /* secondary */
+  --fg-2:     hsl(208  8% 53%);   /* labels, units, captions */
+  --fg-3:     hsl(208  8% 38%);   /* disabled, placeholder */
+
+  --accent:      hsl(191 72% 54%);
+  --accent-hi:   hsl(191 80% 66%);
+  --accent-dim:  hsl(191 46% 34%);
+  --accent-bg:   hsl(191 60% 54% / 0.13);
+  --accent-fg:   hsl(213 30%  7%);   /* text ON accent */
+
+  --ok:       hsl(150 48% 48%);
+  --ok-bg:    hsl(150 48% 48% / 0.14);
+  --warn:     hsl( 38 84% 57%);
+  --warn-bg:  hsl( 38 84% 57% / 0.14);
+  --crit:     hsl(  2 74% 60%);
+  --crit-bg:  hsl(  2 74% 60% / 0.15);
+  --info:     hsl(213 40% 62%);
+  --info-bg:  hsl(213 40% 62% / 0.13);
+
+  --focus:    hsl(191 88% 62%);
+  --shadow-pop: 0 4px 14px hsl(213 30% 3% / 0.62);
+}
+
+/* ------------------------------------------------------------------------ */
+/* LIGHT — separately considered, not a channel flip.                        */
+/* ------------------------------------------------------------------------ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-void:  hsl(210 16% 84%);   /* mid-grey specimen surround, on purpose */
+  --bg-0:     hsl(210 20% 91%);
+  --bg-1:     hsl(210 24% 97%);
+  --bg-2:     hsl(0    0% 100%);
+  --bg-3:     hsl(210 22% 94%);
+  --bg-4:     hsl(210 20% 88%);
+
+  --line-0:   hsl(210 18% 91%);
+  --line-1:   hsl(210 16% 83%);
+  --line-2:   hsl(210 14% 68%);
+
+  --fg-0:     hsl(213 28% 13%);
+  --fg-1:     hsl(213 13% 33%);
+  --fg-2:     hsl(213 10% 47%);
+  --fg-3:     hsl(213  9% 63%);
+
+  --accent:      hsl(197 88% 30%);
+  --accent-hi:   hsl(197 92% 24%);
+  --accent-dim:  hsl(197 40% 62%);
+  --accent-bg:   hsl(197 78% 40% / 0.12);
+  --accent-fg:   hsl(0    0% 100%);
+
+  --ok:       hsl(150 66% 26%);
+  --ok-bg:    hsl(150 60% 34% / 0.13);
+  --warn:     hsl( 30 92% 32%);
+  --warn-bg:  hsl( 34 92% 46% / 0.16);
+  --crit:     hsl(356 70% 43%);
+  --crit-bg:  hsl(356 70% 48% / 0.12);
+  --info:     hsl(214 52% 38%);
+  --info-bg:  hsl(214 52% 44% / 0.12);
+
+  --focus:    hsl(197 92% 34%);
+  --shadow-pop: 0 3px 12px hsl(213 24% 30% / 0.20);
+}
+
+/* System preference drives the default when the user has not chosen. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+
+    --bg-void:  hsl(210 16% 84%);
+    --bg-0:     hsl(210 20% 91%);
+    --bg-1:     hsl(210 24% 97%);
+    --bg-2:     hsl(0    0% 100%);
+    --bg-3:     hsl(210 22% 94%);
+    --bg-4:     hsl(210 20% 88%);
+
+    --line-0:   hsl(210 18% 91%);
+    --line-1:   hsl(210 16% 83%);
+    --line-2:   hsl(210 14% 68%);
+
+    --fg-0:     hsl(213 28% 13%);
+    --fg-1:     hsl(213 13% 33%);
+    --fg-2:     hsl(213 10% 47%);
+    --fg-3:     hsl(213  9% 63%);
+
+    --accent:      hsl(197 88% 30%);
+    --accent-hi:   hsl(197 92% 24%);
+    --accent-dim:  hsl(197 40% 62%);
+    --accent-bg:   hsl(197 78% 40% / 0.12);
+    --accent-fg:   hsl(0    0% 100%);
+
+    --ok:       hsl(150 66% 26%);
+    --ok-bg:    hsl(150 60% 34% / 0.13);
+    --warn:     hsl( 30 92% 32%);
+    --warn-bg:  hsl( 34 92% 46% / 0.16);
+    --crit:     hsl(356 70% 43%);
+    --crit-bg:  hsl(356 70% 48% / 0.12);
+    --info:     hsl(214 52% 38%);
+    --info-bg:  hsl(214 52% 44% / 0.12);
+
+    --focus:    hsl(197 92% 34%);
+    --shadow-pop: 0 3px 12px hsl(213 24% 30% / 0.20);
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Cell-type channel colours.                                                */
+/* Chosen to stay separable at 1-2px point size against both backgrounds and */
+/* to stay distinct for the common dichromacies (no red/green pairing that   */
+/* carries meaning alone — the channel legend always carries the name).      */
+/* Kept OUT of the semantic set: these encode identity, not state.           */
+/* ------------------------------------------------------------------------ */
+:root, :root[data-theme="dark"] {
+  --ch-tumor:       hsl(348 78% 62%);
+  --ch-stromal:     hsl( 42 78% 58%);
+  --ch-immune:      hsl(140 52% 55%);
+  --ch-endothelial: hsl(205 82% 62%);
+  --ch-necrotic:    hsl(220  8% 48%);
+}
+:root[data-theme="light"] {
+  --ch-tumor:       hsl(348 72% 46%);
+  --ch-stromal:     hsl( 36 86% 38%);
+  --ch-immune:      hsl(146 58% 30%);
+  --ch-endothelial: hsl(210 80% 42%);
+  --ch-necrotic:    hsl(220  8% 42%);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --ch-tumor:       hsl(348 72% 46%);
+    --ch-stromal:     hsl( 36 86% 38%);
+    --ch-immune:      hsl(146 58% 30%);
+    --ch-endothelial: hsl(210 80% 42%);
+    --ch-necrotic:    hsl(220  8% 42%);
+  }
+}

@@ -15,6 +15,19 @@ dependencies = [
     "tifffile",
 ]
 
+[project.optional-dependencies]
+# The local tmesim Studio application (app/server/ + app/web/). Additive: the
+# simulation engine, the CLI experiments and the rest of the test suite do not
+# import any of these, so a checkout without the extra behaves exactly as before
+# and tests/test_app_server.py skips itself.
+#   ./.venv/bin/python -m pip install -e '.[app]'
+#   ./.venv/bin/python -m app.server
+app = [
+    "fastapi",
+    "uvicorn",
+    "httpx",   # required by starlette's TestClient (tests/test_app_server.py)
+]
+
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>tmesim Studio</title>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23121619'/%3E%3Crect x='3' y='3' width='10' height='10' fill='none' stroke='%2338bcd6' stroke-width='1.6'/%3E%3Crect x='6' y='6' width='4' height='4' fill='%2338bcd6'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip" href="#stage">Skip to viewer</a>
+
+<div class="shell" id="shell">
+
+  <header class="topbar" role="banner">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="name"><b>tmesim</b> <span>Studio</span></span>
+      <span class="ver">v1</span>
+    </div>
+
+    <div class="topbar-group">
+      <span class="lbl">Section</span>
+      <span class="mono" id="hdr-section" style="color:var(--fg-0)">—</span>
+      <span class="dim mono" id="hdr-section-meta"></span>
+    </div>
+
+    <div class="topbar-group">
+      <span class="lbl">Run</span>
+      <span class="mono" id="hdr-run" style="color:var(--fg-0)">—</span>
+      <span id="hdr-run-status"></span>
+    </div>
+
+    <div class="topbar-group">
+      <span class="lbl">Cells</span>
+      <span class="mono" id="hdr-cells" style="color:var(--fg-0)">—</span>
+      <span class="unit">n</span>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="topbar-group">
+      <span class="led" id="hdr-led" aria-hidden="true"></span>
+      <span class="mono" id="hdr-backend" title="Backend connection state">probing…</span>
+    </div>
+
+    <div class="topbar-group last">
+      <button class="btn ghost sm" id="btn-help" aria-haspopup="dialog" title="Keyboard shortcuts">keys</button>
+      <button class="btn ghost sm" id="btn-theme" aria-pressed="false" title="Toggle light / dark theme">theme: dark</button>
+    </div>
+  </header>
+
+  <div class="body" id="body">
+    <!-- left rail injected by js/ui/spec.js -->
+    <div class="split split-l" id="split-l"></div>
+    <section class="stage" id="stage" aria-label="Cell viewer">
+      <div class="stage-toolbar" role="toolbar" aria-label="Viewer tools">
+        <button class="btn ghost sm" id="tb-fit" title="Fit section to view (F)">fit</button>
+        <button class="btn ghost sm" id="tb-zoom-in" title="Zoom in (+)">+</button>
+        <button class="btn ghost sm" id="tb-zoom-out" title="Zoom out (−)">−</button>
+        <span style="width:1px;height:16px;background:var(--line-1)"></span>
+        <span class="lbl">zoom</span>
+        <span class="mono" id="tb-zoom" style="color:var(--fg-0)">—</span><span class="unit">px/um</span>
+        <span class="lbl" style="margin-left:6px">scale</span>
+        <span class="mono" id="tb-scale" style="color:var(--fg-0)">—</span><span class="unit">um/px</span>
+        <span style="width:1px;height:16px;background:var(--line-1)"></span>
+        <span class="lbl">cursor</span>
+        <span class="mono" id="tb-cursor" style="color:var(--fg-0)">—, —</span><span class="unit">um</span>
+        <span class="topbar-spacer"></span>
+        <span class="lbl">colour</span>
+        <span class="mono" id="tb-colour" style="color:var(--fg-0)">cell type</span>
+        <span style="width:1px;height:16px;background:var(--line-1)"></span>
+        <button class="btn ghost sm" id="tb-pin-clear" title="Clear the pinned cell">unpin</button>
+      </div>
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="gl" tabindex="0" aria-label="WebGL cell viewer. Use arrow keys to pan, plus and minus to zoom."></canvas>
+      </div>
+    </section>
+    <div class="split split-r" id="split-r"></div>
+    <div class="split split-h" id="split-h"></div>
+    <!-- right rail + dock injected -->
+  </div>
+
+  <footer class="statusbar" id="statusbar">
+    <div class="cell"><span class="lbl">mode</span><span class="mono" id="sb-mode">—</span></div>
+    <div class="cell"><span class="lbl">fps</span><span class="num" id="sb-fps">—</span><span class="unit">1/s</span></div>
+    <div class="cell"><span class="lbl">frame</span><span class="num" id="sb-frame">—</span><span class="unit">ms</span></div>
+    <div class="cell"><span class="lbl">drawn</span><span class="num" id="sb-drawn">—</span><span class="unit">pts</span></div>
+    <div class="cell"><span class="lbl">vbo</span><span class="num" id="sb-vbo">—</span></div>
+    <div class="cell"><span class="lbl">index</span><span class="num" id="sb-index">—</span></div>
+    <div class="cell"><span class="lbl">api</span><span class="num" id="sb-latency">—</span><span class="unit">ms</span></div>
+    <div class="cell grow last" id="sb-msg"></div>
+  </footer>
+</div>
+
+<dialog id="help-dlg" style="border:1px solid var(--line-2);border-radius:2px;background:var(--bg-1);color:var(--fg-0);padding:0;max-width:520px">
+  <div class="panel-head"><h2>Keyboard</h2><span class="grow"></span>
+    <button class="btn ghost sm" id="help-close">close</button></div>
+  <div class="panel-body pad">
+    <table class="tbl">
+      <tbody>
+        <tr><td><kbd>F</kbd></td><td>fit section to viewport</td></tr>
+        <tr><td><kbd>+</kbd> / <kbd>−</kbd></td><td>zoom about the viewport centre</td></tr>
+        <tr><td><kbd>←↑→↓</kbd></td><td>pan (hold <kbd>Shift</kbd> for 4×)</td></tr>
+        <tr><td><kbd>1</kbd>…<kbd>5</kbd></td><td>toggle cell-type channel</td></tr>
+        <tr><td><kbd>0</kbd></td><td>show all channels</td></tr>
+        <tr><td><kbd>C</kbd></td><td>colour cells by field value / by type</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>unpin the selected cell</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>submit the current RunSpec</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>focus the RunSpec source editor</td></tr>
+        <tr><td><kbd>T</kbd></td><td>toggle light / dark theme</td></tr>
+      </tbody>
+    </table>
+  </div>
+</dialog>
+
+<noscript>
+  <div style="padding:24px;font-family:system-ui">
+    tmesim Studio is a WebGL2 workstation UI and requires JavaScript.
+  </div>
+</noscript>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
