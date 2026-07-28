@@ -566,7 +566,7 @@ export class Viewer {
       gl.uniform1fv(u.u_typeVis, new Float32Array([1, 1, 1, 1, 1]));
       gl.drawArrays(gl.POINTS, idx, 1);
     };
-    if (this.selected >= 0) drawMark(this.selected, this.markColor, Math.max(16, psz + 10) * this.dpr / this.dpr);
+    if (this.selected >= 0) drawMark(this.selected, this.markColor, Math.max(16, psz + 10));
     if (this.hovered >= 0 && this.hovered !== this.selected) {
       drawMark(this.hovered, [1, 1, 1], Math.max(12, psz + 7));
     }

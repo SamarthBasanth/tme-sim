@@ -1,6 +1,6 @@
 // main.js — boot and wiring.
 
-import { h, $, raf, debounce } from './util/dom.js';
+import { h, $, raf } from './util/dom.js';
 import { createStore, INITIAL } from './state.js';
 import * as api from './api.js';
 import { Viewer, CELL_TYPES } from './gl/viewer.js';
@@ -10,7 +10,7 @@ import { createHistoryPanel } from './ui/history.js';
 import { createOverlays } from './ui/overlays.js';
 import { makeSplitter } from './ui/splitter.js';
 import { toast, notifyError } from './ui/toast.js';
-import { num, int, bytes, dur, NULL_GLYPH } from './util/fmt.js';
+import { num, int, bytes, NULL_GLYPH } from './util/fmt.js';
 
 const store = createStore({ ...INITIAL });
 
@@ -184,7 +184,6 @@ function paintSectionHeader(sectionId) {
     : '';
 }
 
-let lastStatusPaint = 0;
 function paintStatusBar() {
   const s = viewer ? viewer.stats : null;
   const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
@@ -199,7 +198,6 @@ function paintStatusBar() {
     if (fpsEl) fpsEl.style.color = s.fps && s.fps < 30 ? 'var(--warn)' : 'var(--fg-1)';
   }
   set('#sb-latency', api.api.lastLatencyMs === null ? NULL_GLYPH : num(api.api.lastLatencyMs, 1));
-  lastStatusPaint = performance.now();
 }
 
 function updateColourLabel() {

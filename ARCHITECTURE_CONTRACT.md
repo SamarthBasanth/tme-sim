@@ -113,13 +113,20 @@ def assemble_microenvironment(domain, cells, fields, patient_id="reconstructed",
 ```python
 def simulate_drug_transport(micro: Microenvironment, drug: DrugParams,
                             source: np.ndarray, pde: PDEConfig,
-                            velocity: np.ndarray | None = None) -> TransportResult:
+                            velocity: np.ndarray | None = None,
+                            source_profile: np.ndarray | None = None
+                            ) -> TransportResult:
     """Solve convection-diffusion-reaction for drug concentration C(x,y,t):
         dC/dt = div(D_eff grad C) - div(v C) + S - (clearance+binding) C
     - D_eff reduced by ecm_density (tortuosity): D_eff = D*(1 - alpha*ecm).
     - `source` is a (ny,nx) delivery rate from vasculature*bbb_penetrance*plasma(t)
       (the treatment module supplies the time profile; here accept a static source
       scaled internally by an optional plasma(t) — keep it simple & documented).
+    - `source_profile` is that optional plasma(t): a (n_steps,) per-step scalar
+      applied to `source`, so S(x,y,t_n) = source_profile[n] * source(x,y).
+      DEFAULT None == the historical static source, BIT-FOR-BIT. The operator is
+      source-free, so the single LU factorization is still reused. Selected via
+      `PDEConfig.time_resolved` at the engine level.
     - No-flux at domain/tissue-mask boundaries. Unconditionally stable preferred
       (implicit/ADI) or enforce a CFL-safe dt with clear error if violated.
     Accumulate and return TransportResult.auc = integral C dt."""

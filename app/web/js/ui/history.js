@@ -5,7 +5,7 @@
 // viewer — conflating "look at this" with "compare against this" is how
 // people end up reading the wrong pair of numbers.
 
-import { h, clear, fill } from '../util/dom.js';
+import { h, clear } from '../util/dom.js';
 import { METRICS, metricProvenance, chip } from './provenance.js';
 import { auto, num, int, pct, sci, dur, ts, NULL_GLYPH, relPct } from '../util/fmt.js';
 

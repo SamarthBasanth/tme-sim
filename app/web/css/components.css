@@ -701,3 +701,30 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .sparkbar > i.ok { background: var(--ok); }
 .sparkbar > i.warn { background: var(--warn); }
 .sparkbar > i.crit { background: var(--crit); }
+
+/* ---------------------------------------------------- chrome utilities ---
+   These exist so index.html carries NO inline style= attribute: a strict
+   Content-Security-Policy with style-src 'self' (no 'unsafe-inline') blocks
+   inline style attributes, and this app has to run under one. Style set from
+   JS via element.style.* is not governed by CSP and is used freely. */
+.vrule { width: 1px; height: 16px; background: var(--line-1); flex: 0 0 auto; }
+.gap-l { margin-left: 6px; }
+.noscript-note { padding: 24px; font-family: var(--font-ui); color: var(--fg-0); }
+
+#help-dlg {
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  background: var(--bg-1);
+  color: var(--fg-0);
+  padding: 0;
+  max-width: 520px;
+  box-shadow: var(--shadow-pop);
+}
+#help-dlg::backdrop { background: hsl(213 24% 4% / 0.55); }
+#help-dlg .tbl td:first-child { width: 112px; color: var(--fg-1); }
+#help-dlg kbd {
+  display: inline-block; padding: 0 3px; min-width: 15px; text-align: center;
+  border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 2px;
+  background: var(--bg-2); font-family: var(--font-mono);
+  font-size: var(--fs-micro); color: var(--fg-0);
+}

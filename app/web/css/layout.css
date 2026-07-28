@@ -58,10 +58,23 @@
   gap: var(--pad-2);
   padding: 0 var(--pad-3);
   border-right: 1px solid var(--line-1);
-  flex: 0 0 auto;
+  /* Shrinkable, so a long section description cannot push the theme and help
+     controls off the right edge on a narrow window. The identity, the run
+     state, and the backend LED are the things that must never be truncated,
+     so those groups opt out of shrinking below their content. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.topbar-group.keep { flex: 0 0 auto; }
+.topbar-group.last { border-right: 0; flex: 0 0 auto; }
+.topbar-group > .mono,
+.topbar-group > .dim {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   min-width: 0;
 }
-.topbar-group.last { border-right: 0; }
 .topbar-spacer { flex: 1 1 auto; min-width: var(--pad-2); }
 
 /* --------------------------------------------------------------- main body */

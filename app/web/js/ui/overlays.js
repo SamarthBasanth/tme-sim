@@ -4,9 +4,9 @@
 // The scale bar is recomputed from the live camera on every frame, so it is
 // correct at any zoom — it is not a static graphic with a caption.
 
-import { h, clear, fill } from '../util/dom.js';
+import { h, fill } from '../util/dom.js';
 import { nice125, num, int, auto, pct, NULL_GLYPH } from '../util/fmt.js';
-import { gradientCss, sample } from '../gl/ramps.js';
+import { gradientCss } from '../gl/ramps.js';
 import { fieldMeta } from '../fields.js';
 import { CELL_TYPES } from '../gl/viewer.js';
 import { chip } from './provenance.js';

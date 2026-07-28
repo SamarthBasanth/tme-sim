@@ -25,25 +25,25 @@
 
     <div class="topbar-group">
       <span class="lbl">Section</span>
-      <span class="mono" id="hdr-section" style="color:var(--fg-0)">—</span>
+      <span class="mono strong" id="hdr-section">—</span>
       <span class="dim mono" id="hdr-section-meta"></span>
     </div>
 
-    <div class="topbar-group">
+    <div class="topbar-group keep">
       <span class="lbl">Run</span>
-      <span class="mono" id="hdr-run" style="color:var(--fg-0)">—</span>
+      <span class="mono strong" id="hdr-run">—</span>
       <span id="hdr-run-status"></span>
     </div>
 
-    <div class="topbar-group">
+    <div class="topbar-group keep">
       <span class="lbl">Cells</span>
-      <span class="mono" id="hdr-cells" style="color:var(--fg-0)">—</span>
+      <span class="mono strong" id="hdr-cells">—</span>
       <span class="unit">n</span>
     </div>
 
     <div class="topbar-spacer"></div>
 
-    <div class="topbar-group">
+    <div class="topbar-group keep">
       <span class="led" id="hdr-led" aria-hidden="true"></span>
       <span class="mono" id="hdr-backend" title="Backend connection state">probing…</span>
     </div>
@@ -62,18 +62,18 @@
         <button class="btn ghost sm" id="tb-fit" title="Fit section to view (F)">fit</button>
         <button class="btn ghost sm" id="tb-zoom-in" title="Zoom in (+)">+</button>
         <button class="btn ghost sm" id="tb-zoom-out" title="Zoom out (−)">−</button>
-        <span style="width:1px;height:16px;background:var(--line-1)"></span>
+        <span class="vrule" aria-hidden="true"></span>
         <span class="lbl">zoom</span>
-        <span class="mono" id="tb-zoom" style="color:var(--fg-0)">—</span><span class="unit">px/um</span>
-        <span class="lbl" style="margin-left:6px">scale</span>
-        <span class="mono" id="tb-scale" style="color:var(--fg-0)">—</span><span class="unit">um/px</span>
-        <span style="width:1px;height:16px;background:var(--line-1)"></span>
+        <span class="mono strong" id="tb-zoom">—</span><span class="unit">px/um</span>
+        <span class="lbl gap-l">scale</span>
+        <span class="mono strong" id="tb-scale">—</span><span class="unit">um/px</span>
+        <span class="vrule" aria-hidden="true"></span>
         <span class="lbl">cursor</span>
-        <span class="mono" id="tb-cursor" style="color:var(--fg-0)">—, —</span><span class="unit">um</span>
+        <span class="mono strong" id="tb-cursor">—, —</span><span class="unit">um</span>
         <span class="topbar-spacer"></span>
         <span class="lbl">colour</span>
-        <span class="mono" id="tb-colour" style="color:var(--fg-0)">cell type</span>
-        <span style="width:1px;height:16px;background:var(--line-1)"></span>
+        <span class="mono strong" id="tb-colour">cell type</span>
+        <span class="vrule" aria-hidden="true"></span>
         <button class="btn ghost sm" id="tb-pin-clear" title="Clear the pinned cell">unpin</button>
       </div>
       <div class="canvas-wrap" id="canvas-wrap">
@@ -97,7 +97,7 @@
   </footer>
 </div>
 
-<dialog id="help-dlg" style="border:1px solid var(--line-2);border-radius:2px;background:var(--bg-1);color:var(--fg-0);padding:0;max-width:520px">
+<dialog id="help-dlg">
   <div class="panel-head"><h2>Keyboard</h2><span class="grow"></span>
     <button class="btn ghost sm" id="help-close">close</button></div>
   <div class="panel-body pad">
@@ -119,7 +119,7 @@
 </dialog>
 
 <noscript>
-  <div style="padding:24px;font-family:system-ui">
+  <div class="noscript-note">
     tmesim Studio is a WebGL2 workstation UI and requires JavaScript.
   </div>
 </noscript>

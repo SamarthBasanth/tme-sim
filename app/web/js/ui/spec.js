@@ -13,7 +13,7 @@
 
 import { h, clear, fill, debounce } from '../util/dom.js';
 import * as api from '../api.js';
-import { notifyError } from './toast.js';
+import { toast, notifyError } from './toast.js';
 import { dur, num } from '../util/fmt.js';
 
 const MODES = {
@@ -76,7 +76,12 @@ export function createSpecPanel({ store, onSubmit }) {
       ? h('div.with-unit', control, unit(unitText))
       : control;
     const errEl = h('div.field-err.hidden');
-    fieldEls.set(forId, { control, errEl });
+    // The control we mark aria-invalid on must be the focusable field itself,
+    // not a wrapper: a div with aria-invalid tells assistive tech nothing.
+    const target = /^(INPUT|SELECT|TEXTAREA)$/.test(control.tagName)
+      ? control
+      : (control.querySelector('input, select, textarea') || control);
+    fieldEls.set(forId, { control: target, errEl });
     return [lbl(label, forId, title), holder, errEl];
   }
 
@@ -495,12 +500,21 @@ export function createSpecPanel({ store, onSubmit }) {
   let pollTimer = 0;
   let tracked = null;
   let onJobDone = null;
+  // Cancellation is COOPERATIVE on the backend: DELETE sets a flag and a
+  // running job only stops at the next stage boundary. The operator must be
+  // told that, otherwise a click that visibly does nothing reads as a bug and
+  // they hit it again (or worse, assume the run stopped when it has not).
+  let cancelPending = false;
+  let cancelNote = '';
 
   function track(runId, doneCb) {
     tracked = runId;
     onJobDone = doneCb;
+    cancelPending = false;
+    cancelNote = '';
     jobId.textContent = runId;
     cancelBtn.disabled = false;
+    cancelBtn.textContent = 'Cancel';
     document.getElementById('sect-job').open = true;
     clearTimeout(pollTimer);
     poll();
@@ -516,12 +530,23 @@ export function createSpecPanel({ store, onSubmit }) {
       jobPct.textContent = String(pct).padStart(3, ' ');
       jobStage.textContent = s.stage || '—';
       jobElapsed.textContent = dur(s.elapsed_s);
-      jobStatus.className = 'chip st-' + (s.status || 'queued');
-      jobStatus.textContent = s.status || '—';
+      const terminal = s.status === 'done' || s.status === 'failed' || s.status === 'cancelled';
+      if (cancelPending && !terminal) {
+        jobStatus.className = 'chip st-cancelled';
+        jobStatus.textContent = `cancelling · still ${s.status}`;
+        jobStatus.title = cancelNote;
+      } else {
+        jobStatus.className = 'chip st-' + (s.status || 'queued');
+        jobStatus.textContent = s.status || '—';
+        jobStatus.title = '';
+      }
       jobProgress.classList.toggle('done', s.status === 'done');
       jobProgress.classList.toggle('failed', s.status === 'failed');
-      jobProgress.classList.toggle('indet', s.status === 'queued');
-      logEl.textContent = (s.log_tail || []).join('\n');
+      jobProgress.classList.toggle('indet', s.status === 'queued' && !cancelPending);
+      logEl.textContent = [
+        ...(s.log_tail || []),
+        cancelPending && !terminal ? '[ui] cancel requested — ' + (cancelNote || 'waiting for the next stage boundary') : null,
+      ].filter(Boolean).join('\n');
       logEl.scrollTop = logEl.scrollHeight;
 
       if (s.status === 'done' || s.status === 'failed' || s.status === 'cancelled') {
@@ -543,11 +568,21 @@ export function createSpecPanel({ store, onSubmit }) {
     if (!tracked) return;
     const id = tracked;
     cancelBtn.disabled = true;
+    cancelBtn.textContent = 'Cancelling…';
     try {
-      await api.cancelRun(id);
+      const res = await api.cancelRun(id);
+      cancelPending = true;
+      // The backend explains WHY a running job does not stop instantly. Show
+      // its own words rather than inventing a reassurance of our own.
+      cancelNote = (res && (res.reason || res.detail || res.message)) || '';
+      const stillRunning = res && res.status && res.status !== 'cancelled';
+      toast(stillRunning ? 'warn' : 'info',
+        stillRunning ? `Cancel requested for ${id} — not stopped yet` : `Run ${id} cancelled`,
+        cancelNote, stillRunning ? 12000 : 4000);
     } catch (err) {
       notifyError(`DELETE /api/runs/${id} failed`, err);
       cancelBtn.disabled = false;
+      cancelBtn.textContent = 'Cancel';
     }
   }
 
