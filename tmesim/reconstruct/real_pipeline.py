@@ -59,6 +59,11 @@ from ..molecular.mgmt import (
     is_mgmt_calibrated,
     mgmt_sensitivity,
 )
+from ..physics.oxygen_proxy import (
+    OXYGEN_MODES,
+    hypoxia_from_markers,
+    oxygen_from_vessel_distance,
+)
 from .real_fields import (
     add_oxygen,
     ecm_density_from_cells,
@@ -82,6 +87,30 @@ ECM_MARKERS: List[str] = [
 ]
 
 _DEFAULT_VISIUM_SAMPLE = "10x_parent_gbm"
+
+#: How the oxygen field is produced. **The default is and stays ``'pde'``** so no
+#: existing result moves; ``tests/test_oxygen_proxy.py`` asserts the default path
+#: is BIT-IDENTICAL to the pre-option pipeline.
+#:
+#: ``'pde'`` (DEFAULT, unchanged)
+#:     ``physics.solve_oxygen`` — the steady-state reaction-diffusion solve driven
+#:     by the real vascular KDE. **Falsified as value-add**
+#:     (``results/state_validation.md`` §1.2, ``results/oxygen_demotion.md``): it
+#:     is out-predicted by a distance transform built from its own source cells,
+#:     and by its own undiffused source. Kept as the default only because flipping
+#:     it silently would invalidate every published number in ``results/``.
+#: ``'vessel_distance'``
+#:     :func:`physics.oxygen_proxy.oxygen_from_vessel_distance` — a monotone
+#:     SURROGATE from distance to the nearest endothelial cell. Better against
+#:     measured markers, ~10^2-10^3x cheaper, and honestly labelled as not being a
+#:     solved oxygen tension.
+#: ``'markers'``
+#:     :func:`physics.oxygen_proxy.hypoxia_from_markers` — hypoxia read directly
+#:     off MEASURED hypoxia-response transcripts. Only available where the panel
+#:     carries them; on the 319-gene brain panel it raises with an explicit reason
+#:     rather than silently degrading, because on that section hypoxia is
+#:     UNMEASURED. Xenium only (Visium has no per-cell transcripts here).
+OXYGEN_MODE_DEFAULT = "pde"
 
 
 def _load_xenium_retry(sample: Optional[str]):
@@ -117,11 +146,111 @@ def _ecm_weights_from_expression(expression, genes: np.ndarray):
     return weights, used
 
 
+def _install_oxygen(
+    micro: Microenvironment,
+    oxygen_mode: str,
+    cfg: OxygenConfig,
+    expression=None,
+    genes=None,
+    oxygen_kwargs: Optional[Dict] = None,
+) -> Dict:
+    """Fill ``micro.fields.oxygen`` by the requested route and describe what it is.
+
+    ADDITIVE and DEFAULT-PRESERVING: with ``oxygen_mode='pde'`` (the default) the
+    only call made is the historical ``add_oxygen(micro, cfg)``, so the field is
+    bit-identical to the pre-option pipeline. Returns a provenance block that
+    :func:`reconstruction_report` surfaces, so an alternative oxygen route can
+    never be carried silently.
+
+    Raises ``ValueError`` for an unknown mode, and for ``'markers'`` on a panel
+    with no hypoxia-response gene — the honest failure, since on such a section
+    hypoxia is UNMEASURED (see
+    :func:`physics.oxygen_proxy.hypoxia_from_markers`).
+    """
+    mode = str(oxygen_mode).strip().lower()
+    kw = dict(oxygen_kwargs or {})
+    if mode not in OXYGEN_MODES:
+        raise ValueError(
+            f"unknown oxygen_mode {oxygen_mode!r}; expected one of {OXYGEN_MODES}"
+        )
+
+    if mode == "pde":
+        if kw:
+            raise TypeError(
+                f"unexpected oxygen_kwargs {sorted(kw)} for oxygen_mode='pde'")
+        add_oxygen(micro, cfg)
+        return {
+            "oxygen_mode": "pde",
+            "oxygen_source": "physics.solve_oxygen driven by the real vascular field",
+            "oxygen_is_surrogate": False,
+            "oxygen_caveat": (
+                "FALSIFIED AS VALUE-ADD (results/state_validation.md §1.2, "
+                "results/oxygen_demotion.md): out-predicted against measured "
+                "hypoxia markers by a distance transform on its own source cells "
+                "(rho -0.1503 vs -0.1132) and by its own undiffused source "
+                "(-0.1270). Retained as the default so no published number moves "
+                "silently, NOT because it is the best available route."
+            ),
+            "oxygen_detail": None,
+        }
+
+    if mode == "vessel_distance":
+        field, info = oxygen_from_vessel_distance(micro, cfg, detail=True, **kw)
+        micro.fields.oxygen = field
+        return {
+            "oxygen_mode": "vessel_distance",
+            "oxygen_source": (
+                "SURROGATE: exp(-d/L) in distance to the nearest "
+                f"{info['source']} vessel point (L = "
+                f"{info['diffusion_length_um']:.2f} um)"
+            ),
+            "oxygen_is_surrogate": True,
+            "oxygen_caveat": (
+                "NOT a solved oxygen tension. A monotone geometric proxy, "
+                "calibrated to the Thomlinson & Gray 1955 oxygen-diffusion "
+                "distance (PMID 13304213) so its hypoxia band edge sits at 150 um "
+                "from a vessel. Its ABSOLUTE level is uncalibrated — as is the "
+                "PDE's."
+            ),
+            "oxygen_detail": info,
+        }
+
+    # mode == 'markers'
+    if expression is None or genes is None:
+        raise ValueError(
+            "oxygen_mode='markers' needs per-cell expression; it is only "
+            "available for source='xenium' (Visium carries no per-cell transcripts)"
+        )
+    detail = hypoxia_from_markers(micro, expression, genes, detail=True, **kw)
+    if detail["field"] is None:
+        raise ValueError(f"oxygen_mode='markers' is unavailable: {detail['reason']}")
+    micro.fields.oxygen = detail["field"]
+    slim = {k: v for k, v in detail.items() if k not in ("field", "per_cell")}
+    return {
+        "oxygen_mode": "markers",
+        "oxygen_source": (
+            "MEASURED hypoxia-response transcripts "
+            f"({', '.join(detail['genes_used'])}), kernel-regressed onto the grid "
+            "and rank-inverted to an oxygen-like [0, 1] field"
+        ),
+        "oxygen_is_surrogate": True,
+        "oxygen_caveat": (
+            "MEASURED, but a hypoxia-RESPONSE readout, not an oxygen tension. "
+            "Rank-normalised, so its absolute level and its band fractions are "
+            "artefacts of the rank map, not measurements. Validating a state model "
+            "built on this against these same markers would be CIRCULAR."
+        ),
+        "oxygen_detail": slim,
+    }
+
+
 def _reconstruct_xenium(
     sample: Optional[str],
     dx_um: float,
     tissue_mask_mode: str = TISSUE_MASK_MODE,
     tissue_disc_radius_um: float = TISSUE_DISC_RADIUS_UM,
+    oxygen_mode: str = OXYGEN_MODE_DEFAULT,
+    oxygen_kwargs: Optional[Dict] = None,
 ) -> Microenvironment:
     """Assemble the real single-cell Xenium microenvironment with REAL fields.
 
@@ -162,7 +291,11 @@ def _reconstruct_xenium(
     micro.fields = TissueFields(
         ecm_density=ecm, vascular_density=vascular, oxygen=None
     )
-    add_oxygen(micro, OxygenConfig())
+    oxy_info = _install_oxygen(
+        micro, oxygen_mode, OxygenConfig(),
+        expression=data["expression"], genes=data["genes"],
+        oxygen_kwargs=oxygen_kwargs,
+    )
 
     micro.metadata = dict(micro.metadata)
     micro.metadata["real_pipeline"] = {
@@ -170,17 +303,22 @@ def _reconstruct_xenium(
         "vascular_source": "KDE of REAL ENDOTHELIAL cell positions",
         "ecm_source": ecm_source,
         "ecm_markers_used": ecm_markers,
-        "oxygen_source": "physics.solve_oxygen driven by the real vascular field",
         "tissue_mask_mode": str(tissue_mask_mode),
         "tissue_disc_radius_um": (
             float(tissue_disc_radius_um)
             if str(tissue_mask_mode).lower() == "geometric" else None
         ),
+        **oxy_info,
     }
     return micro
 
 
-def _reconstruct_visium(sample: Optional[str], dx_um: float) -> Microenvironment:
+def _reconstruct_visium(
+    sample: Optional[str],
+    dx_um: float,
+    oxygen_mode: str = OXYGEN_MODE_DEFAULT,
+    oxygen_kwargs: Optional[Dict] = None,
+) -> Microenvironment:
     """Assemble the real spot-level Visium microenvironment and add oxygen.
 
     ``reconstruct_from_visium`` already builds vascular density (from the real
@@ -193,15 +331,31 @@ def _reconstruct_visium(sample: Optional[str], dx_um: float) -> Microenvironment
     # the spots, so fall back to the loader default when dx is left small.
     visium_dx = float(dx_um) if dx_um and dx_um >= 50.0 else 100.0
     micro = reconstruct_from_visium(sample_id, dx_um=visium_dx)
-    if micro.fields.oxygen is None:
-        add_oxygen(micro, OxygenConfig())
+    mode = str(oxygen_mode).strip().lower()
+    if mode == "pde":
+        # UNCHANGED path: only solve if the Visium reconstructor left oxygen unset.
+        oxy_info = {
+            "oxygen_mode": "pde",
+            "oxygen_source": "physics.solve_oxygen driven by the real vascular field",
+            "oxygen_is_surrogate": False,
+            "oxygen_caveat": None,
+            "oxygen_detail": None,
+        }
+        if micro.fields.oxygen is None:
+            oxy_info = _install_oxygen(micro, "pde", OxygenConfig())
+    else:
+        # A non-default mode always (re)installs, so the caller gets what they asked
+        # for rather than whatever the Visium reconstructor happened to leave behind.
+        oxy_info = _install_oxygen(
+            micro, mode, OxygenConfig(), oxygen_kwargs=oxygen_kwargs
+        )
     micro.metadata = dict(micro.metadata)
     micro.metadata["real_pipeline"] = {
         "source": "visium",
         "vascular_source": "KDE of REAL ENDOTHELIAL spot fraction",
         "ecm_source": "STROMAL-fraction proxy (spot resolution; no per-cell ECM transcript)",
         "ecm_markers_used": [],
-        "oxygen_source": "physics.solve_oxygen driven by the real vascular field",
+        **oxy_info,
     }
     return micro
 
@@ -212,6 +366,8 @@ def reconstruct_real(
     dx_um: float = 30.0,
     tissue_mask_mode: str = TISSUE_MASK_MODE,
     tissue_disc_radius_um: float = TISSUE_DISC_RADIUS_UM,
+    oxygen_mode: str = OXYGEN_MODE_DEFAULT,
+    oxygen_kwargs: Optional[Dict] = None,
 ) -> Microenvironment:
     """Reconstruct a whole-niche REAL microenvironment from open spatial data.
 
@@ -237,20 +393,52 @@ def reconstruct_real(
     tissue_disc_radius_um : float
         Disc radius for the geometric mask (default 30 um; justified against the
         measured 16.7 um median nearest-neighbour cell spacing).
+    oxygen_mode : {'pde', 'vessel_distance', 'markers'}
+        **ADDITIVE, OPT-IN, DEFAULT UNCHANGED.** How ``fields.oxygen`` is built —
+        see :data:`OXYGEN_MODE_DEFAULT` for what each route is and what it is
+        worth. The default ``'pde'`` runs exactly the historical call and is
+        BIT-IDENTICAL to the pre-option pipeline (asserted by
+        ``tests/test_oxygen_proxy.py::test_default_oxygen_mode_is_bit_identical``),
+        so no existing result in ``results/`` moves.
+
+        ``'pde'`` is retained as the default despite being falsified as value-add
+        (``results/oxygen_demotion.md``) because flipping it would silently
+        invalidate every number that has already been published against it. The
+        recommendation and the re-run list are in that report.
+    oxygen_kwargs : dict, optional
+        Extra keyword arguments forwarded to the chosen route
+        (:func:`physics.oxygen_proxy.oxygen_from_vessel_distance` or
+        :func:`~physics.oxygen_proxy.hypoxia_from_markers`) — e.g.
+        ``{'source': 'vessel_network'}`` to measure distance to a SEGMENTED vessel
+        rather than to any endothelial cell. Must be empty (or ``None``) for
+        ``oxygen_mode='pde'``, which takes no options.
 
     Returns
     -------
     Microenvironment
         Real cells at real positions, REAL vascular / ECM / oxygen fields, ready
         for :func:`tmesim.sim.engine.simulate_response`.
+
+        NOTE for callers using a non-default ``oxygen_mode``:
+        :func:`tmesim.sim.engine.simulate_response` RE-SOLVES the PDE internally
+        and overwrites ``fields.oxygen``, so passing a surrogate reconstruction
+        straight into the engine does NOT change its kill. Oxygen reaches the kill
+        only through ``cells.agents.update_cell_states`` -> the ``PDConfig``
+        resistance multipliers, so the way to propagate a surrogate is to re-band
+        the states and re-run ``cells.pkpd.apply_drug_kill`` on the engine's own
+        transport result. ``validation.oxygen_benchmark`` does exactly that and
+        verifies it reproduces the engine bit-for-bit in the ``'pde'`` arm.
     """
     src = str(source).strip().lower()
     if src == "xenium":
         return _reconstruct_xenium(
-            sample, dx_um, tissue_mask_mode, tissue_disc_radius_um
+            sample, dx_um, tissue_mask_mode, tissue_disc_radius_um,
+            oxygen_mode=oxygen_mode, oxygen_kwargs=oxygen_kwargs,
         )
     if src == "visium":
-        return _reconstruct_visium(sample, dx_um)
+        return _reconstruct_visium(
+            sample, dx_um, oxygen_mode=oxygen_mode, oxygen_kwargs=oxygen_kwargs
+        )
     raise ValueError(f"unknown source {source!r}; expected 'xenium' or 'visium'")
 
 
@@ -616,10 +804,20 @@ def reconstruction_report(micro: Microenvironment) -> Dict:
         ),
     }
 
+    # --- which oxygen route produced fields.oxygen (never silent) ------------
+    rp = micro.metadata.get("real_pipeline", {})
+    oxygen_block = {
+        "mode": rp.get("oxygen_mode", OXYGEN_MODE_DEFAULT),
+        "source": rp.get("oxygen_source"),
+        "is_surrogate": bool(rp.get("oxygen_is_surrogate", False)),
+        "caveat": rp.get("oxygen_caveat"),
+        "detail": rp.get("oxygen_detail"),
+    }
+
     f = micro.fields
     return {
         "patient_id": micro.patient_id,
-        "source": micro.metadata.get("real_pipeline", {}).get("source"),
+        "source": rp.get("source"),
         "n_cells": n,
         "n_tumor": int((ct == int(CellType.TUMOR)).sum()),
         "grid": tuple(micro.domain.shape),
@@ -630,9 +828,9 @@ def reconstruction_report(micro: Microenvironment) -> Dict:
         "mean_vascular_density": _mean(f.vascular_density),
         "mean_ecm_density": _mean(f.ecm_density),
         "mean_oxygen": _mean(f.oxygen),
-        "ecm_markers_used": micro.metadata.get("real_pipeline", {}).get(
-            "ecm_markers_used", []
-        ),
+        "oxygen": oxygen_block,
+        "oxygen_mode": oxygen_block["mode"],
+        "ecm_markers_used": rp.get("ecm_markers_used", []),
         "tissue_mask_mode": micro.metadata.get("tissue_mask_mode"),
         "tissue_disc_radius_um": micro.metadata.get("tissue_disc_radius_um"),
         "tissue_coverage_fraction": float(tissue.mean()),
