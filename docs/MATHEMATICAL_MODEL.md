@@ -89,9 +89,26 @@ $$
 \approx 10^{15}\ \text{atoms},
 $$
 
-already ~6 orders of magnitude beyond routine all-atom MD (millions of atoms). The
-tissue domain is ~1.8 mm across (120×120 at $\Delta x = 15\ \mu m$), i.e.
-$\sim 10^{20}$–$10^{21}$ atoms.
+already ~6 orders of magnitude beyond routine all-atom MD (millions of atoms). Even a
+small *illustrative* domain of 120×120 at $\Delta x = 15\ \mu m$ — ~1.8 mm across —
+is $\sim 10^{20}$–$10^{21}$ atoms.
+
+> **That 120×120 figure is an illustration for this order-of-magnitude argument, not
+> the production configuration.** Production runs are on the real measured sections at
+> $\Delta x = 12\ \mu m$, which are **20–75× larger in area**:
+>
+> | section | grid | extent | bounding area |
+> |---|---|---|---|
+> | `xenium_319` (flagship) | (424, 675) | 8.10 × 5.09 mm | 41.2 mm² |
+> | `xenium_gbm_io` (480-panel) | — | 11.5 × 10.9 mm | 124.6 mm² |
+> | `gse324268` (366-panel) | — | 10.5 × 14.3 mm | 151.1 mm² |
+>
+> The `gse324268` row was measured directly from
+> `GSM9572843_GBMtumor07_cells.csv.gz` (851,509 cells) and matches
+> [`results/classifier_fix.md`](../results/classifier_fix.md) §s3. This note exists
+> because the illustrative figure was previously stated in declarative voice and was
+> the *only* domain-extent-in-mm number in this document — it misled a careful reader
+> into sizing the production domain 4.5–8× too small per edge.
 
 **Steps.** MD is locked to a $\sim1$–2 fs timestep by bond vibrations, while drug
 transport and PD play out over $10^3$–$10^4$ s. Reaching a mere 1 ms needs
