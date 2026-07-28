@@ -46,7 +46,28 @@ export const FIELDS = {
 
 export const FIELD_NAMES = Object.keys(FIELDS);
 
+/**
+ * The time-lapse quantity. Deliberately NOT in FIELDS, because FIELD_NAMES is
+ * the list of overlays `/api/runs/{id}/field/{name}` will serve and this one is
+ * not among them — it arrives in the TMSL payload, one frame at a time. Putting
+ * it in the table would add a field-selector entry that 404s.
+ *
+ * It is also a DIFFERENT QUANTITY from drug_auc: concentration is instantaneous
+ * and can fall, AUC is its running integral and cannot. Sharing a legend label
+ * between them would be the kind of small lie that ends up in a figure caption.
+ */
+export const TIMELAPSE_FIELD = {
+  label: 'Drug concentration',
+  unit: 'uM',
+  short: 'C',
+  ramp: 'magma',
+  provenance: 'computed',
+  source: 'transport solve snapshot at t (TMSL frame)',
+  note: 'Instantaneous interstitial concentration, NOT the AUC integral. With a static plasma source it rises toward a quasi-steady state and does not clear; time_resolved=true is what lets it fall.',
+};
+
 export function fieldMeta(name) {
+  if (name === 'drug_concentration') return TIMELAPSE_FIELD;
   return FIELDS[name] || {
     label: name, unit: '', short: name, ramp: 'viridis',
     provenance: 'unknown', source: 'not described by the contract', note: '',

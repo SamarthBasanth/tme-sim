@@ -48,6 +48,12 @@ let viewer = null;
 let overlays = null;
 let mechLegend = null;
 let scrubber = null;
+// True while the viewer's field texture is holding a TIME-LAPSE frame rather
+// than a served /field/{name} overlay. It is tracked separately from
+// store.fieldName because that name is the SERVER field selector: writing
+// 'drug_concentration' into it would make the next openRun ask the backend for
+// a field it does not serve.
+let timelapseField = false;
 let specPanel = null;
 let inspect = null;
 let history = null;
@@ -280,7 +286,7 @@ function paintStatusBar() {
 
 function setColourMode(m) {
   if (!viewer) return;
-  if (m === COLOR_MODE.FIELD && !store.get().fieldName) {
+  if (m === COLOR_MODE.FIELD && !store.get().fieldName && !timelapseField) {
     toast('warn', 'No field overlay', 'Colouring cells by field value needs a field. Pick one under Field overlay.');
     return;
   }
@@ -300,7 +306,7 @@ function setColourMode(m) {
 function cycleColourMode() {
   if (!viewer) return;
   const available = [COLOR_MODE.TYPE];
-  if (store.get().fieldName) available.push(COLOR_MODE.FIELD);
+  if (store.get().fieldName || timelapseField) available.push(COLOR_MODE.FIELD);
   if (viewer.labels) available.push(COLOR_MODE.LABEL);
   const at = available.indexOf(viewer.colorMode);
   setColourMode(available[(at + 1) % available.length]);
@@ -311,7 +317,7 @@ function syncColourControl() {
   for (const b of $('#tb-colour').children) {
     const mode = Number(b.dataset.mode);
     b.setAttribute('aria-pressed', String(mode === m));
-    b.disabled = (mode === COLOR_MODE.FIELD && !store.get().fieldName)
+    b.disabled = (mode === COLOR_MODE.FIELD && !store.get().fieldName && !timelapseField)
       || (mode === COLOR_MODE.LABEL && !(viewer && viewer.labels));
   }
   if (inspect) inspect.setColorMode(m);
@@ -696,6 +702,7 @@ async function loadMechanism(id, run) {
 async function loadTimelapse(id, run) {
   if (!scrubber) return;
   scrubber.clear();
+  timelapseField = false;
   store.set({ timelapse: null });
   const info = (run && run.timelapse) || null;
   if (info && info.available === false) return;   // the run says there is none
@@ -739,8 +746,10 @@ function onTimelapseFrame(frame, i, series) {
       max: Number.isFinite(hi) ? hi : 1,
       values: frame.values,
     });
-    store.set({ fieldName: 'drug_concentration', field: viewer.field });
+    timelapseField = true;
+    store.set({ field: viewer.field });
     if (overlays) overlays.updateLegend('drug_concentration', viewer.field);
+    syncColourControl();
   }
   const el = $('#sb-msg');
   if (el) {
@@ -780,6 +789,9 @@ async function loadGeometry(id) {
 }
 
 async function selectField(name) {
+  // The operator asked for a served overlay: hand the field texture back and
+  // stop the time-lapse rather than letting the two fight over it.
+  if (timelapseField) { timelapseField = false; if (scrubber) scrubber.pause(); }
   store.set({ fieldName: name || null });
   if (!viewer) return;
   if (!name) {

@@ -1868,6 +1868,8 @@ def write_report(out: Dict, path: str) -> None:
     w("### 5.1 Single agents")
     w("")
     conv = combo["conventions"]
+    _hls = [v["half_life_h"] for v in conv["clinical"].values()]
+    hl_span = max(_hls) / min(_hls)
     w(f"Two PK conventions are run, because **plasma half-life is the parameter "
       f"a stagger acts on** and answering the staggering question only on a "
       f"shared placeholder would be evasive:")
@@ -1888,9 +1890,7 @@ def write_report(out: Dict, path: str) -> None:
       f"{conv['clinical']['cisplatin']['half_life_h']:.1f} h | "
       f"{conv['clinical']['doxorubicin']['peak_um']:.1f} uM, "
       f"{conv['clinical']['doxorubicin']['half_life_h']:.1f} h | each agent on "
-      f"its own measured plasma half-life — a **"
-      f"{max(v['half_life_h'] for v in conv['clinical'].values())
-         / min(v['half_life_h'] for v in conv['clinical'].values()):.0f}x span**, "
+      f"its own measured plasma half-life — a **{hl_span:.0f}x span**, "
       "which is exactly the axis staggering acts on |")
     w("")
     w("**Provenance of the clinical PK, with its weaknesses stated:**")
@@ -2060,11 +2060,22 @@ def write_report(out: Dict, path: str) -> None:
       "about the model's structure and NOT as evidence that sequencing does not "
       "matter.")
     w("")
-    w("The one place staggering does move something materially is the "
-      "**matched-administered-dose** row, and that movement is a window artefact "
-      "in exactly the sense named above. It is largest for doxorubicin under the "
-      "`clinical` convention, whose 30 h plasma half-life means a 12 h delay "
-      "genuinely truncates its counted exposure.")
+    adm = []
+    for cname in ("shared", "clinical"):
+        for e in combo[f"pairs_{cname}"]:
+            j0 = e["arms"]["simultaneous"]["jaccard"]
+            j1 = e["arms"]["B delayed, matched administered"]["jaccard"]
+            adm.append((abs((j1 - j0) / j0) if j0 else 0.0,
+                        f"{e['a']} + {e['b']} (`{cname}`)", j0, j1))
+    adm.sort(reverse=True)
+    w(f"The one place staggering does move something materially is the "
+      f"**matched-administered-dose** row, and that movement is a window "
+      f"artefact in exactly the sense named above — the delayed agent simply has "
+      f"less of the window left in which to be counted. The largest such shift "
+      f"is **{adm[0][1]}**, Jaccard {adm[0][2]:.6f} -> {adm[0][3]:.6f} "
+      f"({adm[0][0]*100:.2f}%), against a largest matched-COUNTED shift of "
+      f"{max(stag_rel)*100:.3f}%. The gap between those two numbers is the whole "
+      f"reason both legs are reported.")
     w("")
     w("---")
     w("")
@@ -2106,11 +2117,30 @@ def write_report(out: Dict, path: str) -> None:
       "— so it is a strong statement about the model and a weak one about "
       "sequencing therapy.")
     w(">")
-    w("> **5. No combination beats the dose-matched control on this section.** "
-      "The self-combination control is at or above every pair, reproducing "
-      "`results/combination.md`'s finding under a time-resolved solver. The "
+    self_ratios = []
+    dose2_ratios = []
+    all_on = []
+    for cname in ("shared", "clinical"):
+        for e in combo[f"pairs_{cname}"]:
+            s = e["arms"]["simultaneous"]
+            self_ratios.append(s["kill_combo"] / e["kill_selfcombo_24h"])
+            dose2_ratios.append(s["kill_combo"] / e["kill_2x_better_24h"])
+            all_on.extend(v["obs_over_null"] for v in e["arms"].values())
+    n_beat_self = sum(1 for r in self_ratios if r > 1.0)
+    n_beat_2x = sum(1 for r in dose2_ratios if r > 1.0)
+    w(f"> **5. Against the dose-matched controls, the combinations do not "
+      f"survive.** Of the {len(self_ratios)} pair-by-convention cells, "
+      f"**{n_beat_2x} beat 2x the better single agent** and "
+      f"**{n_beat_self} beat Bliss(better + ITSELF)** (combo/self-combo range "
+      f"{min(self_ratios):.2f}x-{max(self_ratios):.2f}x). This reproduces "
+      "`results/combination.md`'s finding under a time-resolved solver: the "
       "apparent combination benefit over 2x dosing is the independence "
-      "arithmetic meeting a saturating Hill curve, not spatial complementarity.")
+      "arithmetic meeting a saturating Hill curve, not spatial complementarity. "
+      "The overlap ratios say the same thing from the other side: `obs/null` "
+      f"ranges {min(all_on):.2f}x-{max(all_on):.2f}x across every pair, "
+      "convention and arm — i.e. the two agents' killed populations co-localise "
+      "**more** than a delivery-scrambled null, not less. There is no spatial "
+      "complementarity to exploit on this section.")
     w("")
     w("---")
     w("")

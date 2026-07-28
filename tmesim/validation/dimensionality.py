@@ -786,7 +786,12 @@ def slab_experiment(
     length_density = 2.0 * float(mvd_per_mm2) * 1e-6   # L_V = 2 N_A, um/um^3
     edges = np.linspace(0.0, 240.0, 25)
     core = slice(int(0.15 * n), int(0.85 * n))
-    cov_targets = (0.10, 0.25, 0.50, 0.75, 0.90)
+    # A ladder, PLUS the two published operating points that are not already
+    # saturated at 0 or 1 (lomustine 0.2175 and doxorubicin 0.3836 from
+    # results/delivery_metrics.md). Probing the real operating points directly
+    # is the only way to state the bias on the published numbers without
+    # interpolating between ladder rungs.
+    cov_targets = tuple(sorted({0.10, 0.25, 0.2175, 0.3836, 0.50, 0.75, 0.90}))
     rows = []
     for orient in orientations:
         for lp in persistence_um:
