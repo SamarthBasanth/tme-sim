@@ -972,10 +972,10 @@ def make_figure(sub: _Substrate, cell_type: np.ndarray, ac: Dict, vp: Dict,
     # (a) MGMT+ cells on the section
     ax = fig.add_subplot(gs[0, 0])
     xy = sub.xy
-    ax.scatter(xy[::8, 0], xy[::8, 1], s=0.35, c="#c9c9c9", linewidths=0,
-               label=f"tumour cells (1/8 shown, n={len(xy):,})")
+    ax.scatter(xy[::4, 0], xy[::4, 1], s=0.5, c="#cfcfcf", linewidths=0,
+               label=f"tumour cells (1/4 shown, n={len(xy):,})")
     pos = sub.mgmt > 0
-    ax.scatter(xy[pos, 0], xy[pos, 1], s=0.9, c="#d62728", linewidths=0,
+    ax.scatter(xy[pos, 0], xy[pos, 1], s=0.5, c="#d62728", linewidths=0,
                label=f"MGMT+ ({pos.sum():,}; {100*pos.mean():.2f} %)")
     ax.set_aspect("equal"); ax.invert_yaxis()
     ax.set_title("(a) MGMT-positive tumour cells\nGSE324268 GBMtumor07", fontsize=10)
@@ -1125,6 +1125,9 @@ def make_figure(sub: _Substrate, cell_type: np.ndarray, ac: Dict, vp: Dict,
             ax.set_xticklabels([f"{d['bin_um']} µm bins" for d in dd], fontsize=8)
             ax.axhline(0, color="k", lw=0.8)
             ax.set_ylabel("Δ predicted TMZ kill vs scalar (pp)")
+            top = max(max(d["delta_pp"] for d in dd),
+                      max(d["delta_pp_null"] for d in dd))
+            ax.set_ylim(0, top * 1.45)
             ax.set_title("(i) The scalar-vs-spatial shift is\nreproduced by "
                          "pure noise", fontsize=10)
             ax.legend(fontsize=7, loc="upper left")
