@@ -194,33 +194,61 @@ measured ex-vivo response).
 
 ---
 
-## 6. Outstanding work (interrupted by the spend limit)
+## 6. Outstanding work — status of the seven items listed when this section was written
 
-Highest value first:
-1. Implement the BBB-disruption additive leak (L~0.24) and the veto-shaped `bbb_penetrance`.
-2. Apply the geometric tissue mask (fix #7) and re-run the affected results.
-3. Replace the KDE vascular field with a discrete segmented vessel network; re-test whether
-   the flat floor disappears and drugs finally separate spatially.
-4. Finish the three interrupted external validations: GIST imatinib, Moncayo explants,
-   GSE232173 TMZ ex-vivo.
-5. Finish the two interrupted internal validations: cell-state vs measured MKI67, and
-   simulated oxygen vs measured VEGFA/HIF1A. **Partial result already observed: VEGFA is the
-   single most anti-correlated gene of all 480 with simulated oxygen — encouraging — but
-   HIF1A is exactly null.** Both need completing before either is claimed.
-6. Cross-drug comparability modes (uniform vs determinant sensitivity).
-7. Ranking robustness: cisplatin (0.241) and doxorubicin (0.231) differ by ~4%, well inside
-   plausible parameter uncertainty. **The top-1 call is probably not decision-grade** and
-   should be reported as a tie until shown otherwise.
+All seven were listed as open after the first spend-limit interruption. Six have since been
+closed, several with answers opposite to the ones expected:
+
+| # | item | status |
+|---|---|---|
+| 1 | veto-shaped `bbb_penetrance` | **CLOSED** — defect #9; a mean cannot veto. Eribulin's error fell 66× → 6.9× |
+| 2 | geometric tissue mask (fix #7) | **CLOSED** — and it turned out to be *partially cancelling* defect #6, which is why both had to be fixed together |
+| 3 | discrete vessel network | **CLOSED** — [`vessel_promotion.md`](vessel_promotion.md); now the default. But the premise was wrong: the flat floor is **real diffusion physics** (L_rd 73–296 µm vs a 40 µm intervessel gap), not KDE blur, and drugs *did* separate — `penetration_length_L` spread went 1.07× → 6.91× |
+| 4 | GIST imatinib, Moncayo, GSE232173 TMZ | **CLOSED** — [`gist_imatinib.md`](gist_imatinib.md), [`kill_calibration.md`](kill_calibration.md) |
+| 5 | cell-state vs MKI67; oxygen vs VEGFA/HIF1A | **CLOSED, negative** — [`cell_state_impact.md`](cell_state_impact.md); [`oxygen_demotion.md`](oxygen_demotion.md) falsified the oxygen PDE as a value-add |
+| 6 | cross-drug comparability modes | **CLOSED** — defect #8; `sensitivity_mode` uniform vs determinant |
+| 7 | ranking robustness (cisplatin vs doxorubicin ~4% apart) | **STILL OPEN in spirit.** On the discrete-vessel default the gap is now wide (0.436 vs 0.259), but that is a *different* configuration, not a resolution of the original tie. Re-state before any top-1 call is made |
+
+### Added since, and now open
+
+- **Four mechanisms tested and rejected**, each by a different kind of argument, none by a
+  failure to fit: efflux (wrong sign; provably inert on ratios), uptake (excluded by a 7.8×
+  literature ceiling; OCT1 falsified), ion-trapping (excluded by a 3.09× measured bound, and a
+  uniform R gives zero dispersion at equilibrium), immune sequestration (premise unsupported —
+  the best-quantified case is a *depot* whose depletion **lowered** intratumoral drug 24% —
+  and it worsens the anchor monotonically, 1.995× → 2.237×). The residual glioma error is
+  **not** explained by any transport mechanism we have been able to name.
+- **Therapeutic coverage carries a second, larger error bar** — up to 0.137 absolute from the
+  2-D-section assumption, ~7× its grid bar ([`dimensionality.md`](dimensionality.md)). Mean
+  tumour AUC is unbiased analytically; the transport physics needs no fix.
+- **The mechanism labels conflate two axes.** `UNREACHED` and `UNDERDOSED` are bands on one
+  variable (E/IC50), so a drug that is merely *weak* is reported as *undelivered* — which is
+  exactly what temozolomide does ([`mechanism_attribution.md`](mechanism_attribution.md)).
+  The attribution cannot separate "too little arrived" from "the drug is too weak", and the
+  UI now says so on screen. Separating them needs a second axis, not a re-labelling.
 
 ---
 
 ## 7. The honest position
 
-The physics engine is numerically sound and the reconstruction is externally validated. The
-delivery/partition axis is now validated in human glioma with a quantified error budget. The
-regional axis has a specified, data-derived fix that is not yet implemented. The spatial axis
-is confounded by our own vascular smoothing. The response axis cannot be validated with open
-data at all.
+The physics engine is numerically sound. The delivery/partition axis is validated in human
+glioma with a quantified error budget. The spatial axis is **no longer confounded by our own
+smoothing** — discrete vessels are the default and the flat floor turned out to be real
+physics. The response axis still cannot be validated with open data at all, and that has not
+moved: no open dataset pairs spatial drug distribution with measured response.
+
+Two things must be said that were not in the original version of this section.
+
+**The reconstruction is *not* externally validated — that claim was retracted.** Cross-platform
+concordance fell 0.997 → 0.980 on the 4-vector and **0.016** on the non-tumour subvector, and
+the drop is 100% attributable to fixing the classifier. All three reconstruction-level external
+validations have now been retracted; every drug- and physics-level validation has held. That
+asymmetry is the most informative pattern in the audit and it is not flattering to the part of
+the model that is easiest to make look impressive.
+
+**The residual glioma error survived four independent attempts to explain it mechanistically.**
+That is a real limit, not a to-do item. It should be quoted as a standing ~2× geometric-mean
+fold error rather than treated as something the next mechanism will absorb.
 
 That is a real model with a real error budget — a fundamentally different object from a
 simulator that produces confident numbers. The defects above were found because the model was
