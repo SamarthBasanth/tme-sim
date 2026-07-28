@@ -17,7 +17,7 @@ Five findings, in order of how much they are worth:
 2. **And the surviving hepatic-uptake candidates are quantitatively excluded, by their own literature.** The measurement demands `U_normal` = **11.7x**. The largest value any published source supports is **1.5x** — a **7.8x shortfall**. Even granting that ceiling, the geomean fold error only reaches 5.65x and 4/5 liver ratios still lie below the reachable floor. This is the same *kind* of argument that falsified the transport model, now applied to its proposed replacement.
 3. **On glioma the term is blocked on the one drug that mattered, twice over.** Adavosertib is a properly controlled OATP1A2 substrate (PMID 28928160, HEK293 vs vector P = 0.001, abolished by 100 uM sulfobromophthalein P = 0.005, with OATP2B1 and OAT3 negative in the same experiment) — but the uptake fold appears **only as bars in Figure 4A**, with no value in the text, tables or abstract. And the one number that does exist, Li 2017's human GBM `Kp,uu` of 3.2, is circular against the scorecard target *and* is itself back-fitted: that paper's PBPK uptake clearance of 44 L/h was "assigned based on sensitivity analysis", i.e. tuned so the model reproduces 3.2. Passive plus efflux alone give 0.78-0.92.
 4. **A widely repeated mechanistic story does not survive reading the source.** "The acidic tumour microenvironment activates OATP1A2 uptake" is asserted in `results/efflux_impact.md` on Li 2017's authority. In fact **no pH experiment was ever run on OATP1A2** in that paper — all of its pH-dependence work is on MDCKII efflux, and its own mechanism is *reduced efflux* at low pH (ER 9.2 -> 3.7 for ABCB1), not activated uptake. The PBPK model explicitly holds uptake constant. This run corrects the record.
-5. **The redirect is the most useful output, and it is a correction to the chain's own reasoning.** `results/moncayo_explant.md` eliminated ion-trapping by proving a uniform retardation `R` gives `C = R*C_bath` everywhere, so it cannot produce *spatial dispersion within a section*. That proof is correct — **and it does not apply to a ratio BETWEEN two tissues**, which is what GIST measures. Meanwhile the group that dismantled the OCT1 story concluded that **lysosomal sequestration** determines intracellular imatinib, tested in GIST-T1 among other lines (PMID 26108972). Sizing it with imatinib's own pKa: the required hepatocyte lysosomal volume fraction is **3.9%**, inside the range `moncayo_explant.py` already sweeps. §11.
+5. **The redirect is the most useful output, and it is a correction to the chain's own reasoning.** `results/moncayo_explant.md` eliminated ion-trapping by proving a uniform retardation `R` gives `C = R*C_bath` everywhere, so it cannot produce *spatial dispersion within a section*. That proof is correct — **and it does not apply to a ratio BETWEEN two tissues**, which is what GIST measures. Meanwhile the group that dismantled the OCT1 story concluded that **lysosomal sequestration** determines intracellular imatinib, tested in GIST-T1 among other lines (PMID 26108972). Sizing it with imatinib's own pKa: the required hepatocyte lysosomal volume fraction is **3.9%**, inside the range `moncayo_explant.py` already sweeps. §10.
 
 ## 1. Nothing outside the two new files was touched
 
@@ -51,7 +51,7 @@ The efflux module had to choose between `1/ER` and `2/(1+ER)` — forms that dif
 | directional `Papp(A->B) / Papp(B->A)` | `1 + CL_up/P` |
 | `Papp(A->B)` vs the passive-only monolayer | `1 + CL_up/P` |
 
-Derived from the three-compartment mass balance and **verified numerically** in `molecular/uptake.py`'s self-test, not asserted. An in vivo tissue `Kp,uu` is the same quantity read in vivo, so it needs no conversion either. One form, no form-shopping — one fewer discretionary choice than the efflux term had, which is why the sensitivity table in §10 has no form axis.
+Derived from the three-compartment mass balance and **verified numerically** in `molecular/uptake.py`'s self-test, not asserted. An in vivo tissue `Kp,uu` is the same quantity read in vivo, so it needs no conversion either. One form, no form-shopping — one fewer discretionary choice than the efflux term had, which is why the sensitivity table in §9 has no form axis.
 
 Carriers acting in parallel on one membrane have additive clearances, so `UR_combined = sum_i UR_i - (n - 1)`, the exact mirror of the efflux module's parallel-pump rule.
 
@@ -351,7 +351,9 @@ The published run showed the intervessel half-spacings are the largest single le
 | geometry | penetration length L = 5 um | 1.00 | 3.67x | 3.67x | no |
 | geometry | penetration length L = 400 um (uncalibrated) | 1.00 | 12.87x | 12.87x | no |
 
-**0 of 11 configurations improve the GIST prediction.** The verdict is not an artefact of the geometry, the source preference or the circularity guard.
+**0 of 11 configurations improve the GIST prediction.**
+
+Read that table for what it is: **every row is identical before and after, because `U_normal` resolves to 1.000 in all of them.** It shows the verdict is not an artefact of the geometry, the source preference or the circularity guard, and it shows the geometry lever is real (the published 7.92x moves between 3.67x and 12.87x across the band) — but it cannot say anything about the mechanism, because the mechanism never engages. The sweep that carries information is the upper-bound table in §5.2, where `U_normal` is forced through the whole range and cannot reach the measurement below 11.7x.
 
 ### 5.4 What this does NOT establish, at n = 6
 
@@ -458,7 +460,7 @@ The GIST argument rests on a claim the GIST dataset cannot test, because no tran
 | SLCO1B3 | OATP1B3 | decreased in 60% of 13 paired HCC / adjacent non-tumour samples, mRNA and protein, via HNF3-beta repression | PMID 14739090 (Vavricka 2004 J Hepatol) |
 | SLCO1B1 | OATP1B1 | CONTRADICTS THE CLEAN STORY: OATP1B1 (OATP-C) was NOT significantly decreased in the same 13 paired samples | PMID 14739090 (Vavricka 2004 J Hepatol) |
 
-All carriers downregulated: **False** — and the dissent is recorded in the table rather than dropped: OATP1B1 was **not** significantly decreased in the same paired samples that found OATP1B3 down in 60% (PMID 14739090). The premise is directionally supported and not uniform. No number from these papers enters the model, and HCC is not GIST.
+Uniformly downregulated across all rows: **False** — and the dissent is in the table rather than dropped: OATP1B1 was **not** significantly decreased in the same paired samples that found OATP1B3 down in 60% (PMID 14739090). The premise is directionally supported and not uniform. No number from these papers enters the model, and HCC is not GIST.
 
 ## 9. Does the glioma verdict depend on anything we chose?
 

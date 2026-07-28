@@ -945,7 +945,7 @@ def write_report(add: Dict, subs: List[Dict], circ: List[Dict], gist: Dict,
       f"(PMID 26108972). Sizing it with imatinib's own pKa: the required "
       f"hepatocyte lysosomal volume fraction is "
       f"**{lys['phi_lys_required_in_hepatocytes']*100:.1f}%**, inside the range "
-      f"`moncayo_explant.py` already sweeps. §11.")
+      f"`moncayo_explant.py` already sweeps. §10.")
     a("")
 
     # ---------------------------------------------------------- 1 additivity
@@ -1016,7 +1016,7 @@ def write_report(add: Dict, subs: List[Dict], circ: List[Dict], gist: Dict,
       "in `molecular/uptake.py`'s self-test, not asserted. An in vivo tissue "
       "`Kp,uu` is the same quantity read in vivo, so it needs no conversion either. "
       "One form, no form-shopping — one fewer discretionary choice than the efflux "
-      "term had, which is why the sensitivity table in §10 has no form axis.")
+      "term had, which is why the sensitivity table in §9 has no form axis.")
     a("")
     a("Carriers acting in parallel on one membrane have additive clearances, so "
       "`UR_combined = sum_i UR_i - (n - 1)`, the exact mirror of the efflux "
@@ -1295,9 +1295,17 @@ def write_report(add: Dict, subs: List[Dict], circ: List[Dict], gist: Dict,
           f"{'yes' if r['improved'] else 'no'} |")
     n_imp = sum(1 for r in gsens if r["improved"])
     a("")
-    a(f"**{n_imp} of {len(gsens)} configurations improve the GIST prediction.** The "
-      "verdict is not an artefact of the geometry, the source preference or the "
-      "circularity guard.")
+    a(f"**{n_imp} of {len(gsens)} configurations improve the GIST prediction.**")
+    a("")
+    a("Read that table for what it is: **every row is identical before and after, "
+      "because `U_normal` resolves to 1.000 in all of them.** It shows the verdict "
+      "is not an artefact of the geometry, the source preference or the "
+      "circularity guard, and it shows the geometry lever is real (the published "
+      "7.92x moves between 3.67x and 12.87x across the band) — but it cannot say "
+      "anything about the mechanism, because the mechanism never engages. The "
+      "sweep that carries information is the upper-bound table in §5.2, where "
+      "`U_normal` is forced through the whole range and cannot reach the "
+      f"measurement below {gistreq['required_u_normal']:.1f}x.")
     a("")
 
     a("### 5.4 What this does NOT establish, at n = 6")
@@ -1503,8 +1511,8 @@ def write_report(add: Dict, subs: List[Dict], circ: List[Dict], gist: Dict,
     for r in hcc["rows"]:
         a(f"| {r['gene']} | {r['transporter']} | {r['finding']} | {r['citation']} |")
     a("")
-    a(f"All carriers downregulated: **{hcc['all_downregulated']}** — and the "
-      "dissent is recorded in the table rather than dropped: OATP1B1 was **not** "
+    a(f"Uniformly downregulated across all rows: **{hcc['all_downregulated']}** — "
+      "and the dissent is in the table rather than dropped: OATP1B1 was **not** "
       "significantly decreased in the same paired samples that found OATP1B3 down "
       "in 60% (PMID 14739090). The premise is directionally supported and not "
       "uniform. No number from these papers enters the model, and HCC is not GIST.")
