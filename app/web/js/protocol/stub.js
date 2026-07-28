@@ -767,7 +767,11 @@ export async function plan(source) {
     run_count: runs.length,
     max_runs: maxRuns,
     estimated_cost_s: Math.round(cost),
-    cost_note: `Estimated from section size and grid pitch at ${runs.length ? Math.round(cost / runs.length) : 0} s per run, on this machine's measured reconstruction timings. It is an ESTIMATE, not a measurement.`,
+    // NOT measured, on this machine or anywhere else: `cost` is the hardcoded
+    // polynomial in this file. The previous wording ("on this machine's
+    // measured reconstruction timings") claimed a measurement that never
+    // happened, inside the string whose job is to disclose that it is a guess.
+    cost_note: `GUESSED at ${runs.length ? Math.round(cost / runs.length) : 0} s per run by a hardcoded formula in js/protocol/stub.js over section size and grid pitch. Nothing was timed: this machine's reconstruction speed has not been measured. It is not an estimate from data, it is an ASSUMPTION.`,
     axes,
     runs: runs.map((r) => ({
       index: r.index, coords: r.coords, label: r.label, drug: r.drug,

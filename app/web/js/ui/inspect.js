@@ -6,7 +6,9 @@ import { h, clear, fill } from '../util/dom.js';
 import { CELL_TYPES } from '../gl/viewer.js';
 import { FIELD_NAMES, fieldMeta } from '../fields.js';
 import { RAMP_NAMES, RAMP_META } from '../gl/ramps.js';
-import { METRICS, metricProvenance, reportProvenance, chip } from './provenance.js';
+import {
+  METRICS, metricProvenance, reportProvenance, fieldProvenance, chip, STANDING_LIMITS,
+} from './provenance.js';
 import { auto, num, int, pct, sci, dur, NULL_GLYPH } from '../util/fmt.js';
 
 const CHAN_VARS = ['--ch-tumor', '--ch-stromal', '--ch-immune', '--ch-endothelial', '--ch-necrotic'];
@@ -129,12 +131,13 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       fieldNote.textContent = '';
       return;
     }
+    const fp = fieldProvenance(name);
     fill(fieldStats,
       h('dt', 'min'), h('dd', auto(f.min), h('span.unit', meta.unit)),
       h('dt', 'max'), h('dd', auto(f.max), h('span.unit', meta.unit)),
       h('dt', 'grid'), h('dd', `${f.rows} × ${f.cols}`),
       h('dt', 'dx'), h('dd', num(f.dx, 2), h('span.unit', 'um')),
-      h('dt', 'provenance'), h('dd', chip(meta.provenance, meta.note)),
+      h('dt', 'provenance'), h('dd', chip(fp.kind, fp.why)),
     );
     fieldNote.textContent = `${meta.source}. ${meta.note}`;
   }
@@ -223,11 +226,19 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     if (!pv) {
       fill(provEl, h('dt', 'state'), h('dd.dim', NULL_GLYPH));
     } else {
+      // IC50 is LITERATURE, not MEASURED. It is a real measurement — on GDSC
+      // cell lines, not on this section. Wearing the same green chip as the
+      // cell count implies both came off this specimen; only one did.
       const ic50Measured = pv.ic50_source && /measured/i.test(pv.ic50_source);
       fill(provEl,
-        h('dt', 'alpha'), h('dd', auto(pv.alpha), chip('assumed', 'Tortuosity calibration constant. Fitted once, then held fixed; it is not re-measured per section.')),
+        h('dt', 'alpha'), h('dd', auto(pv.alpha),
+          chip('assumed', pv.alpha_source
+            ? `${pv.alpha_source}\n\nFitted once against a published penetration distance, then held fixed; it is not re-measured per section.`
+            : 'Tortuosity calibration constant. Fitted once, then held fixed; it is not re-measured per section.')),
         h('dt', 'IC50'), h('dd', pv.ic50_uM === null || pv.ic50_uM === undefined ? NULL_GLYPH : auto(pv.ic50_uM), h('span.unit', 'uM'),
-          chip(ic50Measured ? 'measured' : 'assumed', pv.ic50_source || 'no source given')),
+          chip(ic50Measured ? 'literature' : 'assumed',
+            `${pv.ic50_source || 'no source given'}${pv.ic50_note ? '\n\n' + pv.ic50_note : ''}`
+            + '\n\nMeasured in cell culture, NOT on this section. This tissue has no measured drug response.')),
         h('dt', 'runtime'), h('dd', dur(run.runtime_s), chip('measured', 'Wall-clock time the backend spent on this job.')),
       );
       if (pv.ic50_source) {
@@ -260,6 +271,15 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
           : 'Caveats appear here for the selected run.')));
     } else {
       for (const c of cav) caveatsEl.appendChild(h('div.caveat', h('span', String(c))));
+    }
+    // Standing limits are true of the PROJECT, not of this run, so they cannot
+    // arrive in RunResult.provenance.caveats — that list is per-run and may
+    // legitimately be empty. They are rendered unconditionally, below the run's
+    // own caveats, so there is no run whose panel omits them.
+    caveatsEl.appendChild(h('div.hr-lbl', { style: { margin: '6px 0 1px', padding: '0 var(--pad-3)' } },
+      'standing limits · independent of this run'));
+    for (const s of STANDING_LIMITS) {
+      caveatsEl.appendChild(h('div.caveat.standing', h('span', s)));
     }
 
     /* reconstruction report */

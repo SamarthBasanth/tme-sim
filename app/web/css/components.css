@@ -7,9 +7,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  height: var(--ctl-h);
-  padding: 0 8px;
+  gap: var(--sp-3);
+  height: var(--h-ctl);
+  padding: 0 var(--sp-5);
   background: var(--bg-3);
   color: var(--fg-0);
   border: 1px solid var(--line-1);
@@ -37,9 +37,9 @@
 .btn.danger:hover:not(:disabled) { background: var(--crit-bg); border-color: var(--crit); }
 .btn.ghost { background: transparent; border-color: transparent; color: var(--fg-1); }
 .btn.ghost:hover:not(:disabled) { background: var(--bg-3); color: var(--fg-0); }
-.btn.sm { height: 18px; padding: 0 6px; font-size: var(--fs-xs); }
+.btn.sm { height: var(--h-ctl-sm); padding: 0 var(--sp-4); font-size: var(--fs-xs); }
 .btn.icon { width: var(--ctl-h); padding: 0; }
-.btn.icon.sm { width: 18px; }
+.btn.icon.sm { width: var(--h-ctl-sm); }
 .btn[aria-pressed="true"] {
   background: var(--accent-bg);
   border-color: var(--accent-dim);
@@ -56,8 +56,8 @@
 /* segmented control — for enumerated RunSpec modes */
 .seg { display: inline-flex; border: 1px solid var(--line-1); border-radius: var(--radius); overflow: hidden; }
 .seg button {
-  height: 20px;
-  padding: 0 7px;
+  height: var(--h-seg);
+  padding: 0 var(--sp-4);
   background: var(--bg-2);
   color: var(--fg-2);
   border: 0;
@@ -81,7 +81,7 @@
   height: var(--ctl-h);
   min-width: 0;
   width: 100%;
-  padding: 0 5px;
+  padding: 0 var(--sp-3);
   background: var(--bg-3);
   color: var(--fg-0);
   border: 1px solid var(--line-1);
@@ -140,7 +140,7 @@ select.inp {
 }
 
 /* checkbox / radio — square, accent-filled */
-.chk { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+.chk { display: inline-flex; align-items: center; gap: var(--sp-3); cursor: pointer; user-select: none; }
 .chk input[type="checkbox"], .chk input[type="radio"] {
   appearance: none;
   width: 11px; height: 11px;
@@ -192,8 +192,8 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  height: 13px;
-  padding: 0 4px;
+  height: var(--h-chip);
+  padding: 0 var(--sp-3);
   border: 1px solid currentColor;
   border-radius: 1px;
   font-family: var(--font-mono);
@@ -205,11 +205,30 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   vertical-align: 1px;
   cursor: help;
 }
-/* provenance — the three-way distinction the whole product rests on */
-.chip.measured { color: var(--ok);   background: var(--ok-bg); }
-.chip.computed { color: var(--info); background: var(--info-bg); }
-.chip.assumed  { color: var(--warn); background: var(--warn-bg); }
-.chip.unknown  { color: var(--fg-3); background: transparent; }
+/* provenance — the distinction the whole product rests on, as ONE ordered
+   scale read left to right: strongest claim to no claim at all.
+
+     measured    filled green    an instrument, on THIS specimen
+     literature  outlined green  a real measurement, on OTHER material
+     computed    filled blue     a model function of measured inputs
+     assumed     filled amber    a value we chose, or an upper bound
+     unknown     bare grey       the backend stated nothing
+     synthetic   filled magenta  NOT DATA — js/mock.js fabricated it
+
+   `literature` deliberately shares green with `measured` but drops the fill:
+   it IS a measurement, just not of the tissue on screen, and that is a
+   demotion within the same family rather than a different kind of thing.
+   `synthetic` is the only entry outside the green/blue/amber ramp, because it
+   is the only one that is not a claim about data. */
+.chip.measured   { color: var(--ok);   background: var(--ok-bg); }
+.chip.literature { color: var(--ok);   background: transparent; border-style: dashed; }
+.chip.computed   { color: var(--info); background: var(--info-bg); }
+.chip.assumed    { color: var(--warn); background: var(--warn-bg); }
+.chip.unknown    { color: var(--fg-3); background: transparent; }
+.chip.synthetic  {
+  color: var(--synthetic); background: var(--synthetic-bg);
+  border-style: dashed; font-weight: 700;
+}
 
 /* status */
 .chip.st-queued    { color: var(--fg-2);  background: var(--bg-3); }
@@ -237,8 +256,8 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   text-transform: uppercase;
   letter-spacing: var(--tr-wide);
   text-align: left;
-  padding: 2px var(--pad-2);
-  height: 20px;
+  padding: var(--sp-1) var(--pad-2);
+  height: var(--h-th);
   border-bottom: 1px solid var(--line-2);
   white-space: nowrap;
   user-select: none;
@@ -318,7 +337,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .metric .m-meta {
   grid-column: 1 / -1;
   min-width: 0;
-  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
   font-size: var(--fs-micro);
   color: var(--fg-2);
   padding-top: 2px;
@@ -347,7 +366,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   display: grid;
   grid-template-columns: 12px minmax(0, 1fr);
   gap: var(--pad-2);
-  padding: 4px var(--pad-2) 4px 5px;
+  padding: var(--sp-3) var(--pad-2) var(--sp-3) var(--sp-3);
   overflow-wrap: anywhere;
   font-size: var(--fs-xs);
   line-height: 1.4;
@@ -368,6 +387,11 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .caveat.info::before { content: "i"; color: var(--info); }
 .caveat.crit { border-left-color: var(--crit); background: var(--crit-bg); }
 .caveat.crit::before { content: "\00d7"; color: var(--crit); }
+/* Standing limits: true of the project, not of the open run. Same weight as a
+   run caveat on purpose — they are not footnotes — but visually a separate
+   block so it is clear they did not come out of this run. */
+.caveat.standing { border-left-color: var(--fg-2); background: transparent; }
+.caveat.standing::before { content: "\00a7"; color: var(--fg-2); }
 
 /* ========================================================== progress ==== */
 .progress {
@@ -427,7 +451,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 }
 .editor-head {
   display: flex; align-items: center; gap: var(--pad-2);
-  height: 20px; padding: 0 var(--pad-2);
+  height: var(--h-head); padding: 0 var(--pad-2);
   background: var(--bg-2);
   border-bottom: 1px solid var(--line-1);
   font-size: var(--fs-micro);
@@ -476,7 +500,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .editor-ta:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
 .editor-foot {
   display: flex; align-items: center; gap: var(--pad-2);
-  min-height: 19px; padding: 2px var(--pad-2);
+  min-height: var(--h-head); padding: var(--sp-1) var(--pad-2);
   background: var(--bg-2);
   border-top: 1px solid var(--line-1);
   font-size: var(--fs-micro);
@@ -521,7 +545,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 }
 
 /* scale bar */
-.scalebar { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 4px 6px; }
+.scalebar { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-1); padding: var(--sp-3) var(--sp-4); }
 .scalebar .bar {
   height: 5px;
   border: 1px solid var(--fg-0);
@@ -536,7 +560,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 }
 
 /* field legend */
-.legend { padding: 5px 6px; min-width: 158px; }
+.legend { padding: var(--sp-3) var(--sp-4); min-width: 158px; }
 .legend .l-title {
   display: flex; align-items: baseline; gap: 4px;
   font-size: var(--fs-micro);
@@ -570,10 +594,10 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 }
 
 /* hover read-out */
-.readout { padding: 5px 7px; min-width: 210px; max-width: 262px; }
+.readout { padding: var(--sp-3) var(--sp-4); min-width: 210px; max-width: 262px; }
 .readout .r-head {
-  display: flex; align-items: center; gap: 5px;
-  padding-bottom: 3px; margin-bottom: 3px;
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding-bottom: var(--sp-2); margin-bottom: var(--sp-2);
   border-bottom: 1px solid var(--line-1);
   font-size: var(--fs-xs);
 }
@@ -586,8 +610,16 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
    (The render-statistics card that used to float over the specimen has been
    removed outright: it duplicated the status strip exactly, and it was never
    wired up, so what actually shipped was an empty bordered box sitting on the
-   tissue.) */
-.empty {
+   tissue.)
+
+   NAMED .notice, NOT .empty. `.empty` was both this bordered block AND a
+   state modifier that js/ui/tools.js and js/ui/wl.js toggle on their own
+   panels (`.tool-panel.empty`, `.wl.empty`). Same specificity, so an unused
+   line profile or an unloaded window/level control silently inherited this
+   block's border, background, padding and max-width:420px — a stray card
+   inside the rail that nobody wrote. The modifier keeps the short name; the
+   block takes a name that says what it is. */
+.notice {
   text-align: left;
   color: var(--fg-2);
   font-size: var(--fs-sm);
@@ -596,7 +628,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   background: color-mix(in srgb, var(--bg-1) 92%, transparent);
   border: 1px solid var(--line-2);
 }
-.empty h3 {
+.notice h3 {
   font-size: var(--fs-xs);
   color: var(--fg-1);
   text-transform: uppercase;
@@ -604,26 +636,16 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   margin-bottom: 4px;
   font-weight: 600;
 }
-.empty p { line-height: 1.45; }
-.empty-keys { margin-top: 5px; }
-.empty kbd {
-  display: inline-block;
-  padding: 0 3px;
-  border: 1px solid var(--line-2);
-  border-bottom-width: 2px;
-  border-radius: 2px;
-  background: var(--bg-2);
-  font-size: var(--fs-micro);
-  color: var(--fg-1);
-}
+.notice p { line-height: 1.45; }
+.notice-keys { margin-top: var(--sp-3); }
 
 /* ==================================================== channel list ====== */
 .chan {
   display: grid;
   grid-template-columns: auto 9px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
-  height: 19px;
+  gap: var(--sp-4);
+  height: var(--h-ctl-sm);
   padding: 0 var(--pad-2) 0 0;
   border-bottom: 1px solid var(--line-0);
   cursor: pointer;
@@ -745,7 +767,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .tool-body { padding: 0 !important; }
 .tool-panel { display: flex; flex-direction: column; }
 .tool-bar {
-  height: 19px;
+  height: var(--h-head);
   padding: 0 var(--pad-2) 0 var(--pad-3);
   border-bottom: 1px solid var(--line-0);
   background: var(--bg-1);
@@ -753,7 +775,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .plot-wrap { padding: var(--pad-2) var(--pad-3) 0; line-height: 0; }
 .plot-canvas { display: block; width: 100%; height: 104px; cursor: crosshair; }
 .tool-panel .kv { padding: var(--pad-2) var(--pad-3) 0; }
-.tool-panel .kv .step { margin-left: 5px; }
+.tool-panel .kv .step { margin-left: var(--sp-3); }
 .tool-hint {
   font-size: var(--fs-micro);
   color: var(--fg-2);
@@ -767,7 +789,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .tool-panel.empty .tblwrap { display: none; }
 
 .roi-tbl { font-size: var(--fs-xs); }
-.roi-tbl td, .roi-tbl th { padding: 0 var(--pad-2); height: 18px; }
+.roi-tbl td, .roi-tbl th { padding: 0 var(--pad-2); height: var(--h-ctl-sm); }
 .roi-tbl th { background: var(--bg-2); }
 .roi-tbl td:first-child { color: var(--fg-2); }
 .roi-tbl tbody tr:hover td { background: var(--bg-2); }
@@ -784,7 +806,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   font-size: var(--fs-micro);
   text-transform: uppercase;
   letter-spacing: var(--tr-wide);
-  height: 16px;
+  height: var(--sp-8);
   border-bottom: 1px solid var(--line-1);
 }
 
@@ -797,16 +819,31 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .gap-l { margin-left: 6px; }
 .noscript-note { padding: 24px; font-family: var(--font-ui); color: var(--fg-0); }
 
-#help-dlg {
+/* =========================================================== sheets ===== */
+/* A SHEET is a full-attention surface: a task that deserves the whole window —
+   writing a protocol, organising projects, reading a generated report, reading
+   the key map. Before this block existed there were FOUR implementations of
+   that one idea: a position:fixed full-bleed div (.pws) plus three <dialog>
+   elements carrying three different backdrop colours, three border recipes and
+   three header heights. Every <dialog> in this application is a sheet, so the
+   contract is on the element and no module has to remember to opt in.
+   See docs/UI_ARCHITECTURE.md section 2.7. */
+dialog {
+  padding: 0;
   border: 1px solid var(--line-2);
   border-radius: var(--radius);
   background: var(--bg-1);
   color: var(--fg-0);
-  padding: 0;
-  max-width: 520px;
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--elev-2);
+  /* A sheet never covers the CONTEXT bar or the INSTRUMENT strip: the operator
+     must not lose the specimen identity or the backend state to open a task. */
+  max-height: calc(100vh - var(--h-bar) - var(--h-status) - 2 * var(--sp-5));
+  max-width: calc(100vw - 2 * var(--sp-5));
 }
-#help-dlg::backdrop { background: hsl(213 24% 4% / 0.55); }
+dialog::backdrop { background: var(--backdrop); }
+dialog .panel-head { flex: 0 0 auto; }
+
+#help-dlg { width: min(520px, 94vw); }
 #help-dlg .keys-body { max-height: min(74vh, 640px); }
 #help-dlg .tbl td:first-child { width: 118px; color: var(--fg-1); }
 #help-dlg .keys tr.grp td {
@@ -815,16 +852,110 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   font-size: var(--fs-micro);
   text-transform: uppercase;
   letter-spacing: var(--tr-wide);
-  height: 18px;
+  height: var(--h-ctl-sm);
   width: auto;
   border-bottom: 1px solid var(--line-1);
-  padding-top: 2px;
+  padding-top: var(--sp-1);
 }
 #help-dlg .keys tr.grp:first-child td { border-top: 0; }
-#help-dlg .keys td { height: 20px; }
-#help-dlg kbd {
-  display: inline-block; padding: 0 3px; min-width: 15px; text-align: center;
+#help-dlg .keys td { height: var(--h-th); }
+#help-dlg kbd,
+.notice kbd {
+  display: inline-block; padding: 0 var(--sp-2); min-width: 15px; text-align: center;
   border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 2px;
   background: var(--bg-2); font-family: var(--font-mono);
   font-size: var(--fs-micro); color: var(--fg-0);
+}
+
+/* ================================================ SYNTHETIC SESSION ====== */
+/*
+   The no-backend state. js/main.js sets data-mode="stub" on <html> and flips
+   the provenance latch in js/ui/provenance.js; everything below follows from
+   that one attribute.
+
+   The requirement is that a stub session cannot be mistaken for a real one AT
+   ANY GLANCE, FROM ANY PANEL — not that every panel carries a disclaimer. So
+   this is deliberately chrome, not copy: a striped frame around the entire
+   viewport (every panel is inside it), a tag on the viewport itself (the one
+   surface with no text on it at all), and the magenta re-colouring of the few
+   identifiers a reader uses to decide which specimen they are looking at.
+   Combined with the chips — which the latch turns magenta everywhere at once —
+   there is no scroll position and no panel that reads as a live session.
+
+   Nothing here is interactive and nothing here reflows the layout: it is all
+   fixed-position, pointer-events:none, or pure colour. It therefore survives a
+   restructuring of the shell underneath it.
+*/
+html[data-mode="stub"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  border: 4px solid var(--synthetic);
+  border-image: repeating-linear-gradient(
+    45deg, var(--synthetic) 0 9px, transparent 9px 18px) 4;
+}
+html[data-mode="stub"] body::after {
+  content: "SYNTHETIC \00b7  NO BACKEND \00b7  js/mock.js \00b7  NOT DATA";
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  pointer-events: none;
+  padding: var(--sp-3) var(--sp-7) var(--sp-4);
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--synthetic);
+  color: var(--accent-fg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+}
+
+/* The viewport is the largest surface in the product and the only one that
+   carries no text, so a fabricated point cloud there is otherwise indis-
+   tinguishable from a real section at a glance. */
+html[data-mode="stub"] .canvas-wrap::after {
+  content: "SYNTHETIC GEOMETRY \2014  generated by js/mock.js from a seeded PRNG";
+  position: absolute;
+  left: 50%;
+  top: var(--sp-5);
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  padding: var(--sp-2) var(--pad-3);
+  border: 1px dashed var(--synthetic);
+  border-radius: var(--radius);
+  background: var(--synthetic-bg);
+  color: var(--synthetic);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+/* The three identifiers a reader uses to decide WHICH SPECIMEN is on screen.
+   In stub mode they are invented, and they format identically to the real
+   ones — "40,887 cells - 8.12x5.10 mm" is exactly what the live 319 section
+   reads. Colour is the only thing that separates them at a glance. */
+html[data-mode="stub"] #hdr-section,
+html[data-mode="stub"] #hdr-section-meta,
+html[data-mode="stub"] #hdr-cells,
+html[data-mode="stub"] #hdr-run { color: var(--synthetic); }
+
+/* The scale bar is honest arithmetic on a fabricated extent, which makes it
+   the most quietly misleading element on the canvas: it reads "500 um" with
+   the same authority either way. */
+html[data-mode="stub"] .scalebar {
+  border-color: var(--synthetic);
+  color: var(--synthetic);
+}
+html[data-mode="stub"] .scalebar .bar { background: var(--synthetic); }
+html[data-mode="stub"] .scalebar .txt::after {
+  content: " \00b7 synthetic";
+  color: var(--synthetic);
 }

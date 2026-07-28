@@ -11,26 +11,19 @@
    take that away.
    ============================================================================ */
 
+/* Surface, border, backdrop and elevation all come from the shared `dialog`
+   sheet rule in components.css. This file states only what is specific to the
+   projects browser: how big it is and what is inside it. */
 #proj-dlg {
-  border: 1px solid var(--line-2);
-  border-radius: var(--radius);
-  background: var(--bg-1);
-  color: var(--fg-0);
-  padding: 0;
   width: min(1360px, 96vw);
   height: min(880px, 92vh);
-  max-width: none;
-  max-height: none;
-  box-shadow: var(--shadow-pop);
   overflow: hidden;
 }
-#proj-dlg::backdrop { background: hsl(213 24% 4% / 0.62); }
-#proj-dlg .panel-head { height: 26px; }
 
 .proj-body {
   display: grid;
   grid-template-columns: 336px 1px minmax(0, 1fr);
-  height: calc(100% - 26px);
+  height: calc(100% - var(--h-head));
   min-height: 0;
 }
 .proj-div { background: var(--line-2); }
@@ -55,16 +48,16 @@
 }
 .proj-new > .inp { flex: 1 1 auto; min-width: 0; }
 /* `.sm` exists for .btn but not for .inp; scoped here so a dense rail control
-   lines up with the 18px small button beside it, without touching the shared
+   lines up with the small button beside it, without touching the shared
    component. */
-#proj-dlg .inp.sm { height: 18px; padding: 0 4px; font-size: var(--fs-xs); }
+#proj-dlg .inp.sm { height: var(--h-ctl-sm); padding: 0 var(--sp-3); font-size: var(--fs-xs); }
 
 .proj-item {
   border: 1px solid var(--line-1);
   border-left-width: 2px;
   background: var(--bg-2);
-  padding: 4px var(--pad-2);
-  margin-bottom: 3px;
+  padding: var(--sp-3) var(--pad-2);
+  margin-bottom: var(--sp-2);
   cursor: pointer;
 }
 .proj-item:hover { border-color: var(--line-2); }
@@ -90,8 +83,8 @@
 .proj-runs {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
-  margin: 3px 0;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0;
   font-size: var(--fs-micro);
   color: var(--fg-3);
 }
@@ -101,7 +94,7 @@
   gap: 1px;
   border: 1px solid var(--line-1);
   background: var(--bg-3);
-  padding: 0 1px 0 4px;
+  padding: 0 1px 0 var(--sp-3);
   font-size: var(--fs-micro);
   color: var(--fg-1);
 }
@@ -113,7 +106,7 @@
   gap: var(--pad-3);
   align-items: start;
   border: 1px solid var(--line-2);
-  border-left-width: 3px;
+  border-left-width: var(--sp-2);
   background: var(--bg-2);
   padding: var(--pad-2) var(--pad-3);
   margin-bottom: var(--pad-2);

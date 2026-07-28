@@ -174,7 +174,7 @@ export function createProjectsPanel({ store }) {
 
   function renderOffline() {
     clear(railEl);
-    fill(mainEl, h('div.empty', { style: { maxWidth: '520px' } },
+    fill(mainEl, h('div.notice', { style: { maxWidth: '520px' } },
       h('h3', 'Projects need the live backend'),
       h('p', 'A project is state you built — specimens, and the run ids that ' +
         'belong to each patient. js/mock.js deliberately does not synthesise ' +
@@ -297,9 +297,11 @@ export function createProjectsPanel({ store }) {
             `${r.run_id} · ${(r.spec && (r.spec.drug ?? 'none'))} · ${r.status}`))
         : [h('option', { value: '' }, `no unattached run on ${sp.section}`)]);
 
+    // Capability is a property of the PANEL, not a provenance claim about a
+    // number, so it does not wear a provenance chip.
     const capChip = cap.absolute_kill_supported
-      ? h('span.chip.measured', { title: cap.absolute_kill_reason }, 'state supported')
-      : h('span.chip.assumed', { title: cap.absolute_kill_reason }, 'no absolute kill');
+      ? h('span.chip.st-done', { title: cap.absolute_kill_reason }, 'state supported')
+      : h('span.chip.st-failed', { title: cap.absolute_kill_reason }, 'no absolute kill');
 
     return h('div.proj-item.spec',
       h('div.proj-item-top',
@@ -361,7 +363,7 @@ export function createProjectsPanel({ store }) {
   function renderMain() {
     clear(mainEl);
     if (!project) {
-      mainEl.appendChild(h('div.empty',
+      mainEl.appendChild(h('div.notice',
         h('h3', 'No project selected'),
         h('p', 'Create a project, add two sections as specimens, and attach the ' +
           'same drug panel to each. The comparison then answers the question ' +
@@ -407,8 +409,8 @@ export function createProjectsPanel({ store }) {
             (cap.hypoxia_present || []).length
               ? cap.hypoxia_present.join(', ') : 'none'),
           h('td', s.absolute_kill_supported
-            ? chip('measured', cap.absolute_kill_reason)
-            : chip('assumed', cap.absolute_kill_reason)));
+            ? h('span.chip.st-done', { title: cap.absolute_kill_reason }, 'supported')
+            : h('span.chip.st-failed', { title: cap.absolute_kill_reason }, 'no abs kill')));
       })))));
     for (const s of c.specimens) {
       for (const lab of s.labels || []) {
@@ -490,8 +492,8 @@ export function createProjectsPanel({ store }) {
             h('td.right.num', other === undefined ? NULL_GLYPH
               : ratioText(m.ratio[other])),
             h('td', row.comparable
-              ? h('span.chip.measured', { title: 'Both panels support a measured cell state and both runs used one.' }, 'yes')
-              : h('span.chip.unknown', { title: (row.blockers || []).join('\n\n') }, 'NO')));
+              ? h('span.chip.st-done', { title: 'Both panels support a measured cell state and both runs used one. Comparable is a statement about the PAIR, not about the provenance of either number.' }, 'yes')
+              : h('span.chip.st-failed', { title: (row.blockers || []).join('\n\n') }, 'NO')));
         })))));
       const blockers = [...new Set(c.kill.flatMap((r) => r.blockers || []))];
       for (const b of blockers) {

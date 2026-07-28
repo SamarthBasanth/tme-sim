@@ -122,7 +122,7 @@ export function createHistoryPanel({ onOpen, onRefresh }) {
     clear(cmpEl);
 
     if (!A || !B) {
-      cmpEl.appendChild(h('div.empty', { style: { maxWidth: 'none', textAlign: 'left', padding: '4px 0' } },
+      cmpEl.appendChild(h('div.notice', { style: { maxWidth: 'none', textAlign: 'left', padding: '4px 0' } },
         h('p.dim', 'Pick two runs with the ', h('b', 'A'), ' and ', h('b', 'B'),
           ' radio columns to see their metrics side by side with deltas.')));
       return;

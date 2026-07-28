@@ -19,37 +19,12 @@
      comment        the dimmest neutral
 
    Nothing here exceeds a 2px radius, nothing animates except a progress hint,
-   and every interactive element keeps the shell's focus ring. */
+   and every interactive element keeps the shell's focus ring.
 
-:root {
-  --pws-l: 540px;               /* script pane width; drag-resizable */
-
-  --syn-kw: var(--accent);
-  --syn-fld: var(--fg-0);
-  --syn-id: var(--fg-1);
-  --syn-num: hsl(258 66% 76%);
-  --syn-unit-bg: hsl(258 66% 76% / 0.16);
-  --syn-str-bg: hsl(212 12% 26%);
-  --syn-str-fg: var(--fg-0);
-  /* fg-2, not fg-3: in light mode the script pane sits on the mid-grey
-     specimen surround, where fg-3 falls under 3:1 and a comment stops being
-     readable. A comment you cannot read is worse than no comment. */
-  --syn-cmt: var(--fg-2);
-  --syn-op: var(--fg-2);
-  --ce-line-h: 16px;
-}
-:root[data-theme="light"] {
-  --syn-num: hsl(258 62% 42%);
-  --syn-unit-bg: hsl(258 62% 46% / 0.13);
-  --syn-str-bg: hsl(210 22% 90%);
-}
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) {
-    --syn-num: hsl(258 62% 42%);
-    --syn-unit-bg: hsl(258 62% 46% / 0.13);
-    --syn-str-bg: hsl(210 22% 90%);
-  }
-}
+   The --syn-* values, --pws-l and --ce-line-h now live in css/tokens.css with
+   every other token. They were declared in a :root block in THIS file, with a
+   light-mode variant that had to be kept in sync by hand with two other files
+   that nobody editing this one would think to open. */
 
 /* ====================================================== the workspace ==== */
 
@@ -67,10 +42,12 @@
 .pws-top { min-width: 0; }
 .pws[hidden] { display: none; }
 
+/* The protocol workspace is a SHEET (see components.css): same head height,
+   same border, same close affordance as every other full-attention surface. */
 .pws-head {
   display: flex;
   align-items: center;
-  height: 26px;
+  height: var(--h-head);
   gap: var(--pad-2);
   padding: 0 var(--pad-2) 0 var(--pad-3);
   background: var(--bg-2);
@@ -138,7 +115,7 @@
 .ce-head {
   flex: 0 0 auto;
   display: flex; align-items: center; gap: var(--pad-2);
-  height: 21px;
+  height: var(--h-head);
   padding: 0 var(--pad-2) 0 var(--pad-3);
   background: var(--bg-2);
   border-bottom: 1px solid var(--line-1);
@@ -167,16 +144,16 @@
   overflow: hidden;
   background: var(--bg-1);
   border-right: 1px solid var(--line-1);
-  padding: 5px 0;
+  padding: var(--sp-3) 0;
   user-select: none;
 }
 .ce-g {
   display: grid;
   grid-template-columns: 12px minmax(0, 1fr);
   align-items: center;
-  gap: 2px;
+  gap: var(--sp-1);
   height: var(--ce-line-h);
-  padding-right: 5px;
+  padding-right: var(--sp-3);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-micro);
@@ -208,7 +185,7 @@
   position: absolute;
   top: 0; left: 0;
   margin: 0;
-  padding: 5px 8px;
+  padding: var(--sp-3) var(--sp-5);
   width: max-content;
   min-width: 100%;
   pointer-events: none;
@@ -243,7 +220,7 @@
   inset: 0;
   width: 100%; height: 100%;
   margin: 0;
-  padding: 5px 8px;
+  padding: var(--sp-3) var(--sp-5);
   border: 0;
   resize: none;
   overflow: auto;
@@ -286,8 +263,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px var(--pad-3);
-  padding: 3px var(--pad-3);
+  gap: var(--sp-1) var(--pad-3);
+  padding: var(--sp-2) var(--pad-3);
   background: var(--bg-2);
   border-top: 1px solid var(--line-1);
   font-size: var(--fs-micro);
@@ -312,9 +289,9 @@
 .pdiag {
   display: grid;
   grid-template-columns: 13px 44px minmax(0, 1fr);
-  gap: 5px;
+  gap: var(--sp-3);
   width: 100%;
-  padding: 3px var(--pad-2);
+  padding: var(--sp-2) var(--pad-2);
   text-align: left;
   background: transparent;
   border: 0;
@@ -346,7 +323,7 @@
 }
 .pdiag .fix {
   display: inline-flex; align-items: center;
-  height: 15px; margin-top: 3px; padding: 0 5px;
+  height: var(--h-chip); margin-top: var(--sp-2); padding: 0 var(--sp-3);
   border: 1px solid currentColor;
   border-radius: var(--radius);
   background: transparent;
@@ -356,7 +333,7 @@
   cursor: pointer;
 }
 .pdiag .fix:hover { background: color-mix(in srgb, currentColor 16%, transparent); }
-.pdiag-empty { padding: 4px var(--pad-3); font-size: var(--fs-xs); color: var(--fg-3); }
+.pdiag-empty { padding: var(--sp-3) var(--pad-3); font-size: var(--fs-xs); color: var(--fg-3); }
 
 /* ====================================================== templates ======= */
 
@@ -366,7 +343,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0 var(--pad-2);
   width: 100%;
-  padding: 4px var(--pad-2);
+  padding: var(--sp-3) var(--pad-2);
   text-align: left;
   background: transparent;
   border: 0;
@@ -395,7 +372,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: var(--sp-2);
   padding: var(--pad-3);
   border: 1px dashed var(--line-2);
   border-radius: var(--radius);
@@ -445,7 +422,7 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 4px var(--pad-2);
+  padding: var(--sp-3) var(--pad-2);
   background: var(--bg-2);
 }
 .pplan-num .k {
@@ -478,11 +455,11 @@
   text-transform: uppercase;
   letter-spacing: var(--tr-wide);
   color: var(--crit);
-  margin-bottom: 3px;
+  margin-bottom: var(--sp-2);
 }
 .prefusal code {
   display: inline-block;
-  padding: 0 4px;
+  padding: 0 var(--sp-3);
   background: var(--bg-void);
   border: 1px solid var(--line-2);
   color: var(--fg-0);
@@ -508,7 +485,7 @@
   font-size: var(--fs-micro);
   font-weight: 400;
   text-align: center;
-  padding: 2px 4px;
+  padding: var(--sp-1) var(--sp-3);
   border-bottom: 1px solid var(--line-2);
   white-space: nowrap;
 }
@@ -521,7 +498,7 @@
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-micro);
   color: var(--fg-2);
-  padding: 0 5px;
+  padding: 0 var(--sp-3);
   white-space: nowrap;
 }
 .pgrid td { padding: 0; border-right: 1px solid var(--bg-1); border-bottom: 1px solid var(--bg-1); }
@@ -531,11 +508,11 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 3px;
+  gap: var(--sp-2);
   width: 100%;
   min-width: 62px;
-  height: 26px;
-  padding: 0 4px 0 6px;
+  height: var(--h-head);
+  padding: 0 var(--sp-3) 0 var(--sp-4);
   background: var(--bg-3);
   border: 0;
   border-left: 3px solid var(--fg-3);
@@ -575,7 +552,7 @@
 
 .plegend {
   display: flex; align-items: center; gap: var(--pad-2); flex-wrap: wrap;
-  padding: 4px var(--pad-3);
+  padding: var(--sp-3) var(--pad-3);
   font-size: var(--fs-micro);
   color: var(--fg-2);
 }
@@ -611,7 +588,7 @@
 .pcurve text {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 9px;
+  font-size: var(--fs-micro);
   fill: var(--fg-2);
 }
 .pcurve text.axlabel { fill: var(--fg-1); }
@@ -620,7 +597,7 @@
 .pdetail { border-top: 1px solid var(--line-2); background: var(--bg-2); }
 .pdetail .hd {
   display: flex; align-items: center; gap: var(--pad-2);
-  padding: 3px var(--pad-3);
+  padding: var(--sp-2) var(--pad-3);
   border-bottom: 1px solid var(--line-1);
   font-size: var(--fs-xs);
 }
@@ -628,13 +605,13 @@
 
 .passump {
   margin: 0;
-  padding: 4px var(--pad-3) 4px calc(var(--pad-3) + 10px);
+  padding: var(--sp-3) var(--pad-3) var(--sp-3) calc(var(--pad-3) + var(--sp-6));
   font-size: var(--fs-micro);
   line-height: 1.45;
   color: var(--fg-2);
   list-style: none;
 }
-.passump li { position: relative; padding-left: 8px; }
+.passump li { position: relative; padding-left: var(--sp-5); }
 .passump li::before {
   content: "\2013";
   position: absolute; left: 0;

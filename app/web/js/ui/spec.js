@@ -167,7 +167,10 @@ export function createSpecPanel({ store, onSubmit }) {
     title: 'POST /api/runs',
   }, 'Submit run');
   const validateBtn = h('button.btn', { onclick: () => runValidate(true), title: 'POST /api/validate' }, 'Validate');
-  const okBadge = h('span.chip.unknown', 'unvalidated');
+  // Validation state is a STATUS, so it wears the st-* vocabulary. It used to
+  // borrow measured/assumed/unknown, which put a green "measured" chip on the
+  // fact that a JSON object passed a schema check.
+  const okBadge = h('span.chip.st-queued', 'unvalidated');
 
   const submitRow = h('div.frow', { style: { padding: 'var(--pad-2) var(--pad-3)' } },
     submitBtn, validateBtn, h('span.grow'), okBadge);
@@ -180,7 +183,7 @@ export function createSpecPanel({ store, onSubmit }) {
   const jobPct = h('span.mono', '—');
   const jobElapsed = h('span.mono', '—');
   const jobId = h('span.mono.dim', '—');
-  const jobStatus = h('span.chip.unknown', 'idle');
+  const jobStatus = h('span.chip.st-queued', 'idle');
   const cancelBtn = h('button.btn.danger.sm', {
     disabled: true,
     onclick: () => cancelTracked(),
@@ -340,7 +343,7 @@ export function createSpecPanel({ store, onSubmit }) {
       parseState.textContent = 'json invalid';
       parseState.className = 'crit';
       renderDiags([{ path: '', message: 'JSON parse error: ' + err.message, line: guessErrLine(text, err) }], []);
-      okBadge.className = 'chip assumed';
+      okBadge.className = 'chip st-failed';
       okBadge.textContent = 'unparsed';
       submitBtn.disabled = true;
       paintGutter();
@@ -453,7 +456,7 @@ export function createSpecPanel({ store, onSubmit }) {
     const st = store.get();
     if (!st.spec || !st.specTextValid) return;
     store.set({ validating: true });
-    okBadge.className = 'chip unknown';
+    okBadge.className = 'chip st-running';
     okBadge.textContent = 'validating';
     try {
       const res = await api.postValidate(st.spec);
@@ -462,8 +465,7 @@ export function createSpecPanel({ store, onSubmit }) {
       const ok = res.ok !== undefined ? !!res.ok : errors.length === 0;
       store.set({ validation: { ok, errors, warnings }, validating: false });
       renderDiags(errors, warnings);
-      okBadge.className = 'chip ' + (ok ? (warnings.length ? 'assumed' : 'measured') : 'unknown');
-      if (!ok) okBadge.className = 'chip st-failed';
+      okBadge.className = 'chip st-' + (ok ? 'done' : 'failed');
       okBadge.textContent = ok
         ? (warnings.length ? `valid · ${warnings.length} warn` : 'valid')
         : `${errors.length} error${errors.length === 1 ? '' : 's'}`;

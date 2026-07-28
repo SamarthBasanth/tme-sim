@@ -76,21 +76,27 @@ hr.rule {
    changes layout in a dense grid. */
 :focus { outline: none; }
 :focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 1px;
+  outline: var(--focus-w) solid var(--focus);
+  outline-offset: var(--focus-off);
+  /* The promotion is what lets a ring escape a clipping ancestor in a dense
+     grid. It is also how the viewport once vanished: #gl fills its wrapper and
+     paints opaque, so promoting it to z-index 5 on click put it ON TOP of every
+     stage overlay. Anything that paints opaque edge-to-edge must opt out — see
+     the #gl exemption in layout.css. Never solve a focus problem by hiding the
+     content the ring is meant to point at. */
   z-index: 5;
   position: relative;
 }
 .tbl tbody tr:focus-visible,
 [role="row"]:focus-visible {
-  outline-offset: -2px;
+  outline-offset: calc(-1 * var(--focus-w));
 }
 
 /* --- scrollbars: thin, chromeless, always-visible track ------------------ */
 .scroll { overflow: auto; overscroll-behavior: contain; }
 .scroll-x { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
 * { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
-::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar { width: var(--sp-6); height: var(--sp-6); }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--line-2);
@@ -120,6 +126,11 @@ hr.rule {
   .spinner { animation: none !important; }
   .led.busy { animation: none !important; }
   .progress.indet > i { animation: none !important; margin-left: 0 !important; }
+  /* Same reasoning for the two transitions that move a THING rather than
+     recolour one: at 1 ms they read as a jump, which is the motion the setting
+     exists to remove. */
+  .progress > i,
+  .pcell .bar { transition: none !important; }
 }
 
 /* --- utility: screen-reader only ----------------------------------------- */
@@ -135,4 +146,4 @@ hr.rule {
   background: var(--accent); color: var(--accent-fg);
   padding: var(--pad-2) var(--pad-3); font-size: var(--fs-sm);
 }
-.skip:focus { left: 4px; top: 4px; }
+.skip:focus { left: var(--sp-3); top: var(--sp-3); }

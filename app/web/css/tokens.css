@@ -65,29 +65,98 @@
 
   --tr-wide: 0.06em;   /* for uppercase micro-labels only */
 
-  /* --- metrics ----------------------------------------------------------- */
-  --row-h: 22px;          /* dense table row */
-  --ctl-h: 22px;          /* input / button height */
-  --bar-h: 30px;          /* top bar */
-  --status-h: 21px;       /* bottom status strip */
-  --pad-1: 3px;
-  --pad-2: 6px;
-  --pad-3: 9px;
-  --pad-4: 13px;
+  /* --- space -------------------------------------------------------------
+     ONE scale. Before this existed, gaps and paddings of 3, 4, 5, 6, 7, 8, 9,
+     10 and 13 px were used interchangeably across eight stylesheets, which is
+     not a scale, it is eight people guessing. Anything off these steps is a
+     bug. --pad-* are the historical names, kept as aliases so the diff stays
+     reviewable; new work uses --sp-*. */
+  --sp-1: 2px;
+  --sp-2: 3px;
+  --sp-3: 4px;
+  --sp-4: 6px;
+  --sp-5: 8px;
+  --sp-6: 10px;
+  --sp-7: 13px;
+  --sp-8: 18px;
+
+  --pad-1: var(--sp-2);   /* 3  */
+  --pad-2: var(--sp-4);   /* 6  */
+  --pad-3: var(--sp-5);   /* 8  — was 9, normalised onto the scale */
+  --pad-4: var(--sp-7);   /* 13 */
+
+  /* --- height ------------------------------------------------------------
+     The audit that produced docs/UI_ARCHITECTURE.md found EIGHT distinct
+     header-strip heights (19, 20, 20, 21, 23, 23, 26, 26) across five
+     stylesheets, all of them meaning "the title bar of a thing". A workstation
+     reads as one instrument only when its horizontal rules line up, so there
+     is now exactly one secondary-header height and everything adopts it. */
+  --h-bar:     30px;      /* the top bar, and ONLY the top bar */
+  --h-head:    24px;      /* EVERY secondary header: panel head, section
+                             summary, stage toolbar, sheet head, editor head,
+                             tool bar */
+  --h-status:  21px;      /* the status strip */
+  --h-row:     22px;      /* dense table row */
+  --h-th:      20px;      /* table header cell */
+  --h-ctl:     22px;      /* input / select / default button */
+  --h-ctl-sm:  18px;      /* small button */
+  --h-seg:     20px;      /* segmented-control button (fits inside --h-head) */
+  --h-chip:    13px;      /* chip */
+
+  /* historical aliases — do not use in new rules */
+  --row-h: var(--h-row);
+  --ctl-h: var(--h-ctl);
+  --bar-h: var(--h-bar);
+  --status-h: var(--h-status);
+
   --radius: 2px;          /* the ceiling. never exceed. */
 
   --rail-l: 316px;
   --rail-r: 348px;
   --dock-h: 214px;
+  --pws-l:  540px;        /* protocol script pane; drag-resizable */
+
+  --stage-inset: var(--sp-6);   /* gutter between a stage overlay and the edge */
+  --ce-line-h: 16px;            /* code-editor line box */
+
+  /* --- focus -------------------------------------------------------------- */
+  --focus-w: 2px;
+  --focus-off: 1px;
 
   /* --- motion ------------------------------------------------------------ */
   --dur: 90ms;
   --ease: cubic-bezier(0.2, 0, 0.3, 1);
 }
 
-/* ------------------------------------------------------------------------ */
-/* DARK — the primary theme.                                                 */
-/* ------------------------------------------------------------------------ */
+
+/* ==========================================================================
+   PALETTES
+
+   Every colour in the application is declared in one of the three blocks
+   below and nowhere else. Before this consolidation the syntax palette lived
+   in protocol.css, the mechanism palette lived in mechanism.css, and each
+   shipped its own light-mode variant behind a DIFFERENT selector form from
+   the one used here — protocol.css used `:root:not([data-theme])` while
+   mechanism.css used `:root:where(:not([data-theme="dark"]))`. Six blocks,
+   two spellings of the same intent, in three files. It is three blocks now.
+
+   The duplication that remains is irreducible: a media query cannot share a
+   declaration block with a non-media rule, and the media block is what makes
+   the OS preference the default before main.js has stamped data-theme (which
+   is the state the single-file Artifact export actually boots in). Keep the
+   three blocks byte-parallel — if you add a token, add it to all three.
+
+   Families, and they do not mix:
+     neutral      bg / line / fg          — recedes behind tissue
+     accent       ONE cyan                — affordance, selection, focus
+     semantic     ok / warn / crit / info — STATE only, never decoration
+     categorical  ch-* / mech-*           — IDENTITY, never state
+     syntax       syn-*                   — TPL source only
+   ========================================================================== */
+
+/* -------------------------------------------------------------------------
+   DARK — the primary theme.
+   ------------------------------------------------------------------------- */
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -124,16 +193,89 @@
   --info-bg:  hsl(213 40% 62% / 0.13);
 
   --focus:    hsl(191 88% 62%);
-  --shadow-pop: 0 4px 14px hsl(213 30% 3% / 0.62);
+
+  /* Elevation. Only two steps, and only things that genuinely float above the
+     plane get either: a sheet, a toast. Never decoration. */
+  --elev-1:   0 1px 3px hsl(213 30% 3% / 0.40);
+  --elev-2:   0 4px 14px hsl(213 30% 3% / 0.62);
+  --shadow-pop: var(--elev-2);          /* historical alias */
+  --backdrop: hsl(213 26% 4% / 0.62);   /* ONE modal backdrop, for every sheet */
+
+  /* SYNTHETIC — see the provenance scale in js/ui/provenance.js. Magenta is
+     chosen because it is the one hue not otherwise in use: far from the accent
+     cyan, far from all three semantic states, and absent from every colour
+     ramp, so it can never be mistaken for data or for a state of the data. */
+  --synthetic:    hsl(310 82% 64%);
+  --synthetic-bg: hsl(310 82% 64% / 0.16);
+
+  /* --- categorical: cell type ------------------------------------------
+     Separable at 1-2 px point size against both backgrounds and distinct for
+     the common dichromacies. No red/green pairing carries meaning alone — the
+     channel legend always ships the name. Identity, not state. */
+  --ch-tumor:       hsl(348 78% 62%);
+  --ch-stromal:     hsl( 42 78% 58%);
+  --ch-immune:      hsl(140 52% 55%);
+  --ch-endothelial: hsl(205 82% 62%);
+  --ch-necrotic:    hsl(220  8% 48%);
+
+  /* --- categorical: mechanism attribution -------------------------------
+     The four SURVIVAL mechanisms are what the view exists to tell apart, so
+     they are the only categories that get a hue: blue (delivery), amber
+     (dose), red (resistance), magenta (chance). All-pairs Machado-2009 CVD
+     separation is dE 23.7 on the dark viewport surround, against a target
+     of 12 — all-pairs, not adjacent, because this is a dense point cloud and
+     any two categories can end up touching.
+
+     KILLED is deliberately ACHROMATIC: it is the outcome, not a fifth
+     mechanism, and it is usually the largest class. Giving it a hue would
+     make the majority class shout over the four minority classes that carry
+     the finding. UNATTRIBUTED takes the reserved CRITICAL colour, which is
+     correct rather than decorative — it is a state, it should be empty, and
+     if it is not the operator must see that immediately. */
+  --mech-killed:       hsl(212  8% 55%);
+  --mech-unreached:    #3987e5;            /* slot 1 blue    — DELIVERY   */
+  --mech-underdosed:   #c98500;            /* slot 3 yellow  — DOSE       */
+  --mech-resistant:    #e66767;            /* slot 6 red     — RESISTANCE */
+  --mech-stochastic:   #d55181;            /* slot 7 magenta — CHANCE     */
+  --mech-unattributed: hsl(  0 82% 62%);   /* reserved CRITICAL state     */
+  --mech-alreadydead:  hsl(212  9% 34%);
+  --mech-nottumor:     hsl(212 10% 20%);
+
+  /* --- syntax: TPL source ------------------------------------------------
+     The one place hue means something other than state, and it is deliberately
+     narrow. Keyword takes the single accent. Number takes ONE additional hue,
+     an indigo held far from the accent and from all three semantic states, so
+     a coloured token can never be misread as "healthy" or "critical". A unit
+     reuses that same indigo boxed and underlined rather than taking a second
+     hue — a unit is not a different KIND of thing from its number, it is the
+     half of it that makes the number mean anything. */
+  --syn-kw:       var(--accent);
+  --syn-fld:      var(--fg-0);
+  --syn-id:       var(--fg-1);
+  --syn-num:      hsl(258 66% 76%);
+  --syn-unit-bg:  hsl(258 66% 76% / 0.16);
+  --syn-str-bg:   hsl(212 12% 26%);
+  --syn-str-fg:   var(--fg-0);
+  /* fg-2, not fg-3: in light mode the script pane sits on the mid-grey
+     specimen surround, where fg-3 falls under 3:1 and a comment stops being
+     readable. A comment you cannot read is worse than no comment. */
+  --syn-cmt:      var(--fg-2);
+  --syn-op:       var(--fg-2);
 }
 
-/* ------------------------------------------------------------------------ */
-/* LIGHT — separately considered, not a channel flip.                        */
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------------
+   LIGHT — separately considered, not a channel flip.
+
+   In light mode the panels go to paper white, but the viewport surround stays
+   a deliberate mid-grey, because a white surround around rendered tissue
+   destroys apparent contrast — every light-mode imaging workstation puts the
+   specimen on mid-grey. Semantic and categorical hues are RE-PICKED (darker,
+   more saturated) for contrast on white rather than reused from dark.
+   ------------------------------------------------------------------------- */
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --bg-void:  hsl(210 16% 84%);   /* mid-grey specimen surround, on purpose */
+  --bg-void:  hsl(210 16% 84%);
   --bg-0:     hsl(210 20% 91%);
   --bg-1:     hsl(210 24% 97%);
   --bg-2:     hsl(0    0% 100%);
@@ -165,10 +307,48 @@
   --info-bg:  hsl(214 52% 44% / 0.12);
 
   --focus:    hsl(197 92% 34%);
-  --shadow-pop: 0 3px 12px hsl(213 24% 30% / 0.20);
+
+  --elev-1:   0 1px 3px hsl(213 24% 30% / 0.14);
+  --elev-2:   0 3px 12px hsl(213 24% 30% / 0.20);
+  --shadow-pop: var(--elev-2);
+  --backdrop: hsl(213 26% 22% / 0.44);
+
+  --synthetic:    hsl(310 78% 40%);
+  --synthetic-bg: hsl(310 78% 46% / 0.14);
+
+  --ch-tumor:       hsl(348 72% 46%);
+  --ch-stromal:     hsl( 36 86% 38%);
+  --ch-immune:      hsl(146 58% 30%);
+  --ch-endothelial: hsl(210 80% 42%);
+  --ch-necrotic:    hsl(220  8% 42%);
+
+  /* All-pairs CVD separation on the light mid-grey surround is dE 36.6. */
+  --mech-killed:       hsl(212 10% 45%);
+  --mech-unreached:    #2a78d6;
+  --mech-underdosed:   #eda100;
+  --mech-resistant:    #e34948;
+  --mech-stochastic:   #e87ba4;
+  --mech-unattributed: hsl(356 76% 46%);
+  --mech-alreadydead:  hsl(212 10% 62%);
+  --mech-nottumor:     hsl(212 12% 78%);
+
+  --syn-kw:       var(--accent);
+  --syn-fld:      var(--fg-0);
+  --syn-id:       var(--fg-1);
+  --syn-num:      hsl(258 62% 42%);
+  --syn-unit-bg:  hsl(258 62% 46% / 0.13);
+  --syn-str-bg:   hsl(210 22% 90%);
+  --syn-str-fg:   var(--fg-0);
+  --syn-cmt:      var(--fg-2);
+  --syn-op:       var(--fg-2);
 }
 
-/* System preference drives the default when the user has not chosen. */
+/* -------------------------------------------------------------------------
+   The OS preference is the default when the operator has chosen nothing.
+   main.js initTheme() stamps data-theme at boot, so this block governs the
+   pre-boot frame — which is the whole life of the body-level Artifact export
+   until its script runs. Byte-parallel with the block above.
+   ------------------------------------------------------------------------- */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
@@ -205,37 +385,38 @@
     --info-bg:  hsl(214 52% 44% / 0.12);
 
     --focus:    hsl(197 92% 34%);
-    --shadow-pop: 0 3px 12px hsl(213 24% 30% / 0.20);
-  }
-}
 
-/* ------------------------------------------------------------------------ */
-/* Cell-type channel colours.                                                */
-/* Chosen to stay separable at 1-2px point size against both backgrounds and */
-/* to stay distinct for the common dichromacies (no red/green pairing that   */
-/* carries meaning alone — the channel legend always carries the name).      */
-/* Kept OUT of the semantic set: these encode identity, not state.           */
-/* ------------------------------------------------------------------------ */
-:root, :root[data-theme="dark"] {
-  --ch-tumor:       hsl(348 78% 62%);
-  --ch-stromal:     hsl( 42 78% 58%);
-  --ch-immune:      hsl(140 52% 55%);
-  --ch-endothelial: hsl(205 82% 62%);
-  --ch-necrotic:    hsl(220  8% 48%);
-}
-:root[data-theme="light"] {
-  --ch-tumor:       hsl(348 72% 46%);
-  --ch-stromal:     hsl( 36 86% 38%);
-  --ch-immune:      hsl(146 58% 30%);
-  --ch-endothelial: hsl(210 80% 42%);
-  --ch-necrotic:    hsl(220  8% 42%);
-}
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) {
+    --elev-1:   0 1px 3px hsl(213 24% 30% / 0.14);
+    --elev-2:   0 3px 12px hsl(213 24% 30% / 0.20);
+    --shadow-pop: var(--elev-2);
+    --backdrop: hsl(213 26% 22% / 0.44);
+
+    --synthetic:    hsl(310 78% 40%);
+    --synthetic-bg: hsl(310 78% 46% / 0.14);
+
     --ch-tumor:       hsl(348 72% 46%);
     --ch-stromal:     hsl( 36 86% 38%);
     --ch-immune:      hsl(146 58% 30%);
     --ch-endothelial: hsl(210 80% 42%);
     --ch-necrotic:    hsl(220  8% 42%);
+
+    --mech-killed:       hsl(212 10% 45%);
+    --mech-unreached:    #2a78d6;
+    --mech-underdosed:   #eda100;
+    --mech-resistant:    #e34948;
+    --mech-stochastic:   #e87ba4;
+    --mech-unattributed: hsl(356 76% 46%);
+    --mech-alreadydead:  hsl(212 10% 62%);
+    --mech-nottumor:     hsl(212 12% 78%);
+
+    --syn-kw:       var(--accent);
+    --syn-fld:      var(--fg-0);
+    --syn-id:       var(--fg-1);
+    --syn-num:      hsl(258 62% 42%);
+    --syn-unit-bg:  hsl(258 62% 46% / 0.13);
+    --syn-str-bg:   hsl(210 22% 90%);
+    --syn-str-fg:   var(--fg-0);
+    --syn-cmt:      var(--fg-2);
+    --syn-op:       var(--fg-2);
   }
 }

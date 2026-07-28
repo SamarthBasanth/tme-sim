@@ -1009,7 +1009,11 @@ export function createProtocolWorkspace() {
           }))),
         expects.length ? h('div.hr-lbl', 'expectations — recorded, never enforced') : null,
         expects.length ? h('div', expects.map((x) => h('div.frow', { style: { fontSize: 'var(--fs-xs)' } },
-          h('span.chip.' + (x.pass === null ? 'unknown' : x.pass ? 'measured' : 'assumed'),
+          // Status vocabulary, NOT provenance vocabulary. A passing assertion
+          // is not a measurement, and spending the green `measured` chip on it
+          // devalues the one chip that is supposed to mean "an instrument
+          // produced this".
+          h('span.chip.' + (x.pass === null ? 'st-queued' : x.pass ? 'st-done' : 'st-failed'),
             x.pass === null ? 'pending' : x.pass ? 'pass' : 'fail'),
           h('span.mono', `expect ${x.metric} ${x.op} ${x.value}`),
           h('span.dim', x.actual !== undefined

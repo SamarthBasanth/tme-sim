@@ -25,7 +25,7 @@
   line-height: 1.4;
   color: var(--fg-2);
   border-left: 2px solid var(--accent-dim);
-  padding: 3px 0 3px var(--pad-2);
+  padding: var(--sp-2) 0 var(--sp-2) var(--pad-2);
 }
 .rp .rp-lead b { color: var(--fg-0); }
 
@@ -33,7 +33,7 @@
 .rp .rp-drugs {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px var(--pad-2);
+  gap: var(--sp-1) var(--pad-2);
   border: 1px solid var(--line-1);
   background: var(--bg-2);
   padding: var(--pad-2);
@@ -51,9 +51,9 @@
 .rp .rp-prog {
   display: inline-block;
   width: 34px;
-  height: 4px;
-  margin-left: 5px;
-  vertical-align: 2px;
+  height: var(--sp-3);
+  margin-left: var(--sp-3);
+  vertical-align: var(--sp-1);
   background: var(--bg-3);
   border: 1px solid var(--line-1);
 }
@@ -66,20 +66,15 @@
 .rp .rp-err:empty { display: none; }
 
 /* --- the document viewer ---------------------------------------------- */
+/* Surface, border, backdrop and elevation come from the shared `dialog` sheet
+   rule in components.css. Only the size and the internal split live here. */
 #rp-dlg {
   width: min(1180px, 94vw);
   height: min(88vh, 1000px);
-  padding: 0;
-  border: 1px solid var(--line-2);
-  border-radius: var(--radius);
-  background: var(--bg-1);
   color: var(--fg-1);
-  box-shadow: var(--shadow-pop);
 }
-#rp-dlg::backdrop { background: hsl(213 30% 3% / 0.62); }
 #rp-dlg[open] { display: flex; flex-direction: column; }
-
-#rp-dlg .panel-head { flex: 0 0 auto; gap: var(--pad-2); }
+#rp-dlg .panel-head { gap: var(--pad-2); }
 
 #rp-dlg .rp-note {
   flex: 0 0 auto;

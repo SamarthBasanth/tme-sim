@@ -20,7 +20,7 @@ import { auto, num, int, pct, um, NULL_GLYPH, clamp } from '../util/fmt.js';
 import { CELL_TYPES } from '../gl/viewer.js';
 import { sampleLine, rectFieldStats, rectCellStats, buildHistogram } from '../analysis.js';
 import { fieldMeta } from '../fields.js';
-import { chip } from './provenance.js';
+import { chip, fieldProvenance } from './provenance.js';
 
 export const TOOLS = ['pick', 'profile', 'region', 'distance'];
 const CHAN_VARS = ['--ch-tumor', '--ch-stromal', '--ch-immune', '--ch-endothelial', '--ch-necrotic'];
@@ -225,8 +225,11 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
       h('dt', 'min'), h('dd', has ? auto(d.min) : NULL_GLYPH, h('span.unit', meta.unit)),
       h('dt', 'max'), h('dd', has ? auto(d.max) : NULL_GLYPH, h('span.unit', meta.unit)),
       h('dt', 'mean'), h('dd', has ? auto(d.mean) : NULL_GLYPH, h('span.unit', meta.unit)),
-      h('dt', 'source'), h('dd', chip(meta.provenance,
-        `${meta.source}. Sampled bilinearly from the served ${fname} grid along the drawn line; no smoothing, no fitting.`)),
+      h('dt', 'source'), h('dd', (() => {
+        const fp = fieldProvenance(fname);
+        return chip(fp.kind,
+          `${fp.why}\n\nSampled bilinearly from the served ${fname} grid along the drawn line; no smoothing, no fitting.`);
+      })()),
     );
     profHint.textContent = d && d.outside
       ? `${d.outside} of ${d.n} samples fall outside the grid and are not plotted.`
@@ -394,11 +397,14 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     };
 
     const measured = { kind: 'measured', why: 'Cell centroids and phenotype calls come from the segmented spatial assay; counting them inside a rectangle adds no model.' };
-    const computedGrid = meta
-      ? { kind: meta.provenance, why: `${meta.source}. Area statistics are over the served grid nodes inside the region, so they inherit the run dx — a region narrower than one dx reports nothing rather than an interpolated value.` }
+    // Run-aware: a statistic OF a field cannot be a stronger claim than the
+    // field it was taken over.
+    const fp = meta ? fieldProvenance(fname) : null;
+    const computedGrid = fp
+      ? { kind: fp.kind, why: `${fp.why}\n\nArea statistics are over the served grid nodes inside the region, so they inherit the run dx — a region narrower than one dx reports nothing rather than an interpolated value.` }
       : null;
-    const computedCell = meta
-      ? { kind: meta.provenance, why: `${meta.source}, bilinearly interpolated at each measured cell centroid. An interpolation of a computed field is computed, never measured.` }
+    const computedCell = fp
+      ? { kind: fp.kind, why: `${fp.why}\n\nBilinearly interpolated at each measured cell centroid. An interpolation of a computed field is computed, never measured.` }
       : null;
 
     row('area', (r) => num(r.areaUm2 / 1e6, 4), 'mm2',

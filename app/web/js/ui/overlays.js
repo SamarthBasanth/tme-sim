@@ -9,7 +9,7 @@ import { nice125, num, int, auto, pct, NULL_GLYPH } from '../util/fmt.js';
 import { gradientCss } from '../gl/ramps.js';
 import { fieldMeta } from '../fields.js';
 import { CELL_TYPES } from '../gl/viewer.js';
-import { chip } from './provenance.js';
+import { chip, fieldProvenance } from './provenance.js';
 
 const CHAN_VARS = ['--ch-tumor', '--ch-stromal', '--ch-immune', '--ch-endothelial', '--ch-necrotic'];
 
@@ -66,10 +66,13 @@ export function createOverlays(viewer) {
 
     const windowed = Math.abs(lo - legendField.min) > 1e-9 * Math.abs(legendField.max - legendField.min || 1)
       || Math.abs(hi - legendField.max) > 1e-9 * Math.abs(legendField.max - legendField.min || 1);
+    // Run-aware, not the static table: these pixels ARE the field, so if the
+    // run's own metrics escalate to ASSUMED the ramp beside them must too.
+    const fp = fieldProvenance(legendName);
     fill(legNote,
       h('span', `${legendField.rows}×${legendField.cols} @ ${num(legendField.dx, 1)} um`),
       ' ',
-      chip(meta.provenance, meta.note),
+      chip(fp.kind, fp.why),
       windowed
         ? h('div.l-win', { title: 'The colour ramp is mapped across the window, not the full data range. Values outside it are clamped.' },
           'windowed · data ', auto(legendField.min), ' → ', auto(legendField.max))
@@ -138,11 +141,11 @@ export function createOverlays(viewer) {
 
   /* ------------------------------------------------------ empty state -- */
   const empty = h('div.ov.ov-empty.interactive',
-    h('div.empty',
+    h('div.notice',
       h('h3', 'No geometry loaded'),
       h('p', 'Submit a RunSpec, or open a completed run from the history dock, to load its cell geometry over ',
         h('code.badge-code', 'GET /api/runs/{id}/geometry'), '.'),
-      h('p.empty-keys',
+      h('p.notice-keys',
         h('kbd', 'wheel'), ' zoom · ', h('kbd', 'drag'), ' pan · ',
         h('kbd', 'click'), ' pin a cell · ', h('kbd', 'F'), ' fit · ',
         h('kbd', '?'), ' all keys'),

@@ -26,55 +26,24 @@
    In light mode the three low-contrast slots sit under 3:1 on the mid-grey
    surround, so the relief rule applies — the legend always ships a visible
    label AND a count for every category, so identity is never colour-alone.
+
+   The --mech-* values themselves live in css/tokens.css with every other
+   palette. They were declared here, in this file's own :root block with its
+   own light-mode variant behind a third spelling of the media selector, which
+   is exactly how eight stylesheets stop agreeing with each other.
    ============================================================================ */
 
-:root,
-:root[data-theme="dark"] {
-  --mech-killed:       hsl(212  8% 55%);   /* achromatic on purpose */
-  --mech-unreached:    #3987e5;            /* slot 1 blue    — DELIVERY   */
-  --mech-underdosed:   #c98500;            /* slot 3 yellow  — DOSE       */
-  --mech-resistant:    #e66767;            /* slot 6 red     — RESISTANCE */
-  --mech-stochastic:   #d55181;            /* slot 7 magenta — CHANCE     */
-  --mech-unattributed: hsl(  0 82% 62%);   /* reserved CRITICAL state     */
-  --mech-alreadydead:  hsl(212  9% 34%);
-  --mech-nottumor:     hsl(212 10% 20%);
-}
-
-:root[data-theme="light"] {
-  --mech-killed:       hsl(212 10% 45%);
-  --mech-unreached:    #2a78d6;
-  --mech-underdosed:   #eda100;
-  --mech-resistant:    #e34948;
-  --mech-stochastic:   #e87ba4;
-  --mech-unattributed: hsl(356 76% 46%);
-  --mech-alreadydead:  hsl(212 10% 62%);
-  --mech-nottumor:     hsl(212 12% 78%);
-}
-
-@media (prefers-color-scheme: light) {
-  :root:where(:not([data-theme="dark"])) {
-    --mech-killed:       hsl(212 10% 45%);
-    --mech-unreached:    #2a78d6;
-    --mech-underdosed:   #eda100;
-    --mech-resistant:    #e34948;
-    --mech-stochastic:   #e87ba4;
-    --mech-unattributed: hsl(356 76% 46%);
-    --mech-alreadydead:  hsl(212 10% 62%);
-    --mech-nottumor:     hsl(212 12% 78%);
-  }
-}
-
 /* --------------------------------------------------------- legend card --- */
-.ov-mech { right: 10px; top: 10px; max-width: 300px; }
+.ov-mech { right: var(--stage-inset); top: var(--stage-inset); max-width: 300px; }
 
-.mechleg { padding: 5px 6px; min-width: 250px; }
+.mechleg { padding: var(--sp-3) var(--sp-4); min-width: 250px; }
 .mechleg .m-title {
-  display: flex; align-items: baseline; gap: 5px;
+  display: flex; align-items: baseline; gap: var(--sp-3);
   font-size: var(--fs-micro);
   text-transform: uppercase;
   letter-spacing: var(--tr-wide);
   color: var(--fg-1);
-  margin-bottom: 3px;
+  margin-bottom: var(--sp-2);
 }
 .mechleg .m-title .grow { flex: 1; }
 
@@ -82,7 +51,7 @@
 .mechleg .m-row {
   display: grid;
   grid-template-columns: 8px 1fr auto auto;
-  gap: 5px;
+  gap: var(--sp-3);
   align-items: center;
   font-size: var(--fs-micro);
   line-height: 1.5;
@@ -104,11 +73,11 @@
 }
 .mechleg .m-p { color: var(--fg-2); min-width: 42px; text-align: right; }
 
-.mechleg .m-sep { height: 1px; background: var(--line-1); margin: 3px 0; }
+.mechleg .m-sep { height: 1px; background: var(--line-1); margin: var(--sp-2) 0; }
 .mechleg .m-note {
   font-size: var(--fs-micro);
   color: var(--fg-2);
-  margin-top: 3px;
+  margin-top: var(--sp-2);
   line-height: 1.4;
 }
 .mechleg .m-note b { color: var(--fg-1); font-weight: 600; }
@@ -117,7 +86,7 @@
 
 /* the delivery / dose / resistance / chance roll-up */
 .mechleg .m-bar {
-  display: flex; height: 7px; margin: 3px 0 2px;
+  display: flex; height: 7px; margin: var(--sp-2) 0 var(--sp-1);
   border: 1px solid var(--line-2);
 }
 .mechleg .m-bar span { height: 100%; }
@@ -125,15 +94,22 @@
 .mechleg .m-bar span + span { box-shadow: -2px 0 0 0 var(--bg-1); }
 
 /* ------------------------------------------------------------ scrubber --- */
-.ov-timelapse { left: 10px; bottom: 44px; right: 10px; pointer-events: none; }
+/* Sits ABOVE the two bottom-corner cards (scale bar, field legend) rather
+   than beside them: --stage-inset gutter, plus the tallest bottom card. */
+.ov-timelapse {
+  left: var(--stage-inset);
+  right: var(--stage-inset);
+  bottom: calc(var(--stage-inset) + 72px);
+  pointer-events: none;
+}
 
 .scrub {
   pointer-events: auto;
   display: grid;
   grid-template-columns: auto auto 1fr auto;
   align-items: center;
-  gap: 7px;
-  padding: 4px 7px;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
   max-width: 620px;
 }
 .scrub .s-btn {
@@ -144,7 +120,7 @@
 .scrub input[type="range"] {
   width: 100%;
   accent-color: var(--accent);
-  height: 14px;
+  height: var(--sp-7);
   margin: 0;
 }
 .scrub .s-read {

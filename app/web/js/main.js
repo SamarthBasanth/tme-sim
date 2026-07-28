@@ -16,6 +16,7 @@ import { createTools, TOOLS } from './ui/tools.js';
 import { makeSplitter } from './ui/splitter.js';
 import { toast, notifyError } from './ui/toast.js';
 import { fieldMeta } from './fields.js';
+import { setSynthetic, setActiveRun } from './ui/provenance.js';
 import { num, int, auto, bytes, NULL_GLYPH } from './util/fmt.js';
 
 const store = createStore({ ...INITIAL });
@@ -71,7 +72,7 @@ async function boot() {
     viewer = new Viewer(canvas);
   } catch (err) {
     $('#canvas-wrap').appendChild(h('div.ov.ov-empty',
-      h('div.empty',
+      h('div.notice',
         h('h3', 'WebGL2 unavailable'),
         h('p', 'This workstation requires WebGL2 for the cell viewer. ' +
           'The run control, history, and provenance panels still work; the viewport does not.'),
@@ -237,14 +238,32 @@ function stubViewer() {
 /* ========================================================== chrome ===== */
 
 function paintBackendState(a) {
+  // The STUB state is a property of the whole session, not of the status bar.
+  // Two things are set here and NOTHING else has to know about the stub:
+  //   * data-mode on <html> drives the shell-wide chrome in css/components.css
+  //     (striped frame, viewport tag, coloured section header) — every panel is
+  //     inside it, so there is no glance that misses it;
+  //   * the provenance latch re-labels EVERY chip in EVERY panel as SYNTHETIC,
+  //     which is what stops a fabricated cell count wearing a green "measured".
+  // Both are re-evaluated on every mode change, so a mid-session degradation is
+  // caught too, not just one that was present at boot.
+  const stubWhy = 'The FastAPI backend did not answer (' + (a.stubReason || 'backend unreachable')
+    + '). Every response is being synthesised locally by js/mock.js from a seeded PRNG '
+    + 'against the shape of API_CONTRACT.md. There is no tissue, no solve and no measurement behind any of it.';
+  document.documentElement.setAttribute('data-mode', a.stub ? 'stub' : 'live');
+  setSynthetic(!!a.stub, stubWhy);
+  // Re-render whatever is already on screen under the new labelling.
+  if (a.stub && inspect && store.get().activeRun) inspect.renderRun(store.get().activeRun);
+  if (a.stub && history) history.setRuns(store.get().runs || []);
+
   const led = $('#hdr-led');
   const txt = $('#hdr-backend');
   if (!led || !txt) return;
   if (a.stub) {
     led.className = 'led warn';
     txt.textContent = 'STUB DATA · ' + (a.stubReason || 'backend unreachable');
-    txt.style.color = 'var(--warn)';
-    txt.title = 'The FastAPI backend did not answer. Responses are synthesised locally by js/mock.js against API_CONTRACT.md and must not be read as results.';
+    txt.style.color = 'var(--synthetic)';
+    txt.title = stubWhy;
   } else if (a.reachable) {
     led.className = 'led ok';
     txt.textContent = 'live · ' + location.host;
@@ -632,6 +651,10 @@ async function openRun(id) {
     return;
   }
   store.set({ activeRun: run });
+  // A field overlay's provenance depends on the RunSpec that produced it (a KDE
+  // vascular field is not the same claim as a discrete one), but the legend and
+  // the ROI tables do not hold a RunResult. Park it where they can reach it.
+  setActiveRun(run);
   inspect.renderRun(run);
   const st = $('#hdr-run-status');
   while (st.firstChild) st.removeChild(st.firstChild);
