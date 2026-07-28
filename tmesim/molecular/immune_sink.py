@@ -2,10 +2,12 @@
 
 WHAT THIS IS
 ------------
-The reconstruction places real IMMUNE cells — 8.5-19.5% of the segmented cells
-depending on section, dominated on the IO panel by CD163+ (18.2% detection) and
-TREM2+ (9.1%) tumour-associated macrophages — but until now they were
-pharmacologically INERT: they occupied space and consumed nothing. This module
+The reconstruction places real IMMUNE cells — 11.4-19.5% of the segmented cells
+across the three real sections under the shipping ``matched_null_z`` classifier
+(``results/classifier_fix.md`` §3), gated on PTPRC / CD68 / AIF1 / CD163 and
+dominated on the IO panel by CD163, whose detection rate there is 18.2%
+(``results/classifier_fix.md`` §1) — but until now they were pharmacologically
+INERT: they occupied space and consumed nothing. This module
 adds the one thing a microenvironment model can say about them that a
 compartmental model cannot: **drug is lost where the macrophages are**, so the
 loss is a FIELD rather than a number.
@@ -167,6 +169,8 @@ __all__ = [
     "diverted_fraction_from_strength",
     "k_max_from_strength",
     "transport_with_immune_sink",
+    "substrate_summary",
+    "field_summary",
 ]
 
 

@@ -728,8 +728,11 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
         f"i.e. the structure is a property of where the CELLS are and not "
         f"specifically of where the MACROPHAGES are"
     )
+    imm_lo = min(r["immune_pct"] for r in fields)
+    imm_hi = max(r["immune_pct"] for r in fields)
     a("**Verdict up front.** The immune compartment was pharmacologically inert: "
-      "8.5-19.5% of the segmented cells occupied space and consumed nothing. It "
+      f"{imm_lo:.1f}-{imm_hi:.1f}% of the segmented cells across the three real "
+      "sections occupied space and consumed nothing. It "
       "now has a mechanism — a first-order drug loss proportional to the local "
       "MEASURED immune-cell area fraction — and the honest findings are three. "
       "**(i) The literature supports a DIRECTION and not a MAGNITUDE**, and for "

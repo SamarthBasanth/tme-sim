@@ -806,6 +806,7 @@ def compute(dx_um: float = DX_UM) -> Dict:
         for (n, h) in kernels
     }
 
+    out["tmz_kernel_key"] = f"temozolomide@{TMZ_HALF_LIFE_H}"
     tmz_k = kernels[("temozolomide", TMZ_HALF_LIFE_H)]
     tmz = drugs["temozolomide"]
     tmz_hl_s = TMZ_HALF_LIFE_H * HOUR
@@ -1399,12 +1400,11 @@ def write_report(out: Dict, path: str) -> None:
           f"{km['plasma_residual']:.2e} | {km['tissue_residual']:.2e} | "
           f"**{km['residual']:.2e}** |")
     w("")
-    w(f"The substitution is only ever *used* for temozolomide at "
-      f"{TMZ_HALF_LIFE_H} h (the 28-day regimen leg), where the certified error "
-      f"is "
-      f"{out['kernel_meta'][f'temozolomide@{TMZ_HALF_LIFE_H}']['residual']:.1e}. "
-      f"Every other leg reads exact grid entries; the kernel refuses to "
-      f"interpolate and raises instead.")
+    tmz_km = out["kernel_meta"][out["tmz_kernel_key"]]
+    w(f"The substitution is only ever *used* for the temozolomide kernel driving "
+      f"the 28-day regimen leg, where the certified error is "
+      f"**{tmz_km['residual']:.1e}**. Every other leg reads exact grid entries; "
+      f"the kernel refuses to interpolate and raises instead.")
     w("")
     w("### 1.2 Verification — three independent checks, each a full extra solve")
     w("")
@@ -1499,7 +1499,8 @@ def write_report(out: Dict, path: str) -> None:
     ref_cum = 750.0
     for reg in REGIMENS:
         r = _reg_row(rows, reg["key"], "prescribed")
-        w(f"| {reg['label']} | {reg['mg_m2']:.0f} mg/m2/d | "
+        unit = "mg/m2/d" if r["n_doses"] > 1 else "mg/m2, once"
+        w(f"| {reg['label']} | {reg['mg_m2']:.0f} {unit} | "
           f"{daydesc[reg['key']]} | {r['n_doses']} | "
           f"**{r['cumulative_mg_m2_prescribed']:.0f}** | "
           f"{r['cumulative_mg_m2_prescribed']/ref_cum:.2f}x | "
@@ -1613,15 +1614,27 @@ def write_report(out: Dict, path: str) -> None:
     w("`*` = per-dose mg/m2 outside the label's stated linear-PK range "
       "(75-250 mg/m2/day); the linear conversion is an extrapolation for that row.")
     w("")
-    pres = sorted([_reg_row(rows, r["key"], "prescribed") for r in REGIMENS],
-                  key=lambda r: -r["kill_expected"])
-    w(f"**Ranking is monotone in cumulative dose, and nothing else.** The top arm "
-      f"({pres[0]['label']}, {pres[0]['cumulative_mg_m2']:.0f} mg/m2) reaches "
-      f"E[kill] {pres[0]['kill_expected']:.6f}; the bottom "
-      f"({pres[-1]['label']}, {pres[-1]['cumulative_mg_m2']:.0f} mg/m2) reaches "
-      f"{pres[-1]['kill_expected']:.6f}. That is the entire content of this "
-      "table: in a transport model with a static Hill kill map, cumulative dose "
-      "is the only lever visible at this scale.")
+    pres_all = [_reg_row(rows, r["key"], "prescribed") for r in REGIMENS]
+    pres = sorted(pres_all, key=lambda r: -r["kill_expected"])
+    by_dose = sorted(pres_all, key=lambda r: r["cumulative_mg_m2"])
+    monotone = all(by_dose[i]["kill_expected"] <= by_dose[i + 1]["kill_expected"]
+                   + 1e-12 for i in range(len(by_dose) - 1))
+    verdict = ("**Ranking is monotone in cumulative dose, and in nothing else** "
+               "(checked, not asserted: sorting the table by cumulative mg/m2 "
+               "gives a non-decreasing E[kill] at every step)."
+               if monotone else
+               "**Ranking is ALMOST but not exactly monotone in cumulative dose** "
+               "— the exceptions are where the schedule effect of section 4 "
+               "becomes visible.")
+    w(f"{verdict} The top arm ({pres[0]['label']}, "
+      f"{pres[0]['cumulative_mg_m2']:.0f} mg/m2) reaches E[kill] "
+      f"{pres[0]['kill_expected']:.6f}; the bottom ({pres[-1]['label']}, "
+      f"{pres[-1]['cumulative_mg_m2']:.0f} mg/m2) reaches "
+      f"{pres[-1]['kill_expected']:.6f}, a "
+      f"{pres[0]['kill_expected']/max(pres[-1]['kill_expected'],1e-30):.2f}x "
+      "range across a 2.8x range in cumulative dose. That is the entire content "
+      "of this table: in a transport model with a static Hill kill map, "
+      "cumulative dose is the only lever visible at this scale.")
     w("")
     w("> **This is where the model and the clinic diverge, and it is worth being "
       "blunt about it.** RTOG 0525's dose-dense arm delivered ~2.1x the "
@@ -1632,12 +1645,14 @@ def write_report(out: Dict, path: str) -> None:
       "**cannot reproduce that trial**. Section 7 lists what would have to be "
       "added before it could.")
     w("")
-    w("Note also that IC50 coverage is 0% for every arm at clinical doses. "
-      "Temozolomide's GDSC glioma IC50 is "
-      f"{tmzp['ic50']:.0f} uM against a median window-averaged tumour exposure of "
-      f"{pres[0]['median_E_over_ic50']*tmzp['ic50']:.3f} uM at the highest-dose "
-      "arm. This is consistent with `results/dose_schedule.md`, which finds "
-      "temozolomide dose-limited across its whole sweep.")
+    max_cov = max(r["ic50_coverage"] for r in pres_all)
+    w(f"Note also that IC50 coverage never exceeds {max_cov*100:.2f}% of tumor "
+      f"cells on any arm. Temozolomide's cached GDSC glioma IC50 is "
+      f"{tmzp['ic50']:.0f} uM against a median window-averaged tumour exposure "
+      f"of {pres[0]['median_E_over_ic50']*tmzp['ic50']:.4g} uM even on the "
+      "highest-dose arm. This is consistent with `results/dose_schedule.md`, "
+      "which finds temozolomide dose-limited across its whole swept range and "
+      "never reaching IC50 at clinical plasma levels.")
     w("")
     w("---")
     w("")
@@ -1651,25 +1666,52 @@ def write_report(out: Dict, path: str) -> None:
       f"of that fixed total differs. This is the comparison the question actually "
       f"asks for.")
     w("")
-    w("| regimen | doses | mg/m2 per dose | peak per dose (uM) | plasma AUC in "
-      "window (uM*s) | **mean tumour AUC (uM*s)** | vs best | E[kill] | "
-      "kill (1 draw) | tumor >= IC50 | terminal residual C(T) |")
-    w("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
-    for reg in REGIMENS:
+    mrows = [_reg_row(rows, r["key"], "matched") for r in REGIMENS]
+    ref_plasma = max(r["plasma_auc_um_s"] for r in mrows)
+    eff = [r["mean_auc_tumor"] / r["plasma_auc_um_s"] for r in mrows]
+    ref_eff = max(eff)
+    w("| regimen | doses | mg/m2 per dose | peak per dose (uM) | plasma AUC "
+      "COUNTED in window (uM*s) | vs best | **mean tumour AUC (uM*s)** | vs best "
+      "| tissue AUC per counted plasma AUC | vs best | E[kill] | tumor >= IC50 | "
+      "terminal residual C(T) |")
+    w("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    for reg, e in zip(REGIMENS, eff):
         r = _reg_row(rows, reg["key"], "matched")
         flag = " *" if r["outside_linear_range"] else ""
         w(f"| {reg['label']}{flag} | {r['n_doses']} | "
           f"{r['mg_m2_per_dose']:.1f} | {r['peak_um']:.2f} | "
-          f"{r['plasma_auc_um_s']:.6g} | **{r['mean_auc_tumor']:.10g}** | "
-          f"{r['auc_rel_to_best']*100:+.6f}% | {r['kill_expected']:.8f} | "
-          f"{r['kill_drawn']:.6f} | {r['ic50_coverage']*100:.2f}% | "
-          f"{r['residual']*100:.4f}% |")
+          f"{r['plasma_auc_um_s']:.10g} | "
+          f"{(r['plasma_auc_um_s']-ref_plasma)/ref_plasma*100:+.6f}% | "
+          f"**{r['mean_auc_tumor']:.10g}** | "
+          f"{r['auc_rel_to_best']*100:+.6f}% | {e:.10g} | "
+          f"{(e-ref_eff)/ref_eff*100:+.6f}% | {r['kill_expected']:.8f} | "
+          f"{r['ic50_coverage']*100:.2f}% | {r['residual']*100:.4f}% |")
     w("")
     w(f"**Total spread in mean tumour exposure: "
       f"{_pct(out['matched_exposure_spread'], 6)}.** The analytic bound is "
       f"`tau_tissue / T_window` = {tau:.0f} s / 28 d = "
       f"{_pct(out['matched_bound_tau_over_T'], 6)}, and the measured spread sits "
       f"under it, as it must.")
+    w("")
+    w("**Reading the three 'vs best' columns — the difference decomposes "
+      "cleanly.** Matching *administered* cumulative mg/m2 is the clinically "
+      "meaningful match, but it is not quite the same thing as matching the drug "
+      "the solver actually integrates. Two distinct terminal effects separate "
+      "them, and both columns are here so neither is hidden:")
+    w("")
+    w("1. **Drug not yet delivered when the window closes** — a dose given on day "
+      "28 has not finished being absorbed and eliminated by day 28, so part of "
+      "its plasma curve falls outside the integration. That is the *plasma AUC "
+      "counted in window* column, and it is a **measurement-window artefact**, "
+      "not a schedule effect.")
+    w("2. **Drug delivered but still resident in tissue at T** — the terminal "
+      "residual `C(T)`, the last column. This one IS the schedule effect: it is "
+      "the `C(T)` in `A = M^-1 (S_total - C(T))`.")
+    w("")
+    w("The **tissue AUC per counted plasma AUC** column divides the first effect "
+      "out and leaves only the second, so it is the cleanest possible statement "
+      "of the pure schedule effect at matched dose. Its spread across all arms "
+      f"is **{_pct((ref_eff - min(eff)) / ref_eff, 6)}**.")
     w("")
     w("### 4.1 Why the spread is where it is, exactly")
     w("")
@@ -1846,8 +1888,10 @@ def write_report(out: Dict, path: str) -> None:
       f"{conv['clinical']['cisplatin']['half_life_h']:.1f} h | "
       f"{conv['clinical']['doxorubicin']['peak_um']:.1f} uM, "
       f"{conv['clinical']['doxorubicin']['half_life_h']:.1f} h | each agent on "
-      "its own measured plasma half-life — a **60x span**, which is exactly the "
-      "axis staggering acts on |")
+      f"its own measured plasma half-life — a **"
+      f"{max(v['half_life_h'] for v in conv['clinical'].values())
+         / min(v['half_life_h'] for v in conv['clinical'].values()):.0f}x span**, "
+      "which is exactly the axis staggering acts on |")
     w("")
     w("**Provenance of the clinical PK, with its weaknesses stated:**")
     w("")
