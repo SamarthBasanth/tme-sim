@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tmesim Studio — in silico tumor microenvironment</title>
+<meta name="description" content="Reconstruct a tumor microenvironment from real measured tissue and simulate drug delivery through it. Research preview, glioblastoma flagship.">
+<meta name="color-scheme" content="dark light">
+<style>
+/* ============================================================================
+   tmesim Studio — landing page
+   Palette, type and spacing are pulled directly from the product's own
+   app/web/css/tokens.css so this page reads as the same instrument, not a
+   separate marketing skin. Extended only where a landing page needs sizes the
+   dense in-app UI never does (display type, generous section rhythm).
+   ============================================================================ */
+
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-void: hsl(213 18% 5%);
+  --bg-0:    hsl(212 16% 8%);
+  --bg-1:    hsl(212 14% 11%);
+  --bg-2:    hsl(212 13% 14%);
+  --bg-3:    hsl(212 12% 18%);
+  --line-0:  hsl(212 12% 16%);
+  --line-1:  hsl(212 11% 22%);
+  --line-2:  hsl(212 10% 31%);
+  --fg-0:    hsl(208 15% 93%);
+  --fg-1:    hsl(208 10% 73%);
+  --fg-2:    hsl(208  8% 53%);
+  --fg-3:    hsl(208  8% 38%);
+  --accent:      hsl(191 72% 54%);
+  --accent-hi:   hsl(191 80% 66%);
+  --accent-dim:  hsl(191 46% 34%);
+  --accent-bg:   hsl(191 60% 54% / 0.13);
+  --accent-fg:   hsl(213 30%  7%);
+  --ok:      hsl(150 48% 48%);
+  --ok-bg:   hsl(150 48% 48% / 0.14);
+  --warn:    hsl( 38 84% 57%);
+  --crit:    hsl(  2 74% 60%);
+  --focus:   hsl(191 88% 62%);
+  --mech-unreached:  #3987e5;
+  --mech-underdosed: #c98500;
+  --mech-resistant:  #e66767;
+  --mech-stochastic: #d55181;
+  --mech-killed:     hsl(212 8% 48%);
+  --elev-1: 0 1px 3px hsl(213 30% 3% / 0.40);
+  --elev-2: 0 10px 40px hsl(213 30% 3% / 0.55);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg-void: hsl(210 16% 84%);
+  --bg-0:    hsl(210 20% 91%);
+  --bg-1:    hsl(210 24% 97%);
+  --bg-2:    hsl(0    0% 100%);
+  --bg-3:    hsl(210 22% 94%);
+  --line-0:  hsl(210 18% 91%);
+  --line-1:  hsl(210 16% 83%);
+  --line-2:  hsl(210 14% 68%);
+  --fg-0:    hsl(213 28% 13%);
+  --fg-1:    hsl(213 13% 33%);
+  --fg-2:    hsl(213 10% 47%);
+  --fg-3:    hsl(213  9% 63%);
+  --accent:      hsl(197 88% 30%);
+  --accent-hi:   hsl(197 92% 24%);
+  --accent-dim:  hsl(197 40% 62%);
+  --accent-bg:   hsl(197 78% 40% / 0.10);
+  --accent-fg:   hsl(0    0% 100%);
+  --ok:      hsl(150 66% 26%);
+  --ok-bg:   hsl(150 60% 34% / 0.12);
+  --warn:    hsl( 30 92% 32%);
+  --crit:    hsl(356 70% 43%);
+  --focus:   hsl(197 92% 34%);
+  --mech-unreached:  #2a78d6;
+  --mech-underdosed: #b3790a;
+  --mech-resistant:  #cf3f3e;
+  --mech-stochastic: #c15c85;
+  --mech-killed:     hsl(212 10% 55%);
+  --elev-1: 0 1px 3px hsl(213 24% 30% / 0.12);
+  --elev-2: 0 14px 40px hsl(213 24% 30% / 0.16);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --bg-void: hsl(210 16% 84%); --bg-0: hsl(210 20% 91%); --bg-1: hsl(210 24% 97%);
+    --bg-2: hsl(0 0% 100%); --bg-3: hsl(210 22% 94%);
+    --line-0: hsl(210 18% 91%); --line-1: hsl(210 16% 83%); --line-2: hsl(210 14% 68%);
+    --fg-0: hsl(213 28% 13%); --fg-1: hsl(213 13% 33%); --fg-2: hsl(213 10% 47%); --fg-3: hsl(213 9% 63%);
+    --accent: hsl(197 88% 30%); --accent-hi: hsl(197 92% 24%); --accent-dim: hsl(197 40% 62%);
+    --accent-bg: hsl(197 78% 40% / 0.10); --accent-fg: hsl(0 0% 100%);
+    --ok: hsl(150 66% 26%); --ok-bg: hsl(150 60% 34% / 0.12); --warn: hsl(30 92% 32%); --crit: hsl(356 70% 43%);
+    --focus: hsl(197 92% 34%);
+    --mech-unreached: #2a78d6; --mech-underdosed: #b3790a; --mech-resistant: #cf3f3e; --mech-stochastic: #c15c85;
+    --mech-killed: hsl(212 10% 55%);
+    --elev-1: 0 1px 3px hsl(213 24% 30% / 0.12); --elev-2: 0 14px 40px hsl(213 24% 30% / 0.16);
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg-0);
+  color: var(--fg-0);
+  font-family: "Helvetica Neue", "Neue Haas Grotesk Text", "Nimbus Sans", Arimo, "Liberation Sans", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.mono {
+  font-family: "SF Mono", "IBM Plex Mono", "Roboto Mono", "DejaVu Sans Mono", Menlo, Consolas, "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+}
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+img, canvas { max-width: 100%; display: block; }
+
+/* ---- layout shell -------------------------------------------------- */
+.wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+.wrap-wide { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+header.top {
+  position: sticky; top: 0; z-index: 20;
+  background: hsl(from var(--bg-0) h s l / 0.86);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line-1);
+}
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: 1040px; margin: 0 auto; padding: 14px 24px;
+}
+.wordmark {
+  font-size: 14px; font-weight: 700; letter-spacing: 0.01em;
+  display: flex; align-items: baseline; gap: 7px;
+}
+.wordmark .dot { width: 7px; height: 7px; border-radius: 1px; background: var(--accent); display: inline-block; }
+.wordmark .studio { color: var(--fg-2); font-weight: 500; }
+nav.topnav { display: flex; gap: 22px; align-items: center; }
+nav.topnav a {
+  text-decoration: none; color: var(--fg-1); font-size: 12.5px; font-weight: 500;
+  letter-spacing: 0.01em;
+}
+nav.topnav a:hover { color: var(--fg-0); }
+.themebtn {
+  font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--fg-2);
+  background: var(--bg-2); border: 1px solid var(--line-1); border-radius: 2px;
+  padding: 5px 9px; cursor: pointer;
+}
+.themebtn:hover { color: var(--fg-0); border-color: var(--line-2); }
+
+/* ---- eyebrow / headings --------------------------------------------- */
+.eyebrow {
+  font-family: "SF Mono", "IBM Plex Mono", "Roboto Mono", monospace;
+  font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--accent); font-weight: 600;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.eyebrow::before { content: ""; width: 14px; height: 1px; background: var(--accent); display: inline-block; }
+
+h1, h2, h3 { font-weight: 700; letter-spacing: -0.012em; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(32px, 5.6vw, 52px); line-height: 1.08; }
+h2 { font-size: clamp(22px, 3.4vw, 30px); line-height: 1.15; }
+h3 { font-size: 15px; letter-spacing: -0.006em; }
+p { margin: 0; }
+.lede { font-size: 17px; line-height: 1.5; color: var(--fg-1); max-width: 62ch; }
+.body-p { font-size: 14px; line-height: 1.6; color: var(--fg-1); max-width: 60ch; }
+
+/* ---- hero ------------------------------------------------------------ */
+section.hero { padding: 88px 0 64px; }
+.hero-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 56px; align-items: center; }
+@media (max-width: 860px) { .hero-grid { grid-template-columns: 1fr; gap: 40px; } }
+.hero-copy { display: flex; flex-direction: column; gap: 20px; }
+.hero-cta { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.btn {
+  font-family: inherit; font-size: 13px; font-weight: 600; letter-spacing: 0.005em;
+  padding: 11px 20px; border-radius: 2px; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent;
+  transition: filter 90ms cubic-bezier(0.2,0,0.3,1), border-color 90ms cubic-bezier(0.2,0,0.3,1);
+}
+.btn-primary { background: var(--accent); color: var(--accent-fg); }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-ghost { background: transparent; color: var(--fg-1); border-color: var(--line-1); }
+.btn-ghost:hover { color: var(--fg-0); border-color: var(--line-2); }
+
+.hero-figure {
+  background: var(--bg-1); border: 1px solid var(--line-1); border-radius: 3px;
+  padding: 18px; box-shadow: var(--elev-1);
+}
+.hero-figure .fig-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: "SF Mono", "IBM Plex Mono", "Roboto Mono", monospace;
+  font-size: 10px; color: var(--fg-2); letter-spacing: 0.03em; margin-bottom: 10px;
+}
+.hero-figure .fig-head .tag {
+  color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.06em;
+}
+canvas#mechfig { width: 100%; height: 260px; border-radius: 2px; background: var(--bg-void); }
+.fig-legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 12px; }
+.fig-legend .li { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--fg-2); }
+.fig-legend .sw { width: 8px; height: 8px; border-radius: 1px; flex: none; }
+.fig-caption {
+  margin-top: 12px; font-size: 10.5px; color: var(--fg-3); line-height: 1.5;
+  border-top: 1px solid var(--line-0); padding-top: 10px;
+}
+
+/* ---- stat strip ------------------------------------------------------- */
+section.stats { padding: 8px 0 64px; }
+.stat-strip {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  background: var(--line-0); border: 1px solid var(--line-0); border-radius: 3px; overflow: hidden;
+}
+@media (max-width: 700px) { .stat-strip { grid-template-columns: 1fr; } }
+.stat-cell { background: var(--bg-1); padding: 20px 22px; }
+.stat-num {
+  font-family: "SF Mono", "IBM Plex Mono", "Roboto Mono", monospace;
+  font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 600; color: var(--fg-0);
+  letter-spacing: -0.01em;
+}
+.stat-label { font-size: 12px; color: var(--fg-2); margin-top: 4px; }
+.honest-line {
+  margin-top: 16px; font-size: 12px; color: var(--fg-2);
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.honest-line .mk { color: var(--warn); flex: none; font-family: "SF Mono", monospace; }
+
+/* ---- sections --------------------------------------------------------- */
+section { padding: 72px 0; border-top: 1px solid var(--line-0); }
+section.hero, section.stats { border-top: none; }
+.section-head { max-width: 620px; margin-bottom: 40px; display: flex; flex-direction: column; gap: 12px; }
+
+/* ---- how it works steps ------------------------------------------------ */
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; background: var(--line-0); border: 1px solid var(--line-0); border-radius: 3px; overflow: hidden; }
+@media (max-width: 860px) { .steps { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .steps { grid-template-columns: 1fr; } }
+.step { background: var(--bg-1); padding: 22px 20px; display: flex; flex-direction: column; gap: 10px; }
+.step .num {
+  font-family: "SF Mono", "IBM Plex Mono", "Roboto Mono", monospace; font-size: 11px;
+  color: var(--accent); font-weight: 700;
+}
+.step p { font-size: 12.5px; line-height: 1.55; color: var(--fg-2); }
+.step h3 { color: var(--fg-0); }
+
+/* ---- why glioblastoma --------------------------------------------------- */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+@media (max-width: 860px) { .split { grid-template-columns: 1fr; gap: 32px; } }
+.callout {
+  background: var(--bg-1); border: 1px solid var(--line-1); border-left: 2px solid var(--accent);
+  border-radius: 2px; padding: 16px 18px; font-size: 12.5px; color: var(--fg-1); line-height: 1.6;
+}
+.callout b { color: var(--fg-0); }
+.dev-note {
+  margin-top: 14px; font-size: 11.5px; color: var(--fg-3);
+  font-family: "SF Mono", "IBM Plex Mono", "Roboto Mono", monospace;
+}
+
+/* ---- rigor list --------------------------------------------------------- */
+.rigor-list { display: flex; flex-direction: column; gap: 1px; background: var(--line-0); border: 1px solid var(--line-0); border-radius: 3px; overflow: hidden; }
+.rigor-item { background: var(--bg-1); padding: 20px 22px; display: grid; grid-template-columns: 28px 1fr; gap: 16px; }
+.rigor-item .ic {
+  width: 20px; height: 20px; border-radius: 2px; background: var(--accent-bg);
+  color: var(--accent); display: flex; align-items: center; justify-content: center;
+  font-family: "SF Mono", monospace; font-size: 11px; font-weight: 700;
+}
+.rigor-item h3 { margin-bottom: 5px; }
+.rigor-item p { font-size: 12.5px; color: var(--fg-2); line-height: 1.6; max-width: 58ch; }
+.chip-row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.chip {
+  font-family: "SF Mono", "IBM Plex Mono", "Roboto Mono", monospace;
+  font-size: 9.5px; letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 2px; border: 1px solid var(--line-1);
+}
+.chip.measured { color: var(--ok); border-color: color-mix(in hsl, var(--ok) 40%, var(--line-1)); background: var(--ok-bg); }
+.chip.assumed { color: var(--warn); border-color: color-mix(in hsl, var(--warn) 40%, var(--line-1)); }
+.chip.refused { color: var(--crit); border-color: color-mix(in hsl, var(--crit) 40%, var(--line-1)); }
+
+/* ---- cta / footer -------------------------------------------------------- */
+section.cta { text-align: left; }
+.cta-box {
+  background: var(--bg-1); border: 1px solid var(--line-1); border-radius: 4px;
+  padding: 40px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 32px; align-items: center;
+}
+@media (max-width: 760px) { .cta-box { grid-template-columns: 1fr; padding: 28px; } }
+.cta-box .body-p { max-width: none; }
+.cta-actions { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+@media (max-width: 760px) { .cta-actions { align-items: stretch; } }
+.cta-fine { font-size: 11px; color: var(--fg-3); }
+
+footer { border-top: 1px solid var(--line-0); padding: 28px 0 40px; }
+.foot-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+  font-size: 11.5px; color: var(--fg-3);
+}
+.foot-row .wordmark { font-size: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="topbar">
+    <span class="wordmark"><span class="dot"></span>tmesim <span class="studio">Studio</span></span>
+    <nav class="topnav">
+      <a href="#how">Platform</a>
+      <a href="#glioblastoma">Glioblastoma</a>
+      <a href="#rigor">Rigor</a>
+      <a href="#access">Access</a>
+      <button class="themebtn" id="themeToggle" type="button" aria-label="Toggle color theme">Theme</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap-wide">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">In silico tumor microenvironment — research preview</span>
+          <h1>See where the drug goes. And why it didn&rsquo;t reach the rest.</h1>
+          <p class="lede">
+            tmesim Studio reconstructs a tumor&rsquo;s microenvironment from real measured
+            tissue &mdash; vasculature, matrix, oxygen &mdash; and simulates drug delivery
+            through it. Every surviving cell gets a reason: never reached, underdosed,
+            resistant, or chance.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="#access">Request access</a>
+            <a class="btn btn-ghost" href="#how">See the platform</a>
+          </div>
+        </div>
+
+        <div class="hero-figure">
+          <div class="fig-head">
+            <span>mechanism attribution &mdash; per-cell</span>
+            <span class="tag">example rendering</span>
+          </div>
+          <canvas id="mechfig" width="600" height="520" role="img" aria-label="Illustrative scatter of tumor cells colored by why each one survived or was killed"></canvas>
+          <div class="fig-legend">
+            <span class="li"><span class="sw" style="background:var(--mech-killed)"></span>killed</span>
+            <span class="li"><span class="sw" style="background:var(--mech-unreached)"></span>unreached &mdash; delivery</span>
+            <span class="li"><span class="sw" style="background:var(--mech-underdosed)"></span>underdosed &mdash; dose</span>
+            <span class="li"><span class="sw" style="background:var(--mech-resistant)"></span>resistant</span>
+            <span class="li"><span class="sw" style="background:var(--mech-stochastic)"></span>chance</span>
+          </div>
+          <p class="fig-caption">
+            Illustrative rendering, not live patient data. In the product this is the same
+            cell population you reconstructed, colored by a label reconciled bit-for-bit
+            against the run&rsquo;s own kill fraction.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats">
+    <div class="wrap-wide">
+      <div class="stat-strip">
+        <div class="stat-cell">
+          <div class="stat-num mono">509</div>
+          <div class="stat-label">automated tests, run on every change</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num mono">851,509</div>
+          <div class="stat-label">measured cells in a single ingested specimen</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num mono">6</div>
+          <div class="stat-label">drugs checked against measured human glioma tissue:plasma partitions</div>
+        </div>
+      </div>
+      <p class="honest-line">
+        <span class="mk">&gt;</span>
+        Current geometric-mean error against that measured tissue is roughly 2&times;.
+        We publish that number because a system that hides its own error bar can&rsquo;t
+        be checked, and a system that can&rsquo;t be checked isn&rsquo;t worth trusting
+        with a treatment decision.
+      </p>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap-wide">
+      <div class="section-head">
+        <span class="eyebrow">Platform</span>
+        <h2>Upload tissue. Get a mechanism, not a guess.</h2>
+        <p class="body-p">
+          Four steps, and every one of them is real computation on real measured data
+          &mdash; not a template applied to a diagnosis.
+        </p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <span class="num mono">01</span>
+          <h3>Upload</h3>
+          <p>Point it at Xenium or Visium output &mdash; or a generic matrix-plus-coordinates
+             layout. The system detects what it&rsquo;s looking at, checks the gene panel
+             against what a run will need, and reports honestly what it can and cannot
+             support. A missing marker is a stated limitation, not a silent guess.</p>
+        </div>
+        <div class="step">
+          <span class="num mono">02</span>
+          <h3>Reconstruct</h3>
+          <p>Vasculature, extracellular matrix, and oxygen are built from that specimen&rsquo;s
+             own measured markers &mdash; not a population average or a generic tumor
+             template. If a panel can&rsquo;t measure something, the reconstruction says so
+             instead of filling the gap.</p>
+        </div>
+        <div class="step">
+          <span class="num mono">03</span>
+          <h3>Simulate</h3>
+          <p>A convection&ndash;diffusion&ndash;reaction solver moves the drug through the
+             tissue you actually reconstructed. Pharmacokinetics, protein binding,
+             blood&ndash;brain-barrier partitioning, and Hill pharmacodynamics run on the
+             same grid &mdash; not a compartment model standing in for geometry.</p>
+        </div>
+        <div class="step">
+          <span class="num mono">04</span>
+          <h3>Attribute</h3>
+          <p>Every surviving tumor cell gets a reason: never reached, underdosed, resistant,
+             or chance. The attribution reconciles bit-for-bit against the kill fraction it
+             explains &mdash; not just plausible, checked.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="glioblastoma">
+    <div class="wrap-wide">
+      <div class="split">
+        <div>
+          <span class="eyebrow">Why glioblastoma first</span>
+          <h2 style="margin-top:12px;">The cancer where geometry decides the outcome.</h2>
+          <p class="body-p" style="margin-top:16px;">
+            Most solid tumors respond according to intrinsic sensitivity &mdash; genetics,
+            receptor status, driver mutations. Glioblastoma is the exception that makes a
+            transport-physics model matter: the blood&ndash;brain barrier makes
+            <b style="color:var(--fg-0)">delivery itself</b> the dominant clinical variable,
+            not a footnote to it. It&rsquo;s why we started here &mdash; the model earns its
+            keep exactly where geometry, not just biology, decides whether the drug arrives.
+          </p>
+        </div>
+        <div>
+          <div class="callout">
+            <b>Current scope.</b> Reconstruction runs on a single measured tissue section
+            (2-D). Registering multiple serial sections at known z-spacing into a genuine
+            3-D microenvironment is in active development &mdash; using the same real,
+            measured tissue data, not a synthetic volume.
+          </div>
+          <div class="dev-note">/// vascular field: measured endothelial markers, not inferred<br>
+          /// ECM field: measured matrix transcripts<br>
+          /// oxygen field: physics-solved on the measured vasculature</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="rigor">
+    <div class="wrap-wide">
+      <div class="section-head">
+        <span class="eyebrow">Rigor</span>
+        <h2>Built to be checked, not trusted.</h2>
+        <p class="body-p">
+          The output is not just a number. It&rsquo;s a number with a stated origin, and
+          a system that would rather stop than guess.
+        </p>
+      </div>
+      <div class="rigor-list">
+        <div class="rigor-item">
+          <div class="ic">P</div>
+          <div>
+            <h3>Provenance on everything</h3>
+            <p>Every value on screen says where it came from &mdash; measured, computed
+               from measured, literature, or assumed. A value computed from an assumed
+               input is labeled assumed, never upgraded by proximity to real data.</p>
+            <div class="chip-row">
+              <span class="chip measured">measured</span>
+              <span class="chip mono" style="color:var(--fg-2)">computed</span>
+              <span class="chip mono" style="color:var(--fg-2)">literature</span>
+              <span class="chip assumed">assumed</span>
+            </div>
+          </div>
+        </div>
+        <div class="rigor-item">
+          <div class="ic">R</div>
+          <div>
+            <h3>Refuses rather than defaults</h3>
+            <p>An unsupported gene panel, a missing unit, an unrecognized drug &mdash; the
+               system stops and states the reason, instead of quietly filling in a
+               plausible number.</p>
+            <div class="chip-row"><span class="chip refused">refused &mdash; unsupported panel</span></div>
+          </div>
+        </div>
+        <div class="rigor-item">
+          <div class="ic">B</div>
+          <div>
+            <h3>Reconciled, not just reported</h3>
+            <p>Per-cell mechanism attribution is checked bit-for-bit against the kill
+               fraction it explains. Not &ldquo;this is probably why&rdquo; &mdash; the same
+               arithmetic that produced the result, read back out.</p>
+          </div>
+        </div>
+        <div class="rigor-item">
+          <div class="ic">T</div>
+          <div>
+            <h3>Transport physics, not a lookup table</h3>
+            <p>A convection&ndash;diffusion&ndash;reaction PDE, solved on the tissue&rsquo;s
+               own measured geometry &mdash; grid-convergence checked, not assumed.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="access" class="cta">
+    <div class="wrap-wide">
+      <div class="cta-box">
+        <div>
+          <span class="eyebrow">Access</span>
+          <h2 style="margin-top:12px;">This is a research preview, not a diagnostic product.</h2>
+          <p class="body-p" style="margin-top:14px;">
+            If you have spatial tissue data, serial sections, or drug-response data that
+            could pair with it &mdash; or you want to run this on your own specimens
+            &mdash; we want to talk.
+          </p>
+        </div>
+        <div class="cta-actions">
+          <a class="btn btn-primary" href="mailto:samarthbasanth@gmail.com?subject=tmesim%20Studio%20%E2%80%94%20access%20request">Request access</a>
+          <span class="cta-fine mono">samarthbasanth@gmail.com</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap-wide foot-row">
+    <span class="wordmark"><span class="dot"></span>tmesim Studio</span>
+    <span>Every claim on this page is reproducible from the underlying data. Ask us how.</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- theme: persisted, mirrors the product's own toggle ----------------
+  var ROOT = document.documentElement;
+  var KEY = "tmesim-landing-theme";
+  function applyTheme(t) {
+    if (t === "dark" || t === "light") ROOT.setAttribute("data-theme", t);
+    else ROOT.removeAttribute("data-theme");
+  }
+  try {
+    var saved = localStorage.getItem(KEY);
+    if (saved) applyTheme(saved);
+  } catch (e) { /* privacy mode: no persistence, no crash */ }
+
+  var btn = document.getElementById("themeToggle");
+  btn.addEventListener("click", function () {
+    var current = ROOT.getAttribute("data-theme") ||
+      (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    var next = current === "dark" ? "light" : "dark";
+    applyTheme(next);
+    try { localStorage.setItem(KEY, next); } catch (e) { /* ignore */ }
+  });
+
+  // ---- hero figure: static illustrative mechanism-attribution scatter ----
+  // Seeded PRNG so the figure is deterministic, not randomly regenerated on
+  // every load (mulberry32, same generator the product's own stub layer uses).
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function styleColor(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function drawMechFigure() {
+    var canvas = document.getElementById("mechfig");
+    if (!canvas || !canvas.getContext) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cssW = canvas.clientWidth || 600;
+    var cssH = 260;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    var ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    var colors = {
+      killed:     styleColor("--mech-killed")     || "#8a9099",
+      unreached:  styleColor("--mech-unreached")  || "#3987e5",
+      underdosed: styleColor("--mech-underdosed") || "#c98500",
+      resistant:  styleColor("--mech-resistant")  || "#e66767",
+      stochastic: styleColor("--mech-stochastic") || "#d55181"
+    };
+    // Illustrative proportions only — loosely evocative of a mixed-response
+    // case, not pinned to any single reported run.
+    var groups = [
+      { key: "killed",     w: 0.40 },
+      { key: "unreached",  w: 0.24 },
+      { key: "resistant",  w: 0.18 },
+      { key: "underdosed", w: 0.12 },
+      { key: "stochastic", w: 0.06 }
+    ];
+
+    var rand = mulberry32(20260728);
+    var cx = cssW / 2, cy = cssH / 2;
+    var rx = cssW * 0.46, ry = cssH * 0.44;
+    var n = 900;
+
+    // A soft vascular-source glow near two fixed points, so the cloud reads
+    // as tissue rather than noise — purely decorative, not simulated data.
+    var sources = [[cx - rx * 0.35, cy - ry * 0.2], [cx + rx * 0.3, cy + ry * 0.3]];
+    ctx.save();
+    sources.forEach(function (s) {
+      var g = ctx.createRadialGradient(s[0], s[1], 0, s[0], s[1], Math.max(rx, ry) * 0.55);
+      g.addColorStop(0, "rgba(57,135,229,0.10)");
+      g.addColorStop(1, "rgba(57,135,229,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(s[0], s[1], Math.max(rx, ry) * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+
+    var idx = 0;
+    groups.forEach(function (g) {
+      var count = Math.round(n * g.w);
+      ctx.fillStyle = colors[g.key];
+      for (var i = 0; i < count; i++) {
+        var a = rand() * Math.PI * 2;
+        var r = Math.pow(rand(), 0.5);
+        var x = cx + Math.cos(a) * rx * r;
+        var y = cy + Math.sin(a) * ry * r;
+        var size = g.key === "killed" ? 1.5 : 1.9;
+        ctx.globalAlpha = g.key === "killed" ? 0.55 : 0.85;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+        idx++;
+      }
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  drawMechFigure();
+  window.addEventListener("resize", function () {
+    clearTimeout(window.__mechfigT);
+    window.__mechfigT = setTimeout(drawMechFigure, 120);
+  });
+
+  // Redraw on theme change so the figure's colors track the palette.
+  var mo = new MutationObserver(drawMechFigure);
+  mo.observe(ROOT, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>
+</body>
+</html>
