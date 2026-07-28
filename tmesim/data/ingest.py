@@ -1024,16 +1024,17 @@ def _read_coordinate_table(path: str, xcol: str, ycol: str,
                            idcol: Optional[str]) -> Dict[str, List]:
     out: Dict[str, List] = {"x": [], "y": [], "id": []}
     with _open_text(path) as fh:
-        sample = fh.readline()
-        fh.seek(0) if hasattr(fh, "seek") else None
-        delim = "\t" if sample.count("\t") > sample.count(",") else ","
-        reader = csv.DictReader(_open_text(path), delimiter=delim)
-        for row in reader:
+        header = fh.readline()
+    delim = "\t" if header.count("\t") > header.count(",") else ","
+    with _open_text(path) as fh:
+        for row in csv.DictReader(fh, delimiter=delim):
             try:
-                out["x"].append(float(row[xcol]))
-                out["y"].append(float(row[ycol]))
+                x = float(row[xcol])
+                y = float(row[ycol])
             except (TypeError, ValueError, KeyError):
                 continue
+            out["x"].append(x)
+            out["y"].append(y)
             if idcol is not None:
                 out["id"].append(str(row.get(idcol, "")).strip())
     return out

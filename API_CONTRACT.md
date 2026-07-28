@@ -559,6 +559,20 @@ like `app/runs/`.
   rendered document inline, and download it as one file. The stub in `js/mock.js` deliberately
   does **not** synthesise reports — a fabricated clinical-looking document is the one thing this
   product must never produce — so the panel says so and refuses rather than inventing one.
+- A **mechanism colour mode** (`colour by: mechanism`) painting every cell from the TMSM label
+  payload through the existing colour-by-attribute path in `gl/shaders.js` — a third vertex
+  attribute, not a second renderer — with a legend naming each category, its count and its
+  share, the delivery/dose/resistance/chance roll-up as one stacked bar, and the bit-exact
+  reconciliation stated on screen. Legend rows toggle their category, and the cull happens in
+  the vertex stage like every other channel. Every category carries a visible **label and a
+  number**: the palette clears its CVD target on the dark surround but three slots fall under
+  3:1 on the light one, so identity is never colour-alone.
+- A **time-lapse scrubber** (play / pause / seek) over the TMSL frames, windowed across the
+  whole series rather than per frame so scrubbing shows the drug moving instead of the ramp
+  re-normalising. The frames are drug **concentration**, and the legend says so — it is a
+  different quantity from the `drug_auc` overlay and must never share its label.
+- `js/mock.js` synthesises **neither** payload. A fabricated mechanism map would be a picture of
+  a reason that did not exist; a run without one says why instead.
 
 ## Backend responsibilities
 

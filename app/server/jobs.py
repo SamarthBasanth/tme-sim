@@ -215,7 +215,18 @@ def execute_run(spec: Dict, ctx: _Ctx,
     Returns the dict that becomes ``RunResult`` minus the envelope fields
     (``run_id``, ``status``, ``runtime_s``) that :class:`JobManager` owns, plus
     a private ``_payloads`` entry holding the binary blobs to persist.
+
+    A spec carrying ``kind='protocol'`` is a TPL program rather than a RunSpec
+    and is handed to :func:`app.server.protocol_api.execute_protocol_job`, which
+    runs a whole sweep as ONE job on this same worker thread and this same
+    reconstruction cache. The dispatch is additive: a spec without ``kind``
+    takes the original path, unchanged.
     """
+    if spec.get("kind") == "protocol":
+        from .protocol_api import execute_protocol_job
+
+        return execute_protocol_job(spec, ctx, cache=cache)
+
     from tmesim.core import PDConfig, PDEConfig, PKConfig, SimConfig
     from tmesim.molecular.binding_site_barrier import apply_barrier_to_drugparams
     from tmesim.molecular.library import get_molecule

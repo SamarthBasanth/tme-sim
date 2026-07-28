@@ -28,11 +28,36 @@ from app.server.jobs import JobManager  # noqa: E402
 
 DRUGS = ["temozolomide", "cisplatin", "doxorubicin"]
 
+#: Isolated from app/runs/ on purpose — see main().
+DEFAULT_ROOT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "results", "export_runs")
 
-def main() -> int:
+
+def main(argv=None) -> int:
+    # A PRIVATE run store. app/runs/ is shared with any server or test process
+    # that happens to be up, and JobManager allocates ids from the highest one
+    # it finds on disk — so two writers can land on the same r_000NN and leave
+    # each other's stale payloads behind in it. An export must not bake a
+    # payload it cannot prove belongs to the run whose metrics it prints.
+    root = (argv or [None, None])[1] if len(argv or []) > 1 else DEFAULT_ROOT
+    os.makedirs(root, exist_ok=True)
+    print(f"runs dir: {root}", flush=True)
     base = default_spec()
     base["dx_um"] = 12.0
     base["sensitivity_mode"] = "uniform"
+    # Per-cell mechanism attribution: why each tumour cell lived or died. It is
+    # a read-out of arrays the kill already computes, so it costs no extra
+    # solve, and tmesim.sim.mechanism REFUSES to emit an attribution whose
+    # KILLED count does not reproduce the engine's own kill_fraction bit-for-
+    # bit — a map that disagreed with the number it explains would be worse
+    # than none. Set explicitly rather than relying on the default, so the
+    # exported RunSpec says what it asked for.
+    base["attribute_mechanism"] = True
+    # Time-lapse OFF. Each frame is a full 424x675 float32 grid (~1.1 MB), so
+    # even a short series would blow the export's size budget several times
+    # over. The /field/drug_auc overlay still carries the integrated exposure.
+    base["timelapse_frames"] = 0
 
     specs = []
     for drug in DRUGS:
@@ -44,7 +69,7 @@ def main() -> int:
             return 2
         specs.append(spec)
 
-    mgr = JobManager()
+    mgr = JobManager(root=root)
     ids = []
     for spec in specs:
         job = mgr.submit(spec)
@@ -79,10 +104,10 @@ def main() -> int:
 
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            "..", "results", "_export_run_ids.json"), "w") as fh:
-        json.dump(ids, fh)
+        json.dump({"runs_dir": root, "run_ids": ids}, fh, indent=1)
     print("\nrun ids:", ids, flush=True)
     return 0 if ok else 1
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv))

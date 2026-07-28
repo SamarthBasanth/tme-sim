@@ -500,3 +500,37 @@ def test_a_run_without_them_says_why_rather_than_404ing_blankly(client):
     run = client.get(f"/api/runs/{run_id}").json()
     assert run["mechanism"] is None
     assert run["timelapse"]["available"] is False
+
+
+def test_resistance_off_arm_does_not_file_every_survivor_as_resistant():
+    """The counterfactual arm is where the derived band would degenerate.
+
+    With ``PDConfig(hypoxia_resistance=1, quiescent_resistance=1)`` the derived
+    threshold is 1.0, so ``m <= threshold`` is true for EVERY cell. Without the
+    "something was actually suppressed" guard, the one run in which resistance
+    is switched OFF would report 100% of its survivors as RESISTANCE-limited and
+    an empty CHANCE bucket — the exact inversion of the truth.
+    """
+    off = PDConfig(hypoxia_resistance=1.0, quiescent_resistance=1.0)
+    th = MechanismThresholds().resolve(off, hill=1.0)
+    assert th.resistant_modulation == 1.0
+
+    diag = _diag(ratio=[4.0, 4.0], modulation=[1.0, 0.6], p_kill=[0.8, 0.48])
+    out = attribute(np.full(2, int(CellType.TUMOR)), diag,
+                    kill_fraction=0.0, pd=off)
+
+    # unresisted -> chance; genuinely suppressed (a low intrinsic sensitivity,
+    # which survives the counterfactual) -> resistance
+    assert list(out["labels"]) == [SURVIVED_STOCHASTIC, SURVIVED_RESISTANT]
+    assert out["survival_breakdown"]["chance"] == 0.5
+    assert "switched resistance OFF" in \
+        out["threshold_derivation"]["resistant_modulation"]
+
+
+def test_quiescent_cells_sit_exactly_on_the_threshold_and_are_kept():
+    """The guard must not evict the band it was derived from: a QUIESCENT cell
+    has modulation exactly 0.5 == resistant_modulation under production PD."""
+    th = MechanismThresholds().resolve(PDConfig(), hill=1.0)
+    diag = _diag(ratio=[4.0, 4.0], modulation=[0.5, 0.35], p_kill=[0.4, 0.28])
+    got = classify(np.full(2, int(CellType.TUMOR)), diag, th)
+    assert list(got) == [SURVIVED_RESISTANT, SURVIVED_RESISTANT]

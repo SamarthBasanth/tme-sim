@@ -63,6 +63,61 @@ for (const r of B.runs) {
   }
 }
 
+
+/* -------------------------------------------------------- 2b. mechanism -- */
+console.log('mechanism attribution');
+for (const r of B.runs) {
+  const p = B.payloads[r.run_id];
+  if (!p.mechanism) { ok(false, `${r.run_id} has NO mechanism payload baked`); continue; }
+  const m = b64(B.blobs[p.mechanism]);
+  const d = dv(m);
+  ok(m.subarray(0, 4).toString('latin1') === 'TMSM', `${r.run_id} mechanism magic TMSM`);
+  const n = d.getUint32(8, true);
+  const nLabels = d.getUint32(12, true);
+  const jsonLen = d.getUint32(16, true);
+  ok(m.length === 20 + jsonLen + n, `${r.run_id} TMSM length exact (${n} labels, ${jsonLen} B json)`);
+
+  // 1:1 with the geometry payload's cell order — the whole premise of painting
+  // the labels straight into the existing vertex buffer.
+  const g = b64(B.blobs[p.geometry]);
+  const gn = dv(g).getUint32(8, true);
+  ok(n === gn && n === r.report.n_cells,
+    `${r.run_id} TMSM n_cells=${n} aligns 1:1 with TMSG n_cells=${gn} and report.n_cells`);
+
+  const agg = JSON.parse(m.subarray(20, 20 + jsonLen).toString('utf8'));
+  const labels = m.subarray(20 + jsonLen);
+  ok(labels.length === n, `${r.run_id} label array is ${labels.length} bytes, one per cell`);
+  ok(nLabels === (agg.label_names || []).length || nLabels > 0,
+    `${r.run_id} declares ${nLabels} label codes`);
+
+  // Independently recount the labels here and check the aggregate is not
+  // just JSON that says what it likes.
+  const NOT_TUMOR = 7, KILLED = 0, ALREADY_DEAD = 6;
+  const hist = new Array(8).fill(0);
+  for (let i = 0; i < n; i++) hist[labels[i]]++;
+  const names = agg.label_names || ['KILLED', 'SURVIVED_UNREACHED', 'SURVIVED_UNDERDOSED',
+    'SURVIVED_RESISTANT', 'SURVIVED_STOCHASTIC', 'UNATTRIBUTED', 'ALREADY_DEAD', 'NOT_TUMOR'];
+  const mismatch = names.map((nm, i) => [nm, hist[i], (agg.counts || {})[nm] || 0])
+    .filter(([, a, b2]) => a !== b2);
+  ok(mismatch.length === 0,
+    `${r.run_id} recounted label histogram matches aggregate.counts`
+    + (mismatch.length ? ' -> ' + JSON.stringify(mismatch) : ''));
+
+  // THE check: rebuild kill_fraction from the labels with the engine's own
+  // integer arithmetic and compare with === , not a tolerance.
+  const nTumor = n - hist[NOT_TUMOR];
+  const nDead = hist[KILLED] + hist[ALREADY_DEAD];
+  const rebuilt = nTumor === 0 ? 0 : 1.0 - (nTumor - nDead) / nTumor;
+  const engine = r.metrics.kill_fraction;
+  const rec = agg.reconciliation || {};
+  ok(rec.bit_exact === true, `${r.run_id} aggregate declares bit_exact=${rec.bit_exact}`);
+  ok(rebuilt === engine,
+    `${r.run_id} kill rebuilt from labels === engine kill_fraction  `
+    + `(${rebuilt} vs ${engine}, delta ${Math.abs(rebuilt - engine)})`);
+  ok(rec.kill_fraction_from_labels === engine && rec.kill_fraction_from_engine === engine,
+    `${r.run_id} recorded reconciliation agrees with RunResult.metrics.kill_fraction`);
+}
+
 /* ---------------------------------------------------------- 2. caveats -- */
 console.log('provenance');
 const CANARY = 'oxygen (pde): FALSIFIED AS VALUE-ADD';

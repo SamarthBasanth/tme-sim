@@ -189,6 +189,34 @@ ok(!!info, `cell picking works: #${info && info.index} ${info && info.type} at `
   + `${info && info.field !== null ? info.field.toExponential(2) : 'null'}, `
   + `${info && info.total} neighbours in radius`);
 
+console.log('mechanism attribution');
+await evalIn('(()=>{const b=Array.from(document.querySelectorAll(".stage-toolbar button"))'
+  + '.find(x=>/^mechanism$/i.test(x.textContent.trim()));if(b)b.click();return !!b;})()');
+await sleep(900);
+ok(await evalIn('!!(window.__tmesim.viewer.labels && window.__tmesim.viewer.labels.length)'),
+  `per-cell labels uploaded (${await evalIn('window.__tmesim.viewer.labels ? window.__tmesim.viewer.labels.length : 0')} cells)`);
+ok(await evalIn('!document.querySelector(".mechleg").classList.contains("hidden")'),
+  'mechanism legend is visible (not the graceful-degradation path)');
+ok(!(await evalIn('Array.from(document.querySelectorAll(".toast")).some(t=>/No mechanism attribution/i.test(t.textContent))')),
+  'no "No mechanism attribution" warning toast');
+const leg = await evalIn('(()=>{const rows=[...document.querySelectorAll(".mechleg .m-row")].map(r=>({'
+  + 'name:r.querySelector(".m-name").textContent,n:r.querySelector(".m-n").textContent,'
+  + 'p:r.querySelector(".m-p").textContent}));'
+  + 'return{rows,note:document.querySelector(".mechleg .m-note").textContent,'
+  + 'segs:document.querySelectorAll(".mechleg .m-bar span").length};})()');
+ok(leg.rows.length === 8, `legend names all 8 categories: ${leg.rows.map(r=>r.name).join(', ')}`);
+ok(leg.rows.every((r) => r.n !== '' && r.p !== ''),
+  'every legend row carries a count AND a percentage');
+for (const r of leg.rows) console.log(`         ${r.name.padEnd(13)} ${r.n.padStart(8)}  ${r.p.padStart(7)}`);
+ok(/reconciles bit-exact/.test(leg.note),
+  'legend states the bit-exact reconciliation: '
+  + (leg.note.match(/reconciles bit-exact with kill_fraction = [\d.]+/) || [''])[0]);
+ok(leg.segs > 0, `limiter roll-up bar drawn with ${leg.segs} segment(s)`);
+await shot('mechanism.png');
+await evalIn('(()=>{const b=Array.from(document.querySelectorAll(".stage-toolbar button"))'
+  + '.find(x=>/^type$/i.test(x.textContent.trim()));if(b)b.click();return 1;})()');
+await sleep(400);
+
 console.log('run switching');
 const ids = await evalIn('window.__tmesim.store.get().runs.map(r=>r.run_id)');
 for (const rid of ids) {

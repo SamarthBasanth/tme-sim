@@ -191,13 +191,22 @@ def validate_source(source: str) -> Dict:
 # --------------------------------------------------------------------------- #
 def plan(source: str, compile_drugs: bool = True, check_budget: bool = True,
          max_runs: int = DEFAULT_MAX_RUNS,
-         max_window_s: float = DEFAULT_MAX_WINDOW_S) -> Plan:
+         max_window_s: Optional[float] = None) -> Plan:
     """Parse, resolve, expand and check a TPL program without executing it."""
+    if max_window_s is None:
+        from . import dosing as _dosing
+
+        max_window_s = _dosing.DEFAULT_MAX_WINDOW_S
     program, diags = parse(source)
     out = Plan(program=program, diagnostics=diags, max_runs=int(max_runs),
                source=source or "")
     if program is None:
         return out
+    # A statement that failed to PARSE never made it into the program, so a
+    # later `run X with Y` would then also report "unknown protocol Y". That
+    # cascade buries the real error, so name-resolution failures are suppressed
+    # (and said to be suppressed) when the file already has a syntax error.
+    syntax_broken = bool(diags.errors)
     if program.allow_runs is not None:
         out.allow_runs = program.allow_runs.count
 
@@ -297,17 +306,21 @@ def plan(source: str, compile_drugs: bool = True, check_budget: bool = True,
 
         missing_drug = [d for d in drugs if d not in drug_defs]
         for d in missing_drug:
+            if syntax_broken:
+                continue
             diags.error(
                 f"unknown drug {d!r}: no `drug {d} from ...` block in this "
                 f"program. Defined: {', '.join(drug_defs) or '(none)'}.",
                 node=stmt, code="unknown-drug",
                 col=getattr(stmt, "drug_col", 0) or stmt.col)
         if proto_name not in proto_defs:
-            diags.error(
-                f"unknown protocol {proto_name!r}: no `protocol {proto_name}` "
-                f"block. Defined: {', '.join(proto_defs) or '(none)'}.",
-                node=stmt, code="unknown-protocol",
-                col=getattr(stmt, "protocol_col", 0) or stmt.col)
+            if not syntax_broken:
+                diags.error(
+                    f"unknown protocol {proto_name!r}: no `protocol "
+                    f"{proto_name}` block. Defined: "
+                    f"{', '.join(proto_defs) or '(none)'}.",
+                    node=stmt, code="unknown-protocol",
+                    col=getattr(stmt, "protocol_col", 0) or stmt.col)
             continue
         if missing_drug:
             continue

@@ -16,7 +16,7 @@
 >
 > ### The bottom line
 >
-> **Penetration length: 0% bias on the physical `L`; ~24% under-statement of the *fitted* profile decay distance. Mean tumour AUC: 0% bias, analytically. Therapeutic coverage: worst case 0.205 absolute, against the +/-0.03 grid bar already carried, with an inconsistent sign. 3-D:2-D kill ratio: the implied temozolomide IC50 fold moves from 3.26x to 2.73-2.98x, still inside the 2-5x literature band.** Three of the four published quantities move by less than the uncertainty they already carry. The issue is closed.
+> **Penetration length: 0% bias on the physical `L`; ~24% under-statement of the *fitted* profile decay distance. Mean tumour AUC: 0% bias, analytically. Therapeutic coverage: worst case 0.137 absolute at the published operating points (0.205 anywhere on the threshold ladder) — **the one quantity that moves by materially more than the bar it already carries**. 3-D:2-D kill ratio: the implied temozolomide IC50 fold moves from 3.26x to 2.73-2.98x, still inside the 2-5x literature band.** Three of the four published quantities move by less than the uncertainty they already carry; therapeutic coverage is the exception and is reported as such in section 4.3. The transport physics needs no fix; coverage needs an extra error bar.
 
 
 ## 1. Analytic: what 2-D and 3-D actually differ by
@@ -229,7 +229,7 @@ Two cheap one-parameter corrections were fitted against the 3-D mid-plane target
 | (i) **physical** penetration length `L = sqrt(D_eff/k)` | none | **exactly 0** (proved, section 1.1) | no |
 | (i') **fitted** profile decay distance | 2-D too SHORT | ~24% (range -86-40%) | comparable — that metric already carries 16% grid drift and is flagged NOT CONVERGED in `delivery_metrics.md` |
 | (ii) mean tumour AUC | none | **0 systematically** (section 1.4); +/-41% section-sampling scatter | no |
-| (iii) therapeutic coverage | inconsistent sign | worst case **0.205 absolute** | ~2-3x the +/-0.03 grid bar, but far below the 30x kill interval |
+| (iii) therapeutic coverage | structured: 2-D under-counts at permissive thresholds, over-counts at strict ones | **0.137 absolute** at the published operating points, 0.205 worst case on the ladder | **YES — 7x the +/-0.03 grid bar. The one genuine exception in this report** |
 | (iv) 3-D:2-D kill ratio | 2-D over-states the 3-D penalty | fold 3.26x -> 2.73-2.98x | no — **still inside the 2-5x band** |
 
 ### 4.1 Penetration length
@@ -261,12 +261,28 @@ Threshold set so the 2-D field reproduces a given coverage, then read off the 3-
 | coverage in 2-D | coverage in 3-D (mean) | range over configurations | delta |
 |---:|---:|---|---:|
 | 0.10 | 0.028 | 0.001 - 0.071 | -0.072 |
+| 0.22 | 0.142 | 0.080 - 0.193 | -0.075 |
 | 0.25 | 0.185 | 0.099 - 0.247 | -0.065 |
+| 0.38 | 0.405 | 0.306 - 0.487 | +0.022 |
 | 0.50 | 0.610 | 0.553 - 0.681 | +0.110 |
 | 0.75 | 0.891 | 0.833 - 0.955 | +0.141 |
 | 0.90 | 0.970 | 0.922 - 0.990 | +0.070 |
 
-worst-case 0.205 absolute (20 percentage points of tumour cells), against the +/-0.03 grid bar already carried. The sign is not even consistent: 2-D under-counts coverage where the threshold is permissive and over-counts where it is strict, because the 2-D field is broader-tailed at both ends. No drug's classification flips — a saturated drug stays saturated and a zero-coverage drug stays at zero. Concretely, against the published dx = 12 um panel: temozolomide (0.0000) and methotrexate (0.0000) stay at zero, cisplatin (0.9936) stays saturated, and only the mid-range drugs — doxorubicin (0.3836) and lomustine (0.2175) — move at all, by at most a few percentage points.
+worst case 0.205 absolute (20 percentage points of tumour cells) anywhere on the ladder, and 0.137 at the published operating points. **This is the one quantity that moves by materially more than the bar already carried** (0.205 is 7x the +/-0.03 grid bar) and it should not be minimised. The bias is structured, not noise: 2-D UNDER-counts coverage at permissive thresholds (delta about -0.07) and OVER-counts at strict ones (delta up to +0.14), because the 2-D field is broader-tailed at both ends than the tissue really is. What does not change is the drug ORDERING: the two drugs published at exactly 0.0000 are floored and cannot move at all, and the gaps between the remaining three are far wider than the shifts.
+
+**At the published operating points** (dx = 12 um panel of `delivery_metrics.md`), measured directly rather than interpolated between ladder rungs:
+
+| drug | published coverage @1x IC50 | 3-D coverage (mean) | range over configurations | worst delta |
+|---|---:|---:|---|---:|
+| temozolomide | 0.0000 | *saturated* | — | 0.000 |
+| lomustine | 0.2175 | 0.142 | 0.080 - 0.193 | 0.137 |
+| cisplatin | 0.9936 | 0.970 | 0.922 - 0.990 | 0.090 |
+| methotrexate | 0.0000 | *saturated* | — | 0.000 |
+| doxorubicin | 0.3836 | 0.405 | 0.306 - 0.487 | 0.103 |
+
+So the honest statement is: **therapeutic coverage carries a dimensionality uncertainty of up to 0.14 absolute at the operating points this project actually publishes**, on top of its +/-0.03 grid bar. That is the largest single bias found in this report and it is the one place where the 2-D assumption is NOT negligible. It does not change the drug ranking (the two saturated drugs cannot move, and the two mid-range drugs move in the same direction), and it is an order of magnitude smaller than the 30x interval `kill_calibration.md` already quotes on absolute kill — but a coverage number should be quoted with this bar beside the grid bar, not instead of it.
+
+Two details in that table must not be glossed. **The shifts are not in the same direction**: lomustine moves DOWN (0.2175 -> 0.142) because it sits at a permissive threshold, doxorubicin moves slightly UP (0.3836 -> 0.405) because it sits near the crossover, and cisplatin moves down from near-saturation. And **cisplatin at 0.9936 is near-saturated, not saturated** — it is probed at the 0.90 rung, which is the closest one available, so its 0.090 figure is an over-estimate of its true movement. The ordering (temozolomide = methotrexate < lomustine < doxorubicin < cisplatin) is identical before and after, and the gaps between the non-floored drugs (0.14 / 0.41 / 0.97) are several times the shifts.
 
 ### 4.4 The 3-D:2-D kill ratio — the test that PASSED
 
@@ -303,7 +319,7 @@ Two things this does and does not license. It **does** retire the specific worry
 
 ## 6. Verdict
 
-**The 2-D assumption does not need fixing, and the reason is geometric rather than numerical: a capillary is a line, a line source is 2-D-symmetric, and a 5 um section through an 18 um vessel cuts it transversely.** `L = sqrt(D_eff/k)` is preserved exactly; mean tumour AUC is unbiased by a stereological identity; therapeutic coverage moves by at most 0.20 absolute with an inconsistent sign; and the 3-D:2-D kill test not only survives the correction but lands closer to the literature median after it. The one quantity that moves materially — the *fitted* profile decay distance, ~24% low — is already flagged in `delivery_metrics.md` as the metric that did not converge, and the correction is the same size as the caveat it carries.
+**The 2-D assumption does not need fixing, and the reason is geometric rather than numerical: a capillary is a line, a line source is 2-D-symmetric, and a 5 um section through an 18 um vessel cuts it transversely.** `L = sqrt(D_eff/k)` is preserved exactly; mean tumour AUC is unbiased by a stereological identity; therapeutic coverage moves by up to 0.14 absolute at the published operating points — the one place the assumption is NOT negligible, and it earns an extra error bar rather than a code change; and the 3-D:2-D kill test not only survives the correction but lands closer to the literature median after it. The other quantity that moves materially — the *fitted* profile decay distance, ~24% low — is already flagged in `delivery_metrics.md` as the metric that did not converge, and the correction is the same size as the caveat it carries.
 
 **The residual error is conservative.** Every effect measured here runs in the direction of the 2-D solve making the tumour look *harder* to reach than it is. A model that errs towards under-stating delivery is the safe direction for a delivery model to err in.
 

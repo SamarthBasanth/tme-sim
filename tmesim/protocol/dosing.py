@@ -55,6 +55,7 @@ mean and every schedule becomes the same input — the artefact
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -86,8 +87,11 @@ GENERIC_VD_L_PER_KG = 0.6
 #: backend will start. The window is truncated to this and the truncation is
 #: reported (with how many doses fell outside it) rather than hidden.
 #: 24 h covers a full daily dosing interval, so a `every 24 h` schedule is
-#: resolved for one complete cycle of its own period.
-DEFAULT_MAX_WINDOW_S = 24.0 * 3600.0
+#: resolved for one complete cycle of its own period. Overridable with
+#: ``TMESIM_PROTOCOL_MAX_WINDOW_S`` (seconds) — the tests use a short window so
+#: the suite stays fast, and the value in force is reported in every result.
+DEFAULT_MAX_WINDOW_S = float(
+    os.environ.get("TMESIM_PROTOCOL_MAX_WINDOW_S", 24.0 * 3600.0))
 
 #: Target spacing of the micro-boluses an infusion is discretised into, and the
 #: clamp on their count. 15 min is well below the shortest half-life in the
@@ -482,6 +486,15 @@ def convert_dose(
                     "plasma curve rises to a plateau before decaying. This is a "
                     "SUSTAINED profile, not a bolus."),
             }
+            dropped = k * len(in_window) - len(expanded)
+            if dropped > 0:
+                out.infusion["subdoses_outside_window"] = dropped
+                out.notes.append(
+                    f"{dropped} of {k * len(in_window)} infusion micro-boluses "
+                    f"fall outside the {_fmt(window / 3600.0)} h window, so "
+                    f"only {len(expanded)}/{k} of each administration's drug is "
+                    "delivered in this result. The infusion is longer than the "
+                    "observed window.")
         else:
             atten = ((1.0 - math.exp(-lam * t_inf)) / (lam * t_inf)
                      if lam * t_inf > 0 else 1.0)

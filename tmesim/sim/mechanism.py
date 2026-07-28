@@ -263,6 +263,30 @@ class MechanismThresholds:
 # --------------------------------------------------------------------------- #
 # Classification
 # --------------------------------------------------------------------------- #
+def is_resistance_limited(modulation: np.ndarray,
+                          thresholds: MechanismThresholds) -> np.ndarray:
+    """Did this cell's own biology actually hold the kill down?
+
+    Two conditions, and the second is not redundant:
+
+    * ``m <= resistant_modulation`` — the suppression is at least as strong as
+      the mildest resistance penalty the kill model applies, and
+    * ``m < 1.0`` — there *is* a suppression.
+
+    Without the second clause the label degenerates exactly where it matters
+    most. The counterfactual arm of the rank attribution runs with
+    ``PDConfig(hypoxia_resistance=1, quiescent_resistance=1)``; the derived
+    threshold is then ``max(1, 1) = 1.0``, every unresisted cell satisfies
+    ``m <= 1.0``, and every adequately-exposed survivor would be filed as
+    RESISTANCE-limited in the one run where resistance was switched OFF — while
+    CHANCE, which is what those survivals actually are, would be empty. The
+    guard says the obvious thing out loud: a cell whose modulation is 1.0 had
+    nothing suppressed, so nothing about its biology can be the reason it lived.
+    """
+    m = np.asarray(modulation, dtype=np.float64)
+    return (m <= float(thresholds.resistant_modulation)) & (m < 1.0)
+
+
 def classify(
     cell_type: Sequence[int],
     diagnostics: Dict,
@@ -337,7 +361,7 @@ def classify(
     underdosed = rest & (ratio < thresholds.adequate_ratio)
     labels[underdosed] = np.uint8(SURVIVED_UNDERDOSED)
     rest = rest & ~underdosed
-    resistant = rest & (modulation <= thresholds.resistant_modulation)
+    resistant = rest & is_resistance_limited(modulation, thresholds)
     labels[resistant] = np.uint8(SURVIVED_RESISTANT)
     rest = rest & ~resistant
     stochastic = rest & (p_kill >= thresholds.stochastic_min_p_kill)
@@ -442,7 +466,7 @@ def attribute(
     ratio = np.asarray(diagnostics["ratio"], dtype=np.float64)
     modulation = np.asarray(diagnostics["modulation"], dtype=np.float64)
     exposure_limited = (labels == SURVIVED_UNREACHED) | (labels == SURVIVED_UNDERDOSED)
-    also_resistant = exposure_limited & (modulation <= resolved.resistant_modulation)
+    also_resistant = exposure_limited & is_resistance_limited(modulation, resolved)
 
     tumor_ratio = ratio[np.asarray(cell_type) == int(CellType.TUMOR)]
     finite_ratio = tumor_ratio[np.isfinite(tumor_ratio)]
@@ -521,7 +545,14 @@ def attribute(
                 "DERIVED from this run's PDConfig as max(hypoxia_resistance="
                 f"{float(pd.hypoxia_resistance)}, quiescent_resistance="
                 f"{float(pd.quiescent_resistance)}) — the mildest resistance "
-                "penalty the kill model itself applies"),
+                "penalty the kill model itself applies. A cell is called "
+                "RESISTANCE-limited only if it is at or below this AND its "
+                "modulation is below 1.0, i.e. something was actually "
+                "suppressed"
+                + (". This run switched resistance OFF, so the threshold is 1.0 "
+                   "and the second condition is what carries the label: no cell "
+                   "is resistance-limited here, by construction and correctly."
+                   if float(resolved.resistant_modulation) >= 1.0 else "")),
             "stochastic_min_p_kill": (
                 "DERIVED as f(adequate_ratio) * resistant_modulation at "
                 f"hill={hill}, the lowest p_kill the CHANCE branch can produce "

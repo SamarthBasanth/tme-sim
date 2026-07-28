@@ -1498,6 +1498,13 @@ def create_app(manager: Optional[JobManager] = None,
             "pde_dt_s": PDE_DT_S,
         })
 
+    # /api/protocol/* — the TPL editor's routes. Bound to the SAME job manager,
+    # so a protocol sweep shares this process's single worker and the one
+    # reconstruction cache with the /api/runs path.
+    from .protocol_api import build_protocol_router
+
+    app.include_router(build_protocol_router(jobs))
+
     # The UI, mounted LAST so /api always wins.
     _mount_web(app)
     return app

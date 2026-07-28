@@ -74,6 +74,8 @@ All of `API_CONTRACT.md`:
 | `DELETE` | `/api/runs/{id}` | cancel |
 | `GET` | `/api/runs/{id}/geometry` | TMSG binary |
 | `GET` | `/api/runs/{id}/field/{name}` | TMSF binary; `name ∈ vascular_density, ecm_density, oxygen, drug_auc` |
+| `GET` | `/api/runs/{id}/mechanism` | TMSM binary; per-cell mechanism labels + the aggregate breakdown |
+| `GET` | `/api/runs/{id}/timelapse` | TMSL binary; drug-concentration frames + their metadata |
 | `POST` | `/api/validate` | `{ok, errors[], warnings[]}` |
 | `GET` | `/api/sections/{id}/capability` | what this panel can support, before a project exists |
 | `GET`/`POST` | `/api/projects` | list / create a study |
@@ -230,13 +232,32 @@ Little-endian, no padding, laid out so the front end slices one `ArrayBuffer`
 into typed arrays and uploads straight to WebGL2.
 
 ```
-geometry: "TMSG" | version u32 | n_cells u32 | extent_x f32 | extent_y f32
-                 | x f32[n] | y f32[n] | type u8[n]
-field:    "TMSF" | version u32 | rows u32 | cols u32 | dx_um f32
-                 | min f32 | max f32 | values f32[rows*cols]
+geometry:  "TMSG" | version u32 | n_cells u32 | extent_x f32 | extent_y f32
+                  | x f32[n] | y f32[n] | type u8[n]
+field:     "TMSF" | version u32 | rows u32 | cols u32 | dx_um f32
+                  | min f32 | max f32 | values f32[rows*cols]
+mechanism: "TMSM" | version u32 | n_cells u32 | n_labels u32 | json_len u32
+                  | aggregate json[json_len] | label u8[n_cells]
+timelapse: "TMSL" | version u32 | n_frames u32 | interval_s f32 | window_s f32
+                  | n_frames x [ frame u32 | time_s f32 | <a whole TMSF block> ]
 ```
 
-Header sizes are 20 B and 28 B. Field values are **row-major**
+Header sizes are 20 B, 28 B, 20 B and 20 B (+8 B per time-lapse frame).
+
+**TMSM** is one byte per cell in the geometry payload's order, so the front end
+binds it as a third vertex attribute against the position buffer it already
+holds — 850 kB against a 3.4 MB position buffer, and the measured presented
+frame rate at 850k cells is unchanged by it. The aggregate breakdown rides in
+the same response as a short JSON block; a legend without its counts is
+decoration, and a second round trip for four integers is not worth a request.
+
+**TMSL** does not invent a grid format: each frame is a **byte-identical
+`encode_field` block** prefixed with its index and time stamp, so the client
+decodes a frame with the TMSF reader it already ships. `test_mechanism.py::
+test_tmsl_frames_are_byte_identical_to_the_tmsf_field_payload` asserts that
+literally, by searching for the standalone TMSF bytes inside the container.
+Frames are drug **concentration** (uM), not AUC — AUC only accumulates, so it
+can never show drug leaving. Field values are **row-major**
 (`values[r*cols + c]`), matching the engine's `(ny, nx)` grid. `min` / `max` are
 the **finite** range, so the UI can build a colour ramp without a second pass; a
 field with no finite entry reports `nan` for both rather than a fabricated `0..1`.

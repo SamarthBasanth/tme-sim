@@ -45,6 +45,10 @@ __all__ = ["parse", "Parser"]
 #: Keywords that may begin a top-level statement (also the resync set).
 TOP_KEYWORDS = ("drug", "protocol", "sweep", "run", "compare", "expect", "allow")
 
+#: Grammar words that can legitimately sit where a unit would go. A WORD in that
+#: position that is NOT one of these is a failed unit, and is reported as one.
+_UNIT_FOLLOWERS = frozenset({"over", "to", "step", "in", "steps", "end"})
+
 
 def parse(source: str) -> Tuple[A.Program, collect]:
     """Parse ``source``. Returns ``(program, diagnostics)``.
@@ -109,6 +113,11 @@ class Parser:
             return
         if tok.kind == "EOF":
             return
+        if tok.kind == "PERCENT" or (tok.kind == "WORD" and is_unit(tok.text)):
+            raise self._fail(
+                tok, f"{what} is a dimensionless count and must not carry a "
+                     f"unit; found {tok.text!r}.", code="unexpected-unit",
+                hint=f"drop the {tok.text!r}")
         raise self._fail(
             tok, f"{what}: unexpected {_describe(tok)} at the end of the "
                  "statement. TPL statements end at the newline.",
@@ -171,15 +180,19 @@ class Parser:
         return None
 
     def quantity(self, what: str, dimension: Optional[str],
-                 unit_required: bool = True) -> Quantity:
+                 keyword: str = "") -> Quantity:
         """A number plus its unit.
 
         ``dimension=None`` means the value is DIMENSIONLESS and a unit is a
         parse error. ``dimension='dose'`` accepts any of ``mg/m2``, ``mg/kg``,
         ``mg``. Otherwise the unit must carry exactly that dimension.
+
+        ``keyword`` is the bare statement word (``dose``, ``every``, ...) used
+        to build a copy-pasteable hint.
         """
         value, num_tok = self.expect_number(what)
         unit_tok = self._peek_unit()
+        kw = keyword or what.split(":")[-1].strip()
 
         if dimension is None:
             if unit_tok is not None:
@@ -188,25 +201,43 @@ class Parser:
                     f"found {unit_tok.text!r}.",
                     line=unit_tok.line, col=unit_tok.col,
                     end_col=unit_tok.end_col, code="unexpected-unit",
-                    hint=f"write `{what.split(':')[0]} {num_tok.text}`",
+                    hint=f"write `{kw} {num_tok.text}`",
                 )
             return Quantity(value, None, num_tok.line, num_tok.col,
                             num_tok.end_col)
 
+        allowed = (", ".join(_dose_units()) if dimension == "dose"
+                   else ", ".join(units_for(dimension)))
+        if unit_tok is None and dimension == "fraction":
+            # A fraction is the one dimension whose canonical form has NO
+            # symbol, so a bare number is already fully specified — the spec's
+            # own example is `bbb_penetrance 0.31`. `%` stays available and is
+            # converted (and reported) like any other unit.
+            return Quantity(value, None, num_tok.line, num_tok.col,
+                            num_tok.end_col)
         if unit_tok is None:
             nxt = self.peek()
-            allowed = (", ".join(_dose_units()) if dimension == "dose"
-                       else ", ".join(units_for(dimension)))
-            found = ("nothing" if nxt.kind in ("NEWLINE", "EOF")
-                     else f"{_describe(nxt)}")
+            # A WORD sitting where a unit belongs is an attempt at a unit, not
+            # an omission — say which of the two it is, or the message sends
+            # the user hunting for a missing token that is right there.
+            if nxt.kind == "WORD" and nxt.text not in _UNIT_FOLLOWERS:
+                raise UnitError(
+                    f"{what}: {nxt.text!r} is not a recognised unit. TPL's unit "
+                    f"table is fixed: {', '.join(UNITS)}. This position needs a "
+                    f"{dimension} unit — one of: {allowed}.",
+                    line=nxt.line, col=nxt.col, end_col=nxt.end_col,
+                    code="unknown-unit",
+                    hint=f"write `{kw} {num_tok.text} "
+                         f"{allowed.split(',')[0].strip()}`",
+                )
             raise UnitError(
-                f"{what}: a unit is REQUIRED and none was given (found "
-                f"{found}). Every physical quantity in TPL carries a unit — "
-                f"`{what.split(':')[0]} {num_tok.text}` is an error. Use one "
-                f"of: {allowed}.",
+                f"{what}: a unit is REQUIRED and none was given. Every physical "
+                f"quantity in TPL carries a unit — `{kw} {num_tok.text}` is an "
+                f"error. Use one of: {allowed}.",
                 line=num_tok.line, col=num_tok.col, end_col=num_tok.end_col,
                 code="missing-unit",
-                hint=f"write `{num_tok.text} {allowed.split(',')[0].strip()}`",
+                hint=f"write `{kw} {num_tok.text} "
+                     f"{allowed.split(',')[0].strip()}`",
             )
 
         self.next()
@@ -223,8 +254,6 @@ class Parser:
         dim = unit_def(symbol).dimension
         ok = (dim in DOSE_DIMENSIONS) if dimension == "dose" else (dim == dimension)
         if not ok:
-            allowed = (", ".join(_dose_units()) if dimension == "dose"
-                       else ", ".join(units_for(dimension)))
             raise UnitError(
                 f"{what}: {symbol!r} measures {dim}, but this position needs a "
                 f"{dimension} unit. Use one of: {allowed}.",
@@ -387,7 +416,8 @@ class Parser:
                 source=A.Ic50FromGdsc(line=tok.line, col=tok.col,
                                       end_col=g.end_col))
 
-        q = self.quantity(f"{fname}: {drug_name}.{fname}", spec["dimension"])
+        q = self.quantity(f"{fname}: {drug_name}.{fname}", spec["dimension"],
+                          keyword=fname)
         self.expect_newline(fname)
         return A.DrugField(line=tok.line, col=tok.col, end_col=q.end_col,
                            name=fname, value=q)
@@ -448,11 +478,12 @@ class Parser:
                                  end_col=r.end_col, value=r.text)
         elif word == "dose":
             _once("dose")
-            amount = self.quantity(f"{label}: dose", "dose")
+            amount = self.quantity(f"{label}: dose", "dose", keyword="dose")
             over = None
             if self.at_word("over"):
                 over_tok = self.next()
-                over = self.quantity(f"{label}: dose ... over", "time")
+                over = self.quantity(f"{label}: dose ... over", "time",
+                                     keyword="over")
                 if over.value <= 0:
                     raise self._fail(
                         over_tok, f"{label}: infusion duration must be > 0.",
@@ -466,7 +497,7 @@ class Parser:
                                amount=amount, over=over)
         elif word == "every":
             _once("every")
-            q = self.quantity(f"{label}: every", "time")
+            q = self.quantity(f"{label}: every", "time", keyword="every")
             self.expect_newline("every")
             if q.value <= 0:
                 raise self._fail(tok, f"{label}: `every` must be > 0.",
@@ -488,7 +519,7 @@ class Parser:
         elif word == "then":
             _once("rest")
             self.expect_keyword("rest", f"{label}: `then`")
-            q = self.quantity(f"{label}: then rest", "time")
+            q = self.quantity(f"{label}: then rest", "time", keyword="rest")
             self.expect_newline("then rest")
             if q.value <= 0:
                 raise self._fail(tok, f"{label}: rest must be > 0.",
@@ -526,7 +557,8 @@ class Parser:
             start_val, start_tok = self.expect_number(
                 f"sweep {p.text}: the `from` value")
             self.expect_keyword("to", f"sweep {p.text}")
-            stop = self.quantity(f"sweep {p.text}: the `to` value", dim)
+            stop = self.quantity(f"sweep {p.text}: the `to` value", dim,
+                                 keyword="to")
             node.kind = "range"
             node.start = Quantity(start_val, stop.unit, start_tok.line,
                                   start_tok.col, start_tok.end_col)
@@ -562,7 +594,7 @@ class Parser:
                     f"{' ' + (stop.unit or '') if stop.unit else ''}` for a "
                     "fixed override.", code="empty-sweep")
         else:
-            fixed = self.quantity(f"sweep {p.text}", dim)
+            fixed = self.quantity(f"sweep {p.text}", dim, keyword=f"sweep {p.text}")
             node.kind = "fixed"
             node.fixed = fixed
             node.end_col = fixed.end_col
@@ -652,7 +684,7 @@ class Parser:
             seen[word] = tok.line
 
             if word == "dx":
-                opts.dx = self.quantity(f"{label}: dx", "length")
+                opts.dx = self.quantity(f"{label}: dx", "length", keyword="dx")
                 self.expect_newline("dx")
             elif word == "state_mode":
                 v = self.expect_ident(f"{label}: state_mode")

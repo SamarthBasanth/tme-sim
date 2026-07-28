@@ -1010,6 +1010,16 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
       f"`_PDE` is imported from `validation/delivery_metrics.py` so this and "
       f"every flagship delivery number solve the identical problem.")
     a("")
+    a("**Why this section and not all three.** Every absolute AUC / coverage / "
+      "kill number in `results/` was produced on this section at this dx, so it "
+      "is the only one against which a delta is interpretable. The immune FIELD "
+      "is measured on all three (§3), and it is worth reading §3 alongside this "
+      "table: `io_480` and `gse324268_366` carry mean immune area fractions "
+      f"{max(r['phi_mean'] for r in fields) / anchor_row['phi_mean']:.1f}x "
+      "the flagship's, because they are far denser sections, so the same S would "
+      "produce a substantially larger effect there. The levels below are "
+      "flagship-specific; the SHAPE of the S-dependence is not.")
+    a("")
     a("| drug | IC50 (uM) | S | diverted fraction f | mean tumour AUC (uM*s) | "
       "mean exposure (uM) | coverage @1x IC50 | predicted kill | penetration index |")
     a("|---|---|---|---|---|---|---|---|---|")
@@ -1184,6 +1194,36 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
       f"resolved small number; the effect size (the null range) is the more "
       f"informative column.")
     a("")
+    if spf is not None:
+        a("### 5.4 Is the structure a property of the tissue, or of the mesh?")
+        a("")
+        a("`results/state_validation.md` and `results/cell_state_impact.md` both "
+          "turn on the same question, so it is asked here rather than assumed. "
+          "The identical observed statistic, on the identical section and drug "
+          "at the identical strength, at two grid spacings:")
+        a("")
+        a("| dx (um) | structure ratio (sparsest/densest quintile) | "
+          "attenuation p90/p10 | mean attenuation |")
+        a("|---|---|---|---|")
+        for tag in (spf, sp):
+            o = tag["observed"]
+            tail = " (flagship)" if abs(tag["dx_um"] - DX_FLAGSHIP) < 1e-9 else " (null runs here)"
+            a(f"| {tag['dx_um']:.0f}{tail} | **{_f(o['structure_ratio'], 4)}** | "
+              f"{_f(o['a_p90_over_p10'], 4)} | {_f(o['a_mean'], 4)} |")
+        sr_a, sr_b = (sp["observed"]["structure_ratio"],
+                      spf["observed"]["structure_ratio"])
+        swing = max(sr_a, sr_b) / min(sr_a, sr_b) if min(sr_a, sr_b) > 0 else float("nan")
+        a("")
+        a(f"Swing across the mesh: **{_f(swing, 3)}x**. "
+          + ("That is small enough that the structure is a property of the "
+             "measured cell geometry rather than of the discretisation, which "
+             "is the bar this repo applies to every spatial claim."
+             if swing < 1.2 else
+             "That is NOT small, so the structure statistic carries a mesh "
+             "dependence and its LEVEL should not be quoted without the dx it "
+             "was computed at. The qualitative direction (densest quintile "
+             "worse off) is reproduced at both spacings; the magnitude is not."))
+        a("")
 
     # ---------------- §6 -----------------------------------------------------
     a("## 6. Does it improve the measured human-glioma anchor? NO.")
@@ -1362,9 +1402,14 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
     a("")
     a(f"Deterministic — the engine's seeded generator (`seed = 0`) and the "
       f"permutation null's own seed ({sp['seed']}) are the only randomness. "
-      f"Runtime is dominated by "
-      f"{len(DRUGS) * len(SEQUESTRATION_SWEEP) + sp['n_perm'] + 2} full "
-      f"transport solves on the {sw['grid']} flagship grid.")
+      f"Runtime is dominated by transport solves: "
+      f"{len(DRUGS) * (len(SEQUESTRATION_SWEEP) + 1)} on the {sw['grid']} "
+      f"flagship grid (§4, including the three engine reference runs)"
+      + (f", {sp['n_perm'] + 2} at dx = {sp['dx_um']:.0f} um (§5.3) and 2 more "
+         f"at dx = {spf['dx_um']:.0f} um (§5.4)" if spf is not None else "")
+      + ". Each stage is cached to `results/immune_sink_impact_cache.pkl` as it "
+      "completes, so an interrupted run resumes rather than restarting; delete "
+      "that file to force a full recompute.")
     a("")
     a("**Files added by this work:**")
     a("")

@@ -1303,15 +1303,28 @@ def write_report(out: Dict, path: str) -> None:
       "**untreated** resection. There is no measured drug response for any agent "
       "on this tissue, so every kill fraction is a prediction with nothing to "
       "score it against.")
-    w("> * **Absolute kill on this section is NOT defensible** — "
-      "`results/cell_state_impact.md` establishes that. Rankings and relative "
-      "comparisons are. Read every absolute number below as a unit-carrying "
-      "quantity that lets the comparisons be computed, not as a prediction of "
-      "how much tumor dies.")
+    w("> * **Absolute kill on this section is NOT defensible, and that is not my "
+      "hedge — it is this repo's own finding.** "
+      "`results/cell_state_impact.md` concludes verbatim: *\"on the 319-gene "
+      "flagship section, stop quoting an absolute kill fraction or a kill "
+      "ceiling as a result at all: NO route clears the bar there, and the honest "
+      "output of that section is a ranking, a coverage map and a delivery "
+      "metric\"*, and records that absolute kill moves by up to 0.3252 absolute "
+      "(1.77x relative) purely from the choice of cell-state route, with tissue, "
+      "drug, transport and RNG all held identical. **This is that section.** "
+      f"The state route here is the shipping default, `state_mode = "
+      f"'{rep.get('state_mode', 'oxygen')}'`. Every absolute kill and the kill "
+      "ceiling below therefore carry an unresolved uncertainty of that size and "
+      "are printed ONLY because the comparisons are computed from them. The "
+      "comparisons — which are what this file is for — survive; the levels do "
+      "not.")
     w(f"> * **~{out['ceiling_bands']['QUIESCENT']['fraction']*100:.0f}% of tumor "
       f"cells are labelled QUIESCENT by the oxygen-banding model** (x0.5 kill "
       f"multiplier). That single *model* labelling dominates the kill ceiling of "
-      f"{out['kill_ceiling']:.4f} and every absolute kill here.")
+      f"{out['kill_ceiling']:.4f} and every absolute kill here — and per "
+      "`results/cell_state_impact.md` the oxygen route's VIABLE band on this "
+      "section moves from 0.0000% to 10.0412%, i.e. empties entirely, purely "
+      "with bookkeeping.")
     w("> * **Time resolution was added to TRANSPORT, not to pharmacodynamics.** "
       "The kill map is still a static Hill function of window-averaged exposure. "
       "The schedule effect reported here is a **transport-only floor**.")
@@ -1445,7 +1458,12 @@ def write_report(out: Dict, path: str) -> None:
     w(f"**Kill ceiling on this tumor = {out['kill_ceiling']:.4f}** — the kill "
       f"fraction reached as exposure -> infinity, where the Hill term saturates "
       f"and per-cell kill probability tends to `sensitivity x resistance`. "
-      f"**No dose and no schedule can exceed it.**")
+      f"**No dose and no schedule can exceed it.** It is quoted here only "
+      f"because the `% of ceiling` column in section 3 is computed from it; "
+      f"per `results/cell_state_impact.md` a kill ceiling on THIS section is "
+      f"explicitly not a defensible result, and the decomposition below should "
+      f"be read as \"what the model's bookkeeping currently implies\", not as a "
+      f"property of the tumor.")
     w("")
     w("| tumor-cell band | fraction of tumor cells | mean asymptotic kill "
       "probability | contribution to ceiling |")
@@ -1713,6 +1731,25 @@ def write_report(out: Dict, path: str) -> None:
       "of the pure schedule effect at matched dose. Its spread across all arms "
       f"is **{_pct((ref_eff - min(eff)) / ref_eff, 6)}**.")
     w("")
+    drawn = {r["kill_drawn"] for r in mrows}
+    if len(drawn) == 1:
+        w(f"**The Bernoulli-drawn kill fraction is IDENTICAL "
+          f"({mrows[0]['kill_drawn']:.6f}) for every arm**, because the exposure "
+          f"differences above are far below the "
+          f"1/{out['n_tumor']:,} = {1.0/out['n_tumor']:.2e} quantum of a kill "
+          f"fraction obtained by counting cells. Expected kill (the mean "
+          f"per-cell probability) is reported instead throughout, because it is "
+          f"continuous and carries no counting noise. This is worth stating "
+          f"plainly: **at matched cumulative dose this model does not "
+          f"distinguish the regimens even in principle at the resolution of a "
+          f"cell count.**")
+    else:
+        w(f"The Bernoulli-drawn kill fraction takes {len(drawn)} distinct values "
+          f"across the arms, against a counting quantum of "
+          f"1/{out['n_tumor']:,} = {1.0/out['n_tumor']:.2e}. Expected kill is "
+          f"reported throughout because it is continuous and carries no counting "
+          f"noise.")
+    w("")
     w("### 4.1 Why the spread is where it is, exactly")
     w("")
     w("`results/dose_schedule.md` section 4b derives it. Integrating the "
@@ -1817,8 +1854,11 @@ def write_report(out: Dict, path: str) -> None:
     w("")
     w(f"**Exposure spread {_pct(idy['exposure_spread_rel'], 4)}** against the "
       f"bound {_pct(idy['bound_tau_over_T'], 4)}, and it is **monotone: the "
-      f"bolus wins.** That is the same sign `results/dose_schedule.md` found "
-      "across all 48 regimes it tested, and the reason is structural — the "
+      f"bolus wins.** That is the same sign `results/dose_schedule.md` found in "
+      "every regime it tested (its section 5 records the bolus beating the "
+      "sustained infusion across a 192-fold plasma-half-life range, which is the "
+      "**opposite** of the textbook transport-limited intuition). The reason is "
+      "structural — the "
       "earlier a schedule finishes, the more of the steady-state exposure field "
       "it realises inside the window, and there is no saturable perivascular "
       "sink in this transport operator to reverse it. The terminal-residual "
@@ -1912,9 +1952,15 @@ def write_report(out: Dict, path: str) -> None:
       "half-life of 30 hr\"*; Camaggi 1988 gives t1/2-gamma 48.4 h; interpatient "
       "CV ~65%). Peak 2.8 uM is the measured 1509 ng/mL at 35 mg/m2 IV bolus "
       "(Muller 1993, PMID 8339389). **The peak is dominated by sampling time** — "
-      "doxorubicin's distribution half-life is ~4 min, so any reported Cmax is "
-      "as much a statement about when blood was drawn as about the drug. This "
-      "is the least trustworthy number in the report.")
+      "doxorubicin's distribution half-life is ~4 min (Camaggi 1988 t1/2-alpha "
+      "4.8 min), so any reported Cmax is as much a statement about when blood "
+      "was drawn as about the drug. This is the least trustworthy number in the "
+      "report. Speth 1988 (PMID 3042244) adds that intracellular doxorubicin "
+      "concentrations reached in vivo sit **below** the in-vitro "
+      "clonogenic-kill threshold and that the optimal anthracycline schedule "
+      "*\"has never been investigated in a prospective, randomised manner\"* — "
+      "i.e. for this agent, plasma exposure is known NOT to determine effect, "
+      "which is precisely the assumption this model rests on.")
     w("")
     w(f"Single agents over the {combo['window_s']/HOUR:.0f} h combination window, "
       f"dosed at t = 0:")
@@ -2138,9 +2184,14 @@ def write_report(out: Dict, path: str) -> None:
       "arithmetic meeting a saturating Hill curve, not spatial complementarity. "
       "The overlap ratios say the same thing from the other side: `obs/null` "
       f"ranges {min(all_on):.2f}x-{max(all_on):.2f}x across every pair, "
-      "convention and arm — i.e. the two agents' killed populations co-localise "
-      "**more** than a delivery-scrambled null, not less. There is no spatial "
-      "complementarity to exploit on this section.")
+      "convention and arm"
+      + (" — i.e. the two agents' killed populations co-localise **more** than a "
+         "delivery-scrambled null in every single arm, not less. There is no "
+         "spatial complementarity to exploit on this section."
+         if min(all_on) >= 1.0 else
+         " — so the spatial-complementarity picture is mixed rather than "
+         "uniformly redundant; read the per-arm table in section 5.3 rather "
+         "than this summary."))
     w("")
     w("---")
     w("")
@@ -2214,10 +2265,15 @@ def write_report(out: Dict, path: str) -> None:
         "against reality.",
         "**Not clinical dosing guidance.** Research prototype. No regulatory, "
         "diagnostic or treatment-selection use.",
-        "**Absolute kill on this section is not defensible** — "
-        "`results/cell_state_impact.md` establishes this directly. Rankings and "
-        "relative comparisons are what this file is for. Every absolute kill "
-        "here should be read as a unit-carrying intermediate.",
+        "**Absolute kill on this section is not defensible, per this repo's own "
+        "`results/cell_state_impact.md`.** That report finds that on the "
+        "319-gene flagship section — this one — no cell-state route clears the "
+        "bar, absolute kill moves by up to 0.3252 absolute (1.77x) purely with "
+        "the state route, and its explicit recommendation is to **stop quoting "
+        "an absolute kill fraction or a kill ceiling as a result** here. "
+        "Rankings and relative comparisons are what this file is for; every "
+        "absolute kill and the ceiling are unit-carrying intermediates printed "
+        "so the comparisons can be checked.",
         f"**The schedule effect is bounded by `tau_tissue / T_window` and is "
         f"therefore window-conditional.** {tau:.0f} s / 28 d = "
         f"{_pct(out['matched_bound_tau_over_T'], 6)}. Section 4.3 shows the "

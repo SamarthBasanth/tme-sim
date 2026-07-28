@@ -1002,21 +1002,51 @@ def consequences(slab: Dict) -> Dict:
             "delta_worst": float(np.nanmax(np.abs(vals - t))),
         })
     worst = max(r["delta_worst"] for r in cov_rows)
+    # The bias AT THE PUBLISHED OPERATING POINTS, measured rather than
+    # interpolated. Drugs published at exactly 0 or 1 are saturated: no threshold
+    # perturbation can move them, so they are reported as such.
+    by_target = {r["coverage_2d"]: r for r in cov_rows}
+    at_published = []
+    for name, pub_cov in PUBLISHED_NUMBERS["delivery_metrics"][
+            "coverage_1x"].items():
+        if pub_cov <= 0.0 or pub_cov >= 1.0:
+            at_published.append({"drug": name, "published": float(pub_cov),
+                                 "saturated": True, "delta_mean": 0.0,
+                                 "delta_worst": 0.0, "range_3d": None})
+            continue
+        key = min(by_target, key=lambda t: abs(t - pub_cov))
+        r = by_target[key]
+        at_published.append({
+            "drug": name, "published": float(pub_cov), "saturated": False,
+            "probe_target": float(key),
+            "coverage_3d_mean": r["coverage_3d_mean"],
+            "range_3d": (r["coverage_3d_min"], r["coverage_3d_max"]),
+            "delta_mean": r["delta_mean"], "delta_worst": r["delta_worst"],
+        })
+    unsat = [a for a in at_published if not a["saturated"]]
+    worst_at_pub = max((a["delta_worst"] for a in unsat), default=0.0)
     coverage = {
         "rows": cov_rows,
+        "at_published_operating_points": at_published,
         "worst_absolute_delta": float(worst),
+        "worst_absolute_delta_at_published_points": float(worst_at_pub),
         "published_grid_error_bar":
             PUBLISHED_NUMBERS["delivery_metrics"][
                 "published_grid_error_bar_on_coverage"],
         "published": PUBLISHED_NUMBERS["delivery_metrics"]["coverage_1x"],
         "verdict":
-            f"worst-case {worst:.3f} absolute ({100.0*worst:.0f} percentage points "
-            "of tumour cells), against the +/-0.03 grid bar already carried. The "
-            "sign is not even consistent: 2-D under-counts coverage where the "
-            "threshold is permissive and over-counts where it is strict, because "
-            "the 2-D field is broader-tailed at both ends. No drug's "
-            "classification flips — a saturated drug stays saturated and a "
-            "zero-coverage drug stays at zero",
+            f"worst case {worst:.3f} absolute ({100.0*worst:.0f} percentage "
+            f"points of tumour cells) anywhere on the ladder, and {worst_at_pub:.3f} "
+            "at the published operating points. **This is the one quantity that "
+            "moves by materially more than the bar already carried** "
+            f"({worst:.3f} is {worst / 0.03:.0f}x the +/-0.03 grid bar) and it "
+            "should not be minimised. The bias is structured, not noise: 2-D "
+            "UNDER-counts coverage at permissive thresholds (delta about -0.07) "
+            "and OVER-counts at strict ones (delta up to +0.14), because the 2-D "
+            "field is broader-tailed at both ends than the tissue really is. What "
+            "does not change is the drug ORDERING: the two drugs published at "
+            "exactly 0.0000 are floored and cannot move at all, and the gaps "
+            "between the remaining three are far wider than the shifts",
     }
 
     # --- (iv) the 3-D:2-D kill ratio -------------------------------------- #
@@ -1169,13 +1199,17 @@ def write_report(analytic: Dict, stereo: Dict, census: Dict, slab: Dict,
     a(f"> **Penetration length: 0% bias on the physical `L`; ~{100.0*(1.0-dh['median']):.0f}% "
       "under-statement of the *fitted* profile decay distance. Mean tumour AUC: "
       "0% bias, analytically. Therapeutic coverage: worst case "
-      f"{cov['worst_absolute_delta']:.3f} absolute, against the +/-0.03 grid bar "
-      "already carried, with an inconsistent sign. 3-D:2-D kill ratio: the "
+      f"{cov['worst_absolute_delta_at_published_points']:.3f} absolute at the "
+      f"published operating points ({cov['worst_absolute_delta']:.3f} anywhere on "
+      "the threshold ladder) — **the one quantity that moves by materially more "
+      "than the bar it already carries**. 3-D:2-D kill ratio: the "
       f"implied temozolomide IC50 fold moves from {kil['published_fold']:.2f}x to "
       f"{kil['corrected_fold_range'][0]:.2f}-{kil['corrected_fold_range'][1]:.2f}x, "
       f"still inside the {kil['literature_band'][0]:.0f}-{kil['literature_band'][1]:.0f}x "
       "literature band.** Three of the four published quantities move by less "
-      "than the uncertainty they already carry. The issue is closed.\n")
+      "than the uncertainty they already carry; therapeutic coverage is the "
+      "exception and is reported as such in section 4.3. The transport physics "
+      "needs no fix; coverage needs an extra error bar.\n")
 
     # ---- 1. analytic -------------------------------------------------- #
     a("\n## 1. Analytic: what 2-D and 3-D actually differ by\n")
@@ -1430,9 +1464,12 @@ def write_report(analytic: Dict, stereo: Dict, census: Dict, slab: Dict,
     a(f"| (ii) mean tumour AUC | none | **0 systematically** (section 1.4); "
       f"+/-{100.0*max(abs(mau['measured_ratio_2d_over_3d']['max']-1), abs(1-mau['measured_ratio_2d_over_3d']['min'])):.0f}% "
       f"section-sampling scatter | no |")
-    a(f"| (iii) therapeutic coverage | inconsistent sign | worst case "
-      f"**{cov['worst_absolute_delta']:.3f} absolute** | ~2-3x the +/-0.03 grid "
-      f"bar, but far below the 30x kill interval |")
+    a(f"| (iii) therapeutic coverage | structured: 2-D under-counts at "
+      f"permissive thresholds, over-counts at strict ones | "
+      f"**{cov['worst_absolute_delta_at_published_points']:.3f} absolute** at the "
+      f"published operating points, {cov['worst_absolute_delta']:.3f} worst case "
+      f"on the ladder | **YES — {cov['worst_absolute_delta']/0.03:.0f}x the "
+      f"+/-0.03 grid bar. The one genuine exception in this report** |")
     a(f"| (iv) 3-D:2-D kill ratio | 2-D over-states the 3-D penalty | fold "
       f"{kil['published_fold']:.2f}x -> "
       f"{kil['corrected_fold_range'][0]:.2f}-{kil['corrected_fold_range'][1]:.2f}x | "
@@ -1474,11 +1511,41 @@ def write_report(analytic: Dict, stereo: Dict, census: Dict, slab: Dict,
         a(f"| {r['coverage_2d']:.2f} | {r['coverage_3d_mean']:.3f} | "
           f"{r['coverage_3d_min']:.3f} - {r['coverage_3d_max']:.3f} | "
           f"{r['delta_mean']:+.3f} |")
-    a(f"\n{cov['verdict']}. Concretely, against the published dx = 12 um panel: "
-      "temozolomide (0.0000) and methotrexate (0.0000) stay at zero, cisplatin "
-      "(0.9936) stays saturated, and only the mid-range drugs — doxorubicin "
-      "(0.3836) and lomustine (0.2175) — move at all, by at most a few "
-      "percentage points.\n")
+    a(f"\n{cov['verdict']}.\n")
+    a("**At the published operating points** (dx = 12 um panel of "
+      "`delivery_metrics.md`), measured directly rather than interpolated "
+      "between ladder rungs:\n")
+    a("| drug | published coverage @1x IC50 | 3-D coverage (mean) | "
+      "range over configurations | worst delta |\n|---|---:|---:|---|---:|")
+    for ap in cov["at_published_operating_points"]:
+        if ap["saturated"]:
+            a(f"| {ap['drug']} | {ap['published']:.4f} | *saturated* | "
+              "— | 0.000 |")
+        else:
+            lo, hi = ap["range_3d"]
+            a(f"| {ap['drug']} | {ap['published']:.4f} | "
+              f"{ap['coverage_3d_mean']:.3f} | {lo:.3f} - {hi:.3f} | "
+              f"{ap['delta_worst']:.3f} |")
+    a(f"\nSo the honest statement is: **therapeutic coverage carries a "
+      f"dimensionality uncertainty of up to {cov['worst_absolute_delta_at_published_points']:.2f} "
+      "absolute at the operating points this project actually publishes**, on "
+      "top of its +/-0.03 grid bar. That is the largest single bias found in this "
+      "report and it is the one place where the 2-D assumption is NOT negligible. "
+      "It does not change the drug ranking (the two saturated drugs cannot move, "
+      "and the two mid-range drugs move in the same direction), and it is an "
+      "order of magnitude smaller than the 30x interval `kill_calibration.md` "
+      "already quotes on absolute kill — but a coverage number should be quoted "
+      "with this bar beside the grid bar, not instead of it.\n")
+    a("Two details in that table must not be glossed. **The shifts are not in "
+      "the same direction**: lomustine moves DOWN (0.2175 -> 0.142) because it "
+      "sits at a permissive threshold, doxorubicin moves slightly UP "
+      "(0.3836 -> 0.405) because it sits near the crossover, and cisplatin moves "
+      "down from near-saturation. And **cisplatin at 0.9936 is near-saturated, "
+      "not saturated** — it is probed at the 0.90 rung, which is the closest one "
+      "available, so its 0.090 figure is an over-estimate of its true movement. "
+      "The ordering (temozolomide = methotrexate < lomustine < doxorubicin < "
+      "cisplatin) is identical before and after, and the gaps between the "
+      "non-floored drugs (0.14 / 0.41 / 0.97) are several times the shifts.\n")
 
     a("### 4.4 The 3-D:2-D kill ratio — the test that PASSED\n")
     a(f"`results/kill_calibration.md` predicts a temozolomide 3-D:2-D kill ratio "
@@ -1553,9 +1620,11 @@ def write_report(analytic: Dict, stereo: Dict, census: Dict, slab: Dict,
       "2-D-symmetric, and a 5 um section through an 18 um vessel cuts it "
       "transversely.** `L = sqrt(D_eff/k)` is preserved exactly; mean tumour AUC "
       "is unbiased by a stereological identity; therapeutic coverage moves by "
-      f"at most {cov['worst_absolute_delta']:.2f} absolute with an inconsistent "
-      "sign; and the 3-D:2-D kill test not only survives the correction but "
-      "lands closer to the literature median after it. The one quantity that "
+      f"up to {cov['worst_absolute_delta_at_published_points']:.2f} absolute at "
+      "the published operating points — the one place the assumption is NOT "
+      "negligible, and it earns an extra error bar rather than a code change; "
+      "and the 3-D:2-D kill test not only survives the correction but "
+      "lands closer to the literature median after it. The other quantity that "
       "moves materially — the *fitted* profile decay distance, "
       f"~{100.0*(1.0-dh['median']):.0f}% low — is already flagged in "
       "`delivery_metrics.md` as the metric that did not converge, and the "
@@ -1694,7 +1763,9 @@ def _print_summary(census: Dict, slab: Dict, cons: Dict) -> None:
     print(f"    (i)   physical L = sqrt(D/k)   : 0% bias (proved)")
     print(f"    (i')  fitted decay distance    : {100*(1-dh['median']):.0f}% low")
     print(f"    (ii)  mean tumour AUC          : 0% bias (stereological identity)")
-    print(f"    (iii) therapeutic coverage     : <= {cov['worst_absolute_delta']:.3f} abs")
+    print(f"    (iii) therapeutic coverage     : "
+          f"{cov['worst_absolute_delta_at_published_points']:.3f} abs at published "
+          f"points, {cov['worst_absolute_delta']:.3f} worst on ladder  <- ONLY REAL BIAS")
     print(f"    (iv)  3D:2D kill fold          : {kil['published_fold']:.2f}x -> "
           f"{kil['corrected_fold_range'][0]:.2f}-{kil['corrected_fold_range'][1]:.2f}x "
           f"(band {kil['literature_band'][0]:.0f}-{kil['literature_band'][1]:.0f}x) -> "

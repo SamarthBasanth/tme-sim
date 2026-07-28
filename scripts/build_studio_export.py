@@ -253,13 +253,28 @@ def bundle() -> str:
 # --------------------------------------------------------------------------- #
 # Payload baking
 # --------------------------------------------------------------------------- #
-def bake_runs(run_ids):
+#: Payloads a RunResult must positively declare before they are baked. A file
+#: on disk is not evidence: app/runs/ is shared with any server or test process
+#: that is up, JobManager allocates ids from the highest one it finds, and
+#: _persist only writes the payloads THIS run produced — it never deletes a
+#: previous occupant's. So a stale foreign payload can sit in a directory a
+#: later run reused, and baking it would attach one run's data to another run's
+#: metrics. Each entry is (payload name, predicate on the RunResult).
+_DECLARED_BY = {
+    "mechanism": lambda doc: bool(
+        (doc.get("mechanism") or {}).get("reconciliation")),
+    "timelapse": lambda doc: bool((doc.get("timelapse") or {}).get("available")),
+}
+
+
+def bake_runs(run_ids, root=None):
     """RunResults + deduplicated base64 binaries for the requested runs."""
     from app.server.cache import runs_dir
 
+    root = root or runs_dir()
     runs, blobs, payloads, raw_bytes = [], {}, {}, 0
     for rid in run_ids:
-        d = os.path.join(runs_dir(), rid)
+        d = os.path.join(root, rid)
         with open(os.path.join(d, "result.json")) as fh:
             doc = json.load(fh)
         if doc.get("status") != "done":
@@ -273,6 +288,12 @@ def bake_runs(run_ids):
                             + [(f, f"field_{f}.bin") for f in FIELD_NAMES]):
             path = os.path.join(d, fname)
             if not os.path.exists(path):
+                continue
+            declared = _DECLARED_BY.get(name)
+            if declared is not None and not declared(doc):
+                print(f"  SKIPPED       {rid}/{fname}: present on disk but this "
+                      f"RunResult does not declare a {name} payload — refusing "
+                      f"to bake it (stale file from another run?)")
                 continue
             with open(path, "rb") as fh:
                 data = fh.read()
@@ -291,12 +312,18 @@ def main(argv) -> int:
     from app.server.api import default_spec, drug_rows, validate_spec
     from app.server.cache import list_sections
 
-    run_ids = argv[1:]
+    run_ids, root = argv[1:], None
     if not run_ids:
-        # Whatever scripts/export_studio_runs.py produced last.
+        # Whatever scripts/export_studio_runs.py produced last, from the
+        # private store it wrote them to.
         with open(os.path.join(ROOT, "results", "_export_run_ids.json")) as fh:
-            run_ids = json.load(fh)
-    runs, blobs, payloads, raw_bytes = bake_runs(run_ids)
+            manifest = json.load(fh)
+        if isinstance(manifest, dict):
+            run_ids, root = manifest["run_ids"], manifest.get("runs_dir")
+        else:                                   # pre-manifest format
+            run_ids = manifest
+    print(f"  runs dir      {root or 'app/runs (shared)'}")
+    runs, blobs, payloads, raw_bytes = bake_runs(run_ids, root)
 
     sections = list_sections()
     drugs = drug_rows()
