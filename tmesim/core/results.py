@@ -23,6 +23,15 @@ class TransportResult:
     mean_concentration_history : (n_saved,) tissue-mean concentration over time.
     penetration_index : scalar summary in [0,1] — how far the drug reached
         relative to a well-mixed ideal (1 = perfect penetration).
+    frames : (n_frames, ny, nx) concentration snapshots (uM), or None. Only
+        populated when the solver is asked for them via ``capture_frames``;
+        ``None`` is the default and the historical behaviour. This is the
+        time-lapse: the drug field as it enters, spreads and (with a
+        time-resolved plasma driver) clears.
+    frame_times : (n_frames,) time stamps of ``frames`` (s), or None.
+    frame_interval_s : nominal spacing between captured frames (s), or None.
+        The captured step indices are rounded onto the solver's own step grid,
+        so the realised spacing can differ from this by up to one ``dt``.
     """
 
     auc: np.ndarray
@@ -30,6 +39,9 @@ class TransportResult:
     times: np.ndarray
     mean_concentration_history: np.ndarray
     penetration_index: float = 0.0
+    frames: Optional[np.ndarray] = None
+    frame_times: Optional[np.ndarray] = None
+    frame_interval_s: Optional[float] = None
 
 
 @dataclass
@@ -46,6 +58,12 @@ class SimulationResult:
     transport : the TransportResult that drove the kill (for inspection/plots).
     fields : dict of named (ny,nx) fields to visualize (oxygen, ifp, auc, ...).
     extras : free-form scalars/diagnostics.
+    mechanism : per-cell mechanism attribution (tmesim.sim.mechanism.attribute),
+        or None. Populated only when ``simulate_response(..., attribute=True)``
+        is asked for; the run is bit-identical either way. Carries the per-cell
+        label array, the delivery / dose / resistance / chance breakdown of the
+        survivors, the thresholds used, and the bit-exact reconciliation against
+        ``kill_fraction``.
     """
 
     predicted_response: float
@@ -56,6 +74,7 @@ class SimulationResult:
     transport: Optional[TransportResult] = None
     fields: Dict[str, np.ndarray] = field(default_factory=dict)
     extras: Dict[str, float] = field(default_factory=dict)
+    mechanism: Optional[Dict] = None
 
 
 @dataclass

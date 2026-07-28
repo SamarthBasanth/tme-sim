@@ -57,7 +57,7 @@ Units: length um, time s, concentration uM, diffusivity um^2/s.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Dict, Optional
 
 import numpy as np
 from scipy.sparse import csc_matrix
@@ -190,6 +190,7 @@ def simulate_drug_transport(
     pde: PDEConfig,
     velocity: Optional[np.ndarray] = None,
     source_profile: Optional[np.ndarray] = None,
+    capture_frames: Optional[int] = None,
 ) -> TransportResult:
     """Solve convection-diffusion-reaction for drug concentration ``C(x, y, t)``.
 
@@ -257,6 +258,22 @@ def simulate_drug_transport(
         so the single LU factorization is still built once and reused for every
         step: a time-varying source costs one extra scalar multiply per step and
         nothing else.
+    capture_frames : int, optional
+        **Time-lapse.** Number of concentration snapshots to keep, evenly spaced
+        over the window and always including ``t = 0`` (the zero initial
+        condition) and ``t = total_time``. The requested count is clipped to
+        ``n_steps + 1``, so a short solve returns every step rather than
+        duplicating frames. ``None`` (the default) keeps nothing and is the
+        historical path; capture is a pure ``copy`` at selected steps, so it
+        changes no arithmetic and costs ``n_frames * ny * nx * 8`` bytes and
+        nothing else. The snapshots land in ``TransportResult.frames`` /
+        ``.frame_times``.
+
+        The snapshots are the concentration ``C``, not the exposure ``AUC``:
+        AUC only ever rises, so it cannot show drug leaving. Watching drug
+        actually *clear* additionally needs a time-resolved plasma driver
+        (``source_profile``), because a static source holds the delivery rate up
+        for the whole window by construction.
 
     Returns
     -------
@@ -366,6 +383,28 @@ def simulate_drug_transport(
     times = [0.0]
     mean_hist = [float(c[tissue].mean()) if tissue.any() else 0.0]
 
+    # --- optional time-lapse capture (None => nothing allocated, nothing kept) --
+    frames = frame_times = None
+    frame_interval_s = None
+    capture_at: Dict[int, int] = {}
+    if capture_frames is not None:
+        n_frames = int(capture_frames)
+        if n_frames < 2:
+            raise ValueError(
+                f"capture_frames must be >= 2 (a time-lapse needs at least a "
+                f"first and a last frame); got {capture_frames!r}"
+            )
+        n_frames = min(n_frames, n_steps + 1)
+        steps_wanted = np.unique(
+            np.rint(np.linspace(0.0, float(n_steps), n_frames)).astype(int))
+        capture_at = {int(s): i for i, s in enumerate(steps_wanted)}
+        n_frames = steps_wanted.size
+        frames = np.zeros((n_frames, ny, nx), dtype=np.float64)
+        frame_times = steps_wanted.astype(np.float64) * dt
+        frame_interval_s = (
+            float(pde.total_time) / (n_frames - 1) if n_frames > 1 else None)
+        frames[0] = c  # t = 0, the zero initial condition
+
     src_flat = src.ravel()
     for step in range(1, n_steps + 1):
         rhs = c.copy()
@@ -384,6 +423,11 @@ def simulate_drug_transport(
         # Trapezoidal accumulation of the exposure integral (AUC).
         auc += 0.5 * (c + c_new) * dt
         c = c_new
+
+        if capture_at:
+            slot = capture_at.get(step)
+            if slot is not None:
+                frames[slot] = c
 
         if step % save_every == 0 or step == n_steps:
             times.append(step * dt)
@@ -411,6 +455,9 @@ def simulate_drug_transport(
         times=np.asarray(times, dtype=np.float64),
         mean_concentration_history=np.asarray(mean_hist, dtype=np.float64),
         penetration_index=penetration_index,
+        frames=frames,
+        frame_times=frame_times,
+        frame_interval_s=frame_interval_s,
     )
 
 

@@ -22,7 +22,9 @@
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 .btn:hover:not(:disabled) { background: var(--bg-4); border-color: var(--line-2); }
-.btn:active:not(:disabled) { background: var(--bg-4); transform: translateY(0.5px); }
+/* No transform on press: a sub-pixel nudge is a consumer-web flourish that
+   carries no state. The background change is the feedback. */
+.btn:active:not(:disabled) { background: var(--bg-4); border-color: var(--accent-dim); }
 .btn:disabled { opacity: 0.42; cursor: not-allowed; }
 .btn.primary {
   background: var(--accent);
@@ -503,7 +505,9 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .diag.warn { color: var(--warn); border-left-color: var(--warn); background: var(--warn-bg); }
 .diag::before { content: "\00d7"; font-weight: 700; text-align: center; }
 .diag.warn::before { content: "!"; }
-.diag:hover { filter: brightness(1.12); }
+.diag:hover { background: var(--bg-3); }
+.diag.err:hover  { background: var(--crit-bg); border-left-width: 4px; }
+.diag.warn:hover { background: var(--warn-bg); border-left-width: 4px; }
 
 /* ==================================================== stage overlays ==== */
 .ov-card {
@@ -557,6 +561,13 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   margin-top: 2px;
 }
 .legend .l-note { font-size: var(--fs-micro); color: var(--fg-2); margin-top: 2px; }
+.legend .l-win {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-micro);
+  color: var(--warn);
+  margin-top: 1px;
+}
 
 /* hover read-out */
 .readout { padding: 5px 7px; min-width: 210px; max-width: 262px; }
@@ -571,28 +582,30 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .readout .kv > dt { font-size: var(--fs-micro); }
 .readout .r-empty { color: var(--fg-3); font-family: var(--font-mono); font-size: var(--fs-xs); }
 
-/* perf stats */
-.glstats { padding: 4px 6px; font-family: var(--font-mono); font-size: var(--fs-micro); line-height: 1.45; color: var(--fg-1); }
-.glstats b { color: var(--fg-0); font-weight: 600; }
-.glstats .lo { color: var(--warn); }
-
-/* empty state */
+/* empty state — left aligned and in the corner the read-out will occupy.
+   (The render-statistics card that used to float over the specimen has been
+   removed outright: it duplicated the status strip exactly, and it was never
+   wired up, so what actually shipped was an empty bordered box sitting on the
+   tissue.) */
 .empty {
-  text-align: center;
+  text-align: left;
   color: var(--fg-2);
   font-size: var(--fs-sm);
-  padding: var(--pad-4);
-  max-width: 380px;
+  padding: var(--pad-3);
+  max-width: 420px;
+  background: color-mix(in srgb, var(--bg-1) 92%, transparent);
+  border: 1px solid var(--line-2);
 }
 .empty h3 {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--fg-1);
   text-transform: uppercase;
   letter-spacing: var(--tr-wide);
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   font-weight: 600;
 }
-.empty p { line-height: 1.5; }
+.empty p { line-height: 1.45; }
+.empty-keys { margin-top: 5px; }
 .empty kbd {
   display: inline-block;
   padding: 0 3px;
@@ -702,6 +715,79 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .sparkbar > i.warn { background: var(--warn); }
 .sparkbar > i.crit { background: var(--crit); }
 
+/* =================================================== window / level ===== */
+/* The histogram is the control surface, not an illustration: the window edges
+   are grabbed on it directly, and the ramp is painted only across the window
+   so the strip under the bars IS the legend for what is on screen. */
+.wl { display: flex; flex-direction: column; gap: var(--pad-2); }
+.wl-plot { position: relative; line-height: 0; }
+.wl-canvas {
+  display: block;
+  width: 100%;
+  height: 80px;
+  cursor: grab;
+  touch-action: none;
+}
+.wl-canvas:active { cursor: grabbing; }
+.wl-grid { grid-template-columns: 52px minmax(0, 1fr); }
+.wl-btns { gap: var(--pad-1); }
+.wl-kv > dd { gap: 2px; }
+.wl.empty .wl-grid, .wl.empty .wl-btns, .wl.empty .wl-kv { opacity: 0.45; }
+
+.field-note {
+  font-size: var(--fs-micro);
+  color: var(--fg-2);
+  line-height: 1.4;
+  margin-top: 3px;
+}
+
+/* ========================================================== tools ======= */
+.tool-body { padding: 0 !important; }
+.tool-panel { display: flex; flex-direction: column; }
+.tool-bar {
+  height: 19px;
+  padding: 0 var(--pad-2) 0 var(--pad-3);
+  border-bottom: 1px solid var(--line-0);
+  background: var(--bg-1);
+}
+.plot-wrap { padding: var(--pad-2) var(--pad-3) 0; line-height: 0; }
+.plot-canvas { display: block; width: 100%; height: 104px; cursor: crosshair; }
+.tool-panel .kv { padding: var(--pad-2) var(--pad-3) 0; }
+.tool-panel .kv .step { margin-left: 5px; }
+.tool-hint {
+  font-size: var(--fs-micro);
+  color: var(--fg-2);
+  line-height: 1.4;
+  padding: var(--pad-2) var(--pad-3);
+}
+/* An unused tool collapses to a single line of instruction rather than
+   reserving space for a plot that does not exist yet. */
+.tool-panel.empty .plot-wrap,
+.tool-panel.empty .kv,
+.tool-panel.empty .tblwrap { display: none; }
+
+.roi-tbl { font-size: var(--fs-xs); }
+.roi-tbl td, .roi-tbl th { padding: 0 var(--pad-2); height: 18px; }
+.roi-tbl th { background: var(--bg-2); }
+.roi-tbl td:first-child { color: var(--fg-2); }
+.roi-tbl tbody tr:hover td { background: var(--bg-2); }
+.roi-sw {
+  display: inline-block;
+  width: 7px; height: 7px;
+  margin-right: 4px;
+  vertical-align: 0;
+  border: 1px solid color-mix(in srgb, var(--fg-0) 30%, transparent);
+}
+.roi-sep td {
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-wide);
+  height: 16px;
+  border-bottom: 1px solid var(--line-1);
+}
+
 /* ---------------------------------------------------- chrome utilities ---
    These exist so index.html carries NO inline style= attribute: a strict
    Content-Security-Policy with style-src 'self' (no 'unsafe-inline') blocks
@@ -721,7 +807,21 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   box-shadow: var(--shadow-pop);
 }
 #help-dlg::backdrop { background: hsl(213 24% 4% / 0.55); }
-#help-dlg .tbl td:first-child { width: 112px; color: var(--fg-1); }
+#help-dlg .keys-body { max-height: min(74vh, 640px); }
+#help-dlg .tbl td:first-child { width: 118px; color: var(--fg-1); }
+#help-dlg .keys tr.grp td {
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-wide);
+  height: 18px;
+  width: auto;
+  border-bottom: 1px solid var(--line-1);
+  padding-top: 2px;
+}
+#help-dlg .keys tr.grp:first-child td { border-top: 0; }
+#help-dlg .keys td { height: 20px; }
 #help-dlg kbd {
   display: inline-block; padding: 0 3px; min-width: 15px; text-align: center;
   border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 2px;

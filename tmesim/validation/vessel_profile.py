@@ -409,6 +409,53 @@ def empirical_half_distance_um(
     return float(d[i - 1] + (v0 - target) / (v0 - v1) * (d[i] - d[i - 1]))
 
 
+#: How a missing half-distance is rendered. ``empirical_half_distance_um`` returns
+#: ``None`` **by design** when a profile never falls to half its perivascular value,
+#: and under the DISCRETE vessel source temozolomide's exposure profile never halves
+#: across this section (fitted ``L`` ~= 296 um against a 43 um median tumour-to-vessel
+#: distance). "The profile does not halve" is a MEASURED property of the profile, not
+#: a missing number, so it is printed as text and never substituted with a fit-derived
+#: or extrapolated value.
+D_HALF_NEVER = "n/a (never halves)"
+
+
+def _d_half(value, nd: int = 1, never: str = D_HALF_NEVER) -> str:
+    """Format an optional half-distance. ``None`` / non-finite -> :data:`D_HALF_NEVER`.
+
+    Every formatted read of ``empirical_d_half_um`` goes through this, so a profile
+    that never halves can never raise ``TypeError: unsupported format string passed
+    to NoneType.__format__`` in a print, a figure label or a report line.
+    """
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return never
+    return never if not np.isfinite(v) else f"{v:.{nd}f}"
+
+
+def _d_half_u(value, nd: int = 1, unit: str = " µm") -> str:
+    """:func:`_d_half` with the UNIT inside, so a missing half-distance never
+    renders as ``"n/a (never halves) µm"`` — which reads like a quantity that has
+    units, i.e. exactly the misreading this whole guard exists to prevent."""
+    text = _d_half(value, nd)
+    return text if text == D_HALF_NEVER else f"{text}{unit}"
+
+
+def _d_half_range(a, b, nd: int = 0, never: str = D_HALF_NEVER,
+                  unit: str = " µm") -> str:
+    """``lo-hi`` across two arms, or :data:`D_HALF_NEVER` if either arm never halves."""
+    vals = []
+    for x in (a, b):
+        try:
+            v = float(x)
+        except (TypeError, ValueError):
+            return never
+        if not np.isfinite(v):
+            return never
+        vals.append(v)
+    return f"{min(vals):.{nd}f}–{max(vals):.{nd}f}{unit}"
+
+
 def _clean(distance_um, value, weight):
     d = np.asarray(distance_um, dtype=np.float64)
     v = np.asarray(value, dtype=np.float64)
@@ -787,7 +834,7 @@ def run_arm(arm: Dict, alpha: float, drugs: Sequence[str]) -> Dict:
 
     source_null = profile_fits(distance_profile(vasc, dist, tissue))
     print(f"  SOURCE NULL (vascular_density itself): empirical d_half = "
-          f"{source_null['empirical_d_half_um']:.1f} um")
+          f"{_d_half(source_null['empirical_d_half_um'])} um")
 
     pde = PDEConfig(convection=True, **_PDE)
     results = []
@@ -796,7 +843,7 @@ def run_arm(arm: Dict, alpha: float, drugs: Sequence[str]) -> Dict:
         r = analyze_drug(micro, name, alpha, dist, pde)
         r["corr_with_source"] = float(np.corrcoef(r["auc_field"][tissue], vasc[tissue])[0, 1])
         ef = r["auc"]["exp_floor"]
-        print(f" d_half(emp)={r['auc']['empirical_d_half_um']:6.1f} um  "
+        print(f" d_half(emp)={_d_half(r['auc']['empirical_d_half_um']):>6} um  "
               f"L(exp+floor)={ef.get('L_um', float('nan')):6.1f} um  "
               f"R2={ef.get('r2_linear_space', float('nan')):.4f}  "
               f"corr(AUC,source)={r['corr_with_source']:.3f}")
@@ -958,7 +1005,7 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
         ef = r["auc"]["exp_floor"]
         axm.set_title(
             f"({'bc'[j]}) simulated {r['drug']} exposure AUC (µM·s, log scale)\n"
-            f"empirical d½ = {r['auc']['empirical_d_half_um']:.0f} µm  ·  "
+            f"empirical d½ = {_d_half(r['auc']['empirical_d_half_um'], 0)} µm  ·  "
             f"L = {ef.get('L_um', float('nan')):.0f} µm  ·  far-field plateau "
             f"{r['auc']['plateau_fraction']*100:.0f}%\n(cyan = vessel mask)",
             fontsize=9.5)
@@ -982,7 +1029,7 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
                          alpha=0.15, lw=0)
         axd.plot(d, m / c0, "o-", color=col, ms=3.0, lw=1.5,
                  label=f"{r['drug']} — sim mean ± IQR "
-                       f"(d½={r['auc']['empirical_d_half_um']:.0f} µm)")
+                       f"(d½={_d_half(r['auc']['empirical_d_half_um'], 0)} µm)")
         ef = r["auc"]["exp_floor"]
         if "L_um" in ef:
             dd = np.linspace(0, 500, 300)
@@ -994,7 +1041,7 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
     ds, ms, _ = usable_bins(sn["profile"])
     axd.plot(ds, ms / float(ms[0]), "-", color=_SRC_COLOR, lw=2.2, alpha=0.85, zorder=1,
              label=f"SOURCE NULL: vascular_density itself "
-                   f"(d½={sn['empirical_d_half_um']:.0f} µm)")
+                   f"(d½={_d_half(sn['empirical_d_half_um'], 0)} µm)")
     axd.set_xlim(0, 500); axd.set_ylim(0, 1.05)
     axd.set_xlabel("distance from nearest blood vessel (µm)")
     axd.set_ylabel("drug AUC / perivascular AUC")
@@ -1062,7 +1109,7 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
             axg.semilogy(d, m / float(m[0]), ls, color=_COLORS.get(r["drug"], "0.3"),
                          lw=1.6, alpha=0.9,
                          label=f"{r['drug'][:3]} · {arm['short']} "
-                               f"(d½={r['auc']['empirical_d_half_um']:.0f} µm)")
+                               f"(d½={_d_half(r['auc']['empirical_d_half_um'], 0)} µm)")
         ds2, ms2, _ = usable_bins(arm["source_null"]["profile"])
         axg.semilogy(ds2, ms2 / float(ms2[0]), ls, color=_SRC_COLOR, lw=1.2, alpha=0.6,
                      label=f"source null · {arm['short']}")
@@ -1102,9 +1149,18 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
         vals.append(b["source_null_d_half_um"])
         cols.append(_SRC_COLOR)
     y = np.arange(len(labels))
-    axh.barh(y, vals, color=cols, alpha=0.85, height=0.68)
+    # A profile that never halves has NO half-distance (``empirical_half_distance_um``
+    # returns None by design). It cannot be drawn on this axis and must not be
+    # invented, so its bar is omitted and the row is annotated instead.
+    vals = np.array([np.nan if v is None else float(v) for v in vals], dtype=float)
+    axh.barh(y, np.where(np.isfinite(vals), vals, 0.0),
+             color=cols, alpha=0.85, height=0.68)
     for yi, v in zip(y, vals):
-        axh.text(v * 1.06, yi, f"{v:.0f}", va="center", fontsize=7.0)
+        if np.isfinite(v):
+            axh.text(v * 1.06, yi, f"{v:.0f}", va="center", fontsize=7.0)
+        else:
+            axh.text(5.6, yi, "never halves", va="center", fontsize=6.6,
+                     style="italic", color="0.35")
     axh.set_yticks(y); axh.set_yticklabels(labels, fontsize=7.0)
     axh.invert_yaxis(); axh.set_xscale("log"); axh.set_xlim(5, 900)
     axh.set_xlabel("half-distance d½ (µm, log)")
@@ -1141,8 +1197,8 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
         "PERIVASCULAR DRUG GRADIENT on the REAL 10x Xenium glioblastoma section — "
         "the same quantity the immunofluorescence experiments measure\n"
         f"PRIMARY ARM: {prim['label']}  ·  doxorubicin d½ = "
-        f"{vp_['d_half_um']:.0f} µm → {vp_['verdict']}  ·  isolated single vessel d½ = "
-        f"{vi['d_half_um']:.0f} µm\n"
+        f"{_d_half(vp_['d_half_um'], 0)} µm → {vp_['verdict']}  ·  "
+        f"isolated single vessel d½ = {_d_half(vi['d_half_um'], 0)} µm\n"
         "doxorubicin is the CALIBRATION anchor (agreement partly by construction); "
         "TEMOZOLOMIDE is the independent, unvalidated prediction",
         fontsize=12)
@@ -1190,8 +1246,35 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         r = arm["by_name"].get(drug)
         return r["auc"]["exp_floor"].get("L_um", float("nan")) if r else float("nan")
 
+    arm_dx_ladder = " / ".join(f"{a['dx_um']:.0f}" for a in res["arms"])
+
     L: List[str] = [
         "# Perivascular drug gradient on the REAL tissue — predicted vs measured",
+        "",
+        "> **Regenerated under the discrete vessel source.** `vascular_mode = discrete` "
+        "(`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in "
+        f"[`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = "
+        f"{res['alpha']:.1f}**, the e-folding-length convention `L = d_half / ln 2` · "
+        "per-cell sensitivity mode = **`uniform`** (the reconstruction default) · "
+        f"**dx = {prim['dx_um']:.0f} µm** on the primary arm, with "
+        f"{arm_dx_ladder} µm across the {len(res['arms'])} arms.",
+        ">",
+        "> **This regeneration also repairs a latent reporting bug.** "
+        "`empirical_half_distance_um` returns `None` **by design** when a profile "
+        "never falls to half its perivascular value, and under the discrete source "
+        "**temozolomide's exposure profile never halves** across this section "
+        f"(fitted `L` ≈ {_f(Lof(prim,'temozolomide'))} µm against a "
+        f"{np.median(dist_t):.0f} µm median tissue-to-vessel distance). The report, "
+        "the console summary and the figure formatted that `None` with an unguarded "
+        "`:.1f` and died in a `TypeError`. Every read now renders "
+        f"**\"{D_HALF_NEVER}\"** instead. **No substitute number is fitted or "
+        "extrapolated** — a profile that does not halve HAS no half-distance, and "
+        "that is a measured property of the profile, not a gap to be filled.",
+        ">",
+        "> Absolute exposure / AUC / coverage figures below are on the "
+        "**discrete-source unit** and are NOT comparable with the KDE-era numbers "
+        "this file carried before this regeneration (the tissue-integrated source "
+        "total is 3.36x smaller; that is a change of *unit*, not of physics).",
         "",
         "**Module:** `tmesim/validation/vessel_profile.py` "
         "(run: `./.venv/bin/python -m tmesim.validation.vessel_profile`)",
@@ -1211,13 +1294,13 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         f"| **fitted L** (µm), real tissue, primary arm | **{_f(Lof(prim,'doxorubicin'))}** "
         f"| **{_f(Lof(prim,'temozolomide'))}** |",
         f"| **half-distance d½** (µm), real tissue, primary arm | "
-        f"**{_f(dhalf(prim,'doxorubicin'))}** | **{_f(dhalf(prim,'temozolomide'))}** |",
+        f"**{_d_half(dhalf(prim,'doxorubicin'))}** | **{_d_half(dhalf(prim,'temozolomide'))}** |",
         f"| fitted L (µm), isolated single vessel | "
         f"{_f(iso_dox['fit'].get('L_um')) if iso_dox else 'n/a'} | "
         f"{_f(iso_tmz['fit'].get('L_um')) if iso_tmz else 'n/a'} |",
         f"| d½ = L·ln2 (µm), isolated single vessel | "
-        f"{_f(iso_dox['fit'].get('d_half_um')) if iso_dox else 'n/a'} | "
-        f"{_f(iso_tmz['fit'].get('d_half_um')) if iso_tmz else 'n/a'} |",
+        f"{_d_half(iso_dox['fit'].get('d_half_um')) if iso_dox else 'n/a'} | "
+        f"{_d_half(iso_tmz['fit'].get('d_half_um')) if iso_tmz else 'n/a'} |",
         f"| measured | **40–50 µm** (PMID 16361566), 25–75 µm (PMID 23680920) | "
         "*no published perivascular-distance dataset* |",
         "",
@@ -1235,7 +1318,7 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         "2. **The spatial fit to drug-vs-distance on our reconstructed tissue.** This one "
         "is **confounded**: the vessel mask and the drug source are built from the *same* "
         "endothelial-cell KDE, so part of the fitted decay is our own 40 µm smoothing "
-        f"bandwidth. The source null (d½ = {_f(sn['empirical_d_half_um'])} µm with **no "
+        f"bandwidth. The source null (d½ = {_d_half(sn['empirical_d_half_um'])} µm with **no "
         "drug physics at all**) and the bandwidth sweep below quantify how much. On the "
         "fragmented native dx = 12 µm mask the confound is *total* — every drug returns "
         "the same ~26–28 µm decay, within 1.1–1.2× of the null, reproducing the "
@@ -1253,7 +1336,7 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         "Published profiles also flatten into a background, so the qualitative form "
         "matches.",
         "",
-        f"**Verdict for doxorubicin:** real tissue d½ = {_f(vt['d_half_um'])} µm → "
+        f"**Verdict for doxorubicin:** real tissue d½ = {_d_half(vt['d_half_um'])} µm → "
         f"*{vt['verdict']}*; the fitted `L = {_f(vl.get('L_um'))} µm` against the "
         "L-equivalent band `40–50/ln2 ≈ 58–72 µm` → "
         f"*{vl['verdict']}*. **This is not an independent validation** — α was fit to "
@@ -1319,10 +1402,10 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         "domain is 26,058 disconnected fragments whose largest component holds 0.7% of "
         "the tissue.** Lateral diffusion is effectively switched off. That is why, on "
         "the native dx = 12 µm mask, doxorubicin and temozolomide produce *the same* "
-        f"profile ({_f(dhalf(native,'doxorubicin'))} vs "
-        f"{_f(dhalf(native,'temozolomide'))} µm) despite ~4× different transport "
+        f"profile ({_d_half(dhalf(native,'doxorubicin'))} vs "
+        f"{_d_half(dhalf(native,'temozolomide'))} µm) despite ~4× different transport "
         "lengths, and both sit on top of the source null "
-        f"({_f(native['source_null']['empirical_d_half_um'])} µm) — correlation between "
+        f"({_d_half(native['source_null']['empirical_d_half_um'])} µm) — correlation between "
         f"the AUC field and the source field {native['by_name']['doxorubicin']['corr_with_source']:.3f} "
         f"and {native['by_name']['temozolomide']['corr_with_source']:.3f}. This is a "
         "grid artefact, not physics.",
@@ -1340,9 +1423,9 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         L.append(
             f"| {arm['label']}{star} | {arm['dx_um']:.0f} | "
             f"{arm['connectivity_used']['largest_fraction']*100:.1f}% | "
-            f"**{_f(dhalf(arm,'doxorubicin'))}** | {_f(Lof(arm,'doxorubicin'))} | "
-            f"**{_f(dhalf(arm,'temozolomide'))}** | {_f(Lof(arm,'temozolomide'))} | "
-            f"*{_f(arm['source_null']['empirical_d_half_um'])}* | "
+            f"**{_d_half(dhalf(arm,'doxorubicin'))}** | {_f(Lof(arm,'doxorubicin'))} | "
+            f"**{_d_half(dhalf(arm,'temozolomide'))}** | {_f(Lof(arm,'temozolomide'))} | "
+            f"*{_d_half(arm['source_null']['empirical_d_half_um'])}* | "
             f"{arm['by_name']['doxorubicin']['corr_with_source']:.3f} / "
             f"{arm['by_name']['temozolomide']['corr_with_source']:.3f} |")
     L += [
@@ -1362,13 +1445,12 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         f"The dx = 30 µm arm (native mask, {dx30['connectivity_used']['largest_fraction']*100:.0f}% "
         "connected) is an independent cross-check with no morphology applied at all, and "
         "it agrees with the repaired arm qualitatively: doxorubicin "
-        f"{_f(dhalf(dx30,'doxorubicin'))} µm vs temozolomide "
-        f"{_f(dhalf(dx30,'temozolomide'))} µm. **Honest range across the two "
+        f"{_d_half(dhalf(dx30,'doxorubicin'))} µm vs temozolomide "
+        f"{_d_half(dhalf(dx30,'temozolomide'))} µm. **Honest range across the two "
         "physically-sane arms: doxorubicin d½ ≈ "
-        f"{min(dhalf(prim,'doxorubicin'), dhalf(dx30,'doxorubicin')):.0f}–"
-        f"{max(dhalf(prim,'doxorubicin'), dhalf(dx30,'doxorubicin')):.0f} µm, "
-        f"temozolomide d½ ≈ {min(dhalf(prim,'temozolomide'), dhalf(dx30,'temozolomide')):.0f}–"
-        f"{max(dhalf(prim,'temozolomide'), dhalf(dx30,'temozolomide')):.0f} µm.**",
+        f"{_d_half_range(dhalf(prim,'doxorubicin'), dhalf(dx30,'doxorubicin'))}, "
+        "temozolomide d½ ≈ "
+        f"{_d_half_range(dhalf(prim,'temozolomide'), dhalf(dx30,'temozolomide'))}.**",
         "",
         "---",
         "",
@@ -1383,10 +1465,10 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     ]
     for r in rows:
         L.append(f"| **{r['drug']}** AUC | 1.00 → {r['auc']['plateau_fraction']:.2f} | "
-                 f"**{_f(r['auc']['empirical_d_half_um'])}** | "
+                 f"**{_d_half(r['auc']['empirical_d_half_um'])}** | "
                  f"{r['corr_with_source']:.3f} |")
     L.append(f"| *SOURCE NULL: `vascular_density` itself* | 1.00 → "
-             f"{sn['plateau_fraction']:.2f} | *{_f(sn['empirical_d_half_um'])}* | 1.000 |")
+             f"{sn['plateau_fraction']:.2f} | *{_d_half(sn['empirical_d_half_um'])}* | 1.000 |")
     L += [
         "",
         "**Fits.** A *pure* exponential is the wrong model on real tissue: the "
@@ -1417,8 +1499,8 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     L += [
         "",
         "The **final-concentration** field gives essentially the same profile "
-        f"(doxorubicin empirical d½ {_f(dox['conc']['empirical_d_half_um']) if dox else 'n/a'} µm, "
-        f"temozolomide {_f(tmz['conc']['empirical_d_half_um']) if tmz else 'n/a'} µm) — "
+        f"(doxorubicin empirical d½ {_d_half_u(dox['conc']['empirical_d_half_um']) if dox else 'n/a'}, "
+        f"temozolomide {_d_half_u(tmz['conc']['empirical_d_half_um']) if tmz else 'n/a'}) — "
         "expected, because with a constant-source window the field is quasi-steady, so "
         "`AUC ≈ C_steady · Δt` and the two share a spatial shape. It is *not* an "
         "independent check, but it does rule out the profile being an artefact of "
@@ -1432,9 +1514,10 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         f"{rep['mean_vascular_density']:.3f}; tissue 200 µm from the mask still carries "
         f"{sn['plateau_fraction']*100:.0f}% of the peak density). The SOURCE NULL row "
         "measures what that alone buys: an apparent half-distance of "
-        f"**{_f(sn['empirical_d_half_um'])} µm** with no drug physics at all. On the "
+        f"**{_d_half(sn['empirical_d_half_um'])} µm** with no drug physics at all. On the "
         f"primary arm the drugs sit clearly above it "
-        f"({_f(dhalf(prim,'doxorubicin'))} and {_f(dhalf(prim,'temozolomide'))} µm, "
+        f"({_d_half_u(dhalf(prim,'doxorubicin'))} and "
+        f"{_d_half_u(dhalf(prim,'temozolomide'))}, "
         f"correlations {dox['corr_with_source']:.2f} and {tmz['corr_with_source']:.2f}), "
         "so transport is doing real work — but a meaningful part of the profile is still "
         "vessel/KDE geometry, and that share must be subtracted mentally before reading "
@@ -1499,14 +1582,14 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     L += [
         "| doxorubicin readout | predicted | measured | verdict |",
         "|---|---:|---:|:--|",
-        f"| real tissue (primary arm), **empirical d½** | **{_f(vt['d_half_um'])} µm** | "
+        f"| real tissue (primary arm), **empirical d½** | **{_d_half(vt['d_half_um'])} µm** | "
         f"40–50 µm (25–75 µm) | {vt['verdict']} |",
         f"| real tissue (primary arm), fitted **L** vs L-equivalent band | "
         f"**{_f(vl.get('L_um'))} µm** | 58–72 µm | {vl['verdict']} |",
         f"| real tissue (dx = 30 µm cross-check), empirical d½ | "
-        f"{_f(dhalf(dx30,'doxorubicin'))} µm | 40–50 µm (25–75 µm) | "
+        f"{_d_half(dhalf(dx30,'doxorubicin'))} µm | 40–50 µm (25–75 µm) | "
         f"{verdict_vs_measurement(dhalf(dx30,'doxorubicin'))['verdict']} |",
-        f"| **isolated single vessel**, d½ | **{_f(vi['d_half_um'])} µm** | "
+        f"| **isolated single vessel**, d½ | **{_d_half(vi['d_half_um'])} µm** | "
         f"40–50 µm (25–75 µm) | {vi['verdict']} |",
         f"| isolated single vessel, L vs L-equivalent band | {_f(vil.get('L_um'))} µm | "
         f"58–72 µm | {vil['verdict']} |",
@@ -1603,8 +1686,8 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
             f"| p{sv['percentile']:.0f} | {sv['threshold']:.3f} | "
             f"{sv['area_fraction']*100:.1f}% | {sv['max_distance_um']:.0f} | "
             f"{_f(sv['near_L_um'])} | {_f(sv['near_d_half_um'])} | "
-            f"**{_f(sv['empirical_d_half_um'])}** | "
-            f"*{_f(sv['source_empirical_d_half_um'])}* | {_f(sv['r2_log_near'], 4)} |")
+            f"**{_d_half(sv['empirical_d_half_um'])}** | "
+            f"*{_d_half(sv['source_empirical_d_half_um'])}* | {_f(sv['r2_log_near'], 4)} |")
 
     L += [
         "",
@@ -1627,7 +1710,7 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         "and the two agree only qualitatively — hence the honest ranges quoted above "
         "rather than a single number.",
         "- **Part of the gradient is still vessel geometry, not drug transport.** The "
-        f"source null alone gives d½ = {_f(sn['empirical_d_half_um'])} µm. The engine "
+        f"source null alone gives d½ = {_d_half(sn['empirical_d_half_um'])} µm. The engine "
         "delivers drug proportionally to the *continuous* density everywhere, so tissue "
         "scored as 'far from a vessel' still has a local source, which flattens the "
         "predicted profile relative to a true line-source geometry.",
@@ -1696,19 +1779,19 @@ def _print_summary(res: Dict) -> None:
         for r in arm["results"]:
             ef = r["auc"]["exp_floor"]
             print(f"  {tag:34s} {conn:>6} {r['drug']:14s} "
-                  f"{_f(r['auc']['empirical_d_half_um']):>11} "
+                  f"{_d_half(r['auc']['empirical_d_half_um']):>11} "
                   f"{_f(ef.get('L_um')):>13} {_f(ef.get('r2_linear_space'), 3):>7} "
                   f"{r['corr_with_source']:10.3f}")
             tag, conn = "", ""
         sn = arm["source_null"]
         print(f"  {'':34s} {'':>6} {'SOURCE NULL':14s} "
-              f"{_f(sn['empirical_d_half_um']):>11} {_f(sn['exp_floor'].get('L_um')):>13}")
+              f"{_d_half(sn['empirical_d_half_um']):>11} {_f(sn['exp_floor'].get('L_um')):>13}")
         print("-" * 100)
     print("ISOLATED SINGLE VESSEL (uniform medium, same solver -- the drug physics alone):")
     for iso in res["isolated"]:
         f = iso["fit"]
         print(f"  {iso['drug']:16s} L = {_f(f.get('L_um')):>7} um   d_half = "
-              f"{_f(f.get('d_half_um')):>7} um   R2(log) = {_f(f.get('r2_log'), 5)}")
+              f"{_d_half(f.get('d_half_um')):>7} um   R2(log) = {_f(f.get('r2_log'), 5)}")
     print("=" * 100)
     print("vs MEASURED doxorubicin half-distance 40-50 um (Primeau 2005, PMID 16361566;")
     print("    replicated 25-75 um, Patel/Tannock 2013, PMID 23680920)")

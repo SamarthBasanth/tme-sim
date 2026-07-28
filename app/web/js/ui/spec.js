@@ -20,7 +20,13 @@ const MODES = {
   sensitivity_mode: ['uniform', 'determinant'],
   vascular_mode: ['discrete', 'kde'],
   oxygen_mode: ['pde', 'vessel_distance', 'markers'],
+  state_mode: ['oxygen', 'vessel_distance', 'markers'],
 };
+
+// Fallback for a RunSpec that predates state_mode (a restored run, or a hand-typed
+// buffer). It is the pipeline default and is bit-identical to the pre-option
+// behaviour, so assuming it here changes nothing.
+const STATE_MODE_DEFAULT = 'oxygen';
 
 const NO_DRUG = '— none (reconstruction only)';
 
@@ -92,6 +98,7 @@ export function createSpecPanel({ store, onSubmit }) {
     [lbl('Sensitivity', null), segs.sensitivity_mode, h('div.field-err.hidden')],
     [lbl('Vascular', null), segs.vascular_mode, h('div.field-err.hidden')],
     [lbl('Oxygen', null), segs.oxygen_mode, h('div.field-err.hidden')],
+    [lbl('Cell state', null), segs.state_mode, h('div.field-err.hidden')],
     row('MGMT',
       'f-mgmt',
       h('div.frow',
@@ -283,6 +290,7 @@ export function createSpecPanel({ store, onSubmit }) {
       sensitivity_mode: pick('sensitivity_mode'),
       vascular_mode: pick('vascular_mode'),
       oxygen_mode: pick('oxygen_mode'),
+      state_mode: pick('state_mode') ?? STATE_MODE_DEFAULT,
       mgmt: mgmtChk.checked ? numOr(mgmtInp, 0) : null,
       pk: {
         plasma_peak: numOr(pkPeak, 1),
@@ -303,6 +311,7 @@ export function createSpecPanel({ store, onSubmit }) {
       sensitivity_mode: spec.sensitivity_mode,
       vascular_mode: spec.vascular_mode,
       oxygen_mode: spec.oxygen_mode,
+      state_mode: spec.state_mode ?? STATE_MODE_DEFAULT,
       mgmt: spec.mgmt ?? null,
       pk: spec.pk,
       total_time_s: spec.total_time_s,

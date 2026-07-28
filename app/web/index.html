@@ -9,6 +9,10 @@
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/layout.css">
 <link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/protocol.css">
+<link rel="stylesheet" href="css/reports.css">
+<link rel="stylesheet" href="css/projects.css">
+<link rel="stylesheet" href="css/mechanism.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23121619'/%3E%3Crect x='3' y='3' width='10' height='10' fill='none' stroke='%2338bcd6' stroke-width='1.6'/%3E%3Crect x='6' y='6' width='4' height='4' fill='%2338bcd6'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -18,7 +22,6 @@
 
   <header class="topbar" role="banner">
     <div class="brand">
-      <span class="mark" aria-hidden="true"></span>
       <span class="name"><b>tmesim</b> <span>Studio</span></span>
       <span class="ver">v1</span>
     </div>
@@ -49,6 +52,7 @@
     </div>
 
     <div class="topbar-group last">
+      <button class="btn ghost sm" id="btn-protocol" aria-pressed="false" title="Protocol editor and parameter sweeps (P)">protocol</button>
       <button class="btn ghost sm" id="btn-help" aria-haspopup="dialog" title="Keyboard shortcuts">keys</button>
       <button class="btn ghost sm" id="btn-theme" aria-pressed="false" title="Toggle light / dark theme">theme: dark</button>
     </div>
@@ -59,22 +63,39 @@
     <div class="split split-l" id="split-l"></div>
     <section class="stage" id="stage" aria-label="Cell viewer">
       <div class="stage-toolbar" role="toolbar" aria-label="Viewer tools">
+        <div class="seg" role="group" aria-label="Active pointer tool" id="tb-tools">
+          <button type="button" data-tool="pick" aria-pressed="true"
+            title="Pan and pick cells (V)">pick</button>
+          <button type="button" data-tool="profile" aria-pressed="false"
+            title="Line profile: drag a line, read the field value along it (L)">profile</button>
+          <button type="button" data-tool="region" aria-pressed="false"
+            title="Region: drag a rectangle, get composition and exposure statistics (R)">region</button>
+          <button type="button" data-tool="distance" aria-pressed="false"
+            title="Distance: drag between two points, get the separation in um (M)">distance</button>
+        </div>
+        <span class="vrule" aria-hidden="true"></span>
         <button class="btn ghost sm" id="tb-fit" title="Fit section to view (F)">fit</button>
         <button class="btn ghost sm" id="tb-zoom-in" title="Zoom in (+)">+</button>
         <button class="btn ghost sm" id="tb-zoom-out" title="Zoom out (−)">−</button>
         <span class="vrule" aria-hidden="true"></span>
-        <span class="lbl">zoom</span>
-        <span class="mono strong" id="tb-zoom">—</span><span class="unit">px/um</span>
-        <span class="lbl gap-l">scale</span>
+        <span class="lbl">scale</span>
         <span class="mono strong" id="tb-scale">—</span><span class="unit">um/px</span>
-        <span class="vrule" aria-hidden="true"></span>
-        <span class="lbl">cursor</span>
+        <span class="lbl gap-l">cursor</span>
         <span class="mono strong" id="tb-cursor">—, —</span><span class="unit">um</span>
-        <span class="topbar-spacer"></span>
-        <span class="lbl">colour</span>
-        <span class="mono strong" id="tb-colour">cell type</span>
+        <span class="lbl gap-l">value</span>
+        <span class="mono strong" id="tb-value">—</span><span class="unit" id="tb-value-unit"></span>
+        <span class="tb-spacer"></span>
+        <span class="lbl">colour by</span>
+        <div class="seg" role="group" aria-label="Cell colour source" id="tb-colour">
+          <button type="button" data-mode="0" aria-pressed="true"
+            title="Colour each cell by its measured phenotype call (C)">type</button>
+          <button type="button" data-mode="1" aria-pressed="false"
+            title="Colour each cell by the field value at its position, through the current window (C)">field</button>
+          <button type="button" data-mode="2" aria-pressed="false" disabled
+            title="Colour each tumour cell by WHY it died or survived — the per-cell mechanism attribution (C)">mechanism</button>
+        </div>
         <span class="vrule" aria-hidden="true"></span>
-        <button class="btn ghost sm" id="tb-pin-clear" title="Clear the pinned cell">unpin</button>
+        <button class="btn ghost sm" id="tb-pin-clear" disabled title="Clear the pinned cell (Esc)">unpin</button>
       </div>
       <div class="canvas-wrap" id="canvas-wrap">
         <canvas id="gl" tabindex="0" aria-label="WebGL cell viewer. Use arrow keys to pan, plus and minus to zoom."></canvas>
@@ -90,6 +111,7 @@
     <div class="cell"><span class="lbl">fps</span><span class="num" id="sb-fps">—</span><span class="unit">1/s</span></div>
     <div class="cell"><span class="lbl">frame</span><span class="num" id="sb-frame">—</span><span class="unit">ms</span></div>
     <div class="cell"><span class="lbl">drawn</span><span class="num" id="sb-drawn">—</span><span class="unit">pts</span></div>
+    <div class="cell" title="Level of detail: the fraction of the spatially shuffled buffer being drawn. Below 100 only while the camera is moving."><span class="lbl">lod</span><span class="num" id="sb-lod">—</span><span class="unit">%</span></div>
     <div class="cell"><span class="lbl">vbo</span><span class="num" id="sb-vbo">—</span></div>
     <div class="cell"><span class="lbl">index</span><span class="num" id="sb-index">—</span></div>
     <div class="cell"><span class="lbl">api</span><span class="num" id="sb-latency">—</span><span class="unit">ms</span></div>
@@ -97,22 +119,49 @@
   </footer>
 </div>
 
-<dialog id="help-dlg">
+<dialog id="help-dlg" aria-label="Keyboard shortcuts">
   <div class="panel-head"><h2>Keyboard</h2><span class="grow"></span>
     <button class="btn ghost sm" id="help-close">close</button></div>
-  <div class="panel-body pad">
-    <table class="tbl">
+  <div class="panel-body pad keys-body">
+    <table class="tbl keys">
       <tbody>
+        <tr class="grp"><td colspan="2">View</td></tr>
         <tr><td><kbd>F</kbd></td><td>fit section to viewport</td></tr>
         <tr><td><kbd>+</kbd> / <kbd>−</kbd></td><td>zoom about the viewport centre</td></tr>
         <tr><td><kbd>←↑→↓</kbd></td><td>pan (hold <kbd>Shift</kbd> for 4×)</td></tr>
-        <tr><td><kbd>1</kbd>…<kbd>5</kbd></td><td>toggle cell-type channel</td></tr>
+        <tr><td><kbd>wheel</kbd></td><td>zoom about the pointer</td></tr>
+        <tr><td><kbd>middle</kbd>-drag</td><td>pan in any tool mode</td></tr>
+
+        <tr class="grp"><td colspan="2">Tools</td></tr>
+        <tr><td><kbd>V</kbd></td><td>pick / pan — click pins a cell</td></tr>
+        <tr><td><kbd>L</kbd></td><td>line profile — drag a line, read the field along it</td></tr>
+        <tr><td><kbd>R</kbd></td><td>region — drag a rectangle for composition + exposure</td></tr>
+        <tr><td><kbd>M</kbd></td><td>distance — drag between two points, in um</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>drop the newest annotation, or unpin the cell</td></tr>
+        <tr><td><kbd>Shift</kbd>+<kbd>Esc</kbd></td><td>drop every annotation</td></tr>
+
+        <tr class="grp"><td colspan="2">Window / level</td></tr>
+        <tr><td>right-drag</td><td>on the image: ↔ level, ↕ width</td></tr>
+        <tr><td><kbd>Alt</kbd>+drag</td><td>same, for a single-button pointer</td></tr>
+        <tr><td><kbd>W</kbd></td><td>auto window, p2–p98 of the field</td></tr>
+        <tr><td><kbd>Shift</kbd>+<kbd>W</kbd></td><td>window = full served range</td></tr>
+
+        <tr class="grp"><td colspan="2">Channels</td></tr>
+        <tr><td><kbd>1</kbd>…<kbd>5</kbd></td><td>toggle one cell-type channel</td></tr>
         <tr><td><kbd>0</kbd></td><td>show all channels</td></tr>
         <tr><td><kbd>C</kbd></td><td>colour cells by field value / by type</td></tr>
-        <tr><td><kbd>Esc</kbd></td><td>unpin the selected cell</td></tr>
+
+        <tr class="grp"><td colspan="2">Protocol (TPL)</td></tr>
+        <tr><td><kbd>P</kbd></td><td>open / close the protocol workspace</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>in the script pane: plan, then confirm before running</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>validate the program now</td></tr>
+        <tr><td><kbd>F8</kbd></td><td>jump to the next diagnostic</td></tr>
+
+        <tr class="grp"><td colspan="2">Run</td></tr>
         <tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>submit the current RunSpec</td></tr>
         <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>focus the RunSpec source editor</td></tr>
         <tr><td><kbd>T</kbd></td><td>toggle light / dark theme</td></tr>
+        <tr><td><kbd>?</kbd></td><td>this list</td></tr>
       </tbody>
     </table>
   </div>
@@ -125,5 +174,6 @@
 </noscript>
 
 <script type="module" src="js/main.js"></script>
+<script type="module" src="js/ui/protocol.js"></script>
 </body>
 </html>

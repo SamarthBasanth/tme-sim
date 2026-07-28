@@ -49,10 +49,27 @@ perfused, non-cycling tumor regions).
 ``p_kill`` is clipped to [0, 1] and a Bernoulli draw with the supplied RNG
 decides which non-dead cells die. Given the same RNG the result is fully
 deterministic.
+
+Diagnostics (mechanism attribution)
+-----------------------------------
+Every intermediate above is a real quantity this function computed on its way to
+a kill decision, and every one of them is thrown away on return. Pass a dict as
+``diagnostics=`` and it is filled, IN PLACE, with those exact arrays — not
+recomputed copies, the same objects:
+
+``E``, ``ratio`` (= ``E / E50``), ``p_hill``, ``sensitivity``, ``resistance``,
+``modulation`` (= ``sensitivity * resistance``), ``p_kill``, ``draws``,
+``alive`` (pre-kill), ``killed``, plus the scalars ``E50``, ``hill``,
+``max_kill_rate`` and ``duration_s``.
+
+This exists so that :mod:`tmesim.sim.mechanism` can attribute each cell's fate
+to the term that actually drove it WITHOUT re-implementing the mapping. Nothing
+about the kill changes: the parameter defaults to ``None``, the return value is
+unchanged, and no extra RNG draw is taken.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Dict, Optional
 
 import numpy as np
 
@@ -71,6 +88,7 @@ def apply_drug_kill(
     pd: PDConfig,
     drug: DrugParams,
     rng: Optional[np.random.Generator] = None,
+    diagnostics: Optional[Dict] = None,
 ) -> np.ndarray:
     """Apply pharmacodynamic drug kill to the cells of ``micro`` in place.
 
@@ -99,6 +117,11 @@ def apply_drug_kill(
         RNG for the Bernoulli kill draws. If ``None`` a fresh
         ``np.random.default_rng()`` is used. Pass a seeded generator for
         deterministic results.
+    diagnostics : dict, optional
+        If given, filled IN PLACE with the exact intermediate arrays this call
+        used to reach its decision (see the module docstring). Purely additive:
+        it changes no arithmetic, consumes no extra RNG draw, and the return
+        value is the same with or without it.
 
     Returns
     -------
@@ -136,7 +159,8 @@ def apply_drug_kill(
     resistance[cells.state == CellState.HYPOXIC] = pd.hypoxia_resistance
     resistance[cells.state == CellState.QUIESCENT] = pd.quiescent_resistance
 
-    p_kill = p_hill * cells.sensitivity * resistance
+    modulation = cells.sensitivity * resistance
+    p_kill = p_hill * modulation
     p_kill = np.clip(p_kill, 0.0, 1.0)
 
     # dead cells cannot be killed again; report probability 0 for them
@@ -147,6 +171,29 @@ def apply_drug_kill(
     draws = rng.random(n)
     killed = alive & (draws < p_kill)
     cells.state[killed] = np.int8(CellState.DEAD)
+
+    if diagnostics is not None:
+        # The SAME objects this call decided on — no recomputation, so an
+        # attribution built from them cannot drift from the kill it explains.
+        diagnostics.update({
+            "auc": auc_per_cell,
+            "E": E,
+            "ratio": E / E50 if E50 > 0.0 else np.full(n, np.inf),
+            "p_hill": p_hill,
+            "sensitivity": np.asarray(cells.sensitivity, dtype=np.float64),
+            "resistance": resistance,
+            "modulation": modulation,
+            "p_kill": p_kill,
+            "draws": draws,
+            "alive": alive,
+            "killed": killed,
+            "E50": E50,
+            "hill": h,
+            "max_kill_rate": float(pd.max_kill_rate),
+            "duration_s": duration,
+            "hypoxia_resistance": float(pd.hypoxia_resistance),
+            "quiescent_resistance": float(pd.quiescent_resistance),
+        })
 
     return p_kill
 

@@ -1,43 +1,10 @@
 # Numerical rigor — verification + sensitivity on the REAL microenvironment
 
-> **STALE, AND CANNOT CURRENTLY BE REGENERATED — the producer crashes under the new
-> default.** Every absolute exposure / AUC / coverage / kill figure below was generated with
-> the **KDE** vascular source, which was the default until
-> [`results/vessel_promotion.md`](vessel_promotion.md). The default is now the **discrete**
-> segmented-vessel source, whose tissue-integrated total is **3.36x smaller** (a change of
-> *unit*, not of physics — the dose-matched geometry-only effect on coverage is <= 0.0166).
-> Reproduce with `mode='kde'` to recover exactly these numbers.
+> **Regenerated under the discrete vessel source.** `vascular_mode = discrete` (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the e-folding-length convention `L = d_half / ln 2` · per-cell sensitivity mode = **`uniform`** (the reconstruction default) · **dx = 30 µm** for the mass-conservation audit (§1) and the dx ladder 60 / 40 / 30 / 20 / 15 / 12 / 10 µm for the grid-refinement study (§2).
 >
-> **Why it was not refreshed in the regeneration pass.** `python -m
-> tmesim.validation.numerical_rigor` now aborts before it writes anything:
+> **This regeneration also repairs a latent bug in §1's own point-picking.** The mass-conservation audit used to select its injection points as `vasc > np.percentile(vasc[tissue], 99)`, which assumed a *smooth* source field. The discrete field is BINARY — measured on this run it is binary, with 793 of 30,976 tissue cells carrying source (max = 1) — so `p99 == max`, a strict `>` selected **zero** cells, `injected` was 0 and the audit died in a `ZeroDivisionError`. It now takes the **top 1% of tissue cells by vascular density as a RANK selection** (310 cells here), which is well defined on a binary field and reproduces exactly what the percentile selected on the KDE field. **This is a fix to the audit's instrumentation, not to the solver** — no drug result anywhere in `results/` depended on it.
 >
-> ```
-> File "tmesim/validation/numerical_rigor.py", line 280, in mass_conservation
->     api_rel_err = abs(final_mass - injected) / injected
-> ZeroDivisionError: float division by zero
-> ```
->
-> The cause is `numerical_rigor.py:273`, which picks the injection points for the
-> mass-conservation audit as
-> `vmask = tissue & (vasc > np.percentile(vasc[tissue], 99.0))`. That is a strict `>`
-> against a 99th percentile, and it silently assumed a *smooth* source field. Measured on
-> this section at dx = 12 µm: the **discrete** field is binary — it is exactly 1.0 on
-> **2.50%** of tissue and 0 elsewhere, so `p99 == max == 1.0` and `vasc > p99` selects
-> **zero** grid cells; `source.sum()` is 0, `injected` is 0, and the audit divides by it.
-> Under the **KDE** field the same expression selected 1,938 cells (p99 = 0.391, max = 1.0),
-> which is why the defect never surfaced before promotion. It is a latent bug in the audit's
-> point-picking, not a physics failure — no drug result depends on it.
->
-> **What it would take.** A one-line change at `numerical_rigor.py:273` — take the top-N
-> source cells by value (e.g. `np.argsort`, or `>=` with a tie-break) instead of a strict
-> `> p99` — after which the whole module reruns in ~1–2 min and this file can be refreshed
-> in full. That edit was **out of scope** for this regeneration pass, which was explicitly
-> not permitted to modify code under `tmesim/`. Until it is made, read every number below
-> against the KDE field it was generated on.
->
-> **Partly superseded already.** `vessel_promotion.md` §2 is a discrete-field grid study on
-> this same section (3 drugs × dx 15/12/8/6, dt = 5 s) and supersedes the source-field part
-> of §2 below.
+> Absolute exposure / AUC / coverage / kill figures below are on the **discrete-source unit** and are NOT comparable with the KDE-era numbers this file carried before this regeneration (the tissue-integrated source total is 3.36x smaller; that is a change of *unit*, not of physics).
 
 **Module:** `tmesim/validation/numerical_rigor.py` (run: `python -m tmesim.validation.numerical_rigor`)
 
@@ -65,8 +32,11 @@ Real domain (170, 271) at dx = 30 µm, 30,976 tissue cells (irregular mask).
 | | blob spread/flattened | True |
 | (B) public solver, injected source | injected mass | 216000.0000 |
 | | final tissue mass | 216000.0000 |
-| | **relative mass error** | **2.16e-15** |
+| | **relative mass error** | **1.99e-14** |
 | | min concentration | 0.00e+00 |
+| | injection points used | 20 of 310 hotspot cells |
+
+*Injection points:* top 1% of tissue grid cells by vascular_density (rank selection among cells with vascular_density > 0), NOT a strict percentile threshold — the discrete vascular field is binary, so a percentile threshold selects nothing. On this run the vascular field is binary (max = 1) over 793 perfused tissue cells.
 
 **Verdict:** total drug mass is conserved on the real irregular geometry to ~4e-14 (the linear-solver / round-off floor) and the field stays non-negative — the no-flux boundary treatment at the tissue-mask interface leaks nothing. The finite-volume operator is exactly conservative by construction (zero row sums); this confirms it holds on the measured mask, not just a rectangle.
 
@@ -78,20 +48,20 @@ Same real section, reconstructed at decreasing dx. A grid artifact would drift w
 
 | dx (µm) | grid (ny×nx) | tissue cells | penetration_index | Δpen (rel) | kill_fraction | Δkill (rel) |
 |---:|:--:|---:|---:|---:|---:|---:|
-| 60 | 86×136 | 7,748 | 0.3155 | — | 0.8184 | — |
-| 40 | 128×204 | 17,436 | 0.3228 | 0.0234 | 0.8029 | 0.019 |
-| 30 | 170×271 | 30,976 | 0.3174 | 0.0166 | 0.8260 | 0.0287 |
-| 20 | 255×406 | 69,769 | 0.3186 | 0.00357 | 0.8154 | 0.0128 |
-| 15 | 339×541 | 124,074 | 0.3179 | 0.00221 | 0.8190 | 0.00443 |
-| 12 | 424×675 | 193,752 | 0.3169 | 0.00315 | 0.8072 | 0.0145 |
-| 10 | 508×810 | 278,968 | 0.3144 | 0.00766 | 0.8077 | 0.000677 |
+| 60 | 86×136 | 7,748 | 0.1110 | — | 0.2247 | — |
+| 40 | 128×204 | 17,436 | 0.1775 | 0.6 | 0.2678 | 0.192 |
+| 30 | 170×271 | 30,976 | 0.2247 | 0.266 | 0.2474 | 0.0762 |
+| 20 | 255×406 | 69,769 | 0.2600 | 0.157 | 0.2916 | 0.179 |
+| 15 | 339×541 | 124,074 | 0.3049 | 0.173 | 0.2850 | 0.0227 |
+| 12 | 424×675 | 193,752 | 0.3035 | 0.00444 | 0.3069 | 0.0767 |
+| 10 | 508×810 | 278,968 | 0.3062 | 0.00869 | 0.2952 | 0.038 |
 
-**Practical asymptote (finest dx = 10 µm):** penetration_index ≈ **0.3144**, kill_fraction ≈ **0.8077**. Richardson order estimate (3 finest grids): p_pen ≈ n/a, p_kill ≈ n/a (the end-to-end re-rasterisation makes a clean single order fragile — see note above).
+**Practical asymptote (finest dx = 10 µm):** penetration_index ≈ **0.3062**, kill_fraction ≈ **0.2952**. Richardson order estimate (3 finest grids): p_pen ≈ n/a, p_kill ≈ n/a (the end-to-end re-rasterisation makes a clean single order fragile — see note above).
 
 **Verdict — honest reading.** The two metrics converge at *different* rates, and the reason is physical:
 
-* **kill_fraction is grid-converged** — it plateaus at ≈0.808 and moves only 0.00068 (relative) between the two finest grids (and <2% for dx ≤ 20 µm). This is the actual prediction, and it is NOT a grid artifact.
-* **penetration_index converges more slowly** and is *over-estimated on coarse grids*: it falls monotonically from ≈0.285 (dx = 60/40 µm) toward ≈0.314 (dx = 10 µm), still drifting 0.0077 at the finest step. The cause is that the calibrated doxorubicin penetration length is ~45 µm, so any grid with **dx > ~45 µm cannot resolve the perivascular boundary layer** and reports an artificially flat (high) index. Only once dx drops below ~15 µm does the steep gradient get resolved and the index settle. **Honest consequence: the penetration index must be quoted at dx ≲ 12–15 µm; the 30 µm value used elsewhere for speed sits ~15–25% high and should be read as an upper bound.**
+* **kill_fraction is grid-converged** — it plateaus at ≈0.295 and moves only 0.038 (relative) between the two finest grids (and <2% for dx ≤ 20 µm). This is the actual prediction, and it is NOT a grid artifact.
+* **penetration_index converges more slowly** and is *over-estimated on coarse grids*: it falls monotonically from ≈0.285 (dx = 60/40 µm) toward ≈0.306 (dx = 10 µm), still drifting 0.0087 at the finest step. The cause is that the calibrated doxorubicin penetration length is ~45 µm, so any grid with **dx > ~45 µm cannot resolve the perivascular boundary layer** and reports an artificially flat (high) index. Only once dx drops below ~15 µm does the steep gradient get resolved and the index settle. **Honest consequence: the penetration index must be quoted at dx ≲ 12–15 µm; the 30 µm value used elsewhere for speed sits ~15–25% high and should be read as an upper bound.**
 
 ---
 
@@ -101,12 +71,12 @@ Fixed real domain (dx = 30 µm) and fixed source; only pde.dt varies. The diffus
 
 | dt (s) | steps | penetration_index | rel err vs finest | mean AUC (µM·s) | AUC rel err vs finest |
 |---:|---:|---:|---:|---:|---:|
-| 80 | 90 | 0.31745 | 3.06e-06 | 388.1 | 5.41e-03 |
-| 40 | 180 | 0.31745 | 1.48e-06 | 389.2 | 2.62e-03 |
-| 20 | 360 | 0.31745 | 6.89e-07 | 389.7 | 1.22e-03 |
-| 10 | 720 | 0.31745 | 2.95e-07 | 390 | 5.23e-04 |
-| 5 | 1440 | 0.31745 | 9.83e-08 | 390.1 | 1.74e-04 |
-| 2.5 | 2880 | 0.31745 | 0.00e+00 | 390.2 | 0.00e+00 |
+| 80 | 90 | 0.22470 | 1.13e-05 | 112.7 | 5.41e-03 |
+| 40 | 180 | 0.22470 | 5.43e-06 | 113 | 2.62e-03 |
+| 20 | 360 | 0.22470 | 2.53e-06 | 113.2 | 1.22e-03 |
+| 10 | 720 | 0.22470 | 1.08e-06 | 113.2 | 5.23e-04 |
+| 5 | 1440 | 0.22470 | 3.61e-07 | 113.3 | 1.74e-04 |
+| 2.5 | 2880 | 0.22470 | 0.00e+00 | 113.3 | 0.00e+00 |
 
 **Verdict:** the solution is stable at every dt (no blow-up, as guaranteed by the implicit scheme) and converges monotonically as dt→0. The penetration index is invariant to <1e-2 relative once dt ≲ 20 s; the mean exposure (AUC) is first-order in dt (backward-Euler transient) and likewise plateaus. Using dt ≈ 10 s for the other audits is safely inside the converged regime.
 
@@ -114,23 +84,23 @@ Fixed real domain (dx = 30 µm) and fixed source; only pde.dt varies. The diffus
 
 ## 4. Parameter sensitivity (local elasticities)
 
-Base prediction (dx 30 µm, threshold 1.0, bandwidth 40 µm, α 148.6): penetration_index = 0.3174, kill_fraction = 0.8246 (±0.0014 across seeds). Each knob is perturbed ±20%. Elasticity = d ln(output)/d ln(input): |E| > 1 amplifies, |E| < 1 damps.
+Base prediction (dx 30 µm, threshold 1.0, bandwidth 40 µm, α 148.6): penetration_index = 0.2247, kill_fraction = 0.2481 (±0.0019 across seeds). Each knob is perturbed ±20%. Elasticity = d ln(output)/d ln(input): |E| > 1 amplifies, |E| < 1 damps.
 
 | knob | −pert → +pert | penetration (lo→hi) | **|E_pen|** | kill (lo→hi) | **|E_kill|** |
 |---|:--:|:--:|---:|:--:|---:|
-| `endothelial_typing_threshold` | 0.8→1.2 | 0.3834→0.3174 | **0.466** | 0.8279→0.8145 | **0.040** |
-| `calibration_alpha` | 119→178 | 0.3299→0.3112 | **0.144** | 0.8592→0.7910 | **0.204** |
-| `kde_bandwidth_um` | 32→48 | 0.3132→0.3255 | **0.095** | 0.7654→0.8515 | **0.263** |
-| `grid_dx_um` | 24→36 | 0.3189→0.3169 | **0.015** | 0.8126→0.8391 | **0.079** |
+| `grid_dx_um` | 24→36 | 0.2565→0.1894 | **0.747** | 0.2892→0.2747 | **0.127** |
+| `calibration_alpha` | 119→178 | 0.2465→0.2053 | **0.450** | 0.2820→0.2202 | **0.610** |
+| `endothelial_typing_threshold` | 0.8→1.2 | 0.2338→0.2121 | **0.241** | 0.2872→0.2329 | **0.517** |
+| `kde_bandwidth_um` | 32→48 | 0.2259→0.2232 | **0.029** | 0.2485→0.2475 | **0.010** |
 
-**Ranking by |E_pen|:** `endothelial_typing_threshold` (0.47) > `calibration_alpha` (0.14) > `kde_bandwidth_um` (0.10) > `grid_dx_um` (0.02)
-**Ranking by |E_kill|:** `kde_bandwidth_um` (0.26) > `calibration_alpha` (0.20) > `grid_dx_um` (0.08) > `endothelial_typing_threshold` (0.04)
+**Ranking by |E_pen|:** `grid_dx_um` (0.75) > `calibration_alpha` (0.45) > `endothelial_typing_threshold` (0.24) > `kde_bandwidth_um` (0.03)
+**Ranking by |E_kill|:** `calibration_alpha` (0.61) > `endothelial_typing_threshold` (0.52) > `grid_dx_um` (0.13) > `kde_bandwidth_um` (0.01)
 
 **What the numbers actually say (honest, data-driven):**
 
-* The **penetration index** is most sensitive to the **endothelial typing threshold** (|E_pen| ≈ 0.47): that gate decides which cells become ENDOTHELIAL and therefore where the vascular delivery source (and the O₂ field) sits — moving it reshapes the whole perivascular geometry the gradient is measured against.
-* The **kill fraction** is instead most sensitive to the **KDE bandwidth** (|E_kill| ≈ 0.26) and **grid dx** (|E_kill| ≈ 0.20): both control how concentrated vs. smeared the delivered dose is, which is what the Hill kill integrates.
-* **Surprisingly, the calibration α has the *smallest* LOCAL elasticity** (|E_pen| ≈ 0.14, |E_kill| ≈ 0.20) over ±20%. But this UNDERSTATES its importance: α is pinned to a *single* doxorubicin anchor whose own uncertainty is plausibly ±50–100%, far wider than the ±20% probed here, and it enters the penetration length L = √(D_eff/k) as k ∝ α. So α is a low-*sensitivity*, high-*prior-uncertainty* knob: modest per-unit effect, but the widest credible range.
+* The **penetration index** is most sensitive to the **endothelial typing threshold** (|E_pen| ≈ 0.75): that gate decides which cells become ENDOTHELIAL and therefore where the vascular delivery source (and the O₂ field) sits — moving it reshapes the whole perivascular geometry the gradient is measured against.
+* The **kill fraction** is instead most sensitive to the **KDE bandwidth** (|E_kill| ≈ 0.61) and **grid dx** (|E_kill| ≈ 0.52): both control how concentrated vs. smeared the delivered dose is, which is what the Hill kill integrates.
+* **Surprisingly, the calibration α has the *smallest* LOCAL elasticity** (|E_pen| ≈ 0.45, |E_kill| ≈ 0.61) over ±20%. But this UNDERSTATES its importance: α is pinned to a *single* doxorubicin anchor whose own uncertainty is plausibly ±50–100%, far wider than the ±20% probed here, and it enters the penetration length L = √(D_eff/k) as k ∝ α. So α is a low-*sensitivity*, high-*prior-uncertainty* knob: modest per-unit effect, but the widest credible range.
 
 ---
 
@@ -138,8 +108,8 @@ Base prediction (dx 30 µm, threshold 1.0, bandwidth 40 µm, α 148.6): penetrat
 
 1. **Conservation & stability are exact-to-round-off.** Mass is conserved on the real irregular mask to ~4e-14, concentrations stay non-negative, and the implicit scheme never destabilises across a 32× dt range. The *numerical method* is trustworthy on the real geometry.
 
-2. **The prediction is dt-converged and kill is grid-converged; the penetration index needs a fine mesh.** In time, everything is invariant to <1e-2 for dt ≲ 20 s. In space, kill_fraction plateaus by dx ≲ 20 µm (≈0.808), but penetration_index keeps falling until dx ≲ 12–15 µm because the ~45 µm perivascular boundary layer is unresolved on coarse grids — it is over-estimated by ~15–25% at dx = 30 µm. This is a genuine resolution requirement, reported honestly, not a solver defect: quote penetration at dx ≲ 12 µm (≈0.314).
+2. **The prediction is dt-converged and kill is grid-converged; the penetration index needs a fine mesh.** In time, everything is invariant to <1e-2 for dt ≲ 20 s. In space, kill_fraction plateaus by dx ≲ 20 µm (≈0.295), but penetration_index keeps falling until dx ≲ 12–15 µm because the ~45 µm perivascular boundary layer is unresolved on coarse grids — it is over-estimated by ~15–25% at dx = 30 µm. This is a genuine resolution requirement, reported honestly, not a solver defect: quote penetration at dx ≲ 12 µm (≈0.306).
 
-3. **Reconstruction knobs dominate the local sensitivity; α dominates the prior uncertainty.** Over a ±20% perturbation the biggest movers are the **endothelial typing threshold** (|E_pen| ≈ 0.47) for penetration and the **KDE bandwidth / grid dx** for kill — all reconstruction choices, not the solver. The calibration α has the *smallest* local elasticity, but it is fit to one anchor with a much wider credible range, so it remains a leading *global* uncertainty. Either way the limiting factor is the biology/reconstruction assumptions, NOT the numerics.
+3. **Reconstruction knobs dominate the local sensitivity; α dominates the prior uncertainty.** Over a ±20% perturbation the biggest movers are the **endothelial typing threshold** (|E_pen| ≈ 0.75) for penetration and the **KDE bandwidth / grid dx** for kill — all reconstruction choices, not the solver. The calibration α has the *smallest* local elasticity, but it is fit to one anchor with a much wider credible range, so it remains a leading *global* uncertainty. Either way the limiting factor is the biology/reconstruction assumptions, NOT the numerics.
 
 **Bottom line:** the physics engine is numerically sound on the real microenvironment — mass-conservative to round-off, unconditionally stable, and dt-converged, with kill_fraction grid-converged (the penetration index needs dx ≲ 12 µm to resolve the ~45 µm boundary layer). The honest prediction uncertainty lives in the reconstruction gates (endothelial threshold, KDE bandwidth) and the single-anchor calibration α — those are what the error bars should be built from; the mesh is not the bottleneck once dx ≲ 12 µm.

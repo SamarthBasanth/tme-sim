@@ -5,7 +5,7 @@
 import { h, clear, fill } from '../util/dom.js';
 import { CELL_TYPES } from '../gl/viewer.js';
 import { FIELD_NAMES, fieldMeta } from '../fields.js';
-import { RAMP_NAMES, RAMP_META, gradientCss } from '../gl/ramps.js';
+import { RAMP_NAMES, RAMP_META } from '../gl/ramps.js';
 import { METRICS, metricProvenance, reportProvenance, chip } from './provenance.js';
 import { auto, num, int, pct, sci, dur, NULL_GLYPH } from '../util/fmt.js';
 
@@ -27,7 +27,7 @@ function metricUnit(key) {
   return m.fmt === 'pct' ? '%' : m.unit;
 }
 
-export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView }) {
+export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView, windowLevelEl, profileEl, regionEl }) {
   /* ------------------------------------------------------- channels ---- */
   const chanList = h('div');
   const chanRows = [];
@@ -94,7 +94,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView 
 
   const rampSel = h('select.inp', {
     id: 'f-ramp',
-    onchange: () => { viewer.setRamp(rampSel.value); paintLegendSwatch(); onChange && onChange(); },
+    onchange: () => { viewer.setRamp(rampSel.value); onChange && onChange(); },
   }, RAMP_NAMES.map((n) => h('option', { value: n, title: RAMP_META[n].note }, RAMP_META[n].label)));
 
   const opacity = h('input', {
@@ -116,15 +116,8 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView 
     onchange: () => { viewer.setColorMode(colorByField.checked ? 1 : 0); onChange && onChange(); },
   });
 
-  const legendSwatch = h('div', {
-    style: { height: '9px', border: '1px solid var(--line-2)', marginTop: '3px' },
-  });
   const fieldStats = h('dl.kv');
-  const fieldNote = h('div', { style: { fontSize: 'var(--fs-micro)', color: 'var(--fg-2)', lineHeight: '1.4', marginTop: '3px' } });
-
-  function paintLegendSwatch() {
-    legendSwatch.style.backgroundImage = gradientCss(viewer.rampName);
-  }
+  const fieldNote = h('div.field-note');
 
   let onFieldChange = () => {};
 
@@ -241,6 +234,14 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView 
         provEl.appendChild(h('dt', 'IC50 src'));
         provEl.appendChild(h('dd', { title: pv.ic50_source, style: { fontSize: 'var(--fs-micro)' } }, pv.ic50_source));
       }
+      if (pv.state_mode) {
+        provEl.appendChild(h('dt', 'state route'));
+        provEl.appendChild(h('dd', pv.state_mode,
+          chip(pv.state_is_measured && !(pv.state_unmeasured || []).length ? 'measured' : 'assumed',
+            pv.state_drives_kill === false
+              ? String(pv.state_drives_kill_reason || '')
+              : String(pv.state_source || ''))));
+      }
       if (pv.sensitivity_note) {
         provEl.appendChild(h('dt', 'sensitivity'));
         provEl.appendChild(h('dd', {
@@ -286,6 +287,32 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView 
         reportEl.appendChild(h('dd', rep.oxygen.mode || NULL_GLYPH,
           chip(rep.oxygen.is_surrogate ? 'assumed' : 'computed', rep.oxygen.caveat || rep.oxygen.source || '')));
       }
+      if (rep.cell_state) {
+        const cs = rep.cell_state;
+        const unmeasured = Array.isArray(cs.unmeasured_states) ? cs.unmeasured_states : [];
+        // is_measured is the pipeline's own verdict; an UNMEASURED state on the
+        // panel demotes the chip regardless, because the route then assigns that
+        // state to NO cell and a reader must not read that as a measured zero.
+        const kind = unmeasured.length ? 'assumed' : (cs.is_measured ? 'measured' : 'assumed');
+        reportEl.appendChild(h('dt', 'state mode'));
+        reportEl.appendChild(h('dd', cs.mode || NULL_GLYPH,
+          chip(kind, cs.caveat || cs.source || '')));
+        if (unmeasured.length) {
+          reportEl.appendChild(h('dt', 'UNMEASURED'));
+          reportEl.appendChild(h('dd', {
+            title: 'These states are assigned to NO cell because this panel cannot measure them. That is NOT the same as computed and found to be zero.',
+            style: { fontSize: 'var(--fs-micro)' },
+          }, unmeasured.join(', '), chip('assumed', 'Declared UNMEASURED by the panel-coverage check.')));
+        }
+        const fr = cs.fractions_tumor;
+        if (fr) {
+          reportEl.appendChild(h('dt', 'tumour V/Q/H'));
+          reportEl.appendChild(h('dd',
+            `${pct(fr.viable, 1)} / ${pct(fr.quiescent, 1)} / ${pct(fr.hypoxic, 1)}`,
+            h('span.unit', '%'),
+            chip(kind, 'Tumour-cell band occupancy under this state route. These occupancies are what the PDConfig resistance multipliers act on.')));
+        }
+      }
       if (rep.sensitivity) {
         const s = rep.sensitivity;
         reportEl.appendChild(h('dt', 'sens mode'));
@@ -321,9 +348,20 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView 
             h('label.lbl', { for: 'f-colorby' }, 'Colour cells'),
             h('label.chk', colorByField, h('span.lbl', 'by field value, not type')),
           ),
-          legendSwatch,
           fieldStats,
           fieldNote)),
+
+      h('details.sect', { open: true },
+        h('summary', 'Window / level', h('span.hint', 'transfer function')),
+        h('div.sect-body', windowLevelEl || h('div.dim', 'unavailable without WebGL2'))),
+
+      h('details.sect', { open: true },
+        h('summary', 'Line profile', h('span.hint', 'L · drag')),
+        h('div.sect-body.tool-body', profileEl || h('div.dim', 'unavailable without WebGL2'))),
+
+      h('details.sect', { open: true },
+        h('summary', 'Regions', h('span.hint', 'R · drag')),
+        h('div.sect-body.tool-body', regionEl || h('div.dim', 'unavailable without WebGL2'))),
 
       h('details.sect', { open: true },
         h('summary', 'Metrics', h('span.hint', 'provenance on every value')),
@@ -362,7 +400,6 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView 
     ),
   );
 
-  paintLegendSwatch();
   buildChannels(null, 0);
   renderRun(null);
   setFieldInfo(null, null);
@@ -380,9 +417,10 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView 
       if (meta.ramp && RAMP_NAMES.includes(meta.ramp)) {
         rampSel.value = meta.ramp;
         viewer.setRamp(meta.ramp);
-        paintLegendSwatch();
       }
     },
+    /** Keep the rail checkbox in step with the toolbar's colour-mode control. */
+    setColorMode(m) { colorByField.checked = m === 1; },
     get rampName() { return rampSel.value; },
     benchOut,
   };

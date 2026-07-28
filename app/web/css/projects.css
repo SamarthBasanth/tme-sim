@@ -1,0 +1,163 @@
+/* ============================================================================
+   projects.css — the project / specimen browser and the cross-specimen
+   comparison. Loaded after components.css; every value here is a token from
+   tokens.css, and nothing in this file restyles an existing component.
+
+   Same house rules as the rest of the workstation: square corners, dense
+   tabular data, monospace for every number, one accent, semantic colour
+   reserved for state. The only new idea is `.verdict` — the comparison has a
+   single primary result (does the ranking agree?) and it gets the one piece of
+   large type on the page, because a reader who takes nothing else away must
+   take that away.
+   ============================================================================ */
+
+#proj-dlg {
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  background: var(--bg-1);
+  color: var(--fg-0);
+  padding: 0;
+  width: min(1360px, 96vw);
+  height: min(880px, 92vh);
+  max-width: none;
+  max-height: none;
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+}
+#proj-dlg::backdrop { background: hsl(213 24% 4% / 0.62); }
+#proj-dlg .panel-head { height: 26px; }
+
+.proj-body {
+  display: grid;
+  grid-template-columns: 336px 1px minmax(0, 1fr);
+  height: calc(100% - 26px);
+  min-height: 0;
+}
+.proj-div { background: var(--line-2); }
+.proj-rail {
+  overflow: auto;
+  min-height: 0;
+  padding: 0 var(--pad-2) var(--pad-3);
+  background: var(--bg-1);
+}
+.proj-main {
+  overflow: auto;
+  min-height: 0;
+  padding: var(--pad-2) var(--pad-3) var(--pad-4);
+}
+
+/* --- rail rows ----------------------------------------------------------- */
+.proj-new {
+  display: flex;
+  gap: var(--pad-1);
+  align-items: center;
+  margin-bottom: var(--pad-2);
+}
+.proj-new > .inp { flex: 1 1 auto; min-width: 0; }
+/* `.sm` exists for .btn but not for .inp; scoped here so a dense rail control
+   lines up with the 18px small button beside it, without touching the shared
+   component. */
+#proj-dlg .inp.sm { height: 18px; padding: 0 4px; font-size: var(--fs-xs); }
+
+.proj-item {
+  border: 1px solid var(--line-1);
+  border-left-width: 2px;
+  background: var(--bg-2);
+  padding: 4px var(--pad-2);
+  margin-bottom: 3px;
+  cursor: pointer;
+}
+.proj-item:hover { border-color: var(--line-2); }
+.proj-item:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.proj-item.on { border-left-color: var(--accent); background: var(--accent-bg); }
+.proj-item.spec { cursor: default; }
+
+.proj-item-top {
+  display: flex;
+  align-items: center;
+  gap: var(--pad-1);
+  font-size: var(--fs-sm);
+  min-width: 0;
+}
+.proj-item-top .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proj-item-sub {
+  font-size: var(--fs-micro);
+  color: var(--fg-2);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.proj-runs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 3px 0;
+  font-size: var(--fs-micro);
+  color: var(--fg-3);
+}
+.runchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  border: 1px solid var(--line-1);
+  background: var(--bg-3);
+  padding: 0 1px 0 4px;
+  font-size: var(--fs-micro);
+  color: var(--fg-1);
+}
+
+/* --- the one piece of large type on the page ----------------------------- */
+.verdict {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--pad-3);
+  align-items: start;
+  border: 1px solid var(--line-2);
+  border-left-width: 3px;
+  background: var(--bg-2);
+  padding: var(--pad-2) var(--pad-3);
+  margin-bottom: var(--pad-2);
+}
+.verdict-tag {
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  letter-spacing: var(--tr-wide);
+  white-space: nowrap;
+  color: var(--fg-1);
+}
+.verdict-body {
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--fg-1);
+  overflow-wrap: anywhere;
+}
+.verdict.ok   { border-left-color: var(--ok);   background: var(--ok-bg); }
+.verdict.ok   .verdict-tag { color: var(--ok); }
+.verdict.crit { border-left-color: var(--crit); background: var(--crit-bg); }
+.verdict.crit .verdict-tag { color: var(--crit); }
+.verdict.info { border-left-color: var(--info); background: var(--info-bg); }
+.verdict.info .verdict-tag { color: var(--info); }
+
+/* A row the backend flagged not-comparable. Deliberately NOT hidden and NOT
+   struck through: the numbers are real, it is the DIFFERENCE between them that
+   is not readable. Dimming plus a hatched left edge says "present, not
+   conclusive" without pretending the value does not exist. */
+.proj-main tr.blocked td { color: var(--fg-2); }
+.proj-main tr.blocked td:first-child {
+  box-shadow: inset 2px 0 0 var(--warn);
+}
+.proj-main tr.blocked td .num,
+.proj-main tr.blocked td.num { color: var(--fg-2); }
+
+.proj-main .rank { color: var(--fg-0); letter-spacing: 0.01em; }
+.proj-main .tblwrap { margin-bottom: var(--pad-1); }
+.proj-main .caveat { border-bottom-color: var(--line-1); }
+.proj-main .hint {
+  font-size: var(--fs-micro);
+  color: var(--fg-3);
+}
+
+@media (max-width: 900px) {
+  .proj-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1px minmax(0, 1fr); }
+}

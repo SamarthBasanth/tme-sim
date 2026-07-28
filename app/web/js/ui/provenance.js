@@ -82,6 +82,16 @@ export function metricProvenance(key, run) {
     kind = 'assumed';
     reasons.push('vascular_mode=kde did not converge under grid refinement');
   }
+  // The cell-state label gates the kill through the PDConfig resistance
+  // multipliers and is the largest single term in any absolute kill number here.
+  if (key === 'kill_fraction' && rep.cell_state && !rep.cell_state.is_measured) {
+    kind = 'assumed';
+    reasons.push(`cells.state is labelled by state_mode=${rep.cell_state.mode}, which is not a measurement; across the three state routes this kill moves by up to 0.3252 absolute (1.77x) with tissue, drug, transport and RNG held identical`);
+  }
+  if (prov.state_unmeasured && prov.state_unmeasured.length && key === 'kill_fraction') {
+    kind = 'assumed';
+    reasons.push(`${prov.state_unmeasured.join(', ')} is UNMEASURED on this panel and is assigned to NO cell — that is not "computed and found to be zero", and its resistance multiplier therefore acts on nothing`);
+  }
   if (prov.ic50_source && !/measured/i.test(prov.ic50_source) && key !== 'penetration_length_um') {
     kind = 'assumed';
     reasons.push(`IC50 is not a measured value (${prov.ic50_source})`);

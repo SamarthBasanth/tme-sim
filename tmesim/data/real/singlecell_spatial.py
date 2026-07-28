@@ -144,21 +144,28 @@ _DATASETS = {
 }
 
 
-def _read_panel_identity(path: str) -> Optional[dict]:
-    """Return the ``payload.panel`` block of the shipped gene_panel.json, if any."""
-    panel_path = os.path.join(path, _PANEL_FILE)
+def _read_panel_identity(path: str, panel_path: Optional[str] = None) -> Optional[dict]:
+    """Return the ``payload.panel`` block of the shipped gene_panel.json, if any.
+
+    ``panel_path`` overrides the repo-canonical ``Xenium_GBM_gene_panel.json``
+    filename so a stock 10x bundle (``*_gene_panel.json``, possibly gzipped) can
+    be read; :mod:`tmesim.data.ingest` resolves it.
+    """
+    panel_path = panel_path or os.path.join(path, _PANEL_FILE)
     if not os.path.exists(panel_path):
         return None
     try:
-        with open(panel_path, "r") as fh:
+        opener = gzip.open if panel_path.endswith(".gz") else open
+        with opener(panel_path, "rt") as fh:
             return json.load(fh)["payload"]["panel"]
     except (ValueError, KeyError, OSError):
         return None
 
 
-def _source_for(path: str, n_genes: int) -> Dict[str, object]:
+def _source_for(path: str, n_genes: int,
+                panel_path: Optional[str] = None) -> Dict[str, object]:
     """Resolve provenance for the cache at ``path`` from its own panel spec."""
-    panel = _read_panel_identity(path)
+    panel = _read_panel_identity(path, panel_path)
     base_name = None
     if panel:
         base_name = (
@@ -186,16 +193,36 @@ def _source_for(path: str, n_genes: int) -> Dict[str, object]:
     return src
 
 
+def _first_existing(matrix_dir: str, *names: str) -> Optional[str]:
+    for name in names:
+        p = os.path.join(matrix_dir, name)
+        if os.path.exists(p):
+            return p
+    return None
+
+
 def _read_mex(matrix_dir: str):
-    """Read a 10x MEX triple into (csr features x cells, features_df, barcodes)."""
-    mtx = os.path.join(matrix_dir, "matrix.mtx.gz")
-    feats = os.path.join(matrix_dir, "features.tsv.gz")
-    bcs = os.path.join(matrix_dir, "barcodes.tsv.gz")
-    for p in (mtx, feats, bcs):
-        if not os.path.exists(p):
-            raise FileNotFoundError(f"Missing MEX component: {p}")
-    with gzip.open(mtx, "rb") as fh:
-        mat = sparse.csr_matrix(mmread(fh))  # features x cells
+    """Read a 10x MEX triple into (csr features x cells, features_df, barcodes).
+
+    The ``.gz`` triple is what every Xenium bundle ships and is tried first; the
+    uncompressed spellings (and the legacy ``genes.tsv``) are accepted too so a
+    hand-extracted directory still loads. Nothing else about the read changes.
+    """
+    mtx = _first_existing(matrix_dir, "matrix.mtx.gz", "matrix.mtx")
+    feats = _first_existing(
+        matrix_dir, "features.tsv.gz", "features.tsv", "genes.tsv.gz", "genes.tsv"
+    )
+    bcs = _first_existing(matrix_dir, "barcodes.tsv.gz", "barcodes.tsv")
+    for p, label in ((mtx, "matrix.mtx.gz"), (feats, "features.tsv.gz"),
+                     (bcs, "barcodes.tsv.gz")):
+        if p is None:
+            raise FileNotFoundError(
+                f"Missing MEX component: {os.path.join(matrix_dir, label)}")
+    if mtx.endswith(".gz"):
+        with gzip.open(mtx, "rb") as fh:
+            mat = sparse.csr_matrix(mmread(fh))  # features x cells
+    else:
+        mat = sparse.csr_matrix(mmread(mtx))
     features = pd.read_csv(
         feats, sep="\t", header=None, names=["ensembl", "symbol", "type"]
     )
@@ -250,25 +277,43 @@ def load(
         ``XENIUM_GBM_FILES`` into ``path`` first
         (see ``docs/real_data/singlecell_spatial.md``).
     """
-    cells_path = os.path.join(path, _CELLS_FILE)
-    if not os.path.exists(cells_path):
+    # Resolve the three components. The repo-canonical basenames
+    # (Xenium_GBM_*) are tried FIRST, so every existing cache resolves to
+    # exactly the paths this loader used before and its output is unchanged; a
+    # stock 10x bundle (cells.csv.gz / cell_feature_matrix[.tar.gz] /
+    # gene_panel.json) resolves too. Imported lazily: tmesim.data.ingest imports
+    # this module.
+    from ..ingest import resolve_xenium_files
+
+    found = resolve_xenium_files(path)
+
+    cells_path = found.get("cells")
+    if cells_path is None:
         raise FileNotFoundError(
-            f"Missing cached cells file: {cells_path}. "
+            f"Missing cached cells file: {os.path.join(path, _CELLS_FILE)}. "
             "Download the Xenium GBM files into data_cache/xenium_gbm/ first "
             "(see docs/real_data/singlecell_spatial.md)."
         )
 
     # Ensure the MEX triple is extracted from the tarball.
-    matrix_dir = os.path.join(path, _MATRIX_DIR)
-    if not os.path.exists(os.path.join(matrix_dir, "matrix.mtx.gz")):
-        tar_path = os.path.join(path, _MATRIX_TAR)
-        if not os.path.exists(tar_path):
+    matrix_dir = found.get("matrix_dir")
+    if matrix_dir is None:
+        tar_path = found.get("matrix_tar")
+        if tar_path is None:
             raise FileNotFoundError(
-                f"Missing matrix (neither extracted dir {matrix_dir} nor tar "
-                f"{tar_path}). See docs/real_data/singlecell_spatial.md."
+                f"Missing matrix (neither extracted dir "
+                f"{os.path.join(path, _MATRIX_DIR)} nor tar "
+                f"{os.path.join(path, _MATRIX_TAR)}). "
+                "See docs/real_data/singlecell_spatial.md."
             )
         with tarfile.open(tar_path, "r:gz") as tf:
             tf.extractall(path)
+        matrix_dir = resolve_xenium_files(path).get("matrix_dir")
+        if matrix_dir is None:
+            raise FileNotFoundError(
+                f"{tar_path} extracted into {path} but no MEX triple "
+                "(matrix.mtx.gz + features.tsv.gz + barcodes.tsv.gz) appeared."
+            )
 
     cells = pd.read_csv(cells_path)
     mat, features, barcodes = _read_mex(matrix_dir)  # mat: features x cells
@@ -307,7 +352,7 @@ def load(
         "cell_ids": cells["cell_id"].to_numpy().astype(str),
         "cell_meta": cells,
         "coordinate_units": "micrometer",
-        "source": _source_for(path, len(genes)),
+        "source": _source_for(path, len(genes), found.get("panel")),
     }
 
 

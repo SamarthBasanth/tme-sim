@@ -53,6 +53,7 @@ from ..core import (
     OxygenConfig,
     TissueFields,
 )
+from ..cells.agents import update_cell_states
 from ..data.real.singlecell_spatial import load as load_singlecell_spatial
 from ..molecular.mgmt import (
     MGMT_CALIBRATED_DRUGS,
@@ -64,7 +65,11 @@ from ..physics.oxygen_proxy import (
     hypoxia_from_markers,
     oxygen_from_vessel_distance,
 )
-from .cell_state import STATE_MODES, state_from_markers_micro
+from .cell_state import (
+    STATE_MODES,
+    state_fractions_from_states,
+    state_from_markers_micro,
+)
 from .real_fields import (
     _DEFAULT_VASCULAR_MODE,
     add_oxygen,
@@ -128,6 +133,15 @@ OXYGEN_MODE_DEFAULT = "pde"
 #:     mask its HYPOXIC band is EMPTY, so ``PDConfig.hypoxia_resistance`` acts on
 #:     no cells. Retained as the default only because flipping it silently would
 #:     invalidate every published kill number.
+#: ``'vessel_distance'``
+#:     The same banding rule (``cells.agents.update_cell_states``) applied to
+#:     :func:`physics.oxygen_proxy.oxygen_from_vessel_distance` instead of the PDE:
+#:     ``exp(-d/L)`` in distance to the nearest MEASURED endothelial cell, with L
+#:     from the published Thomlinson & Gray oxygen-diffusion distance (PMID
+#:     13304213). Traceable further than the default and dx-stable to 1.00x, but
+#:     still a geometric SURROGATE — and on the sections tested it calls 91-100% of
+#:     tumour cells VIABLE, so it is stable partly by being nearly uninformative
+#:     (``results/cell_state_impact.md`` §4).
 #: ``'markers'``
 #:     :func:`reconstruct.cell_state.state_from_markers` — proliferative /
 #:     quiescent from measured proliferation transcripts and hypoxic from measured
@@ -281,6 +295,7 @@ def _install_states(
     expression=None,
     genes=None,
     state_kwargs: Optional[Dict] = None,
+    cfg: Optional[OxygenConfig] = None,
 ) -> Dict:
     """Optionally overwrite ``micro.cells.state`` and describe where it came from.
 
@@ -323,6 +338,60 @@ def _install_states(
                 "moves silently, NOT because it is the best available route."
             ),
             "state_detail": None,
+        }
+
+    if mode == "vessel_distance":
+        # Band a GEOMETRIC surrogate — exp(-d/L) in distance to the nearest measured
+        # endothelial cell — through the UNMODIFIED cells.agents.update_cell_states,
+        # i.e. exactly the same banding rule the default uses, applied to a
+        # different field. This is the route validation.cell_state_impact scores as
+        # `vessel_distance`; it is implemented here so it is reachable from
+        # reconstruct_real (and therefore from the Studio API) rather than only
+        # from that one analysis module.
+        ocfg = cfg if cfg is not None else OxygenConfig()
+        field, info = oxygen_from_vessel_distance(micro, ocfg, detail=True, **kw)
+        update_cell_states(micro, np.asarray(field, dtype=np.float64), ocfg)
+        tumor = np.asarray(micro.cells.cell_type) == int(CellType.TUMOR)
+        return {
+            "state_mode": "vessel_distance",
+            "state_source": (
+                "cells.agents.update_cell_states banding the SURROGATE field "
+                f"exp(-d/L) in distance to the nearest {info['source']} vessel "
+                f"point (L = {info['diffusion_length_um']:.2f} um), at "
+                f"hypoxia_threshold = {ocfg.hypoxia_threshold:g}"
+            ),
+            # The vessel POSITIONS are measured; the field banded from them is not
+            # an oxygen tension, so this route is not a measurement of a state.
+            "state_is_measured": False,
+            "state_caveat": (
+                "NOT A MEASUREMENT OF A STATE, but traceable further than the "
+                "default: the endothelial positions are MEASURED and the length "
+                "scale is the published Thomlinson & Gray oxygen-diffusion "
+                "distance (PMID 13304213), yet the field itself is a monotone "
+                "GEOMETRIC proxy and its absolute level is uncalibrated. On the "
+                "sections tested in results/cell_state_impact.md it calls 91-100% "
+                "of tumour cells VIABLE, so its dx-stability (1.00x) is partly the "
+                "stability of a near-constant. Its band OCCUPANCIES differ from "
+                "the default's enough to move absolute kill by up to 0.3252 "
+                "absolute (results/cell_state_impact.md §3.2)."
+            ),
+            "state_detail": {
+                "route": "vessel_distance",
+                "diffusion_length_um": info.get("diffusion_length_um"),
+                "vessel_source": info.get("source"),
+                "hypoxia_threshold": float(ocfg.hypoxia_threshold),
+                "fractions": {
+                    "all": state_fractions_from_states(micro.cells.state),
+                    "tumor": state_fractions_from_states(micro.cells.state, tumor),
+                },
+                "coverage": {
+                    "unmeasured_states": [],
+                    "note": (
+                        "no state is UNMEASURED on this route — but nothing on it "
+                        "is measured either; every cell is labelled from geometry."
+                    ),
+                },
+            },
         }
 
     # mode == 'markers'
@@ -415,7 +484,7 @@ def _reconstruct_xenium(
     state_info = _install_states(
         micro, state_mode,
         expression=data["expression"], genes=data["genes"],
-        state_kwargs=state_kwargs,
+        state_kwargs=state_kwargs, cfg=OxygenConfig(),
     )
 
     micro.metadata = dict(micro.metadata)
@@ -475,7 +544,8 @@ def _reconstruct_visium(
         )
     # Visium has no per-cell transcripts, so state_mode='markers' is refused here
     # rather than silently degrading (_install_states raises with the reason).
-    state_info = _install_states(micro, state_mode, state_kwargs=state_kwargs)
+    state_info = _install_states(micro, state_mode, state_kwargs=state_kwargs,
+                                 cfg=OxygenConfig())
     micro.metadata = dict(micro.metadata)
     micro.metadata["real_pipeline"] = {
         "source": "visium",
@@ -542,12 +612,17 @@ def reconstruct_real(
         ``{'source': 'vessel_network'}`` to measure distance to a SEGMENTED vessel
         rather than to any endothelial cell. Must be empty (or ``None``) for
         ``oxygen_mode='pde'``, which takes no options.
-    state_mode : {'oxygen', 'markers'}
+    state_mode : {'oxygen', 'vessel_distance', 'markers'}
         **ADDITIVE, OPT-IN, DEFAULT UNCHANGED.** How ``cells.state`` is labelled —
         see :data:`STATE_MODE_DEFAULT`. Under the default ``'oxygen'`` this
         function does not touch ``cells.state`` at all, so the reconstruction is
         BIT-IDENTICAL to the pre-option pipeline (asserted by
         ``tests/test_cell_state.py::test_default_state_mode_is_bit_identical``).
+        ``'vessel_distance'`` bands
+        :func:`physics.oxygen_proxy.oxygen_from_vessel_distance` through the
+        unmodified ``cells.agents.update_cell_states`` — measured endothelial
+        positions and a published diffusion length, but still a geometric proxy
+        for a state rather than a measurement of one.
         ``'markers'`` installs
         :func:`reconstruct.cell_state.state_from_markers` and records the full
         coverage report — including which states are UNMEASURED on that panel — in

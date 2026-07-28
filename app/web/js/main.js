@@ -3,14 +3,20 @@
 import { h, $, raf } from './util/dom.js';
 import { createStore, INITIAL } from './state.js';
 import * as api from './api.js';
-import { Viewer, CELL_TYPES } from './gl/viewer.js';
+import { Viewer, CELL_TYPES, COLOR_MODE } from './gl/viewer.js';
 import { createSpecPanel } from './ui/spec.js';
 import { createInspectPanel } from './ui/inspect.js';
 import { createHistoryPanel } from './ui/history.js';
+import { createReportsPanel } from './ui/reports.js';
+import { createProjectsPanel } from './ui/projects.js';
 import { createOverlays } from './ui/overlays.js';
+import { createMechanismLegend, createTimelapseScrubber } from './ui/mechanism.js';
+import { createWindowLevel } from './ui/wl.js';
+import { createTools, TOOLS } from './ui/tools.js';
 import { makeSplitter } from './ui/splitter.js';
 import { toast, notifyError } from './ui/toast.js';
-import { num, int, bytes, NULL_GLYPH } from './util/fmt.js';
+import { fieldMeta } from './fields.js';
+import { num, int, auto, bytes, NULL_GLYPH } from './util/fmt.js';
 
 const store = createStore({ ...INITIAL });
 
@@ -40,9 +46,15 @@ function toggleTheme() {
 
 let viewer = null;
 let overlays = null;
+let mechLegend = null;
+let scrubber = null;
 let specPanel = null;
 let inspect = null;
 let history = null;
+let reportsPanel = null;
+let projectsPanel = null;
+let wl = null;
+let tools = null;
 
 async function boot() {
   initTheme();
@@ -65,17 +77,58 @@ async function boot() {
     overlays = createOverlays(viewer);
     for (const n of overlays.nodes) $('#canvas-wrap').appendChild(n);
     overlays.setEmpty(true);
+
+    // Mechanism legend + time-lapse scrubber. Both are appended alongside the
+    // existing overlays and never modify them.
+    mechLegend = createMechanismLegend(viewer, {
+      onToggle: () => { viewer.dirty = true; },
+    });
+    scrubber = createTimelapseScrubber({ onFrame: onTimelapseFrame });
+    $('#canvas-wrap').appendChild(mechLegend.node);
+    $('#canvas-wrap').appendChild(scrubber.node);
+
+    wl = createWindowLevel({ viewer, onChange: onWindowChange });
+    tools = createTools({
+      viewer,
+      getFieldName: () => store.get().fieldName,
+      onChange: () => { paintToolState(); },
+      onRoiChange: (roi) => { if (wl) wl.setRoiHist(roi && roi.hist ? { hist: roi.hist, label: roi.label } : null); },
+    });
+    $('#canvas-wrap').appendChild(tools.annot);
+    // One repaint per presented frame keeps the annotation layer glued to the
+    // tissue through every camera path — inertia, LOD relax, keyboard pan —
+    // without adding anything to the GL pass. tickOverlays is rAF-coalesced,
+    // and the layer early-outs when there is nothing drawn on it.
+    viewer.onFrame = () => { if (viewer.interacting) tickOverlays(); };
   }
 
   /* --- panels --------------------------------------------------------- */
   specPanel = createSpecPanel({ store, onSubmit: submitRun });
   inspect = createInspectPanel({
     viewer: viewer || stubViewer(),
-    onChange: () => { if (viewer) viewer.dirty = true; updateColourLabel(); },
+    onChange: () => { if (viewer) { viewer.dirty = true; } syncColourControl(); if (wl) wl.draw(); },
     onBenchmark: runBenchmark,
     onResetView: () => { if (viewer) { viewer.fit(); tickOverlays(); } },
+    windowLevelEl: wl ? wl.el : null,
+    profileEl: tools ? tools.profileEl : null,
+    regionEl: tools ? tools.regionEl : null,
   });
   history = createHistoryPanel({ onOpen: openRun, onRefresh: refreshRuns });
+  // Additive: the reports panel mounts as a third dock column and brings its
+  // own stylesheet, so nothing above it has to change.
+  reportsPanel = createReportsPanel({
+    store,
+    getSection: () => (store.get().spec && store.get().spec.section)
+      || (store.get().activeRun && store.get().activeRun.spec
+        && store.get().activeRun.spec.section) || null,
+  });
+  history.el.classList.add('with-reports');
+  history.el.appendChild(h('div.dock-div'));
+  history.el.appendChild(reportsPanel.el);
+  // Additive: the project / specimen browser and the cross-specimen comparison
+  // live in their own modal with their own stylesheet, and inject their own
+  // toolbar button — the three-rail layout is untouched.
+  projectsPanel = createProjectsPanel({ store });
 
   const body = $('#body');
   body.insertBefore(specPanel.el, body.firstChild);
@@ -94,6 +147,9 @@ async function boot() {
     toggleTheme();
     if (viewer) { viewer.refreshTheme(); }
     if (overlays) overlays.refreshRamp();
+    if (mechLegend) mechLegend.refresh();
+    if (wl) wl.draw();
+    if (tools) { tools.repaintPanels(); tools.draw(); }
   });
   const dlg = $('#help-dlg');
   $('#btn-help').addEventListener('click', () => dlg.showModal());
@@ -104,7 +160,15 @@ async function boot() {
   $('#tb-zoom-out').addEventListener('click', () => zoomCentre(1 / 1.35));
   $('#tb-pin-clear').addEventListener('click', clearPin);
 
-  if (viewer) wireCanvas(canvas);
+  for (const b of $('#tb-tools').children) {
+    b.addEventListener('click', () => setTool(b.dataset.tool));
+  }
+  for (const b of $('#tb-colour').children) {
+    b.addEventListener('click', () => setColourMode(Number(b.dataset.mode)));
+  }
+
+  if (viewer) { wireCanvas(canvas); setTool('pick'); }
+  syncColourControl();
   wireKeys();
 
   window.addEventListener('resize', onLayout);
@@ -129,6 +193,7 @@ async function boot() {
     store.set({ sections, drugs });
     specPanel.setSections(sections);
     specPanel.setDrugs(drugs);
+    reportsPanel.setDrugs(drugs);
     specPanel.loadSpec(defaults);
     paintSectionHeader(defaults.section);
   } catch (err) {
@@ -144,6 +209,15 @@ async function boot() {
   if (viewer) viewer.start();
   setInterval(paintStatusBar, 250);
   setInterval(refreshRuns, 6000);
+  // Reports poll fast while arms are in flight, slowly when idle. A report is
+  // 2 runs per drug, so it is minutes long — a fixed fast poll would be noise.
+  await reportsPanel.refresh();
+  (async function pollReports() {
+    for (;;) {
+      await new Promise((r) => setTimeout(r, reportsPanel.busy() ? 2500 : 15000));
+      await reportsPanel.refresh();
+    }
+  }());
 }
 
 function stubViewer() {
@@ -179,6 +253,7 @@ function paintBackendState(a) {
 function paintSectionHeader(sectionId) {
   const s = (store.get().sections || []).find((x) => x.id === sectionId);
   $('#hdr-section').textContent = sectionId || NULL_GLYPH;
+  if (reportsPanel) reportsPanel.setSection();
   $('#hdr-section-meta').textContent = s
     ? `${int(s.n_cells)} cells · ${num(s.extent_um[0] / 1000, 2)}×${num(s.extent_um[1] / 1000, 2)} mm · ${s.panel}`
     : '';
@@ -192,6 +267,7 @@ function paintStatusBar() {
     set('#sb-fps', s.fps ? s.fps.toFixed(1) : NULL_GLYPH);
     set('#sb-frame', s.frameMs ? s.frameMs.toFixed(2) : NULL_GLYPH);
     set('#sb-drawn', s.total ? `${int(s.drawn)} / ${int(s.total)}` : NULL_GLYPH);
+    set('#sb-lod', s.total ? (s.lod * 100).toFixed(0) : NULL_GLYPH);
     set('#sb-vbo', s.gpuBytes ? bytes(s.gpuBytes) : NULL_GLYPH);
     set('#sb-index', s.indexBytes ? `${bytes(s.indexBytes)} · ${num(s.indexMs, 0)} ms` : NULL_GLYPH);
     const fpsEl = $('#sb-fps');
@@ -200,17 +276,81 @@ function paintStatusBar() {
   set('#sb-latency', api.api.lastLatencyMs === null ? NULL_GLYPH : num(api.api.lastLatencyMs, 1));
 }
 
-function updateColourLabel() {
-  const el = $('#tb-colour');
-  if (!el || !viewer) return;
-  el.textContent = viewer.colorMode === 1 ? `field: ${store.get().fieldName || 'none'}` : 'cell type';
+/* ----------------------------------------------------------- controls -- */
+
+function setColourMode(m) {
+  if (!viewer) return;
+  if (m === COLOR_MODE.FIELD && !store.get().fieldName) {
+    toast('warn', 'No field overlay', 'Colouring cells by field value needs a field. Pick one under Field overlay.');
+    return;
+  }
+  if (m === COLOR_MODE.LABEL && !viewer.labels) {
+    const r = store.get().activeRun;
+    toast('warn', 'No mechanism attribution for this run',
+      (r && r.mechanism_reason)
+      || 'This run carries no per-cell attribution. Submit a run with '
+         + 'attribute_mechanism (the default) to get one.');
+    return;
+  }
+  viewer.setColorMode(m);
+  syncColourControl();
+}
+
+/** Cycle 'colour by' through the modes this run can actually offer. */
+function cycleColourMode() {
+  if (!viewer) return;
+  const available = [COLOR_MODE.TYPE];
+  if (store.get().fieldName) available.push(COLOR_MODE.FIELD);
+  if (viewer.labels) available.push(COLOR_MODE.LABEL);
+  const at = available.indexOf(viewer.colorMode);
+  setColourMode(available[(at + 1) % available.length]);
+}
+
+function syncColourControl() {
+  const m = viewer ? viewer.colorMode : 0;
+  for (const b of $('#tb-colour').children) {
+    const mode = Number(b.dataset.mode);
+    b.setAttribute('aria-pressed', String(mode === m));
+    b.disabled = (mode === COLOR_MODE.FIELD && !store.get().fieldName)
+      || (mode === COLOR_MODE.LABEL && !(viewer && viewer.labels));
+  }
+  if (inspect) inspect.setColorMode(m);
+}
+
+function setTool(t) {
+  if (!tools || !TOOLS.includes(t)) return;
+  tools.setTool(t);
+  for (const b of $('#tb-tools').children) {
+    b.setAttribute('aria-pressed', String(b.dataset.tool === t));
+  }
+  const canvas = $('#gl');
+  canvas.classList.toggle('tooling', t !== 'pick');
+  paintToolState();
+}
+
+function paintToolState() {
+  const msg = $('#sb-msg');
+  if (!msg || !tools) return;
+  if (tools.tool === 'pick') return;
+  msg.textContent = {
+    profile: 'line profile — drag across the tissue; middle-drag pans',
+    region: 'region — drag a rectangle; middle-drag pans',
+    distance: 'distance — drag between two points; middle-drag pans',
+  }[tools.tool] || '';
+}
+
+/** Anything that changes the window: relabel the legend, the plot band, the
+ *  read-out. The pixels themselves are re-mapped by the shader. */
+function onWindowChange() {
+  if (overlays) overlays.refreshWindow();
+  if (tools) tools.repaintPlot();
 }
 
 const tickOverlays = raf(() => {
   if (!viewer || !overlays) return;
   overlays.updateScalebar();
-  const el = $('#tb-zoom'); if (el) el.textContent = num(viewer.cam.zoom, 4);
   const el2 = $('#tb-scale'); if (el2) el2.textContent = num(viewer.umPerPx, 3);
+  if (tools) tools.draw();
 });
 
 function onLayout() {
@@ -232,11 +372,30 @@ function clearPin() {
   viewer.selected = -1;
   store.set({ pinned: null });
   viewer.dirty = true;
+  $('#tb-pin-clear').disabled = true;
   overlays.updateReadout(viewer.hovered >= 0 ? viewer.cellInfo(viewer.hovered) : null, store.get().fieldName, false);
 }
 
+/* Window / level by dragging on the image, the way every diagnostic viewer
+   does it: horizontal moves the LEVEL (window centre), vertical changes the
+   WIDTH. Right-drag is the convention; Alt+left-drag is the same gesture for a
+   pointer with one button. Both are scaled to the full data range so the feel
+   is identical whether the field spans 0–1 or 0–1e7. */
+function applyWindowDrag(base, dxPx, dyPx, widthPx) {
+  const [flo, fhi] = viewer.fullRange();
+  const span = fhi - flo || 1;
+  const centre = base.c + (dxPx / Math.max(120, widthPx)) * span * 1.6;
+  const width = Math.max(span * 1e-4, base.w * Math.exp(dyPx * 0.006));
+  viewer.setWindow(centre, width);
+  if (wl) wl.sync();
+}
+
 function wireCanvas(canvas) {
-  let panning = false, moved = 0, lastX = 0, lastY = 0, pid = null;
+  let mode = null;                // null | 'pan' | 'tool' | 'window'
+  let moved = 0, lastX = 0, lastY = 0, pid = null;
+  let base = null;                // window at gesture start
+
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
@@ -247,36 +406,68 @@ function wireCanvas(canvas) {
   }, { passive: false });
 
   canvas.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
-    panning = true; moved = 0; lastX = e.clientX; lastY = e.clientY; pid = e.pointerId;
-    canvas.setPointerCapture(pid);
-    canvas.classList.add('panning');
+    const r = canvas.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
     canvas.focus();
+    moved = 0; lastX = e.clientX; lastY = e.clientY;
+
+    const windowing = (e.button === 2 || (e.button === 0 && e.altKey)) && !!viewer.field;
+    if (windowing) {
+      const [lo, hi] = viewer.windowRange();
+      base = { c: (lo + hi) / 2, w: hi - lo, x: e.clientX, y: e.clientY };
+      mode = 'window';
+      canvas.classList.add('windowing');
+    } else if (e.button === 1 || (e.button === 0 && tools.tool === 'pick')) {
+      mode = 'pan';
+      canvas.classList.add('panning');
+    } else if (e.button === 0) {
+      mode = 'tool';
+      tools.pointerDown(viewer.screenToWorld(px, py));
+    } else {
+      return;
+    }
+    pid = e.pointerId;
+    canvas.setPointerCapture(pid);
+    e.preventDefault();
   });
 
   const hoverUpdate = raf(() => {
     if (!viewer.geom) return;
     const info = viewer.hovered >= 0 ? viewer.cellInfo(viewer.hovered) : null;
     const pinnedInfo = store.get().pinned;
-    overlays.updateReadout(
-      info || (pinnedInfo ? viewer.cellInfo(pinnedInfo) : null),
-      store.get().fieldName,
-      !info && !!pinnedInfo);
+    const shown = info || (pinnedInfo !== null ? viewer.cellInfo(pinnedInfo) : null);
+    overlays.updateReadout(shown, store.get().fieldName, !info && pinnedInfo !== null);
+    // Brushing: the value of the cell under the pointer is marked on the
+    // histogram, so "where does this cell sit in the distribution" is one
+    // glance rather than an inference from a colour.
+    if (wl) wl.setBrush(shown ? shown.fieldValue : null);
   });
 
   canvas.addEventListener('pointermove', (e) => {
     const r = canvas.getBoundingClientRect();
     const px = e.clientX - r.left, py = e.clientY - r.top;
-    if (panning) {
-      moved += Math.abs(e.clientX - lastX) + Math.abs(e.clientY - lastY);
-      viewer.panByScreen(e.clientX - lastX, e.clientY - lastY);
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+
+    if (mode === 'pan') {
+      moved += Math.abs(dx) + Math.abs(dy);
+      viewer.panByScreen(dx, dy);
       lastX = e.clientX; lastY = e.clientY;
       tickOverlays();
       return;
     }
+    if (mode === 'window') {
+      applyWindowDrag(base, e.clientX - base.x, e.clientY - base.y, r.width);
+      return;
+    }
+    if (mode === 'tool') {
+      tools.pointerMove(viewer.screenToWorld(px, py));
+      return;
+    }
+
     const w = viewer.screenToWorld(px, py);
     const cur = $('#tb-cursor');
     if (cur) cur.textContent = `${num(w.x, 1)}, ${num(w.y, 1)}`;
+    paintCursorValue(w);
     const idx = viewer.pick(px, py);
     if (idx !== viewer.hovered) {
       viewer.hovered = idx;
@@ -285,29 +476,54 @@ function wireCanvas(canvas) {
     }
   });
 
-  const endPan = (e) => {
-    if (!panning) return;
-    panning = false;
-    canvas.classList.remove('panning');
+  const endGesture = (e) => {
+    if (!mode) return;
+    const r = canvas.getBoundingClientRect();
+    const was = mode;
+    mode = null;
+    canvas.classList.remove('panning', 'windowing');
     try { canvas.releasePointerCapture(pid); } catch { /* already released */ }
-    if (moved < 4) {
-      const r = canvas.getBoundingClientRect();
+    if (was === 'tool') {
+      tools.pointerUp(viewer.screenToWorld(e.clientX - r.left, e.clientY - r.top));
+    } else if (was === 'pan' && moved < 4) {
       const idx = viewer.pick(e.clientX - r.left, e.clientY - r.top);
       viewer.selected = idx;
       store.set({ pinned: idx >= 0 ? idx : null });
       viewer.dirty = true;
-      overlays.updateReadout(idx >= 0 ? viewer.cellInfo(idx) : null, store.get().fieldName, idx >= 0);
+      $('#tb-pin-clear').disabled = idx < 0;
+      const info = idx >= 0 ? viewer.cellInfo(idx) : null;
+      overlays.updateReadout(info, store.get().fieldName, idx >= 0);
+      if (wl) wl.setBrush(info ? info.fieldValue : null);
     }
   };
-  canvas.addEventListener('pointerup', endPan);
-  canvas.addEventListener('pointercancel', () => { panning = false; canvas.classList.remove('panning'); });
+  canvas.addEventListener('pointerup', endGesture);
+  canvas.addEventListener('pointercancel', () => {
+    mode = null;
+    canvas.classList.remove('panning', 'windowing');
+  });
   canvas.addEventListener('pointerleave', () => {
-    if (panning) return;
+    if (mode) return;
     viewer.hovered = -1;
     viewer.dirty = true;
     const p = store.get().pinned;
-    overlays.updateReadout(p !== null ? viewer.cellInfo(p) : null, store.get().fieldName, p !== null);
+    const info = p !== null ? viewer.cellInfo(p) : null;
+    overlays.updateReadout(info, store.get().fieldName, p !== null);
+    if (wl) wl.setBrush(info ? info.fieldValue : null);
+    const v = $('#tb-value'); if (v) v.textContent = NULL_GLYPH;
   });
+}
+
+/** Field value under the pointer — the imaging read-out, independent of
+ *  whether a cell happens to be there. */
+function paintCursorValue(world) {
+  const el = $('#tb-value');
+  const unit = $('#tb-value-unit');
+  if (!el) return;
+  const name = store.get().fieldName;
+  if (!name || !viewer.field) { el.textContent = NULL_GLYPH; unit.textContent = ''; return; }
+  const v = viewer.sampleField(world.x, world.y);
+  el.textContent = v === null || !Number.isFinite(v) ? NULL_GLYPH : auto(v);
+  unit.textContent = fieldMeta(name).unit;
 }
 
 function wireKeys() {
@@ -333,11 +549,27 @@ function wireKeys() {
       case 'ArrowRight': if (viewer) { viewer.panByScreen(-step, 0); tickOverlays(); e.preventDefault(); } break;
       case 'ArrowUp': if (viewer) { viewer.panByScreen(0, step); tickOverlays(); e.preventDefault(); } break;
       case 'ArrowDown': if (viewer) { viewer.panByScreen(0, -step); tickOverlays(); e.preventDefault(); } break;
-      case 'Escape': clearPin(); break;
+      case 'Escape':
+        if (e.shiftKey && tools) { tools.clearAll(); break; }
+        if (tools && tools.clearActive()) break;
+        clearPin();
+        break;
+      case '?': $('#help-dlg').showModal(); break;
       case 't': case 'T':
-        toggleTheme(); if (viewer) viewer.refreshTheme(); if (overlays) overlays.refreshRamp(); break;
-      case 'c': case 'C':
-        if (viewer) { viewer.setColorMode(viewer.colorMode ? 0 : 1); updateColourLabel(); } break;
+        toggleTheme();
+        if (viewer) viewer.refreshTheme();
+        if (overlays) overlays.refreshRamp();
+        if (wl) wl.draw();
+        if (tools) { tools.repaintPanels(); tools.draw(); }
+        break;
+      case 'v': case 'V': setTool('pick'); break;
+      case 'l': setTool('profile'); break;
+      case 'L': setTool('profile'); break;
+      case 'r': case 'R': setTool('region'); break;
+      case 'm': case 'M': setTool('distance'); break;
+      case 'w': if (wl) wl.autoWindow(0.02, 0.98); break;
+      case 'W': if (viewer && viewer.field) { viewer.resetWindow(); wl.sync(); } break;
+      case 'c': case 'C': cycleColourMode(); break;
       case '0':
         if (viewer) { CELL_TYPES.forEach((_, i) => viewer.setVisible(i, true)); inspect.buildChannels(viewer.counts, viewer.geom ? viewer.geom.n : 0); } break;
       default: {
@@ -400,12 +632,115 @@ async function openRun(id) {
   if (!viewer) return;
   if (run.status !== 'done') {
     viewer.clearGeometry();
+    if (mechLegend) mechLegend.set(null);
+    if (scrubber) scrubber.clear();
+    syncColourControl();
     overlays.setEmpty(true);
     $('#hdr-cells').textContent = NULL_GLYPH;
     return;
   }
   await loadGeometry(id);
+  await loadMechanism(id, run);
+  await loadTimelapse(id, run);
   if (store.get().fieldName) await selectField(store.get().fieldName);
+}
+
+/* ------------------------------------------------- mechanism attribution -- */
+
+/**
+ * Fetch the per-cell mechanism attribution and hand it to the viewer.
+ *
+ * A missing attribution is a normal state, not an error: a reconstruction-only
+ * run has no kill to attribute. The backend returns 404 with the run's OWN
+ * recorded reason, which is surfaced verbatim rather than replaced with a
+ * generic message.
+ */
+async function loadMechanism(id, run) {
+  if (!viewer) return;
+  viewer.clearLabels();
+  if (mechLegend) mechLegend.set(null);
+  syncColourControl();
+
+  const msg = $('#sb-msg');
+  try {
+    const m = await api.getMechanism(id);
+    viewer.setLabels(m.labels);
+    if (mechLegend) mechLegend.set(m.aggregate);
+    syncColourControl();
+    const rec = m.aggregate && m.aggregate.reconciliation;
+    if (rec && rec.bit_exact === false) {
+      // The backend refuses to emit a non-reconciling attribution, so this can
+      // only mean the payload was tampered with in transit. Say so loudly.
+      toast('err', 'Mechanism attribution does not reconcile',
+        `labels give kill_fraction ${rec.kill_fraction_from_labels}, the engine `
+        + `reported ${rec.kill_fraction_from_engine}. Do not read this map.`, 0);
+    }
+    msg.textContent = `mechanism ${int(m.n_cells)} labels · ${bytes(m.bytes)} · `
+      + `${m.aggregate.counts.KILLED} killed / ${m.aggregate.n_tumor} tumour`;
+  } catch (err) {
+    const reason = (err && err.payload && err.payload.detail
+      && err.payload.detail.reason)
+      || (run && run.mechanism_reason) || (err && err.message);
+    msg.textContent = 'no mechanism attribution: ' + reason;
+  }
+}
+
+/* ------------------------------------------------------------- time-lapse -- */
+
+async function loadTimelapse(id, run) {
+  if (!scrubber) return;
+  scrubber.clear();
+  store.set({ timelapse: null });
+  const info = (run && run.timelapse) || null;
+  if (info && info.available === false) return;   // the run says there is none
+  try {
+    const tl = await api.getTimelapse(id);
+    scrubber.set(tl, info || {});
+    store.set({ timelapse: tl });
+  } catch {
+    // A run without a time-lapse is ordinary; the reason already rides in
+    // RunResult.timelapse.reason and is shown in the run's provenance panel.
+    scrubber.clear();
+  }
+}
+
+/**
+ * Paint one time-lapse frame. The frames are drug CONCENTRATION, which is a
+ * different quantity from the /field/drug_auc overlay, so the field is
+ * (re)installed as its own named field the first time and thereafter only its
+ * pixels are replaced — keeping the operator's window fixed across the series
+ * so the animation shows the drug moving, not the ramp re-normalising.
+ */
+function onTimelapseFrame(frame, i, series) {
+  if (!viewer) return;
+  const f = viewer.field;
+  const same = f && f.name === 'drug_concentration'
+    && f.rows === frame.rows && f.cols === frame.cols;
+  if (same) {
+    viewer.setFieldValues(frame.values, frame.min, frame.max, true);
+  } else {
+    // Window across the WHOLE series, not this frame, so scrubbing is
+    // comparable frame to frame.
+    let lo = Infinity, hi = -Infinity;
+    for (const fr of series.frames) {
+      if (Number.isFinite(fr.min)) lo = Math.min(lo, fr.min);
+      if (Number.isFinite(fr.max)) hi = Math.max(hi, fr.max);
+    }
+    viewer.setField({
+      name: 'drug_concentration',
+      rows: frame.rows, cols: frame.cols, dx: frame.dx,
+      min: Number.isFinite(lo) ? lo : 0,
+      max: Number.isFinite(hi) ? hi : 1,
+      values: frame.values,
+    });
+    store.set({ fieldName: 'drug_concentration', field: viewer.field });
+    if (overlays) overlays.updateLegend('drug_concentration', viewer.field);
+  }
+  const el = $('#sb-msg');
+  if (el) {
+    el.textContent = `time-lapse frame ${i + 1}/${series.n_frames} · `
+      + `t = ${num(frame.time_s, 0)} s · max ${num(frame.max, 4)} uM`;
+  }
 }
 
 async function loadGeometry(id) {
@@ -419,6 +754,11 @@ async function loadGeometry(id) {
     const { indexMs } = viewer.setGeometry(g);
     const uploadMs = performance.now() - t1;
     viewer.fit();
+    // Annotations are section coordinates. A different geometry means they
+    // point at nothing, so they go rather than silently re-projecting onto
+    // tissue they were not drawn on.
+    if (tools) tools.clearAll();
+    $('#tb-pin-clear').disabled = true;
     overlays.setEmpty(false);
     inspect.buildChannels(viewer.counts, g.n);
     $('#hdr-cells').textContent = int(g.n);
@@ -435,13 +775,16 @@ async function loadGeometry(id) {
 
 async function selectField(name) {
   store.set({ fieldName: name || null });
-  updateColourLabel();
   if (!viewer) return;
   if (!name) {
     viewer.setField(null);
     store.set({ field: null });
     overlays.updateLegend(null, null);
     inspect.setFieldInfo(null, null);
+    if (wl) wl.setField(null, null);
+    if (tools) tools.recompute();
+    if (viewer.colorMode === 1) viewer.setColorMode(0);
+    syncColourControl();
     return;
   }
   const id = store.get().activeRunId;
@@ -456,11 +799,14 @@ async function selectField(name) {
   try {
     const f = await api.getField(id, name);
     inspect.setRampFor(name);
-    viewer.setField(f);
+    viewer.setField(f);           // installs the full range as the window
     store.set({ field: f });
     overlays.updateLegend(name, f);
     inspect.setFieldInfo(name, f);
     overlays.refreshRamp();
+    if (wl) wl.setField(name, f);
+    if (tools) tools.recompute();
+    syncColourControl();
     msg.textContent = `field ${name} · ${f.rows}×${f.cols} @ ${num(f.dx, 2)} um · ${bytes(f.bytes)}`;
   } catch (err) {
     msg.textContent = `field ${name} failed: ` + (err.message || err);
@@ -469,6 +815,9 @@ async function selectField(name) {
     store.set({ fieldName: null });
     viewer.setField(null);
     overlays.updateLegend(null, null);
+    if (wl) wl.setField(null, null);
+    if (tools) tools.recompute();
+    syncColourControl();
   }
 }
 
@@ -564,9 +913,15 @@ async function benchmark850k(progress = () => {}) {
 window.__tmesim = {
   get viewer() { return viewer; },
   get store() { return store; },
+  get projects() { return projectsPanel; },
+  get tools() { return tools; },
+  get wl() { return wl; },
   api,
   benchmark850k,
   runBenchmark,
+  // Load a run into the viewer + inspector from outside the shell. The protocol
+  // workspace (js/ui/protocol.js) calls this when a sweep cell is clicked.
+  openRun,
 };
 
 boot().catch((err) => {

@@ -51,6 +51,7 @@ export const DEFAULT_SPEC = {
   sensitivity_mode: 'uniform',
   vascular_mode: 'discrete',
   oxygen_mode: 'pde',
+  state_mode: 'oxygen',
   mgmt: null,
   pk: { plasma_peak: 1.0, half_life_s: 14400, n_doses: 1, dose_interval_s: 86400 },
   total_time_s: 600.0,
@@ -261,7 +262,7 @@ export function buildField(sectionId, name, dx) {
 /* -------------------------------------------------------- validation --- */
 
 const SPEC_KEYS = ['section', 'dx_um', 'drug', 'sensitivity_mode', 'vascular_mode',
-  'oxygen_mode', 'mgmt', 'pk', 'total_time_s'];
+  'oxygen_mode', 'state_mode', 'mgmt', 'pk', 'total_time_s'];
 const PK_KEYS = ['plasma_peak', 'half_life_s', 'n_doses', 'dose_interval_s'];
 
 export function validateSpec(spec) {
@@ -303,6 +304,7 @@ export function validateSpec(spec) {
     sensitivity_mode: ['uniform', 'determinant'],
     vascular_mode: ['discrete', 'kde'],
     oxygen_mode: ['pde', 'vessel_distance', 'markers'],
+    state_mode: ['oxygen', 'vessel_distance', 'markers'],
   };
   for (const [k, allowed] of Object.entries(enums)) {
     if (spec[k] !== undefined && !allowed.includes(spec[k])) {
@@ -311,6 +313,15 @@ export function validateSpec(spec) {
   }
   if (spec.vascular_mode === 'kde') W('vascular_mode', 'kde vessel field did not converge under grid refinement; discrete is the production default');
   if (spec.oxygen_mode === 'markers') W('oxygen_mode', 'marker-derived oxygen is a SURROGATE, not a measured pO2 — every downstream number inherits that');
+  if (spec.state_mode && spec.state_mode !== 'oxygen') {
+    W('state_mode', `state_mode=${spec.state_mode} relabels cells.state on the RECONSTRUCTION only; sim.engine re-bands from its own oxygen solve, so it moves the reported band occupancies, not kill_fraction`);
+  }
+  if (spec.state_mode === 'markers' && spec.section === 'xenium_319') {
+    W('state_mode', 'state_mode=markers on the 319-gene panel: it carries NO hypoxia-response transcript, so HYPOXIC is UNMEASURED and assigned to no cell — that is NOT "computed and found to be zero". Proliferation detection is 13x below the published Ki-67 range, so the per-cell call falls back to a neighbourhood ENRICHMENT rule whose level is not an index.');
+  }
+  if (spec.section === 'xenium_319' && spec.drug) {
+    W('state_mode', 'ABSOLUTE KILL SHOULD NOT BE QUOTED FROM THIS SECTION UNDER ANY state_mode: no state route clears the bar on this panel and kill moves up to 0.3252 absolute (1.77x) across routes. The cross-drug RANKING is invariant and is the defensible output.');
+  }
   if (spec.sensitivity_mode === 'determinant' && spec.drug && !['temozolomide', 'lomustine', 'carmustine'].includes(spec.drug)) {
     W('sensitivity_mode', `no determinant gene on panel for "${spec.drug}"; will fall back to uniform 1.0`);
   }
@@ -407,6 +418,21 @@ function reportFor(spec) {
       detail: `oxygen_mode=${spec.oxygen_mode}`,
     },
     oxygen_mode: spec.oxygen_mode,
+    cell_state: {
+      mode: spec.state_mode || 'oxygen',
+      source: spec.state_mode === 'markers'
+        ? 'measured proliferation transcripts; hypoxia UNMEASURED on this panel'
+        : spec.state_mode === 'vessel_distance'
+          ? 'update_cell_states banding exp(-d/L) in distance to measured endothelial cells'
+          : 'update_cell_states banding the SIMULATED oxygen field',
+      is_measured: spec.state_mode === 'markers',
+      unmeasured_states: spec.state_mode === 'markers' && spec.section === 'xenium_319' ? ['HYPOXIC'] : [],
+      caveat: (spec.state_mode || 'oxygen') === 'oxygen'
+        ? 'NOT A MEASUREMENT: the VIABLE fraction this produces moves with the tissue-mask convention and the mesh, neither of which is a measurement.'
+        : 'sim.engine re-bands cells.state from its own oxygen solve, so this route did not drive kill_fraction.',
+      detail: `state_mode=${spec.state_mode || 'oxygen'}`,
+    },
+    state_mode: spec.state_mode || 'oxygen',
     ecm_markers_used: ['COL1A1', 'FN1', 'SPARC'],
     tissue_mask_mode: 'alpha-shape of detected cells',
     tissue_coverage_fraction: 0.6412,
@@ -434,6 +460,12 @@ function provenanceFor(spec, rng) {
   ];
   if (spec.oxygen_mode === 'markers') {
     caveats.push('oxygen_mode=markers: the oxygen field is a transcriptional surrogate. It has not been calibrated against a measured pO2 on this tissue.');
+  }
+  if (spec.state_mode && spec.state_mode !== 'oxygen') {
+    caveats.push(`state_mode=${spec.state_mode}: sim.engine re-bands cells.state from its own oxygen solve before the kill, so this route changed the REPORTED band occupancies and their provenance, not this run's kill_fraction.`);
+  }
+  if (spec.section === 'xenium_319') {
+    caveats.push('ABSOLUTE KILL MUST NOT BE QUOTED FROM THIS SECTION UNDER ANY STATE ROUTE: its panel measures no hypoxia, so no route clears the bar and kill moves up to 0.3252 absolute across routes. The cross-drug ranking is invariant and is the defensible output.');
   }
   if (spec.vascular_mode === 'kde') {
     caveats.push('vascular_mode=kde did not converge under grid refinement in the held-out check; discrete vessels are the production default.');

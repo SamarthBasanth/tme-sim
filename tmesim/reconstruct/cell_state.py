@@ -266,7 +266,15 @@ NEIGHBOURHOOD_MIN_CELLS = 10
 
 #: The state routes this project can take. ``'oxygen'`` is and remains the
 #: shipping default (see ``reconstruct.real_pipeline.reconstruct_real``).
-STATE_MODES: Tuple[str, ...] = ("oxygen", "markers")
+#:
+#: ``'vessel_distance'`` is implemented in
+#: :func:`reconstruct.real_pipeline._install_states` rather than here: it bands
+#: ``physics.oxygen_proxy.oxygen_from_vessel_distance`` through the UNMODIFIED
+#: ``cells.agents.update_cell_states``, so it reads no transcript and belongs to
+#: neither this module's marker machinery nor the default's PDE. It is listed here
+#: because this tuple is the one enumeration of the state routes, and
+#: ``results/cell_state_impact.md`` scores all three against the same bar.
+STATE_MODES: Tuple[str, ...] = ("oxygen", "vessel_distance", "markers")
 
 
 # ---------------------------------------------------------------------------

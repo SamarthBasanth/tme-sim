@@ -165,9 +165,36 @@ export const getRun = (id) => call('GET', `/api/runs/${encodeURIComponent(id)}`)
 export const getStatus = (id) => call('GET', `/api/runs/${encodeURIComponent(id)}/status`);
 export const cancelRun = (id) => call('DELETE', `/api/runs/${encodeURIComponent(id)}`);
 
+/* --- therapy reports ---------------------------------------------------- */
+export const postReport = (body) => call('POST', '/api/reports', { body });
+export const listReports = () => call('GET', '/api/reports');
+export const getReport = (id) => call('GET', `/api/reports/${encodeURIComponent(id)}`);
+export const cancelReport = (id) => call('DELETE', `/api/reports/${encodeURIComponent(id)}`);
+/** Absolute path of the rendered document — used as an iframe src and as a download. */
+export const reportHtmlUrl = (id) => `${api.base}/api/reports/${encodeURIComponent(id)}/html`;
+
 export async function getGeometry(id) {
   const buf = await call('GET', `/api/runs/${encodeURIComponent(id)}/geometry`, { binary: true });
   return decodeTMSG(buf);
+}
+
+/**
+ * Per-cell mechanism attribution (TMSM). Returns
+ * `{n_cells, labels: Uint8Array, aggregate, bytes}` where `labels` is aligned
+ * one-to-one with the geometry payload's cell order.
+ */
+export async function getMechanism(id) {
+  const buf = await call('GET', `/api/runs/${encodeURIComponent(id)}/mechanism`, { binary: true });
+  return decodeTMSM(buf);
+}
+
+/**
+ * Drug-concentration time-lapse (TMSL). Returns
+ * `{n_frames, interval_s, window_s, frames: [...TMSF], bytes}`.
+ */
+export async function getTimelapse(id) {
+  const buf = await call('GET', `/api/runs/${encodeURIComponent(id)}/timelapse`, { binary: true });
+  return decodeTMSL(buf);
 }
 
 export async function getField(id, name) {
@@ -237,6 +264,97 @@ export function decodeTMSF(buf) {
   };
 }
 
+/**
+ * TMSM: magic(4) | version u32 | n_cells u32 | n_labels u32 | json_len u32
+ *       | aggregate json[json_len] (UTF-8) | label u8[n_cells]
+ *
+ * One byte per cell in geometry order, so the labels go straight into a vertex
+ * buffer. The aggregate breakdown rides along as a short JSON block — a legend
+ * without its counts is decoration, and a second round trip for four integers
+ * is not worth a request.
+ */
+export function decodeTMSM(buf) {
+  const u8 = new Uint8Array(buf);
+  if (buf.byteLength < 20 || !MAGIC(u8, 'TMSM')) {
+    throw new ApiError('mechanism payload is not TMSM (bad magic) — refusing to render it', { status: 502 });
+  }
+  const dv = new DataView(buf);
+  const version = dv.getUint32(4, true);
+  const n = dv.getUint32(8, true);
+  const nLabels = dv.getUint32(12, true);
+  const jsonLen = dv.getUint32(16, true);
+  const need = 20 + jsonLen + n;
+  if (buf.byteLength < need) {
+    throw new ApiError(`TMSM truncated: ${buf.byteLength} B for n_cells=${n} (need ${need} B)`, { status: 502 });
+  }
+  let aggregate;
+  try {
+    aggregate = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen)));
+  } catch (e) {
+    throw new ApiError('TMSM aggregate block is not valid JSON', { status: 502, cause: e });
+  }
+  return {
+    version, n_cells: n, n_labels: nLabels, aggregate,
+    labels: new Uint8Array(buf, 20 + jsonLen, n),
+    bytes: buf.byteLength,
+  };
+}
+
+/**
+ * TMSL: magic(4) | version u32 | n_frames u32 | interval_s f32 | window_s f32
+ *       | n_frames x [ frame u32 | time_s f32 | <a complete TMSF block> ]
+ *
+ * Each frame is a byte-identical TMSF block, so it is decoded by the reader
+ * already in this file — the container adds a frame index and a time stamp and
+ * nothing else. Values are Float32Array views over the SAME response buffer, so
+ * a 24-frame series costs one allocation, not 24.
+ */
+export function decodeTMSL(buf) {
+  const u8 = new Uint8Array(buf);
+  if (buf.byteLength < 20 || !MAGIC(u8, 'TMSL')) {
+    throw new ApiError('timelapse payload is not TMSL (bad magic) — refusing to render it', { status: 502 });
+  }
+  const dv = new DataView(buf);
+  const version = dv.getUint32(4, true);
+  const nFrames = dv.getUint32(8, true);
+  const interval = dv.getFloat32(12, true);
+  const window = dv.getFloat32(16, true);
+
+  const frames = [];
+  let off = 20;
+  for (let i = 0; i < nFrames; i++) {
+    if (off + 8 + 28 > buf.byteLength) {
+      throw new ApiError(`TMSL truncated at frame ${i} of ${nFrames}`, { status: 502 });
+    }
+    const index = dv.getUint32(off, true);
+    const t = dv.getFloat32(off + 4, true);
+    if (index !== i) {
+      throw new ApiError(`TMSL frame index out of order: got ${index}, expected ${i}`, { status: 502 });
+    }
+    off += 8;
+    if (!MAGIC(new Uint8Array(buf, off, 4), 'TMSF')) {
+      throw new ApiError(`TMSL frame ${i} is not a TMSF block`, { status: 502 });
+    }
+    const rows = dv.getUint32(off + 8, true);
+    const cols = dv.getUint32(off + 12, true);
+    const size = 28 + rows * cols * 4;
+    if (off + size > buf.byteLength) {
+      throw new ApiError(`TMSL frame ${i} truncated (${rows}x${cols})`, { status: 502 });
+    }
+    frames.push({
+      frame: index,
+      time_s: t,
+      rows, cols,
+      dx: dv.getFloat32(off + 16, true),
+      min: dv.getFloat32(off + 20, true),
+      max: dv.getFloat32(off + 24, true),
+      values: new Float32Array(buf, off + 28, rows * cols),
+    });
+    off += size;
+  }
+  return { version, n_frames: nFrames, interval_s: interval, window_s: window, frames, bytes: buf.byteLength };
+}
+
 /* -------------------------------------------------- local synth payload -- */
 
 /**
@@ -269,5 +387,43 @@ export function synthTMSG(n, extentX = 24000, extentY = 18000, seed = 12345) {
   }
   return buf;
 }
+
+/* ------------------------------------------------- projects / specimens --
+ *
+ * The multi-patient layer (API_CONTRACT.md "Projects, specimens, and the
+ * cross-specimen comparison"). A specimen holds run IDS into app/runs/, so
+ * nothing here ever moves a run: attach/detach are pure association.
+ *
+ * js/mock.js does NOT synthesise these — a study is state the operator built,
+ * and inventing one would put fabricated patients on screen. When the backend
+ * is unreachable these reject, and ui/projects.js says so instead of drawing
+ * a fake project.
+ */
+const P = (id) => `/api/projects/${encodeURIComponent(id)}`;
+const S = (id, sid) => `${P(id)}/specimens/${encodeURIComponent(sid)}`;
+
+export const listProjects = () => call('GET', '/api/projects');
+export const createProject = (name, notes = '') =>
+  call('POST', '/api/projects', { body: { name, notes } });
+export const getProject = (id) => call('GET', P(id));
+export const patchProject = (id, patch) => call('PATCH', P(id), { body: patch });
+export const deleteProject = (id) => call('DELETE', P(id));
+
+export const addSpecimen = (id, section, label, notes = '') =>
+  call('POST', `${P(id)}/specimens`, { body: { section, label, notes } });
+export const getSpecimen = (id, sid) => call('GET', S(id, sid));
+export const patchSpecimen = (id, sid, patch) => call('PATCH', S(id, sid), { body: patch });
+export const deleteSpecimen = (id, sid) => call('DELETE', S(id, sid));
+
+export const attachRun = (id, sid, runId) =>
+  call('POST', `${S(id, sid)}/runs`, { body: { run_id: runId } });
+export const detachRun = (id, sid, runId) =>
+  call('DELETE', `${S(id, sid)}/runs/${encodeURIComponent(runId)}`);
+
+export const compareProject = (id, metric = 'kill_fraction') =>
+  call('GET', `${P(id)}/compare?metric=${encodeURIComponent(metric)}`);
+
+export const getCapability = (sectionId) =>
+  call('GET', `/api/sections/${encodeURIComponent(sectionId)}/capability`);
 
 export { mock };

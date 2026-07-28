@@ -134,7 +134,14 @@ highest-value structural fix outstanding. Literature basis is established:
 
 ## 4. What survives the audit
 
-- **Reconstruction fidelity**: cross-platform Pearson 0.997; endothelial agrees to 0.03%
+- **Reconstruction fidelity**: cross-platform Pearson 0.997 — **RETRACTED, see results/revalidation.md**.
+  Re-run under the fixed classifier it is 0.980 on the 4-vector and **0.016** on the non-tumour
+  subvector (rank rho 1.00 -> 0.40). Attribution proven: reverting ONLY the classifier
+  aggregation to legacy mean_z reproduces 0.9974/0.9450 to four decimals, so the arity fix
+  accounts for 100% of the move. The 0.997 was agreement between a BIASED estimator and
+  another estimator; its tightness was coincidental. Cross-platform concordance is an OPEN
+  QUESTION, not a restored pass. Do not cite 0.997. Original text follows:
+  cross-platform Pearson 0.997; endothelial agrees to 0.03%
   between two independent platforms on the SAME section.
   **RETRACTED (held-out test, results/heldout_patient.md): the external agreement does NOT
   replicate.** On a second real patient the endothelial fraction is 4.18% vs the 8.0%

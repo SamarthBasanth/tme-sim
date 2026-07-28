@@ -13,6 +13,12 @@ precision highp float;
 
 layout(location = 0) in vec2  a_pos;   // normalised [0,1] over the extent
 layout(location = 1) in float a_type;  // CellType 0..4
+// Colour-by-attribute channel. Currently carries the mechanism-attribution
+// label (tmesim.sim.mechanism, 0..7); it is a generic per-cell u8 slot, so a
+// future per-cell category rides it without another buffer. Disabled attributes
+// read the constant set by gl.vertexAttrib1f, so this costs nothing when no
+// attribute is loaded.
+layout(location = 2) in float a_label;
 
 uniform vec2  u_extent;      // um
 uniform vec2  u_scale;       // world -> clip
@@ -20,8 +26,11 @@ uniform vec2  u_offset;
 uniform float u_pointSize;   // device px
 uniform vec3  u_typeColor[5];
 uniform float u_typeVis[5];
-uniform int   u_colorMode;   // 0 = cell type, 1 = field value at cell
+uniform int   u_colorMode;   // 0 = cell type, 1 = field value at cell, 2 = label
 uniform int   u_hasField;
+uniform int   u_hasLabel;
+uniform vec3  u_labelColor[8];
+uniform float u_labelVis[8];
 uniform sampler2D u_field;
 uniform sampler2D u_ramp;
 uniform vec2  u_fieldRange;  // min, max in field units
@@ -31,11 +40,14 @@ out vec4 v_color;
 
 void main() {
   int t = int(a_type + 0.5);
+  int l = int(a_label + 0.5);
   vec2 world = a_pos * u_extent;
 
-  if (u_typeVis[t] < 0.5) {
+  bool labelMode = (u_colorMode == 2 && u_hasLabel == 1);
+  if (u_typeVis[t] < 0.5 || (labelMode && u_labelVis[l] < 0.5)) {
     // Cull invisible channels in the vertex stage: zero-area point pushed
-    // outside the frustum costs no rasterisation at all.
+    // outside the frustum costs no rasterisation at all. A mechanism category
+    // toggled off in the legend culls by exactly the same route.
     gl_Position  = vec4(2.0, 2.0, 2.0, 1.0);
     gl_PointSize = 0.0;
     v_color = vec4(0.0);
@@ -48,6 +60,8 @@ void main() {
   vec3 c;
   if (u_force.w > 0.5) {
     c = u_force.rgb;
+  } else if (labelMode) {
+    c = u_labelColor[l];
   } else if (u_colorMode == 1 && u_hasField == 1) {
     float f  = texture(u_field, a_pos).r;
     float t01 = clamp((f - u_fieldRange.x) / max(1e-12, u_fieldRange.y - u_fieldRange.x), 0.0, 1.0);

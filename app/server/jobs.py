@@ -39,13 +39,28 @@ from typing import Callable, Deque, Dict, List, Optional
 
 import numpy as np
 
-from .cache import RECON_CACHE, ReconstructionCache, make_key, runs_dir
-from .payloads import FIELD_NAMES, encode_field, encode_geometry
+from .cache import (
+    RECON_CACHE,
+    ReconstructionCache,
+    make_key,
+    runs_dir,
+    state_route_support,
+)
+from .payloads import (
+    FIELD_NAMES,
+    MAX_TIMELAPSE_FRAMES,
+    encode_field,
+    encode_geometry,
+    encode_mechanism,
+    encode_timelapse,
+)
 
 __all__ = [
     "PDE_DT_S",
     "PDE_SAVE_EVERY",
     "SIM_SEED",
+    "DEFAULT_TIMELAPSE_FRAMES",
+    "TIMELAPSE_BUDGET_BYTES",
     "RunCancelled",
     "Job",
     "JobManager",
@@ -66,6 +81,18 @@ PDE_DT_S = 10.0
 PDE_SAVE_EVERY = 500
 PDE_CONVECTION = True
 SIM_SEED = 0
+
+#: Time-lapse frames captured per run unless the RunSpec says otherwise. 24 is
+#: the largest count that keeps the flagship 677x425 grid under 30 MB on the
+#: wire (1.15 MB/frame), and is dense enough that a 6 h window is sampled every
+#: 15 min. ``MAX_TIMELAPSE_FRAMES`` (40) is the hard ceiling; 0 disables capture.
+DEFAULT_TIMELAPSE_FRAMES = 24
+
+#: Wire/disk budget for one run's time-lapse. If the requested frame count would
+#: exceed it, the count is REDUCED to the largest that fits and the reason is
+#: returned with the run — the payload is never silently truncated and the
+#: capture is never silently skipped.
+TIMELAPSE_BUDGET_BYTES = 48 * 1024 * 1024
 
 #: Terminal statuses — a job in one of these is never re-run.
 TERMINAL = ("done", "failed", "cancelled")
@@ -189,7 +216,7 @@ def execute_run(spec: Dict, ctx: _Ctx,
     (``run_id``, ``status``, ``runtime_s``) that :class:`JobManager` owns, plus
     a private ``_payloads`` entry holding the binary blobs to persist.
     """
-    from tmesim.core import PDEConfig, PKConfig, SimConfig
+    from tmesim.core import PDConfig, PDEConfig, PKConfig, SimConfig
     from tmesim.molecular.binding_site_barrier import apply_barrier_to_drugparams
     from tmesim.molecular.library import get_molecule
     from tmesim.molecular.potency import resolve_ic50
@@ -208,25 +235,51 @@ def execute_run(spec: Dict, ctx: _Ctx,
     sens_mode = spec.get("sensitivity_mode") or "uniform"
     vasc_mode = spec.get("vascular_mode") or "discrete"
     oxy_mode = spec.get("oxygen_mode") or "pde"
+    state_mode = spec.get("state_mode") or "oxygen"
     mgmt = spec.get("mgmt")
     pk = spec.get("pk") or {}
     total_time_s = float(spec["total_time_s"])
+    # The COUNTERFACTUAL arm of the rank attribution: an otherwise bit-identical
+    # run with PDConfig(hypoxia_resistance=1, quiescent_resistance=1), i.e. this
+    # tumour's oxygen-driven resistance switched off. Dividing the two kills
+    # gives rho, the O2-RESISTANCE term in tmesim.report.attribution. It is a
+    # RunSpec field rather than a private hook so that both arms of a report go
+    # through this same queue and this same reconstruction cache — the arm is
+    # visible in /api/runs, cancellable, and reproducible from its own spec.
+    resistance_off = bool(spec.get("resistance_off", False))
+    # --- mechanism attribution + time-lapse (both additive, both optional) --- #
+    # attribute_mechanism is on by default: it is a read-out of arrays the kill
+    # model already computed, costs a handful of numpy passes, and the run is
+    # bit-identical with it on or off (tmesim.sim.mechanism). time_resolved is
+    # OFF by default because it changes the physics — it is the only way tissue
+    # concentration can fall, and therefore the only way a time-lapse can show
+    # the drug CLEAR rather than plateau, but it is not the historical path.
+    attribute_mechanism = bool(spec.get("attribute_mechanism", True))
+    timelapse_frames = spec.get("timelapse_frames", DEFAULT_TIMELAPSE_FRAMES)
+    timelapse_frames = int(timelapse_frames) if timelapse_frames is not None else 0
+    time_resolved = bool(spec.get("time_resolved", False))
 
     caveats: List[str] = []
     metric_reasons: Dict[str, str] = {}
 
     # --- 1. reconstruction (cached) --------------------------------------- #
     ctx.stage("reconstruct")
-    key = make_key(section, dx_um, vasc_mode, oxy_mode)
+    key = make_key(section, dx_um, vasc_mode, oxy_mode, state_mode)
     was_cached = cache.peek(key) is not None
     entry = cache.get_or_build(key, log=ctx.log)
     micro = entry["micro"]
     caveats.extend(entry.get("notes") or [])
 
     # Reset the shared cached microenvironment to the state reconstruct_real
-    # left it in, so a previous run's per-cell sensitivity can never leak into
-    # this one. (The worker is single-threaded, so this is a full reset.)
+    # left it in, so a previous run's per-cell sensitivity — or cell-state
+    # labelling — can never leak into this one. (The worker is single-threaded,
+    # so this is a full reset.) ``state_mode`` is part of the cache key, so a
+    # differently-stated reconstruction is a different entry and is never reused
+    # here; this reset guards the remaining case of two runs sharing one entry.
     micro.cells.sensitivity = np.array(entry["pristine_sensitivity"], copy=True)
+    pristine_state = entry.get("pristine_state")
+    if pristine_state is not None:
+        micro.cells.state = np.array(pristine_state, copy=True)
     micro.metadata = dict(entry["pristine_metadata"])
 
     ctx.check_cancelled()
@@ -257,6 +310,51 @@ def execute_run(spec: Dict, ctx: _Ctx,
     oxy_block = report.get("oxygen") or {}
     if oxy_block.get("caveat"):
         caveats.append(f"oxygen ({oxy_block.get('mode')}): {oxy_block['caveat']}")
+
+    # --- cell state: which route labelled cells.state, and what it cost ------ #
+    state_block = report.get("cell_state") or {}
+    if state_block.get("caveat"):
+        caveats.append(
+            f"cell_state ({state_block.get('mode')}): {state_block['caveat']}")
+    unmeasured = state_block.get("unmeasured_states") or []
+    if unmeasured:
+        caveats.append(
+            f"state_mode={state_mode!r}: {sorted(unmeasured)} is UNMEASURED on "
+            "this panel and is assigned to NO cell. That is NOT the same "
+            "statement as 'computed and found to be zero', and it must not be "
+            "reported as if it were (results/cell_state_impact.md §3.1)."
+        )
+    # results/cell_state_impact.md §5: on a panel that carries NO hypoxia-response
+    # transcript, no state route clears the bar — the default's HYPOXIC band is
+    # empty for a bookkeeping reason, the marker route declares hypoxia UNMEASURED,
+    # and the vessel-distance route is a geometric proxy. The honest output of such
+    # a section is a RANKING, a coverage map and a delivery metric; the absolute
+    # level is not earned under ANY route. Derived from the panel's gene list, not
+    # hardcoded to a section id.
+    support = state_route_support(section)
+    if support["genes_known"] and not support["hypoxia_present"]:
+        caveats.append(
+            "ABSOLUTE KILL MUST NOT BE QUOTED FROM THIS SECTION UNDER ANY STATE "
+            f"ROUTE. Its panel carries none of {support['hypoxia_missing']}, so "
+            "hypoxia is UNMEASURED here and NO state route clears the bar "
+            "(results/cell_state_impact.md §5): kill moves by up to 0.3252 "
+            "absolute (1.77x relative) purely with the choice of state route, "
+            "with tissue, drug, transport and RNG held identical. The CROSS-DRUG "
+            "RANKING is invariant across all three routes and is the defensible "
+            "output; kill_fraction and any kill ceiling on this section carry an "
+            "unresolved uncertainty of that size."
+        )
+    if str(state_mode) != "oxygen":
+        caveats.append(
+            "sim.engine.simulate_response RE-BANDS every living cell from its "
+            "OWN internal oxygen solve (cells.agents.update_cell_states), so the "
+            f"state_mode={state_mode!r} labelling reported here is the "
+            "RECONSTRUCTION's and did NOT drive this run's kill_fraction. It "
+            "changes the reported band occupancies and their provenance, not the "
+            "simulated kill. Propagating a state route into a kill means "
+            "re-running cells.pkpd.apply_drug_kill on the engine's own transport "
+            "result, which is what validation.cell_state_impact does."
+        )
     if str(oxy_mode) != "pde":
         caveats.append(
             "sim.engine.simulate_response RE-SOLVES the steady-state oxygen PDE "
@@ -287,14 +385,41 @@ def execute_run(spec: Dict, ctx: _Ctx,
         "sensitivity_mode": sens_mode if drug_name else None,
         "sensitivity_upper_bound": None,
         "sensitivity_determinant_gene": None,
+        # --- cell-state route, surfaced verbatim from the engine ------------ #
+        # reconstruction_report()['cell_state'] is the pipeline's own provenance
+        # block: mode, source, is_measured, caveat, the marker-coverage detail
+        # and the resulting tumour band fractions. It is copied here whole rather
+        # than summarised, because the coverage block is exactly what has to
+        # travel with any number derived from a marker route
+        # (results/cell_state_impact.md §1).
+        "state_mode": state_mode,
+        "cell_state": jsonable(state_block),
+        "state_is_measured": bool(state_block.get("is_measured", False)),
+        "state_source": state_block.get("source"),
+        "state_unmeasured": sorted(unmeasured) if unmeasured else [],
+        "state_fractions_tumor": jsonable(state_block.get("fractions_tumor")),
+        "state_drives_kill": False,
+        "state_drives_kill_reason": (
+            "sim.engine.simulate_response re-bands cells.state from its own "
+            "oxygen solve before applying the kill, so state_mode changes the "
+            "REPORTED band occupancies and their provenance, not this run's "
+            "kill_fraction."
+        ),
         "pde_dt_s": PDE_DT_S,
         "pde_save_every": PDE_SAVE_EVERY,
         "pde_convection": PDE_CONVECTION,
-        # PDEConfig.time_resolved (whether the source follows plasma(t) or its
-        # window average) is not in the frozen RunSpec, so this backend always
-        # runs the engine's own default. Read off the dataclass rather than
-        # retyped, and reported as None if this engine build has no such field.
-        "pde_time_resolved": getattr(PDEConfig(), "time_resolved", None),
+        "resistance_off": resistance_off,
+        "pd_hypoxia_resistance": 1.0 if resistance_off else float(
+            PDConfig().hypoxia_resistance),
+        "pd_quiescent_resistance": 1.0 if resistance_off else float(
+            PDConfig().quiescent_resistance),
+        # PDEConfig.time_resolved: whether the transport source follows the real
+        # plasma(t) curve or its window average. It defaults to the engine's own
+        # default (False, the historical Stage-0 path) and is only raised when
+        # the RunSpec asks for it — which is what a time-lapse needs if the drug
+        # is to be seen CLEARING rather than plateauing.
+        "pde_time_resolved": time_resolved,
+        "pde_time_resolved_default": getattr(PDEConfig(), "time_resolved", None),
         "seed": SIM_SEED,
         "engine_entrypoints": [
             "reconstruct.real_pipeline.reconstruct_real",
@@ -330,12 +455,18 @@ def execute_run(spec: Dict, ctx: _Ctx,
                 "requires a drug; this RunSpec has drug=null "
                 "(reconstruction-only run)"
             )
+        no_drug = ("requires a drug; this RunSpec has drug=null "
+                   "(reconstruction-only run), so there is no kill to attribute "
+                   "and no drug field to film")
         return {
             "report": jsonable(report),
             "metrics": {k: None for k in metric_reasons},
             "metric_reasons": metric_reasons,
             "provenance": jsonable(provenance),
             "drug_params": None,
+            "mechanism": None,
+            "mechanism_reason": no_drug,
+            "timelapse": {"available": False, "reason": no_drug},
             "_payloads": payloads,
         }
 
@@ -394,20 +525,43 @@ def execute_run(spec: Dict, ctx: _Ctx,
     # --- 4. simulate ------------------------------------------------------- #
     ctx.stage("simulate")
     pde = PDEConfig(dt=PDE_DT_S, total_time=total_time_s,
-                    convection=PDE_CONVECTION, save_every=PDE_SAVE_EVERY)
+                    convection=PDE_CONVECTION, save_every=PDE_SAVE_EVERY,
+                    time_resolved=time_resolved)
+    n_frames, timelapse_reason = _plan_timelapse(
+        timelapse_frames, micro.domain.shape, total_time_s)
+    if timelapse_reason:
+        ctx.log("timelapse: " + timelapse_reason)
     pk_cfg = PKConfig(
         plasma_peak=float(pk.get("plasma_peak", PKConfig().plasma_peak)),
         half_life=float(pk.get("half_life_s", PKConfig().half_life)),
         n_doses=int(pk.get("n_doses", PKConfig().n_doses)),
         dose_interval=float(pk.get("dose_interval_s", PKConfig().dose_interval)),
     )
-    cfg = SimConfig(drug=dp, pk=pk_cfg, pde=pde, seed=SIM_SEED)
+    cfg_kwargs = {}
+    if resistance_off:
+        cfg_kwargs["pd"] = PDConfig(hypoxia_resistance=1.0,
+                                    quiescent_resistance=1.0)
+        caveats.append(
+            "COUNTERFACTUAL ARM: this run was simulated with "
+            "PDConfig(hypoxia_resistance=1, quiescent_resistance=1), i.e. this "
+            "tumour's oxygen-driven resistance switched OFF. Its kill_fraction "
+            "is NOT a prediction for this tissue — it is the denominator of "
+            "rho = kill / kill(resistance off), the O2-RESISTANCE term of the "
+            "rank attribution (tmesim.report.attribution). Do not read it, "
+            "quote it, or compare it as a therapy result."
+        )
+    cfg = SimConfig(drug=dp, pk=pk_cfg, pde=pde, seed=SIM_SEED, **cfg_kwargs)
     ctx.log(f"simulate_response(dt={PDE_DT_S}s, total_time={total_time_s}s, "
             f"convection={PDE_CONVECTION}, seed={SIM_SEED}, "
             f"plasma_peak={pk_cfg.plasma_peak} uM, "
-            f"half_life={pk_cfg.half_life} s, n_doses={pk_cfg.n_doses})")
+            f"half_life={pk_cfg.half_life} s, n_doses={pk_cfg.n_doses}, "
+            f"resistance_off={resistance_off})")
     t_sim = time.time()
-    res = simulate_response(micro, cfg)
+    res = simulate_response(
+        micro, cfg,
+        attribute=attribute_mechanism,
+        capture_frames=(n_frames if n_frames >= 2 else None),
+    )
     ctx.log(f"simulate_response done in {time.time() - t_sim:.1f}s: "
             f"kill_fraction={res.kill_fraction:.6f}")
 
@@ -474,11 +628,23 @@ def execute_run(spec: Dict, ctx: _Ctx,
            " kill_fraction is grid-converged only for dx <= 20 um, so this "
            "run's kill fraction is NOT in the converged regime either.")
     )
-    caveats.append(
-        "Systemic PK is the documented Stage-0 simplification: a single "
-        "time-averaged sustained plasma level drives the transport solve "
-        "(tmesim/sim/engine.py), not a time-resolved infusion."
-    )
+    if time_resolved:
+        caveats.append(
+            "Systemic PK was driven TIME-RESOLVED for this run: the real "
+            "plasma(t) curve rescales the delivery source at every solver step "
+            "(PDEConfig.time_resolved=True), so tissue concentration genuinely "
+            "rises and falls. Both paths deliver the same TOTAL drug over the "
+            "window, so a difference against a static-source run is a SCHEDULE "
+            "effect, not a dose effect. Stored calibrations and regressions in "
+            "this repo were produced on the static path, so this run's absolute "
+            "numbers are not directly comparable with them."
+        )
+    else:
+        caveats.append(
+            "Systemic PK is the documented Stage-0 simplification: a single "
+            "time-averaged sustained plasma level drives the transport solve "
+            "(tmesim/sim/engine.py), not a time-resolved infusion."
+        )
     caveats.append(
         "This tissue is an untreated resection with no outcome label. Every "
         "number here is a PREDICTION of the physical model and has never been "
@@ -489,6 +655,47 @@ def execute_run(spec: Dict, ctx: _Ctx,
     ctx.stage("payloads")
     payloads = _build_payloads(
         micro, report, auc_field=res.fields["auc"], log=ctx.log)
+
+    # --- mechanism attribution -------------------------------------------- #
+    mechanism_block, mechanism_reason = _mechanism_block(
+        res, attribute_mechanism)
+    if mechanism_block is not None:
+        payloads["mechanism"] = encode_mechanism(
+            mechanism_block.pop("_labels"), mechanism_block)
+        rec = mechanism_block["reconciliation"]
+        ctx.log(
+            f"mechanism: {mechanism_block['counts']['KILLED']} killed / "
+            f"{mechanism_block['n_tumor']} tumour cells; reconciles bit-exact="
+            f"{rec['bit_exact']}; survival "
+            + ", ".join(f"{k} {v:.3f}"
+                        for k, v in mechanism_block["survival_breakdown"].items())
+        )
+        if mechanism_block["counts"]["UNATTRIBUTED"]:
+            caveats.append(
+                f"MECHANISM: {mechanism_block['counts']['UNATTRIBUTED']} "
+                "surviving tumour cells are UNATTRIBUTED — their survival is not "
+                "explained by the exposure/resistance/chance bands, and they "
+                "have NOT been assigned to the nearest plausible category "
+                "(tmesim.sim.mechanism)."
+            )
+
+    # --- time-lapse --------------------------------------------------------- #
+    timelapse_block = _timelapse_block(
+        res, float(micro.domain.dx), n_frames, timelapse_reason, time_resolved)
+    if timelapse_block.get("available"):
+        payloads["timelapse"] = encode_timelapse(
+            res.transport.frames,
+            res.transport.frame_times,
+            float(micro.domain.dx),
+            interval_s=res.transport.frame_interval_s,
+        )
+        timelapse_block["payload_bytes"] = len(payloads["timelapse"])
+        ctx.log(
+            f"timelapse: {timelapse_block['n_frames']} frames every "
+            f"{timelapse_block['interval_s']:.1f} s over "
+            f"{timelapse_block['window_s']:.1f} s "
+            f"({len(payloads['timelapse']) / 1e6:.2f} MB)"
+        )
 
     drug_params = {
         "name": dp.name,
@@ -509,8 +716,137 @@ def execute_run(spec: Dict, ctx: _Ctx,
         "extra_metrics": jsonable(extra_metrics),
         "provenance": jsonable(provenance),
         "drug_params": jsonable(drug_params),
+        "mechanism": mechanism_block,
+        "mechanism_reason": mechanism_reason,
+        "timelapse": timelapse_block,
         "_payloads": payloads,
     }
+
+
+# --------------------------------------------------------------------------- #
+# Mechanism + time-lapse helpers
+# --------------------------------------------------------------------------- #
+def _plan_timelapse(requested: int, grid_shape, total_time_s: float):
+    """Decide how many concentration frames to capture, and say why.
+
+    Returns ``(n_frames, reason_or_None)``. The count is clamped to
+    ``MAX_TIMELAPSE_FRAMES`` and then reduced, if necessary, to the largest
+    number that fits :data:`TIMELAPSE_BUDGET_BYTES`. A capture is never silently
+    skipped or silently shortened: whenever the answer differs from what was
+    asked for, the reason travels with the run.
+    """
+    if requested <= 0:
+        return 0, "disabled by RunSpec (timelapse_frames <= 0)"
+    if requested < 2:
+        return 0, (f"timelapse_frames={requested} is below the minimum of 2 "
+                   f"(a time-lapse needs a first and a last frame)")
+
+    reason = None
+    n = int(requested)
+    if n > MAX_TIMELAPSE_FRAMES:
+        reason = (f"requested {n} frames, capped at MAX_TIMELAPSE_FRAMES="
+                  f"{MAX_TIMELAPSE_FRAMES}")
+        n = MAX_TIMELAPSE_FRAMES
+
+    rows, cols = int(grid_shape[0]), int(grid_shape[1])
+    per_frame = rows * cols * 4  # f32 on the wire
+    if per_frame <= 0:
+        return 0, "grid has no cells"
+    fits = int(TIMELAPSE_BUDGET_BYTES // per_frame)
+    if fits < n:
+        if fits < 2:
+            return 0, (
+                f"a single {rows}x{cols} frame is {per_frame / 1e6:.1f} MB, so "
+                f"even two frames exceed the {TIMELAPSE_BUDGET_BYTES / 1e6:.0f} "
+                f"MB time-lapse budget; no frames were captured"
+            )
+        reason = (
+            f"requested {requested} frames but {rows}x{cols} is "
+            f"{per_frame / 1e6:.2f} MB/frame, so the count was reduced to "
+            f"{fits} to stay inside the {TIMELAPSE_BUDGET_BYTES / 1e6:.0f} MB "
+            f"budget"
+        )
+        n = fits
+
+    steps = int(round(float(total_time_s) / PDE_DT_S))
+    if n > steps + 1:
+        reason = (f"requested {n} frames but the solve takes only {steps} steps; "
+                  f"capturing {steps + 1}")
+        n = steps + 1
+    return n, reason
+
+
+def _mechanism_block(res, requested: bool):
+    """Split the engine's attribution into a JSON block + the label array.
+
+    Returns ``(block_or_None, reason_or_None)``. The block carries the labels
+    under the private key ``_labels``; the caller pops them into the binary
+    payload so the JSON never duplicates 850k bytes.
+    """
+    if not requested:
+        return None, "disabled by RunSpec (attribute_mechanism=false)"
+    mech = getattr(res, "mechanism", None)
+    if mech is None:
+        return None, (
+            "simulate_response returned no attribution; this engine build "
+            "predates tmesim.sim.mechanism"
+        )
+    block = jsonable({k: v for k, v in mech.items() if k != "labels"})
+    block["_labels"] = np.asarray(mech["labels"], dtype=np.uint8)
+    block["payload"] = "GET /api/runs/{id}/mechanism (TMSM)"
+    block["order"] = (
+        "one byte per cell, in the same order as the geometry payload "
+        "(GET /api/runs/{id}/geometry)"
+    )
+    return block, None
+
+
+def _timelapse_block(res, dx_um: float, n_frames: int,
+                     plan_reason: Optional[str], time_resolved: bool) -> Dict:
+    """Frame metadata for the RunResult (the frames themselves are binary)."""
+    transport = getattr(res, "transport", None)
+    frames = getattr(transport, "frames", None) if transport is not None else None
+    block: Dict = {
+        "available": frames is not None and len(frames) > 0,
+        "requested_frames": int(n_frames),
+        "reason": plan_reason,
+        "time_resolved": bool(time_resolved),
+        "quantity": "drug concentration C (uM)",
+        "quantity_note": (
+            "snapshots are the CONCENTRATION field, not the AUC field the "
+            "/field/drug_auc overlay serves. AUC only accumulates, so it can "
+            "never show drug leaving."
+        ),
+        "payload": "GET /api/runs/{id}/timelapse (TMSL)",
+    }
+    if not block["available"]:
+        block.setdefault("reason", None)
+        if block["reason"] is None:
+            block["reason"] = "no frames were captured for this run"
+        return block
+
+    times = np.asarray(transport.frame_times, dtype=np.float64)
+    block.update({
+        "n_frames": int(len(frames)),
+        "frame_times_s": [float(t) for t in times],
+        "interval_s": float(transport.frame_interval_s or 0.0),
+        "realised_interval_s": (
+            float(np.diff(times).mean()) if times.size > 1 else 0.0),
+        "window_s": float(times[-1]) if times.size else 0.0,
+        "grid": [int(frames.shape[1]), int(frames.shape[2])],
+        "dx_um": float(dx_um),
+        "max_concentration_uM": float(np.nanmax(frames)) if frames.size else None,
+    })
+    if not time_resolved:
+        block["plateau_note"] = (
+            "this run used the static (window-averaged) plasma source, so the "
+            "delivery rate is held constant for the whole window by "
+            "construction: the drug is seen to ENTER and SPREAD, and it "
+            "approaches a quasi-steady state rather than clearing. Set "
+            "time_resolved=true in the RunSpec to drive the solver with the "
+            "real plasma(t) curve and see it fall."
+        )
+    return block
 
 
 def _build_payloads(micro, report: Dict, auc_field, log: Callable[[str], None]
@@ -682,7 +1018,8 @@ class JobManager:
             job.error = stored.get("error")
             job.body = {k: v for k, v in stored.items()
                         if k in ("report", "metrics", "metric_reasons",
-                                 "extra_metrics", "provenance", "drug_params")}
+                                 "extra_metrics", "provenance", "drug_params",
+                                 "mechanism", "mechanism_reason", "timelapse")}
             job._log.clear()
             for line in (stored.get("log_tail") or []):
                 job._log.append(line)

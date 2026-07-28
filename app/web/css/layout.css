@@ -23,21 +23,14 @@
 }
 .topbar > * { display: flex; align-items: center; }
 
+/* No logo mark. The accent is reserved for interactive affordance, selection
+   and focus (see tokens.css); an accent-filled glyph that does nothing is the
+   one place the interface was spending its only accent on decoration. */
 .brand {
   padding: 0 var(--pad-3) 0 var(--pad-4);
   gap: 7px;
   border-right: 1px solid var(--line-1);
   flex: 0 0 auto;
-}
-.brand .mark {
-  width: 13px; height: 13px;
-  border: 1.5px solid var(--accent);
-  position: relative;
-  flex: 0 0 auto;
-}
-.brand .mark::after {
-  content: ""; position: absolute; inset: 3px;
-  background: var(--accent);
 }
 .brand .name {
   font-size: var(--fs-md);
@@ -157,6 +150,10 @@
   white-space: nowrap;
 }
 .stage-toolbar > * { flex: 0 0 auto; }
+/* The one element in the toolbar that IS allowed to grow. `.topbar-spacer`
+   cannot do this job here — the rule above has equal specificity and comes
+   later, so it silently overrode it and the right-hand group never moved. */
+.stage-toolbar > .tb-spacer { flex: 1 1 auto; min-width: var(--pad-2); }
 .stage-toolbar::-webkit-scrollbar { height: 0; }
 .canvas-wrap {
   position: relative;
@@ -172,7 +169,22 @@
   height: 100%;
   cursor: crosshair;
 }
+/* The canvas must be exempt from the global `:focus-visible { position:
+   relative; z-index: 5 }` rule in base.css. It fills its wrapper and paints
+   opaque, so being promoted to z-index 5 put it ON TOP of every stage overlay:
+   focusing the viewport — which a click does — made the scale bar, the field
+   legend, the hover read-out and the annotation layer disappear behind it. The
+   focus ring is drawn INSIDE instead, because the wrapper clips overflow and
+   an outside ring would be invisible anyway. */
+#gl:focus-visible {
+  position: static;
+  z-index: auto;
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
 #gl.panning { cursor: grabbing; }
+#gl.tooling { cursor: crosshair; }
+#gl.windowing { cursor: move; }
 
 /* stage overlays -- absolutely positioned, pointer-transparent by default */
 .ov { position: absolute; pointer-events: none; z-index: 2; }
@@ -181,10 +193,14 @@
 .ov-scalebar { left: 10px; bottom: 10px; }
 .ov-legend   { right: 10px; bottom: 10px; }
 .ov-readout  { left: 10px; top: 10px; }
-.ov-stats    { right: 10px; top: 10px; }
+/* The annotation layer is the full viewport and sits UNDER the read-out cards
+   so a card is never obscured by a line the operator drew. */
+.ov-annot { inset: 0; z-index: 1; }
+/* Not centred: an empty viewport is a state, not a splash screen. The notice
+   sits where the hover read-out will be, so the eye is already in the right
+   place when geometry arrives. */
 .ov-empty {
-  inset: 0;
-  display: flex; align-items: center; justify-content: center;
+  left: 10px; top: 10px; right: 10px;
   z-index: 3;
 }
 

@@ -137,6 +137,12 @@ from tmesim.reconstruct.region_label import (
     region_field,
     region_signatures,
 )
+# The attribution is SHARED with the Studio's POST /api/reports so that the CLI
+# artifact and the in-product artifact cannot drift apart (tmesim/report/).
+from tmesim.report.attribution import TERM_LABEL as _TERM_LABEL
+from tmesim.report.attribution import TERMS as _TERMS
+from tmesim.report.attribution import attribute
+from tmesim.report.attribution import gap_reason as _gap_reason
 from tmesim.sim.engine import simulate_response
 from tmesim.validation.calibration import calibrate_alpha, calibrated_drugparams
 from tmesim.validation.pk_reality import penetration_length_um
@@ -556,123 +562,10 @@ def simulate_panel(micro, alpha: float, mean_ecm: float,
 # --------------------------------------------------------------------------- #
 # 3. attribution — computed, additive, falsifiable
 # --------------------------------------------------------------------------- #
-_TERMS = ("delivery_decades", "potency_decades", "hypoxia_decades")
-_TERM_LABEL = {
-    "delivery_decades": "DELIVERY",
-    "potency_decades": "POTENCY",
-    # The counterfactual switches off BOTH the hypoxic and the quiescent kill
-    # penalty, so the honest name for this term is the whole oxygen-driven
-    # resistance state, not hypoxia alone.
-    "hypoxia_decades": "O2-RESISTANCE",
-}
-
-
-def _pct_rank(values: Sequence[float], i: int, higher_is_better: bool = True) -> float:
-    """Percentile of item ``i`` within the panel (0 = worst, 100 = best)."""
-    v = np.asarray(values, dtype=np.float64)
-    n = v.size
-    if n < 2:
-        return 100.0
-    order = np.argsort(v if higher_is_better else -v)
-    rank = int(np.where(order == i)[0][0])
-    return 100.0 * rank / (n - 1)
-
-
-def _spearman(a: Sequence[float], b: Sequence[float]) -> float:
-    from scipy.stats import rankdata
-
-    ra, rb = rankdata(a), rankdata(b)
-    if ra.std() == 0 or rb.std() == 0:
-        return float("nan")
-    return float(np.corrcoef(ra, rb)[0, 1])
-
-
-def attribute(rows: List[Dict], window_s: float = WINDOW_S) -> Dict:
-    """Attach the exact additive log10 attribution to every row, in place.
-
-    ``delivery + potency`` reproduces the drug's log10 exposure-to-potency drive
-    relative to the panel mean *exactly*; ``hypoxia`` is measured by the
-    counterfactual resistance-off simulation. Returns the method's own
-    faithfulness check.
-    """
-    eps = 1e-30
-    c_tumor = np.array([max(r["tumor_auc"], eps) / window_s for r in rows])
-    ic50 = np.array([max(r["ic50"], eps) for r in rows])
-    rho = np.array([
-        (r["kill"] / r["kill_no_resistance"]) if r["kill_no_resistance"] > 0 else 1.0
-        for r in rows])
-    rho = np.clip(rho, eps, None)
-
-    log_c, log_ic50, log_rho = np.log10(c_tumor), np.log10(ic50), np.log10(rho)
-    delivery = log_c - log_c.mean()
-    potency = -(log_ic50 - log_ic50.mean())
-    hypoxia = log_rho - log_rho.mean()
-
-    kills = [r["kill"] for r in rows]
-    for i, r in enumerate(rows):
-        r["c_tumor_uM"] = float(c_tumor[i])
-        r["drive"] = float(c_tumor[i] / ic50[i])
-        r["rho"] = float(rho[i])
-        r["hypoxia_cost"] = float(1.0 - rho[i])
-        r["delivery_decades"] = float(delivery[i])
-        r["potency_decades"] = float(potency[i])
-        r["hypoxia_decades"] = float(hypoxia[i])
-        r["total_decades"] = float(delivery[i] + potency[i] + hypoxia[i])
-        r["exposure_pct"] = _pct_rank(c_tumor, i, higher_is_better=True)
-        r["potency_pct"] = _pct_rank(ic50, i, higher_is_better=False)
-        r["hypoxia_pct"] = _pct_rank(rho, i, higher_is_better=True)
-        r["penetration_pct"] = _pct_rank([x["L_um"] for x in rows], i, True)
-        dom = max(_TERMS, key=lambda k: abs(r[k]))
-        # Name the term AND its direction — "DELIVERY" alone is ambiguous
-        # between "wins on delivery" and "is crippled by delivery".
-        r["dominant"] = (f"{_TERM_LABEL[dom]} "
-                         f"({'advantage' if r[dom] >= 0 else 'penalty'})")
-        r["dominant_term"] = _TERM_LABEL[dom]
-        r["dominant_key"] = dom
-
-    totals = [r["total_decades"] for r in rows]
-    return {
-        "spearman_total_vs_kill": _spearman(totals, kills),
-        "spearman_delivery_vs_kill": _spearman(
-            [r["delivery_decades"] for r in rows], kills),
-        "spearman_potency_vs_kill": _spearman(
-            [r["potency_decades"] for r in rows], kills),
-        "panel_mean_hypoxia_cost": float(np.mean([r["hypoxia_cost"] for r in rows])),
-        "window_s": float(window_s),
-    }
-
-
-def _gap_reason(better: Dict, worse: Dict, *, from_below: bool = False) -> str:
-    """Which attribution term actually explains an adjacent rank gap.
-
-    Deltas are always computed as ``better - worse`` (the higher-ranked drug
-    minus the lower-ranked one); ``from_below`` only changes how the sentence is
-    phrased, so the last-placed drug is described relative to the drug ABOVE it
-    rather than nonsensically against itself.
-    """
-    deltas = {k: better[k] - worse[k] for k in _TERMS}
-    key = max(deltas, key=lambda k: abs(deltas[k]))
-    fold = 10.0 ** abs(deltas[key])
-    if from_below:
-        # Restate every delta from the LOWER-ranked drug's point of view, so the
-        # signs in one sentence all share a single reference drug.
-        others = ", ".join(f"{_TERM_LABEL[k].lower()} {-deltas[k]:+.2f}"
-                           for k in _TERMS if k != key)
-        return (
-            f"Versus **{better['name']}** immediately above it, the term that "
-            f"differs most is **{_TERM_LABEL[key]}** ({-deltas[key]:+.2f} "
-            f"decades for this drug ≈ {fold:.1f}× "
-            f"{'against it' if deltas[key] > 0 else 'in its favour'}); its "
-            f"other terms stand at {others} relative to that drug."
-        )
-    others = ", ".join(
-        f"{_TERM_LABEL[k].lower()} {deltas[k]:+.2f}" for k in _TERMS if k != key)
-    return (
-        f"Versus **{worse['name']}** immediately below it, the term that differs "
-        f"most is **{_TERM_LABEL[key]}** ({deltas[key]:+.2f} decades ≈ "
-        f"{fold:.1f}× {'in its favour' if deltas[key] > 0 else 'against it'}); "
-        f"the other terms differ by {others}."
-    )
+# Both the terms and the arithmetic now live in ``tmesim.report.attribution``
+# (imported at the top of this module), so this experiment and the Studio's
+# ``POST /api/reports`` run the SAME decomposition rather than two copies of it.
+# Nothing about the science changed when it moved.
 
 
 # --------------------------------------------------------------------------- #

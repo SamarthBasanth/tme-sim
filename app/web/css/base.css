@@ -112,7 +112,14 @@ hr.rule {
     transition-duration: 1ms !important;
     scroll-behavior: auto !important;
   }
+  /* The blanket rule above is not enough for anything that ANIMATES OPACITY OR
+     POSITION on a loop: compressing the duration to 1 ms turns a 1.1 s pulse
+     into a strobe, which is worse than the motion it was meant to suppress.
+     These three have to be stopped outright, and each keeps a static form that
+     still reads: the LED stays lit, the indeterminate bar stays a stub. */
   .spinner { animation: none !important; }
+  .led.busy { animation: none !important; }
+  .progress.indet > i { animation: none !important; margin-left: 0 !important; }
 }
 
 /* --- utility: screen-reader only ----------------------------------------- */

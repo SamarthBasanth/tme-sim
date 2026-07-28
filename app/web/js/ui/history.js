@@ -28,6 +28,7 @@ const SPEC_ROWS = [
   ['sensitivity_mode', (s) => s.sensitivity_mode],
   ['vascular_mode', (s) => s.vascular_mode],
   ['oxygen_mode', (s) => s.oxygen_mode],
+  ['state_mode', (s) => s.state_mode ?? 'oxygen'],
   ['mgmt', (s) => (s.mgmt === null || s.mgmt === undefined ? 'null' : num(s.mgmt, 2) + ' log2CPM')],
   ['pk.plasma_peak', (s) => num(s.pk && s.pk.plasma_peak, 2) + ' uM'],
   ['pk.half_life_s', (s) => int(s.pk && s.pk.half_life_s) + ' s'],

@@ -103,6 +103,13 @@ DRUG_NAME = "doxorubicin"
 BASE_DX = 30.0
 BASE_THRESHOLD = 1.0          # reconstruct.real_xenium.TYPING_THRESHOLD default
 BASE_BANDWIDTH = 40.0         # reconstruct.real_fields._DEFAULT_BANDWIDTH_UM default
+#: Fraction of TISSUE grid cells treated as vascular hotspots when the
+#: mass-conservation audit picks its injection points (:func:`mass_conservation`).
+#: 1% reproduces exactly what the historical `vasc > percentile(vasc[tissue], 99)`
+#: selected on the smooth KDE field, but as a RANK selection it is also well
+#: defined on the binary discrete vessel field, where a percentile threshold
+#: selects nothing at all.
+HOTSPOT_FRACTION = 0.01
 KILL_SEEDS = (0, 1, 2, 3)     # seeds averaged to de-noise the stochastic kill
 GRID_SEEDS = (0, 1)           # fewer seeds for the (expensive) fine-grid sweep
 _TRAPZ = getattr(np, "trapezoid", np.trapz)
@@ -268,12 +275,42 @@ def mass_conservation(dx_um: float = BASE_DX) -> Dict:
     # --- (B) public solver, injected source, zero clearance/binding -------------
     pde = PDEConfig(dt=dt, total_time=total_time, convection=False, save_every=200)
     source = domain.zeros()
-    # inject at a handful of real vascular hotspots inside the mask
-    vasc = np.asarray(micro.fields.vascular_density)
-    vmask = tissue & (vasc > np.percentile(vasc[tissue], 99.0))
+    # Inject at a handful of real vascular hotspots inside the mask.
+    #
+    # This used to read `vmask = tissue & (vasc > np.percentile(vasc[tissue], 99))`,
+    # which silently assumed a SMOOTH source field. The shipping default vascular
+    # source is now the DISCRETE segmented-vessel field
+    # (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
+    # results/vessel_promotion.md), which is BINARY: exactly 1.0 on ~2.5% of tissue
+    # and 0 elsewhere. There p99 == max == 1.0, a strict `>` selects ZERO cells,
+    # `source.sum()` is 0 and `injected` is 0 -> ZeroDivisionError below.
+    #
+    # The fix is a RANK selection instead of a value threshold: take the top
+    # HOTSPOT_FRACTION of tissue cells by vascular density, restricted to cells
+    # that actually carry source (`vasc > 0`). That is well defined on a binary
+    # field AND reproduces what the percentile did on the KDE field, where
+    # `vasc > p99` selected the top 1% of tissue cells by construction.
+    vasc = np.asarray(micro.fields.vascular_density, dtype=np.float64)
+    n_tissue = int(tissue.sum())
+    perfused = tissue & (vasc > 0.0)
+    cand = np.flatnonzero(perfused.ravel())
+    if cand.size == 0:
+        raise ValueError(
+            "mass_conservation: no tissue grid cell carries any vascular density, "
+            "so there is nowhere physical to inject the audit's source. This is a "
+            "reconstruction failure, not a solver failure."
+        )
+    n_top = min(cand.size, max(1, int(round(HOTSPOT_FRACTION * n_tissue))))
+    # Descending by density, ties broken by grid index (stable) so the selection is
+    # deterministic on a binary field where every candidate has the same value.
+    order = np.argsort(vasc.ravel()[cand], kind="stable")[::-1]
+    vmask = np.zeros(tissue.shape, dtype=bool)
+    vmask.ravel()[cand[order[:n_top]]] = True
     vr, vc = np.nonzero(vmask)
     take = np.linspace(0, len(vr) - 1, min(20, len(vr))).astype(int)
     source[vr[take], vc[take]] = 1.0
+    binary_source = bool(np.array_equal(
+        np.unique(vasc[tissue]), np.array([0.0, 1.0])))
     res = simulate_drug_transport(micro, inert, source, pde)
     injected = n_steps * dt * float(source.sum())
     final_mass = float(res.final_concentration.sum())
@@ -298,6 +335,20 @@ def mass_conservation(dx_um: float = BASE_DX) -> Dict:
             "rel_err": api_rel_err,
             "min_value": api_min,
             "n_source_points": int(source.astype(bool).sum()),
+            # How the injection points were chosen, so the audit's own
+            # point-picking is auditable (see the comment above).
+            "hotspot_fraction": float(HOTSPOT_FRACTION),
+            "n_hotspot_cells": int(vmask.sum()),
+            "n_perfused_tissue_cells": int(cand.size),
+            "vascular_source_is_binary": binary_source,
+            "vascular_max": float(vasc[tissue].max()) if n_tissue else None,
+            "selection_rule": (
+                f"top {HOTSPOT_FRACTION * 100:.0f}% of tissue grid cells by "
+                "vascular_density (rank selection among cells with "
+                "vascular_density > 0), NOT a strict percentile threshold — the "
+                "discrete vascular field is binary, so a percentile threshold "
+                "selects nothing"
+            ),
         },
     }
 
@@ -514,12 +565,46 @@ def write_report(mass: Dict, grid: Dict, dt: Dict, sens: Dict,
     A = L.append
     A("# Numerical rigor — verification + sensitivity on the REAL microenvironment")
     A("")
+    ps0 = mass["public_solver"]
+    dx_ladder = " / ".join(f"{r['dx_um']:.0f}" for r in grid["rows"])
+    A("> **Regenerated under the discrete vessel source.** `vascular_mode = discrete` "
+      "(`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in "
+      "[`results/vessel_promotion.md`](vessel_promotion.md)) · "
+      f"**alpha = {sens['alpha0']:.1f}**, the e-folding-length convention "
+      "`L = d_half / ln 2` · per-cell sensitivity mode = **`uniform`** (the "
+      "reconstruction default) · **dx = "
+      f"{mass['dx_um']:.0f} µm** for the mass-conservation audit (§1) and the "
+      f"dx ladder {dx_ladder} µm for the grid-refinement study (§2).")
+    A(">")
+    A("> **This regeneration also repairs a latent bug in §1's own point-picking.** "
+      "The mass-conservation audit used to select its injection points as "
+      "`vasc > np.percentile(vasc[tissue], 99)`, which assumed a *smooth* source "
+      "field. The discrete field is BINARY — measured on this run it is "
+      f"{'' if ps0.get('vascular_source_is_binary') else 'NOT '}binary, with "
+      f"{ps0['n_perfused_tissue_cells']:,} of {mass['n_tissue_cells']:,} tissue "
+      f"cells carrying source (max = {_fmt(ps0.get('vascular_max'), 3)}) — so "
+      "`p99 == max`, a strict `>` selected **zero** cells, `injected` was 0 and the "
+      "audit died in a `ZeroDivisionError`. It now takes the "
+      f"**top {ps0['hotspot_fraction'] * 100:.0f}% of tissue cells by vascular "
+      f"density as a RANK selection** ({ps0['n_hotspot_cells']:,} cells here), "
+      "which is well defined on a binary field and reproduces exactly what the "
+      "percentile selected on the KDE field. **This is a fix to the audit's "
+      "instrumentation, not to the solver** — no drug result anywhere in "
+      "`results/` depended on it.")
+    A(">")
+    A("> Absolute exposure / AUC / coverage / kill figures below are on the "
+      "**discrete-source unit** and are NOT comparable with the KDE-era numbers "
+      "this file carried before this regeneration (the tissue-integrated source "
+      "total is 3.36x smaller; that is a change of *unit*, not of physics).")
+    A("")
     A("**Module:** `tmesim/validation/numerical_rigor.py` "
       "(run: `python -m tmesim.validation.numerical_rigor`)")
     A("")
     A("**Geometry:** the REAL 40,887-cell 10x Xenium GBM section, reconstructed by "
       "`reconstruct.real_pipeline.reconstruct_real('xenium', dx_um=…)` — real cell "
-      "positions, real endothelial-KDE vascular field, real matrix-transcript ECM "
+      "positions, real DISCRETE segmented-vessel vascular field (the shipping "
+      "default since `results/vessel_promotion.md`; earlier revisions of this file "
+      "used the 40 µm endothelial KDE), real matrix-transcript ECM "
       "field, physics-solved oxygen. **Drug:** the α-calibrated **doxorubicin** "
       "(perivascular-sink model from `validation.calibration`). **Advection OFF** "
       )
@@ -577,6 +662,13 @@ def write_report(mass: Dict, grid: Dict, dt: Dict, sens: Dict,
     A(f"| | final tissue mass | {ps['final_mass']:.4f} |")
     A(f"| | **relative mass error** | **{ps['rel_err']:.2e}** |")
     A(f"| | min concentration | {ps['min_value']:.2e} |")
+    A(f"| | injection points used | {ps['n_source_points']} of "
+      f"{ps['n_hotspot_cells']:,} hotspot cells |")
+    A("")
+    A(f"*Injection points:* {ps['selection_rule']}. On this run the vascular field "
+      f"is {'binary' if ps['vascular_source_is_binary'] else 'continuous'} "
+      f"(max = {_fmt(ps.get('vascular_max'), 3)}) over "
+      f"{ps['n_perfused_tissue_cells']:,} perfused tissue cells.")
     A("")
     A(f"**Verdict:** total drug mass is conserved on the real irregular geometry to "
       f"~{max(b['rel_err'], ps['rel_err']):.0e} (the linear-solver / round-off floor) "

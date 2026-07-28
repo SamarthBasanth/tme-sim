@@ -8,7 +8,7 @@ Four things are checked, in rising order of what they would cost if they broke:
 2. **Job lifecycle** — submit -> queued -> running -> done, live status with a
    log tail, cancel, and history that survives a restart.
 3. **Reconstruction cache** — the same
-   ``(section, dx, vascular_mode, oxygen_mode)`` is reconstructed once and
+   ``(section, dx, vascular_mode, oxygen_mode, state_mode)`` is reconstructed once and
    reused, and different keys do not collide.
 4. **CLI parity** — a run through the API produces numbers IDENTICAL (exact
    equality, not tolerance) to the same run driven straight through the
@@ -243,21 +243,25 @@ class TestStaticEndpoints:
     def test_defaults_are_a_valid_runspec(self, client):
         spec = client.get("/api/defaults").json()
         assert set(spec) == {"section", "dx_um", "drug", "sensitivity_mode",
-                             "vascular_mode", "oxygen_mode", "mgmt", "pk",
-                             "total_time_s"}
+                             "vascular_mode", "oxygen_mode", "state_mode",
+                             "mgmt", "pk", "total_time_s"}
         verdict = client.post("/api/validate", json=spec).json()
         assert verdict["ok"], verdict["errors"]
 
     def test_engine_mode_tuples_match_the_registry(self):
         from tmesim.physics.oxygen_proxy import OXYGEN_MODES as ENGINE_OXY
         from tmesim.reconstruct.real_fields import VASCULAR_MODES as ENGINE_VASC
+        from tmesim.reconstruct.cell_state import STATE_MODES as ENGINE_STATE
         from tmesim.reconstruct.real_pipeline import (
+            STATE_MODE_DEFAULT,
             SENSITIVITY_MODES as ENGINE_SENS,
         )
 
         assert set(cache_mod.OXYGEN_MODES) == set(ENGINE_OXY)
         assert set(cache_mod.VASCULAR_MODES) == set(ENGINE_VASC)
         assert set(cache_mod.SENSITIVITY_MODES) == set(ENGINE_SENS)
+        assert set(cache_mod.STATE_MODES) == set(ENGINE_STATE)
+        assert cache_mod._STATE_MODE_DEFAULT == STATE_MODE_DEFAULT
 
 
 class TestValidate:
@@ -281,6 +285,56 @@ class TestValidate:
         v = validate_spec(_spec(oxygen_mode="markers"))
         assert not v["ok"]
         assert any("markers" in e and "hypoxia" in e for e in v["errors"])
+
+    def test_unknown_state_mode_is_rejected(self):
+        v = validate_spec(_spec(state_mode="vibes"))
+        assert not v["ok"]
+        assert any("state_mode" in e and "vibes" in e for e in v["errors"])
+
+    def test_default_state_mode_is_accepted_and_silent_about_the_route(self):
+        v = validate_spec(_spec(state_mode="oxygen"))
+        assert v["ok"], v["errors"]
+        # The default must not warn that it "changes" anything: it is
+        # bit-identical to the pre-option pipeline.
+        assert not any("changes cells.state" in w for w in v["warnings"])
+
+    def test_marker_state_rejected_on_visium(self):
+        v = validate_spec(_spec(section="visium_gbm1", state_mode="markers",
+                                dx_um=100.0))
+        assert not v["ok"]
+        assert any("state_mode='markers'" in e and "Xenium only" in e
+                   for e in v["errors"])
+
+    @requires_section
+    def test_marker_state_warns_loudly_on_the_319_panel(self):
+        """results/cell_state_impact.md: the 319-gene flagship panel carries NO
+        hypoxia gene, so HYPOXIC is UNMEASURED there, and proliferation detection
+        is 13x below the published Ki-67 range so the per-cell call is refused.
+        The route must not silently produce a number."""
+        v = validate_spec(_spec(state_mode="markers"))
+        joined = " ".join(v["warnings"])
+        assert "UNMEASURED" in joined
+        assert "hypoxia-response transcript" in joined
+        # It must say what the fallback is and that its LEVEL is not an index.
+        assert "NEIGHBOURHOOD" in joined or "neighbourhood" in joined
+        assert "1.42%" in joined and "19-40%" in joined
+        # And it must never be silent: some warning has to name state_mode.
+        assert any("state_mode" in w for w in v["warnings"])
+
+    @requires_section
+    def test_absolute_kill_is_warned_against_on_that_panel_under_every_route(self):
+        """§5: on a panel with no hypoxia gene NO state route clears the bar, so
+        an absolute kill must not be quoted from it under ANY route."""
+        for mode in ("oxygen", "vessel_distance", "markers"):
+            v = validate_spec(_spec(state_mode=mode))
+            assert any("ABSOLUTE KILL" in w for w in v["warnings"]), mode
+            hit = next(w for w in v["warnings"] if "ABSOLUTE KILL" in w)
+            assert "RANKING" in hit          # what IS defensible
+            assert "0.3252" in hit           # the measured size of the swing
+
+    def test_absolute_kill_warning_is_not_raised_without_a_drug(self):
+        v = validate_spec(_spec(drug=None))
+        assert not any("ABSOLUTE KILL" in w for w in v["warnings"])
 
     def test_markers_oxygen_rejected_on_visium(self):
         v = validate_spec(_spec(section="visium_gbm1", oxygen_mode="markers",
@@ -519,12 +573,23 @@ class TestReconstructionCache:
         after = cache_mod.RECON_CACHE.stats()
         assert after["misses"] == before["misses"] + 1
 
-    def test_key_is_the_four_contract_fields(self):
+    def test_key_is_the_five_contract_fields(self):
         k = cache_mod.make_key("s", 12.0, "Discrete", "PDE")
-        assert k == ("s", 12.0, "discrete", "pde")
+        assert k == ("s", 12.0, "discrete", "pde", "oxygen")
         assert cache_mod.make_key("s", 12.0, "discrete", "pde") == \
             cache_mod.make_key("s", 12.000000000001, "discrete", "pde")
         assert cache_mod.make_key("s", 12.0, "kde", "pde") != k
+
+    def test_state_mode_is_part_of_the_key(self):
+        """``state_mode`` rewrites ``cells.state``, so a reconstruction built
+        under one route must never be served for another. Reusing it would
+        report the wrong band occupancies — the largest single term in an
+        absolute kill (results/cell_state_impact.md section 3.2)."""
+        base = cache_mod.make_key("s", 12.0, "discrete", "pde", "oxygen")
+        assert cache_mod.make_key("s", 12.0, "discrete", "pde", "markers") != base
+        assert cache_mod.make_key(
+            "s", 12.0, "discrete", "pde", "vessel_distance") != base
+        assert cache_mod.make_key("s", 12.0, "discrete", "pde", "OXYGEN") == base
 
     def test_a_run_never_inherits_the_previous_run_sensitivity(self, client):
         """The cached microenvironment is shared, and

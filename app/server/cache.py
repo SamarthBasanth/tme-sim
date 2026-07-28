@@ -8,8 +8,8 @@ Two responsibilities, both about the EXPENSIVE half of a run:
    ``available: false`` and a ``reason``; it never raises and never disappears
    from the list, so the UI can show *why* something is unusable.
 
-2. **Caching reconstructions by ``(section, dx_um, vascular_mode,
-   oxygen_mode)``.** A reconstruction takes 1 s (40k-cell brain section at
+2. **Caching reconstructions by ``(section, dx_um, vascular_mode, oxygen_mode,
+   state_mode)``.** A reconstruction takes 1 s (40k-cell brain section at
    dx = 30 um) to ~90 s (851k-cell GSE324268 section at dx = 12 um) and is
    IDENTICAL across every drug run on the same geometry, so caching it is the
    single biggest responsiveness win available. The cache is in-process (the
@@ -34,9 +34,12 @@ import numpy as np
 
 __all__ = [
     "SECTIONS",
+    "all_sections",
+    "lookup_section",
     "VASCULAR_MODES",
     "OXYGEN_MODES",
     "SENSITIVITY_MODES",
+    "STATE_MODES",
     "ReconKey",
     "ReconstructionCache",
     "RECON_CACHE",
@@ -44,6 +47,7 @@ __all__ = [
     "get_section",
     "list_sections",
     "section_genes",
+    "state_route_support",
     "repo_root",
     "runs_dir",
 ]
@@ -78,6 +82,10 @@ def _abs(*parts: str) -> str:
 VASCULAR_MODES: Tuple[str, ...] = ("discrete", "kde")
 OXYGEN_MODES: Tuple[str, ...] = ("pde", "vessel_distance", "markers")
 SENSITIVITY_MODES: Tuple[str, ...] = ("uniform", "determinant")
+#: How ``cells.state`` is labelled. Mirrors
+#: ``reconstruct.cell_state.STATE_MODES``; asserted equal in
+#: ``tests/test_app_server.py::test_engine_mode_tuples_match_the_registry``.
+STATE_MODES: Tuple[str, ...] = ("oxygen", "vessel_distance", "markers")
 
 
 # --------------------------------------------------------------------------- #
@@ -171,6 +179,42 @@ SECTIONS: "OrderedDict[str, Dict]" = OrderedDict([
 _XENIUM_REQUIRED = ("Xenium_GBM_cells.csv.gz",)
 _XENIUM_MATRIX_FILES = ("matrix.mtx.gz", "features.tsv.gz", "barcodes.tsv.gz")
 
+
+# --------------------------------------------------------------------------- #
+# Built-in + ingested sections
+#
+# :data:`SECTIONS` stays exactly what it was: the seven specimens this repo
+# ships evidence for, in their original order. Sections ingested from a
+# directory (``app/server/ingest_registry``, backed by ``tmesim.data.ingest``)
+# are appended AFTER them and can never replace one — ``register`` refuses a
+# built-in id. So every lookup below is "built-in first, ingested second", and
+# the built-in behaviour is unchanged whether or not anything has been ingested.
+# --------------------------------------------------------------------------- #
+def all_sections() -> "OrderedDict[str, Dict]":
+    """Built-in sections, then ingested ones. Never raises."""
+    out: "OrderedDict[str, Dict]" = OrderedDict(SECTIONS)
+    try:
+        from .ingest_registry import ingested_sections
+
+        for sid, rec in ingested_sections().items():
+            out.setdefault(sid, rec)
+    except Exception:  # noqa: BLE001 - a broken store must not hide the built-ins
+        pass
+    return out
+
+
+def lookup_section(section_id: str) -> Optional[Dict]:
+    """The registry record for ``section_id``, built-in or ingested."""
+    rec = SECTIONS.get(section_id)
+    if rec is not None:
+        return rec
+    try:
+        from .ingest_registry import ingested_sections
+
+        return ingested_sections().get(section_id)
+    except Exception:  # noqa: BLE001
+        return None
+
 #: On-disk memo of the numbers that need a file read (cell counts, extents,
 #: panel gene lists). Keyed by section id + a fingerprint of the source files,
 #: so it self-invalidates when the cache directory changes.
@@ -226,13 +270,34 @@ def _fingerprint(paths: List[str]) -> str:
 # Availability + cheap metadata, per source
 # --------------------------------------------------------------------------- #
 def _xenium_paths(rec: Dict) -> Dict[str, str]:
+    """Resolve a Xenium cache's components.
+
+    Delegates to ``tmesim.data.ingest.resolve_xenium_files``, which matches the
+    repo-canonical ``Xenium_GBM_*`` basenames FIRST — so all three built-in
+    caches resolve to exactly the paths this function used to hardcode, and an
+    ingested stock 10x bundle (``cells.csv.gz`` / ``cell_feature_matrix/`` /
+    ``gene_panel.json``) resolves too. The hardcoded names are kept as the
+    fallback so a MISSING file still produces the same "missing
+    Xenium_GBM_cells.csv.gz" message a user has seen before.
+    """
     root = _abs(rec["cache_dir"])
+    found: Dict[str, Optional[str]] = {}
+    try:
+        from tmesim.data.ingest import resolve_xenium_files
+
+        found = resolve_xenium_files(root)
+    except Exception:  # noqa: BLE001 - fall back to the historical names
+        found = {}
     return {
         "root": root,
-        "cells": os.path.join(root, "Xenium_GBM_cells.csv.gz"),
-        "matrix_dir": os.path.join(root, "cell_feature_matrix"),
-        "tar": os.path.join(root, "Xenium_GBM_cell_feature_matrix.tar.gz"),
-        "panel": os.path.join(root, "Xenium_GBM_gene_panel.json"),
+        "cells": found.get("cells")
+        or os.path.join(root, "Xenium_GBM_cells.csv.gz"),
+        "matrix_dir": found.get("matrix_dir")
+        or os.path.join(root, "cell_feature_matrix"),
+        "tar": found.get("matrix_tar")
+        or os.path.join(root, "Xenium_GBM_cell_feature_matrix.tar.gz"),
+        "panel": found.get("panel")
+        or os.path.join(root, "Xenium_GBM_gene_panel.json"),
     }
 
 
@@ -249,8 +314,9 @@ def _xenium_available(rec: Dict) -> Tuple[bool, Optional[str]]:
             "(the per-cell centroid table)"
         )
     has_mex = all(
-        os.path.exists(os.path.join(p["matrix_dir"], f))
-        for f in _XENIUM_MATRIX_FILES
+        any(os.path.exists(os.path.join(p["matrix_dir"], f))
+            for f in (name, name[:-3] if name.endswith(".gz") else name + ".gz"))
+        for name in _XENIUM_MATRIX_FILES
     )
     if not has_mex and not os.path.exists(p["tar"]):
         return False, (
@@ -301,9 +367,13 @@ def _xenium_metadata(rec: Dict) -> Dict:
     y = cells["y_centroid"].to_numpy(dtype=np.float64)
 
     genes: List[str] = []
-    features = os.path.join(p["matrix_dir"], "features.tsv.gz")
-    if os.path.exists(features):
-        with gzip.open(features, "rt") as fh:
+    features = next(
+        (f for f in (os.path.join(p["matrix_dir"], n)
+                     for n in ("features.tsv.gz", "features.tsv"))
+         if os.path.exists(f)), None)
+    if features is not None:
+        opener = gzip.open if features.endswith(".gz") else open
+        with opener(features, "rt") as fh:
             for line in fh:
                 parts = line.rstrip("\n").split("\t")
                 if len(parts) >= 3 and parts[2].strip() == "Gene Expression":
@@ -381,6 +451,39 @@ def _visium_metadata(rec: Dict) -> Dict:
     return out
 
 
+def _ingested_available(rec: Dict) -> Tuple[bool, Optional[str]]:
+    """Is an ingested section's directory still there and still ingestable?
+
+    Re-checked on every enumeration rather than trusted from the store: the
+    store records a PATH, and a path can go away. Cheap — ``detect`` only
+    stats filenames.
+    """
+    path = rec.get("cache_dir")
+    if not path or not os.path.isdir(path):
+        return False, (
+            f"ingested directory {path!r} no longer exists. Re-ingest it with "
+            f"POST /api/sections/scan, or DELETE /api/sections/{rec['id']}."
+        )
+    if not rec.get("runnable", True):
+        return False, (
+            f"platform {rec.get('platform')!r} is ingestable and inspectable "
+            "but not reconstructable: reconstruct_real accepts 'xenium' or "
+            "'visium' only. Its capability report is still valid."
+        )
+    try:
+        from tmesim.data.ingest import detect
+
+        det = detect(path)
+    except Exception as exc:  # noqa: BLE001
+        return False, f"re-detection failed: {type(exc).__name__}: {exc}"
+    if not det.get("ingestable"):
+        return False, (
+            f"{path} is no longer ingestable: "
+            + ("; ".join(det.get("issues") or []) or "layout not recognised")
+        )
+    return True, None
+
+
 def _metadata_source_files(rec: Dict) -> List[str]:
     if rec["source"] == "xenium":
         p = _xenium_paths(rec)
@@ -389,8 +492,35 @@ def _metadata_source_files(rec: Dict) -> List[str]:
     return [_abs(rec["cache_dir"])]
 
 
+def _ingested_metadata(rec: Dict) -> Dict:
+    """Metadata for an INGESTED section, taken from the ingest itself.
+
+    An ingested section was fully loaded and validated at registration, so its
+    cell count, extent and gene list are already MEASURED — re-deriving them
+    from disk would repeat the work and, for ``platform='mex'``, would need a
+    reader the built-in paths do not have. Nothing here is estimated.
+    """
+    ex = rec.get("extent_um_ingested")
+    genes = list(rec.get("genes") or [])
+    return {
+        "n_cells": rec.get("n_cells_ingested"),
+        "extent_um": list(ex) if ex else None,
+        "n_genes": rec.get("n_genes_ingested") or (len(genes) or None),
+        "genes": genes,
+        "panel": rec.get("panel"),
+        "n_spots": (rec.get("n_cells_ingested")
+                    if rec.get("platform") == "visium" else None),
+        "measured_from": (
+            f"tmesim.data.ingest.ingest({rec.get('cache_dir')!r}) at "
+            f"registration time"
+        ),
+    }
+
+
 def _section_metadata(rec: Dict) -> Dict:
     """Cheap on-disk metadata for one section, memoised in ``app/runs``."""
+    if rec.get("ingested"):
+        return _ingested_metadata(rec)
     fp = _fingerprint(_metadata_source_files(rec))
     memo = _load_meta().get(rec["id"])
     if memo and memo.get("_fingerprint") == fp:
@@ -418,7 +548,7 @@ def record_observed_reconstruction(section_id: str, report: Dict) -> None:
     Only ever records numbers that were actually produced by
     ``reconstruction_report``.
     """
-    rec = SECTIONS.get(section_id)
+    rec = lookup_section(section_id)
     if rec is None:
         return
     meta = dict(_section_metadata(rec))
@@ -434,7 +564,7 @@ def section_genes(section_id: str) -> List[str]:
     Used by ``/api/validate`` to reject ``oxygen_mode='markers'`` on a panel
     that carries no hypoxia-response transcript BEFORE a 40 s run discovers it.
     """
-    rec = SECTIONS.get(section_id)
+    rec = lookup_section(section_id)
     if rec is None:
         return []
     try:
@@ -443,15 +573,56 @@ def section_genes(section_id: str) -> List[str]:
         return []
 
 
+def state_route_support(section_id: str) -> Dict:
+    """Which cell-state axes this section's PANEL can carry, from its gene list.
+
+    Cheap (it reads the memoised ``features.tsv.gz`` gene symbols, never the count
+    matrix), so ``POST /api/validate`` can answer before a run is paid for. It
+    reports **presence on the panel** only — a gene being on the panel does not
+    mean it fires often enough for a per-cell call, which is a detection RATE and
+    can only be measured by reading the matrix. That distinction is exactly what
+    disqualifies the 319-gene flagship panel: MKI67 and TOP2A ARE on it, and they
+    fire in 1.42% of tumour cells, 13x below the published 19-40% Ki-67 range
+    (``results/cell_state_impact.md`` §1.1). ``genes_known`` says whether any
+    verdict here is evidence at all.
+
+    Returns ``{genes_known, source, proliferation_present, proliferation_missing,
+    hypoxia_present, hypoxia_missing, cycle_specific_present}``.
+    """
+    from tmesim.reconstruct.cell_state import (
+        CELL_CYCLE_SPECIFIC_MARKERS,
+        HYPOXIA_MARKERS,
+        PROLIFERATION_MARKERS,
+    )
+
+    rec = lookup_section(section_id) or {}
+    genes = set(section_genes(section_id))
+    present = lambda ms: [g for g in ms if g in genes]      # noqa: E731
+    missing = lambda ms: [g for g in ms if g not in genes]  # noqa: E731
+    return {
+        "genes_known": bool(genes),
+        "source": rec.get("source"),
+        "proliferation_present": present(PROLIFERATION_MARKERS),
+        "proliferation_missing": missing(PROLIFERATION_MARKERS),
+        "cycle_specific_present": present(CELL_CYCLE_SPECIFIC_MARKERS),
+        "hypoxia_present": present(HYPOXIA_MARKERS),
+        "hypoxia_missing": missing(HYPOXIA_MARKERS),
+    }
+
+
 def get_section(section_id: str) -> Optional[Dict]:
     """The registry record for ``section_id``, or ``None`` if unknown."""
-    return SECTIONS.get(section_id)
+    return lookup_section(section_id)
 
 
 def describe_section(section_id: str) -> Dict:
     """One ``Section`` object exactly as ``GET /api/sections`` returns it."""
-    rec = SECTIONS[section_id]
-    if rec["source"] == "xenium":
+    rec = lookup_section(section_id)
+    if rec is None:
+        raise KeyError(section_id)
+    if rec.get("ingested"):
+        available, reason = _ingested_available(rec)
+    elif rec["source"] == "xenium":
         available, reason = _xenium_available(rec)
     else:
         available, reason = _visium_available(rec)
@@ -474,6 +645,20 @@ def describe_section(section_id: str) -> Dict:
         "n_spots": None,
         "n_genes": None,
     }
+    if rec.get("ingested"):
+        # Everything an ingested section knows that a built-in one does not.
+        # ``capability`` is the whole point: the UI can show what the specimen
+        # cannot support BEFORE a run, not after a meaningless number.
+        out.update({
+            "ingested": True,
+            "platform": rec.get("platform"),
+            "layout": rec.get("layout"),
+            "detect_confidence": rec.get("detect_confidence"),
+            "detect_issues": rec.get("detect_issues") or [],
+            "runnable": rec.get("runnable", True),
+            "capability": rec.get("capability"),
+            "validation": rec.get("validation"),
+        })
     if not available:
         out["n_cells_reason"] = reason
         out["extent_um_reason"] = reason
@@ -509,11 +694,12 @@ def describe_section(section_id: str) -> Dict:
 def list_sections() -> List[Dict]:
     """Every registered section, available or not. Never raises."""
     out = []
-    for sid in SECTIONS:
+    registry = all_sections()
+    for sid in registry:
         try:
             out.append(describe_section(sid))
         except Exception as exc:  # noqa: BLE001
-            rec = SECTIONS[sid]
+            rec = registry[sid]
             out.append({
                 "id": sid, "label": rec["label"], "n_cells": None,
                 "extent_um": None, "panel": rec.get("panel"),
@@ -527,15 +713,33 @@ def list_sections() -> List[Dict]:
 # --------------------------------------------------------------------------- #
 # Reconstruction
 # --------------------------------------------------------------------------- #
-ReconKey = Tuple[str, float, str, str]
+ReconKey = Tuple[str, float, str, str, str]
+
+#: The state route a key defaults to when a caller omits it. Kept as a literal
+#: rather than imported at module scope so importing this module stays cheap; it
+#: is asserted against ``real_pipeline.STATE_MODE_DEFAULT`` in the tests.
+_STATE_MODE_DEFAULT = "oxygen"
 
 
 def make_key(section: str, dx_um: float, vascular_mode: str,
-             oxygen_mode: str) -> ReconKey:
+             oxygen_mode: str,
+             state_mode: str = _STATE_MODE_DEFAULT) -> ReconKey:
     """The cache key. ``dx_um`` is rounded so 12.0 and 12.000000001 share an
-    entry rather than silently rebuilding a 90 s reconstruction."""
+    entry rather than silently rebuilding a 90 s reconstruction.
+
+    ``state_mode`` is part of the key because it CHANGES ``cells.state`` on the
+    cached ``Microenvironment`` (``'vessel_distance'`` and ``'markers'`` both
+    overwrite it; ``'oxygen'`` leaves it as the reconstructor produced it). Two
+    specs that differ only in ``state_mode`` are therefore two different
+    reconstructions, and serving one from the other's entry would report the
+    wrong band occupancies — which is the largest single term in every absolute
+    kill number this project produces (``results/cell_state_impact.md`` §3.2:
+    up to 0.3252 absolute). A cached reconstruction under a different
+    ``state_mode`` is WRONG to reuse, not merely stale.
+    """
     return (str(section), round(float(dx_um), 6),
-            str(vascular_mode).strip().lower(), str(oxygen_mode).strip().lower())
+            str(vascular_mode).strip().lower(), str(oxygen_mode).strip().lower(),
+            str(state_mode).strip().lower())
 
 
 def _max_darcy_speed(micro) -> Optional[float]:
@@ -561,6 +765,7 @@ def build_reconstruction(
     dx_um: float,
     vascular_mode: str,
     oxygen_mode: str,
+    state_mode: str = _STATE_MODE_DEFAULT,
     log: Optional[Callable[[str], None]] = None,
 ) -> Dict:
     """Reconstruct one specimen through the production pipeline.
@@ -592,17 +797,23 @@ def build_reconstruction(
         if log is not None:
             log(msg)
 
-    rec = SECTIONS.get(section_id)
+    rec = lookup_section(section_id)
     if rec is None:
         raise KeyError(
-            f"unknown section {section_id!r}; known: {sorted(SECTIONS)}"
+            f"unknown section {section_id!r}; known: {sorted(all_sections())}"
         )
     vmode = str(vascular_mode).strip().lower()
     omode = str(oxygen_mode).strip().lower()
+    smode = str(state_mode).strip().lower()
     if vmode not in VASCULAR_MODES:
         raise ValueError(
             f"unknown vascular_mode {vascular_mode!r}; expected one of "
             f"{list(VASCULAR_MODES)}"
+        )
+    if smode not in STATE_MODES:
+        raise ValueError(
+            f"unknown state_mode {state_mode!r}; expected one of "
+            f"{list(STATE_MODES)}"
         )
 
     notes: List[str] = []
@@ -615,10 +826,10 @@ def build_reconstruction(
         sample = _abs(sample)
 
     _log(f"reconstruct_real(source={rec['source']!r}, sample={sample!r}, "
-         f"dx_um={dx_um}, oxygen_mode={omode!r})")
+         f"dx_um={dx_um}, oxygen_mode={omode!r}, state_mode={smode!r})")
     micro = real_pipeline.reconstruct_real(
         source=rec["source"], sample=sample, dx_um=float(dx_um),
-        oxygen_mode=omode,
+        oxygen_mode=omode, state_mode=smode,
     )
 
     if vmode == "kde":
@@ -660,6 +871,17 @@ def build_reconstruction(
                 "vascular_mode parameter. The ECM field and the cell "
                 "reconstruction are the unmodified production ones."
             )
+            if smode != "oxygen":
+                notes.append(
+                    f"cells.state was labelled by state_mode={smode!r} inside the "
+                    "production reconstruction and was NOT re-derived after the "
+                    "KDE swap. That is correct for both non-default routes and "
+                    "not an omission: 'markers' reads transcripts, and "
+                    "'vessel_distance' measures distance to the ENDOTHELIAL CELL "
+                    "POSITIONS (physics.oxygen_proxy.oxygen_from_vessel_distance), "
+                    "not to fields.vascular_density — so neither depends on which "
+                    "vascular field is in force."
+                )
     else:
         meta = dict(micro.metadata)
         rp = dict(meta.get("real_pipeline", {}))
@@ -671,6 +893,8 @@ def build_reconstruction(
     report["vascular_mode"] = vmode
     report["vascular_source"] = micro.metadata.get(
         "real_pipeline", {}).get("vascular_source")
+    report["state_mode"] = micro.metadata.get(
+        "real_pipeline", {}).get("state_mode", smode)
     build_time = time.time() - t0
     _log(f"reconstruction done in {build_time:.1f}s: "
          f"{report['n_cells']} cells, grid {report['grid']}")
@@ -687,9 +911,13 @@ def build_reconstruction(
         "build_time_s": float(build_time),
         "max_darcy_speed_um_s": speed,
         "notes": notes,
-        # Snapshot of the two things a run mutates on the shared cached object,
-        # so every run can start from exactly what reconstruct_real produced.
+        # Snapshot of what a run could mutate on the shared cached object, so
+        # every run starts from exactly what reconstruct_real produced.
+        # ``state`` is snapshotted too now that ``state_mode`` can install a
+        # non-default labelling: it is the largest single term in an absolute
+        # kill number, so it must not be able to drift across runs sharing a key.
         "pristine_sensitivity": np.array(micro.cells.sensitivity, copy=True),
+        "pristine_state": np.array(micro.cells.state, copy=True),
         "pristine_metadata": dict(micro.metadata),
     }
 
@@ -699,7 +927,7 @@ def build_reconstruction(
 # --------------------------------------------------------------------------- #
 class ReconstructionCache:
     """Thread-safe LRU of reconstructions keyed by
-    ``(section, dx_um, vascular_mode, oxygen_mode)``.
+    ``(section, dx_um, vascular_mode, oxygen_mode, state_mode)``.
 
     Two jobs that want the same key do NOT both reconstruct: the second blocks
     on a per-key lock and then finds the first one's entry (single-flight). The
@@ -843,8 +1071,9 @@ class ReconstructionCache:
                 self.misses += 1
             if log is not None:
                 log(f"reconstruction CACHE MISS for {key}; building")
-            section, dx_um, vmode, omode = key
-            built = build_reconstruction(section, dx_um, vmode, omode, log=log)
+            section, dx_um, vmode, omode, smode = key
+            built = build_reconstruction(section, dx_um, vmode, omode, smode,
+                                         log=log)
             built["key"] = key
             built["created_at"] = time.time()
             with self._lock:

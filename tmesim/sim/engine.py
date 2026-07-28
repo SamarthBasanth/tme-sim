@@ -226,6 +226,9 @@ def simulate_response(
     micro: Microenvironment,
     cfg: SimConfig,
     rng: Optional[np.random.Generator] = None,
+    attribute: bool = False,
+    capture_frames: Optional[int] = None,
+    thresholds: Optional["MechanismThresholds"] = None,
 ) -> SimulationResult:
     """Run the full microenvironment drug-response simulation for one patient.
 
@@ -245,6 +248,24 @@ def simulate_response(
     rng : np.random.Generator, optional
         RNG for the stochastic kill draws. Defaults to
         ``np.random.default_rng(cfg.seed)`` for reproducibility.
+    attribute : bool, default False
+        Compute the per-cell **mechanism attribution** (see
+        :mod:`tmesim.sim.mechanism`) and return it as ``result.mechanism``. It is
+        built from the arrays :func:`~tmesim.cells.pkpd.apply_drug_kill` actually
+        decided on, consumes no extra RNG draw, and changes no arithmetic — the
+        run is bit-identical with it on or off, which is why it defaults to off
+        rather than being made unconditional. Raises
+        :class:`~tmesim.sim.mechanism.MechanismReconciliationError` if the labels
+        do not reproduce ``kill_fraction`` bit-for-bit.
+    capture_frames : int, optional
+        Number of drug-concentration snapshots to keep through the solve (the
+        **time-lapse**), passed straight to
+        :func:`~tmesim.physics.diffusion.simulate_drug_transport`. ``None``
+        keeps none. To see the drug actually clear rather than plateau, combine
+        this with ``cfg.pde.time_resolved = True``.
+    thresholds : MechanismThresholds, optional
+        Bands for the attribution. ``None`` uses the defaults, whose two
+        otherwise-arbitrary values are derived from ``cfg.pd``.
 
     Returns
     -------
@@ -252,8 +273,8 @@ def simulate_response(
         ``predicted_response`` (= kill fraction, in [0, 1]),
         ``viable_tumor_fraction``, ``kill_fraction``, a short ``viable_history``
         trajectory with matching ``times``, the driving ``transport`` result,
-        ``fields`` for plotting (oxygen / ifp / auc / vascular_density), and
-        diagnostic ``extras``.
+        ``fields`` for plotting (oxygen / ifp / auc / vascular_density),
+        diagnostic ``extras``, and — when ``attribute=True`` — ``mechanism``.
     """
     if rng is None:
         rng = np.random.default_rng(cfg.seed)
@@ -304,10 +325,15 @@ def simulate_response(
         cfg.pde,
         velocity=(velocity if cfg.pde.convection else None),
         source_profile=source_profile,
+        capture_frames=capture_frames,
     )
 
     # 6. Pharmacodynamic kill over the treatment course.
-    apply_drug_kill(work, transport, cfg.pd, drug, rng=rng)
+    #    When an attribution is asked for, hand apply_drug_kill a dict to fill
+    #    with the arrays it decides on, so the attribution reads the kill's own
+    #    numbers instead of re-deriving (and possibly drifting from) them.
+    kill_diag: Optional[dict] = {} if attribute else None
+    apply_drug_kill(work, transport, cfg.pd, drug, rng=rng, diagnostics=kill_diag)
 
     # 7. Readouts.
     viable = work.cells.viable_tumor_fraction()
@@ -329,6 +355,19 @@ def simulate_response(
         if n_tumor
         else 0.0
     )
+
+    # 10. Mechanism attribution (opt-in; asserts its own faithfulness).
+    mechanism = None
+    if kill_diag is not None:
+        from .mechanism import attribute as _attribute
+
+        mechanism = _attribute(
+            work.cells.cell_type,
+            kill_diag,
+            kill_fraction,
+            pd=cfg.pd,
+            thresholds=thresholds,
+        )
 
     return SimulationResult(
         predicted_response=float(predicted_response),
@@ -355,6 +394,7 @@ def simulate_response(
             "bbb_penetrance": float(drug.bbb_penetrance),
             "n_tumor": float(n_tumor),
         },
+        mechanism=mechanism,
     )
 
 

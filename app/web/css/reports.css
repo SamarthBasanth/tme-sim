@@ -1,0 +1,98 @@
+/* reports.css — the therapy-report panel.
+   ADDITIVE. Loaded after components.css so the one layout override it needs
+   (a third dock column) wins without editing layout.css. Every rule is scoped
+   to .rp / #rp-dlg, so nothing here can reach the viewer, the run history or
+   the spec editor. Same house rules: square corners, mono numerics, one accent,
+   semantic colour for state only. */
+
+/* The dock grows a third column ONLY when the reports panel is mounted. */
+.dock.with-reports {
+  grid-template-columns:
+    minmax(280px, 1.2fr) 1px minmax(240px, 0.85fr) 1px minmax(300px, 1.05fr);
+}
+
+.rp .rp-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: var(--pad-2);
+  padding: var(--pad-2) var(--pad-3);
+  overflow: auto;
+}
+
+.rp .rp-lead {
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  color: var(--fg-2);
+  border-left: 2px solid var(--accent-dim);
+  padding: 3px 0 3px var(--pad-2);
+}
+.rp .rp-lead b { color: var(--fg-0); }
+
+/* --- drug picker ------------------------------------------------------- */
+.rp .rp-drugs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--pad-2);
+  border: 1px solid var(--line-1);
+  background: var(--bg-2);
+  padding: var(--pad-2);
+  max-height: 78px;
+  overflow-y: auto;
+}
+.rp .rp-drug {
+  font-size: var(--fs-xs);
+  color: var(--fg-1);
+  white-space: nowrap;
+}
+.rp .rp-drug:hover { color: var(--fg-0); }
+
+/* --- inline build progress -------------------------------------------- */
+.rp .rp-prog {
+  display: inline-block;
+  width: 34px;
+  height: 4px;
+  margin-left: 5px;
+  vertical-align: 2px;
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+}
+.rp .rp-prog > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.rp .rp-err:empty { display: none; }
+
+/* --- the document viewer ---------------------------------------------- */
+#rp-dlg {
+  width: min(1180px, 94vw);
+  height: min(88vh, 1000px);
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  background: var(--bg-1);
+  color: var(--fg-1);
+  box-shadow: var(--shadow-pop);
+}
+#rp-dlg::backdrop { background: hsl(213 30% 3% / 0.62); }
+#rp-dlg[open] { display: flex; flex-direction: column; }
+
+#rp-dlg .panel-head { flex: 0 0 auto; gap: var(--pad-2); }
+
+#rp-dlg .rp-note {
+  flex: 0 0 auto;
+  max-height: 30%;
+  overflow-y: auto;
+}
+#rp-dlg .rp-note:empty { display: none; }
+
+#rp-dlg .rp-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--line-2);
+  background: var(--bg-0);
+}

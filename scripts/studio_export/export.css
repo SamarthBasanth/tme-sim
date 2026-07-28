@@ -1,0 +1,118 @@
+/* export.css — the ONLY styles added by the static export.
+   No token is redefined and no existing rule is overridden: every value below
+   is drawn from css/tokens.css, so the banner is the same material as the rest
+   of the workstation (square corners, cool neutral, one accent, dense type).
+   Its job is to be unmissable without looking like it came from a different
+   product. */
+
+/* The shell is a fixed 3-row grid. Give the banner its own row and push the
+   three existing regions down, rather than letting it eat the top bar. */
+.shell.has-xbanner { grid-template-rows: auto var(--bar-h) 1fr var(--status-h); }
+.shell.has-xbanner > .topbar { grid-row: 2; }
+.shell.has-xbanner > .body { grid-row: 3; }
+.shell.has-xbanner > .statusbar { grid-row: 4; }
+
+.xbanner {
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--pad-2) var(--pad-3);
+  align-items: start;
+  padding: var(--pad-2) var(--pad-4);
+  background: var(--warn-bg);
+  border-bottom: 1px solid var(--warn);
+  max-height: 30vh;
+  overflow: auto;
+}
+
+/* The two commands sit beside the prose rather than under it, so the notice
+   costs one band of vertical space instead of two. */
+.xb-side { min-width: 0; }
+@media (max-width: 1180px) {
+  .xbanner { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .xb-side { grid-column: 2; }
+}
+
+.xb-mark {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: var(--tr-wide);
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  padding: 2px 5px;
+  white-space: nowrap;
+  align-self: start;
+}
+
+.xb-body { font-size: var(--fs-xs); line-height: 1.4; color: var(--fg-1); min-width: 0; }
+.xb-body > p { margin: 0 0 3px; overflow-wrap: anywhere; }
+.xb-body > p:last-child { margin-bottom: 0; }
+.xb-body b { color: var(--fg-0); font-weight: 600; }
+.xb-warn { color: var(--fg-0); }
+.xb-warn b { color: var(--warn); }
+
+.xb-runs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pad-1) var(--pad-3);
+  margin: 0 0 3px;
+  padding: 2px var(--pad-2);
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+}
+.xb-run { display: flex; align-items: center; gap: 5px; font-size: var(--fs-micro); }
+.xb-sep { color: var(--fg-3); }
+
+.xb-cmd {
+  margin: 0;
+  padding: 5px var(--pad-2);
+  background: var(--bg-void);
+  border: 1px solid var(--line-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  line-height: 1.6;
+  color: var(--accent);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.xb-x { align-self: start; white-space: nowrap; }
+
+/* Collapsed: the marker and the escape hatch, nothing else. */
+.xbanner.collapsed { max-height: none; padding: var(--pad-1) var(--pad-4); align-items: center; }
+.xbanner.collapsed .xb-body, .xbanner.collapsed .xb-side { display: none; }
+.xbanner.collapsed::after {
+  content: "precomputed runs · no server behind this page";
+  font-size: var(--fs-micro);
+  color: var(--fg-2);
+  grid-column: 2;
+}
+
+/* A note that replaces a control which cannot work here. Deliberately NOT
+   styled as a button, so nothing looks clickable. */
+.xnote {
+  padding: 5px var(--pad-2);
+  font-size: var(--fs-micro);
+  line-height: 1.45;
+  color: var(--fg-2);
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-left: 2px solid var(--warn);
+  overflow-wrap: anywhere;
+}
+.xnote b { color: var(--fg-1); }
+
+.xlog {
+  margin: 0;
+  padding: 4px 6px;
+  max-height: 148px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  line-height: 1.4;
+  color: var(--fg-2);
+  background: var(--bg-void);
+  border: 1px solid var(--line-1);
+  white-space: pre;
+}

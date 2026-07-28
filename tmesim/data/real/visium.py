@@ -289,6 +289,62 @@ def list_samples(present_only: bool = True) -> List[str]:
     return [s for s in ids if _has_local(s)]
 
 
+def register_sample(
+    sample_id: str,
+    path: str,
+    source: str = "ingested by path (unregistered provenance)",
+    accession: str = "unregistered",
+    diagnosis: str = "unknown",
+    open_access: bool = False,
+) -> Dict:
+    """Add a Space Ranger directory to the sample registry AT RUNTIME.
+
+    This is what lets a NEW patient specimen reach the reconstruction pipeline
+    without editing code. ``reconstruct.real_visium.reconstruct_from_visium``
+    takes a ``sample_id``, not a path, and resolves it through this module's
+    registry; registering the directory under an id therefore makes the whole
+    downstream chain work unchanged.
+
+    ``path`` is stored as the sample's ``subdir``. ``os.path.join`` returns an
+    absolute right-hand operand unchanged, so an absolute ``path`` bypasses
+    ``_CACHE`` entirely and a relative one is still resolved under it - which is
+    exactly the behaviour the four built-in samples rely on.
+
+    Raises ``KeyError`` if ``sample_id`` is already registered with a DIFFERENT
+    location, so an ingested sample can never silently shadow a built-in one and
+    change what a published number was measured from. Re-registering the same
+    location is a no-op.
+    """
+    existing = _SAMPLES.get(sample_id)
+    if existing is not None:
+        if os.path.abspath(str(existing["subdir"]) or _CACHE) != os.path.abspath(path):
+            raise KeyError(
+                f"sample_id {sample_id!r} is already registered at "
+                f"{existing['subdir']!r}; refusing to repoint it to {path!r}. "
+                "Use a different id."
+            )
+        return dict(existing, sample_id=sample_id)
+    _SAMPLES[sample_id] = {
+        "subdir": path,
+        "source": source,
+        "accession": accession,
+        "landing": None,
+        "open": bool(open_access),
+        "diagnosis": diagnosis,
+        "ingested": True,
+    }
+    return dict(_SAMPLES[sample_id], sample_id=sample_id)
+
+
+def unregister_sample(sample_id: str) -> bool:
+    """Remove a RUNTIME-registered sample. Built-in samples cannot be removed."""
+    rec = _SAMPLES.get(sample_id)
+    if rec is None or not rec.get("ingested"):
+        return False
+    del _SAMPLES[sample_id]
+    return True
+
+
 def sample_info(sample_id: str) -> Dict:
     """Return the static provenance record for ``sample_id`` (no file access)."""
     if sample_id not in _SAMPLES:
@@ -299,32 +355,26 @@ def sample_info(sample_id: str) -> Dict:
     return rec
 
 
-def load_sample(sample_id: str, marker_report: bool = True) -> Dict:
-    """Load a REAL Visium GBM section from the local cache.
+def load_from_dirs(
+    spatial_dir: str,
+    matrix_dir: str,
+    sample_id: str = "unregistered",
+    marker_report: bool = True,
+) -> Dict:
+    """Read a Space Ranger output from an EXPLICIT ``(spatial_dir, matrix_dir)``.
 
-    Returns a dict with the keys required by the build plan plus useful extras:
+    This is the whole reader; :func:`load_sample` is this function plus the
+    registry lookup that finds the two directories and stamps provenance onto
+    the result. Split out so the generic ingester
+    (:mod:`tmesim.data.ingest`) can read a Space Ranger bundle from ANY
+    directory through exactly the same code path — byte-identical output, no
+    second implementation to drift.
 
-    ``coords_um``   : (n_spots, 2) float64 array of in-tissue spot centroids in
-                      micrometers, origin shifted to (0, 0), aligned row-for-row
-                      with ``barcodes`` and the rows of ``expression``.
-    ``expression``  : scipy.sparse CSR of shape (n_spots, n_genes), integer UMI
-                      counts (spots as rows, genes as columns).
-    ``genes``       : list[str] of gene SYMBOLS, length n_genes (column order).
-    ``barcodes``    : list[str] of spot barcodes, length n_spots (row order).
-
-    extras: ``ensembl_ids`` (list, aligned to ``genes``), ``umpp``
-    (um-per-pixel), ``spot_diameter_fullres`` (px), ``coords_px`` (n_spots, 2),
-    ``n_spots``, ``n_genes``, ``total_counts`` (per-spot UMI), ``source``,
-    ``accession``, ``diagnosis``, and (if ``marker_report``) ``markers_present``.
-
-    Raises
-    ------
-    FileNotFoundError if the sample's bytes are not cached (see
-    ``docs/real_data/visium_gbm.md`` for how to fetch).
+    The returned dict carries no ``source`` / ``accession`` / ``diagnosis``:
+    those are properties of the sample registry, not of the bytes, and a
+    directory handed in by a user has none. :func:`load_sample` adds them.
     """
-    from scipy.sparse import csr_matrix
-
-    spatial_dir, matrix_dir = _locate(sample_id)
+    from scipy.sparse import csr_matrix  # noqa: F401  (parity with load_sample)
 
     coords_px = _read_positions(spatial_dir)
     umpp, spot_diam = _read_umpp(spatial_dir)
@@ -375,9 +425,6 @@ def load_sample(sample_id: str, marker_report: bool = True) -> Dict:
         "n_spots": int(expr.shape[0]),
         "n_genes": int(expr.shape[1]),
         "total_counts": total_counts,
-        "source": _SAMPLES[sample_id]["source"],
-        "accession": _SAMPLES[sample_id]["accession"],
-        "diagnosis": _SAMPLES[sample_id]["diagnosis"],
         "spatial_dir": spatial_dir,
         "matrix_dir": matrix_dir,
     }
@@ -391,6 +438,39 @@ def load_sample(sample_id: str, marker_report: bool = True) -> Dict:
             present[cls] = [g for g in genes if g in sym_to_col]
         out["markers_present"] = present
 
+    return out
+
+
+def load_sample(sample_id: str, marker_report: bool = True) -> Dict:
+    """Load a REAL Visium GBM section from the local cache.
+
+    Returns a dict with the keys required by the build plan plus useful extras:
+
+    ``coords_um``   : (n_spots, 2) float64 array of in-tissue spot centroids in
+                      micrometers, origin shifted to (0, 0), aligned row-for-row
+                      with ``barcodes`` and the rows of ``expression``.
+    ``expression``  : scipy.sparse CSR of shape (n_spots, n_genes), integer UMI
+                      counts (spots as rows, genes as columns).
+    ``genes``       : list[str] of gene SYMBOLS, length n_genes (column order).
+    ``barcodes``    : list[str] of spot barcodes, length n_spots (row order).
+
+    extras: ``ensembl_ids`` (list, aligned to ``genes``), ``umpp``
+    (um-per-pixel), ``spot_diameter_fullres`` (px), ``coords_px`` (n_spots, 2),
+    ``n_spots``, ``n_genes``, ``total_counts`` (per-spot UMI), ``source``,
+    ``accession``, ``diagnosis``, and (if ``marker_report``) ``markers_present``.
+
+    Raises
+    ------
+    FileNotFoundError if the sample's bytes are not cached (see
+    ``docs/real_data/visium_gbm.md`` for how to fetch).
+    """
+    spatial_dir, matrix_dir = _locate(sample_id)
+    out = load_from_dirs(
+        spatial_dir, matrix_dir, sample_id=sample_id, marker_report=marker_report
+    )
+    out["source"] = _SAMPLES[sample_id]["source"]
+    out["accession"] = _SAMPLES[sample_id]["accession"]
+    out["diagnosis"] = _SAMPLES[sample_id]["diagnosis"]
     return out
 
 

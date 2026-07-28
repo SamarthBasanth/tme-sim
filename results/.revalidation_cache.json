@@ -1,0 +1,165 @@
+{
+ "pharm": {
+  "pharm.spearman": 0.826625386996904,
+  "pharm.p_value": 2.3456553098215367e-05,
+  "pharm.n_overlap": 18,
+  "_detail": {
+   "resolve_ic50_measured_library_drugs": [
+    "temozolomide",
+    "methotrexate",
+    "cisplatin"
+   ]
+  },
+  "_status": "ok",
+  "_seconds": 1.0
+ },
+ "pk": {
+  "pk.alpha": 148.60815765445545,
+  "pk.mitoxantrone_L_um": 48.208641624517966,
+  "pk.topotecan_L_um": 83.62365431547649,
+  "pk.n_oos_pass": 2,
+  "_detail": {
+   "rows": [
+    {
+     "drug": "doxorubicin",
+     "L_um": 64.92127684000336,
+     "lequiv_band_um": [
+      57.70780163555854,
+      72.13475204444818
+     ],
+     "verdict": "FIT",
+     "in_sample": true
+    },
+    {
+     "drug": "mitoxantrone",
+     "L_um": 48.208641624517966,
+     "lequiv_band_um": [
+      36.06737602222409,
+      108.20212806667226
+     ],
+     "verdict": "PASS",
+     "in_sample": false
+    },
+    {
+     "drug": "topotecan",
+     "L_um": 83.62365431547649,
+     "lequiv_band_um": [
+      36.06737602222409,
+      108.20212806667226
+     ],
+     "verdict": "PASS",
+     "in_sample": false
+    }
+   ],
+   "n_oos": 2,
+   "dox_target_um": 64.92127684000336
+  },
+  "_status": "ok",
+  "_seconds": 6.8
+ },
+ "recon": {
+  "recon.ordering_spearman": 0.39999999999999997,
+  "recon.pearson_4type": 0.9803265831576258,
+  "recon.pearson_nontumor": 0.015884175943461552,
+  "recon.xenium_endothelial_pct": 10.504561352018978,
+  "recon.mean_abs_diff_pct": 12.209160629518722,
+  "recon.PECAM1_d": 1.2925507699004226,
+  "recon.VEGFA_d": 1.3526917082498595,
+  "recon.CA9_d": 0.6736009335244911,
+  "recon.PECAM1_p": 9.999000099990002e-05,
+  "recon.VEGFA_p": 9.999000099990002e-05,
+  "recon.CA9_p": 9.999000099990002e-05,
+  "_detail": {
+   "xenium_n_cells": 40887,
+   "visium_n_spots": 3468,
+   "xenium_fractions_pct": {
+    "TUMOR": 58.23855993347519,
+    "STROMAL": 11.776359233986353,
+    "IMMUNE": 19.480519480519483,
+    "ENDOTHELIAL": 10.504561352018978
+   },
+   "visium_fractions_pct": {
+    "TUMOR": 82.65688119251263,
+    "STROMAL": 1.0429524899397227,
+    "IMMUNE": 6.528222141644845,
+    "ENDOTHELIAL": 9.771944175902801
+   },
+   "region_distribution": {
+    "core": 786,
+    "margin": 90,
+    "necrotic": 1628,
+    "perivascular": 964
+   }
+  },
+  "_status": "ok",
+  "_seconds": 46.3
+ },
+ "glioma": {
+  "glioma.gm_abs_fold_error_postfix": 1.9945848979744396,
+  "glioma.n_pass_10x_postfix": 6,
+  "glioma.n_pass_3x_postfix": 4,
+  "glioma.worst_abs_fold_error_postfix": 6.943953863670182,
+  "glioma.lev_model_ratio": 1.190573068738105,
+  "glioma.cef_model_ratio": 5.873410164200031,
+  "glioma.lev_measured_ratio": 1.4521566958420458,
+  "glioma.cef_measured_ratio": 4.263466042154565,
+  "glioma.anchor_gm_ratio_error": 1.2962610595241026,
+  "_detail": {
+   "per_drug": [
+    {
+     "drug": "eribulin",
+     "measured": 0.005086255990411808,
+     "predicted": 0.03531872693623568,
+     "fold": 6.943953863670182
+    },
+    {
+     "drug": "cefazolin",
+     "measured": 0.1495726495726496,
+     "predicted": 0.15258002911172316,
+     "fold": 1.020106480346949
+    },
+    {
+     "drug": "methotrexate",
+     "measured": 0.17800000000000002,
+     "predicted": 0.1415070576046895,
+     "fold": 0.7949834696892668
+    },
+    {
+     "drug": "temozolomide",
+     "measured": 0.19507142857142856,
+     "predicted": 0.15937158358322562,
+     "fold": 0.8169909081527494
+    },
+    {
+     "drug": "levetiracetam",
+     "measured": 0.6971999999999999,
+     "predicted": 0.9465556482607032,
+     "fold": 1.3576529665242445
+    },
+    {
+     "drug": "adavosertib",
+     "measured": 2.46,
+     "predicted": 0.5784765155825272,
+     "fold": 0.23515305511484846
+    }
+   ],
+   "leak_constant": 0.238
+  },
+  "_status": "ok",
+  "_seconds": 2.7
+ },
+ "gist": {
+  "gist.m1_geomean_fold_error": 7.917931874015634,
+  "gist.n": 6,
+  "gist.null_geomean_fold_error": 12.960878234986744,
+  "gist.m1_spearman_rho": 0.6546536707079772,
+  "_detail": {
+   "max_fold": 25.059303209009386,
+   "min_fold": 1.110603547213672,
+   "n_within_3x": 1,
+   "beats_plasma_null": true
+  },
+  "_status": "ok",
+  "_seconds": 5.0
+ }
+}

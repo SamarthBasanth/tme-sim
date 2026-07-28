@@ -43,22 +43,41 @@ export function createOverlays(viewer) {
   const legend = h('div.ov.ov-legend.ov-card.legend.hidden', { role: 'figure', 'aria-label': 'Field legend' },
     legTitle, legRamp, legTicks, legNote);
 
+  let legendField = null, legendName = null;
+
+  // The legend labels the WINDOW, not the payload range, because the window is
+  // what the colours on screen actually mean. When the two differ the legend
+  // says so and prints the full served range underneath — a narrowed window
+  // that is not declared is a lie about the image.
   function updateLegend(name, field) {
-    if (!name || !field) { legend.classList.add('hidden'); return; }
-    const meta = fieldMeta(name);
+    legendName = name || null;
+    legendField = field || null;
+    if (!legendName || !legendField) { legend.classList.add('hidden'); return; }
+    const meta = fieldMeta(legendName);
     legend.classList.remove('hidden');
-    fill(legTitle, h('span', meta.label), h('span.unit', meta.unit), h('span.grow'));
+    fill(legTitle, h('span', meta.label), h('span.unit', meta.unit));
     legRamp.style.backgroundImage = gradientCss(viewer.rampName);
-    const mid = field.min + (field.max - field.min) * 0.5;
+
+    const [lo, hi] = viewer.windowRange();
     fill(legTicks,
-      h('span', auto(field.min)),
-      h('span', auto(mid)),
-      h('span', auto(field.max)));
+      h('span', auto(lo)),
+      h('span', auto(lo + (hi - lo) * 0.5)),
+      h('span', auto(hi)));
+
+    const windowed = Math.abs(lo - legendField.min) > 1e-9 * Math.abs(legendField.max - legendField.min || 1)
+      || Math.abs(hi - legendField.max) > 1e-9 * Math.abs(legendField.max - legendField.min || 1);
     fill(legNote,
-      h('span', `${meta.unit} · ${field.rows}×${field.cols} @ ${num(field.dx, 1)} um`),
+      h('span', `${legendField.rows}×${legendField.cols} @ ${num(legendField.dx, 1)} um`),
       ' ',
-      chip(meta.provenance, meta.note));
+      chip(meta.provenance, meta.note),
+      windowed
+        ? h('div.l-win', { title: 'The colour ramp is mapped across the window, not the full data range. Values outside it are clamped.' },
+          'windowed · data ', auto(legendField.min), ' → ', auto(legendField.max))
+        : null);
   }
+
+  /** Re-label the legend after the window moved, without refetching anything. */
+  function refreshWindow() { if (legendName) updateLegend(legendName, legendField); }
 
   /* --------------------------------------------------------- read-out -- */
   const roBody = h('div');
@@ -117,34 +136,24 @@ export function createOverlays(viewer) {
     readout.style.borderColor = pinned ? 'var(--accent)' : '';
   }
 
-  /* ------------------------------------------------------------ stats -- */
-  const statsEl = h('div.ov.ov-stats.ov-card.glstats', { 'aria-hidden': 'true' });
-
-  function updateStats(s) {
-    const lo = s.fps > 0 && s.fps < 30;
-    fill(statsEl,
-      h('div', h('b', { class: lo ? 'lo' : '' }, s.fps ? s.fps.toFixed(1) : '—'), ' fps  ',
-        h('span', s.frameMs ? s.frameMs.toFixed(2) : '—'), ' ms/f'),
-      h('div', h('b', int(s.drawn)), ' / ', int(s.total), ' pts'),
-      h('div', 'lod ', h('b', (s.lod * 100).toFixed(0)), '%  ', s.mode),
-    );
-  }
-
   /* ------------------------------------------------------ empty state -- */
   const empty = h('div.ov.ov-empty.interactive',
     h('div.empty',
       h('h3', 'No geometry loaded'),
       h('p', 'Submit a RunSpec, or open a completed run from the history dock, to load its cell geometry over ',
         h('code.badge-code', 'GET /api/runs/{id}/geometry'), '.'),
-      h('p', { style: { marginTop: '6px' } },
+      h('p.empty-keys',
         h('kbd', 'wheel'), ' zoom · ', h('kbd', 'drag'), ' pan · ',
-        h('kbd', 'click'), ' pin a cell · ', h('kbd', 'F'), ' fit'),
+        h('kbd', 'click'), ' pin a cell · ', h('kbd', 'F'), ' fit · ',
+        h('kbd', '?'), ' all keys'),
     ));
 
   return {
-    nodes: [empty, scalebar, legend, readout, statsEl],
-    updateScalebar, updateLegend, updateReadout, updateStats,
+    nodes: [empty, scalebar, legend, readout],
+    updateScalebar, updateLegend, updateReadout, refreshWindow,
     setEmpty(on) { empty.classList.toggle('hidden', !on); },
-    refreshRamp() { legRamp.style.backgroundImage = gradientCss(viewer.rampName); },
+    refreshRamp() {
+      legRamp.style.backgroundImage = gradientCss(viewer.rampName);
+    },
   };
 }

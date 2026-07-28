@@ -1,0 +1,164 @@
+/* ============================================================================
+   Mechanism attribution + drug time-lapse
+   ============================================================================
+
+   COLOUR
+   ------
+   The four SURVIVAL mechanisms are what this view exists to tell apart, so they
+   are the only categories that get a hue: blue (delivery), amber (dose), red
+   (resistance), magenta (chance). The set is the documented categorical
+   instance, in its fixed slot order, and it was validated rather than eyeballed
+   — all-pairs Machado-2009 CVD separation is dE 23.7 on the dark viewport
+   surround and 36.6 on the light one, against a target of 12. All-pairs, not
+   adjacent, because this is a dense point cloud: any two categories can end up
+   touching.
+
+   KILLED is deliberately ACHROMATIC. It is not a fifth mechanism — it is the
+   outcome, it is usually the largest class, and giving it a hue would make the
+   majority class shout over the four minority classes that carry the finding.
+   A neutral still reads as a distinct band and stays out of the hue channel.
+
+   ALREADY_DEAD and NOT_TUMOR recede further into the surround. UNATTRIBUTED
+   takes the reserved CRITICAL status colour, which is correct rather than
+   decorative: it is a state, not a series, it should be empty, and if it is not
+   empty the operator must see that immediately.
+
+   In light mode the three low-contrast slots sit under 3:1 on the mid-grey
+   surround, so the relief rule applies — the legend always ships a visible
+   label AND a count for every category, so identity is never colour-alone.
+   ============================================================================ */
+
+:root,
+:root[data-theme="dark"] {
+  --mech-killed:       hsl(212  8% 55%);   /* achromatic on purpose */
+  --mech-unreached:    #3987e5;            /* slot 1 blue    — DELIVERY   */
+  --mech-underdosed:   #c98500;            /* slot 3 yellow  — DOSE       */
+  --mech-resistant:    #e66767;            /* slot 6 red     — RESISTANCE */
+  --mech-stochastic:   #d55181;            /* slot 7 magenta — CHANCE     */
+  --mech-unattributed: hsl(  0 82% 62%);   /* reserved CRITICAL state     */
+  --mech-alreadydead:  hsl(212  9% 34%);
+  --mech-nottumor:     hsl(212 10% 20%);
+}
+
+:root[data-theme="light"] {
+  --mech-killed:       hsl(212 10% 45%);
+  --mech-unreached:    #2a78d6;
+  --mech-underdosed:   #eda100;
+  --mech-resistant:    #e34948;
+  --mech-stochastic:   #e87ba4;
+  --mech-unattributed: hsl(356 76% 46%);
+  --mech-alreadydead:  hsl(212 10% 62%);
+  --mech-nottumor:     hsl(212 12% 78%);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:where(:not([data-theme="dark"])) {
+    --mech-killed:       hsl(212 10% 45%);
+    --mech-unreached:    #2a78d6;
+    --mech-underdosed:   #eda100;
+    --mech-resistant:    #e34948;
+    --mech-stochastic:   #e87ba4;
+    --mech-unattributed: hsl(356 76% 46%);
+    --mech-alreadydead:  hsl(212 10% 62%);
+    --mech-nottumor:     hsl(212 12% 78%);
+  }
+}
+
+/* --------------------------------------------------------- legend card --- */
+.ov-mech { right: 10px; top: 10px; max-width: 300px; }
+
+.mechleg { padding: 5px 6px; min-width: 250px; }
+.mechleg .m-title {
+  display: flex; align-items: baseline; gap: 5px;
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-wide);
+  color: var(--fg-1);
+  margin-bottom: 3px;
+}
+.mechleg .m-title .grow { flex: 1; }
+
+.mechleg .m-rows { display: grid; gap: 0; }
+.mechleg .m-row {
+  display: grid;
+  grid-template-columns: 8px 1fr auto auto;
+  gap: 5px;
+  align-items: center;
+  font-size: var(--fs-micro);
+  line-height: 1.5;
+  padding: 0 2px;
+  cursor: pointer;
+  pointer-events: auto;
+  border: 1px solid transparent;
+}
+.mechleg .m-row:hover { background: var(--bg-3); }
+.mechleg .m-row.off { opacity: 0.36; }
+.mechleg .m-row.zero { opacity: 0.5; }
+.mechleg .m-sw { width: 8px; height: 8px; border: 1px solid var(--line-1); }
+.mechleg .m-name { color: var(--fg-1); letter-spacing: 0.02em; }
+.mechleg .m-n,
+.mechleg .m-p {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-0);
+}
+.mechleg .m-p { color: var(--fg-2); min-width: 42px; text-align: right; }
+
+.mechleg .m-sep { height: 1px; background: var(--line-1); margin: 3px 0; }
+.mechleg .m-note {
+  font-size: var(--fs-micro);
+  color: var(--fg-2);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.mechleg .m-note b { color: var(--fg-1); font-weight: 600; }
+.mechleg .m-bad { color: var(--crit); }
+.mechleg .m-ok  { color: var(--ok); }
+
+/* the delivery / dose / resistance / chance roll-up */
+.mechleg .m-bar {
+  display: flex; height: 7px; margin: 3px 0 2px;
+  border: 1px solid var(--line-2);
+}
+.mechleg .m-bar span { height: 100%; }
+/* 2px surface gap between adjacent fills, per the mark spec */
+.mechleg .m-bar span + span { box-shadow: -2px 0 0 0 var(--bg-1); }
+
+/* ------------------------------------------------------------ scrubber --- */
+.ov-timelapse { left: 10px; bottom: 44px; right: 10px; pointer-events: none; }
+
+.scrub {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 7px;
+  max-width: 620px;
+}
+.scrub .s-btn {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  min-width: 28px;
+}
+.scrub input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  height: 14px;
+  margin: 0;
+}
+.scrub .s-read {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--fg-0);
+  white-space: nowrap;
+}
+.scrub .s-read .unit { color: var(--fg-2); }
+.scrub .s-meta {
+  grid-column: 1 / -1;
+  font-size: var(--fs-micro);
+  color: var(--fg-2);
+  line-height: 1.4;
+}
+.scrub .s-meta .warn { color: var(--warn); }

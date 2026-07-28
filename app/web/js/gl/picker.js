@@ -91,6 +91,38 @@ export class GridIndex {
   }
 
   /**
+   * Visit every cell inside an axis-aligned um rectangle. Used by the ROI
+   * tool. Bin-bounded like `nearest`, so the cost is proportional to the
+   * region, not to the section — an ROI over 1% of the tissue reads ~1% of
+   * the cells rather than scanning all 850k.
+   */
+  forEachInRect(x0, y0, x1, y1, cb) {
+    const { nx, ny, bw, bh, start, items, xs, ys } = this;
+    const ax = Math.min(x0, x1), bx = Math.max(x0, x1);
+    const ay = Math.min(y0, y1), by = Math.max(y0, y1);
+    let bx0 = Math.floor(ax / bw), bx1 = Math.floor(bx / bw);
+    let by0 = Math.floor(ay / bh), by1 = Math.floor(by / bh);
+    if (bx1 < 0 || by1 < 0 || bx0 >= nx || by0 >= ny) return 0;
+    if (bx0 < 0) bx0 = 0; if (by0 < 0) by0 = 0;
+    if (bx1 >= nx) bx1 = nx - 1; if (by1 >= ny) by1 = ny - 1;
+    let n = 0;
+    for (let byi = by0; byi <= by1; byi++) {
+      const row = byi * nx;
+      for (let bxi = bx0; bxi <= bx1; bxi++) {
+        const s = start[row + bxi], e = start[row + bxi + 1];
+        for (let k = s; k < e; k++) {
+          const i = items[k];
+          const x = xs[i], y = ys[i];
+          if (x < ax || x > bx || y < ay || y > by) continue;
+          cb(i);
+          n++;
+        }
+      }
+    }
+    return n;
+  }
+
+  /**
    * Local composition: counts per cell type within `radius` um of (x,y),
    * plus the total. This is the "what is around this cell" read-out.
    */

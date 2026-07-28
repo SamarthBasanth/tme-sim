@@ -51,6 +51,8 @@ that test fails.
 | `payloads.py` | TMSG / TMSF binary wire formats |
 | `cache.py` | section registry + the reconstruction LRU |
 | `jobs.py` | run execution, the queue, the worker, on-disk history |
+| `projects.py` | projects / specimens (multi-patient) + the cross-specimen comparison |
+| `report.py` | therapy reports: panel assembly, the limits block, the self-contained HTML |
 | `api.py` | routes, drug/defaults registries, `POST /api/validate` |
 | `__main__.py` | `python -m app.server` |
 
@@ -73,6 +75,18 @@ All of `API_CONTRACT.md`:
 | `GET` | `/api/runs/{id}/geometry` | TMSG binary |
 | `GET` | `/api/runs/{id}/field/{name}` | TMSF binary; `name ∈ vascular_density, ecm_density, oxygen, drug_auc` |
 | `POST` | `/api/validate` | `{ok, errors[], warnings[]}` |
+| `GET` | `/api/sections/{id}/capability` | what this panel can support, before a project exists |
+| `GET`/`POST` | `/api/projects` | list / create a study |
+| `GET`/`PATCH`/`DELETE` | `/api/projects/{id}` | one study; delete detaches runs, never deletes them |
+| `POST` | `/api/projects/{id}/specimens` | bind a section as a patient (`409` if already bound) |
+| `GET`/`PATCH`/`DELETE` | `/api/projects/{id}/specimens/{sid}` | one specimen + its resolved runs |
+| `POST`/`DELETE` | `/api/projects/{id}/specimens/{sid}/runs[/{run_id}]` | associate / detach a run (`409` on a section mismatch) |
+| `GET` | `/api/projects/{id}/compare` | cross-specimen comparison; see below |
+| `POST` | `/api/reports` | `202` + `{report_id, status, run_ids, warnings}`; enqueues 2 runs per drug |
+| `GET` | `/api/reports` | newest first; `?limit=` (default 200) |
+| `GET` | `/api/reports/{id}` | the full report document; also the poll target |
+| `GET` | `/api/reports/{id}/html` | the rendered, self-contained document; `409` until every arm is done |
+| `DELETE` | `/api/reports/{id}` | cancel a queued/running report (cancels every arm) |
 
 Two additive diagnostics the UI need not use: `GET /api/health` (cache and queue
 counters) and `GET /api/runs/{id}/traceback` (the stack for a `failed` run).
@@ -121,9 +135,10 @@ thread** drains the queue.
 * **One worker.** Runs on the same key share the cached `Microenvironment`, and
   `apply_drug_sensitivity` writes `cells.sensitivity` on it. Serialising the
   worker makes that safe by construction, and stops N runs fighting over the same
-  cores. Every run additionally restores the pristine sensitivity array snapshot
-  taken at build time, so one run can never inherit another's assumption —
-  asserted by `test_a_run_never_inherits_the_previous_run_sensitivity`.
+  cores. Every run additionally restores the pristine sensitivity **and cell-state**
+  array snapshots taken at build time, so one run can never inherit another's
+  assumption — asserted by
+  `test_a_run_never_inherits_the_previous_run_sensitivity`.
 
 **Stages** are `reconstruct → sensitivity → compile_drug → simulate → metrics →
 payloads → done`, with `progress` fixed per stage. Progress is deliberately
@@ -155,8 +170,19 @@ renders — survives a restart, and run ids keep counting rather than colliding.
 
 ## Reconstruction cache
 
-Keyed by exactly `(section, dx_um, vascular_mode, oxygen_mode)`, as the contract
-specifies. `dx_um` is rounded to 6 dp so `12.0` and `12.000000001` share an entry.
+Keyed by exactly `(section, dx_um, vascular_mode, oxygen_mode, state_mode)`, as the
+contract specifies. `dx_um` is rounded to 6 dp so `12.0` and `12.000000001` share an
+entry.
+
+`state_mode` is in the key because it **rewrites `cells.state`** — `'vessel_distance'`
+and `'markers'` both overwrite it, `'oxygen'` leaves it exactly as the reconstructor
+produced it. Two specs that differ only in `state_mode` are therefore two different
+reconstructions, and serving one from the other's entry would report the wrong band
+occupancies. That is not a staleness nicety: the band occupancy is the largest single
+term in every absolute kill number here, and it moves the kill by up to 0.3252 absolute
+(1.77x relative) across the three routes with tissue, drug, transport and RNG held
+identical (`results/cell_state_impact.md` §3.2). A cached reconstruction under a
+different `state_mode` is **wrong to reuse**, not merely out of date.
 
 Measured build times on this machine:
 
@@ -269,6 +295,17 @@ re-solves the oxygen PDE internally and overwrites `fields.oxygen`. So with
 `/field/oxygen` is the **reconstruction's** oxygen and did *not* drive the kill.
 That is stated in `provenance.caveats` and as a `/api/validate` warning.
 
+The same is true of `state_mode`, and for the same reason: `simulate_response`
+re-bands every living cell through `cells.agents.update_cell_states` from its own
+oxygen solve before applying the kill. So `state_mode` moves the **reported** band
+occupancies and their provenance, not this run's `kill_fraction`. It is returned as
+`provenance.cell_state` (the pipeline's own block, verbatim: mode, source,
+`is_measured`, caveat, marker-coverage detail, tumour band fractions), plus
+`provenance.state_unmeasured` and `provenance.state_drives_kill = false`, and it is
+stated as a `/api/validate` warning. Propagating a state route into a kill means
+re-running `cells.pkpd.apply_drug_kill` on the engine's own transport result, which is
+what `validation.cell_state_impact` does — the API deliberately does not fake it.
+
 ---
 
 ## `POST /api/validate`
@@ -281,7 +318,10 @@ invalid mode; non-numeric or non-positive `dx_um`; `total_time_s` below the
 solver step `dt` (which would take zero steps and report every exposure as 0);
 `oxygen_mode='markers'` on Visium, or on a panel carrying none of
 `HYPOXIA_MARKER_GENES` (the 319-gene brain panel carries none, so hypoxia there
-is *unmeasured*); `pk.plasma_peak <= 0`, `pk.half_life_s <= 0`, `pk.n_doses < 1`
+is *unmeasured*);
+`state_mode='markers'` on Visium (no per-cell transcripts) or on a panel carrying
+neither a proliferation nor a hypoxia-response transcript (nothing would be measured
+at all); `pk.plasma_peak <= 0`, `pk.half_life_s <= 0`, `pk.n_doses < 1`
 or fractional, `pk.dose_interval_s <= 0` with multiple doses; a non-numeric,
 negative, or non-`methylated`/`unmethylated` `mgmt`.
 
@@ -292,7 +332,15 @@ will therefore be overridden by the loader; grid sizes that make a run take
 minutes; `sensitivity_mode='determinant'` (not comparable across drugs, and inert
 on Visium); the surrogate oxygen routes; unrecognised spec keys; `mgmt` on a
 non-MGMT-calibrated drug; clinically unattainable PK; a dose interval longer than
-the window.
+the window; every non-default `state_mode` (it moves reported band occupancies, not
+the kill, and forces a cache rebuild); `state_mode='markers'` on a panel missing one
+axis — naming the axis, the genes, and the fact that the state is then assigned to
+**no cell**, which is not the same statement as "computed and found to be zero"; and,
+on any panel carrying no hypoxia-response transcript, that **absolute kill must not be
+quoted from that section under any state route**, because no route clears the bar
+there and the kill moves up to 0.3252 absolute across the three
+(`results/cell_state_impact.md` §5). The cross-drug ranking is invariant across all
+three routes and is the defensible output.
 
 ### The advection CFL
 
@@ -319,10 +367,108 @@ No speed is ever assumed. On `xenium_319` the measured peak is ≈0.60 µm/s, so
 
 ---
 
+## Projects and specimens — the multi-patient layer
+
+`projects.py`. A **project** is a study; a **specimen** is a patient, bound to
+one `section` id and to the *capability report* of that section's panel. A
+specimen holds `run_id`s **into `app/runs/`** — runs are associated, never
+copied. Deleting a project or detaching a run therefore never deletes a run, and
+attaching a run whose `spec.section` differs from the specimen's section is a
+`409`, because filing another patient's run under a specimen would silently
+corrupt every comparison built on the study. Projects persist as one JSON
+document per project under `app/projects/<id>/project.json` (gitignored).
+
+`GET /api/projects/{id}/compare` is the point of the whole layer, and its shape
+is dictated by what the evidence in `results/` supports:
+
+* **Rank agreement is the primary result.** `results/heldout_patient.md` §3.3
+  found the kill ordering IDENTICAL on two real GBM sections;
+  `results/cell_state_impact.md` §3.3 found it INVARIANT across all three
+  cell-state routes. The comparison reports the per-specimen ordering, a
+  Kendall tau-b per pair, and the swapped drug pairs when it disagrees.
+* **Absolute kill is flagged, not differenced.** `comparable` is `false` unless
+  *every* specimen's panel carries a hypoxia-response transcript **and** every
+  matched run actually used a MEASURED state route. That is
+  `results/cell_state_impact.md` §5: with no hypoxia gene no route clears the
+  bar, and kill moves by up to **0.3252 absolute (1.77×)** with the choice of
+  route alone. The 319-gene flagship panel fails this; the 480-gene IO panel
+  passes it (VEGFA). A measured kill is never differenced against an assumed one.
+* **Only identical RunSpecs are matched** — `spec_signature` folds in the mesh,
+  every mode, `mgmt`, `resistance_off`, the whole `pk` block and the window, and
+  fails closed on any RunSpec field it has never heard of.
+* **Composition rows carry their own verdict.** `mean_ecm_density` and
+  `mean_oxygen` are *always* `comparable: false` (a max-normalised KDE over
+  whichever matrix transcripts the panel carries has no common absolute scale;
+  the oxygen level is uncalibrated on every section — §3.5). The ENDOTHELIAL
+  *fraction* and *areal density* rows sit adjacent because on the real pair they
+  moved in opposite directions, 0.43× and 2.67× (§1.1).
+
+Front end: `app/web/js/ui/projects.js` + `css/projects.css`, a modal reached
+from the `projects` button in the top bar.
+
+---
+
+## Therapy reports
+
+A **report** is the deliverable: one ranked, mechanistically attributed drug
+panel for ONE specimen, with the provenance of every input and the limits of the
+output attached. It is the in-product form of `experiments/patient_report.py`.
+
+**`report.py` simulates nothing.** A report is assembled out of runs:
+
+* every arm is an ordinary `RunSpec` on the ordinary queue, so it shares the one
+  worker, the reconstruction cache, cancellation and `app/runs/` persistence;
+* each drug contributes **two** arms — the real run, and the
+  `resistance_off: true` counterfactual (`PDConfig(hypoxia_resistance=1,
+  quiescent_resistance=1)`) whose kill is the denominator of
+  `rho = kill / kill(resistance off)`;
+* all 2N arms share one cache key, so the reconstruction is built once and every
+  later arm is a hit — that is the whole reason a report goes *through* the queue
+  rather than around it;
+* when every arm is `done` the panel is assembled by
+  `tmesim.report.attribution.attribute` — the **same function object**
+  `experiments/patient_report.py` calls, asserted in the tests. Two
+  implementations of an attribution would be two sciences.
+
+`sensitivity_mode` is forced to `uniform` and cannot be overridden: it is the
+only mode in which a cross-drug ranking is fair. `drug` and `resistance_off` are
+swept per arm. Any other `RunSpec` field may be passed in `spec_overrides`;
+overriding an owned field is a warning and is reported back as ignored.
+
+**The document carries its own limits, prominently.** `build_limits()` returns
+the block that opens every rendering — the NOT FOR CLINICAL USE banner, the
+ranking-is-the-output rule (`results/cell_state_impact.md` §3.2/§5, kill moving
+0.3252 absolute across state routes), whether *this* panel can support an
+absolute kill at all (the 319-gene panel carries no hypoxia gene and calls
+proliferation in 1.42% of tumour cells against a published 19-40%), the interval
+absolute kill is defensible as (TMZ 0.0048-0.1442, 30x —
+`results/kill_calibration.md` §5.1), the uniform-mode upper bound, the oxygen
+PDE's falsification (`results/oxygen_demotion.md`), and the absence of any
+outcome label anywhere in this repository. An item that does not apply to a
+section is still returned, saying why — a caveat that disappears cannot be
+audited.
+
+`render_html()` inlines `app/web/css/tokens.css` and emits **one self-contained
+file**: no external stylesheet, webfont, image, script or fetch of any kind, so
+it reads the same off a USB stick as it does in the product. The banner is at
+the top *and* the bottom; the limits are section 1, above the ranking.
+
+Reports persist to `app/reports/<id>/report.json` (+ `report.html` once done),
+gitignored like `app/runs/`.
+
+Front end: `app/web/js/ui/reports.js` + `css/reports.css`, a third dock column
+with a modal document viewer. `js/mock.js` deliberately does **not** synthesise
+reports — a fabricated clinical-looking document is the one thing this product
+must never produce — so the panel says so and refuses.
+
+---
+
 ## Tests
 
 ```
 ./.venv/bin/python -m pytest tests/test_app_server.py -q      # 30 passed, ~90 s
+./.venv/bin/python -m pytest tests/test_projects.py -q        # 41 passed, ~2 s
+./.venv/bin/python -m pytest tests/test_app_reports.py -q     # 34 passed, ~60 s
 ```
 
 `tests/test_app_server.py` covers, in rising order of what a break would cost:
@@ -341,3 +487,33 @@ No speed is ever assumed. On `xenium_319` the measured peak is ≈0.60 µm/s, so
 The file skips itself cleanly if `fastapi`/`httpx` are absent, and each
 end-to-end test skips if `data_cache/xenium_gbm` is not present, so it never
 breaks a checkout without the extra or without the data.
+
+`tests/test_app_reports.py` covers three separable things, because they fail
+separately: (1) the science is *imported, not re-implemented* — the Studio and
+`experiments/patient_report.py` must hold the identical function object, and the
+decomposition's own `delivery + potency == log10 drive - mean` identity is
+checked on numbers it did not choose; (2) every mandatory limit is present with
+its measured number and survives rendering, the banner is at top and bottom, and
+the limits are positioned before the first kill figure in the document; (3) the
+rendered file references nothing external at all. The end-to-end arm asserts the
+two arms per drug are real, spec-identical apart from `resistance_off`, that the
+reconstruction was built once, that the counterfactual never kills *less* than
+the real arm (if it did, `rho` would not be a resistance ratio), and that every
+row's numbers came out of its own arm rather than being recomputed.
+
+`tests/test_projects.py` covers the multi-patient layer on the same principle:
+
+1. **persistence** — a project survives a fresh `ProjectStore` over the same
+   directory, with its specimens, capability blocks and run associations intact,
+   and ids do not collide after a restart;
+2. **association** — the project document holds ids and no result body, attach is
+   idempotent, a run from another section is a `409`, and detach / remove-specimen
+   / delete-project all report the runs they retained;
+3. **the comparison's capability-aware flagging** — rank agreement and the swapped
+   pairs, the 319-vs-IO panel asymmetry, measured-against-assumed refusal, the
+   composition verdicts, and an UNMEASURED state band coming back `null` rather
+   than a measured-looking `0.0`.
+
+The flagging tests build their `RunResult` views by hand, so the whole decision
+table runs in milliseconds; the end-to-end path is exercised by the two real
+sections wherever they are cached.

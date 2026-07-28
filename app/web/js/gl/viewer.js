@@ -23,8 +23,16 @@ import { POINTS_VS, POINTS_FS, FIELD_VS, FIELD_FS, LINE_VS, LINE_FS } from './sh
 import { GridIndex } from './picker.js';
 import { lut } from './ramps.js';
 
+import { MECH_VARS } from '../mechanism.js';
+
 export const CELL_TYPES = ['TUMOR', 'STROMAL', 'IMMUNE', 'ENDOTHELIAL', 'NECROTIC'];
 export const CELL_TYPE_VARS = ['--ch-tumor', '--ch-stromal', '--ch-immune', '--ch-endothelial', '--ch-necrotic'];
+
+/** Colour modes accepted by setColorMode(). */
+export const COLOR_MODE = { TYPE: 0, FIELD: 1, LABEL: 2 };
+
+/** Size of the u_labelColor / u_labelVis uniform arrays in shaders.js. */
+const MECH_SLOTS = 8;
 
 const TARGET_MS = 1000 / 55;   // engage LOD above this while interacting
 const RELAX_MS = 1000 / 90;    // relax LOD below this
@@ -156,7 +164,20 @@ export class Viewer {
     this.fieldVisible = true;
     this.fieldOpacity = 0.55;
     this.fieldGamma = 1;
+    // Window / level, in FIELD UNITS. null = "not set yet"; setField installs
+    // the full data range. The ramp is mapped across [c - w/2, c + w/2] and
+    // clamped outside, which is what lets an operator pull structure out of a
+    // compressed tail instead of looking at a flat wash.
+    this.win = null;
     this.visible = [1, 1, 1, 1, 1];
+    // Per-cell colour-by-attribute channel (colorMode 2). Currently the
+    // mechanism-attribution label. `labels` holds the payload in the ORIGINAL
+    // (geometry) cell order for read-out; the GPU buffer holds it in the
+    // viewer's internal shuffled order.
+    this.labels = null;
+    this.labelBuf = null;
+    this.labelVis = new Array(MECH_SLOTS).fill(1);
+    this.labelCounts = null;
     this.hovered = -1;
     this.selected = -1;
     this.lod = 1;
@@ -189,6 +210,8 @@ export class Viewer {
     this.markColor = cssRGB('--focus');
     this.flatTypeColors = new Float32Array(15);
     this.typeColors.forEach((c, i) => this.flatTypeColors.set(c, i * 3));
+    this.flatLabelColors = new Float32Array(MECH_SLOTS * 3);
+    MECH_VARS.forEach((v, i) => this.flatLabelColors.set(cssRGB(v), i * 3));
     this.dirty = true;
   }
 
@@ -255,6 +278,12 @@ export class Viewer {
     this.index = new GridIndex(xs, ys, ex, ey, 2);
     const indexMs = performance.now() - t0;
 
+    // Kept so a per-cell attribute payload arriving later (mechanism labels)
+    // can be permuted into the same order as the position buffer without
+    // re-shuffling the geometry.
+    this.order = order;
+    this.clearLabels();
+
     this.geom = { n, ex, ey, xs, ys, types };
     this.counts = new Int32Array(CELL_TYPES.length);
     for (let i = 0; i < n; i++) if (types[i] < CELL_TYPES.length) this.counts[types[i]]++;
@@ -270,9 +299,78 @@ export class Viewer {
   }
 
   clearGeometry() {
-    this.geom = null; this.index = null; this.counts = null;
+    this.geom = null; this.index = null; this.counts = null; this.order = null;
+    this.clearLabels();
     this.hovered = -1; this.selected = -1;
     this.stats.total = 0; this.stats.drawn = 0;
+    this.dirty = true;
+  }
+
+  /* --------------------------------------------- colour-by-attribute -- */
+
+  /**
+   * Install a per-cell u8 attribute (the mechanism-attribution label) as the
+   * third vertex attribute, so colorMode 2 paints from it. The payload arrives
+   * in the geometry payload's cell order and is permuted here into the
+   * viewer's internal shuffled order — the same permutation the positions got,
+   * so prefix-LOD stays a uniform subsample of every category.
+   *
+   * One extra byte per vertex. At 850k cells that is 850 kB of additional
+   * vertex fetch against a 3.4 MB position buffer, and it is only fetched at
+   * all while a geometry is bound; the branch that reads it is uniform-guarded,
+   * so cell-type and field colouring cost exactly what they cost before.
+   *
+   * @param {Uint8Array|null} labels one code per cell, geometry order
+   */
+  setLabels(labels) {
+    const gl = this.gl;
+    if (!labels || !this.geom || !this.order) { this.clearLabels(); return; }
+    const n = this.geom.n;
+    if (labels.length !== n) {
+      throw new Error(
+        `mechanism payload has ${labels.length} labels but the geometry has ` +
+        `${n} cells — refusing to render a misaligned attribution`);
+    }
+    const shuffled = new Uint8Array(n);
+    for (let k = 0; k < n; k++) shuffled[k] = labels[this.order[k]];
+
+    if (!this.labelBuf) this.labelBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.labelBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, shuffled, gl.STATIC_DRAW);
+    gl.bindVertexArray(this.vao);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, false, 0, 0);
+    gl.bindVertexArray(null);
+
+    this.labels = labels;
+    this.labelCounts = new Int32Array(MECH_SLOTS);
+    for (let i = 0; i < n; i++) {
+      if (labels[i] < MECH_SLOTS) this.labelCounts[labels[i]]++;
+    }
+    this.labelVis = new Array(MECH_SLOTS).fill(1);
+    this.stats.labelBytes = shuffled.byteLength;
+    this.dirty = true;
+  }
+
+  clearLabels() {
+    const gl = this.gl;
+    this.labels = null;
+    this.labelCounts = null;
+    this.labelVis = new Array(MECH_SLOTS).fill(1);
+    this.stats.labelBytes = 0;
+    if (this.vao) {
+      gl.bindVertexArray(this.vao);
+      gl.disableVertexAttribArray(2);
+      gl.vertexAttrib1f(2, 0);       // constant attribute; no buffer read
+      gl.bindVertexArray(null);
+    }
+    if (this.colorMode === COLOR_MODE.LABEL) this.colorMode = COLOR_MODE.TYPE;
+    this.dirty = true;
+  }
+
+  setLabelVisible(code, on) {
+    if (code < 0 || code >= MECH_SLOTS) return;
+    this.labelVis[code] = on ? 1 : 0;
     this.dirty = true;
   }
 
@@ -281,7 +379,7 @@ export class Viewer {
   /** @param {{name,rows,cols,dx,min,max,values:Float32Array,unit?:string}|null} f */
   setField(f) {
     const gl = this.gl;
-    if (!f) { this.field = null; this.dirty = true; return; }
+    if (!f) { this.field = null; this.win = null; this.dirty = true; return; }
     if (!this.fieldTex) {
       this.fieldTex = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, this.fieldTex);
@@ -295,6 +393,75 @@ export class Viewer {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, f.cols, f.rows, 0, gl.RED, gl.FLOAT, f.values);
     this.field = f;
+    this.resetWindow();
+    this.dirty = true;
+  }
+
+  /* --------------------------------------------------------- window/level */
+
+  /** Full data range of the loaded field, guarded against a degenerate span. */
+  fullRange() {
+    const f = this.field;
+    if (!f) return [0, 1];
+    let lo = f.min, hi = f.max;
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [0, 1];
+    if (hi <= lo) hi = lo + 1e-9;
+    return [lo, hi];
+  }
+
+  /** The window actually applied to the ramp: [lo, hi] in field units. */
+  windowRange() {
+    if (!this.win) return this.fullRange();
+    const half = Math.max(1e-12, this.win.w) / 2;
+    return [this.win.c - half, this.win.c + half];
+  }
+
+  setWindow(centre, width) {
+    if (!Number.isFinite(centre) || !Number.isFinite(width)) return;
+    this.win = { c: centre, w: Math.max(1e-12, width) };
+    this.dirty = true;
+  }
+
+  /**
+   * Replace only the PIXELS of the already-installed field, keeping its
+   * dimensions, its texture object and (optionally) the operator's window.
+   *
+   * This is the time-lapse path. Re-calling setField() per frame would
+   * reallocate a 1.15 MB R32F texture and reset the window on every scrub
+   * step, which both costs a driver allocation per frame and makes the
+   * animation flicker as the ramp re-normalises to each frame's own range.
+   * texSubImage2D uploads into the existing storage instead.
+   *
+   * @param {Float32Array} values row-major, must match the installed rows*cols
+   * @param {number} min  finite min to report for this frame
+   * @param {number} max  finite max to report for this frame
+   * @param {boolean} keepWindow leave the window/level alone (default true)
+   */
+  setFieldValues(values, min, max, keepWindow = true) {
+    const gl = this.gl;
+    const f = this.field;
+    if (!f || !this.fieldTex) {
+      throw new Error('setFieldValues: no field is installed; call setField first');
+    }
+    if (values.length !== f.rows * f.cols) {
+      throw new Error(
+        `setFieldValues: ${values.length} samples for a ${f.rows}x${f.cols} ` +
+        'grid — frame does not match the installed field');
+    }
+    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, f.cols, f.rows, gl.RED, gl.FLOAT, values);
+    f.values = values;
+    if (Number.isFinite(min)) f.min = min;
+    if (Number.isFinite(max)) f.max = max;
+    if (!keepWindow) this.resetWindow();
+    this.dirty = true;
+  }
+
+  /** Restore the window to the full served range (TMSF min..max). */
+  resetWindow() {
+    const [lo, hi] = this.fullRange();
+    this.win = { c: (lo + hi) / 2, w: hi - lo };
     this.dirty = true;
   }
 
@@ -414,6 +581,9 @@ export class Viewer {
       composition: comp,
       compositionRadiusUm,
       fieldValue: this.sampleField(x, y),
+      // `labels` is in the payload's own order; `order[i]` maps the viewer's
+      // internal index back to it.
+      label: this.labels && this.order ? this.labels[this.order[i]] : null,
     };
   }
 
@@ -496,6 +666,8 @@ export class Viewer {
     const offset = [-this.cam.cx * 2 * z / w, this.cam.cy * 2 * z / h];
     const extent = [this.geom.ex, this.geom.ey];
 
+    const [winLo, winHi] = this.windowRange();
+
     /* --- field underlay ------------------------------------------------ */
     if (this.field && this.fieldVisible && this.fieldOpacity > 0.001) {
       const { p, u } = this.prog.field;
@@ -504,7 +676,7 @@ export class Viewer {
       gl.uniform2fv(u.u_extent, extent);
       gl.uniform2fv(u.u_scale, scale);
       gl.uniform2fv(u.u_offset, offset);
-      gl.uniform2f(u.u_range, this.field.min, this.field.max);
+      gl.uniform2f(u.u_range, winLo, winHi);
       gl.uniform1f(u.u_opacity, this.fieldOpacity);
       gl.uniform1f(u.u_gamma, this.fieldGamma);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.fieldTex);
@@ -527,7 +699,10 @@ export class Viewer {
     gl.uniform1fv(u.u_typeVis, new Float32Array(this.visible));
     gl.uniform1i(u.u_colorMode, this.colorMode);
     gl.uniform1i(u.u_hasField, this.field ? 1 : 0);
-    gl.uniform2f(u.u_fieldRange, this.field ? this.field.min : 0, this.field ? this.field.max : 1);
+    gl.uniform1i(u.u_hasLabel, this.labels ? 1 : 0);
+    gl.uniform3fv(u.u_labelColor, this.flatLabelColors);
+    gl.uniform1fv(u.u_labelVis, new Float32Array(this.labelVis));
+    gl.uniform2f(u.u_fieldRange, winLo, winHi);
     gl.uniform4f(u.u_force, 0, 0, 0, 0);
     gl.uniform1f(u.u_alpha, this.pointAlpha);
     gl.uniform1f(u.u_ring, 0);
@@ -564,6 +739,10 @@ export class Viewer {
       gl.uniform1f(u.u_ring, 1);
       gl.uniform4f(u.u_force, color[0], color[1], color[2], 1);
       gl.uniform1fv(u.u_typeVis, new Float32Array([1, 1, 1, 1, 1]));
+      // A pinned cell must stay visible even when its channel — or its
+      // mechanism category — is toggled off; otherwise the marker silently
+      // vanishes and the read-out describes something the operator cannot see.
+      gl.uniform1fv(u.u_labelVis, new Float32Array(MECH_SLOTS).fill(1));
       gl.drawArrays(gl.POINTS, idx, 1);
     };
     if (this.selected >= 0) drawMark(this.selected, this.markColor, Math.max(16, psz + 10));
