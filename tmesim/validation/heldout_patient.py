@@ -657,12 +657,20 @@ def verdicts(res: Dict) -> List[Dict]:
     # --- MVD ----------------------------------------------------------------- #
     m1 = s1["vascular"]["vessels"]["mvd_per_mm2"]
     m2 = s2["vascular"]["vessels"]["mvd_per_mm2"]
+    m1_ok, m2_ok = 35.0 <= m1 <= 95.0, 35.0 <= m2 <= 95.0
     add("MVD lands in the published human GBM range 35-95/mm2 (PMID 27583442)",
         m1, m2,
-        "REPLICATES" if 35.0 <= m2 <= 95.0 else "DOES NOT REPLICATE",
+        "REPLICATES" if (m1_ok and m2_ok) else
+        ("NOT REPRODUCED ON EITHER" if not (m1_ok or m2_ok) else
+         "DOES NOT REPLICATE" if m1_ok else "PARTIAL"),
         (f"{m2:.0f}/mm2 vs published 65 (35-95); section 1 gave {m1:.0f}/mm2. "
-         "Both are the same DIRECTION of error (too many vessel objects), so this "
-         "is a systematic property of the segmentation, not patient noise."),
+         + ("BOTH sections are high, and by a similar amount, so this is a "
+            "systematic property of the segmentation (endothelial cells are "
+            "over-split into vessel objects) rather than something the held-out "
+            "patient revealed — and it is the one place where the two sections "
+            "AGREE with each other while both disagreeing with the literature."
+            if not (m1_ok or m2_ok) else
+            "the two sections fall on opposite sides of the published range.")),
         "vessels/mm2")
 
     # --- drug ordering -------------------------------------------------------- #
@@ -677,12 +685,48 @@ def verdicts(res: Dict) -> List[Dict]:
         ("identical on both sections" if o2 == o1 else
          f"section 2 reorders to {' > '.join(o2)}"),
         "")
+    # A claim that fails on BOTH sections is not a generalisation failure — it is
+    # a claim that does not hold in THIS configuration at all, on the development
+    # section included. Those two cases must not be scored the same way.
+    cov1_ok, cov2_ok = (c1 == o1), (c2 == o2)
+    if cov1_ok and cov2_ok:
+        cov_status, cov_why = "REPLICATES", (
+            "coverage reproduces the kill ordering on both sections")
+    elif cov1_ok and not cov2_ok:
+        cov_status, cov_why = "DOES NOT REPLICATE", (
+            "coverage reproduces the kill ordering on section 1 but not on the "
+            "held-out patient")
+    elif cov2_ok and not cov1_ok:
+        cov_status, cov_why = "PARTIAL", (
+            "coverage reproduces the kill ordering on the held-out patient but "
+            "not on section 1 — so the agreement reported elsewhere is "
+            "configuration-dependent")
+    else:
+        cov_status, cov_why = "NOT REPRODUCED ON EITHER", (
+            "coverage does NOT reproduce the kill ordering on EITHER section in "
+            "this configuration (both swap doxorubicin and lomustine), so this "
+            "is not a held-out failure — it is a disagreement with "
+            "`results/delivery_metrics.md`, which ran at a different exposure "
+            "scale where coverage was not saturated. See §3.3")
     add("therapeutic_coverage @1x IC50 recovers the kill ordering",
-        " > ".join(c1), " > ".join(c2),
-        "REPLICATES" if (c2 == o2 and c1 == o1) else
-        ("PARTIAL" if (c1 == o1) != (c2 == o2) else "DOES NOT REPLICATE"),
-        (f"section 1 coverage order {'==' if c1 == o1 else '!='} kill order; "
-         f"section 2 coverage order {'==' if c2 == o2 else '!='} kill order"),
+        " > ".join(c1), " > ".join(c2), cov_status, cov_why, "")
+
+    # Is coverage still discriminating, or has it saturated?
+    sat1 = sum(1 for r in s1["drugs"] if r["coverage_1x"] > 0.9 or r["coverage_1x"] < 0.01)
+    sat2 = sum(1 for r in s2["drugs"] if r["coverage_1x"] > 0.9 or r["coverage_1x"] < 0.01)
+    add("therapeutic_coverage @1x IC50 is still a DISCRIMINATING headline metric",
+        f"{sat1}/{len(s1['drugs'])} drugs pinned at 0 or >0.9",
+        f"{sat2}/{len(s2['drugs'])} drugs pinned at 0 or >0.9",
+        "HOLDS" if max(sat1, sat2) < len(s1["drugs"]) else
+        ("NOT REPRODUCED ON EITHER" if min(sat1, sat2) >= len(s1["drugs"])
+         else "DOES NOT REPLICATE"),
+        ("coverage has saturated at BOTH ends in this configuration — every drug "
+         "is either effectively 0 or above 0.9, on both sections — so it is "
+         "behaving as a binary indicator rather than a graded metric. "
+         "`results/delivery_metrics.md` flagged this saturation as a 'latent, "
+         "not active' weakness; at this exposure scale it is ACTIVE."
+         if max(sat1, sat2) >= len(s1["drugs"]) else
+         "coverage still spreads the panel on both sections"),
         "")
 
     # --- is the ordering trivially IC50? -------------------------------------- #
@@ -817,16 +861,18 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
             ax.text(xi, vi + 1.0, f"{vi:.1f}", ha="center", fontsize=7.5,
                     color=_INK)
     ax.axhline(ENDO_VOLUME_EM["value_pct"], color=_INK_2, lw=1.2, ls="--", zorder=2)
-    ax.text(len(classes) - 0.5, ENDO_VOLUME_EM["value_pct"] + 1.6,
-            "8.0% — human volume-EM endothelial (PMID 38723085)",
-            ha="right", fontsize=7.5, color=_INK_2)
+    ax.annotate("8.0% — human volume-EM\nendothelial (PMID 38723085)",
+                xy=(1.35, ENDO_VOLUME_EM["value_pct"]), xytext=(1.35, 27.0),
+                ha="center", fontsize=7.5, color=_INK_2,
+                arrowprops=dict(arrowstyle="-", color=_INK_2, lw=0.9))
+    ax.set_ylim(0, 100)
     ax.set_xticks(x)
     ax.set_xticklabels(classes, fontsize=8.5)
     ax.set_ylabel("% of measured cells")
     ax.set_title("a · Cell-type composition — DIFFERENT PANELS, so composition\n"
                  "differences are part biology, part measurable-gene content",
                  loc="left", fontsize=9.5)
-    ax.legend(frameon=False, fontsize=7.6, loc="upper center")
+    ax.legend(frameon=False, fontsize=7.6, loc="upper right")
     _clean(ax)
 
     # ---- (b) vascular morphometry vs published ------------------------------ #
@@ -869,9 +915,10 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
         if d.size > 200_000:  # plotting only; every statistic uses all cells
             d = d[:: max(1, d.size // 200_000)]
         ax.plot(d, np.linspace(0, 1, d.size), lw=2.2, color=_SEC_COLORS[key],
-                label=(f"{labels[key]}\nmedian "
-                       f"{sec['vascular']['tumor_to_vessel']['median']:.0f} µm, "
-                       f">100 µm "
+                label=(f"{'Section 1 (DEV)' if key.startswith('section1') else 'Section 2 (HELD OUT)'}"
+                       f" · median "
+                       f"{sec['vascular']['tumor_to_vessel']['median']:.0f} µm"
+                       f" · >100 µm "
                        f"{100*sec['vascular']['vessels']['tumor_frac_beyond_100um']:.1f}%"),
                 zorder=3)
     ax.axvline(100.0, color=_INK_2, lw=1.0, ls=":", zorder=2)
@@ -881,7 +928,8 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
     ax.set_xlabel("distance from tumour cell to nearest endothelial cell (µm)")
     ax.set_ylabel("cumulative fraction of tumour cells")
     ax.set_title("c · The delivery-relevant geometry", loc="left", fontsize=9.5)
-    ax.legend(frameon=False, fontsize=7.4, loc="lower right")
+    ax.legend(frameon=False, fontsize=7.6, loc="lower right",
+              handlelength=1.6, labelspacing=0.7)
     _clean(ax, ygrid=False)
     ax.grid(color=_GRID, lw=0.8, zorder=0)
     ax.set_axisbelow(True)
@@ -909,6 +957,10 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
                         rotation=90)
         if logy:
             ax.set_yscale("log")
+            lo, hi = ax.get_ylim()
+            ax.set_ylim(lo, hi * 6.0)
+        else:
+            ax.set_ylim(0, max(1.0, ax.get_ylim()[1]) * 1.30)
         ax.set_xticks(x)
         ax.set_xticklabels([d[:4] + "." if len(d) > 6 else d for d in drugs],
                            fontsize=8)
@@ -924,14 +976,19 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
     if h2 is not None:
         names = ["simulated_o2", "vascular_kde", "dist_endothelial",
                  "local_cell_density"]
-        nice = ["SIMULATED O₂\n(the PDE)", "vascular_kde\n(its own source)",
-                "dist_endothelial\n(one cKDTree query)", "local_cell_density\n(no vessels)"]
+        nice = ["SIMULATED O₂\nthe PDE", "vascular_kde\nits own source",
+                "dist_endothelial\n1 cKDTree query", "local_density\nno vessels"]
         vals = [h2["predictors"][n]["rho_score"] for n in names]
         cols = ["#e34948" if n == "simulated_o2" else "#2a78d6" for n in names]
         ax.barh(np.arange(len(names)), vals, 0.6, color=cols, zorder=3)
+        span = abs(min(vals))
         for i2, v in enumerate(vals):
-            ax.text(v - 0.006, i2, f"{v:+.4f}", va="center", ha="right",
-                    fontsize=8, color=_INK)
+            inside = abs(v) > 0.28 * span   # label fits inside the bar
+            ax.text(v + (0.004 if inside else -0.004), i2, f"{v:+.4f}",
+                    va="center", ha="left" if inside else "right", fontsize=8,
+                    color="white" if inside else _INK,
+                    fontweight="bold" if inside else "normal")
+        ax.set_xlim(min(vals) * 1.12, 0.004)
         ax.set_yticks(np.arange(len(names)))
         ax.set_yticklabels(nice, fontsize=7.8)
         ax.invert_yaxis()
@@ -981,25 +1038,26 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
                  loc="left", fontsize=9.5)
     colours = {"REPLICATES": "#2e7d32", "CONFIRMED": "#2e7d32", "HOLDS": "#2e7d32",
                "DOES NOT REPLICATE": "#c62828", "REFUTED": "#c62828",
-               "FAILS": "#c62828", "PARTIAL": "#ef6c00", "CONTEXT": "#52514e"}
-    y = 0.965
+               "FAILS": "#c62828", "PARTIAL": "#ef6c00", "CONTEXT": "#52514e",
+               "NOT REPRODUCED ON EITHER": "#6a1b9a"}
+    y = 0.975
     for v in vd:
-        ax.text(0.0, y, v["status"], fontsize=8.2, fontweight="bold",
+        ax.text(0.0, y, v["status"], fontsize=8.0, fontweight="bold",
                 color=colours.get(v["status"], _INK_2), va="top",
                 transform=ax.transAxes)
+        y -= 0.030
         claim = v["claim"]
-        wrapped = []
-        line = ""
+        wrapped, line = [], ""
         for w in claim.split():
-            if len(line) + len(w) > 52:
+            if len(line) + len(w) > 62:
                 wrapped.append(line)
                 line = w
             else:
                 line = (line + " " + w).strip()
         wrapped.append(line)
-        ax.text(0.30, y, "\n".join(wrapped), fontsize=7.6, va="top", color=_INK,
+        ax.text(0.03, y, "\n".join(wrapped), fontsize=7.4, va="top", color=_INK,
                 transform=ax.transAxes)
-        y -= 0.038 + 0.030 * len(wrapped)
+        y -= 0.018 + 0.0265 * len(wrapped)
 
     fig.suptitle(
         "THE HELD-OUT PATIENT — the whole validated pipeline, re-run on a second "
@@ -1050,8 +1108,13 @@ def write_report(res: Dict, path: str = _OUT_MD,
       "frozen production path at the identical settings, so **section 1's numbers "
       "here are re-derived, not quoted**.")
     A("")
-    A(f"**{len(replicates)} of {len(replicates) + len(fails)} scored claims "
-      f"replicate.** The headline result in one line each:")
+    neither = [v for v in vd if v["status"] == "NOT REPRODUCED ON EITHER"]
+    A(f"**{len(replicates)} of {len(replicates) + len(fails)} claims that could be "
+      f"scored as generalisation replicate.** A further {len(neither)} fail on "
+      "**both** sections — those are not generalisation failures, they are claims "
+      "that do not hold in this configuration at all, and they are called out "
+      "separately because conflating the two would be the easiest way to make "
+      "this report say something it should not. The headline, one line each:")
     A("")
     A("| what | section 1 (development) | section 2 (held out) | verdict |")
     A("|---|---|---|:--|")
@@ -1193,9 +1256,13 @@ def write_report(res: Dict, path: str = _OUT_MD,
     A("2. **Denominator.** Section 2 has "
       f"{c2['cell_density_per_mm2']/c1['cell_density_per_mm2']:.1f}× the cell "
       "density, so the same vasculature is divided by many more non-endothelial "
-      "cells. This is arithmetically sufficient on its own: at section 1's cell "
-      "density, section 2's endothelial density would be "
-      f"{100*c2['endothelial_per_mm2']/c1['cell_density_per_mm2']:.2f}% of cells.")
+      "cells. The denominator alone is arithmetically sufficient to explain the "
+      "whole gap: divide section 2's endothelial areal density by section 1's "
+      "total cell density and the fraction would read "
+      f"{100*c2['endothelial_per_mm2']/c1['cell_density_per_mm2']:.1f}% — far "
+      f"ABOVE 8.0%, not the {c2['endothelial_pct']:.2f}% observed. The observed "
+      "fraction is set as much by how many cells the section contains as by how "
+      "many of them are endothelial.")
     det1 = c1["marker_detection"]
     det2 = c2["marker_detection"]
     endo1 = ", ".join(f"{m} {100*det1[m]:.2f}%" for m in c1["markers_used"]["ENDOTHELIAL"])
@@ -1382,8 +1449,16 @@ def write_report(res: Dict, path: str = _OUT_MD,
         same = "✅" if o1[key] == o2[key] else "❌"
         A(f"| {lab} | {' > '.join(o1[key])} | {' > '.join(o2[key])} | {same} |")
     A("")
+    A("*(The 'same?' column compares the two SECTIONS with each other. Whether "
+      "each ranking agrees with the KILL ranking — the separate question — is "
+      "read down the rows: on both sections `coverage` swaps doxorubicin and "
+      "lomustine relative to kill, and `AUC/IC50` reproduces kill exactly.)*")
+    A("")
     A(f"**Published ordering** (`results/real_drug_panel.md`, uniform mode): "
-      f"{' > '.join(PUBLISHED_ORDERING)}.")
+      f"{' > '.join(PUBLISHED_ORDERING)}. Section 1's kill fractions here "
+      "(" + ", ".join(f"{n} {d1[n]['kill_fraction']:.4f}" for n in res["panel"]) + ") "
+      "reproduce that report's numbers exactly, which is the check that this "
+      "harness is running the same pipeline and not a variant of it.")
     A("")
     kill_same = o1["rank_by_kill"] == o2["rank_by_kill"]
     if kill_same:
@@ -1466,12 +1541,13 @@ def write_report(res: Dict, path: str = _OUT_MD,
       f"({', '.join(r1['ecm_markers_used'])}) — **COL1A2 and POSTN, the two "
       "fibrillar-collagen markers, are absent from the IO panel entirely.** Mean "
       f"ECM comes out at {r2['mean_ecm_density']:.3f} vs {r1['mean_ecm_density']:.3f}, "
-      f"which cuts D_eff by a further {(1-ALPHA_TORTUOSITY*r2['mean_ecm_density'])/(1-ALPHA_TORTUOSITY*r1['mean_ecm_density']):.2f}×. "
-      "That is **panel content, not tissue biology** — the ECM field is "
-      "max-normalised over whichever markers happen to be measured, so a panel "
-      "with three sparse matrix genes and a panel with three different ones do "
-      "not produce comparable absolute ECM. This is the clearest case in the "
-      "report of a difference that must NOT be read as biology.")
+      f"which scales D_eff to {(1-ALPHA_TORTUOSITY*r2['mean_ecm_density'])/(1-ALPHA_TORTUOSITY*r1['mean_ecm_density']):.2f}× of its section-1 value. "
+      "That is **panel content, not tissue biology** — the ECM field is a "
+      "max-normalised KDE over whichever matrix markers happen to be measured, "
+      f"so an 11-marker field and a {len(r2['ecm_markers_used'])}-marker field "
+      "have no common absolute scale even on identical tissue. This is the "
+      "clearest case in the report of a difference that must NOT be read as "
+      "biology.")
     A("")
     A("**Consequence.** Absolute kills and absolute AUCs are *not* comparable "
       "between the two sections. The **ordering** and the **within-section "
@@ -1736,7 +1812,12 @@ def write_report(res: Dict, path: str = _OUT_MD,
     # --- §6 verdicts ------------------------------------------------------------
     A("## 6. Verdict — what generalises to a second patient, and what does not")
     A("")
-    A("### 6.1 Generalises")
+    A("### 6.1 Replicates / confirmed")
+    A("")
+    A("Two of these are confirmations of a *negative* result — the hypoxia rows "
+      "confirm that the reaction-diffusion solve is out-predicted by a distance "
+      "transform. 'Confirmed' means the prior finding reproduced, not that the "
+      "model performed well.")
     A("")
     for v in vd:
         if v["status"] in ("REPLICATES", "CONFIRMED", "HOLDS"):
@@ -1748,7 +1829,19 @@ def write_report(res: Dict, path: str = _OUT_MD,
         if v["status"] in ("DOES NOT REPLICATE", "REFUTED", "FAILS"):
             A(f"* **{v['claim']}** — {v['why']}")
     A("")
-    A("### 6.3 Untestable on one section or the other")
+    A("### 6.3 Fails on BOTH sections — not a generalisation failure")
+    A("")
+    A("These are the rows where the held-out patient behaved exactly like the "
+      "development section, and both disagree with something this project has "
+      "claimed. Reading them as 'it did not generalise' would be wrong; they are "
+      "disagreements with a *prior configuration*, and the second patient's role "
+      "here is to show the disagreement is not patient-specific.")
+    A("")
+    for v in vd:
+        if v["status"] == "NOT REPRODUCED ON EITHER":
+            A(f"* **{v['claim']}** — {v['why']}")
+    A("")
+    A("### 6.4 Untestable on one section or the other")
     A("")
     A("* **Hypoxia against measured markers** is impossible on the 319-gene "
       "section: it carries no VEGFA, no HIF1A, no CA9, no ADM, no NDRG1, no "
@@ -1766,7 +1859,7 @@ def write_report(res: Dict, path: str = _OUT_MD,
       "behaves consistently on a second real tissue, which is a different and "
       "much weaker claim.")
     A("")
-    A("### 6.4 The one-paragraph reading")
+    A("### 6.5 The one-paragraph reading")
     A("")
     A(("**The response layer travels; the reconstruction layer does not.** " if
        kill_same else
