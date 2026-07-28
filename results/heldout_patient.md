@@ -1,5 +1,20 @@
 # The held-out patient — running the whole validated pipeline on a second real GBM section
 
+> ## ⚠ STALE — the absolute numbers in this file no longer match the engine
+>
+> **Do not quote an absolute kill from this file.** Found independently while re-anchoring the
+> flagship: this file's recorded reconstruction has **mean vascular 0.0250 / oxygen 0.2955**,
+> where the current code gives **0.0268 / 0.3520** on identical inputs at unchanged α = 148.6.
+> Every kill here is **~1.2× low**. The cause is the endothelial classifier fix
+> (`matched_null_z`), the same one that invalidated
+> [`results/real_drug_panel.md`](real_drug_panel.md).
+>
+> **Rankings are unaffected**, which is the standing pattern: the ranking is invariant, the
+> level is not. The same re-run reproduces `cell_state_impact.md` §3.2 **8/8 to 5e-5**, so the
+> pipeline is reproducible — these two files are simply older than the engine.
+>
+> Regeneration pending, together with `real_drug_panel.md` and `patient_report_xenium.md`.
+
 > **Regenerated under the discrete vessel source.** `vascular_mode = discrete`
 > (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
 > [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the

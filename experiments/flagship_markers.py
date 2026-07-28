@@ -472,12 +472,18 @@ def mgmt_from_xenium_panel(path: str, tumor: Optional[np.ndarray] = None) -> Dic
 # One section
 # --------------------------------------------------------------------------- #
 def run_section(key: str, dx_um: float = DX_UM,
-                drugs: Sequence[str] = PANEL) -> Dict:
+                drugs: Sequence[str] = PANEL,
+                checkpoint: Optional[str] = None) -> Dict:
     """Reconstruct ONCE with ``state_mode='markers'``, then run the whole panel.
 
     One reconstruction and one transport solve per drug; every state route reuses
     them. The reconstruction is the frozen ``reconstruct_real`` path with the only
     non-default argument being ``state_mode='markers'``.
+
+    ``checkpoint`` (optional) writes the per-drug rows to disk as they complete and
+    reloads them on a restart, so an interrupted run resumes at the next drug
+    instead of repeating ~4 min of transport solve per finished drug. It changes no
+    number: every drug is independent given the shared reconstruction.
     """
     meta = SECTIONS[key]
     path = meta["path"]
@@ -523,8 +529,17 @@ def run_section(key: str, dx_um: float = DX_UM,
     pdcfg = PDConfig()
     ocfg = OxygenConfig()
     rows: List[Dict] = []
+    if checkpoint and os.path.exists(checkpoint):
+        with open(checkpoint) as fh:
+            rows = json.load(fh).get("rows", [])
+        if rows:
+            print(f"  resuming from checkpoint: "
+                  f"{[r['drug'] for r in rows]} already done")
+    done = {r["drug"] for r in rows}
 
     for name in drugs:
+        if name in done:
+            continue
         t0 = time.time()
         dp, mol = compile_real_drug(name, alpha)
         apply_drug_sensitivity(micro, name, mode="uniform")
@@ -604,7 +619,13 @@ def run_section(key: str, dx_um: float = DX_UM,
         print(f"  {name:14s} kill  oxygen={row['kill_oxygen']:.4f}  "
               f"markers={row['kill_markers']:.4f}   "
               f"cov@1x={row['coverage_1x']:.4f}  "
-              f"meanAUC={row['mean_tumor_auc']:.3g}   [{row['runtime_s']:.0f}s]")
+              f"meanAUC={row['mean_tumor_auc']:.3g}   [{row['runtime_s']:.0f}s]",
+              flush=True)
+        if checkpoint:
+            with open(checkpoint, "w") as fh:
+                json.dump({"key": key, "rows": rows}, fh)
+
+    rows = [r for name in drugs for r in rows if r["drug"] == name]  # panel order
 
     if key == "brain_319":
         gate = _reproduction_gate(rows)
@@ -989,6 +1010,44 @@ def write_report(results: Dict[str, Dict], out_path: str = _OUT_MD) -> str:
                    for i, x in enumerate(all_rank) if x == rk]
             A(f"* " + " > ".join(rk) + " — " + ", ".join(who))
     A("")
+    A("**But the invariance is not equally safe at every adjacent pair, and the "
+      "narrowest gap should be quoted with it.** The engine draws kills as "
+      "Bernoulli trials over tumour cells, so a gap of order the sampling scale "
+      "`sqrt(p(1-p)/n)` is not a resolved ordering:")
+    A("")
+    A("| section | tightest adjacent pair (markers route) | gap | Bernoulli sigma | "
+      "gap / sigma |")
+    A("|---|---|---:|---:|---:|")
+    for k in order:
+        r = results[k]
+        ordered = sorted(r["rows"], key=lambda x: -x["kill_markers"])
+        pairs = [(ordered[i], ordered[i + 1]) for i in range(len(ordered) - 1)]
+        a, b = min(pairs, key=lambda p: p[0]["kill_markers"] - p[1]["kill_markers"])
+        gap = a["kill_markers"] - b["kill_markers"]
+        n = max(int(r["n_tumor"]), 1)
+        sig = math.sqrt(max(a["kill_markers"] * (1 - a["kill_markers"]), 0.0) / n)
+        A(f"| `{k}` | {a['drug']} vs {b['drug']} | {gap:.4f} | {sig:.5f} | "
+          f"{gap / max(sig, 1e-12):.1f} |")
+    A("")
+    A("Every other adjacent pair is far wider. So the ordering is solid at the top "
+      "— cisplatin's lead over the next drug is orders of magnitude above the "
+      "sampling scale on every section — and the **methotrexate / temozolomide "
+      "boundary at the bottom is the one place the ranking rests on a small "
+      "margin**. §5 shows that measuring MGMT opens that particular gap decisively, "
+      "which is the substantive reason to care about it here.")
+    A("")
+    n_cov_ok = sum(1 for k in order
+                   if results[k]["ranking_coverage"] == results[k]["ranking_markers"])
+    A(f"**`therapeutic_coverage_1x` still does not recover the kill ordering — on "
+      f"{len(order) - n_cov_ok} of {len(order)} sections.** It swaps doxorubicin "
+      "and lomustine on both large sections (doxorubicin is delivery-starved but "
+      "1200x more potent, so it kills more while covering less) and it is pinned at "
+      "0.0000 for temozolomide and methotrexate wherever their exposure never "
+      "reaches 1x IC50. `results/heldout_patient.md` §6.3 found exactly this on two "
+      "sections and declined to call it a generalisation failure; a third section "
+      "agreeing makes it a settled property of the metric rather than of any "
+      "tissue.")
+    A("")
     A("**What moves instead is the level.** Same drugs, same physics, different "
       "state route:")
     A("")
@@ -1001,10 +1060,32 @@ def write_report(results: Dict[str, Dict], out_path: str = _OUT_MD) -> str:
             A(f"| `{k}` | {row['drug']} | {row['kill_oxygen']:.4f} | "
               f"{row['kill_markers']:.4f} | {_f(ratio, 2)}x |")
     A("")
+    ratios = [r["kill_markers"] / r["kill_oxygen"] for k in order
+              for r in results[k]["rows"] if r["kill_oxygen"] > 0]
+    xsec = {}
+    for k in order:
+        for r in results[k]["rows"]:
+            xsec.setdefault(r["drug"], []).append(r["kill_markers"])
+    worst = max(xsec.items(), key=lambda kv: max(kv[1]) / max(min(kv[1]), 1e-12))
+    A(f"Across the {len(ratios)} (section x drug) cells above the state route moves "
+      f"the level by {min(ratios):.2f}x-{max(ratios):.2f}x. Across SECTIONS it "
+      f"moves far more: the same drug's marker-route kill spans up to "
+      f"{max(worst[1]) / max(min(worst[1]), 1e-12):.1f}x ({worst[0]}, "
+      + " / ".join(f"{v:.4f}" for v in worst[1]) + ").")
+    A("")
+    A("**A finding worth naming: the state route matters LESS on the sections that "
+      "can actually measure it.** On the two markers-capable sections the oxygen "
+      "and marker routes give kills within 0.86x-1.02x of each other; on the "
+      "319-gene section, where the marker route has to fall back to a neighbourhood "
+      "rule and the oxygen route's VIABLE band is a mask artefact, they differ by "
+      "1.18x-1.21x. The route disagreement on the incumbent section is not a "
+      "measurement of how much cell state matters — it is a measurement of how "
+      "badly that panel constrains it.")
+    A("")
     A("So a claim of the form *\"cisplatin beats doxorubicin beats lomustine on "
       "this tissue\"* survives every section and every route tested here, while a "
-      "claim of the form *\"temozolomide kills X% of tumour cells\"* survives "
-      "none of them.")
+      "claim of the form *\"temozolomide kills X% of tumour cells\"* does not "
+      "survive a change of section at all.")
     A("")
 
     # ------------------------------------------------------- 5. MGMT #
@@ -1141,6 +1222,24 @@ def write_report(results: Dict[str, Dict], out_path: str = _OUT_MD) -> str:
           "MAGNITUDE and the LABEL, not the rank**: a number that was flagged "
           "*'no intrinsic resistance modelled'* now carries the resistance value "
           "used, its CI, and where it came from.")
+        A("")
+        others = sorted(((r["drug"], r["kill_markers"]) for r in prim["rows"]
+                         if r["drug"] != "temozolomide"), key=lambda t: t[1])
+        nxt, nxt_k = others[0]
+        gap0 = nxt_k - base
+        gap1 = nxt_k - arms["bridged"]["kill_markers"]
+        sig = math.sqrt(max(base * (1 - base), 0.0) / max(prim["n_tumor"], 1))
+        A("**It does, however, make the placement itself robust, and that IS the "
+          f"same correction `results/mgmt_scalar.md` describes.** Without MGMT, "
+          f"temozolomide ({base:.4f}) sits below {nxt} ({nxt_k:.4f}) by only "
+          f"{gap0:.4f} — {gap0 / max(sig, 1e-12):.1f}x the Bernoulli sampling scale "
+          f"on {prim['n_tumor']:,} tumour cells, i.e. a placement that is nearly a "
+          f"coin-flip. With the measured MGMT scalar the gap opens to {gap1:.4f} "
+          f"({gap1 / max(sig, 1e-12):.0f}x sigma). That mirrors the finding in "
+          "`results/mgmt_scalar.md` exactly — there the measurement moved TMZ off "
+          "an artificially-inflated #4 and opened a 0.5 pp gap to 7-9 pp; here it "
+          "cannot move the rank because `uniform` mode never inflated it, but it "
+          "converts a marginal last place into a decisive one.")
         A("")
         A("**And it is not a small correction.** The measured scalar cuts "
           "temozolomide's predicted kill by "
@@ -1363,7 +1462,9 @@ def main(sections: Sequence[str] = SECTION_ORDER, dx_um: float = DX_UM,
             if key in results:
                 print(f"[{key}] already cached — skipping (delete {cache} to redo)")
                 continue
-            results[key] = run_section(key, dx_um=dx_um)
+            ckpt = (os.path.splitext(cache)[0] + f".{key}.partial.json"
+                    if cache else None)
+            results[key] = run_section(key, dx_um=dx_um, checkpoint=ckpt)
             if cache:
                 os.makedirs(os.path.dirname(cache) or ".", exist_ok=True)
                 with open(cache, "w") as fh:
