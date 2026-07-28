@@ -1,13 +1,5 @@
 # DOSE & SCHEDULE on ONE REAL TUMOR
 
-> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
-> figure below was generated with the **KDE** vascular source, which was the default until
-> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
-> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
-> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
-> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
-> `mode='kde'` to recover exactly these numbers.
-
 **Predicted dose-response, fractionation and infusion-duration behaviour for temozolomide and cisplatin on the real 10x Xenium glioblastoma section.** This is the question the simulator exists to inform — not *which* drug, but *how much* and *how often* — asked of one real patient's tissue.
 
 ![dose & schedule](dose_schedule.png)
@@ -26,8 +18,8 @@
 
 ## 1. Methods
 
-* **Tissue — one real tumor.** The open 10x Xenium GBM section: 40,887 measured cells (30,174 tumor), reconstructed **once** at the grid-converged `dx = 12 um` (grid 424x675) and reused for every sweep, so all differences are attributable to dose/schedule and not to the tissue. Mean vascular density 0.103, mean ECM 0.090, mean oxygen 0.250. After the oxygen solve 13.4% of tumor cells are hypoxic and 86.0% quiescent (both carry reduced drug kill).
-* **Vascular geometry.** Vessel mask = top 5% of the endothelial-derived vascular-density field (5.0% of tissue area). Distance from the nearest vessel over tissue: median 241 um, p90 714 um, max 2347 um. This is the geometry the drug's penetration has to cover — though see section 3: on this section most of the far tissue is reached by a diffuse source floor rather than by a diffusion front, which changes how that comparison should be read.
+* **Tissue — one real tumor.** The open 10x Xenium GBM section: 40,887 measured cells (23,812 tumor), reconstructed **once** at the grid-converged `dx = 12 um` (grid 424x675) and reused for every sweep, so all differences are attributable to dose/schedule and not to the tissue. Mean vascular density 0.027, mean ECM 0.076, mean oxygen 0.352. After the oxygen solve 0.0% of tumor cells are hypoxic and 90.0% quiescent (both carry reduced drug kill).
+* **Vascular geometry.** Vessel mask = top 5% of the endothelial-derived vascular-density field (2.7% of tissue area). Distance from the nearest vessel over tissue: median 43 um, p90 85 um, max 786 um. This is the geometry the drug's penetration has to cover — though see section 3: on this section most of the far tissue is reached by a diffuse source floor rather than by a diffusion front, which changes how that comparison should be read.
 * **Drugs.** `calibrated_drugparams(name, alpha = 148.61)` (single perivascular-sink constant, fit once on doxorubicin) then `apply_barrier_to_drugparams` — the identical compilation pipeline `real_drug_panel.py` uses.
 * **Per-cell sensitivity** is layered on per drug with `reconstruct.real_pipeline.apply_drug_sensitivity` (measured determinant where the panel carries one, honest uniform 1.0 otherwise). See the table below.
 * **Numerics.** `dt = 10 s`, convection on. Dose-response window 6 h; schedule / half-life window 12 h (cut from 24 h for compute, and held EXACTLY constant across every schedule and half-life compared). `dx = 10 um` is deliberately not used — it violates the upwind advection CFL condition at this `dt`. Seed 0, fully deterministic.
@@ -41,8 +33,8 @@ This is verified, not asserted: the **full** `sim.engine.simulate_response` was 
 
 | verification point | full-engine kill | fast-path kill | abs delta |
 |---|---|---|---|
-| temozolomide dose 1x (6 h window) | 0.1845628687 | 0.1845628687 | 0.0e+00 |
-| temozolomide schedule n=10 matched-AUC (12 h window) | 0.1471465500 | 0.1471465500 | 0.0e+00 |
+| temozolomide dose 1x (6 h window) | 0.0183520914 | 0.0183520914 | 0.0e+00 |
+| temozolomide schedule n=10 matched-AUC (12 h window) | 0.0117587771 | 0.0117587771 | 0.0e+00 |
 
 Largest discrepancy anywhere: **0.0e+00**.
 
@@ -50,8 +42,8 @@ Largest discrepancy anywhere: **0.0e+00**.
 
 | drug | MW (Da) | D (um²/s) | IC50 (uM) | hill | BBB | k_loss (1/s) | transport time-scale 1/k | analytic L = √(D_eff/k) | sensitivity determinant | median sensitivity (tumor) | kill ceiling |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| temozolomide | 194.2 | 278 | 606.0 | 1.20 | 0.558 | 3.02e-03 | 331 s | 295 um | none (uniform 1.0) | 1.000 | 0.4828 |
-| cisplatin | 298.0 | 236 | 24.6 | 1.20 | 0.893 | 8.79e-03 | 114 s | 159 um | MKI67 | 0.589 | 0.2853 |
+| temozolomide | 194.2 | 278 | 606.0 | 1.20 | 0.125 | 3.02e-03 | 331 s | 296 um | none (uniform 1.0) | 1.000 | 0.5502 |
+| cisplatin | 298.0 | 236 | 24.6 | 1.20 | 0.858 | 8.79e-03 | 114 s | 160 um | MKI67 | 0.589 | 0.3254 |
 
 **The kill ceiling** is the kill fraction reached as exposure → ∞: the Hill term saturates at `max_kill_rate`, so per-cell kill probability tends to `sensitivity x hypoxia/quiescence resistance`. It is a property of the sensitivity model and this tissue's oxygenation. **No dose can exceed it**, and it is the reference against which "is more drug worth it?" must be judged.
 
@@ -59,21 +51,21 @@ Largest discrepancy anywhere: **0.0e+00**.
 
 This matters more than any single kill number, so it is broken out per cell-state band. `contribution` is that band's share of the ceiling (fraction of tumor cells x their mean asymptotic kill probability); the three contributions sum to the ceiling.
 
-**temozolomide** — ceiling 0.4828
+**temozolomide** — ceiling 0.5502
 
 | tumor-cell band | fraction of tumor cells | resistance multiplier | mean asymptotic kill probability | contribution to ceiling |
 |---|---|---|---|---|
-| VIABLE | 0.6% | x1.00 | 1.000 | 0.0060 |
-| HYPOXIC | 13.4% | x0.35 | 0.350 | 0.0470 |
-| QUIESCENT | 86.0% | x0.50 | 0.500 | 0.4299 |
+| VIABLE | 10.0% | x1.00 | 1.000 | 0.1004 |
+| HYPOXIC | 0.0% | x0.35 | 0.000 | 0.0000 |
+| QUIESCENT | 90.0% | x0.50 | 0.500 | 0.4498 |
 
-**cisplatin** — ceiling 0.2853
+**cisplatin** — ceiling 0.3254
 
 | tumor-cell band | fraction of tumor cells | resistance multiplier | mean asymptotic kill probability | contribution to ceiling |
 |---|---|---|---|---|
-| VIABLE | 0.6% | x1.00 | 0.598 | 0.0036 |
-| HYPOXIC | 13.4% | x0.35 | 0.207 | 0.0278 |
-| QUIESCENT | 86.0% | x0.50 | 0.295 | 0.2539 |
+| VIABLE | 10.0% | x1.00 | 0.593 | 0.0595 |
+| HYPOXIC | 0.0% | x0.35 | 0.000 | 0.0000 |
+| QUIESCENT | 90.0% | x0.50 | 0.296 | 0.2659 |
 
 Read that table before reading anything else. The ceiling is **not** a delivery number and **not** an IC50 number: at infinite exposure every cell is at the top of its Hill curve, so what is left is exactly `sensitivity x resistance`. For temozolomide, whose per-cell sensitivity is uniform 1.0 on this panel, the ceiling is *entirely* the hypoxia (x0.35) and quiescence (x0.5) multipliers applied to the oxygen-banded cell states — i.e. it is set by how much of this tumor the model considers metabolically out of reach, not by how much drug arrives. For cisplatin the MKI67-derived sensitivity multiplies that down further.
 
@@ -87,37 +79,37 @@ Read that table before reading anything else. The ceiling is **not** a delivery 
 
 | dose (× nominal) | plasma peak (uM) | window-mean plasma (uM) | kill fraction | % of kill ceiling | tumor cells ≥ IC50 | tumor cells ≥ 0.1·IC50 | median exposure / IC50 | IC50 depth from vessel (um) |
 |---|---|---|---|---|---|---|---|---|
-| 0.05x | 2.5 | 1.55 | 0.01283 | 2.7% | 0.00% | 8.27% | 0.033 | — (below IC50 even at the vessel wall) |
-| 0.1x | 5.0 | 3.11 | 0.02721 | 5.6% | 0.00% | 31.08% | 0.066 | — (below IC50 even at the vessel wall) |
-| 0.3x | 15.0 | 9.33 | 0.07904 | 16.4% | 2.66% | 73.58% | 0.197 | 12 |
-| 1x | 50.0 | 31.09 | 0.18456 | 38.2% | 31.08% | 90.37% | 0.655 | 72 |
-| 3x | 150.0 | 93.28 | 0.30052 | 62.2% | 73.58% | 95.91% | 1.965 | 1389 |
-| 10x | 500.0 | 310.95 | 0.39746 | 82.3% | 90.37% | 98.30% | 6.550 | 1530+ |
-| 30x | 1500.0 | 932.85 | 0.44479 | 92.1% | 95.91% | 99.09% | 19.650 | 1530+ |
+| 0.05x | 2.5 | 1.55 | 0.00055 | 0.1% | 0.00% | 0.00% | 0.003 | — (below IC50 even at the vessel wall) |
+| 0.1x | 5.0 | 3.11 | 0.00139 | 0.3% | 0.00% | 0.00% | 0.006 | — (below IC50 even at the vessel wall) |
+| 0.3x | 15.0 | 9.33 | 0.00462 | 0.8% | 0.00% | 0.00% | 0.017 | — (below IC50 even at the vessel wall) |
+| 1x | 50.0 | 31.09 | 0.01835 | 3.3% | 0.00% | 2.89% | 0.056 | — (below IC50 even at the vessel wall) |
+| 3x | 150.0 | 93.28 | 0.06136 | 11.2% | 0.00% | 97.68% | 0.167 | — (below IC50 even at the vessel wall) |
+| 10x | 500.0 | 310.95 | 0.18869 | 34.3% | 2.89% | 99.87% | 0.555 | — (below IC50 even at the vessel wall) |
+| 30x | 1500.0 | 932.85 | 0.35373 | 64.3% | 97.68% | 99.87% | 1.666 | 145 |
 
-**Saturation.** **Kill has NOT saturated within the swept range** — it is still climbing at 30x nominal, reaching 90% of its 30x value only at 30x itself. Over this whole range more drug is still buying more kill; IC50 coverage passes 90% of tumor cells by **10x**. At 30x the predicted kill is 0.4448 = 92.1% of the 0.4828 ceiling, so the residual 7.9% of the ceiling is what *no achievable dose* recovers — that residual is the hypoxic/quiescent fraction the Hill term can never reach past.
+**Saturation.** **Kill has NOT saturated within the swept range** — it is still climbing at 30x nominal, reaching 90% of its 30x value only at 30x itself. Over this whole range more drug is still buying more kill; IC50 coverage passes 90% of tumor cells by **30x**. At 30x the predicted kill is 0.3537 = 64.3% of the 0.5502 ceiling, so the residual 35.7% of the ceiling is what *no achievable dose* recovers — that residual is the hypoxic/quiescent fraction the Hill term can never reach past.
 
-**At the approximate clinical plasma band.** Published Cmax for temozolomide is of order 30–70 uM, i.e. **0.6x–1.4x** of the shared nominal level used for the axis. Interpolating the sweep there gives kill 0.1398–0.2201 (29–46% of ceiling) and IC50 coverage 19.0–44.1% of tumor cells. *This band is an order-of-magnitude literature reference attached for scale only — it is not fitted, not patient-specific, and not a dose recommendation.*
+**At the approximate clinical plasma band.** Published Cmax for temozolomide is of order 30–70 uM, i.e. **0.6x–1.4x** of the shared nominal level used for the axis. Interpolating the sweep there gives kill 0.0125–0.0315 (2–6% of ceiling) and IC50 coverage 0.0–0.0% of tumor cells. *This band is an order-of-magnitude literature reference attached for scale only — it is not fitted, not patient-specific, and not a dose recommendation.*
 
-**What 30x buys over 1x.** kill 0.1846 → 0.4448 (+0.2602 absolute, 2.41x relative) for a 30-fold increase in systemic exposure — i.e. a 59% share of the final kill bought at 30x the systemic toxicity.
+**What 30x buys over 1x.** kill 0.0184 → 0.3537 (+0.3354 absolute, 19.27x relative) for a 30-fold increase in systemic exposure — i.e. a 95% share of the final kill bought at 30x the systemic toxicity.
 
 ### 2.2 cisplatin
 
 | dose (× nominal) | plasma peak (uM) | window-mean plasma (uM) | kill fraction | % of kill ceiling | tumor cells ≥ IC50 | tumor cells ≥ 0.1·IC50 | median exposure / IC50 | IC50 depth from vessel (um) |
 |---|---|---|---|---|---|---|---|---|
-| 0.05x | 2.5 | 1.55 | 0.08865 | 31.1% | 16.31% | 86.84% | 0.449 | 52 |
-| 0.1x | 5.0 | 3.11 | 0.13164 | 46.1% | 44.95% | 92.48% | 0.898 | 206 |
-| 0.3x | 15.0 | 9.33 | 0.19520 | 68.4% | 79.64% | 96.70% | 2.694 | 1415 |
-| 1x | 50.0 | 31.09 | 0.24143 | 84.6% | 92.48% | 98.55% | 8.978 | 1530+ |
-| 3x | 150.0 | 93.28 | 0.26404 | 92.6% | 96.70% | 99.24% | 26.935 | 1530+ |
-| 10x | 500.0 | 310.95 | 0.27454 | 96.2% | 98.55% | 99.55% | 89.784 | 1530+ |
-| 30x | 1500.0 | 932.85 | 0.27832 | 97.6% | 99.24% | 99.71% | 269.353 | 1530+ |
+| 0.05x | 2.5 | 1.55 | 0.03620 | 11.1% | 0.00% | 91.39% | 0.159 | — (below IC50 even at the vessel wall) |
+| 0.1x | 5.0 | 3.11 | 0.06967 | 21.4% | 0.50% | 99.55% | 0.318 | — (below IC50 even at the vessel wall) |
+| 0.3x | 15.0 | 9.33 | 0.16076 | 49.4% | 44.20% | 99.87% | 0.953 | 47 |
+| 1x | 50.0 | 31.09 | 0.25491 | 78.3% | 99.55% | 99.87% | 3.178 | 150+ |
+| 3x | 150.0 | 93.28 | 0.29771 | 91.5% | 99.87% | 99.87% | 9.533 | 150+ |
+| 10x | 500.0 | 310.95 | 0.31375 | 96.4% | 99.87% | 99.87% | 31.775 | 150+ |
+| 30x | 1500.0 | 932.85 | 0.31786 | 97.7% | 99.87% | 99.87% | 95.326 | 150+ |
 
-**Saturation.** **Kill saturates at about 3x** (90% of its 30x value) and is flat by 30x; IC50 coverage passes 90% of tumor cells by **1x**. At 30x the predicted kill is 0.2783 = 97.6% of the 0.2853 ceiling, so the residual 2.4% of the ceiling is what *no achievable dose* recovers — that residual is the hypoxic/quiescent fraction the Hill term can never reach past.
+**Saturation.** **Kill saturates at about 3x** (90% of its 30x value) and is flat by 30x; IC50 coverage passes 90% of tumor cells by **1x**. At 30x the predicted kill is 0.3179 = 97.7% of the 0.3254 ceiling, so the residual 2.3% of the ceiling is what *no achievable dose* recovers — that residual is the hypoxic/quiescent fraction the Hill term can never reach past.
 
-**At the approximate clinical plasma band.** Published Cmax for cisplatin is of order 2–6 uM, i.e. **0.04x–0.12x** of the shared nominal level used for the axis. Interpolating the sweep there gives kill 0.0887–0.1422 (31–50% of ceiling) and IC50 coverage 16.3–50.7% of tumor cells (the low end is clamped to the swept minimum). *This band is an order-of-magnitude literature reference attached for scale only — it is not fitted, not patient-specific, and not a dose recommendation.*
+**At the approximate clinical plasma band.** Published Cmax for cisplatin is of order 2–6 uM, i.e. **0.04x–0.12x** of the shared nominal level used for the axis. Interpolating the sweep there gives kill 0.0362–0.0848 (11–26% of ceiling) and IC50 coverage 0.0–7.8% of tumor cells (the low end is clamped to the swept minimum). *This band is an order-of-magnitude literature reference attached for scale only — it is not fitted, not patient-specific, and not a dose recommendation.*
 
-**What 30x buys over 1x.** kill 0.2414 → 0.2783 (+0.0369 absolute, 1.15x relative) for a 30-fold increase in systemic exposure — i.e. a 13% share of the final kill bought at 30x the systemic toxicity.
+**What 30x buys over 1x.** kill 0.2549 → 0.3179 (+0.0630 absolute, 1.25x relative) for a 30-fold increase in systemic exposure — i.e. a 20% share of the final kill bought at 30x the systemic toxicity.
 
 ---
 
@@ -129,8 +121,8 @@ Because the field is linear in dose, **dose moves the amplitude of the perivascu
 
 | drug | empirical half-distance (no model assumed) | **source-null half-distance** | near-field exponential L (d ≤ p90) | near-field fit R² | floor-model L | floor level (% of perivascular) | far-field plateau / perivascular | analytic √(D_eff/k) | equilibration t95 | penetration index |
 |---|---|---|---|---|---|---|---|---|---|---|
-| temozolomide | 36 um | 30 um | 574 um | 0.38 | 30 um | 15% | 0.12 | 295 um | 1100 s (18.3 min) | 0.195 |
-| cisplatin | 35 um | 30 um | 575 um | 0.38 | 30 um | 15% | 0.12 | 159 um | 400 s (6.7 min) | 0.196 |
+| temozolomide | 144 um | 12 um | 291 um | 0.99 | 269 um | 0% | 0.56 | 296 um | 1100 s (18.3 min) | 0.511 |
+| cisplatin | 98 um | 12 um | 153 um | 0.98 | 130 um | 8% | 0.37 | 160 um | 400 s (6.7 min) | 0.428 |
 
 **Which column to believe:** the *empirical* half-distance assumes no functional form and is the trustworthy gradient number. The single-exponential fits — over the full range and over the near field alike — have poor R² and return decay lengths inflated by the plateau; disregard them as descriptions of the gradient. The floor model reconciles the two: a short decaying component (its `L` is close to the empirical half-distance) plus a background floor. Note also that the two drugs return nearly identical geometry despite differing in `D_eff` and `k` by ~2x — further evidence that what is being measured here is mostly the source field, not drug-specific transport.
 
@@ -140,7 +132,7 @@ Three things to take from that table, in order of importance:
 2. **A large fraction of the field is floor, not gradient.** See the plateau column. Any statement of the form "drug reaches X um" is therefore mostly a statement about where the floor sits relative to IC50, not about a diffusion front, and the `IC50 depth` column in section 2 must be read that way: when it jumps to the edge of the profiled range between two doses, what happened is that the **floor** crossed IC50, not that the drug travelled further.
 3. **Depth cannot be bought with dose.** The shape is fixed, so raising the dose slides the whole curve up and the IC50 crossing moves only as `L*ln(dose)` in the decaying region — and, once the floor clears IC50, saturates entirely.
 
-For scale: median distance-to-vessel on this section is 241 um, p90 714 um, max 2347 um. Bins beyond the p90 hold only a few hundred pixels each, so the far tail of panel C is noisy as well as flat — the near-field exponential above is deliberately restricted to d ≤ p90.
+For scale: median distance-to-vessel on this section is 43 um, p90 85 um, max 786 um. Bins beyond the p90 hold only a few hundred pixels each, so the far tail of panel C is noisy as well as flat — the near-field exponential above is deliberately restricted to d ≤ p90.
 
 ---
 
@@ -158,11 +150,11 @@ One 12 h course, 4 h plasma half-life, split into 1 / 3 / 10 fractions. Three le
 
 | schedule | per-dose peak, leg A (uM) | window-mean plasma, A | **kill, A (matched exposure)** | tumor ≥ IC50, A | window-mean plasma, B | kill, B (matched administered dose) | window-mean plasma, C | kill, C (matched peak) |
 |---|---|---|---|---|---|---|---|---|
-| 1 dose (bolus) | 50.00 | 21.0444 | **0.147147** | 16.09% | 21.0444 | 0.147147 | 21.0444 | 0.147147 |
-| 3 doses q4.0h | 20.59 | 21.0444 | **0.147147** | 16.09% | 17.0359 | 0.126831 | 51.1077 | 0.237655 |
-| 10 doses q1.2h | 7.04 | 21.0444 | **0.147147** | 16.09% | 14.9463 | 0.115132 | 149.4628 | 0.343972 |
+| 1 dose (bolus) | 50.00 | 21.0444 | **0.011759** | 0.00% | 21.0444 | 0.011759 | 21.0444 | 0.011759 |
+| 3 doses q4.0h | 20.59 | 21.0444 | **0.011759** | 0.00% | 17.0359 | 0.009575 | 51.1077 | 0.032505 |
+| 10 doses q1.2h | 7.04 | 21.0444 | **0.011759** | 0.00% | 14.9463 | 0.008105 | 149.4628 | 0.100958 |
 
-Leg A spread across 1 → 10 fractions: **0.00e+00** (exactly zero to machine precision). Leg B falls 0.147147 → 0.115132 (21.8% relative). Leg C rises 0.147147 → 0.343972.
+Leg A spread across 1 → 10 fractions: **0.00e+00** (exactly zero to machine precision). Leg B falls 0.011759 → 0.008105 (31.1% relative). Leg C rises 0.011759 → 0.100958.
 
 ### 4.x Interpretation — read this carefully, the honest answer has two halves
 
@@ -192,9 +184,9 @@ A short half-life is a bolus that is gone quickly; a long half-life is a sustain
 
 | plasma half-life (h) | peak, matched exposure (uM) | window-mean plasma | **kill (matched total exposure)** | tumor ≥ IC50 | IC50 depth (um) | window-mean plasma, matched peak | kill (matched peak) | IC50 depth, matched peak (um) |
 |---|---|---|---|---|---|---|---|---|
-| 0.25 | 697.48 | 21.0444 | **0.147147** | 16.09% | 52 | 1.5086 | 0.012560 | — (below IC50 even at the vessel wall) |
-| 4 | 50.00 | 21.0444 | **0.147147** | 16.09% | 52 | 21.0444 | 0.147147 | 52 |
-| 48 | 22.92 | 21.0444 | **0.147147** | 16.09% | 52 | 45.9085 | 0.226022 | 278 |
+| 0.25 | 697.48 | 21.0444 | **0.011759** | 0.00% | — (below IC50 even at the vessel wall) | 1.5086 | 0.000504 | — (below IC50 even at the vessel wall) |
+| 4 | 50.00 | 21.0444 | **0.011759** | 0.00% | — (below IC50 even at the vessel wall) | 21.0444 | 0.011759 | — (below IC50 even at the vessel wall) |
+| 48 | 22.92 | 21.0444 | **0.011759** | 0.00% | — (below IC50 even at the vessel wall) | 45.9085 | 0.028893 | — (below IC50 even at the vessel wall) |
 
 Spread in kill across the 192-fold half-life range at matched exposure: **0.00e+00**. Penetration depth: **unchanged**.
 
@@ -228,19 +220,19 @@ The transport-limited hypothesis is **rejected on this tissue for the drug teste
 
 **DOSE-limited over the swept range, then sensitivity-limited.**
 
-At the nominal dose 31.1% of tumor cells clear IC50, rising to 95.9% by 30x — the drug *can* reach essentially the whole tumor once enough of it is given, so the binding constraint over this range is how much drug is present, not how far it travels. Kill climbs with dose (0.1846 → 0.4448), and at 30x it has reached 92.1% of the 0.4828 ceiling without yet flattening — the sweep never gets far enough for delivery to stop mattering.
+At the nominal dose 0.0% of tumor cells clear IC50, rising to 97.7% by 30x — the drug *can* reach essentially the whole tumor once enough of it is given, so the binding constraint over this range is how much drug is present, not how far it travels. Kill climbs with dose (0.0184 → 0.3537), and at 30x it has reached 64.3% of the 0.5502 ceiling without yet flattening — the sweep never gets far enough for delivery to stop mattering.
 
-Geometry check: near-field exposure decay length **L = 574 um** (d ≤ p90) vs median distance-to-vessel **241 um** and p90 **714 um**. IC50 depth at 1x: 72 um; at 30x: 1530+ um — but see section 3: with a far-field plateau at 0.12 of the perivascular value, the large depths are the FLOOR clearing IC50, not a diffusion front reaching further.
+Geometry check: near-field exposure decay length **L = 291 um** (d ≤ p90) vs median distance-to-vessel **43 um** and p90 **85 um**. IC50 depth at 1x: — (below IC50 even at the vessel wall) um; at 30x: 145 um — but see section 3: with a far-field plateau at 0.56 of the perivascular value, the large depths are the FLOOR clearing IC50, not a diffusion front reaching further.
 
 ### cisplatin
 
-**DOSE-limited over the swept range, then sensitivity-limited.**
+**NEITHER dose- nor delivery-limited — it is SENSITIVITY-limited.**
 
-At the nominal dose 92.5% of tumor cells clear IC50, rising to 99.2% by 30x — the drug *can* reach essentially the whole tumor once enough of it is given, so the binding constraint over this range is how much drug is present, not how far it travels. Kill climbs with dose (0.2414 → 0.2783), and at 30x it has reached 97.6% of the 0.2853 ceiling, flattening from about 3x onward, beyond which extra drug buys essentially nothing and the limit becomes intrinsic resistance.
+Already at the nominal dose, 99.5% of tumor cells see an exposure above IC50. The drug reaches essentially the whole tumor; raising the dose 30-fold moves kill only 0.2549 → 0.3179. What caps the response is the kill ceiling (0.3254) — the sensitivity model plus hypoxic / quiescent resistance. More drug does not help; a different drug, or reversing resistance, is the only lever the model leaves open.
 
-**Important qualification — the verdict above is stated at the shared nominal level, which is well above cisplatin's clinical range.** Its approximate clinical Cmax (2–6 uM) is only 0.04x–0.12x nominal. Down there the sweep gives IC50 coverage 16% and kill 0.0887 (31% of ceiling), extrapolated to the edge of the swept range — i.e. at clinically plausible exposures this drug is materially **dose-limited on this tumor**, and it only becomes sensitivity-limited once pushed to supratherapeutic levels. Both statements are in the table; which one is relevant depends on the dose actually deliverable.
+**Important qualification — the verdict above is stated at the shared nominal level, which is well above cisplatin's clinical range.** Its approximate clinical Cmax (2–6 uM) is only 0.04x–0.12x nominal. Down there the sweep gives IC50 coverage 0% and kill 0.0362 (11% of ceiling), extrapolated to the edge of the swept range — i.e. at clinically plausible exposures this drug is materially **dose-limited on this tumor**, and it only becomes sensitivity-limited once pushed to supratherapeutic levels. Both statements are in the table; which one is relevant depends on the dose actually deliverable.
 
-Geometry check: near-field exposure decay length **L = 575 um** (d ≤ p90) vs median distance-to-vessel **241 um** and p90 **714 um**. IC50 depth at 1x: 1530+ um; at 30x: 1530+ um — but see section 3: with a far-field plateau at 0.12 of the perivascular value, the large depths are the FLOOR clearing IC50, not a diffusion front reaching further.
+Geometry check: near-field exposure decay length **L = 153 um** (d ≤ p90) vs median distance-to-vessel **43 um** and p90 **85 um**. IC50 depth at 1x: 150+ um; at 30x: 150+ um — but see section 3: with a far-field plateau at 0.37 of the perivascular value, the large depths are the FLOOR clearing IC50, not a diffusion front reaching further.
 
 ### What this means operationally (within the model's limits)
 
@@ -264,4 +256,4 @@ Geometry check: near-field exposure decay length **L = 575 um** (d ≤ p90) vs m
 10. **Scope was cut for the compute budget** (see the banner at the top): 7 dose points; schedule + half-life for temozolomide only; 3 schedules; 3 half-lives; 12 h schedule window; 2 engine verification runs. Nothing was extrapolated to fill the gaps — the gaps are named instead.
 11. **One calibration constant** (`alpha`, fit once on doxorubicin) sets the perivascular sink for every drug; the penetration lengths and therefore every depth number inherit its uncertainty.
 
-*Generated by `experiments/dose_schedule.py` — ONE reconstruction reused everywhere, 3 transport solves, 2 full-engine verification runs, 9.1 min total, seed 0, deterministic.*
+*Generated by `experiments/dose_schedule.py` — ONE reconstruction reused everywhere, 3 transport solves, 2 full-engine verification runs, 13.7 min total, seed 0, deterministic.*

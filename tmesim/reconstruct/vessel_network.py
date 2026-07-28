@@ -78,15 +78,34 @@ leaking endothelium, not the lumen alone.
 * The normal-brain lower bound is a mean capillary radius of 2.39 ± 0.08 µm —
   Ji X et al., Neuron 2021;109(7):1168-1187, PMID 33657412,
   doi:10.1016/j.neuron.2021.02.006. (Mouse, light-sheet whole-brain.)
-* **HONEST CAVEAT.** At the production grid ``dx = 12 µm`` a single grid cell is
-  144 µm², i.e. an equivalent disc radius of 6.8 µm. **No vessel smaller than that
-  is representable at all.** 7.5 µm is therefore as much a statement about the
-  grid as about biology: it is the smallest radius that reliably paints ≥1 grid
-  cell per vessel while staying inside the published range. The resulting
-  **vascular area fraction is the quantity to validate**, and it is reported by
-  :func:`segmentation_report` against the measured GBM whole-section CD34 area
-  fraction of 2.1 ± 0.3% (Angelucci C et al., Cells 2022;12(1):11, PMID 36611806,
-  doi:10.3390/cells12010011).
+* **SUPERSEDED — see** :mod:`reconstruct.vessel_geometry` **and**
+  ``results/vessel_geometry_fix.md``. The paragraph that used to stand here said
+  that at ``dx = 12 µm`` a grid cell has an equivalent disc radius of 6.8 µm so
+  "no vessel smaller than that is representable", and that 7.5 µm was therefore
+  "the smallest radius that reliably paints ≥1 grid cell per vessel". Two
+  corrections:
+
+  1. That reasoning does not make the *area fraction* grid-dependent. Sweeping
+     ``dx = 30/20/12/8/6 µm`` on both production sections moves it by ≤1.03×,
+     because point-sampling a fixed physical region on a lattice is an unbiased
+     area estimator at any pitch. What the coarse grid destroys is the field's
+     *geometry* — at ``dx = 30 µm`` only 0.26 pixels are painted per vessel, so
+     most vessels vanish from the source entirely.
+  2. A radius justified by the grid still cannot be used to produce a tissue
+     measurement, and — the defect that actually moves the number — the disc is
+     painted around every endothelial **cell**, so the area fraction tracks
+     endothelial-cell density rather than vessel density. The two production
+     sections have near-identical vessel densities (111 vs 104 /mm²) but 2.7×
+     different endothelial densities, and their reported area fractions differed
+     by exactly that ratio.
+
+  :data:`VESSEL_RADIUS_UM` and the binary field below are therefore kept
+  **bit-identical** (so no published result silently moves) but are no longer the
+  route to the area fraction. :func:`segmentation_report` now reports the sub-grid,
+  data-derived area fraction from :func:`reconstruct.vessel_geometry.
+  vascular_area_fraction`, still scored against the measured GBM whole-section
+  CD34 area fraction of 2.1 ± 0.3% (Angelucci C et al., Cells 2022;12(1):11,
+  PMID 36611806, doi:10.3390/cells12010011).
 
 Run:  ./.venv/bin/python -m tmesim.reconstruct.vessel_network
 """
@@ -396,6 +415,8 @@ def discrete_vascular_field(
     radius_um: float = VESSEL_RADIUS_UM,
     amplitude: str = "unit",
     match_total_to: Optional[np.ndarray] = None,
+    geometry: str = "binary",
+    radius_mode: str = "data",
 ) -> np.ndarray:
     """Source field (ny, nx) that is nonzero ONLY within ``radius_um`` of a
     segmented vessel, and EXACTLY zero everywhere else.
@@ -404,6 +425,22 @@ def discrete_vascular_field(
     endothelial cell belonging to a segmented vessel object. The result is then
     masked to ``domain.tissue_mask``. There is no Gaussian tail and therefore no
     far-field floor: ``field[d > radius_um] == 0.0`` exactly.
+
+    ``geometry='subgrid'`` — the FIXED geometry
+    -------------------------------------------
+    **ADDITIVE AND OPT-IN; the default is bit-identical to the historical field.**
+    With ``geometry='subgrid'`` the field is instead the fractional area coverage
+    of :func:`reconstruct.vessel_geometry.subgrid_coverage_field`: one footprint
+    per segmented **vessel object** (not per endothelial cell), at a radius derived
+    from that object's own endothelial content, painted as a partial-area weight so
+    a vessel smaller than a grid cell is still represented. Values are then in
+    ``[0, 1]`` continuously rather than binary. ``radius_um`` is ignored unless
+    ``radius_mode='constant'``. See ``results/vessel_geometry_fix.md``.
+
+    The default is left at ``'binary'`` because ``vascular_density_from_cells``
+    (and therefore every reconstruction and every result already published against
+    it) routes through this function; flipping it is a deliberate re-run, not a
+    silent one.
 
     Normalisation — what the numbers MEAN
     -------------------------------------
@@ -454,9 +491,38 @@ def discrete_vascular_field(
         (ny, nx) non-negative field, zero outside the vessel radius and outside
         tissue.
     """
+    geom_mode = str(geometry).strip().lower()
+    if geom_mode not in {"binary", "subgrid"}:
+        raise ValueError(f"unknown geometry {geometry!r}; "
+                         "expected 'binary' or 'subgrid'")
+
     field = domain.zeros()
     xy = np.asarray(vessels["xy"], dtype=np.float64)
     if xy.shape[0] == 0:
+        return field
+
+    if geom_mode == "subgrid":
+        from .vessel_geometry import subgrid_coverage_field, vessel_geometry
+        if amplitude not in {"unit", "per_vessel_cells"}:
+            raise ValueError(f"unknown amplitude {amplitude!r}; "
+                             "expected 'unit' or 'per_vessel_cells'")
+        geom = vessel_geometry(
+            vessels, radius_mode=radius_mode,
+            constant_radius_um=(radius_um if radius_mode == "constant" else None))
+        field = subgrid_coverage_field(domain, geom)
+        if amplitude == "per_vessel_cells":
+            raise ValueError(
+                "amplitude='per_vessel_cells' is not defined for "
+                "geometry='subgrid': the sub-grid footprint already carries the "
+                "object's endothelial content through its radius, so scaling by "
+                "the cell count again would double-count it")
+        tissue = np.asarray(domain.tissue_mask, dtype=bool)
+        if match_total_to is not None:
+            ref = np.asarray(match_total_to, dtype=np.float64)
+            ref_total = float(ref[tissue].sum())
+            cur_total = float(field[tissue].sum())
+            if cur_total > 0 and ref_total > 0:
+                field = field * (ref_total / cur_total)
         return field
 
     ny, nx = domain.shape
@@ -502,17 +568,49 @@ def discrete_vascular_field(
 # 3. Scoring the segmentation against published morphometry
 # --------------------------------------------------------------------------- #
 def segmentation_report(vessels: Dict, domain: Domain,
-                        radius_um: float = VESSEL_RADIUS_UM) -> Dict:
+                        radius_um: float = VESSEL_RADIUS_UM,
+                        area_fraction_geometry: str = "subgrid",
+                        radius_mode: str = "data") -> Dict:
     """Score a :func:`segment_vessels` result against :data:`PUBLISHED`.
 
     Returns one row per comparable quantity with the reconstructed value, the
     published value + range, the ratio, and a PASS/HIGH/LOW verdict (PASS = inside
     the published range).
+
+    Parameters
+    ----------
+    radius_um : float
+        Radius for the LEGACY binary field, which is still computed and reported
+        as ``legacy_binary_area_fraction_pct`` so the two can be compared.
+    area_fraction_geometry : {'subgrid', 'binary'}
+        Which geometry supplies the headline ``vessel_area_fraction_pct`` that is
+        scored against the published 2.1 ± 0.3 %. Default ``'subgrid'`` — the
+        sub-grid, data-derived footprint of
+        :func:`reconstruct.vessel_geometry.vascular_area_fraction`, which is
+        grid-independent by construction and uses no hardcoded radius.
+        ``'binary'`` reproduces the historical (per-endothelial-cell, fixed
+        7.5 µm, centre-in-disc) number.
+    radius_mode : {'data', 'stereological', 'constant'}
+        Passed through to :func:`reconstruct.vessel_geometry.vessel_geometry`.
     """
+    from .vessel_geometry import vascular_area_fraction
+
     field = discrete_vascular_field(domain, vessels, radius_um=radius_um)
     tissue = np.asarray(domain.tissue_mask, dtype=bool)
-    area_frac_pct = (100.0 * float((field > 0)[tissue].sum()) / float(tissue.sum())
-                     if tissue.any() else float("nan"))
+    legacy_area_frac_pct = (
+        100.0 * float((field > 0)[tissue].sum()) / float(tissue.sum())
+        if tissue.any() else float("nan"))
+
+    geom_mode = str(area_fraction_geometry).strip().lower()
+    if geom_mode not in {"subgrid", "binary"}:
+        raise ValueError(f"unknown area_fraction_geometry {area_fraction_geometry!r};"
+                         " expected 'subgrid' or 'binary'")
+    af = vascular_area_fraction(
+        domain, vessels, radius_mode=radius_mode,
+        constant_radius_um=(radius_um if radius_mode == "constant" else None))
+    af.pop("coverage", None)
+    area_frac_pct = (af["area_fraction_pct"] if geom_mode == "subgrid"
+                     else legacy_area_frac_pct)
 
     rows = []
 
@@ -553,7 +651,14 @@ def segmentation_report(vessels: Dict, domain: Domain,
     return {
         "rows": rows,
         "vessel_area_fraction_pct": area_frac_pct,
+        "area_fraction_geometry": geom_mode,
+        # The historical per-endothelial-cell, fixed-7.5 µm, centre-in-disc number,
+        # kept so the size of the correction is always visible next to the fix.
+        "legacy_binary_area_fraction_pct": legacy_area_frac_pct,
+        "area_fraction_detail": af,
         "radius_um": float(radius_um),
+        # Only meaningful for the legacy binary field; the sub-grid painter has no
+        # minimum representable radius, which is the point of it.
         "grid_min_representable_radius_um": float(np.sqrt(domain.dx ** 2 / np.pi)),
         "csr_median_um": csr_median,
         "csr_frac_beyond_100um": csr_beyond_100,

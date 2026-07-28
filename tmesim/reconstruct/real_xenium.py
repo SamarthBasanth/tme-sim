@@ -40,24 +40,75 @@ mechanistic proxy AND on the logistic mapping constants, neither of which is
 calibrated against a measured drug response. This section is an untreated
 resection with no outcome label; none of this is validated.
 
-Phenotyping (marker -> CellType) — THRESHOLD-GATED
---------------------------------------------------
+Phenotyping (marker -> CellType) — MATCHED-NULL GATED
+-----------------------------------------------------
 Markers are log1p-transformed then z-scored across all cells (so each marker
-contributes on a comparable scale), and each type's score is the *mean* z-score
-over its present markers (mean, not sum, so types with different marker counts
-compare on a comparable scale). A cell is assigned a type only when that type's
-score both (a) clears a POSITIVE threshold :data:`TYPING_THRESHOLD` (z >= 1.0, a
-marker signal at least ~1 SD above the cohort mean — a genuine positive call, not
-merely noise) AND (b) is the maximum among the gated types. Cells that clear no
-gate default to ``TUMOR`` (the malignant background of a GBM section).
+contributes on a comparable scale) and a type's raw score is the *mean* z-score
+over its present markers. That raw mean-z is then converted, per cell, into a z
+against a **matched random gene set of the same size and the same per-marker
+detection rates** (:func:`_matched_null_moments`). A cell is assigned a type only
+when that matched-null z both (a) clears :data:`TYPING_THRESHOLD` (>= 1.0) AND
+(b) is the maximum among the gated types. Cells that clear no gate default to
+``TUMOR`` (the malignant background of a GBM section).
 
-Why the gate (and not a bare arg-max). A bare arg-max INFLATES the single-marker
-``ENDOTHELIAL`` class to ~20%: its score is one raw PECAM1 z-score (high variance)
-while the multi-marker types are *means* pulled toward zero by averaging, so
-endothelium wins any near-zero tie. Requiring a real positive signal (z >= 1.0)
-breaks that single-vs-multi-marker imbalance and pulls the endothelial fraction
-down to a biologically realistic ~10% (consistent with the Visium deconvolution's
-~9.8%). The map (only markers actually present in the 319-gene panel are used):
+WHY THE MATCHED NULL — the ARITY BUG it fixes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The previous rule gated the RAW mean-z at 1.0. Every marker z-score has unit
+variance by construction, so a type's mean-z has standard deviation
+
+    sd = sqrt( (1 + (n - 1) * rho) / n )
+
+for ``n`` markers of mean pairwise correlation ``rho`` — i.e. it SHRINKS with the
+number of markers. Measured on the three real sections (empirical sd matches that
+formula to 3 decimal places):
+
+    section              type          n   sd     % of cells clearing z >= 1
+    brain 319   (s1)     ENDOTHELIAL   1   1.000  11.76
+                         TUMOR         4   0.607   7.29
+    IO 480      (s2)     ENDOTHELIAL   3   0.821   4.57
+    GSE324268   (s3)     ENDOTHELIAL   1   1.000  14.03
+
+So a FIXED absolute gate on a score whose spread depends on the marker count is
+mechanically easier to clear for a one-marker type. ENDOTHELIAL is defined by one
+marker (PECAM1) on the brain panel and by three (VWF/FLT1/PLVAP) on the IO panel,
+so the bias differed per section and the reconstructed endothelial fraction swung
+**9.74 / 4.18 / 12.19 %** (a 2.91x spread) across three sections whose true
+vascularity is unlikely to differ by 3x. That was a CLASSIFIER DEFECT, not
+biology, and not merely a panel artefact (s1 and s3 share the PECAM1 gate and
+still differ 1.25x).
+
+The matched null removes it at the source: the observed marker-set score is
+compared against what a *random* gene set of the same size and the same detection
+rates produces IN THE SAME CELL, so arity, per-marker sparsity and per-cell
+sequencing depth are all controlled. The gate then means "this cell's marker-set
+signal is >= 1 SD above a size- and abundance-matched random signature", which is
+a statement of the same strength for a 1-marker and a 4-marker type. It is the
+same control used successfully by the MGMT spatial work
+(``validation/mgmt_spatial.py``, abundance-matched reference genes).
+
+Measured effect (see ``results/classifier_fix.md`` for the full comparison):
+
+    ENDOTHELIAL %        s1      s2      s3     max/min
+    mean_z (old)        9.74    4.18   12.19     2.91x
+    matched_null_z     10.50    7.07    8.75     1.49x
+
+with the independent Visium NNLS deconvolution (``reconstruct/deconvolve.py``,
+which uses no marker gate at all) putting ENDOTHELIAL at 9.77% on the parent
+Visium sample. See :data:`TYPING_AGGREGATION` for the alternatives that were
+evaluated and rejected.
+
+HONEST RESIDUAL, opposite in sign. The matched null draws its ``n`` reference
+genes INDEPENDENTLY, while a real marker set is a co-expressed programme (mean
+pairwise marker correlation 0.16-0.48 on section 1). Correlated markers make the
+observed score more variable than an independent null predicts, so the null SD is
+slightly too small for a coherent multi-marker programme and its z is nudged UP —
+which is part of why IMMUNE and STROMAL grow under the new rule. It is
+second-order next to the ``sqrt(n)`` effect it replaces and it is NOT corrected
+here: doing so needs a null reproducing the marker set's covariance, which
+detection-rate matching alone cannot build. Treat a multi-marker class fraction
+from this classifier as a mild over-estimate.
+
+The map (only markers actually present in the panel are used):
 
   TUMOR       <- EGFR, SOX2, OLIG2, MKI67        (malignant glioma)
   IMMUNE      <- PTPRC, CD68, AIF1, CD163        (TAM / lymphoid)
@@ -111,11 +162,15 @@ from .marker_panels import BRAIN_PANEL_MARKER_MAP, select_marker_map
 # ---------------------------------------------------------------------------
 # Marker -> CellType map (documented; only present markers are used at runtime).
 #
-# UNCHANGED IN CONTENT: this is now an ALIAS for the same dict, moved verbatim
-# (same entries, same key order) into ``reconstruct.marker_panels`` so a SECOND
-# panel can be registered alongside it. ``real_xenium.MARKER_MAP`` remains the
-# 319-gene Xenium Human Brain map and the 319-panel reconstruction is bit-for-bit
-# identical (TUMOR 73.80 / STROMAL 7.92 / IMMUNE 8.54 / ENDOTHELIAL 9.74 %).
+# UNCHANGED IN CONTENT: this is an ALIAS for the same dict, moved verbatim (same
+# entries, same key order) into ``reconstruct.marker_panels`` so a SECOND panel
+# can be registered alongside it. ``real_xenium.MARKER_MAP`` remains the 319-gene
+# Xenium Human Brain map. Under the LEGACY ``aggregation='mean_z'`` rule the
+# 319-panel reconstruction is still bit-for-bit its historical self (TUMOR 73.80 /
+# STROMAL 7.92 / IMMUNE 8.54 / ENDOTHELIAL 9.74 %); the default aggregation has
+# since changed to ``'matched_null_z'`` (TUMOR 58.24 / STROMAL 11.78 / IMMUNE
+# 19.48 / ENDOTHELIAL 10.50 %) to remove the marker-count bias — see
+# :data:`TYPING_AGGREGATION` and ``results/classifier_fix.md``.
 #
 # The map used at runtime is chosen from the PANEL that was actually loaded (see
 # :func:`marker_panels.select_marker_map`), because this map is meaningless on
@@ -128,11 +183,59 @@ MARKER_MAP: Dict[CellType, List[str]] = BRAIN_PANEL_MARKER_MAP
 # diameter scale of spatial smoothing so a field varies over tissue niches.
 _DENSITY_BANDWIDTH_UM = 50.0
 
-# Positive marker-signal gate (per-cell mean z-score) a type must clear to be
-# assigned. z >= 1.0 == the marker signal is at least ~1 SD above the cohort
-# mean (a genuine positive call). This is what breaks the single-vs-multi-marker
-# imbalance that a bare arg-max suffers (see the module docstring).
+# Positive marker-signal gate a type must clear to be assigned: the type's
+# aggregated score must be >= 1.0. Under the default ``'matched_null_z'``
+# aggregation that reads "the marker-set score is at least ~1 SD above what a
+# size- and detection-rate-matched RANDOM gene set gives in this same cell".
+# UNCHANGED at 1.0 across every aggregation evaluated in
+# ``results/classifier_fix.md``, deliberately, so the comparison isolates the
+# aggregation rule and nothing is tuned to the 8.0% volume-EM anchor.
 TYPING_THRESHOLD = 1.0
+
+#: How a type's per-cell score is aggregated from its marker z-scores. Four rules
+#: were measured on all three real sections (``results/classifier_fix.md``);
+#: ENDOTHELIAL % on brain-319 / IO-480 / GSE324268 and the resulting spread:
+#:
+#:   rule               s1     s2     s3    max/min  verdict
+#:   'mean_z'          9.74   4.18  12.19    2.91x   LEGACY — the arity bug
+#:   'max_z'           6.70   8.62   7.31    1.29x   rejected: arity-biased the
+#:                                                   OTHER way (E[max of n] grows
+#:                                                   with n), so its tightness
+#:                                                   here is cancellation, not
+#:                                                   control; also types every
+#:                                                   cell off ONE extreme count
+#:   'marker_vote'    10.37   8.37  13.77    1.65x   rejected: "fraction of
+#:                                                   markers positive" saturates
+#:                                                   at 1.0 for a 1-marker type,
+#:                                                   which is arity bias again
+#:   'mean_z_norm'     8.65   5.34  10.73    2.01x   partial: fixes arity but not
+#:                                                   per-marker sparsity / depth
+#:   'matched_null_z' 10.50   7.07   8.75    1.49x   CHOSEN
+#:
+#: ``'matched_null_z'`` is option (c): the per-cell z of the marker-set mean
+#: against a same-size, detection-rate-matched random gene set, which controls
+#: arity AND per-marker sparsity AND per-cell depth simultaneously. The other
+#: rules remain reachable so the comparison stays reproducible and so the legacy
+#: numbers can be regenerated exactly.
+TYPING_AGGREGATION = "matched_null_z"
+
+#: Number of detection-rate-matched panel genes forming the null pool for EACH
+#: marker slot under ``'matched_null_z'``. The null moments are computed
+#: ANALYTICALLY over the whole pool (uniform sampling with replacement), so there
+#: is no RNG and no Monte-Carlo noise. 25 is a declared constant, not fitted:
+#: ENDOTHELIAL % on the three sections moves 10.50/7.07/8.75 (K=25) ->
+#: 10.26/7.65/8.43 (K=10) -> 10.40/6.88/8.67 (K=50), i.e. the choice is not
+#: load-bearing (the 3-section spread is 1.49x / 1.34x / 1.51x respectively).
+MATCHED_NULL_POOL_SIZE = 25
+
+#: Floor applied to the matched-null standard deviation, as a fraction of its
+#: median over cells. Prevents a degenerate (near-constant) matched pool from
+#: manufacturing an unbounded z for a single cell.
+_MATCHED_NULL_SIGMA_FLOOR_FRAC = 0.1
+
+#: Every aggregation rule ``phenotype_cells`` accepts.
+TYPING_AGGREGATIONS = ("matched_null_z", "mean_z", "mean_z_norm", "max_z",
+                       "marker_vote")
 
 # ---------------------------------------------------------------------------
 # Tissue mask: a PHYSICAL domain, independent of the numerical grid.
@@ -241,35 +344,171 @@ def _zscore_columns(dense: np.ndarray) -> np.ndarray:
     return (x - mean) / std
 
 
+def _column_reader(expression):
+    """Return ``get(j) -> (n_cells,) float64 counts`` for one gene column.
+
+    Converts a sparse matrix to CSC ONCE so the matched-null pool (which touches
+    :data:`MATCHED_NULL_POOL_SIZE` x n_markers columns) does not pay CSR
+    column-slicing costs per read.
+    """
+    if sparse.issparse(expression):
+        csc = expression.tocsc()
+
+        def get(j: int) -> np.ndarray:
+            return np.asarray(csc[:, int(j)].todense()).ravel().astype(np.float64)
+    else:
+        arr = np.asarray(expression)
+
+        def get(j: int) -> np.ndarray:
+            return arr[:, int(j)].astype(np.float64)
+
+    return get
+
+
+def _zscore_one(col: np.ndarray) -> np.ndarray:
+    """log1p + z-score a single gene column (the 1-D form of _zscore_columns)."""
+    return _zscore_columns(np.asarray(col, dtype=np.float64)[:, None]).ravel()
+
+
+def detection_rates(expression) -> np.ndarray:
+    """Per-gene fraction of cells with a non-zero count.
+
+    The abundance statistic the matched null is matched ON: it is the dominant
+    driver of how a targeted-panel marker's z-score is distributed (a gene seen in
+    0.2% of cells has a near-degenerate, heavy-tailed z; one seen in 99% is close
+    to continuous), so a null that ignores it is not a fair reference.
+    """
+    if sparse.issparse(expression):
+        b = expression.tocsc(copy=True)
+        b.data = np.ones_like(b.data)
+        return np.asarray(b.sum(axis=0)).ravel() / float(expression.shape[0])
+    arr = np.asarray(expression)
+    return (arr > 0).mean(axis=0).astype(np.float64)
+
+
+def _matched_pool(
+    det: np.ndarray, target: float, exclude: set, pool_size: int
+) -> List[int]:
+    """Panel-gene columns whose detection rate is closest to ``target``.
+
+    Distance is on the LOGIT of the detection rate, so "4.2% vs 4.4%" is treated
+    as close while "90% vs 96%" is treated as the large difference it is in
+    z-score shape terms. Genes that are markers of ANY type are excluded (a null
+    must not contain the signal it is a null for), as are all-zero genes.
+    """
+    eps = 1e-6
+    det = np.asarray(det, dtype=np.float64)
+    d = np.clip(det, eps, 1.0 - eps)
+    t = float(np.clip(target, eps, 1.0 - eps))
+    dist = np.abs(np.log(d / (1.0 - d)) - np.log(t / (1.0 - t)))
+    if exclude:
+        dist[sorted(exclude)] = np.inf
+    dist[det <= 0.0] = np.inf
+    order = np.argsort(dist, kind="stable")
+    return [int(j) for j in order[: int(pool_size)] if np.isfinite(dist[j])]
+
+
+def _matched_null_moments(
+    get,
+    det: np.ndarray,
+    marker_cols: List[int],
+    exclude: set,
+    pool_size: int,
+    n_cells: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-cell mean and SD of the mean-z score of a MATCHED random gene set.
+
+    The reference set has the same SIZE as ``marker_cols`` and, slot by slot, the
+    same per-marker DETECTION RATE, so it is the right null for both the arity
+    bug and per-marker sparsity. The moments are computed analytically over the
+    whole pool rather than by Monte-Carlo draws — for independent uniform draws
+    from each slot's pool,
+
+        E[score]   = (1/n)   * sum_s  mean_{g in pool_s} z_g(cell)
+        Var[score] = (1/n^2) * sum_s  var_{g in pool_s}  z_g(cell)
+
+    — so the result is exact, deterministic and RNG-free.
+    """
+    n = len(marker_cols)
+    mu = np.zeros(n_cells, dtype=np.float64)
+    var = np.zeros(n_cells, dtype=np.float64)
+    for c in marker_cols:
+        pool = _matched_pool(det, float(det[c]), exclude, pool_size)
+        if not pool:
+            continue
+        s1 = np.zeros(n_cells, dtype=np.float64)
+        s2 = np.zeros(n_cells, dtype=np.float64)
+        for j in pool:
+            zz = _zscore_one(get(j))
+            s1 += zz
+            s2 += zz * zz
+        k = float(len(pool))
+        m1 = s1 / k
+        mu += m1
+        var += np.maximum(s2 / k - m1 * m1, 0.0)
+    return mu / n, np.sqrt(var) / n
+
+
 def phenotype_cells(
     expression,
     genes: np.ndarray,
     threshold: float = TYPING_THRESHOLD,
     marker_map: Optional[Dict[CellType, List[str]]] = None,
+    aggregation: str = TYPING_AGGREGATION,
+    pool_size: int = MATCHED_NULL_POOL_SIZE,
 ) -> tuple[np.ndarray, Dict[CellType, List[str]], List[str]]:
-    """Assign a CellType to each cell by a THRESHOLD-GATED marker z-score rule.
+    """Assign a CellType to each cell from its marker z-scores, ARITY-CONTROLLED.
 
-    Each type's score is the mean log1p-z-score of its present markers. A cell is
-    assigned the type with the highest score AMONG the types whose score clears a
-    positive ``threshold`` (a genuine marker-positive call); cells that clear no
-    gate default to ``TUMOR`` (the malignant GBM background). The positive gate is
-    what breaks the single-vs-multi-marker imbalance a bare arg-max produces (which
-    inflates the single-marker ENDOTHELIAL class); see the module docstring.
+    Markers are log1p-transformed and z-scored across all cells; a type's raw
+    score is the MEAN z over its present markers. That raw score is then turned
+    into the gated score by ``aggregation``. A cell is assigned the type with the
+    highest aggregated score AMONG the types clearing ``threshold``; cells that
+    clear no gate default to ``TUMOR`` (the malignant GBM background).
+
+    THE ARITY BUG THIS FIXES. A mean of ``n`` unit-variance z-scores has standard
+    deviation ``sqrt((1 + (n-1)*rho)/n) <= 1``, so a FIXED gate on the raw mean-z
+    is systematically easier to clear the FEWER markers a type has. ENDOTHELIAL
+    has one marker on the brain panel (PECAM1) and three on the IO panel
+    (VWF/FLT1/PLVAP), which is why the reconstructed endothelial fraction used to
+    swing 9.74 / 4.18 / 12.19 % over three real sections. See the module docstring
+    and ``results/classifier_fix.md``.
 
     Parameters
     ----------
     expression : scipy.sparse or ndarray (n_cells, n_genes)
-        Real per-cell targeted-panel counts.
+        Real per-cell targeted-panel counts. ALL columns are used by
+        ``'matched_null_z'`` (it needs the non-marker genes to build its null);
+        the other rules touch only the marker columns.
     genes : ndarray of str
         Column labels for ``expression``.
     threshold : float
-        Positive mean-z gate a type must clear to be assignable (default
-        :data:`TYPING_THRESHOLD` = 1.0, i.e. ~1 SD above the cohort mean).
+        Gate a type's aggregated score must clear (default
+        :data:`TYPING_THRESHOLD` = 1.0). Held FIXED across aggregations so the
+        comparison in ``results/classifier_fix.md`` isolates the aggregation rule
+        and nothing is tuned to the 8.0% volume-EM anchor.
+    aggregation : str
+        One of :data:`TYPING_AGGREGATIONS`; default :data:`TYPING_AGGREGATION`.
+
+        * ``'matched_null_z'`` (**chosen**) — per-cell z of the marker-set mean
+          against a same-size, detection-rate-matched RANDOM gene set. Controls
+          arity, per-marker sparsity and per-cell depth simultaneously.
+        * ``'mean_z'`` — LEGACY raw mean-z. Reproduces the historical numbers
+          exactly; carries the arity bug. Kept only for reproducibility.
+        * ``'mean_z_norm'`` — mean-z divided by its own SD across cells, i.e.
+          mean-z with the ``1/sqrt(n_markers)`` variance correction. Fixes arity
+          but not per-marker sparsity or per-cell depth.
+        * ``'max_z'`` — largest single-marker z. Arity-biased the OTHER way
+          (``E[max of n]`` grows with ``n``) and types each cell off one count.
+        * ``'marker_vote'`` — fraction of a type's markers individually
+          z >= ``threshold``, tie-broken by max-z, requiring >= 1 positive
+          marker. Also arity-biased (a 1-marker type saturates the score at 1.0).
+    pool_size : int
+        Matched-null pool size per marker slot (default
+        :data:`MATCHED_NULL_POOL_SIZE`). Ignored by the other aggregations.
     marker_map : dict CellType -> list of str, optional
         Marker map to type with. ``None`` (the default) resolves it from the
         PANEL via :func:`marker_panels.select_marker_map`, which returns
-        :data:`MARKER_MAP` itself for the 319-gene brain panel — so the historical
-        behaviour on that section is bit-for-bit unchanged — and the
+        :data:`MARKER_MAP` itself for the 319-gene brain panel and the
         Immuno-Oncology map for the 480-gene section, whose panel carries none of
         PECAM1 / SOX2 / OLIG2 / AQP4 / GJA1 / MOG and on which the brain map
         would collapse the whole reconstruction to TUMOR + IMMUNE with no
@@ -281,6 +520,56 @@ def phenotype_cells(
     used_map : dict CellType -> list of markers actually found in the panel.
     missing : list of markers requested but absent from the panel.
     """
+    scores, types, used_map, missing = marker_scores(
+        expression, genes, threshold=threshold, marker_map=marker_map,
+        aggregation=aggregation, pool_size=pool_size,
+    )
+
+    # Threshold gate: a type is only assignable to a cell when its aggregated
+    # score clears the positive threshold. Non-clearing scores are set to -inf so
+    # they can never win the arg-max.
+    gated = np.where(scores >= float(threshold), scores, -np.inf)
+    winner = gated.argmax(axis=1)
+    cell_type = np.array([int(types[i]) for i in winner], dtype=np.int8)
+
+    # Cells that clear NO gate (all types below threshold) default to the
+    # malignant background: TUMOR.
+    ungated = ~np.isfinite(gated.max(axis=1))
+    cell_type[ungated] = int(CellType.TUMOR)
+    return cell_type, used_map, missing
+
+
+def marker_scores(
+    expression,
+    genes: np.ndarray,
+    threshold: float = TYPING_THRESHOLD,
+    marker_map: Optional[Dict[CellType, List[str]]] = None,
+    aggregation: str = TYPING_AGGREGATION,
+    pool_size: int = MATCHED_NULL_POOL_SIZE,
+) -> tuple[np.ndarray, List[CellType], Dict[CellType, List[str]], List[str]]:
+    """The per-cell, per-type SCORES that :func:`phenotype_cells` gates.
+
+    Split out so the arity audit (``validation/classifier_fix.py``) and the tests
+    can inspect the score distributions directly instead of re-deriving them, and
+    so the two can never drift apart. Arguments are exactly those of
+    :func:`phenotype_cells`; ``threshold`` is only used by the ``'marker_vote'``
+    rule, which needs it to make its per-marker positive calls.
+
+    Returns
+    -------
+    scores : (n_cells, n_types) float64. ``-inf`` for a type with no measured
+        marker on this panel.
+    types : list of CellType, aligned to the score columns (map key order, which
+        also sets the arg-max tie-break).
+    used_map, missing : as :func:`phenotype_cells`.
+    """
+    agg = str(aggregation).strip().lower()
+    if agg not in TYPING_AGGREGATIONS:
+        raise ValueError(
+            f"unknown aggregation {aggregation!r}; expected one of "
+            f"{TYPING_AGGREGATIONS}"
+        )
+
     genes = np.asarray(genes, dtype=str)
     gene_index = {g: j for j, g in enumerate(genes)}
 
@@ -308,24 +597,73 @@ def phenotype_cells(
 
     n_cells = z.shape[0]
     types = list(used_map.keys())
-    scores = np.full((n_cells, len(types)), -np.inf, dtype=np.float64)
-    for t_idx, ct in enumerate(types):
-        cols = [col_pos[gene_index[m]] for m in used_map[ct]]
+    n_types = len(types)
+    type_cols = [[col_pos[gene_index[m]] for m in used_map[ct]] for ct in types]
+
+    mean_z = np.full((n_cells, n_types), -np.inf, dtype=np.float64)
+    for t_idx, cols in enumerate(type_cols):
         if cols:
-            scores[:, t_idx] = z[:, cols].mean(axis=1)
+            mean_z[:, t_idx] = z[:, cols].mean(axis=1)
 
-    # Threshold gate: a type is only assignable to a cell when its mean z-score
-    # clears the positive threshold. Non-clearing scores are set to -inf so they
-    # can never win the arg-max.
-    gated = np.where(scores >= float(threshold), scores, -np.inf)
-    winner = gated.argmax(axis=1)
-    cell_type = np.array([int(types[i]) for i in winner], dtype=np.int8)
+    # --- aggregate the raw mean-z into the score the gate is applied to ------
+    if agg == "mean_z":
+        scores = mean_z
 
-    # Cells that clear NO gate (all types below threshold) default to the
-    # malignant background: TUMOR.
-    ungated = ~np.isfinite(gated.max(axis=1))
-    cell_type[ungated] = int(CellType.TUMOR)
-    return cell_type, used_map, sorted(set(missing))
+    elif agg == "max_z":
+        scores = np.full((n_cells, n_types), -np.inf, dtype=np.float64)
+        for t_idx, cols in enumerate(type_cols):
+            if cols:
+                scores[:, t_idx] = z[:, cols].max(axis=1)
+
+    elif agg == "mean_z_norm":
+        # Every marker z has mean 0, so mean_z has mean 0 too; dividing by its own
+        # SD puts a type with ANY number of markers on the same scale, which is
+        # exactly the n_markers variance correction.
+        scores = np.array(mean_z, copy=True)
+        for t_idx, cols in enumerate(type_cols):
+            if cols:
+                s = scores[:, t_idx].std()
+                if s > 0:
+                    scores[:, t_idx] = scores[:, t_idx] / s
+
+    elif agg == "marker_vote":
+        # Fraction of a type's markers individually positive; max-z breaks ties;
+        # a type needs at least one positive marker to be assignable at all.
+        frac_pos = np.zeros((n_cells, n_types), dtype=np.float64)
+        tie = np.zeros((n_cells, n_types), dtype=np.float64)
+        for t_idx, cols in enumerate(type_cols):
+            if not cols:
+                continue
+            frac_pos[:, t_idx] = (z[:, cols] >= float(threshold)).mean(axis=1)
+            mx = z[:, cols].max(axis=1)
+            rng = float(np.ptp(mx))
+            tie[:, t_idx] = (mx - mx.min()) / (rng if rng > 0 else 1.0)
+        # Encoded so the shared gate below fires exactly when a type has >= 1
+        # positive marker, and the arg-max then prefers the higher vote fraction.
+        scores = np.where(
+            frac_pos > 0.0, float(threshold) + frac_pos + 1e-6 * tie, -np.inf
+        )
+
+    else:  # 'matched_null_z' — the default
+        det = detection_rates(expression)
+        get = _column_reader(expression)
+        exclude = set(needed_cols)
+        scores = np.full((n_cells, n_types), -np.inf, dtype=np.float64)
+        for t_idx, ct in enumerate(types):
+            cols = [gene_index[m] for m in used_map[ct]]
+            if not cols:
+                continue
+            mu, sigma = _matched_null_moments(
+                get, det, cols, exclude, int(pool_size), n_cells
+            )
+            pos = sigma[sigma > 0]
+            floor = (
+                _MATCHED_NULL_SIGMA_FLOOR_FRAC * float(np.median(pos))
+                if pos.size else 1e-6
+            )
+            scores[:, t_idx] = (mean_z[:, t_idx] - mu) / np.maximum(sigma, floor)
+
+    return scores, types, used_map, sorted(set(missing))
 
 
 # ---------------------------------------------------------------------------
@@ -575,6 +913,7 @@ def reconstruct_from_xenium(
     dx_um: float = 30.0,
     tissue_mask_mode: str = TISSUE_MASK_MODE,
     tissue_disc_radius_um: float = TISSUE_DISC_RADIUS_UM,
+    typing_aggregation: str = TYPING_AGGREGATION,
 ) -> Microenvironment:
     """Reconstruct the real cell-resolved GBM microenvironment from Xenium.
 
@@ -594,6 +933,10 @@ def reconstruct_from_xenium(
         Disc radius for the geometric mask (default
         :data:`TISSUE_DISC_RADIUS_UM` = 30 um; see that constant for the
         measured justification).
+    typing_aggregation : str
+        Marker-score aggregation passed to :func:`phenotype_cells` (default
+        :data:`TYPING_AGGREGATION` = ``'matched_null_z'``). Pass ``'mean_z'`` to
+        regenerate the legacy, arity-biased composition exactly.
 
     Returns
     -------
@@ -622,7 +965,7 @@ def reconstruct_from_xenium(
     # Immuno-Oncology section to its own map (see reconstruct.marker_panels).
     panel_map, panel_name, panel_coverage = select_marker_map(genes)
     cell_type, used_map, missing = phenotype_cells(
-        expression, genes, marker_map=panel_map
+        expression, genes, marker_map=panel_map, aggregation=typing_aggregation
     )
 
     # --- per-cell sensitivity: UNIFORM 1.0 (drug-agnostic geometry) ----------
@@ -676,6 +1019,20 @@ def reconstruct_from_xenium(
         "marker_panel_used": panel_name,
         "marker_panel_coverage": panel_coverage,
         "markers_missing_from_panel": missing,
+        "typing_aggregation": str(typing_aggregation),
+        "typing_threshold": float(TYPING_THRESHOLD),
+        "typing_note": (
+            "Cell types come from phenotype_cells with aggregation="
+            f"{typing_aggregation!r}. The default 'matched_null_z' scores each "
+            "type by the per-cell z of its marker-set mean against a same-size, "
+            "detection-rate-matched RANDOM gene set, which removes the "
+            "marker-COUNT (arity) bias of the legacy raw mean-z rule: a mean of n "
+            "unit-variance z-scores has SD sqrt((1+(n-1)rho)/n), so a fixed gate "
+            "was mechanically easier to clear for a 1-marker type (ENDOTHELIAL on "
+            "the brain panel) than for a 3- or 4-marker one. Endothelial fraction "
+            "over three real sections went 9.74/4.18/12.19 % (2.91x spread) -> "
+            "10.50/7.07/8.75 % (1.49x). See results/classifier_fix.md."
+        ),
         "celltype_distribution": dist,
         "tissue_mask_mode": str(tissue_mask_mode),
         "tissue_disc_radius_um": (

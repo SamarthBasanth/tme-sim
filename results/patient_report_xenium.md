@@ -1,12 +1,18 @@
 # Virtual drug panel — one real 10x Xenium single-cell glioblastoma section
 
-> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
-> figure below was generated with the **KDE** vascular source, which was the default until
-> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
-> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
-> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
-> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
-> `mode='kde'` to recover exactly these numbers.
+> **Regenerated under the discrete vessel source.** `vascular_mode = discrete`
+> (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
+> [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the
+> e-folding-length convention `L = d_half / ln 2` · per-cell sensitivity mode =
+> **`uniform`** · **dx = 12 µm**.
+>
+> Every absolute exposure / AUC / coverage / kill below is on the **discrete-source
+> unit** and is NOT comparable with the KDE-era numbers this file carried before this
+> regeneration (the tissue-integrated source total is 3.36x smaller; that is a change
+> of *unit*, not of physics — the dose-matched, geometry-only effect on coverage is
+> <= 0.0166). To recover the old numbers, re-run with `mode='kde'`.
+>
+> Regenerated in the same pass as `results/real_drug_panel.md`; the two agree drug-for-drug. The kill ordering is unchanged from the KDE-era file (cisplatin > doxorubicin > lomustine > methotrexate > temozolomide).
 
 **Patient / sample id:** `xenium-gbm-real` · **source:** `xenium` · **grid:** 424×675 at dx = 12 µm · **extent:** 8100 × 5088 µm
 
@@ -64,25 +70,25 @@ Tumor cells: **30,174** (73.8% of all measured cells).
 
 | field | mean | p10 | median | p90 | max |
 |---|---:|---:|---:|---:|---:|
-| vascular density | **0.084** | 0.010 | 0.066 | 0.171 | 1.000 |
+| vascular density | **0.025** | 0.000 | 0.000 | 0.000 | 1.000 |
 | ECM volume fraction | **0.076** | 0.033 | 0.067 | 0.119 | 1.000 |
-| oxygen (relative) | **0.575** | 0.444 | 0.615 | 0.650 | 0.678 |
+| oxygen (relative) | **0.295** | 0.200 | 0.326 | 0.353 | 0.375 |
 
 Tissue mask covers 193,752 grid voxels (67.7% of the bounding box).
 
 ### 1.3 Hypoxia and the resistance state of the tumor cells
 
-> **0.0% of this tumor's cells are hypoxic** (O₂ below the 0.2 threshold in the real-perfusion oxygen solve).
+> **12.7% of this tumor's cells are hypoxic** (O₂ below the 0.2 threshold in the real-perfusion oxygen solve).
 
 The oxygen solve bands every living tumor cell, and *both* the hypoxic and the marginal-oxygen quiescent band carry a kill penalty — so the full resistance picture, not just hypoxia, is what suppresses the panel:
 
 | tumor-cell state | O₂ band | fraction | kill penalty |
 |---|---|---:|---|
-| VIABLE | O₂ ≥ 0.4 | 94.9% | none |
-| QUIESCENT | 0.2 ≤ O₂ < 0.4 | 5.1% | ×0.5 |
-| HYPOXIC | O₂ < 0.2 | 0.0% | ×0.35 |
+| VIABLE | O₂ ≥ 0.4 | 0.0% | none |
+| QUIESCENT | 0.2 ≤ O₂ < 0.4 | 87.3% | ×0.5 |
+| HYPOXIC | O₂ < 0.2 | 12.7% | ×0.35 |
 
-So although only 0.0% of tumor cells are outright hypoxic, 5.1% carry *some* oxygen-driven resistance. §3 measures what that costs each drug by re-simulating with both penalties switched off.
+So although only 12.7% of tumor cells are outright hypoxic, 100.0% carry *some* oxygen-driven resistance. §3 measures what that costs each drug by re-simulating with both penalties switched off.
 
 > **Honest caveat on this number — read it before using it.** The hypoxic fraction is a threshold-crossing count sitting close to the O₂ cutoff, and this simulator does not currently predict it reliably.
 >
@@ -107,8 +113,8 @@ Each of 2,786 measured locations (pooled 100 µm × 100 µm neighbourhoods of �
 
 ## 2. Ranked virtual drug panel
 
-> ### 🏁 Highest predicted kill on this tumor: **cisplatin** (0.9125)
-> Dominant driver **DELIVERY (advantage)** · L = 160 µm · IC50 24.6 µM — GDSC **measured** (n=34 glioma lines) · tumor-cell exposure 5.76e+06 µM·s.
+> ### 🏁 Highest predicted kill on this tumor: **cisplatin** (0.3699)
+> Dominant driver **DELIVERY (advantage)** · L = 160 µm · IC50 24.6 µM — GDSC **measured** (n=34 glioma lines) · tumor-cell exposure 1.69e+06 µM·s.
 > 
 > **This is a model output, not a recommendation.** It has never been checked against a measured response for this tissue or any other. Treat it as a hypothesis to test in the lab, nothing more.
 
@@ -118,11 +124,11 @@ All five drugs are simulated on the **same** reconstruction with the same 6 h ex
 
 | # | drug | MW (Da) | real IC50 (µM) | IC50 source | BBB penetrance | D_eff (µm²/s) | penetration L (µm) | tumor-cell exposure AUC (µM·s) | tissue exposure AUC (µM·s) | penetration_index | **predicted kill** |
 |---:|---|---:|---:|:--|---:|---:|---:|---:|---:|---:|---:|
-| 1 | **cisplatin** | 298 | 24.6 | GDSC (measured) | 0.858 | 225 | 160 | 5.76e+06 | 5.48e+06 | 0.404 | **0.9125** |
-| 2 | **doxorubicin** | 544 | 0.5 | literature | 0.021 | 176 | 73 | 3.71e+04 | 3.48e+04 | 0.317 | **0.7531** |
-| 3 | **lomustine** | 234 | 50 | literature | 0.973 | 247 | 113 | 2.97e+06 | 2.81e+06 | 0.364 | **0.7228** |
-| 4 | **methotrexate** | 454 | 12 | GDSC (measured) | 0.023 | 190 | 84 | 5.05e+04 | 4.75e+04 | 0.332 | **0.1205** |
-| 5 | **temozolomide** | 194 | 606 | GDSC (measured) | 0.125 | 265 | 296 | 2.4e+06 | 2.31e+06 | 0.451 | **0.1151** |
+| 1 | **cisplatin** | 298 | 24.6 | GDSC (measured) | 0.858 | 225 | 160 | 1.69e+06 | 1.63e+06 | 0.420 | **0.3699** |
+| 2 | **doxorubicin** | 544 | 0.5 | literature | 0.021 | 176 | 73 | 1.08e+04 | 1.03e+04 | 0.310 | **0.2165** |
+| 3 | **lomustine** | 234 | 50 | literature | 0.973 | 247 | 113 | 8.7e+05 | 8.35e+05 | 0.370 | **0.1975** |
+| 4 | **methotrexate** | 454 | 12 | GDSC (measured) | 0.023 | 190 | 84 | 1.48e+04 | 1.41e+04 | 0.331 | **0.0162** |
+| 5 | **temozolomide** | 194 | 606 | GDSC (measured) | 0.125 | 265 | 296 | 7.06e+05 | 6.86e+05 | 0.470 | **0.0147** |
 
 **Column definitions.**
 
@@ -171,11 +177,11 @@ The **dominant driver** for a drug is the term of largest magnitude (labelled *a
 
 | # | drug | delivery | potency | O₂-resist. | net | dominant driver | exposure pct | potency pct | O₂-resistance cost |
 |---:|---|---:|---:|---:|---:|:--|---:|---:|---:|
-| 1 | **cisplatin** | +0.98 | -0.06 | -0.00 | +0.92 | DELIVERY (advantage) | 100 | 50 | 2.4% |
-| 2 | **doxorubicin** | -1.21 | +1.63 | -0.00 | +0.42 | POTENCY (advantage) | 0 | 100 | 2.0% |
-| 3 | **lomustine** | +0.70 | -0.37 | -0.00 | +0.33 | DELIVERY (advantage) | 75 | 25 | 1.9% |
-| 4 | **methotrexate** | -1.07 | +0.25 | +0.00 | -0.82 | DELIVERY (penalty) | 25 | 75 | 0.8% |
-| 5 | **temozolomide** | +0.60 | -1.45 | +0.00 | -0.85 | POTENCY (penalty) | 50 | 0 | 1.0% |
+| 1 | **cisplatin** | +0.98 | -0.06 | -0.01 | +0.91 | DELIVERY (advantage) | 100 | 50 | 52.4% |
+| 2 | **doxorubicin** | -1.21 | +1.63 | -0.01 | +0.42 | POTENCY (advantage) | 0 | 100 | 52.0% |
+| 3 | **lomustine** | +0.70 | -0.37 | +0.00 | +0.33 | DELIVERY (advantage) | 75 | 25 | 51.3% |
+| 4 | **methotrexate** | -1.07 | +0.25 | +0.01 | -0.81 | DELIVERY (penalty) | 25 | 75 | 50.2% |
+| 5 | **temozolomide** | +0.60 | -1.45 | +0.00 | -0.84 | POTENCY (penalty) | 50 | 0 | 50.8% |
 
 ### 3.3 Is the attribution itself faithful? (falsifiability check)
 
@@ -189,53 +195,53 @@ Component-wise: ρ(delivery, kill) = +0.300, ρ(potency, kill) = +0.500. With on
 
 ### #1 · cisplatin — dominant driver: **DELIVERY (advantage)**
 
-`predicted kill 0.9125` · `tumor-cell exposure 5.76e+06 µM·s (C̄ = 267 µM)` · `L = 160 µm` · `IC50 = 24.6 µM` · `BBB 0.858` · `D_eff 225 µm²/s`
+`predicted kill 0.3699` · `tumor-cell exposure 1.69e+06 µM·s (C̄ = 78.3 µM)` · `L = 160 µm` · `IC50 = 24.6 µM` · `BBB 0.858` · `D_eff 225 µm²/s`
 
-- **Delivery +0.98 decades.** The mean drug exposure actually sampled at this tumor's own tumor-cell positions is 5.76e+06 µM·s over the 6 h window (time-averaged C̄ = 267 µM), the 100ᵗʰ percentile of the 5-drug panel. That follows from D_eff = 225 µm²/s at this tumor's mean ECM (0.076) and BBB penetrance 0.858, giving a penetration length L = 160 µm (3.6× the calibrated ~45 µm perivascular boundary layer, 75ᵗʰ percentile).
+- **Delivery +0.98 decades.** The mean drug exposure actually sampled at this tumor's own tumor-cell positions is 1.69e+06 µM·s over the 6 h window (time-averaged C̄ = 78.3 µM), the 100ᵗʰ percentile of the 5-drug panel. That follows from D_eff = 225 µm²/s at this tumor's mean ECM (0.076) and BBB penetrance 0.858, giving a penetration length L = 160 µm (3.6× the calibrated ~45 µm perivascular boundary layer, 75ᵗʰ percentile).
 - **Potency -0.06 decades.** IC50 = 24.6 µM — GDSC **measured** (n=34 glioma lines) — the 50ᵗʰ percentile of the panel.
-- **O₂-resistance -0.00 decades.** Counterfactual check: re-simulating this same drug on this same tissue with the hypoxic *and* quiescent kill penalties switched OFF raises the predicted kill from 0.9125 to 0.9349 — so this tumor's oxygen-driven resistance state (§1.3) costs this drug **2.4%** of the kill it would otherwise achieve (0ᵗʰ percentile — higher is less penalised). Note this term is nearly identical across the panel: it depresses every drug rather than re-ordering them.
-- **Reading.** Its position is set mainly by **DELIVERY** (+0.98 decades), with potency (-0.06) second; the three terms net to +0.92 decades versus the panel average.
-- **Why it ranks above the next drug.** Versus **doxorubicin** immediately below it, the term that differs most is **DELIVERY** (+2.19 decades ≈ 155.1× in its favour); the other terms differ by potency -1.69, o2-resistance -0.00.
+- **O₂-resistance -0.01 decades.** Counterfactual check: re-simulating this same drug on this same tissue with the hypoxic *and* quiescent kill penalties switched OFF raises the predicted kill from 0.3699 to 0.7763 — so this tumor's oxygen-driven resistance state (§1.3) costs this drug **52.4%** of the kill it would otherwise achieve (0ᵗʰ percentile — higher is less penalised). Note this term is nearly identical across the panel: it depresses every drug rather than re-ordering them.
+- **Reading.** Its position is set mainly by **DELIVERY** (+0.98 decades), with potency (-0.06) second; the three terms net to +0.91 decades versus the panel average.
+- **Why it ranks above the next drug.** Versus **doxorubicin** immediately below it, the term that differs most is **DELIVERY** (+2.19 decades ≈ 156.1× in its favour); the other terms differ by potency -1.69, o2-resistance -0.00.
 
 ### #2 · doxorubicin — dominant driver: **POTENCY (advantage)**
 
-`predicted kill 0.7531` · `tumor-cell exposure 3.71e+04 µM·s (C̄ = 1.72 µM)` · `L = 73 µm` · `IC50 = 0.5 µM` · `BBB 0.021` · `D_eff 176 µm²/s`
+`predicted kill 0.2165` · `tumor-cell exposure 1.08e+04 µM·s (C̄ = 0.501 µM)` · `L = 73 µm` · `IC50 = 0.5 µM` · `BBB 0.021` · `D_eff 176 µm²/s`
 
-- **Delivery -1.21 decades.** The mean drug exposure actually sampled at this tumor's own tumor-cell positions is 3.71e+04 µM·s over the 6 h window (time-averaged C̄ = 1.72 µM), the 0ᵗʰ percentile of the 5-drug panel. That follows from D_eff = 176 µm²/s at this tumor's mean ECM (0.076) and BBB penetrance 0.021, giving a penetration length L = 73 µm (1.6× the calibrated ~45 µm perivascular boundary layer, 0ᵗʰ percentile).
+- **Delivery -1.21 decades.** The mean drug exposure actually sampled at this tumor's own tumor-cell positions is 1.08e+04 µM·s over the 6 h window (time-averaged C̄ = 0.501 µM), the 0ᵗʰ percentile of the 5-drug panel. That follows from D_eff = 176 µm²/s at this tumor's mean ECM (0.076) and BBB penetrance 0.021, giving a penetration length L = 73 µm (1.6× the calibrated ~45 µm perivascular boundary layer, 0ᵗʰ percentile).
 - **Potency +1.63 decades.** IC50 = 0.5 µM — curated **literature** — the 100ᵗʰ percentile of the panel.
-- **O₂-resistance -0.00 decades.** Counterfactual check: re-simulating this same drug on this same tissue with the hypoxic *and* quiescent kill penalties switched OFF raises the predicted kill from 0.7531 to 0.7683 — so this tumor's oxygen-driven resistance state (§1.3) costs this drug **2.0%** of the kill it would otherwise achieve (25ᵗʰ percentile — higher is less penalised). Note this term is nearly identical across the panel: it depresses every drug rather than re-ordering them.
+- **O₂-resistance -0.01 decades.** Counterfactual check: re-simulating this same drug on this same tissue with the hypoxic *and* quiescent kill penalties switched OFF raises the predicted kill from 0.2165 to 0.4512 — so this tumor's oxygen-driven resistance state (§1.3) costs this drug **52.0%** of the kill it would otherwise achieve (25ᵗʰ percentile — higher is less penalised). Note this term is nearly identical across the panel: it depresses every drug rather than re-ordering them.
 - **Reading.** Its position is set mainly by **POTENCY** (+1.63 decades), with delivery (-1.21) second; the three terms net to +0.42 decades versus the panel average.
-- **Why it ranks above the next drug.** Versus **lomustine** immediately below it, the term that differs most is **POTENCY** (+2.00 decades ≈ 100.0× in its favour); the other terms differ by delivery -1.90, o2-resistance -0.00.
+- **Why it ranks above the next drug.** Versus **lomustine** immediately below it, the term that differs most is **POTENCY** (+2.00 decades ≈ 100.0× in its favour); the other terms differ by delivery -1.90, o2-resistance -0.01.
 
 ### #3 · lomustine — dominant driver: **DELIVERY (advantage)**
 
-`predicted kill 0.7228` · `tumor-cell exposure 2.97e+06 µM·s (C̄ = 137 µM)` · `L = 113 µm` · `IC50 = 50 µM` · `BBB 0.973` · `D_eff 247 µm²/s`
+`predicted kill 0.1975` · `tumor-cell exposure 8.7e+05 µM·s (C̄ = 40.3 µM)` · `L = 113 µm` · `IC50 = 50 µM` · `BBB 0.973` · `D_eff 247 µm²/s`
 
-- **Delivery +0.70 decades.** The mean drug exposure actually sampled at this tumor's own tumor-cell positions is 2.97e+06 µM·s over the 6 h window (time-averaged C̄ = 137 µM), the 75ᵗʰ percentile of the 5-drug panel. That follows from D_eff = 247 µm²/s at this tumor's mean ECM (0.076) and BBB penetrance 0.973, giving a penetration length L = 113 µm (2.5× the calibrated ~45 µm perivascular boundary layer, 50ᵗʰ percentile).
+- **Delivery +0.70 decades.** The mean drug exposure actually sampled at this tumor's own tumor-cell positions is 8.7e+05 µM·s over the 6 h window (time-averaged C̄ = 40.3 µM), the 75ᵗʰ percentile of the 5-drug panel. That follows from D_eff = 247 µm²/s at this tumor's mean ECM (0.076) and BBB penetrance 0.973, giving a penetration length L = 113 µm (2.5× the calibrated ~45 µm perivascular boundary layer, 50ᵗʰ percentile).
 - **Potency -0.37 decades.** IC50 = 50 µM — curated **literature** — the 25ᵗʰ percentile of the panel.
-- **O₂-resistance -0.00 decades.** Counterfactual check: re-simulating this same drug on this same tissue with the hypoxic *and* quiescent kill penalties switched OFF raises the predicted kill from 0.7228 to 0.7370 — so this tumor's oxygen-driven resistance state (§1.3) costs this drug **1.9%** of the kill it would otherwise achieve (50ᵗʰ percentile — higher is less penalised). Note this term is nearly identical across the panel: it depresses every drug rather than re-ordering them.
+- **O₂-resistance +0.00 decades.** Counterfactual check: re-simulating this same drug on this same tissue with the hypoxic *and* quiescent kill penalties switched OFF raises the predicted kill from 0.1975 to 0.4052 — so this tumor's oxygen-driven resistance state (§1.3) costs this drug **51.3%** of the kill it would otherwise achieve (50ᵗʰ percentile — higher is less penalised). Note this term is nearly identical across the panel: it depresses every drug rather than re-ordering them.
 - **Reading.** Its position is set mainly by **DELIVERY** (+0.70 decades), with potency (-0.37) second; the three terms net to +0.33 decades versus the panel average.
-- **Why it ranks above the next drug.** Versus **methotrexate** immediately below it, the term that differs most is **DELIVERY** (+1.77 decades ≈ 58.8× in its favour); the other terms differ by potency -0.62, o2-resistance -0.00.
+- **Why it ranks above the next drug.** Versus **methotrexate** immediately below it, the term that differs most is **DELIVERY** (+1.77 decades ≈ 58.9× in its favour); the other terms differ by potency -0.62, o2-resistance -0.01.
 
 ### #4 · methotrexate — dominant driver: **DELIVERY (penalty)**
 
-`predicted kill 0.1205` · `tumor-cell exposure 5.05e+04 µM·s (C̄ = 2.34 µM)` · `L = 84 µm` · `IC50 = 12 µM` · `BBB 0.023` · `D_eff 190 µm²/s`
+`predicted kill 0.0162` · `tumor-cell exposure 1.48e+04 µM·s (C̄ = 0.684 µM)` · `L = 84 µm` · `IC50 = 12 µM` · `BBB 0.023` · `D_eff 190 µm²/s`
 
-- **Delivery -1.07 decades.** The mean drug exposure actually sampled at this tumor's own tumor-cell positions is 5.05e+04 µM·s over the 6 h window (time-averaged C̄ = 2.34 µM), the 25ᵗʰ percentile of the 5-drug panel. That follows from D_eff = 190 µm²/s at this tumor's mean ECM (0.076) and BBB penetrance 0.023, giving a penetration length L = 84 µm (1.9× the calibrated ~45 µm perivascular boundary layer, 25ᵗʰ percentile).
+- **Delivery -1.07 decades.** The mean drug exposure actually sampled at this tumor's own tumor-cell positions is 1.48e+04 µM·s over the 6 h window (time-averaged C̄ = 0.684 µM), the 25ᵗʰ percentile of the 5-drug panel. That follows from D_eff = 190 µm²/s at this tumor's mean ECM (0.076) and BBB penetrance 0.023, giving a penetration length L = 84 µm (1.9× the calibrated ~45 µm perivascular boundary layer, 25ᵗʰ percentile).
 - **Potency +0.25 decades.** IC50 = 12 µM — GDSC **measured** (n=49 glioma lines) — the 75ᵗʰ percentile of the panel.
-- **O₂-resistance +0.00 decades.** Counterfactual check: re-simulating this same drug on this same tissue with the hypoxic *and* quiescent kill penalties switched OFF raises the predicted kill from 0.1205 to 0.1216 — so this tumor's oxygen-driven resistance state (§1.3) costs this drug **0.8%** of the kill it would otherwise achieve (100ᵗʰ percentile — higher is less penalised). Note this term is nearly identical across the panel: it depresses every drug rather than re-ordering them.
-- **Reading.** Its position is set mainly by **DELIVERY** (-1.07 decades), with potency (+0.25) second; the three terms net to -0.82 decades versus the panel average.
-- **Why it ranks above the next drug.** Versus **temozolomide** immediately below it, the term that differs most is **POTENCY** (+1.70 decades ≈ 50.5× in its favour); the other terms differ by delivery -1.68, o2-resistance +0.00.
+- **O₂-resistance +0.01 decades.** Counterfactual check: re-simulating this same drug on this same tissue with the hypoxic *and* quiescent kill penalties switched OFF raises the predicted kill from 0.0162 to 0.0325 — so this tumor's oxygen-driven resistance state (§1.3) costs this drug **50.2%** of the kill it would otherwise achieve (100ᵗʰ percentile — higher is less penalised). Note this term is nearly identical across the panel: it depresses every drug rather than re-ordering them.
+- **Reading.** Its position is set mainly by **DELIVERY** (-1.07 decades), with potency (+0.25) second; the three terms net to -0.81 decades versus the panel average.
+- **Why it ranks above the next drug.** Versus **temozolomide** immediately below it, the term that differs most is **POTENCY** (+1.70 decades ≈ 50.5× in its favour); the other terms differ by delivery -1.68, o2-resistance +0.01.
 
 ### #5 · temozolomide — dominant driver: **POTENCY (penalty)**
 
-`predicted kill 0.1151` · `tumor-cell exposure 2.4e+06 µM·s (C̄ = 111 µM)` · `L = 296 µm` · `IC50 = 606 µM` · `BBB 0.125` · `D_eff 265 µm²/s`
+`predicted kill 0.0147` · `tumor-cell exposure 7.06e+05 µM·s (C̄ = 32.7 µM)` · `L = 296 µm` · `IC50 = 606 µM` · `BBB 0.125` · `D_eff 265 µm²/s`
 
-- **Delivery +0.60 decades.** The mean drug exposure actually sampled at this tumor's own tumor-cell positions is 2.4e+06 µM·s over the 6 h window (time-averaged C̄ = 111 µM), the 50ᵗʰ percentile of the 5-drug panel. That follows from D_eff = 265 µm²/s at this tumor's mean ECM (0.076) and BBB penetrance 0.125, giving a penetration length L = 296 µm (6.6× the calibrated ~45 µm perivascular boundary layer, 100ᵗʰ percentile).
+- **Delivery +0.60 decades.** The mean drug exposure actually sampled at this tumor's own tumor-cell positions is 7.06e+05 µM·s over the 6 h window (time-averaged C̄ = 32.7 µM), the 50ᵗʰ percentile of the 5-drug panel. That follows from D_eff = 265 µm²/s at this tumor's mean ECM (0.076) and BBB penetrance 0.125, giving a penetration length L = 296 µm (6.6× the calibrated ~45 µm perivascular boundary layer, 100ᵗʰ percentile).
 - **Potency -1.45 decades.** IC50 = 606 µM — GDSC **measured** (n=51 glioma lines) — the 0ᵗʰ percentile of the panel.
-- **O₂-resistance +0.00 decades.** Counterfactual check: re-simulating this same drug on this same tissue with the hypoxic *and* quiescent kill penalties switched OFF raises the predicted kill from 0.1151 to 0.1163 — so this tumor's oxygen-driven resistance state (§1.3) costs this drug **1.0%** of the kill it would otherwise achieve (75ᵗʰ percentile — higher is less penalised). Note this term is nearly identical across the panel: it depresses every drug rather than re-ordering them.
-- **Reading.** Its position is set mainly by **POTENCY** (-1.45 decades), with delivery (+0.60) second; the three terms net to -0.85 decades versus the panel average.
-- **Why it ranks last.** Versus **methotrexate** immediately above it, the term that differs most is **POTENCY** (-1.70 decades for this drug ≈ 50.5× against it); its other terms stand at delivery +1.68, o2-resistance -0.00 relative to that drug.
+- **O₂-resistance +0.00 decades.** Counterfactual check: re-simulating this same drug on this same tissue with the hypoxic *and* quiescent kill penalties switched OFF raises the predicted kill from 0.0147 to 0.0299 — so this tumor's oxygen-driven resistance state (§1.3) costs this drug **50.8%** of the kill it would otherwise achieve (75ᵗʰ percentile — higher is less penalised). Note this term is nearly identical across the panel: it depresses every drug rather than re-ordering them.
+- **Reading.** Its position is set mainly by **POTENCY** (-1.45 decades), with delivery (+0.60) second; the three terms net to -0.84 decades versus the panel average.
+- **Why it ranks last.** Versus **methotrexate** immediately above it, the term that differs most is **POTENCY** (-1.70 decades for this drug ≈ 50.5× against it); its other terms stand at delivery +1.68, o2-resistance -0.01 relative to that drug.
 
 ---
 
@@ -273,4 +279,4 @@ Until then the correct reading of this artifact is: *this is what validated tran
 > 8. **The tissue mask was grid-dependent and has been fixed; every earlier hypoxia number from this pipeline is retracted.** `Domain.tissue_mask` used to be "grid cells containing ≥ 1 segmented cell", whose coverage collapsed 50.6% → 32.7% → 13.9% at dx = 30 → 20 → 12 µm; because the vascular KDE is masked to tissue, the total O₂ *supply* shrank with the mesh. It is now the union of 30 µm discs around the measured centroids (coverage 67.2/67.4/67.7% over the same grids), so mean O₂ is grid-invariant to ~2%. The consequence is reported honestly in §1.3: the predicted hypoxic fraction is now 0%, which for a glioblastoma is *also* not credible — the un-calibrated `OxygenConfig.consumption` means the absolute oxygen level is unanchored in both directions. Nothing in this report should rest on it.
 > 7. **Systemic PK is simplified.** A single time-averaged sustained plasma level drives the transport solve (documented Stage-0 simplification in `tmesim/sim/engine.py`); it preserves total delivered drug and relative ranking but is not a time-resolved infusion.
 
-*Generated 2026-07-27 18:22:08 by `experiments/patient_report.py` in 1023 s. Deterministic (seed 0) — re-running reproduces this file.*
+*Generated 2026-07-28 01:53:45 by `experiments/patient_report.py` in 499 s. Deterministic (seed 0) — re-running reproduces this file.*

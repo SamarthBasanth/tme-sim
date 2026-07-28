@@ -1,12 +1,43 @@
 # Numerical rigor — verification + sensitivity on the REAL microenvironment
 
-> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
-> figure below was generated with the **KDE** vascular source, which was the default until
-> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
-> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
-> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
-> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
-> `mode='kde'` to recover exactly these numbers.
+> **STALE, AND CANNOT CURRENTLY BE REGENERATED — the producer crashes under the new
+> default.** Every absolute exposure / AUC / coverage / kill figure below was generated with
+> the **KDE** vascular source, which was the default until
+> [`results/vessel_promotion.md`](vessel_promotion.md). The default is now the **discrete**
+> segmented-vessel source, whose tissue-integrated total is **3.36x smaller** (a change of
+> *unit*, not of physics — the dose-matched geometry-only effect on coverage is <= 0.0166).
+> Reproduce with `mode='kde'` to recover exactly these numbers.
+>
+> **Why it was not refreshed in the regeneration pass.** `python -m
+> tmesim.validation.numerical_rigor` now aborts before it writes anything:
+>
+> ```
+> File "tmesim/validation/numerical_rigor.py", line 280, in mass_conservation
+>     api_rel_err = abs(final_mass - injected) / injected
+> ZeroDivisionError: float division by zero
+> ```
+>
+> The cause is `numerical_rigor.py:273`, which picks the injection points for the
+> mass-conservation audit as
+> `vmask = tissue & (vasc > np.percentile(vasc[tissue], 99.0))`. That is a strict `>`
+> against a 99th percentile, and it silently assumed a *smooth* source field. Measured on
+> this section at dx = 12 µm: the **discrete** field is binary — it is exactly 1.0 on
+> **2.50%** of tissue and 0 elsewhere, so `p99 == max == 1.0` and `vasc > p99` selects
+> **zero** grid cells; `source.sum()` is 0, `injected` is 0, and the audit divides by it.
+> Under the **KDE** field the same expression selected 1,938 cells (p99 = 0.391, max = 1.0),
+> which is why the defect never surfaced before promotion. It is a latent bug in the audit's
+> point-picking, not a physics failure — no drug result depends on it.
+>
+> **What it would take.** A one-line change at `numerical_rigor.py:273` — take the top-N
+> source cells by value (e.g. `np.argsort`, or `>=` with a tie-break) instead of a strict
+> `> p99` — after which the whole module reruns in ~1–2 min and this file can be refreshed
+> in full. That edit was **out of scope** for this regeneration pass, which was explicitly
+> not permitted to modify code under `tmesim/`. Until it is made, read every number below
+> against the KDE field it was generated on.
+>
+> **Partly superseded already.** `vessel_promotion.md` §2 is a discrete-field grid study on
+> this same section (3 drugs × dx 15/12/8/6, dt = 5 s) and supersedes the source-field part
+> of §2 below.
 
 **Module:** `tmesim/validation/numerical_rigor.py` (run: `python -m tmesim.validation.numerical_rigor`)
 

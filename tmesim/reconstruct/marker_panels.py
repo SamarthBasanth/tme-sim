@@ -31,9 +31,17 @@ Backward compatibility (load-bearing)
 ORDER, of the map that used to live in ``real_xenium.MARKER_MAP`` (key order
 matters: it sets the arg-max tie-break in ``phenotype_cells``).
 ``real_xenium.MARKER_MAP`` is now an alias for it, and :func:`select_marker_map`
-returns *that same dict object* for the 319-gene brain panel. The 319-panel
-reconstruction is therefore unchanged: TUMOR 73.80 / STROMAL 7.92 / IMMUNE 8.54
-/ ENDOTHELIAL 9.74 percent, verified against the pre-change numbers.
+returns *that same dict object* for the 319-gene brain panel. Adding the IO panel
+therefore left the 319-panel reconstruction unchanged: TUMOR 73.80 / STROMAL 7.92
+/ IMMUNE 8.54 / ENDOTHELIAL 9.74 percent, verified against the pre-change numbers
+and still asserted by ``validation.state_validation.check_brain_panel_unchanged``.
+
+Those numbers are the LEGACY ``aggregation='mean_z'`` composition. The default
+scoring rule has since changed to ``'matched_null_z'`` to remove the marker-COUNT
+bias documented in ``results/classifier_fix.md`` — a deliberate change that is
+about how the markers are SCORED, not about which markers they are. The maps
+below are untouched by it. Under the current default the same section reads TUMOR
+58.24 / STROMAL 11.78 / IMMUNE 19.48 / ENDOTHELIAL 10.50 percent.
 
 The IO-panel map, and why these genes
 -------------------------------------
@@ -53,8 +61,13 @@ Each entry is the closest measurable analogue of the brain-panel class:
       bodies), ``FLT1`` (VEGFR1) and ``PLVAP`` (plasmalemma vesicle-associated
       protein, the fenestral diaphragm protein strongly induced in GBM's leaky
       neovasculature) are all canonical endothelial genes. Three markers rather
-      than the brain map's single ``PECAM1``, which also removes the
-      single-vs-multi-marker imbalance discussed in ``real_xenium``.
+      than the brain map's single ``PECAM1`` — which, under the LEGACY mean-z
+      scoring, did NOT remove the single-vs-multi-marker imbalance but reversed
+      its sign on this section: the 3-marker gate cleared for only 4.57% of cells
+      against PECAM1's 11.76-14.03% elsewhere, and the endothelial fraction read
+      4.18% here against 9.74/12.19% on the two PECAM1 sections. That is the arity
+      bug, and it is fixed in the SCORING (``real_xenium.TYPING_AGGREGATION``),
+      not in this map. See ``results/classifier_fix.md``.
   STROMAL     <- SLC1A3, S100B, PTN
       The direct analogue of the brain map's astro-lineage ``AQP4``/``GJA1``
       (+ oligodendrocyte ``MOG``): astrocytic glutamate transporter, the

@@ -1,12 +1,16 @@
 # Predicted drug response by anatomic niche region on real glioblastoma tissue
 
-> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
-> figure below was generated with the **KDE** vascular source, which was the default until
-> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
-> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
-> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
-> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
-> `mode='kde'` to recover exactly these numbers.
+> **Regenerated under the discrete vessel source.** `vascular_mode = discrete`
+> (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
+> [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the
+> e-folding-length convention `L = d_half / ln 2` · per-cell sensitivity mode =
+> **`uniform` (pipeline default; the engine's hypoxia/quiescence resistance factor still applies and is the point of this report)** · **dx = 12 µm**.
+>
+> Every absolute exposure / AUC / coverage / kill below is on the **discrete-source
+> unit** and is NOT comparable with the KDE-era numbers this file carried before this
+> regeneration (the tissue-integrated source total is 3.36x smaller; that is a change
+> of *unit*, not of physics — the dose-matched, geometry-only effect on coverage is
+> <= 0.0166). To recover the old numbers, re-run with `mode='kde'`.
 
 **Experiment:** `experiments/niche_response.py` (run: `./.venv/bin/python experiments/niche_response.py`)
 
@@ -61,36 +65,36 @@ Marker validation of the assignment (mean per-spot log CP10k of canonical marker
 
 | drug | zone | mean tissue AUC (µM·s) | mean per-cell exposure (µM·s) | mean tumour-cell exposure (µM·s) | predicted kill of tumour cells in zone | expected kill (mean *p*) | vascular density | oxygen |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | margin | 1.33e+07 | 1.33e+07 | 1.34e+07 | 0.4851 | 0.4926 | 0.0890 | 0.5291 |
-| temozolomide | core | 1.2e+07 | 1.21e+07 | 1.2e+07 | 0.4067 | 0.4124 | 0.0778 | 0.5060 |
-| temozolomide | perivascular | 2.57e+07 | 2.6e+07 | 2.46e+07 | 0.6348 | 0.6365 | 0.2839 | 0.6854 |
-| temozolomide | necrotic | 1.49e+07 | 1.51e+07 | 1.45e+07 | 0.4736 | 0.4772 | 0.1036 | 0.5654 |
-| lomustine | margin | 3.65e+06 | 3.66e+06 | 3.66e+06 | 0.7684 | 0.7563 | 0.0890 | 0.5291 |
-| lomustine | core | 2.98e+06 | 2.98e+06 | 2.95e+06 | 0.6192 | 0.6238 | 0.0778 | 0.5060 |
-| lomustine | perivascular | 8.28e+06 | 8.44e+06 | 7.59e+06 | 0.8697 | 0.8681 | 0.2839 | 0.6854 |
+| temozolomide | margin | 2.98e+06 | 2.99e+06 | 3e+06 | 0.1332 | 0.1448 | 0.0890 | 0.5291 |
+| temozolomide | core | 2.7e+06 | 2.71e+06 | 2.7e+06 | 0.1263 | 0.1231 | 0.0778 | 0.5060 |
+| temozolomide | perivascular | 5.78e+06 | 5.84e+06 | 5.52e+06 | 0.2494 | 0.2514 | 0.2839 | 0.6854 |
+| temozolomide | necrotic | 3.35e+06 | 3.38e+06 | 3.26e+06 | 0.1522 | 0.1512 | 0.1036 | 0.5654 |
+| lomustine | margin | 3.65e+06 | 3.66e+06 | 3.66e+06 | 0.7684 | 0.7562 | 0.0890 | 0.5291 |
+| lomustine | core | 2.98e+06 | 2.98e+06 | 2.95e+06 | 0.6192 | 0.6237 | 0.0778 | 0.5060 |
+| lomustine | perivascular | 8.28e+06 | 8.44e+06 | 7.59e+06 | 0.8697 | 0.8680 | 0.2839 | 0.6854 |
 | lomustine | necrotic | 3.75e+06 | 3.79e+06 | 3.56e+06 | 0.7021 | 0.7013 | 0.1036 | 0.5654 |
-| cisplatin | margin | 7.61e+06 | 7.64e+06 | 7.67e+06 | 0.9493 | 0.9453 | 0.0890 | 0.5291 |
-| cisplatin | core | 6.3e+06 | 6.31e+06 | 6.26e+06 | 0.8393 | 0.8432 | 0.0778 | 0.5060 |
-| cisplatin | perivascular | 1.59e+07 | 1.62e+07 | 1.48e+07 | 0.9648 | 0.9651 | 0.2839 | 0.6854 |
-| cisplatin | necrotic | 7.87e+06 | 7.95e+06 | 7.54e+06 | 0.9005 | 0.9013 | 0.1036 | 0.5654 |
-| methotrexate | margin | 3.04e+05 | 3.04e+05 | 3.04e+05 | 0.4483 | 0.4818 | 0.0890 | 0.5291 |
-| methotrexate | core | 2.49e+05 | 2.49e+05 | 2.46e+05 | 0.3846 | 0.3855 | 0.0778 | 0.5060 |
-| methotrexate | perivascular | 7.44e+05 | 7.6e+05 | 6.74e+05 | 0.6887 | 0.6919 | 0.2839 | 0.6854 |
-| methotrexate | necrotic | 3.17e+05 | 3.21e+05 | 2.98e+05 | 0.4469 | 0.4493 | 0.1036 | 0.5654 |
-| doxorubicin | margin | 1.05e+05 | 1.05e+05 | 1.05e+05 | 0.9095 | 0.8905 | 0.0890 | 0.5291 |
-| doxorubicin | core | 8.7e+04 | 8.69e+04 | 8.57e+04 | 0.7590 | 0.7637 | 0.0778 | 0.5060 |
-| doxorubicin | perivascular | 2.68e+05 | 2.74e+05 | 2.41e+05 | 0.9528 | 0.9515 | 0.2839 | 0.6854 |
-| doxorubicin | necrotic | 1.11e+05 | 1.12e+05 | 1.04e+05 | 0.8422 | 0.8401 | 0.1036 | 0.5654 |
+| cisplatin | margin | 7.31e+06 | 7.34e+06 | 7.36e+06 | 0.9463 | 0.9429 | 0.0890 | 0.5291 |
+| cisplatin | core | 6.05e+06 | 6.06e+06 | 6.02e+06 | 0.8356 | 0.8400 | 0.0778 | 0.5060 |
+| cisplatin | perivascular | 1.53e+07 | 1.55e+07 | 1.42e+07 | 0.9640 | 0.9638 | 0.2839 | 0.6854 |
+| cisplatin | necrotic | 7.56e+06 | 7.64e+06 | 7.24e+06 | 0.8977 | 0.8986 | 0.1036 | 0.5654 |
+| methotrexate | margin | 5.94e+04 | 5.94e+04 | 5.94e+04 | 0.1302 | 0.1403 | 0.0890 | 0.5291 |
+| methotrexate | core | 4.88e+04 | 4.88e+04 | 4.82e+04 | 0.1119 | 0.1103 | 0.0778 | 0.5060 |
+| methotrexate | perivascular | 1.46e+05 | 1.49e+05 | 1.32e+05 | 0.2865 | 0.2858 | 0.2839 | 0.6854 |
+| methotrexate | necrotic | 6.21e+04 | 6.27e+04 | 5.84e+04 | 0.1342 | 0.1341 | 0.1036 | 0.5654 |
+| doxorubicin | margin | 4.26e+04 | 4.26e+04 | 4.25e+04 | 0.7704 | 0.7579 | 0.0890 | 0.5291 |
+| doxorubicin | core | 3.52e+04 | 3.52e+04 | 3.47e+04 | 0.6237 | 0.6294 | 0.0778 | 0.5060 |
+| doxorubicin | perivascular | 1.08e+05 | 1.11e+05 | 9.77e+04 | 0.8910 | 0.8891 | 0.2839 | 0.6854 |
+| doxorubicin | necrotic | 4.51e+04 | 4.55e+04 | 4.22e+04 | 0.7114 | 0.7099 | 0.1036 | 0.5654 |
 
 Whole-tumour reference (the number the flagship panel would report, i.e. what the per-zone resolution is hiding):
 
 | drug | MW (Da) | real IC50 (µM) | bbb | whole-tumour kill | penetration index | whole-tissue mean AUC (µM·s) | tumour hypoxic fraction |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | 194 | 606 | 0.558 | 0.4949 | 0.325 | 1.56e+07 | 0.0% |
+| temozolomide | 194 | 606 | 0.125 | 0.1679 | 0.325 | 3.5e+06 | 0.0% |
 | lomustine | 234 | 50 | 0.973 | 0.7225 | 0.234 | 4.26e+06 | 0.0% |
-| cisplatin | 298 | 24.6 | 0.893 | 0.9017 | 0.259 | 8.65e+06 | 0.0% |
-| methotrexate | 454 | 12 | 0.115 | 0.4879 | 0.219 | 3.68e+05 | 0.0% |
-| doxorubicin | 544 | 0.5 | 0.051 | 0.8493 | 0.213 | 1.3e+05 | 0.0% |
+| cisplatin | 298 | 24.6 | 0.858 | 0.8991 | 0.259 | 8.31e+06 | 0.0% |
+| methotrexate | 454 | 12 | 0.023 | 0.1641 | 0.219 | 7.2e+04 | 0.0% |
+| doxorubicin | 544 | 0.5 | 0.021 | 0.7333 | 0.213 | 5.28e+04 | 0.0% |
 
 *(The per-cell kill reconstruction reproduces the engine's own `kill_fraction` to 0.00e+00 absolute — the per-zone kills are a decomposition of the engine's result, not a re-implementation.)*
 
@@ -98,10 +102,10 @@ Whole-tumour reference (the number the flagship panel would report, i.e. what th
 
 | drug | zones ranked by mean tumour-cell exposure (high → low) | zones ranked by predicted kill (high → low) | expected ordering recovered? |
 |---|---|---|:--:|
-| temozolomide | perivascular > necrotic > margin > core | perivascular > margin > necrotic > core | no |
+| temozolomide | perivascular > necrotic > margin > core | perivascular > necrotic > margin > core | no |
 | lomustine | perivascular > margin > necrotic > core | perivascular > margin > necrotic > core | no |
 | cisplatin | perivascular > margin > necrotic > core | perivascular > margin > necrotic > core | no |
-| methotrexate | perivascular > margin > necrotic > core | perivascular > margin > necrotic > core | no |
+| methotrexate | perivascular > margin > necrotic > core | perivascular > necrotic > margin > core | no |
 | doxorubicin | perivascular > margin > necrotic > core | perivascular > margin > necrotic > core | no |
 
 Textbook expectation for reference: `perivascular > margin > core > necrotic`.
@@ -118,21 +122,21 @@ Textbook expectation for reference: `perivascular > margin > core > necrotic`.
 
 | drug | mean AUC perivascular | mean AUC core+necrotic | ratio | Δ | Cohen's *d* | Cliff's δ | *p*<sub>perm</sub> | *p*<sub>spatial</sub> |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | 2.6e+07 | 1.41e+07 | 1.84× | 1.19e+07 | +1.211 | +0.609 | 0.0001 | 0.004 |
+| temozolomide | 5.83e+06 | 3.16e+06 | 1.84× | 2.67e+06 | +1.211 | +0.609 | 0.0001 | 0.004 |
 | lomustine | 8.43e+06 | 3.53e+06 | 2.39× | 4.9e+06 | +1.361 | +0.676 | 0.0001 | 0.003 |
-| cisplatin | 1.62e+07 | 7.42e+06 | 2.18× | 8.75e+06 | +1.316 | +0.661 | 0.0001 | 0.003 |
-| methotrexate | 7.59e+05 | 2.98e+05 | 2.55× | 4.61e+05 | +1.389 | +0.684 | 0.0001 | 0.003 |
-| doxorubicin | 2.73e+05 | 1.04e+05 | 2.62× | 1.69e+05 | +1.401 | +0.687 | 0.0001 | 0.003 |
+| cisplatin | 1.55e+07 | 7.13e+06 | 2.18× | 8.4e+06 | +1.316 | +0.661 | 0.0001 | 0.003 |
+| methotrexate | 1.48e+05 | 5.82e+04 | 2.55× | 9.02e+04 | +1.389 | +0.684 | 0.0001 | 0.003 |
+| doxorubicin | 1.11e+05 | 4.22e+04 | 2.62× | 6.85e+04 | +1.401 | +0.687 | 0.0001 | 0.003 |
 
 ### 4b. Kill (per-spot mean predicted kill probability of tumour cells)
 
 | drug | mean *p*<sub>kill</sub> perivascular | mean *p*<sub>kill</sub> core+necrotic | ratio | Δ | Cohen's *d* | Cliff's δ | *p*<sub>perm</sub> | *p*<sub>spatial</sub> |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | 0.6478 | 0.4621 | 1.40× | 0.1857 | +1.117 | +0.604 | 0.0001 | 0.007 |
-| lomustine | 0.8784 | 0.6835 | 1.29× | 0.1949 | +0.977 | +0.667 | 0.0001 | 0.006 |
-| cisplatin | 0.9678 | 0.8850 | 1.09× | 0.08276 | +0.559 | +0.653 | 0.0001 | 0.006 |
-| methotrexate | 0.7138 | 0.4398 | 1.62× | 0.274 | +1.283 | +0.675 | 0.0001 | 0.006 |
-| doxorubicin | 0.9565 | 0.8207 | 1.17× | 0.1358 | +0.718 | +0.676 | 0.0001 | 0.006 |
+| temozolomide | 0.2614 | 0.1459 | 1.79× | 0.1155 | +1.209 | +0.604 | 0.0001 | 0.007 |
+| lomustine | 0.8783 | 0.6835 | 1.29× | 0.1949 | +0.977 | +0.667 | 0.0001 | 0.006 |
+| cisplatin | 0.9666 | 0.8822 | 1.10× | 0.08436 | +0.568 | +0.653 | 0.0001 | 0.006 |
+| methotrexate | 0.3090 | 0.1330 | 2.32× | 0.176 | +1.436 | +0.676 | 0.0001 | 0.006 |
+| doxorubicin | 0.8997 | 0.6928 | 1.30× | 0.2069 | +0.955 | +0.677 | 0.0001 | 0.006 |
 
 ### 4c. Pairwise zone contrasts (delivery, first drug in the panel as reference)
 
@@ -150,11 +154,11 @@ The same panel, the same zone labels, on the assembler's own spot-pitch grid:
 
 | drug | perivasc/(core+necrotic) AUC ratio @12 µm | @100 µm | Cliff's δ @12 µm | @100 µm | whole-tumour kill @12 µm | @100 µm |
 |---|---:|---:|---:|---:|---:|---:|
-| temozolomide | 1.84× | 1.85× | +0.609 | +0.605 | 0.4949 | 0.5105 |
-| lomustine | 2.39× | 2.38× | +0.676 | +0.672 | 0.7225 | 0.7389 |
-| cisplatin | 2.18× | 2.18× | +0.661 | +0.656 | 0.9017 | 0.9176 |
-| methotrexate | 2.55× | 2.53× | +0.684 | +0.679 | 0.4879 | 0.5011 |
-| doxorubicin | 2.62× | 2.60× | +0.687 | +0.681 | 0.8493 | 0.8639 |
+| temozolomide | 1.84× | 1.85× | +0.609 | +0.605 | 0.1679 | 0.1769 |
+| lomustine | 2.39× | 2.38× | +0.676 | +0.672 | 0.7225 | 0.7388 |
+| cisplatin | 2.18× | 2.18× | +0.661 | +0.656 | 0.8991 | 0.9151 |
+| methotrexate | 2.55× | 2.53× | +0.684 | +0.679 | 0.1641 | 0.1729 |
+| doxorubicin | 2.62× | 2.60× | +0.687 | +0.681 | 0.7333 | 0.7493 |
 
 The perivascular/(core+necrotic) contrast has the **same direction at both resolutions** for every drug (12 µm ratios 1.84–2.62× vs 100 µm ratios 1.85–2.60×). Refining the mesh sharpens the near-vessel gradient the PDE can represent, but it adds no measurement information: the source field is spot-limited at both resolutions.
 
@@ -168,7 +172,7 @@ The perivascular/(core+necrotic) contrast has the **same direction at both resol
 
 **The non-circular half of the prediction FAILS, and this is the most informative result here.** Stripping out every contrast that involves the perivascular label leaves: **margin vs necrotic**: 0.89× (δ=+0.00, p_spatial=0.32), **core vs necrotic**: 0.80× (δ=-0.24, p_spatial=0.7). The textbook expectation is that the necrotic/perinecrotic zone is the worst-perfused, worst-delivered compartment in the tumour — it is not. On this section the `necrotic` zone receives **more** predicted drug than the `core` (1.25× more, Cliff's δ=+0.24), and the difference is not significant against the spatial null (p_spatial = 0.7). Mechanically this follows straight from the reconstructed fields: mean vascular density is 0.1036 in the necrotic zone vs 0.0778 in the core, and mean oxygen 0.5654 vs 0.5060. Biologically that is defensible — perinecrotic HIF-high tissue (`CA9`/`VEGFA`/`ADM`) is precisely the tissue that *drives* microvascular proliferation, so it sits next to vessels — but it means **this model does not reproduce the classic 'necrotic core is a drug sanctuary' picture**, and the honest reading is that once you remove the vascular-marker circularity, only the perivascular-vs-everything contrast survives, and the finer zone structure does not.
 
-**Exposure differences convert into kill differences.** Predicted kill of the tumour cells inside the perivascular zone exceeds that in core+necrotic for every drug, by 1.09–1.62×. This is the spatially explicit version of the whole claim: a single whole-tumour `kill_fraction` averages over cells whose predicted fates differ by that factor. Note however that the **kill contrast is much smaller than the exposure contrast** (exposure 1.84–2.62× vs kill 1.09–1.62×): the Hill dose-response compresses it, because at these predicted exposures most drugs sit high on the sigmoid where extra drug buys little extra kill. A delivery gradient only matters when the tissue straddles the drug's IC50: here the largest kill contrast is **methotrexate** (1.62×) and the smallest is **cisplatin** (1.09×), which tracks where each drug's achieved exposure sits on its own dose-response curve rather than how steep its delivery gradient is.
+**Exposure differences convert into kill differences.** Predicted kill of the tumour cells inside the perivascular zone exceeds that in core+necrotic for every drug, by 1.10–2.32×. This is the spatially explicit version of the whole claim: a single whole-tumour `kill_fraction` averages over cells whose predicted fates differ by that factor. Note however that the **kill contrast is much smaller than the exposure contrast** (exposure 1.84–2.62× vs kill 1.10–2.32×): the Hill dose-response compresses it, because at these predicted exposures most drugs sit high on the sigmoid where extra drug buys little extra kill. A delivery gradient only matters when the tissue straddles the drug's IC50: here the largest kill contrast is **methotrexate** (2.32×) and the smallest is **cisplatin** (1.10×), which tracks where each drug's achieved exposure sits on its own dose-response curve rather than how steep its delivery gradient is.
 
 **Hypoxia is not the mechanism here.** On this section at dx = 12 µm the predicted tumour hypoxic fraction is 0.0%, so the hypoxia-resistance multiplier in the PD model is essentially inactive and the regional kill differences are driven almost entirely by **delivered exposure**, not by hypoxic drug resistance. The Visium-derived vascular field is a spot-resolution KDE and is consequently much smoother than the Xenium single-cell field, which is why this section reads as well-oxygenated. Do not transfer the hypoxia numbers from the Xenium panel to this one.
 

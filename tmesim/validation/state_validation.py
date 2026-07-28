@@ -990,43 +990,77 @@ def run_test1(
 #: marker map existed. :func:`check_brain_panel_unchanged` re-derives these and
 #: fails loudly on any drift, so adding the IO panel cannot silently perturb the
 #: section every other result in ``results/`` is computed on.
+#:
+#: SCOPED TO THE LEGACY SCORING RULE. This guard exists to prove the IO MARKER MAP
+#: is inert on the brain panel, so it is now checked under
+#: ``aggregation='mean_z'`` — the rule that was in force when these numbers were
+#: frozen. The production default has since moved to ``'matched_null_z'`` to
+#: remove the marker-COUNT bias (``results/classifier_fix.md``), which changes the
+#: composition ON PURPOSE; pinning the current default is
+#: ``tests/test_classifier_arity.py``'s job, not this guard's.
 BRAIN_PANEL_REFERENCE_PCT: Dict[str, float] = {
     "TUMOR": 73.80, "STROMAL": 7.92, "IMMUNE": 8.54, "ENDOTHELIAL": 9.74,
 }
 BRAIN_PANEL_TOLERANCE_PCT = 0.02
 
+#: The same section under the CURRENT default aggregation. Reported, not asserted
+#: — it is pinned by ``tests/test_classifier_arity.py``.
+BRAIN_PANEL_CURRENT_PCT: Dict[str, float] = {
+    "TUMOR": 58.24, "STROMAL": 11.78, "IMMUNE": 19.48, "ENDOTHELIAL": 10.50,
+}
+
 
 def check_brain_panel_unchanged(sample: str = BRAIN_SAMPLE) -> Dict:
-    """Assert the 319-gene reconstruction still gives the historical fractions.
+    """Assert the 319-gene MARKER MAP still gives the historical fractions.
 
     The IO marker map is only admissible if it is inert on the other section. This
-    re-runs the real typing path on the brain panel and compares against
+    re-runs the real typing path on the brain panel **under the legacy
+    ``'mean_z'`` aggregation** and compares against
     :data:`BRAIN_PANEL_REFERENCE_PCT` to 0.02 percentage points, and additionally
     checks that :func:`marker_panels.select_marker_map` returns the *same object*
     as :data:`BRAIN_PANEL_MARKER_MAP` for that panel (identity, not just equality).
+
+    Scoring the legacy rule (rather than the production default) is deliberate:
+    the property under test is that the PANEL REGISTRY did not move this section,
+    and that property must stay checkable after the deliberate change of default
+    aggregation documented in ``results/classifier_fix.md``. The composition under
+    the current default is reported alongside so any drift there is still visible.
     """
+    from ..reconstruct.real_xenium import TYPING_AGGREGATION, phenotype_cells
+
     data = load_section(sample)
     genes = np.asarray(data["genes"], dtype=str)
     mm, panel_name, cov = select_marker_map(genes)
-    st = band_states(sample, DX_CONVERGED, DEFAULT_MASK_MODE)
-    ct = st["cell_type"]
-    n = int(ct.size)
-    pct = {c.name: 100.0 * float((ct == int(c)).sum()) / n for c in CellType}
+
+    ct_legacy, _um, _ms = phenotype_cells(
+        data["expression"], genes, marker_map=mm, aggregation="mean_z"
+    )
+    n = int(ct_legacy.size)
+    pct = {c.name: 100.0 * float((ct_legacy == int(c)).sum()) / n for c in CellType}
+
+    ct_now, _um2, _ms2 = phenotype_cells(data["expression"], genes, marker_map=mm)
+    pct_now = {c.name: 100.0 * float((ct_now == int(c)).sum()) / n for c in CellType}
+
     drift = {k: abs(pct[k] - v) for k, v in BRAIN_PANEL_REFERENCE_PCT.items()}
     ok = (panel_name == "brain_319" and mm is BRAIN_PANEL_MARKER_MAP
           and max(drift.values()) <= BRAIN_PANEL_TOLERANCE_PCT)
-    print(f"\n  PANEL REGRESSION GUARD (319-gene brain section): "
-          f"{'PASS' if ok else 'FAIL'}")
+    print(f"\n  PANEL REGRESSION GUARD (319-gene brain section, aggregation="
+          f"'mean_z'): {'PASS' if ok else 'FAIL'}")
     print("    " + "  ".join(f"{k}={pct[k]:.2f}%" for k in BRAIN_PANEL_REFERENCE_PCT))
+    print(f"    current default ({TYPING_AGGREGATION}, reported not asserted): "
+          + "  ".join(f"{k}={pct_now[k]:.2f}%" for k in BRAIN_PANEL_REFERENCE_PCT))
     print(f"    map identity is BRAIN_PANEL_MARKER_MAP: {mm is BRAIN_PANEL_MARKER_MAP}"
           f"   selected panel: {panel_name}  coverage {cov}")
     if not ok:
         raise RuntimeError(
-            "the 319-gene brain-panel reconstruction CHANGED: "
+            "the 319-gene brain-panel MARKER MAP changed the reconstruction: "
             f"{pct} vs reference {BRAIN_PANEL_REFERENCE_PCT}"
         )
     return {"panel_name": panel_name, "coverage": cov, "percent": pct,
             "reference_percent": dict(BRAIN_PANEL_REFERENCE_PCT),
+            "aggregation_checked": "mean_z",
+            "current_default_aggregation": str(TYPING_AGGREGATION),
+            "current_default_percent": pct_now,
             "max_drift_pct": float(max(drift.values())),
             "is_same_map_object": bool(mm is BRAIN_PANEL_MARKER_MAP), "pass": ok}
 

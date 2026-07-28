@@ -1,12 +1,16 @@
 # Combination therapy on the real Xenium glioblastoma microenvironment
 
-> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
-> figure below was generated with the **KDE** vascular source, which was the default until
-> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
-> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
-> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
-> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
-> `mode='kde'` to recover exactly these numbers.
+> **Regenerated under the discrete vessel source.** `vascular_mode = discrete`
+> (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
+> [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the
+> e-folding-length convention `L = d_half / ln 2` · per-cell sensitivity mode =
+> **`uniform` (pipeline default; the engine additionally applies the hypoxia/quiescence resistance factor, identical for both agents)** · **dx = 12 µm**.
+>
+> Every absolute exposure / AUC / coverage / kill below is on the **discrete-source
+> unit** and is NOT comparable with the KDE-era numbers this file carried before this
+> regeneration (the tissue-integrated source total is 3.36x smaller; that is a change
+> of *unit*, not of physics — the dose-matched, geometry-only effect on coverage is
+> <= 0.0166). To recover the old numbers, re-run with `mode='kde'`.
 
 **Experiment:** `experiments/combination.py` (run: `./.venv/bin/python experiments/combination.py`)
 
@@ -54,17 +58,17 @@ so the headline numbers carry no Monte-Carlo noise; a single seeded realisation 
 
 | drug | MW | IC50 (uM) | D (um^2/s) | sink k (1/s) | BBB | mean tissue AUC (uM*s) | E[kill] | engine kill (1 draw) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | 194 | 606 | 278 | 0.00302 | 0.558 | 1.03e+07 | 0.4205 | 0.4173 |
-| doxorubicin | 544 | 0.5 | 185 | 0.0333 | 0.051 | 8.59e+04 | 0.8806 | 0.8839 |
-| cisplatin | 298 | 24.6 | 236 | 0.00879 | 0.893 | 5.7e+06 | 0.9147 | 0.9152 |
+| temozolomide | 194 | 606 | 278 | 0.00302 | 0.125 | 6.86e+05 | 0.0144 | 0.0147 |
+| doxorubicin | 544 | 0.5 | 185 | 0.0333 | 0.021 | 1.03e+04 | 0.2212 | 0.2165 |
+| cisplatin | 298 | 24.6 | 236 | 0.00879 | 0.858 | 1.63e+06 | 0.3748 | 0.3699 |
 
 **POTENCY HEADROOM — the number that decides the whole experiment.** A steep delivery gradient only produces a steep KILL gradient if the concentration crosses IC50 somewhere inside the tissue. Per tumor cell, the time-averaged effective concentration `E = AUC / T` in units of that drug's own IC50:
 
 | drug | median E (uM) | IC50 (uM) | median E / IC50 | % tumor cells above IC50 | exposure half-distance | deepest bin still >= IC50 |
 |---|---:|---:|---:|---:|---:|---:|
-| temozolomide | 477.6 | 606 | 0.788 | 15.0% | 380 um | 30 um |
-| doxorubicin | 3.71 | 0.5 | 7.42 | 99.6% | 66 um | 650 um |
-| cisplatin | 257.2 | 24.6 | 10.5 | 99.9% | 180 um | 650 um |
+| temozolomide | 31.88 | 606 | 0.0526 | 0.0% | 140 um | none |
+| doxorubicin | 0.4278 | 0.5 | 0.856 | 38.4% | 30 um | 30 um |
+| cisplatin | 72.93 | 24.6 | 2.97 | 99.4% | 78 um | 140 um |
 
 `E[kill]` (mean per-cell kill probability over tumor cells) is the noise-free expectation; `engine kill` is one Bernoulli realisation returned by `simulate_response`. They agree to within sampling error — the cross-check that the re-read probabilities are the engine's own.
 
@@ -72,17 +76,17 @@ so the headline numbers carry no Monte-Carlo noise; a single seeded realisation 
 
 | drug | E[kill] @1x | E[kill] @2x | gain from doubling the dose |
 |---|---:|---:|---:|
-| temozolomide | 0.4205 | 0.6134 | 1.46x |
-| doxorubicin | 0.8806 | 0.9295 | 1.06x |
-| cisplatin | 0.9147 | 0.9467 | 1.03x |
+| temozolomide | 0.0144 | 0.0317 | 2.20x |
+| doxorubicin | 0.2212 | 0.3093 | 1.40x |
+| cisplatin | 0.3748 | 0.4267 | 1.14x |
 
 ## Kill: A, B, A+B, and both controls
 
 | pair | A alone | B alone | A+B (Bliss) | better single | 2x dose of better | Bliss(better+ITSELF) | combo/best single | combo/2x-dose | combo/self-combo |
 |---|---:|---:|---:|---|---:|---:|---:|---:|---:|
-| temozolomide + doxorubicin | 0.4205 | 0.8806 | 0.9195 | doxorubicin | 0.9295 | 0.9688 | 1.04x | 0.99x | 0.95x |
-| cisplatin + doxorubicin | 0.9147 | 0.8806 | 0.9750 | cisplatin | 0.9467 | 0.9786 | 1.07x | 1.03x | 1.00x |
-| temozolomide + cisplatin | 0.4205 | 0.9147 | 0.9407 | cisplatin | 0.9467 | 0.9786 | 1.03x | 0.99x | 0.96x |
+| temozolomide + doxorubicin | 0.0144 | 0.2212 | 0.2320 | doxorubicin | 0.3093 | 0.3864 | 1.05x | 0.75x | 0.60x |
+| cisplatin + doxorubicin | 0.3748 | 0.2212 | 0.5085 | cisplatin | 0.4267 | 0.6048 | 1.36x | 1.19x | 0.84x |
+| temozolomide + cisplatin | 0.0144 | 0.3748 | 0.3835 | cisplatin | 0.4267 | 0.6048 | 1.02x | 0.90x | 0.63x |
 
 All values are expected fractions of **tumor cells** killed. The last column is the one that matters: a ratio at or below 1.00 means combining two *different* drugs did no better than the model's own independence arithmetic applied to a single drug against itself.
 
@@ -90,9 +94,9 @@ All values are expected fractions of **tumor cells** killed. The last column is 
 
 | pair | killed by A only | by B only | by both | Jaccard | overlap coef | full-shuffle null | obs/full | delivery-shuffle null | obs/delivery |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide + doxorubicin | 4.2% | 54.3% | 41.5% | 0.4151 | 0.9076 | 0.3978 +- 0.0001 | 1.04x | 0.4095 +- 0.0000 | 1.01x |
-| cisplatin + doxorubicin | 9.7% | 6.2% | 84.1% | 0.8414 | 0.9316 | 0.8138 +- 0.0002 | 1.03x | 0.8370 +- 0.0000 | 1.01x |
-| temozolomide + cisplatin | 2.8% | 55.3% | 41.9% | 0.4194 | 0.9382 | 0.4047 +- 0.0001 | 1.04x | 0.4160 +- 0.0000 | 1.01x |
+| temozolomide + doxorubicin | 4.7% | 93.8% | 1.5% | 0.0155 | 0.2492 | 0.0137 +- 0.0000 | 1.13x | 0.0144 +- 0.0000 | 1.08x |
+| cisplatin + doxorubicin | 56.5% | 26.3% | 17.2% | 0.1721 | 0.3957 | 0.1616 +- 0.0001 | 1.07x | 0.1672 +- 0.0000 | 1.03x |
+| temozolomide + cisplatin | 2.3% | 96.2% | 1.5% | 0.0149 | 0.3975 | 0.0141 +- 0.0000 | 1.06x | 0.0146 +- 0.0000 | 1.02x |
 
 A-only / B-only / both are percentages **of the killed population** (they sum to 100%). The delivery-shuffle null preserves drug B's marginal kill to within 0.0%, 0.0%, 0.0% respectively.
 
@@ -100,56 +104,48 @@ As fractions of all tumor cells:
 
 | pair | A only | B only | both | any (= combo kill) |
 |---|---:|---:|---:|---:|
-| temozolomide + doxorubicin | 3.89% | 49.90% | 38.17% | 91.95% |
-| cisplatin + doxorubicin | 9.44% | 6.02% | 82.04% | 97.50% |
-| temozolomide + cisplatin | 2.60% | 52.02% | 39.45% | 94.07% |
+| temozolomide + doxorubicin | 1.08% | 21.76% | 0.36% | 23.20% |
+| cisplatin + doxorubicin | 28.73% | 13.37% | 8.75% | 50.85% |
+| temozolomide + cisplatin | 0.87% | 36.91% | 0.57% | 38.35% |
 
 Correlation of the per-cell kill probabilities across tumor cells — a coupling-free redundancy measure. `p` includes the shared cell-intrinsic factor; `p_hill` is the DELIVERY term alone:
 
 | pair | Pearson(p_A,p_B) | Spearman(p_A,p_B) | Pearson(hill_A,hill_B) | Spearman(hill_A,hill_B) |
 |---|---:|---:|---:|---:|
-| temozolomide + doxorubicin | 0.821 | 0.823 | 0.714 | 0.812 |
-| cisplatin + doxorubicin | 0.961 | 0.932 | 0.874 | 0.926 |
-| temozolomide + cisplatin | 0.784 | 0.963 | 0.708 | 0.962 |
+| temozolomide + doxorubicin | 0.808 | 0.823 | 0.764 | 0.776 |
+| cisplatin + doxorubicin | 0.831 | 0.923 | 0.865 | 0.902 |
+| temozolomide + cisplatin | 0.834 | 0.967 | 0.838 | 0.961 |
 
 ## Where each drug actually kills (the delivery axis)
 
-Vessel mask = the p95 threshold on the real endothelial-KDE vascular density (5.0% of tissue area, 9,688 pixels); distance is the Euclidean transform in um. Per tumor-cell distance bin: mean exposure AUC (normalised to the perivascular bin), mean kill probability, and the shared cell-intrinsic factor.
+Vessel mask = the p95 threshold on the real endothelial-KDE vascular density (2.5% of tissue area, 4,843 pixels); distance is the Euclidean transform in um. Per tumor-cell distance bin: mean exposure AUC (normalised to the perivascular bin), mean kill probability, and the shared cell-intrinsic factor.
 
-Bin widths are 12 um (= dx) out to 120 um, then 40 um, then 100 um: tumor cells on this section sit a MEDIAN of 134 um from the vessel mask (max 1179 um), so a uniform near-field grid would collapse most of the tumor into one overflow bin. Cells beyond 1200 um (0.0% of tumor cells) are DROPPED from the profiles rather than clipped into the last bin.
+Bin widths are 12 um (= dx) out to 120 um, then 40 um, then 100 um: tumor cells on this section sit a MEDIAN of 43 um from the vessel mask (max 779 um), so a uniform near-field grid would collapse most of the tumor into one overflow bin. Cells beyond 1200 um (0.0% of tumor cells) are DROPPED from the profiles rather than clipped into the last bin.
 
 | distance (um) | cells | AUC temo | AUC doxo | AUC cisp | p_kill temo | p_kill doxo | p_kill cisp | p_kill combo | intrinsic factor |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 6 | 2,186 | 1.000 | 1.000 | 1.000 | 0.5460 | 0.9696 | 0.9700 | 0.9853 | 1.0000 |
-| 18 | 1,070 | 0.839 | 0.675 | 0.769 | 0.4964 | 0.9532 | 0.9581 | 0.9746 | 0.9967 |
-| 30 | 1,268 | 0.819 | 0.614 | 0.735 | 0.4888 | 0.9496 | 0.9572 | 0.9727 | 0.9980 |
-| 42 | 1,055 | 0.791 | 0.562 | 0.699 | 0.4804 | 0.9443 | 0.9546 | 0.9694 | 0.9972 |
-| 54 | 1,063 | 0.776 | 0.521 | 0.675 | 0.4744 | 0.9391 | 0.9527 | 0.9662 | 0.9972 |
-| 66 | 1,534 | 0.742 | 0.472 | 0.634 | 0.4622 | 0.9305 | 0.9480 | 0.9602 | 0.9951 |
-| 78 | 1,181 | 0.734 | 0.445 | 0.619 | 0.4589 | 0.9253 | 0.9461 | 0.9569 | 0.9945 |
-| 90 | 1,412 | 0.705 | 0.412 | 0.586 | 0.4485 | 0.9186 | 0.9435 | 0.9526 | 0.9947 |
-| 102 | 1,398 | 0.696 | 0.391 | 0.571 | 0.4424 | 0.9083 | 0.9365 | 0.9444 | 0.9896 |
-| 114 | 1,301 | 0.663 | 0.362 | 0.536 | 0.4289 | 0.8997 | 0.9319 | 0.9381 | 0.9885 |
-| 140 | 4,391 | 0.637 | 0.335 | 0.506 | 0.4174 | 0.8882 | 0.9257 | 0.9295 | 0.9854 |
-| 180 | 3,735 | 0.598 | 0.299 | 0.461 | 0.3980 | 0.8691 | 0.9142 | 0.9145 | 0.9795 |
-| 220 | 2,598 | 0.563 | 0.276 | 0.425 | 0.3782 | 0.8471 | 0.8975 | 0.8957 | 0.9679 |
-| 260 | 2,160 | 0.538 | 0.253 | 0.397 | 0.3619 | 0.8191 | 0.8801 | 0.8726 | 0.9553 |
-| 300 | 1,492 | 0.514 | 0.242 | 0.376 | 0.3426 | 0.7916 | 0.8537 | 0.8469 | 0.9323 |
-| 340 | 993 | 0.502 | 0.244 | 0.370 | 0.3275 | 0.7668 | 0.8227 | 0.8218 | 0.9008 |
-| 380 | 637 | 0.484 | 0.248 | 0.362 | 0.3186 | 0.7707 | 0.8201 | 0.8229 | 0.9003 |
-| 450 | 473 | 0.408 | 0.206 | 0.302 | 0.2638 | 0.6890 | 0.7472 | 0.7423 | 0.8520 |
-| 550 | 106 | 0.246 | 0.104 | 0.171 | 0.1329 | 0.4628 | 0.5602 | 0.5232 | 0.6981 |
-| 650 | 59 | 0.212 | 0.139 | 0.167 | 0.1084 | 0.4398 | 0.4879 | 0.4895 | 0.6864 |
+| 6 | 210 | 1.000 | 1.000 | 1.000 | 0.0203 | 0.3602 | 0.4218 | 0.3728 | 0.4886 |
+| 18 | 4,291 | 0.879 | 0.634 | 0.794 | 0.0174 | 0.3023 | 0.4056 | 0.3141 | 0.4892 |
+| 30 | 6,563 | 0.808 | 0.453 | 0.679 | 0.0158 | 0.2614 | 0.3932 | 0.2728 | 0.4876 |
+| 42 | 5,004 | 0.763 | 0.366 | 0.615 | 0.0147 | 0.2329 | 0.3828 | 0.2439 | 0.4848 |
+| 54 | 4,112 | 0.738 | 0.315 | 0.578 | 0.0141 | 0.2120 | 0.3758 | 0.2228 | 0.4827 |
+| 66 | 4,048 | 0.704 | 0.264 | 0.534 | 0.0133 | 0.1871 | 0.3659 | 0.1977 | 0.4798 |
+| 78 | 2,145 | 0.668 | 0.221 | 0.491 | 0.0124 | 0.1629 | 0.3530 | 0.1731 | 0.4742 |
+| 90 | 1,679 | 0.642 | 0.188 | 0.458 | 0.0118 | 0.1415 | 0.3403 | 0.1514 | 0.4680 |
+| 102 | 972 | 0.594 | 0.153 | 0.408 | 0.0106 | 0.1174 | 0.3218 | 0.1266 | 0.4603 |
+| 114 | 527 | 0.567 | 0.128 | 0.377 | 0.0099 | 0.0986 | 0.3071 | 0.1073 | 0.4516 |
+| 140 | 523 | 0.492 | 0.092 | 0.309 | 0.0081 | 0.0689 | 0.2694 | 0.0763 | 0.4346 |
+| 180 | 64 | 0.342 | 0.037 | 0.182 | 0.0054 | 0.0270 | 0.1925 | 0.0322 | 0.4344 |
 
 Near-vessel vs deep, for exposure (the delivery quantity) and for kill:
 
 | drug | AUC near / AUC deep | p_kill perivascular bin | p_kill first bin >100 um | p_kill far/near |
 |---|---:|---:|---:|---:|
-| temozolomide | 1.44x | 0.5460 | 0.4424 | 0.81x |
-| doxorubicin | 2.56x | 0.9696 | 0.9083 | 0.94x |
-| cisplatin | 1.75x | 0.9700 | 0.9365 | 0.97x |
+| temozolomide | 1.68x | 0.0203 | 0.0106 | 0.52x |
+| doxorubicin | 6.53x | 0.3602 | 0.1174 | 0.33x |
+| cisplatin | 2.45x | 0.4218 | 0.3218 | 0.76x |
 
-The shared cell-intrinsic factor is nearly FLAT over the same range (1.0000 perivascular -> 0.9896 deep, 0.99x), so it is not what shapes these curves — delivery is.
+The shared cell-intrinsic factor is nearly FLAT over the same range (0.4886 perivascular -> 0.4603 deep, 0.94x), so it is not what shapes these curves — delivery is.
 
 ## THE HYPOTHESIS, TESTED DIRECTLY: where does each agent kill *uniquely*?
 
@@ -159,59 +155,47 @@ The claim under test is not just that the combination kills more, but that the p
 
 | distance (um) | cells | A only | B only | both | A-only share of kills |
 |---:|---:|---:|---:|---:|---:|
-| 6 | 2,186 | 0.0157 | 0.4393 | 0.5303 | 1.6% |
-| 18 | 1,070 | 0.0213 | 0.4782 | 0.4750 | 2.2% |
-| 30 | 1,268 | 0.0231 | 0.4839 | 0.4657 | 2.4% |
-| 42 | 1,055 | 0.0251 | 0.4889 | 0.4554 | 2.6% |
-| 54 | 1,063 | 0.0270 | 0.4918 | 0.4473 | 2.8% |
-| 66 | 1,534 | 0.0297 | 0.4981 | 0.4324 | 3.1% |
-| 78 | 1,181 | 0.0316 | 0.4980 | 0.4273 | 3.3% |
-| 90 | 1,412 | 0.0340 | 0.5041 | 0.4145 | 3.6% |
-| 102 | 1,398 | 0.0361 | 0.5020 | 0.4062 | 3.8% |
-| 114 | 1,301 | 0.0384 | 0.5091 | 0.3906 | 4.1% |
-| 140 | 4,391 | 0.0413 | 0.5121 | 0.3761 | 4.4% |
-| 180 | 3,735 | 0.0454 | 0.5165 | 0.3526 | 5.0% |
-| 220 | 2,598 | 0.0486 | 0.5175 | 0.3296 | 5.4% |
-| 260 | 2,160 | 0.0535 | 0.5107 | 0.3084 | 6.1% |
-| 300 | 1,492 | 0.0554 | 0.5043 | 0.2872 | 6.5% |
-| 340 | 993 | 0.0550 | 0.4942 | 0.2725 | 6.7% |
-| 380 | 637 | 0.0522 | 0.5043 | 0.2663 | 6.3% |
-| 450 | 473 | 0.0533 | 0.4786 | 0.2104 | 7.2% |
-| 550 | 106 | 0.0604 | 0.3903 | 0.0726 | 11.5% |
-| 650 | 59 | 0.0497 | 0.3811 | 0.0587 | 10.1% |
+| 6 | 210 | 0.0126 | 0.3525 | 0.0077 | 3.4% |
+| 18 | 4,291 | 0.0118 | 0.2966 | 0.0057 | 3.8% |
+| 30 | 6,563 | 0.0113 | 0.2570 | 0.0044 | 4.2% |
+| 42 | 5,004 | 0.0110 | 0.2292 | 0.0037 | 4.5% |
+| 54 | 4,112 | 0.0109 | 0.2087 | 0.0032 | 4.9% |
+| 66 | 4,048 | 0.0106 | 0.1844 | 0.0027 | 5.4% |
+| 78 | 2,145 | 0.0102 | 0.1607 | 0.0023 | 5.9% |
+| 90 | 1,679 | 0.0099 | 0.1396 | 0.0019 | 6.5% |
+| 102 | 972 | 0.0092 | 0.1160 | 0.0015 | 7.2% |
+| 114 | 527 | 0.0088 | 0.0974 | 0.0012 | 8.2% |
+| 140 | 523 | 0.0074 | 0.0682 | 0.0007 | 9.7% |
+| 180 | 64 | 0.0052 | 0.0268 | 0.0002 | 16.1% |
 
 **cisplatin (A) + doxorubicin (B)**  (condensed — every fourth bin)
 
 | distance (um) | cells | A only | B only | both | A-only share of kills |
 |---:|---:|---:|---:|---:|---:|
-| 6 | 2,186 | 0.0293 | 0.0290 | 0.9407 | 2.9% |
-| 54 | 1,063 | 0.0564 | 0.0428 | 0.8963 | 5.7% |
-| 102 | 1,398 | 0.0804 | 0.0521 | 0.8562 | 8.1% |
-| 220 | 2,598 | 0.1224 | 0.0720 | 0.7751 | 12.6% |
-| 380 | 637 | 0.1494 | 0.1000 | 0.6707 | 16.2% |
+| 6 | 210 | 0.2666 | 0.2051 | 0.1552 | 42.5% |
+| 54 | 4,112 | 0.2931 | 0.1293 | 0.0827 | 58.0% |
+| 102 | 972 | 0.2807 | 0.0764 | 0.0411 | 70.5% |
 
 **temozolomide (A) + cisplatin (B)**  (condensed — every fourth bin)
 
 | distance (um) | cells | A only | B only | both | A-only share of kills |
 |---:|---:|---:|---:|---:|---:|
-| 6 | 2,186 | 0.0154 | 0.4394 | 0.5306 | 1.6% |
-| 54 | 1,063 | 0.0205 | 0.4989 | 0.4538 | 2.1% |
-| 102 | 1,398 | 0.0238 | 0.5180 | 0.4185 | 2.5% |
-| 220 | 2,598 | 0.0301 | 0.5494 | 0.3481 | 3.2% |
-| 380 | 637 | 0.0366 | 0.5381 | 0.2820 | 4.3% |
+| 6 | 210 | 0.0114 | 0.4129 | 0.0089 | 2.6% |
+| 54 | 4,112 | 0.0086 | 0.3703 | 0.0056 | 2.2% |
+| 102 | 972 | 0.0069 | 0.3180 | 0.0037 | 2.1% |
 
 ## Verdict
 
 THE DELIVERY-COMPLEMENTARITY HYPOTHESIS FAILS on this tissue. Every pair's killed populations overlap MORE than the delivery-shuffled null (the two drugs hit the same cells), and no combination beats the better agent Bliss-combined with ITSELF — so the apparent combination benefit over 2x dosing is an artifact of the independence assumption acting against a saturating Hill curve, not spatial complementarity.
 
-- temozolomide + doxorubicin: overlap vs delivery-null 1.01x (vs full-null 1.04x) -> no spatial structure. combo 0.9195 vs 2x-doxorubicin 0.9295 (0.99x, loses) and vs Bliss(doxorubicin+itself) 0.9688 (0.95x, LOSES).
-- cisplatin + doxorubicin: overlap vs delivery-null 1.01x (vs full-null 1.03x) -> no spatial structure. combo 0.9750 vs 2x-cisplatin 0.9467 (1.03x, beats) and vs Bliss(cisplatin+itself) 0.9786 (1.00x, LOSES).
-- temozolomide + cisplatin: overlap vs delivery-null 1.01x (vs full-null 1.04x) -> no spatial structure. combo 0.9407 vs 2x-cisplatin 0.9467 (0.99x, loses) and vs Bliss(cisplatin+itself) 0.9786 (0.96x, LOSES).
+- temozolomide + doxorubicin: overlap vs delivery-null 1.08x (vs full-null 1.13x) -> REDUNDANT (same cells). combo 0.2320 vs 2x-doxorubicin 0.3093 (0.75x, loses) and vs Bliss(doxorubicin+itself) 0.3864 (0.60x, LOSES).
+- cisplatin + doxorubicin: overlap vs delivery-null 1.03x (vs full-null 1.07x) -> no spatial structure. combo 0.5085 vs 2x-cisplatin 0.4267 (1.19x, beats) and vs Bliss(cisplatin+itself) 0.6048 (0.84x, LOSES).
+- temozolomide + cisplatin: overlap vs delivery-null 1.02x (vs full-null 1.06x) -> no spatial structure. combo 0.3835 vs 2x-cisplatin 0.4267 (0.90x, loses) and vs Bliss(cisplatin+itself) 0.6048 (0.63x, LOSES).
 
 ### What the numbers mean, mechanistically
 
-1. **The delivery gradients are real but nearly IDENTICAL in shape.** All three agents' exposure falls to half within 66-380 um of the vessel mask and the normalised profiles lie almost on top of one another. This is the confound `results/vessel_profile.md` already documented: with a fast perivascular sink the tissue field is close to reaction-dominated (`C ~ S/k`), so every drug largely INHERITS the shape of the same vascular source field. **Two drugs entering from the same vessels have correlated, not complementary, delivery geometry** — which is the structural reason the complementarity hypothesis has so little room to work here.
-2. **What differs between the agents is MAGNITUDE relative to potency, not shape.** Doxorubicin's mean tissue AUC is ~120x below temozolomide's — it is genuinely delivery-limited in concentration — but its IC50 is ~1212x lower, so the delivered concentration still sits at 7.4x IC50 in the median tumor cell versus 0.79x for temozolomide. **Doxorubicin is therefore NOT effectively delivery-limited on this section**: its Hill curve is saturated well past the ~45 um cuff, so its kill barely decays with distance while the weak agent's kill decays steeply. The premise of the headline pairing fails at this step.
+1. **The delivery gradients are real but nearly IDENTICAL in shape.** All three agents' exposure falls to half within 30-140 um of the vessel mask and the normalised profiles lie almost on top of one another. This is the confound `results/vessel_profile.md` already documented: with a fast perivascular sink the tissue field is close to reaction-dominated (`C ~ S/k`), so every drug largely INHERITS the shape of the same vascular source field. **Two drugs entering from the same vessels have correlated, not complementary, delivery geometry** — which is the structural reason the complementarity hypothesis has so little room to work here.
+2. **What differs between the agents is MAGNITUDE relative to potency, not shape.** Doxorubicin's mean tissue AUC is ~66x below temozolomide's — it is genuinely delivery-limited in concentration — but its IC50 is ~1212x lower, so the delivered concentration still sits at 0.86x IC50 in the median tumor cell versus 0.053x for temozolomide. **Doxorubicin is therefore NOT effectively delivery-limited on this section**: its Hill curve is saturated well past the ~45 um cuff, so its kill barely decays with distance while the weak agent's kill decays steeply. The premise of the headline pairing fails at this step.
 3. **The penetrant agent's unique kills are PERIVASCULAR, not deep** — the opposite of the hypothesis. In the temozolomide + doxorubicin pair the temozolomide-only contribution is largest in the near-vessel bins and falls with distance (table above), because temozolomide only wins where its own exposure is highest. It does not open up a disjoint deep territory; the deep tissue is already covered by the potent agent.
 4. **Hence overlap ABOVE both nulls.** The killed populations co-localise more than chance even against the delivery-shuffle null, which holds each cell's intrinsic killability fixed. The redundancy is delivery redundancy.
 5. **The combination still beats 2x dosing — but so does a drug combined with ITSELF.** Returns to dose are steeply diminishing (dose-doubling table), so under a Bliss model *any* second independent hit beats *any* second dose, including the same agent twice. The self-combination control is the one that separates the two explanations, and every pair LOSES to it. The apparent 'combination benefit' here is the independence arithmetic meeting a saturating Hill curve, not spatial complementarity.
@@ -222,7 +206,7 @@ THE DELIVERY-COMPLEMENTARITY HYPOTHESIS FAILS on this tissue. Every pair's kille
 
 - **No synergy is modelled.** Bliss independence is an assumption, not a result. Real drug-drug interaction (synergy or antagonism) is outside this model's reach and could dominate everything reported here.
 - **No outcome validation.** This open Xenium section is an *untreated* resection: there is no paired measured response for any of these agents, alone or combined. Every number here is a PREDICTION.
-- **Absolute kills are conditional on the sensitivity model.** The reconstruction carries a UNIFORM per-cell `sensitivity` of 1.0 (a deliberately drug-agnostic geometry-only choice, documented in `reconstruct/real_xenium.py`), so the only cell-intrinsic modulation here is hypoxia / quiescence resistance (0% of tumor cells are hypoxic). Absolute kill fractions are therefore an upper-ish bound conditional on 'every tumor cell is fully sensitive', and would fall — unevenly — under any real per-cell sensitivity model. Such a model could move the overlap ratios in either direction; it would not change the exposure fields, on which the delivery conclusions rest.
+- **Absolute kills are conditional on the sensitivity model.** The reconstruction carries a UNIFORM per-cell `sensitivity` of 1.0 (a deliberately drug-agnostic geometry-only choice, documented in `reconstruct/real_xenium.py`), so the only cell-intrinsic modulation here is hypoxia / quiescence resistance (13% of tumor cells are hypoxic). Absolute kill fractions are therefore an upper-ish bound conditional on 'every tumor cell is fully sensitive', and would fall — unevenly — under any real per-cell sensitivity model. Such a model could move the overlap ratios in either direction; it would not change the exposure fields, on which the delivery conclusions rest.
 - **Absolute kills are also conditional on the potency inputs.** IC50s come from the cached GDSC glioma screen (e.g. temozolomide at 606 uM, a genuinely weak in-vitro potency); the headroom argument above is a direct function of those numbers and of the shared nominal dose.
 - **All agents share one nominal dose.** Every drug is driven at the same 50 uM peak plasma level, which is NOT clinically dose-matched between agents, so cross-drug absolute comparisons are soft. The dose-matched control is defined in the same 'standard dose' units, so the combo-vs-2x comparison is internally consistent.
 - **Dosing is the engine's Stage-0 plasma average.** The transport solve uses a static source at the time-averaged plasma level, so schedule (sequential vs concurrent — which matters enormously in real combination therapy) cannot be represented at all.

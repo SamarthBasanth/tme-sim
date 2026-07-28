@@ -1,12 +1,15 @@
 # Real-outcome validation: the drug-POTENCY axis
 
-> **STALE ABSOLUTE NUMBERS — regenerate.** Every absolute exposure / AUC / coverage / kill
-> figure below was generated with the **KDE** vascular source, which was the default until
-> `results/vessel_promotion.md`. The default is now the **discrete** segmented-vessel source,
-> whose tissue-integrated total is **3.36x smaller** (a change of *unit*, not of physics —
-> the dose-matched geometry-only effect on coverage is <=0.0166). Relative orderings and
-> per-drug contrasts here are largely unaffected; absolute levels are not. Reproduce with
-> `mode='kde'` to recover exactly these numbers.
+> **Vascular-source promotion: NOT AFFECTED, and this was verified, not assumed.** This
+> file was carrying the blanket "STALE ABSOLUTE NUMBERS" banner applied after
+> [`results/vessel_promotion.md`](vessel_promotion.md) promoted the discrete
+> segmented-vessel source (`vascular_mode = discrete`). The banner was **over-broad here**:
+> `tmesim/validation/pharmacology_real.py` imports nothing from `tmesim.reconstruct` —
+> no domain, no vascular field, no PDE — it reads HGCC and GDSC tables and molecular
+> descriptors only. Re-running it under the discrete default reproduced this file
+> **byte-for-byte** (diff empty apart from the removed banner), so the banner has been
+> removed rather than refreshed. No `alpha`, no `dx` and no sensitivity mode enter this
+> report.
 
 First test of tmesim's molecular / pharmacology layer against a **real, measured** outcome: does structure-derived chemistry (and independently, measured GDSC potency) predict **real drug sensitivity in patient-derived glioblastoma cultures (HGCC, Johansson et al. 2020, *Cell Reports*)**?
 

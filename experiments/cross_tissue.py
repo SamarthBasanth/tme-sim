@@ -770,7 +770,8 @@ def make_figure(rows: List[Dict], native: List[Dict], ladder: List[Dict],
 # ---------------------------------------------------------------------------
 # markdown
 # ---------------------------------------------------------------------------
-def _verdict(rows: List[Dict], native: List[Dict], st: Dict) -> Tuple[str, str]:
+def _verdict(rows: List[Dict], native: List[Dict], st: Dict,
+             alpha: float) -> Tuple[str, str]:
     """Decide -- from the numbers, not from a prior -- whether the heterogeneity
     claim survives at matched resolution. Returns (headline, body)."""
     nat = {r["label"]: r for r in native}
@@ -1203,7 +1204,7 @@ def write_md(rows: List[Dict], native: List[Dict], ladder: List[Dict],
     )
 
     # ---------------- verdict ----------------
-    head, body = _verdict(rows, native, st)
+    head, body = _verdict(rows, native, st, alpha)
     L.append("## Does the inter-tumor heterogeneity claim survive?\n")
     L.append(head + "\n")
     L.append(body + "\n")
@@ -1521,7 +1522,7 @@ def main() -> None:
         print(f"VISIUM GRID LADDER ({VISIUM_LADDER_SAMPLE}):  " + "  ".join(
             f"dx{r['dx_um']:g}:kill={r['kill_fraction']:.4f}" for r in lad))
     print("-" * 100)
-    head, _ = _verdict(rows, native, st)
+    head, _ = _verdict(rows, native, st, alpha)
     print(head.replace("**", ""))
     print("HONEST: predictions on real geometry, NO outcome labels; n=5; Visium "
           "information content is still ~100 um spot-limited even at dx=12 um; "

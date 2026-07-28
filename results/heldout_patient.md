@@ -1,8 +1,22 @@
 # The held-out patient — running the whole validated pipeline on a second real GBM section
 
+> **Regenerated under the discrete vessel source.** `vascular_mode = discrete`
+> (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
+> [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the
+> e-folding-length convention `L = d_half / ln 2` · per-cell sensitivity mode =
+> **`uniform` (both sections)** · **dx = 12 µm (both sections)**.
+>
+> Every absolute exposure / AUC / coverage / kill below is on the **discrete-source
+> unit** and is NOT comparable with the KDE-era numbers this file carried before this
+> regeneration (the tissue-integrated source total is 3.36x smaller; that is a change
+> of *unit*, not of physics — the dose-matched, geometry-only effect on coverage is
+> <= 0.0166). To recover the old numbers, re-run with `mode='kde'`.
+>
+> **This file was NOT carrying a stale banner but was stale anyway** — it was produced at 23:59 on the KDE default, ~30 min before `real_fields._DEFAULT_VASCULAR_MODE` was flipped to `discrete`, and the post-promotion banner sweep missed it. It has now been re-run end to end on both sections under the discrete source. **The headline generalisation result is unchanged: the kill ordering (cisplatin > doxorubicin > lomustine > methotrexate > temozolomide) REPLICATES on the held-out 816,769-cell section**, and `therapeutic_coverage` @1x IC50 still fails to recover it on either section.
+
 Every validated result in this project was developed on **one** tissue: the 319-gene 10x Xenium GBM section (40,887 cells). This report re-runs the entire pipeline — reconstruction, vessel segmentation, the five-drug simulation and the hypoxia check — on a **second real patient the pipeline was never developed on**: the 480-gene Immuno-Oncology Xenium GBM section (816,769 cells). Both sections are driven through the identical frozen production path at the identical settings, so **section 1's numbers here are re-derived, not quoted**.
 
-**4 of 6 claims that could be scored as generalisation replicate.** A further 3 fail on **both** sections — those are not generalisation failures, they are claims that do not hold in this configuration at all, and they are called out separately because conflating the two would be the easiest way to make this report say something it should not. The headline, one line each:
+**5 of 7 claims that could be scored as generalisation replicate.** A further 2 fail on **both** sections — those are not generalisation failures, they are claims that do not hold in this configuration at all, and they are called out separately because conflating the two would be the easiest way to make this report say something it should not. The headline, one line each:
 
 | what | section 1 (development) | section 2 (held out) | verdict |
 |---|---|---|:--|
@@ -11,11 +25,11 @@ Every validated result in this project was developed on **one** tissue: the 319-
 | Vascular area fraction matches measured 2.1 +/- 0.3% (PMID 36611806) | 2.50 % | 5.79 % | **DOES NOT REPLICATE** |
 | MVD lands in the published human GBM range 35-95/mm2 (PMID 27583442) | 110.82 vessels/mm2 | 104.17 vessels/mm2 | **NOT REPRODUCED ON EITHER** |
 | Kill ordering is cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide  | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide  | **REPLICATES** |
-| therapeutic_coverage @1x IC50 recovers the kill ordering | cisplatin > lomustine > doxorubicin > methotrexate > temozolomide  | cisplatin > lomustine > doxorubicin > methotrexate > temozolomide  | **NOT REPRODUCED ON EITHER** |
-| therapeutic_coverage @1x IC50 is still a DISCRIMINATING headline metric | 5/5 drugs pinned at 0 or >0.9  | 5/5 drugs pinned at 0 or >0.9  | **NOT REPRODUCED ON EITHER** |
+| therapeutic_coverage @1x IC50 recovers the kill ordering | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate  | cisplatin > lomustine > doxorubicin > temozolomide > methotrexate  | **NOT REPRODUCED ON EITHER** |
+| therapeutic_coverage @1x IC50 is still a DISCRIMINATING headline metric | 3/5 drugs pinned at 0 or >0.9  | 3/5 drugs pinned at 0 or >0.9  | **HOLDS** |
 | The ordering is NOT simply the IC50 ordering read back out | doxorubicin > methotrexate > cisplatin > lomustine > temozolomide  | doxorubicin > methotrexate > cisplatin > lomustine > temozolomide  | **HOLDS** |
-| Simulated oxygen is BEATEN by a distance-to-nearest-vessel baseline (state_validation.md Test 1) | UNTESTABLE (no hypoxia gene on the 319 panel) Spearman rho | rho_PDE -0.1132 vs rho_dist -0.1503 Spearman rho | **CONFIRMED** |
-| VEGFA is the most anti-correlated gene on the panel; HIF1A is null | n/a — neither gene is on the 319 panel  | VEGFA rank 1/480, HIF1A rank 249/480  | **CONFIRMED** |
+| Simulated oxygen is BEATEN by a distance-to-nearest-vessel baseline (state_validation.md Test 1) | UNTESTABLE (no hypoxia gene on the 319 panel) Spearman rho | rho_PDE -0.1135 vs rho_dist -0.1503 Spearman rho | **CONFIRMED** |
+| VEGFA is the most anti-correlated gene on the panel; HIF1A is null | n/a — neither gene is on the 319 panel  | VEGFA rank 1/480, HIF1A rank 233/480  | **CONFIRMED** |
 
 > **THE CONFOUND, FIRST.** These are **different patients** *and* **different panels** — the two Xenium panels share only **60 genes**. The IO panel carries none of PECAM1 / SOX2 / OLIG2 / TOP2A / AQP4 / GJA1 / MOG, so the endothelial gate runs on VWF/FLT1/PLVAP instead of PECAM1 and the stromal gate on SLC1A3/S100B/PTN instead of AQP4/GJA1/MOG. Every composition difference below is therefore **jointly** a difference in biology and a difference in what is measurable. Where the two can be separated, this report separates them; where they cannot, it says so. Neither section carries a drug-response outcome label, so nothing here validates a kill prediction — only the machinery that produces one.
 
@@ -47,10 +61,10 @@ This is an out-of-sample test of the **pipeline**, not of a fitted model. Being 
 | STROMAL | 7.92% | 9.98% |
 | IMMUNE | 8.54% | 6.74% |
 | ENDOTHELIAL | 9.74% | 4.18% |
-| mean vascular density | 0.0840 | 0.0888 |
+| mean vascular density | 0.0250 | 0.0579 |
 | mean ECM density | 0.0759 | 0.4571 |
 | ECM markers on panel | COL1A2, COL12A1, COL25A1, POSTN, VCAN, DCN, FBLN1, LAMA2, THBS1, SPON1, TGFBI | VCAN, DCN, FBLN1 |
-| mean oxygen (tissue) | 0.5755 | 0.1760 |
+| mean oxygen (tissue) | 0.2955 | 0.1232 |
 | tissue coverage of bbox | 67.70% | 71.83% |
 
 ### 1.1 The endothelial check — the one external anchor the reconstruction has
@@ -148,35 +162,35 @@ Five drugs, **uniform** per-cell sensitivity (the only fair cross-drug mode — 
 
 | drug | IC50 (µM) | BBB | D_eff (µm²/s) | mean tumour AUC (µM·s) | **coverage @1× IC50** | coverage @0.5×/2× | median E/IC50 | **kill** |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | 606.047 | 0.125 | 265.3 | 2.4e+06 | **0.0000** | 0.000 / 0.000 | 0.18 | **0.1151** |
-| lomustine | 50 | 0.973 | 247.4 | 2.97e+06 | **0.9718** | 0.996 / 0.704 | 2.50 | **0.7228** |
-| cisplatin | 24.5503 | 0.858 | 225.4 | 5.76e+06 | **0.9986** | 0.999 / 0.997 | 10.06 | **0.9125** |
-| methotrexate | 12 | 0.023 | 189.8 | 5.05e+04 | **0.0007** | 0.026 / 0.000 | 0.17 | **0.1205** |
-| doxorubicin | 0.5 | 0.021 | 176.3 | 3.71e+04 | **0.9692** | 0.995 / 0.790 | 3.00 | **0.7531** |
+| temozolomide | 606.047 | 0.125 | 265.3 | 7.06e+05 | **0.0000** | 0.000 / 0.000 | 0.05 | **0.0147** |
+| lomustine | 50 | 0.973 | 247.4 | 8.7e+05 | **0.2175** | 0.804 / 0.021 | 0.73 | **0.1975** |
+| cisplatin | 24.5503 | 0.858 | 225.4 | 1.69e+06 | **0.9936** | 0.998 / 0.853 | 2.97 | **0.3699** |
+| methotrexate | 12 | 0.023 | 189.8 | 1.48e+04 | **0.0000** | 0.000 / 0.000 | 0.05 | **0.0162** |
+| doxorubicin | 0.5 | 0.021 | 176.3 | 1.08e+04 | **0.3836** | 0.826 / 0.064 | 0.86 | **0.2165** |
 
 ### 3.2 Section 2 (HELD OUT)
 
 | drug | IC50 (µM) | BBB | D_eff (µm²/s) | mean tumour AUC (µM·s) | **coverage @1× IC50** | coverage @0.5×/2× | median E/IC50 | **kill** |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | 606.047 | 0.125 | 201.7 | 2.5e+06 | **0.0000** | 0.000 / 0.000 | 0.18 | **0.0483** |
-| lomustine | 50 | 0.973 | 188.1 | 3.01e+06 | **0.9265** | 0.986 / 0.678 | 2.58 | **0.2836** |
-| cisplatin | 24.5503 | 0.858 | 171.4 | 5.92e+06 | **0.9985** | 0.999 / 0.995 | 10.41 | **0.3601** |
-| methotrexate | 12 | 0.023 | 144.3 | 5.07e+04 | **0.0000** | 0.014 / 0.000 | 0.18 | **0.0497** |
-| doxorubicin | 0.5 | 0.021 | 134.1 | 3.7e+04 | **0.9132** | 0.976 / 0.732 | 3.10 | **0.2922** |
+| temozolomide | 606.047 | 0.125 | 201.7 | 1.64e+06 | **0.0000** | 0.000 / 0.000 | 0.12 | **0.0274** |
+| lomustine | 50 | 0.973 | 188.1 | 1.95e+06 | **0.8013** | 0.957 / 0.365 | 1.66 | **0.2210** |
+| cisplatin | 24.5503 | 0.858 | 171.4 | 3.85e+06 | **0.9976** | 0.999 / 0.980 | 6.80 | **0.3162** |
+| methotrexate | 12 | 0.023 | 144.3 | 3.25e+04 | **0.0000** | 0.001 / 0.000 | 0.11 | **0.0276** |
+| doxorubicin | 0.5 | 0.021 | 134.1 | 2.36e+04 | **0.7908** | 0.933 / 0.477 | 1.92 | **0.2284** |
 
 ### 3.3 The ordering
 
 | ranked by | section 1 | section 2 (HELD OUT) | same? |
 |---|---|---|:--:|
 | simulated **kill** | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | ✅ |
-| **coverage @1× IC50** | cisplatin > lomustine > doxorubicin > methotrexate > temozolomide | cisplatin > lomustine > doxorubicin > methotrexate > temozolomide | ✅ |
+| **coverage @1× IC50** | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate | cisplatin > lomustine > doxorubicin > temozolomide > methotrexate | ❌ |
 | mean tumour AUC (delivery alone) | cisplatin > lomustine > temozolomide > methotrexate > doxorubicin | cisplatin > lomustine > temozolomide > methotrexate > doxorubicin | ✅ |
 | 1/IC50 (potency alone) | doxorubicin > methotrexate > cisplatin > lomustine > temozolomide | doxorubicin > methotrexate > cisplatin > lomustine > temozolomide | ✅ |
 | AUC/IC50 (delivery × potency) | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | ✅ |
 
 *(The 'same?' column compares the two SECTIONS with each other. Whether each ranking agrees with the KILL ranking — the separate question — is read down the rows: on both sections `coverage` swaps doxorubicin and lomustine relative to kill, and `AUC/IC50` reproduces kill exactly.)*
 
-**Published ordering** (`results/real_drug_panel.md`, uniform mode): cisplatin > doxorubicin > lomustine > methotrexate > temozolomide. Section 1's kill fractions here (temozolomide 0.1151, lomustine 0.7228, cisplatin 0.9125, methotrexate 0.1205, doxorubicin 0.7531) reproduce that report's numbers exactly, which is the check that this harness is running the same pipeline and not a variant of it.
+**Published ordering** (`results/real_drug_panel.md`, uniform mode): cisplatin > doxorubicin > lomustine > methotrexate > temozolomide. Section 1's kill fractions here (temozolomide 0.0147, lomustine 0.1975, cisplatin 0.3699, methotrexate 0.0162, doxorubicin 0.2165) reproduce that report's numbers exactly, which is the check that this harness is running the same pipeline and not a variant of it.
 
 **The kill ordering is IDENTICAL on both patients.** That is the headline, and the immediate next question is whether it is identical for a *trivial* reason.
 
@@ -187,27 +201,27 @@ An ordering that just reproduces the potency ranking would be reproducible by a 
 | | section 1 | section 2 |
 |---|---:|---:|
 | IC50 fold range across the panel | 1212× | 1212× |
-| mean-tumour-AUC fold range | 155× | 160× |
+| mean-tumour-AUC fold range | 156× | 163× |
 | ρ(kill, 1/IC50) — potency alone | +0.50 | +0.50 |
 | ρ(kill, mean AUC) — delivery alone | +0.30 | +0.30 |
 | ρ(kill, AUC/IC50) — the product | +1.00 | +1.00 |
-| kill spread (max − min) | 0.797 | 0.312 |
-| coverage spread (max − min) | 0.999 | 0.998 |
+| kill spread (max − min) | 0.355 | 0.289 |
+| coverage spread (max − min) | 0.994 | 0.998 |
 
-**It is NOT the IC50 ordering.** Potency alone would rank doxorubicin > methotrexate > cisplatin > lomustine > temozolomide; the simulation ranks cisplatin > doxorubicin > lomustine > methotrexate > temozolomide. Delivery spans 160× and potency 1212×, and the product AUC/IC50 tracks kill at ρ = +1.00 — the delivery × potency claim from `results/SESSION_AUDIT.md` §4 survives on the held-out patient.
+**It is NOT the IC50 ordering.** Potency alone would rank doxorubicin > methotrexate > cisplatin > lomustine > temozolomide; the simulation ranks cisplatin > doxorubicin > lomustine > methotrexate > temozolomide. Delivery spans 163× and potency 1212×, and the product AUC/IC50 tracks kill at ρ = +1.00 — the delivery × potency claim from `results/SESSION_AUDIT.md` §4 survives on the held-out patient.
 
 ### 3.5 Why the absolute numbers move so much, and why that is NOT a ranking result
 
 | | section 1 | section 2 |
 |---|---:|---:|
-| mean oxygen over tissue | 0.5755 | 0.1760 |
-| model-HYPOXIC tumour fraction | 0.00% | 76.13% |
-| model-VIABLE tumour fraction | 94.92% | 0.06% |
+| mean oxygen over tissue | 0.2955 | 0.1232 |
+| model-HYPOXIC tumour fraction | 12.68% | 96.90% |
+| model-VIABLE tumour fraction | 0.00% | 0.00% |
 | mean ECM density | 0.076 | 0.457 |
 
 Two mechanisms move every absolute kill on section 2, and **neither is a drug property**, so both largely cancel out of the ranking:
 
-1. **Oxygen.** Mean tissue O₂ is 0.176 on section 2 against 0.575 on section 1 — the denser tissue is a bigger sink — so 76% of tumour cells fall in the model's HYPOXIC band versus 0%, and `PDConfig.hypoxia_resistance` (×0.35) plus `quiescent_resistance` (×0.5) then suppress every drug's kill together. **`results/state_validation.md` §1.6 already established that the absolute oxygen level is uncalibrated** — `OxygenConfig.consumption` has never been fitted to a measured oxygen tension — so this difference is a statement about the sink constant and the cell density, not about the two tumours.
+1. **Oxygen.** Mean tissue O₂ is 0.123 on section 2 against 0.295 on section 1 — the denser tissue is a bigger sink — so 97% of tumour cells fall in the model's HYPOXIC band versus 13%, and `PDConfig.hypoxia_resistance` (×0.35) plus `quiescent_resistance` (×0.5) then suppress every drug's kill together. **`results/state_validation.md` §1.6 already established that the absolute oxygen level is uncalibrated** — `OxygenConfig.consumption` has never been fitted to a measured oxygen tension — so this difference is a statement about the sink constant and the cell density, not about the two tumours.
 2. **ECM.** The IO panel carries only 3 of the 11 matrix transcripts the ECM field is built from (VCAN, DCN, FBLN1) against section 1's 11 (COL1A2, COL12A1, COL25A1, POSTN, VCAN, DCN, FBLN1, LAMA2, THBS1, SPON1, TGFBI) — **COL1A2 and POSTN, the two fibrillar-collagen markers, are absent from the IO panel entirely.** Mean ECM comes out at 0.457 vs 0.076, which scales D_eff to 0.76× of its section-1 value. That is **panel content, not tissue biology** — the ECM field is a max-normalised KDE over whichever matrix markers happen to be measured, so an 11-marker field and a 3-marker field have no common absolute scale even on identical tissue. This is the clearest case in the report of a difference that must NOT be read as biology.
 
 **Consequence.** Absolute kills and absolute AUCs are *not* comparable between the two sections. The **ordering** and the **within-section spread** are the transportable quantities, and those are what §3.3 reports.
@@ -222,8 +236,8 @@ Measured genes: **VEGFA** (detected in 63.36% of cells), **HIF1A** (detected in 
 
 | predictor | what it is | ρ vs hypoxia score | ρ vs VEGFA | ρ vs HIF1A | ρ with log-depth partialled out |
 |---|---|---:|---:|---:|---:|
-| **SIMULATED O₂ (the PDE)** | the reaction-diffusion solve under test | **-0.1132** | -0.1479 | +0.0085 | -0.1283 |
-| vascular_kde | the solver's own input field, undiffused | **-0.1270** | -0.1456 | -0.0085 | -0.1320 |
+| **SIMULATED O₂ (the PDE)** | the reaction-diffusion solve under test | **-0.1135** | -0.1464 | +0.0067 | -0.1283 |
+| vascular_kde | the solver's own input field, undiffused | **-0.1504** | -0.1386 | -0.0755 | -0.1589 |
 | dist_endothelial | one cKDTree query on the PDE's own source cells; no physics | **-0.1503** | -0.1647 | -0.0290 | -0.1545 |
 | local_cell_density | pure local crowding; ignores vessels entirely | **-0.0192** | -0.0031 | -0.0439 | -0.0336 |
 
@@ -231,21 +245,21 @@ Permutation p-values (label shuffling, 2,000 draws on a seeded 50,000-cell subsa
 
 | predictor | ρ on the subsample | permutation p |
 |---|---:|---:|
-| simulated_o2 | -0.1090 | 0.00050 |
+| simulated_o2 | -0.1088 | 0.00050 |
 | dist_endothelial | -0.1549 | 0.00050 |
-| vascular_kde | -0.1281 | 0.00050 |
+| vascular_kde | -0.1511 | 0.00050 |
 
-**CONFIRMED.** The simulated field is significantly anti-correlated with measured hypoxia response (ρ = -0.1132), but a one-line `cKDTree` query on its own source cells scores -0.1503 — 1.33× the solved field — and the undiffused source term itself scores -0.1270, so the reaction–diffusion solve is not what carries the signal. `results/state_validation.md` §1.2 is reproduced.
+**CONFIRMED.** The simulated field is significantly anti-correlated with measured hypoxia response (ρ = -0.1135), but a one-line `cKDTree` query on its own source cells scores -0.1503 — 1.32× the solved field — and the undiffused source term itself scores -0.1504, so the reaction–diffusion solve is not what carries the signal. `results/state_validation.md` §1.2 is reproduced.
 
 ### 4.2 Nested test — does the PDE add anything beyond the raw geometry?
 
 | partial Spearman | ρ |
 |---|---:|
-| hypoxia score vs **simulated O₂**, distance-to-vessel held fixed | -0.0660 |
-| hypoxia score vs **−distance-to-vessel**, simulated O₂ held fixed | -0.1192 |
-| simulated O₂ vs −distance-to-vessel (how nested the two are) | +0.3459 |
+| hypoxia score vs **simulated O₂**, distance-to-vessel held fixed | -0.0631 |
+| hypoxia score vs **−distance-to-vessel**, simulated O₂ held fixed | -0.1174 |
+| simulated O₂ vs −distance-to-vessel (how nested the two are) | +0.3689 |
 
-**Depth control.** The simulated field correlates with total transcript count — a purely technical variable — at ρ = +0.0975; partialling log-depth out (last column of §4.1) does not change the ordering, so it is not a depth artefact.
+**Depth control.** The simulated field correlates with total transcript count — a purely technical variable — at ρ = +0.0952; partialling log-depth out (last column of §4.1) does not change the ordering, so it is not a depth artefact.
 
 ### 4.3 The 480-gene ranking
 
@@ -253,32 +267,32 @@ Every one of the 480 panel genes was depth-normalised and rank-correlated agains
 
 | rank (1 = most negative) | gene | ρ vs simulated O₂ | detection |
 |---:|---|---:|---:|
-| 1 | VEGFA **←** | -0.1479 | 63.36% |
-| 2 | SOX9 | -0.1227 | 79.41% |
-| 3 | PTN | -0.1197 | 94.57% |
-| 4 | NCAM1 | -0.1114 | 83.24% |
-| 5 | IL1RAP | -0.1040 | 45.74% |
-| 6 | S100B | -0.0992 | 96.95% |
-| 7 | FEZ1 | -0.0874 | 83.21% |
-| 8 | CCND1 | -0.0836 | 77.43% |
+| 1 | VEGFA **←** | -0.1464 | 63.36% |
+| 2 | PTN | -0.1241 | 94.57% |
+| 3 | SOX9 | -0.1238 | 79.41% |
+| 4 | NCAM1 | -0.1150 | 83.24% |
+| 5 | S100B | -0.1045 | 96.95% |
+| 6 | IL1RAP | -0.1022 | 45.74% |
+| 7 | FEZ1 | -0.0894 | 83.21% |
+| 8 | CCND1 | -0.0811 | 77.43% |
 | … | … | … | … |
-| 249 | HIF1A **←** | +0.0085 | 54.93% |
+| 233 | HIF1A **←** | +0.0067 | 54.93% |
 | … | … | … | … |
-| 480 | S100A9 | +0.1869 | 7.67% |
-| 479 | A2M | +0.1668 | 51.44% |
-| 478 | SPARC | +0.1487 | 78.80% |
-| 477 | RGS5 | +0.1430 | 12.45% |
-| 476 | IFITM3 | +0.1262 | 66.57% |
+| 480 | S100A9 | +0.1849 | 7.67% |
+| 479 | A2M | +0.1674 | 51.44% |
+| 478 | RGS5 | +0.1541 | 12.45% |
+| 477 | SPARC | +0.1511 | 78.80% |
+| 476 | FLT1 | +0.1335 | 9.42% |
 
-* **VEGFA is rank 1 of 480** at ρ = -0.14793. Of every gene the panel measures, the canonical hypoxia-response gene is (among) the ones the simulated oxygen field most strongly anti-correlates with. Reproduced.
-* **HIF1A is rank 249 of 480** at ρ = +0.00850 — null. Expected on mechanism: HIF-1α is regulated by oxygen-dependent prolyl hydroxylation and VHL-mediated proteolysis of the **protein** (Ivan et al., *Science* 2001;292:464-468, [PMID 11292862](https://pubmed.ncbi.nlm.nih.gov/11292862/); Jaakkola et al., *Science* 2001;292:468-472, [PMID 11292861](https://pubmed.ncbi.nlm.nih.gov/11292861/)), so its mRNA has no obligation to track oxygen. Reproduced.
+* **VEGFA is rank 1 of 480** at ρ = -0.14641. Of every gene the panel measures, the canonical hypoxia-response gene is (among) the ones the simulated oxygen field most strongly anti-correlates with. Reproduced.
+* **HIF1A is rank 233 of 480** at ρ = +0.00667 — null. Expected on mechanism: HIF-1α is regulated by oxygen-dependent prolyl hydroxylation and VHL-mediated proteolysis of the **protein** (Ivan et al., *Science* 2001;292:464-468, [PMID 11292862](https://pubmed.ncbi.nlm.nih.gov/11292862/); Jaakkola et al., *Science* 2001;292:468-472, [PMID 11292861](https://pubmed.ncbi.nlm.nih.gov/11292861/)), so its mRNA has no obligation to track oxygen. Reproduced.
 * **The circularity, restated.** The positive end of that table is the vascular and myeloid programme, and `FLT1` is one of the three ENDOTHELIAL markers that *builds* the oxygen source term — so its positive correlation is partly the model correlating with itself. Only the negative end is informative.
 
 ### 4.4 Field-vs-field agreement, and the state bands
 
-Averaging both fields over fixed 60 µm tissue tiles (≥5 measured cells per tile, 24,254 tiles) gives Spearman ρ = **-0.2736** (Pearson -0.3184) — about 2.4× the per-cell value, the expected signature of per-cell dropout rather than of a better model. It is the most favourable framing of the test and is reported as such.
+Averaging both fields over fixed 60 µm tissue tiles (≥5 measured cells per tile, 24,254 tiles) gives Spearman ρ = **-0.2718** (Pearson -0.3155) — about 2.4× the per-cell value, the expected signature of per-cell dropout rather than of a better model. It is the most favourable framing of the test and is reported as such.
 
-State occupancy over all cells at this configuration: **VIABLE** 0.13%, **HYPOXIC** 73.68%, **QUIESCENT** 26.18%.
+State occupancy over all cells at this configuration: **HYPOXIC** 96.01%, **QUIESCENT** 3.99%.
 
 ## 5. Everything, side by side
 
@@ -298,10 +312,10 @@ State occupancy over all cells at this configuration: **VIABLE** 0.13%, **HYPOXI
 | ENDOTHELIAL vs 8.0% volume-EM | 1.22× | 0.52× | PASS → **LOW** |
 | endothelial areal density (/mm²) | 143 | 382 | 2.67× |
 | **FIELDS** | | | |
-| mean vascular density | 0.0840 | 0.0888 | 1.06× |
+| mean vascular density | 0.0250 | 0.0579 | 2.32× |
 | mean ECM density | 0.0759 | 0.4571 | different matrix genes on the two panels — NOT comparable as biology |
-| mean oxygen (tissue) | 0.5755 | 0.1760 | absolute level is uncalibrated on both |
-| model-HYPOXIC tumour fraction | 0.00% | 76.13% | a statement about the sink constant, not the tumours |
+| mean oxygen (tissue) | 0.2955 | 0.1232 | absolute level is uncalibrated on both |
+| model-HYPOXIC tumour fraction | 12.68% | 96.90% | a statement about the sink constant, not the tumours |
 | **VASCULATURE** | | | |
 | discrete vessel objects | 3,092 | 9,322 | 3.01× |
 | MVD (/mm²) | 110.8 | 104.2 | published 65 (35–95): HIGH → **HIGH** |
@@ -313,29 +327,29 @@ State occupancy over all cells at this configuration: **VIABLE** 0.13%, **HYPOXI
 | endothelial cells per vessel object | 1.29 | 3.67 | section 2's objects look far more like real vessel profiles |
 | **DRUG PANEL (uniform sensitivity)** | | | |
 | temozolomide — coverage @1× IC50 | 0.0000 | 0.0000 |  |
-| lomustine — coverage @1× IC50 | 0.9718 | 0.9265 | 0.95× |
-| cisplatin — coverage @1× IC50 | 0.9986 | 0.9985 | 1.00× |
-| methotrexate — coverage @1× IC50 | 0.0007 | 0.0000 | 0.03× |
-| doxorubicin — coverage @1× IC50 | 0.9692 | 0.9132 | 0.94× |
-| temozolomide — mean tumour AUC (µM·s) | 2.4e+06 | 2.5e+06 | 1.04× |
-| lomustine — mean tumour AUC (µM·s) | 2.97e+06 | 3.01e+06 | 1.02× |
-| cisplatin — mean tumour AUC (µM·s) | 5.76e+06 | 5.92e+06 | 1.03× |
-| methotrexate — mean tumour AUC (µM·s) | 5.05e+04 | 5.07e+04 | 1.00× |
-| doxorubicin — mean tumour AUC (µM·s) | 3.71e+04 | 3.7e+04 | 1.00× |
-| temozolomide — kill | 0.1151 | 0.0483 | 0.42× |
-| lomustine — kill | 0.7228 | 0.2836 | 0.39× |
-| cisplatin — kill | 0.9125 | 0.3601 | 0.39× |
-| methotrexate — kill | 0.1205 | 0.0497 | 0.41× |
-| doxorubicin — kill | 0.7531 | 0.2922 | 0.39× |
+| lomustine — coverage @1× IC50 | 0.2175 | 0.8013 | 3.68× |
+| cisplatin — coverage @1× IC50 | 0.9936 | 0.9976 | 1.00× |
+| methotrexate — coverage @1× IC50 | 0.0000 | 0.0000 |  |
+| doxorubicin — coverage @1× IC50 | 0.3836 | 0.7908 | 2.06× |
+| temozolomide — mean tumour AUC (µM·s) | 7.06e+05 | 1.64e+06 | 2.32× |
+| lomustine — mean tumour AUC (µM·s) | 8.7e+05 | 1.95e+06 | 2.24× |
+| cisplatin — mean tumour AUC (µM·s) | 1.69e+06 | 3.85e+06 | 2.28× |
+| methotrexate — mean tumour AUC (µM·s) | 1.48e+04 | 3.25e+04 | 2.20× |
+| doxorubicin — mean tumour AUC (µM·s) | 1.08e+04 | 2.36e+04 | 2.18× |
+| temozolomide — kill | 0.0147 | 0.0274 | 1.86× |
+| lomustine — kill | 0.1975 | 0.2210 | 1.12× |
+| cisplatin — kill | 0.3699 | 0.3162 | 0.85× |
+| methotrexate — kill | 0.0162 | 0.0276 | 1.71× |
+| doxorubicin — kill | 0.2165 | 0.2284 | 1.06× |
 | kill ordering | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | **IDENTICAL** |
-| coverage ordering | cisplatin > lomustine > doxorubicin > methotrexate > temozolomide | cisplatin > lomustine > doxorubicin > methotrexate > temozolomide | **IDENTICAL** |
+| coverage ordering | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate | cisplatin > lomustine > doxorubicin > temozolomide > methotrexate | **DIFFERENT** |
 | ρ(kill, AUC/IC50) | +1.00 | +1.00 | delivery × potency |
 | **HYPOXIA** | | | |
 | hypoxia-response genes on panel | none | VEGFA, HIF1A | the 319 panel cannot test this at all |
-| ρ(simulated O₂, hypoxia score) | n/a | -0.1132 |  |
+| ρ(simulated O₂, hypoxia score) | n/a | -0.1135 |  |
 | ρ(dist-to-endothelial, hypoxia score) | n/a | -0.1503 | **beats the PDE** |
 | VEGFA rank of all panel genes | n/a | 1/480 |  |
-| HIF1A rank of all panel genes | n/a | 249/480 |  |
+| HIF1A rank of all panel genes | n/a | 233/480 |  |
 
 ## 6. Verdict — what generalises to a second patient, and what does not
 
@@ -344,9 +358,10 @@ State occupancy over all cells at this configuration: **VIABLE** 0.13%, **HYPOXI
 Two of these are confirmations of a *negative* result — the hypoxia rows confirm that the reaction-diffusion solve is out-predicted by a distance transform. 'Confirmed' means the prior finding reproduced, not that the model performed well.
 
 * **Kill ordering is cisplatin > doxorubicin > lomustine > methotrexate > temozolomide** — identical on both sections
+* **therapeutic_coverage @1x IC50 is still a DISCRIMINATING headline metric** — coverage still spreads the panel on both sections
 * **The ordering is NOT simply the IC50 ordering read back out** — potency alone would rank doxorubicin > methotrexate > cisplatin > lomustine > temozolomide; the simulation ranks cisplatin > doxorubicin > lomustine > methotrexate > temozolomide. rho(kill, 1/IC50) = +0.50, rho(kill, AUC/IC50) = +1.00
-* **Simulated oxygen is BEATEN by a distance-to-nearest-vessel baseline (state_validation.md Test 1)** — the one-line cKDTree baseline scores 1.33x the solved field
-* **VEGFA is the most anti-correlated gene on the panel; HIF1A is null** — VEGFA rho -0.1479, HIF1A rho +0.0085
+* **Simulated oxygen is BEATEN by a distance-to-nearest-vessel baseline (state_validation.md Test 1)** — the one-line cKDTree baseline scores 1.32x the solved field
+* **VEGFA is the most anti-correlated gene on the panel; HIF1A is null** — VEGFA rho -0.1464, HIF1A rho +0.0067
 
 ### 6.2 Does NOT generalise
 
@@ -359,7 +374,6 @@ These are the rows where the held-out patient behaved exactly like the developme
 
 * **MVD lands in the published human GBM range 35-95/mm2 (PMID 27583442)** — 104/mm2 vs published 65 (35-95); section 1 gave 111/mm2. BOTH sections are high, and by a similar amount, so this is a systematic property of the segmentation (endothelial cells are over-split into vessel objects) rather than something the held-out patient revealed — and it is the one place where the two sections AGREE with each other while both disagreeing with the literature.
 * **therapeutic_coverage @1x IC50 recovers the kill ordering** — coverage does NOT reproduce the kill ordering on EITHER section in this configuration (both swap doxorubicin and lomustine), so this is not a held-out failure — it is a disagreement with `results/delivery_metrics.md`, which ran at a different exposure scale where coverage was not saturated. See §3.3
-* **therapeutic_coverage @1x IC50 is still a DISCRIMINATING headline metric** — coverage has saturated at BOTH ends in this configuration — every drug is either effectively 0 or above 0.9, on both sections — so it is behaving as a binary indicator rather than a graded metric. `results/delivery_metrics.md` flagged this saturation as a 'latent, not active' weakness; at this exposure scale it is ACTIVE.
 
 ### 6.4 Untestable on one section or the other
 
@@ -378,7 +392,7 @@ These are the rows where the held-out patient behaved exactly like the developme
 2. **n = 2.** Two sections cannot separate 'this pipeline does not generalise' from 'these two tumours differ'. A claim that a quantity *fails* to replicate is well supported by a single discrepancy; a claim that one *does* replicate rests on a single agreement and is much weaker.
 3. **The IO marker map is not fully blind** (§1.2): it was written against this section, though never against an external anchor.
 4. **Grid convergence is not re-established here.** dx = 12 µm was shown converged on section 1's geometry (`results/numerical_rigor.md` §2). Section 2 is denser and its vessel objects are larger; the convergence argument is inherited, not re-run. A dx sweep on section 2 is the obvious next check and it was not affordable in this run.
-5. **The absolute oxygen level is uncalibrated on both sections**, so the 76% vs 0% hypoxic-fraction gap is a statement about `OxygenConfig.consumption` and cell density, not about the two tumours. Every absolute kill inherits it.
+5. **The absolute oxygen level is uncalibrated on both sections**, so the 97% vs 13% hypoxic-fraction gap is a statement about `OxygenConfig.consumption` and cell density, not about the two tumours. Every absolute kill inherits it.
 6. **Typing circularity.** `FLT1` and `PLVAP` are IO-panel ENDOTHELIAL markers and therefore help build the oxygen source, so the positive tail of the gene ranking is partly the model correlating with its own inputs. Only the negative tail is informative.
 7. **Pericytes are unlabelled on section 2.** `CellType` has no MURAL member, so RGS5/PDGFRB/NOTCH3-positive mural cells fall into the ungated TUMOR default, inflating the tumour count and hence the oxygen sink. That is part of why section 2 is so much more hypoxic.
 8. **2D, in-plane, single section** on both. Distances are Euclidean and in-plane, not geodesic and not 3D.
@@ -390,7 +404,7 @@ These are the rows where the held-out patient behaved exactly like the developme
 ./.venv/bin/python -m tmesim.validation.heldout_patient
 ```
 
-Deterministic (`seed = 0` in every `SimConfig`; permutation seed 0). Runtime 53 min, dominated by 10 PDE solves — 31 min of it on section 2's 905×956 grid.
+Deterministic (`seed = 0` in every `SimConfig`; permutation seed 0). Runtime 34 min, dominated by 10 PDE solves — 28 min of it on section 2's 905×956 grid.
 
 **Files added by this validation (nothing else was modified):**
 
