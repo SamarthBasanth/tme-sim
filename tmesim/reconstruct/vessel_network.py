@@ -138,10 +138,24 @@ LINK_DISTANCE_UM = 20.0
 #: the dx = 12 µm resolution caveat.
 VESSEL_RADIUS_UM = 7.5
 
-#: Published human morphometry this segmentation is scored against. Every entry is
-#: a measured value from the literature with its PMID; nothing here is estimated by
-#: this project. The MVD anchor and the Poisson conversion are the same ones
+#: Published human morphometry this segmentation is compared against. Every entry
+#: is a measured value from the literature with its PMID; nothing here is estimated
+#: by this project. The MVD anchor and the Poisson conversion are the same ones
 #: ``results/vascular_validation.md`` uses, so the two reports cannot drift apart.
+#:
+#: **These are POPULATION REFERENCES, NOT TARGETS.** Every value here is a cohort
+#: mean over tens of patients. This project reconstructs *one section of one
+#: tumour*, and glioblastoma vasculature is abnormal and heterogeneous by
+#: definition — that abnormality is diagnostic of the disease, not an error in the
+#: reconstruction. A patient-specific reconstruction is therefore *expected* to
+#: depart from these numbers, and pulling it towards them would erase exactly the
+#: patient-specific signal the model exists to carry. Read the ``verdict`` field as
+#: "inside / above / below the published cohort range", which is a description of
+#: where this tumour sits, not a pass or a failure. The quantities that must
+#: actually hold are (a) grid-independence — a number that claims to describe
+#: tissue must not move when the mesh does — and (b) fidelity to the sample, i.e.
+#: the field must reproduce the measured endothelial distribution including its
+#: unevenness (:func:`reconstruct.vessel_geometry.vascular_heterogeneity`).
 PUBLISHED: Dict[str, Dict] = {
     "mvd_per_mm2": {
         "value": 65.0, "sd": 30.0, "range": (35.0, 95.0),
@@ -630,7 +644,12 @@ def segmentation_report(vessels: Dict, domain: Domain,
             "reconstructed": float(recon),
             "published": pub["value"], "published_range": (float(lo), float(hi)),
             "ratio": float(recon / pub["value"]) if pub["value"] else float("nan"),
-            "verdict": verdict, "pmid": pub["pmid"], "doi": pub["doi"],
+            # NB: 'HIGH'/'LOW' mean "outside the published COHORT range", not
+            # "wrong". See the note on PUBLISHED: these are population references
+            # for context, not targets for a single-patient reconstruction.
+            "verdict": verdict,
+            "reference_kind": "population cohort mean — context, not a target",
+            "pmid": pub["pmid"], "doi": pub["doi"],
             "source": pub["source"],
         })
 

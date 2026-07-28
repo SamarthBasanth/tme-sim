@@ -20,6 +20,7 @@ from tmesim.reconstruct.vessel_geometry import (
     SINGLE_EC_VESSEL_RADIUS_UM,
     subgrid_coverage_field,
     vascular_area_fraction,
+    vascular_heterogeneity,
     vessel_geometry,
 )
 from tmesim.reconstruct.vessel_network import (
@@ -492,3 +493,92 @@ def test_empty_endothelium_is_handled_by_the_fixed_geometry():
     assert subgrid_coverage_field(domain, geom).sum() == 0.0
     assert vascular_area_fraction(domain, v)["area_fraction_pct"] == 0.0
     assert discrete_vascular_field(domain, v, geometry="subgrid").sum() == 0.0
+
+
+def test_subgrid_painted_area_is_unbiased_against_a_closed_form():
+    """The painter must return the area it was asked for, at every dx.
+
+    Isolated, non-overlapping discs at positions that are deliberately NOT
+    lattice-aligned, so the exact answer is n.pi.r^2 and any systematic offset is
+    the painter's own. The 3 % tolerance is the measured bias of the sub-lattice
+    rasteriser over r = 3-20 um (worst case 1.2 %), not a number chosen to pass.
+    """
+    rng = np.random.default_rng(7)
+    side, pitch = 12, 120.0
+    g = (np.arange(side) + 0.5) * pitch
+    X, Y = np.meshgrid(g, g)
+    jitter = rng.uniform(-20.0, 20.0, size=(2,) + X.shape)
+    cx, cy = (X + jitter[0]).ravel(), (Y + jitter[1]).ravel()
+    n, extent = cx.size, side * pitch
+
+    for r in (SINGLE_EC_VESSEL_RADIUS_UM, MEAN_VESSEL_RADIUS_UM, 7.5, 20.0):
+        geom = {
+            "axis_p0": np.column_stack([cx, cy]),
+            "axis_p1": np.column_stack([cx, cy]),
+            "radius_um": np.full(n, r),
+            "axis_length_um": np.zeros(n),
+        }
+        exact = n * np.pi * r ** 2
+        painted = []
+        for dx in DX_SWEEP:
+            nn = int(round(extent / dx))
+            assert nn * dx == extent
+            dom = Domain(nx=nn, ny=nn, dx=dx)
+            painted.append(float((subgrid_coverage_field(dom, geom) * dx * dx).sum()))
+        painted = np.asarray(painted)
+        assert np.allclose(painted, exact, rtol=0.03), (
+            f"r={r}: painted {painted} vs exact {exact}")
+        assert painted.max() / painted.min() <= 1.01, (
+            f"r={r}: painted area moved with dx: {painted}")
+
+
+def test_fixed_geometry_preserves_measured_heterogeneity_and_the_kde_does_not():
+    """Fidelity to THIS sample, not to a population mean.
+
+    A patient-specific reconstruction exists to carry this tumour's own vascular
+    architecture, and in glioblastoma the unevenness of that architecture is the
+    signal. So the field must (a) put vasculature where the endothelial cells
+    actually are, (b) keep the tissue that has none genuinely empty, and (c) do
+    both independently of the mesh.
+    """
+    domain, cells = _population()
+    v = segment_vessels(cells, domain, link_distance_um=LINK_DISTANCE_UM)
+    xy = v["xy"]
+
+    kde = vascular_density_from_cells(domain, cells, mode="kde")
+    sub = subgrid_coverage_field(domain, vessel_geometry(v))
+    h_kde = vascular_heterogeneity(domain, kde, xy)
+    h_sub = vascular_heterogeneity(domain, sub, xy)
+
+    # Most of this section has no vessel in it, and the measurement says so.
+    assert h_sub["empty_frac_measured"] > 0.5
+    # The smooth KDE fills that emptiness in and flattens the variance...
+    assert h_kde["empty_frac_field"] < 0.5 * h_sub["empty_frac_measured"]
+    assert h_kde["heterogeneity_ratio"] < h_sub["heterogeneity_ratio"]
+    # ...whereas the sub-grid field leaves avascular tissue avascular and puts its
+    # vasculature where the cells are. The tolerance is a few bins: a vessel whose
+    # centre sits near a bin edge legitimately paints into the neighbouring bin,
+    # which counts as "not empty" there. Measured on the real sections the gap is
+    # 3, 5 and 0.2 percentage points (results/vessel_geometry_fix.md).
+    assert h_sub["empty_frac_field"] == pytest.approx(
+        h_sub["empty_frac_measured"], abs=0.10)
+    assert h_sub["empty_frac_field"] > h_kde["empty_frac_field"] + 0.3
+    assert h_sub["pearson_r"] > 0.7 and h_sub["spearman_r"] > 0.7
+
+    # And the heterogeneity it reports is a property of the tissue, not the mesh.
+    # The bin is 120 um, a whole number of every dx in the sweep, so each bin holds
+    # the same grid cells at every resolution and the comparison isolates the
+    # painter. (With only three vessels in this section a bin edge that moves by
+    # one grid cell would otherwise reassign a whole vessel; on the real sections,
+    # with thousands, that averages out to <=1.02x at any bin size.)
+    ratios = []
+    for dx in DX_SWEEP:
+        dom, c = _population_at(dx)
+        vv = segment_vessels(c, dom, link_distance_um=LINK_DISTANCE_UM)
+        cov = subgrid_coverage_field(dom, vessel_geometry(vv))
+        ratios.append(vascular_heterogeneity(
+            dom, cov, vv["xy"], bin_um=120.0)["heterogeneity_ratio"])
+    ratios = np.asarray(ratios)
+    assert np.all(np.isfinite(ratios))
+    assert ratios.max() / ratios.min() <= GRID_INDEPENDENCE_TOL, (
+        f"heterogeneity moved {ratios.max()/ratios.min():.3f}x across dx: {ratios}")

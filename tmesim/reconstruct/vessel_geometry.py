@@ -144,6 +144,7 @@ __all__ = [
     "vessel_geometry",
     "subgrid_coverage_field",
     "vascular_area_fraction",
+    "vascular_heterogeneity",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -392,25 +393,60 @@ def _subgrid_coverage(
     nfx, nfy = int(np.ceil(W / h)), int(np.ceil(H / h))
     hit = np.zeros(nfy * nfx, dtype=bool)
 
-    # Quantise radii to whole sub-pixels so each distinct radius needs its stencil
-    # built only once; the quantisation is at the sub-pitch, i.e. sub-micron.
-    rq = np.maximum(1, np.rint(radii / h).astype(int))
-    ci = np.rint(centres[:, 0] / h - 0.5).astype(np.int64)
-    cj = np.rint(centres[:, 1] / h - 0.5).astype(np.int64)
+    # Each disc is rasterised from a precomputed stencil. Two things decide which
+    # stencil, and both exist to keep the painted area unbiased:
+    #
+    #  * RADIUS is grouped LOGARITHMICALLY at 1 %, a *relative* tolerance, so the
+    #    stencil radius stays within 1 % (2 % in area) of the true radius over the
+    #    whole range. An absolute quantisation to whole sub-pixels would cost up to
+    #    half a sub-pixel and would be worst exactly where it matters most — on the
+    #    smallest vessels, which are the majority.
+    #  * SUB-PIXEL PHASE is kept (to 1/4 of a sub-pixel) for small discs instead of
+    #    snapping every centre to a lattice point. Snapping is not merely
+    #    imprecise, it is *biased*: every disc of a given radius then gets the
+    #    identical lattice count, so the O(1) point-count error of a small disc
+    #    stops averaging out over the section and becomes a systematic offset.
+    #    Above PHASE_FREE_RHO the count error is already below a percent and the
+    #    phase is not worth the stencils.
+    n_phase, phase_free_rho = 4, 16.0
+    rho = np.maximum(radii / h, 1.0)
+    step = np.log1p(0.01)
+    bin_of = np.rint(np.log(rho) / step).astype(np.int64)
 
-    for rr in np.unique(rq):
-        sel = rq == rr
+    fx = centres[:, 0] / h - 0.5
+    fy = centres[:, 1] / h - 0.5
+    ci, cj = np.floor(fx).astype(np.int64), np.floor(fy).astype(np.int64)
+    small = rho <= phase_free_rho
+    pi = np.where(small, np.minimum((( fx - ci) * n_phase).astype(np.int64),
+                                    n_phase - 1), 0)
+    pj = np.where(small, np.minimum(((fy - cj) * n_phase).astype(np.int64),
+                                    n_phase - 1), 0)
+    # centres without a phase are snapped instead, which is what rint() does
+    ci = np.where(small, ci, np.rint(fx).astype(np.int64))
+    cj = np.where(small, cj, np.rint(fy).astype(np.int64))
+
+    key = (bin_of * n_phase + pi) * n_phase + pj
+    order = np.argsort(key, kind="stable")
+    bounds = np.flatnonzero(np.r_[True, np.diff(key[order]) != 0, True])
+    for s0, s1 in zip(bounds[:-1], bounds[1:]):
+        idx = order[s0:s1]
+        b, p_i, p_j = bin_of[idx[0]], pi[idx[0]], pj[idx[0]]
+        rb = float(np.exp(b * step))
+        ox = (p_i + 0.5) / n_phase if rb <= phase_free_rho else 0.0
+        oy = (p_j + 0.5) / n_phase if rb <= phase_free_rho else 0.0
+        rr = int(np.ceil(rb + 1.0))
         d = np.arange(-rr, rr + 1)
         DI, DJ = np.meshgrid(d, d)
-        inside = (DI ** 2 + DJ ** 2) <= rr ** 2
+        inside = ((DI - ox) ** 2 + (DJ - oy) ** 2) <= rb ** 2
         di, dj = DI[inside], DJ[inside]
+        if di.size == 0:
+            continue
         # chunk so the (n_centres x n_stencil) broadcast stays bounded
-        idx = np.flatnonzero(sel)
-        chunk = max(1, int(4_000_000 // max(di.size, 1)))
+        chunk = max(1, int(4_000_000 // di.size))
         for s in range(0, idx.size, chunk):
-            b = idx[s:s + chunk]
-            ii = ci[b][:, None] + di[None, :]
-            jj = cj[b][:, None] + dj[None, :]
+            c = idx[s:s + chunk]
+            ii = ci[c][:, None] + di[None, :]
+            jj = cj[c][:, None] + dj[None, :]
             ok = (ii >= 0) & (ii < nfx) & (jj >= 0) & (jj < nfy)
             hit[(jj[ok] * nfx + ii[ok])] = True
 
@@ -528,6 +564,105 @@ def vascular_area_fraction(
         "single_ec_radius_um": float(SINGLE_EC_VESSEL_RADIUS_UM),
         "mean_vessel_radius_um": float(MEAN_VESSEL_RADIUS_UM),
         "coverage": cov,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# 4. Fidelity to the sample: is the measured heterogeneity preserved?
+# --------------------------------------------------------------------------- #
+def vascular_heterogeneity(
+    domain: Domain,
+    field: np.ndarray,
+    endothelial_xy: np.ndarray,
+    bin_um: float = 100.0,
+    min_tissue_frac: float = 0.5,
+) -> Dict:
+    """Does a vascular field reproduce the MEASURED spatial heterogeneity?
+
+    The point of a patient-specific reconstruction is to carry this tumour's own
+    vascular architecture, including how uneven it is — in glioblastoma the
+    unevenness is diagnostic, not noise. A field can have a perfectly correct area
+    fraction and still be useless if it has smeared that architecture flat. This
+    scores the field against the raw endothelial cell positions it came from.
+
+    Both the field and the measured endothelial cells are aggregated into bins of
+    a fixed **physical** size (``bin_um``, default 100 µm — the scale of the
+    published 124 µm inter-vessel spacing), so the comparison is between two
+    quantities on the same footing and does not itself depend on ``dx``.
+
+    Returns
+    -------
+    dict
+        ``cv_measured`` — coefficient of variation of the measured endothelial
+        count per bin. This is the target.
+        ``cv_field`` — the same for the field's mass per bin.
+        ``heterogeneity_ratio`` — ``cv_field / cv_measured``. 1.0 means the field
+        carries exactly the measured unevenness; well below 1.0 means it has been
+        smoothed away; above 1.0 means the painting has sharpened it.
+        ``pearson_r`` / ``spearman_r`` — bin-wise agreement between field mass and
+        measured endothelial count: does the field put its vasculature *where the
+        cells actually are*?
+        ``empty_frac_measured`` / ``empty_frac_field`` — fraction of tissue bins
+        with no vasculature at all. A real section has genuinely avascular tissue;
+        a smooth kernel does not.
+    """
+    field = np.asarray(field, dtype=np.float64)
+    xy = np.asarray(endothelial_xy, dtype=np.float64).reshape(-1, 2)
+    dx = float(domain.dx)
+    ny, nx = domain.shape
+    tissue = np.asarray(domain.tissue_mask, dtype=bool)
+
+    nbx = max(1, int(np.ceil(nx * dx / bin_um)))
+    nby = max(1, int(np.ceil(ny * dx / bin_um)))
+
+    gx = ((np.arange(nx) + 0.5) * dx / bin_um).astype(np.int64).clip(0, nbx - 1)
+    gy = ((np.arange(ny) + 0.5) * dx / bin_um).astype(np.int64).clip(0, nby - 1)
+    flat = (gy[:, None] * nbx + gx[None, :]).ravel()
+
+    n_cells = np.bincount(flat, minlength=nbx * nby).astype(np.float64)
+    n_tissue = np.bincount(flat, weights=tissue.ravel().astype(np.float64),
+                           minlength=nbx * nby)
+    f_mass = np.bincount(flat, weights=(field * tissue).ravel(),
+                         minlength=nbx * nby)
+
+    if xy.shape[0]:
+        bx = (xy[:, 0] / bin_um).astype(np.int64).clip(0, nbx - 1)
+        by = (xy[:, 1] / bin_um).astype(np.int64).clip(0, nby - 1)
+        ec = np.bincount(by * nbx + bx, minlength=nbx * nby).astype(np.float64)
+    else:
+        ec = np.zeros(nbx * nby, dtype=np.float64)
+
+    keep = (n_cells > 0) & (n_tissue / np.maximum(n_cells, 1.0) >= min_tissue_frac)
+    ec, f_mass = ec[keep], f_mass[keep]
+
+    def _cv(a):
+        m = a.mean()
+        return float(a.std() / m) if m > 0 else float("nan")
+
+    def _rank(a):
+        o = np.argsort(a, kind="stable")
+        r = np.empty(a.size, dtype=np.float64)
+        r[o] = np.arange(a.size, dtype=np.float64)
+        return r
+
+    def _corr(a, b):
+        if a.size < 3 or a.std() == 0 or b.std() == 0:
+            return float("nan")
+        return float(np.corrcoef(a, b)[0, 1])
+
+    cv_m, cv_f = _cv(ec), _cv(f_mass)
+    return {
+        "bin_um": float(bin_um),
+        "n_bins": int(ec.size),
+        "cv_measured": cv_m,
+        "cv_field": cv_f,
+        "heterogeneity_ratio": (cv_f / cv_m if np.isfinite(cv_m) and cv_m > 0
+                                else float("nan")),
+        "pearson_r": _corr(ec, f_mass),
+        "spearman_r": _corr(_rank(ec), _rank(f_mass)),
+        "empty_frac_measured": float((ec == 0).mean()) if ec.size else float("nan"),
+        "empty_frac_field": (float((f_mass == 0).mean()) if f_mass.size
+                             else float("nan")),
     }
 
 
