@@ -51,7 +51,7 @@ mean): eribulin 65.6x -> 6.9x, within-10x 5/6 -> 6/6, GM fold error 3.66x -> 2.0
 | 8 | Unfair cross-drug comparison: TMZ advantaged because its resistance determinant is *unmeasured* | **FIXED** (uniform/determinant modes; plus a measured per-patient MGMT scalar that returns TMZ to #5) |
 | 9 | `bbb_penetrance` mean cannot express a veto | **FIXED** (geometric mean; eribulin 65.6x -> 6.9x; within-10x 5/6 -> 6/6) |
 | 10 | `membrane_permeability` returned 4.2e7 um/s for imatinib (tens of m/s) — unbounded logP | **FIXED** (logP clamp + unstirred aqueous boundary layer in series) |
-| 11 | Oxygen PDE **falsified as value-add** — beaten by distance-to-nearest-vessel (rho -0.150 vs -0.113), and by its own undiffused source (-0.127) | open; hypoxia should come from measured markers |
+| 11 | Oxygen PDE **falsified as value-add** — beaten by distance-to-nearest-vessel (rho -0.150 vs -0.113), and by its own undiffused source (-0.127) | **DEMOTED, not deleted** (`results/oxygen_demotion.md`): a `vessel_distance` surrogate and a measured-marker route are now available via `reconstruct_real(oxygen_mode=...)`, the PDE's falsification travels with it in `reconstruction_report()['oxygen']['caveat']`, and the default stays `'pde'` (bit-identical) because flipping it moves kill by <=0.026 and coverage by exactly 0 while invalidating every published kill number |
 
 **#7 is the most instructive.** Two grid-dependence bugs pulled in opposite directions, so
 the output looked *more* stable than it was. Compensating errors that produce plausible

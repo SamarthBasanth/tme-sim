@@ -239,9 +239,9 @@ def pde_diffusion_length_um(
     :func:`physics.oxygen._tumor_density`, in cells per 144 um^2 reference tile).
 
     Reported in ``results/oxygen_demotion.md`` as a DIAGNOSTIC, not a calibration.
-    On the real sections it comes out at ~500-800 um against the ~150 um
+    On the real sections it comes out at ~310-800 um against the ~150 um
     Thomlinson & Gray oxygen-diffusion distance, so the solved field is smoothed
-    at a length scale 5-9x longer than tissue oxygen is measured to vary over.
+    at a length scale 2-5x longer than tissue oxygen is measured to vary over.
     That is the mechanism behind "the diffusion step destroys information": it
     low-pass-filters its own source. Neither number is anchored to a measured
     oxygen tension — ``OxygenConfig.consumption`` has never been fitted — so this

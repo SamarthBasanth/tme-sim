@@ -10,7 +10,7 @@
 |---|---|
 | **Best predictor of measured VEGFA** | `vessel_distance_exact` at rho = -0.1647 (p = 0.00050) |
 | **The PDE** | rho = -0.1479 (p = 0.00050), rank 5 of 7 |
-| **Cost ratio** | the PDE is 12x to 30x slower than the surrogate |
+| **Cost ratio** | the PDE is 11x to 31x slower than the surrogate |
 | **Downstream effect on predicted kill** | at most 0.0262 absolute across three drugs |
 | **Downstream effect on therapeutic coverage** | 0 — coverage is oxygen-invariant *by construction* |
 | **Recommendation** | keep `'pde'` as the default; use `oxygen_mode='vessel_distance'` for any NEW hypoxia claim. See §5. |
@@ -37,7 +37,7 @@ Every predictor is **sign-aligned to oxygen** (larger = better perfused), so a c
 
 **Reading the table.**
 
-* **The vessel-distance surrogate wins.** `vessel_distance_exact` at rho = -0.1647 against the PDE's -0.1479 — a 1.11x larger effect, from a kd-tree query instead of a sparse linear solve.
+* **The vessel-distance surrogate wins.** `vessel_distance_exact` at rho = -0.1647 against the PDE's -0.1479 — a 1.11x larger effect, from a kd-tree query instead of a sparse linear solve. Ranks 1 and 2 are the SAME predictor written two ways: `vessel_distance_exact` is `exp(-d/L)` and `dist_endothelial` is `-d`, and a monotone map cannot change a Spearman rho. They are both listed only to make that identity visible rather than claimed.
 * **Meshing costs almost nothing here.** The grid-sampled surrogate (-0.1636) and the exact per-cell surrogate (-0.1647) differ by 0.0012, so binning the distance to a 12 um mesh is not what separates the routes.
 * **The 'more physical' vessel definition is WORSE.** Measuring distance to a SEGMENTED vessel object rather than to any endothelial cell scores -0.1521 against -0.1636. Segmentation discards 4,003 of 34,179 endothelial cells as singletons, and on this section those discarded cells were carrying signal. It is offered as an option and is NOT the default — the plainer definition is the one that was benchmarked and the one that wins.
 * **The mapping cannot be tuned to win.** `exp(-d/L)` is strictly monotone in distance, so **every** monotone map of distance gives the identical Spearman rho. The constant `L` sets where the HYPOXIC/QUIESCENT/VIABLE band edges fall and nothing else. This is why it is anchored to published morphometry rather than fitted — fitting it would be unfalsifiable decoration.
@@ -71,11 +71,11 @@ Best of 3 on the same reconstructed microenvironment (`data_cache/xenium_gbm_io`
 
 | dx (um) | grid | unknowns | PDE solve (s) | vessel-distance (s) | speed-up |
 |---|---|---|---|---|---|
-| 30 | 363x383 | 139,029 | 2.101 | 0.1787 | **12x** |
-| 20 | 543x574 | 311,682 | 6.486 | 0.3193 | **20x** |
-| 12 | 905x956 | 865,180 | 32.026 | 1.0843 | **30x** |
+| 30 | 363x383 | 139,029 | 1.441 | 0.1275 | **11x** |
+| 20 | 543x574 | 311,682 | 4.394 | 0.2571 | **17x** |
+| 12 | 905x956 | 865,180 | 20.428 | 0.6556 | **31x** |
 
-The gap widens with refinement, as it must: the sparse direct solve's cost grows superlinearly in the number of unknowns while the kd-tree query grows as `O(n_grid log n_vessels)`. At the production dx = 12 um the solve is the single most expensive step in a reconstruction and the surrogate is 30x cheaper.
+The gap widens with refinement, as it must: the sparse direct solve's cost grows superlinearly in the number of unknowns while the kd-tree query grows as `O(n_grid log n_vessels)`. At the production dx = 12 um the solve is the single most expensive step in a reconstruction and the surrogate is 31x cheaper.
 
 ## 3. Downstream — does the oxygen route change a drug prediction?
 
@@ -104,11 +104,15 @@ The banding is identical for every drug (it is set before any drug is applied), 
 | cisplatin | 24.6 | 0.9125 | 0.8862 | -0.0262 | -2.9% | 0.9986 | 0.9986 | 10.06 | 10.06 |
 | doxorubicin | 0.5 | 0.7531 | 0.7371 | -0.0160 | -2.1% | 0.9692 | 0.9692 | 3.003 | 3.003 |
 
-`median E/IC50` is carried alongside coverage because coverage@1xIC50 is 0.0000 for these drugs on this section — no tumour cell reaches its IC50 — so a zero-vs-zero comparison would be uninformative on its own. The median potency margin is a non-degenerate delivery quantity, and it is identical to every digit across the two arms.
+`median E/IC50` is carried alongside coverage because coverage@1xIC50 is degenerate at one end or the other for these drugs on this section (temozolomide 0.0000 — no tumour cell reaches its IC50; cisplatin and doxorubicin near-saturated above 0.96), so an identical pair of coverage numbers could be read as a saturation artefact. The median potency margin is un-saturated, spans two orders of magnitude across the panel, and is *also* identical to every digit across the two arms.
 
 **Therapeutic coverage does not move at all, and that is structural.** `delivery_metrics.therapeutic_coverage` is a pure function of the per-cell AUC and the drug's IC50, and the AUC field has no oxygen dependence anywhere in the pipeline. So **no oxygen model of any kind — the PDE, the surrogate, a perfect measurement — can change a delivery metric in this codebase.** Every coverage number already published is therefore immune to this whole question, which is the most useful thing in this report for anyone auditing `results/delivery_metrics.md`, `results/dose_schedule.md` or `results/vessel_network_impact.md`.
 
-**Predicted kill does move**: up to 0.0262 absolute (3.4% relative). The oxygen route IS load-bearing for absolute kill, because the two routes band substantially different fractions of the tumour into the resistant states (§3.1) and those bands carry the 0.35x / 0.5x multipliers. Absolute kill fractions are conditional on the oxygen route and must be reported with it; a cross-drug RANKING is far more robust, since the multiplier structure is shared and largely cancels.
+**Predicted kill moves a little, and always downwards**: -0.0262 to -0.0039 absolute, i.e. 3.4% relative at worst. The direction is not a coincidence — the surrogate bands more tumour into the resistant QUIESCENT band than the PDE does (§3.1), and every resistant cell carries a 0.5x kill multiplier.
+
+**The cross-drug ranking is unchanged**: cisplatin > doxorubicin > temozolomide under the PDE, cisplatin > doxorubicin > temozolomide under the surrogate — identical. That is the expected structure: the resistance multipliers are shared across drugs, so they largely cancel out of a comparison and do not cancel out of a level.
+
+**So: how load-bearing is the oxygen field?** *Weakly.* A 2-3% relative shift in absolute kill is far smaller than the acknowledged uncertainty in those levels — `results/state_validation.md` §2.2 shows the VIABLE fraction on this section swings 165x across two tissue-mask conventions and three grid spacings, all of which are bookkeeping choices. The oxygen ROUTE is a second-order knob next to the tissue-mask convention. It is not zero, though, so absolute kill fractions must be reported with the oxygen mode attached, which is why `reconstruction_report()['oxygen']['mode']` now exists.
 
 ### 3.3 What this does NOT show
 
@@ -119,7 +123,7 @@ Neither section carries a paired drug-response outcome label, so nothing here sa
 | | |
 |---|---|
 | new module | `tmesim/physics/oxygen_proxy.py` — `oxygen_from_vessel_distance`, `vessel_distance_um`, `hypoxia_from_markers`, `diffusion_length_um`, `pde_diffusion_length_um` |
-| new option | `reconstruct_real(..., oxygen_mode='pde'|'vessel_distance'|'markers', oxygen_kwargs=None)` |
+| new option | `reconstruct_real(..., oxygen_mode=...)` with `'pde'` / `'vessel_distance'` / `'markers'`, plus `oxygen_kwargs=None` |
 | default | **`'pde'`, unchanged and BIT-IDENTICAL** — asserted by `tests/test_oxygen_proxy.py` |
 | recorded in | `reconstruction_report()['oxygen']` -> `mode`, `source`, `is_surrogate`, `caveat`, `detail` (and a flat `['oxygen_mode']`) |
 | NOT touched | `tmesim/core`, `tmesim/sim/engine.py`, `tmesim/physics/oxygen.py` |
@@ -134,8 +138,9 @@ A caller who passes `oxygen_mode='vessel_distance'` straight into `sim.engine.si
 
 The reasoning, in order of weight:
 
-1. **The surrogate is better and cheaper on the one section where we can measure** — rho -0.1647 vs -0.1479, at 30x less compute at dx = 12 um. There is no accuracy argument for the solve.
-2. **But flipping the default would move nothing that matters and break everything that is published.** §3 shows therapeutic coverage is exactly invariant and kill moves by at most 0.0262. Flipping the default therefore buys ~0 in predictive quality on the drug outputs, while invalidating the provenance of every number in `results/` that was computed against the PDE field. Silent improvement is still silent change.
+1. **The surrogate is better and cheaper on the one section where we can measure** — rho -0.1647 vs -0.1479, at 31x less compute at dx = 12 um. There is no accuracy argument for the solve.
+2. **But the drug outputs barely notice, and flipping the default would invalidate the provenance of everything already published.** §3 shows therapeutic coverage is EXACTLY invariant and kill moves by at most 0.0262 absolute (3.4% relative) with the cross-drug ranking unchanged. The measurable gain on the drug side is therefore close to nil, while the cost is re-deriving every kill number in `results/` (§5.1) and breaking the correspondence between those documents and the code. Silent improvement is still silent change.
+   The honest asymmetry: the surrogate is unambiguously better as a *hypoxia predictor* (§1) and only marginally different as a *drug-kill input* (§3). So the recommendation splits along exactly that line — flip it for hypoxia claims, leave it for the kill pipeline until that pipeline is being re-run for some other reason anyway.
 3. **The measured route is the right long-run answer and is not available yet.** `hypoxia_from_markers` is the only route here that is a measurement, but the flagship drug section's panel does not carry a hypoxia-response gene, and on the IO section that does, benchmarking it is circular. A panel or platform carrying CA9/ADM/NDRG1/SLC2A1 alongside a drug-relevant readout would settle this properly.
 
 ### 5.1 If the default WERE flipped, this is the re-run list
@@ -173,7 +178,7 @@ Everything whose numbers depend on the per-cell state banding — i.e. on `PDCon
 python -m tmesim.validation.oxygen_benchmark
 ```
 
-Deterministic (the only randomness is the seeded permutation / subsampling, `PERM_SEED = 0`, and the engine's `seed = 0`). Runtime ~21 min, dominated by the 816,769-cell reconstructions and the three transport solves.
+Deterministic (the only randomness is the seeded permutation / subsampling, `PERM_SEED = 0`, and the engine's `seed = 0`). Runtime ~10 min, dominated by the 816,769-cell reconstructions and the three transport solves.
 
 **Files added or changed by this work:**
 
