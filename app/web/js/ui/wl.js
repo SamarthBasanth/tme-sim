@@ -28,6 +28,13 @@ function cssv(el, name) {
   return getComputedStyle(el).getPropertyValue(name).trim() || '#888';
 }
 
+/** Canvas text in the SAME mono stack as the DOM. Canvas has no
+ *  font-variant-numeric, but every face in --font-mono is fixed-advance, so
+ *  digits still sit in columns. */
+function monoFont(el, px) {
+  return `${px}px ${cssv(el, '--font-mono') || 'monospace'}`;
+}
+
 export function createWindowLevel({ viewer, onChange }) {
   let field = null;
   let name = null;
@@ -214,7 +221,7 @@ export function createWindowLevel({ viewer, onChange }) {
     const plotH = H - PAD_B;
     if (!hist || !hist.total) {
       ctx.fillStyle = fg3;
-      ctx.font = '9.5px ui-monospace, "SF Mono", Menlo, monospace';
+      ctx.font = monoFont(root, 9.5);
       ctx.fillText('no field overlay loaded', 6, plotH / 2 + 3);
       ctx.strokeStyle = line;
       ctx.strokeRect(0.5, 0.5, w - 1, H - 1);
@@ -305,7 +312,7 @@ export function createWindowLevel({ viewer, onChange }) {
     // Axis row, BELOW the ramp strip: the data ends in muted type, the window
     // centre in full contrast, because the centre is the number the operator
     // is actually setting.
-    ctx.font = '9px ui-monospace, "SF Mono", Menlo, monospace';
+    ctx.font = monoFont(root, 9);
     ctx.fillStyle = fg2;
     ctx.textBaseline = 'bottom';
     ctx.fillText(auto(hist.min), 1, H - 1);

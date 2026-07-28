@@ -446,6 +446,11 @@ def attribute(
 
     tumor_ratio = ratio[np.asarray(cell_type) == int(CellType.TUMOR)]
     finite_ratio = tumor_ratio[np.isfinite(tumor_ratio)]
+    median_ratio = float(np.median(finite_ratio)) if finite_ratio.size else None
+    shortfall = (
+        float(resolved.adequate_ratio) / median_ratio
+        if median_ratio and median_ratio > 0 else None
+    )
 
     return {
         "labels": labels,
@@ -482,6 +487,28 @@ def attribute(
             "p95": float(np.percentile(finite_ratio, 95)) if finite_ratio.size else None,
             "max": float(finite_ratio.max()) if finite_ratio.size else None,
         },
+        "exposure_shortfall_fold": shortfall,
+        "exposure_shortfall_note": (
+            "adequate_ratio / median(E/IC50) over tumour cells: the fold change "
+            "in exposure the median tumour cell would need to reach IC50. Above "
+            "1 the median cell is short of drug; below 1 it is already past the "
+            "half-effect point and something else is holding the kill down."
+        ),
+        # This is the honesty note the split above requires, and it is a
+        # property of the KILL MODEL, not of this module: p_hill depends on E
+        # and IC50 only through their ratio, so within one run the model has no
+        # separate potency term to attribute to.
+        "exposure_axis_note": (
+            "UNREACHED and UNDERDOSED are two bands on ONE axis, E/IC50, not two "
+            "independent mechanisms. The kill model reaches p_hill through that "
+            "ratio alone, so it cannot separate 'too little drug arrived' from "
+            "'the drug is too weak' — and neither can this attribution. What IS "
+            "separable within a run: IC50 is a single per-drug constant, so the "
+            "entire CELL-TO-CELL spread in E/IC50 is delivery, while the "
+            "population's overall position relative to 1.0 is set jointly by "
+            "delivery and potency. Read the split as a statement about how far "
+            "short the exposure fell, not about which upstream term caused it."
+        ),
         "thresholds": resolved.as_dict(),
         "threshold_derivation": {
             "unreached_ratio": (

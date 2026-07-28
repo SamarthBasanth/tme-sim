@@ -203,9 +203,10 @@ export function rectCellStats(viewer, rect, nTypes = 5) {
     if (exposure.length < 400000) exposure.push(v);
   });
   let exp = null;
+  const values = Float32Array.from(exposure);
   if (nExp) {
     const mean = sum / nExp;
-    const hist = buildHistogram(Float32Array.from(exposure), min, max, 512);
+    const hist = buildHistogram(values, min, max, 512);
     exp = {
       n: nExp, mean, sd: Math.sqrt(Math.max(0, sum2 / nExp - mean * mean)),
       min, max,
@@ -214,5 +215,8 @@ export function rectCellStats(viewer, rect, nTypes = 5) {
       tumorN: tumorSum.n,
     };
   }
-  return { counts, total, exposure: exp };
+  // `values` is handed back so the caller can histogram the same samples
+  // against a different range (the field-wide axis, for the overlay) without
+  // walking the region a second time.
+  return { counts, total, exposure: exp, values };
 }

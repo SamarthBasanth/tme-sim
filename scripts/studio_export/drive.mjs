@@ -126,6 +126,15 @@ ok(await evalIn('!document.querySelector("#help-dlg tbody").textContent.includes
   'the Ctrl+Enter submit shortcut is gone from the keyboard help');
 ok(await evalIn('document.body.textContent.includes("Run submission is disabled")'),
   'the submit row is replaced by an explanation');
+ok(await evalIn('!document.getElementById("btn-protocol")'),
+  'the protocol-workspace button is gone (its module is not bundled)');
+ok(await evalIn('!document.querySelector("#help-dlg tbody").textContent.includes("protocol workspace")'),
+  'the P shortcut is gone from the keyboard help');
+// Nothing on screen may be wired to a module that was not bundled, and no
+// element may carry an inline handler attribute a strict CSP would drop.
+ok(await evalIn('Array.from(document.querySelectorAll("*")).filter(e=>Array.from(e.attributes)'
+  + '.some(a=>/^on/i.test(a.name))).length') === 0,
+  'no inline on* handler attributes anywhere in the live DOM');
 ok(await evalIn('document.querySelector(".xlog").textContent.includes("[stage] simulate")'),
   'the recorded engine log is shown for the open run');
 

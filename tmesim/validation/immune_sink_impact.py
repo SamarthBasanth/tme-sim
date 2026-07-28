@@ -719,20 +719,29 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
     a("# Immune (TAM) drug sequestration — implemented as a SPATIAL sink, and the "
       "spatial structure is the whole result")
     a("")
+    p_sr = float(sp["p_structure_ratio"])
+    beats_null = p_sr <= 0.05
+    null_clause = (
+        f"and it beats a label-permutation null at p = {_f(p_sr, 4)}"
+        if beats_null else
+        f"but it does NOT beat a label-permutation null (p = {_f(p_sr, 4)}), "
+        f"i.e. the structure is a property of where the CELLS are and not "
+        f"specifically of where the MACROPHAGES are"
+    )
     a("**Verdict up front.** The immune compartment was pharmacologically inert: "
       "8.5-19.5% of the segmented cells occupied space and consumed nothing. It "
       "now has a mechanism — a first-order drug loss proportional to the local "
       "MEASURED immune-cell area fraction — and the honest findings are three. "
       "**(i) The literature supports a DIRECTION and not a MAGNITUDE**, and for "
       "free doxorubicin the one direct measurement is NEGATIVE, so the magnitude "
-      "is swept and never fitted. **(ii) The reduction is genuinely spatially "
-      "structured** — tumour cells in the macrophage-densest quintile lose "
-      f"{_f(obs['bins'][-1]['attenuation_mean'], 3)} of their exposure against "
-      f"{_f(obs['bins'][0]['attenuation_mean'], 3)} in the sparsest, a "
-      f"**{_f(obs['structure_ratio'], 4)}x** contrast that a well-mixed model "
-      f"gives as exactly 1.0000, and it beats a label-permutation null at "
-      f"p = {_f(sp['p_structure_ratio'], 4)}. **(iii) It does not improve the "
-      "measured human-glioma anchor**, so it ships DEFAULT-OFF.")
+      "is swept and never fitted. **(ii) The reduction is spatially "
+      "structured rather than uniform** — tumour cells in the macrophage-densest "
+      f"quintile keep {_f(obs['bins'][-1]['attenuation_mean'], 4)} of their "
+      f"exposure against {_f(obs['bins'][0]['attenuation_mean'], 4)} in the "
+      f"sparsest, a **{_f(obs['structure_ratio'], 4)}x** contrast that a "
+      f"well-mixed model gives as exactly 1.0000, {null_clause}. "
+      "**(iii) It does not improve the measured human-glioma anchor**, so it "
+      "ships DEFAULT-OFF.")
     a("")
     a("| question | answer |")
     a("|---|---|")
@@ -1107,14 +1116,41 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
     a(f"| mean attenuation (a magnitude, NOT a structure statistic) | "
       f"{_f(obs['a_mean'], 4)} | {_f(sp['null_a_mean_mean'], 4)} | -- | -- |")
     a("")
-    a("**Read the last row as the control.** The MEAN attenuation is essentially "
-      "unchanged by the permutation — the same number of macrophages removes the "
-      "same total amount of drug wherever they are — while the SPREAD and the "
-      "density contrast are not. That separation is the whole finding: the "
-      "measured immune geometry does not change how much drug is lost, it "
-      "changes **which tumour cells lose it**. A compartmental model gets the "
-      "first quantity right by construction and the second one wrong by "
-      "construction.")
+    a("**Read the last row as the control.** The MEAN attenuation is a magnitude, "
+      "not a structure statistic: the same number of macrophages removes roughly "
+      "the same total amount of drug wherever they sit. What the permutation is "
+      "asked about is the SPREAD and the density contrast — i.e. not how much "
+      "drug is lost, but **which tumour cells lose it**. A compartmental model "
+      "gets the first quantity right by construction and cannot express the "
+      "second at all.")
+    a("")
+    if beats_null:
+        a(f"**The measured immune geometry is doing work.** The observed "
+          f"structure ratio of {_f(obs['structure_ratio'], 4)} sits above the "
+          f"entire null range "
+          f"({_f(sp['null_structure_ratio_min'], 4)}-"
+          f"{_f(sp['null_structure_ratio_max'], 4)}), p = {_f(p_sr, 4)}: putting "
+          f"the same number of macrophages at other measured cell positions "
+          f"produces a measurably WEAKER exposure gradient than putting them "
+          f"where the data says they are. The clustering is not an artefact of "
+          f"the tissue being denser in some places than others.")
+    else:
+        a(f"**Honest negative on the null, and it is a specific one.** The "
+          f"observed structure ratio of {_f(obs['structure_ratio'], 4)} is NOT "
+          f"outside the null range "
+          f"({_f(sp['null_structure_ratio_min'], 4)}-"
+          f"{_f(sp['null_structure_ratio_max'], 4)}), p = {_f(p_sr, 4)}. The "
+          f"reduction IS spatially structured — the contrast against a "
+          f"well-mixed model's exact 1.0000 is real and is what the "
+          f"microenvironment model adds — but the structure is not specific to "
+          f"the MACROPHAGES: relabelling the same number of immune cells onto "
+          f"other measured cell positions reproduces a comparable gradient, "
+          f"because the dominant signal is where the TISSUE is dense, not where "
+          f"the CD163+ cells are. This is a deliberately conservative null (it "
+          f"holds the tissue outline and cell layout fixed), and it says the "
+          f"claim this analysis can support is 'exposure is structured by local "
+          f"cellularity', not 'exposure is structured by macrophages "
+          f"specifically'.")
     a("")
     a(f"The floor on the p-value at {sp['n_perm']} permutations is "
       f"{1.0 / (1 + sp['n_perm']):.4f}, so a reported "
@@ -1218,14 +1254,26 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
       "structurally cannot: it is a one-directional term on a scorecard whose "
       "errors point both ways. This is the same outcome the efflux, uptake and "
       "ion-trapping runs reached, and the same conclusion follows.")
-    a(f"3. **But the spatial result is real and is worth keeping.** The "
-      f"reduction is structured — {_f(obs['structure_ratio'], 4)}x between the "
-      f"sparsest and densest immune quintile against a well-mixed model's exact "
-      f"1.0000, permutation p = {_f(sp['p_structure_ratio'], 4)}, with the mean "
-      f"attenuation unchanged under the null while the spread is not. That is a "
-      "clean demonstration of what a microenvironment model adds over a "
-      "compartmental one, and it holds at every strength because the geometry, "
-      "not the magnitude, produces it.")
+    if beats_null:
+        a(f"3. **But the spatial result is real and is worth keeping.** The "
+          f"reduction is structured — {_f(obs['structure_ratio'], 4)}x between "
+          f"the sparsest and densest immune quintile against a well-mixed "
+          f"model's exact 1.0000 — and it survives a permutation null that "
+          f"holds the tissue, the cell layout and the total sink magnitude "
+          f"fixed (p = {_f(p_sr, 4)}). That is a clean demonstration of what a "
+          "microenvironment model adds over a compartmental one, and it holds "
+          "at every strength because the geometry, not the magnitude, produces "
+          "it.")
+    else:
+        a(f"3. **The reduction is structured, but the structure is not "
+          f"MACROPHAGE-specific.** The {_f(obs['structure_ratio'], 4)}x contrast "
+          f"between the sparsest and densest immune quintile is real and is "
+          f"exactly 1.0000 in a well-mixed model, so the spatial capability is "
+          f"demonstrated. But relabelling the same number of immune cells onto "
+          f"other measured cell positions reproduces it "
+          f"(p = {_f(p_sr, 4)}), so what the analysis actually establishes is "
+          f"that exposure is structured by local CELLULARITY. Quoting it as a "
+          f"macrophage effect would over-claim, and this report does not.")
     a("4. **The ranking is safe either way.** "
       f"{'The cross-drug ranking is invariant across the entire swept range' if sw['ranking_invariant'] else 'The ranking moves within the swept range'}, "
       "so no comparative conclusion in `results/` is at risk from this term "

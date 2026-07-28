@@ -103,6 +103,10 @@
 }
 .xnote b { color: var(--fg-1); }
 
+/* Replaces an inline style write, so the export adds no runtime style
+   attribute of its own beyond what app/web/js/ already sets via CSSOM. */
+.xlog-head { margin-bottom: 4px; }
+
 .xlog {
   margin: 0;
   padding: 4px 6px;

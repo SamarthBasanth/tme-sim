@@ -61,6 +61,16 @@ function fmtMetric(meta, v) {
   }
 }
 
+/**
+ * The value in the units TPL itself uses. `expect kill > 0.05` compares against
+ * a FRACTION, so an assertion row that printed "39.6" beside "> 0.05" would
+ * read as a pass by a factor of a hundred. Assertions are shown raw.
+ */
+function fmtRaw(meta, v) {
+  if (v === null || v === undefined || Number.isNaN(v)) return NULL_GLYPH;
+  return meta.fmt === 'pct' ? num(v, 4) : fmtMetric(meta, v);
+}
+
 function fmtQty(q) {
   if (!q) return NULL_GLYPH;
   if (typeof q === 'number') return num(q, q % 1 === 0 ? 0 : 2);
@@ -1002,7 +1012,9 @@ export function createProtocolWorkspace() {
           h('span.chip.' + (x.pass === null ? 'unknown' : x.pass ? 'measured' : 'assumed'),
             x.pass === null ? 'pending' : x.pass ? 'pass' : 'fail'),
           h('span.mono', `expect ${x.metric} ${x.op} ${x.value}`),
-          h('span.dim', x.actual !== undefined ? `actual ${fmtMetric(metricMeta(x.metric, metrics), x.actual)}` : '')))) : null,
+          h('span.dim', x.actual !== undefined
+            ? `actual ${fmtRaw(metricMeta(x.metric, metrics), x.actual)}`
+            : 'the run has not produced this metric yet')))) : null,
         h('div.hr-lbl', 'parameters'),
         h('dl.kv',
           h('dt', 'drug'), h('dd', run.drug || NULL_GLYPH),

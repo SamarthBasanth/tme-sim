@@ -28,6 +28,8 @@ const MAX_ROI = 4;
 const PLOT_H = 104;
 
 const cssv = (el, n) => getComputedStyle(el).getPropertyValue(n).trim() || '#888';
+/** Canvas text in the same mono stack the DOM uses. */
+const monoFont = (el, px) => `${px}px ${cssv(el, '--font-mono') || 'monospace'}`;
 
 export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
   let tool = 'pick';
@@ -72,7 +74,7 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     const bg = cssv(annot, '--bg-1');
     const S = (x, y) => viewer.worldToScreen(x, y);
 
-    actx.font = '10px ui-monospace, "SF Mono", Menlo, monospace';
+    actx.font = monoFont(annot, 10);
     actx.textBaseline = 'middle';
 
     const tag = (x, y, text, colour) => {
@@ -251,7 +253,7 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     pctx.fillRect(0, 0, w, PLOT_H);
     pctx.strokeStyle = line;
     pctx.strokeRect(0.5, 0.5, w - 1, PLOT_H - 1);
-    pctx.font = '9px ui-monospace, "SF Mono", Menlo, monospace';
+    pctx.font = monoFont(plot, 9);
 
     const d = profileData;
     if (!d || !d.valid) {
@@ -317,7 +319,8 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     const endTxt = `${num(d.lengthUm, 0)} um`;
     pctx.fillText(endTxt, w - padR - pctx.measureText(endTxt).width, PLOT_H - 2);
     pctx.textBaseline = 'top';
-    pctx.fillText(auto(hi), padL + 1, 1);
+    const fn = getFieldName();
+    pctx.fillText(`${auto(hi)}${fn ? ' ' + fieldMeta(fn).unit : ''}`, padL + 1, 1);
   }
 
   plot.addEventListener('pointermove', (e) => {
@@ -354,16 +357,13 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     r.cells = rectCellStats(viewer, rect);
     r.fieldStats = viewer.field ? rectFieldStats(viewer.field, viewer.geom.ex, viewer.geom.ey, rect) : null;
     r.areaUm2 = (rect.x1 - rect.x0) * (rect.y1 - rect.y0);
-    r.hist = null;
-    if (viewer.field && r.cells && r.cells.exposure) {
-      // Exposure distribution INSIDE the region, for the histogram overlay.
-      const vals = [];
-      viewer.index.forEachInRect(rect.x0, rect.y0, rect.x1, rect.y1, (i) => {
-        const v = viewer.sampleField(viewer.geom.xs[i], viewer.geom.ys[i]);
-        if (v !== null && Number.isFinite(v) && vals.length < 300000) vals.push(v);
-      });
-      if (vals.length) r.hist = buildHistogram(Float32Array.from(vals), viewer.field.min, viewer.field.max);
-    }
+    // The region's own exposure distribution, binned against the FIELD-WIDE
+    // axis so it can be overlaid on the window/level histogram and compared
+    // like for like. Same samples the statistics came from — the region is
+    // walked once.
+    r.hist = (viewer.field && r.cells && r.cells.values && r.cells.values.length)
+      ? buildHistogram(r.cells.values, viewer.field.min, viewer.field.max)
+      : null;
   }
 
   function paintRois() {

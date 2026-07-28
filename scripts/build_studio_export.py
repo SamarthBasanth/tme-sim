@@ -63,6 +63,20 @@ MODULE_OVERRIDES = {
     "ui/static_shell": os.path.join(EXPORT_SRC, "static_shell.js"),
 }
 
+#: Module entry points declared by index.html that are DELIBERATELY not
+#: bundled, with the reason. Anything else index.html loads and this file does
+#: not list is a build failure — a front end can grow a second entry point at
+#: any time, and silently dropping one leaves its markup on screen with nothing
+#: wired to it, which is exactly the dead control this export must not ship.
+EXCLUDED_ENTRIES = {
+    "ui/protocol": (
+        "the protocol workspace is entirely server-backed — POST "
+        "/api/protocol/{validate,upload,plan,start} and the sweep queue. "
+        "Every control in it would 501, so the panel and its toolbar button "
+        "are removed by static_shell.js instead of shipped dead."
+    ),
+}
+
 #: Where the walk starts. Everything else is discovered from the imports, so a
 #: front end that grows a module does not need this file edited — and a module
 #: that is half-built and not yet reachable from main.js is not dragged in.
@@ -324,6 +338,12 @@ def main(argv) -> int:
         "field_rows": grid[0],
         "field_cols": grid[1],
         "payload_mib": round(raw_bytes / 1048576.0, 2),
+        # The tab / gallery name. Baked rather than composed in the front end,
+        # because the Artifact publisher reads the <title> ELEMENT while the
+        # browser tab shows document.title — if static_shell.js rewrote one and
+        # not the other they would disagree, and the gallery card would drift
+        # from the tab on every redeploy.
+        "document_title": None,   # filled per-variant below
         "built_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         "repo": "tme-sim",
         "commands": [
@@ -357,8 +377,24 @@ def main(argv) -> int:
     with open(os.path.join(EXPORT_SRC, "export.css")) as fh:
         css.append("/* ===== export.css ===== */\n" + fh.read())
 
+    # Every module entry point index.html declares must be accounted for.
+    declared = [m[len("js/"):-len(".js")] for m in
+                re.findall(r'<script type="module" src="([^"]+)"></script>', index)]
+    unhandled = [d for d in declared
+                 if d not in ENTRIES and d not in EXCLUDED_ENTRIES]
+    if unhandled:
+        raise SystemExit(
+            f"bundler: app/web/index.html loads module entry point(s) {unhandled} "
+            "that this build neither bundles nor excludes. Add them to ENTRIES "
+            "(if they work without a server) or to EXCLUDED_ENTRIES with a "
+            "reason — do not ship their markup with nothing wired to it."
+        )
+    for d in declared:
+        if d in EXCLUDED_ENTRIES:
+            print(f"  excluded      {d}: {EXCLUDED_ENTRIES[d].split(chr(10))[0]}")
+
     body = index.split("<body>", 1)[1].rsplit("</body>", 1)[0]
-    # Drop the module <script> tag; the bundle replaces it.
+    # Drop the module <script> tags; the bundle replaces them.
     body = re.sub(r'<script type="module"[^>]*></script>\s*', "", body)
 
     # The shipped favicon is an inline SVG, which must carry the SVG xmlns —
@@ -367,20 +403,28 @@ def main(argv) -> int:
     # the export's "zero http(s) in src/href" property literally true.
     with open(os.path.join(EXPORT_SRC, "favicon.b64")) as fh:
         icon = fh.read().strip()
-    payload_js = json.dumps(baked, separators=(",", ":"), allow_nan=False)
+    standalone_title = (
+        f"tmesim Studio — static export · {section_id} · dx {spec['dx_um']:g} um")
+
+    def payload_for(title: str) -> str:
+        baked["export_meta"]["document_title"] = title
+        return json.dumps(baked, separators=(",", ":"), allow_nan=False)
 
     style_block = "<style>\n" + "\n".join(css) + "\n</style>\n"
-    # </script> cannot appear inside the JSON; escape defensively.
-    data_block = (
-        '<script id="tmesim-baked" type="application/json">'
-        + payload_js.replace("</", "<\\/")
-        + "</script>\n"
-        "<script>\n"
-        'window.__TMESIM_BAKED = JSON.parse('
-        'document.getElementById("tmesim-baked").textContent);\n'
-        "</script>\n"
-        "<script>\n" + bundle() + "\n</script>\n"
-    )
+    bundle_js = bundle()
+
+    def data_block(title: str) -> str:
+        # </script> cannot appear inside the JSON; escape defensively.
+        return (
+            '<script id="tmesim-baked" type="application/json">'
+            + payload_for(title).replace("</", "<\\/")
+            + "</script>\n"
+            "<script>\n"
+            'window.__TMESIM_BAKED = JSON.parse('
+            'document.getElementById("tmesim-baked").textContent);\n'
+            "</script>\n"
+            "<script>\n" + bundle_js + "\n</script>\n"
+        )
 
     # ---------------------------------------------------------------- #
     # 1. Standalone: a complete document you can double-click.
@@ -392,14 +436,14 @@ def main(argv) -> int:
         '<meta name="viewport" content="width=device-width, initial-scale=1, '
         'viewport-fit=cover">\n'
         '<meta name="color-scheme" content="dark light">\n'
-        f"<title>tmesim Studio — static export · {section_id} · dx {spec['dx_um']:g} um</title>\n"
+        f"<title>{standalone_title}</title>\n"
         '<meta name="description" content="Single-file static export of tmesim '
         'Studio. Precomputed runs, no server.">\n'
         f'<link rel="icon" href="{icon}">\n'
         + style_block
         + "</head>\n<body>\n"
         + body
-        + "\n" + data_block
+        + "\n" + data_block(standalone_title)
         + "</body>\n</html>\n"
     )
 
@@ -427,7 +471,7 @@ def main(argv) -> int:
         f"<title>{ARTIFACT_TITLE}</title>\n"
         + style_block
         + body
-        + "\n" + data_block
+        + "\n" + data_block(ARTIFACT_TITLE)
     )
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)

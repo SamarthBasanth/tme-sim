@@ -331,7 +331,13 @@ function setTool(t) {
 function paintToolState() {
   const msg = $('#sb-msg');
   if (!msg || !tools) return;
-  if (tools.tool === 'pick') return;
+  if (tools.tool === 'pick') {
+    // Do not leave the previous tool's instruction sitting in the status
+    // strip after the operator has left that tool.
+    if (msg.dataset.tool) { msg.textContent = ''; delete msg.dataset.tool; }
+    return;
+  }
+  msg.dataset.tool = tools.tool;
   msg.textContent = {
     profile: 'line profile — drag across the tissue; middle-drag pans',
     region: 'region — drag a rectangle; middle-drag pans',

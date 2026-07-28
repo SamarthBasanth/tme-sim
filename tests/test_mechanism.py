@@ -327,3 +327,176 @@ def _tiny_micro():
             state=np.array([int(CellState.VIABLE)]),
             sensitivity=np.array([1.0])),
     )
+
+
+# --------------------------------------------------------------------------- #
+# 5. The wire: TMSM / TMSL payloads and the two routes
+# --------------------------------------------------------------------------- #
+fastapi = pytest.importorskip("fastapi", reason="the app/server backend needs fastapi")
+pytest.importorskip("httpx", reason="starlette's TestClient needs httpx")
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.server.api import create_app, validate_spec  # noqa: E402
+from app.server.jobs import JobManager  # noqa: E402
+from app.server.payloads import (  # noqa: E402
+    MAGIC_MECHANISM,
+    MAGIC_TIMELAPSE,
+    MAX_TIMELAPSE_FRAMES,
+    decode_mechanism,
+    decode_timelapse,
+    encode_field,
+    encode_mechanism,
+    encode_timelapse,
+)
+
+_SECTION = "xenium_319"
+_SPEC = {
+    "section": _SECTION, "dx_um": 30.0, "drug": "temozolomide",
+    "sensitivity_mode": "uniform", "vascular_mode": "discrete",
+    "oxygen_mode": "pde", "state_mode": "oxygen", "mgmt": None,
+    "pk": {"plasma_peak": 50.0, "half_life_s": 14400.0,
+           "n_doses": 1, "dose_interval_s": 86400.0},
+    "total_time_s": 600.0, "timelapse_frames": 4,
+}
+
+
+def test_tmsm_round_trips_and_refuses_an_out_of_range_code():
+    labels = np.array([0, 1, 2, 3, 4, 5, 6, 7], dtype=np.uint8)
+    agg = {"label_names": list(LABELS), "counts": {"KILLED": 1}}
+    blob = encode_mechanism(labels, agg)
+    assert blob[:4] == MAGIC_MECHANISM
+
+    back = decode_mechanism(blob)
+    assert back["n_cells"] == 8
+    assert back["n_labels"] == len(LABELS)
+    assert np.array_equal(back["labels"], labels)
+    assert back["aggregate"] == agg
+    # A truncated payload must raise, not render garbage.
+    with pytest.raises(ValueError, match="expected"):
+        decode_mechanism(blob[:-1])
+    with pytest.raises(ValueError, match="uint8"):
+        encode_mechanism(np.array([300]), agg)
+
+
+def test_tmsl_frames_are_byte_identical_to_the_tmsf_field_payload():
+    """The container extends the existing field payload; it does not replace it.
+
+    That is the whole reason the front end can decode a frame with the TMSF
+    reader it already ships, so it is asserted at the byte level.
+    """
+    rng = np.random.default_rng(0)
+    frames = rng.random((3, 5, 7))
+    blob = encode_timelapse(frames, [0.0, 10.0, 20.0], 12.0, interval_s=10.0)
+    assert blob[:4] == MAGIC_TIMELAPSE
+
+    # header 20 B, then per frame: 8 B prefix + a whole TMSF block
+    solo = encode_field(frames[1], 12.0)
+    assert solo in blob
+
+    back = decode_timelapse(blob)
+    assert back["n_frames"] == 3
+    assert back["interval_s"] == 10.0 and back["window_s"] == 20.0
+    assert [f["frame"] for f in back["frames"]] == [0, 1, 2]
+    assert [f["time_s"] for f in back["frames"]] == [0.0, 10.0, 20.0]
+    assert np.allclose(back["frames"][2]["values"], frames[2], atol=1e-6)
+
+    with pytest.raises(ValueError, match="MAX_TIMELAPSE_FRAMES"):
+        encode_timelapse(np.zeros((MAX_TIMELAPSE_FRAMES + 1, 2, 2)),
+                         np.arange(MAX_TIMELAPSE_FRAMES + 1), 1.0)
+
+
+def test_validate_accepts_the_new_fields_and_warns_about_the_static_plateau():
+    ok = validate_spec(dict(_SPEC))
+    assert ok["ok"] is True
+    assert any("never CLEAR" in w for w in ok["warnings"])
+
+    bad = validate_spec(dict(_SPEC, timelapse_frames=1))
+    assert bad["ok"] is False
+    assert any("at least a first and a last frame" in e for e in bad["errors"])
+
+    tr = validate_spec(dict(_SPEC, time_resolved=True))
+    assert tr["ok"] is True
+    assert any("SCHEDULE effect" in w for w in tr["warnings"])
+    assert not any("never CLEAR" in w for w in tr["warnings"])
+
+
+@pytest.fixture(scope="module")
+def client(tmp_path_factory):
+    jobs = JobManager(root=str(tmp_path_factory.mktemp("mech_runs")))
+    with TestClient(create_app(jobs)) as c:
+        yield c
+    jobs.shutdown()
+
+
+def _await(client, run_id, timeout=600.0):
+    import time as _t
+    t0 = _t.time()
+    while _t.time() - t0 < timeout:
+        st = client.get(f"/api/runs/{run_id}/status").json()
+        if st["status"] in ("done", "failed", "cancelled"):
+            return st
+        _t.sleep(0.4)
+    raise AssertionError(f"run {run_id} did not finish in {timeout}s")
+
+
+def test_routes_serve_a_reconciling_attribution_and_a_playable_timelapse(client):
+    run_id = client.post("/api/runs", json=_SPEC).json()["run_id"]
+    st = _await(client, run_id)
+    assert st["status"] == "done", client.get(
+        f"/api/runs/{run_id}/traceback").json()
+
+    run = client.get(f"/api/runs/{run_id}").json()
+
+    # --- mechanism ------------------------------------------------------- #
+    r = client.get(f"/api/runs/{run_id}/mechanism")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/octet-stream"
+    mech = decode_mechanism(r.content)
+    agg = mech["aggregate"]
+
+    geom = client.get(f"/api/runs/{run_id}/geometry")
+    n_cells = int(np.frombuffer(geom.content, dtype="<u4", count=1, offset=8)[0])
+    assert mech["n_cells"] == n_cells, "labels are not aligned to the geometry"
+
+    # THE claim: the labels reproduce the engine's own kill_fraction exactly.
+    assert agg["reconciliation"]["bit_exact"] is True
+    assert (agg["reconciliation"]["kill_fraction_from_engine"]
+            == run["metrics"]["kill_fraction"])
+    assert agg["counts"]["KILLED"] + agg["counts"]["ALREADY_DEAD"] \
+        + agg["n_survived"] == agg["n_tumor"]
+    assert run["mechanism"]["counts"] == agg["counts"]
+    assert "labels" not in run["mechanism"], "the JSON must not carry 850k labels"
+
+    # --- time-lapse ------------------------------------------------------- #
+    r = client.get(f"/api/runs/{run_id}/timelapse")
+    assert r.status_code == 200
+    tl = decode_timelapse(r.content)
+    assert tl["n_frames"] == 4
+    assert [f["frame"] for f in tl["frames"]] == [0, 1, 2, 3]
+    assert tl["frames"][0]["time_s"] == 0.0
+    assert tl["frames"][-1]["time_s"] == pytest.approx(_SPEC["total_time_s"])
+    assert np.all(tl["frames"][0]["values"] == 0.0)      # zero initial condition
+    assert tl["frames"][-1]["values"].max() > 0.0        # drug arrived
+    assert run["timelapse"]["available"] is True
+    assert run["timelapse"]["n_frames"] == 4
+    # the static-source caveat must travel with the frames
+    assert "quasi-steady state" in run["timelapse"]["plateau_note"]
+
+
+def test_a_run_without_them_says_why_rather_than_404ing_blankly(client):
+    spec = dict(_SPEC, drug=None, timelapse_frames=0)
+    run_id = client.post("/api/runs", json=spec).json()["run_id"]
+    assert _await(client, run_id)["status"] == "done"
+
+    r = client.get(f"/api/runs/{run_id}/mechanism")
+    assert r.status_code == 404
+    assert "reconstruction-only" in r.json()["detail"]["reason"]
+
+    r = client.get(f"/api/runs/{run_id}/timelapse")
+    assert r.status_code == 404
+    assert "reconstruction-only" in r.json()["detail"]["reason"]
+
+    run = client.get(f"/api/runs/{run_id}").json()
+    assert run["mechanism"] is None
+    assert run["timelapse"]["available"] is False

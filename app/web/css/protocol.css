@@ -31,7 +31,10 @@
   --syn-unit-bg: hsl(258 66% 76% / 0.16);
   --syn-str-bg: hsl(212 12% 26%);
   --syn-str-fg: var(--fg-0);
-  --syn-cmt: var(--fg-3);
+  /* fg-2, not fg-3: in light mode the script pane sits on the mid-grey
+     specimen surround, where fg-3 falls under 3:1 and a comment stops being
+     readable. A comment you cannot read is worse than no comment. */
+  --syn-cmt: var(--fg-2);
   --syn-op: var(--fg-2);
   --ce-line-h: 16px;
 }
@@ -155,7 +158,7 @@
 .ce-scroll {
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 46px minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
 }
@@ -555,6 +558,10 @@
 .pcell.pv-computed { border-left-color: var(--info); }
 .pcell.pv-assumed { border-left-color: var(--warn); }
 .pcell.pv-unknown { border-left-color: var(--fg-3); }
+/* If a live executor states a cell's provenance in the DrugParams taxonomy
+   rather than the result taxonomy, it still gets an edge rather than silence. */
+.pcell.pv-user-supplied { border-left-color: var(--accent); }
+.pcell.pv-flagged-default { border-left-color: var(--warn); }
 .pcell .bar {
   position: absolute;
   left: 0; bottom: 0; height: 2px;

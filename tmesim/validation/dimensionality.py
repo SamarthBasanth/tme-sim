@@ -1106,6 +1106,11 @@ def write_report(analytic: Dict, stereo: Dict, census: Dict, slab: Dict,
     fix = cons["the_fix"]
     ctl = slab["control"]
     dh = pen["fitted_d_half_ratio_2d_over_3d"]
+    # Headline census figure: the first section that actually loaded. Guarded so
+    # a data-load failure degrades the sentence rather than crashing the report.
+    _ok = [s for s in census["sections"] if "error" not in s]
+    _head_frac = (_ok[0]["thresholds"][1]["frac_all_objects"]
+                  if _ok else float("nan"))
 
     a("# THE 2-D ASSUMPTION, QUANTIFIED\n")
     a("**Verdict: the 2-D solve does NOT need fixing.** The penetration length "
@@ -1134,7 +1139,7 @@ def write_report(analytic: Dict, stereo: Dict, census: Dict, slab: Dict,
       "dimensionally biased.\n>")
     a("> **3. The vessels really are cut transversely, and it is measured, not "
       "assumed.** On the flagship section "
-      f"**{100.0 * census['sections'][0]['thresholds'][1]['frac_all_objects']:.1f}%** "
+      f"**{100.0 * _head_frac:.1f}%** "
       "of reconstructed vessel objects have an in-plane extent no larger than "
       f"1.5x the measured glioma vessel caliber ({census['caliber_um']:.1f} um) — "
       "i.e. they look like round cross-sections, not streaks. The section is "

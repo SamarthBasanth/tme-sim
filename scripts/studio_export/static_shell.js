@@ -41,10 +41,10 @@ function buildBanner() {
         'tmesim Studio is a FastAPI + WebGL2 workstation that runs on your machine; '
         + 'this page has no server behind it. Pan, zoom, cell picking, channels, field '
         + 'overlays, run switching and the A/B comparison are live and operate on real '
-        + 'data. Submitting, cancelling and validating a run are not — nor are therapy '
-        + 'reports and the project/specimen browser, which are backend jobs and mutable '
-        + 'server state. Those surfaces were removed rather than left on screen looking '
-        + 'live.'),
+        + 'data. Submitting, cancelling and validating a run are not — nor are the '
+        + 'protocol workspace, therapy reports and the project/specimen browser, which '
+        + 'are backend jobs, sweeps and mutable server state. Those surfaces were '
+        + 'removed rather than left on screen looking live.'),
       h('p',
         h('b', 'The three runs were precomputed by the production engine '),
         '(', cmd('reconstruct_real'), ' → ', cmd('apply_drug_sensitivity'), ' → ',
@@ -162,7 +162,7 @@ function removeDeadControls() {
   const body = sect.querySelector('.sect-body');
   if (!body) return;
   const pre = h('pre.xlog', { 'aria-label': 'Recorded engine log for the open run' }, '');
-  const head = h('div.frow', { style: { marginBottom: '4px' } },
+  const head = h('div.frow.xlog-head',
     h('span.lbl', 'run'), h('span.mono.strong.xlog-id', '—'),
     h('span.grow'),
     h('span.chip.st-done', 'terminal'));
@@ -195,10 +195,21 @@ function removeDeadControls() {
 function patchHelpDialog() {
   const dlg = document.getElementById('help-dlg');
   if (!dlg) return;
-  const rows = dlg.querySelectorAll('tbody tr');
-  for (const tr of rows) {
-    if (/submit the current RunSpec/i.test(tr.textContent)) tr.remove();
+  for (const tr of dlg.querySelectorAll('tbody tr')) {
+    if (/submit the current RunSpec/i.test(tr.textContent)
+        || /protocol workspace/i.test(tr.textContent)) tr.remove();
   }
+}
+
+/**
+ * The protocol workspace ships its button in index.html's markup and wires it
+ * from a SECOND module entry point, js/ui/protocol.js, which this export does
+ * not bundle: every one of its actions is a POST to /api/protocol/*. A button
+ * whose module is absent is inert, so it goes.
+ */
+function removeProtocolEntryPoint() {
+  const btn = document.getElementById('btn-protocol');
+  if (btn) btn.remove();
 }
 
 /* --------------------------------------------------------------- boot --- */
@@ -210,8 +221,11 @@ function install() {
   shell.insertBefore(buildBanner(), shell.firstChild);
   patchTopbar();
   removeDeadControls();
+  removeProtocolEntryPoint();
   patchHelpDialog();
-  document.title = `tmesim Studio — static export · ${M.section_id} · dx ${M.dx_um} um`;
+  // Set from the baked value so document.title and the <title> element the
+  // Artifact publisher reads can never disagree.
+  if (M.document_title) document.title = M.document_title;
   return true;
 }
 
