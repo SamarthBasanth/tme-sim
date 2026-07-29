@@ -152,14 +152,86 @@ IO_PANEL_MARKER_MAP: Dict[CellType, List[str]] = {
 HYPOXIA_RESPONSE_GENES: Dict[str, List[str]] = {
     "brain_319": [],
     "io_480": ["VEGFA", "HIF1A"],
+    # CONFIRMED absent by direct grep of the real 313-gene panel (see
+    # results/breast_cancer_flagship.md): neither VEGFA, CA9, nor HIF1A is a
+    # target on this panel. Explicit empty entry, not a silent fallback.
+    "breast_313": [],
+}
+
+#: The 313-gene Xenium Human Breast panel (Janesick et al. 2023, Rep1/Rep2;
+#: ``results/registration_3d_breast_poc.md``). Added the same way the IO panel
+#: was added above: this is NOT a change to how the brain or IO maps behave (see
+#: ``PANEL_REGISTRY`` below and ``tests/test_breast_marker_panel.py``, which
+#: asserts both existing panels are still selected and still produce their
+#: on-record cell-type fractions bit-for-bit) -- it is a THIRD registry entry so
+#: a THIRD, previously-unrecognised panel gets a map matched to its own genes
+#: instead of silently falling back to the brain map by default (which is what
+#: happens with no entry here: brain_319 covers 7/12 = 0.583 of its markers on
+#: this panel purely by chance overlap on EGFR/MKI67/PTPRC/CD68/AIF1/CD163/
+#: PECAM1, io_480 covers 8/14 = 0.571, and BOTH leave STROMAL at zero markers
+#: present because MOG/AQP4/GJA1 and SLC1A3/S100B/PTN(partial) are brain-lineage
+#: genes absent from a breast panel -- see
+#: ``results/breast_cancer_flagship.md`` for the measured effect of the
+#: fallback: STROMAL collapses to 0.0% and every non-immune, non-endothelial
+#: support cell (fibroblast, myoepithelial, adipocyte) silently defaults to the
+#: ungated TUMOR class).
+#:
+#: Each entry below is a marker CONFIRMED present on the real 313-gene panel
+#: (``data_cache/xenium_breast_janesick/rep1/cell_feature_matrix/features.tsv.gz``,
+#: checked directly, not assumed):
+#:
+#:   TUMOR       <- EPCAM, KRT8, ERBB2, ESR1
+#:       Pan-epithelial identity (EPCAM, KRT8 cytokeratin) plus the two clinical
+#:       breast-cancer receptors this particular tumour is characterised by
+#:       (Janesick et al.: ER+/HER2+/PR-) -- ERBB2/HER2 and ESR1/ER. The
+#:       like-for-like analogue of the brain map's lineage-identity choice
+#:       (EGFR/SOX2/OLIG2/MKI67), swapped for breast epithelial identity genes
+#:       rather than glial ones.
+#:   IMMUNE      <- PTPRC, CD68, AIF1, CD163
+#:       IDENTICAL to the brain and IO maps -- all four are pan-leukocyte /
+#:       macrophage markers with no tissue-of-origin assumption baked in, and
+#:       all four are on this panel too.
+#:   ENDOTHELIAL <- PECAM1, VWF, CLDN5
+#:       PECAM1 (shared with the brain map) plus two more canonical endothelial
+#:       genes this richer panel also carries (von Willebrand factor; claudin-5,
+#:       a tight-junction/endothelial marker) -- three markers instead of the
+#:       brain map's one, which the classifier-fix work
+#:       (``results/classifier_fix.md``) found matters less now that scoring is
+#:       matched-null (arity-controlled) rather than raw mean-z, but is still a
+#:       strictly richer readout where the panel supports it.
+#:   STROMAL     <- LUM, POSTN, PDGFRA
+#:       Lumican (fibroblast/stromal proteoglycan) and periostin (matricellular
+#:       protein, already used as an ECM transcript in
+#:       ``reconstruct.real_pipeline.ECM_MARKERS``) plus PDGFRA (fibroblast /
+#:       CAF receptor) -- the breast-panel analogue of the brain map's
+#:       astro-lineage STROMAL class, built from cancer-associated-fibroblast /
+#:       matrix genes instead of glial ones since breast tissue's non-malignant
+#:       "stroma" is fibroblastic, not astrocytic.
+#:
+#: NECROTIC is still never assigned: this panel carries no necrosis marker
+#: either.
+#:
+#: Coverage on the real Rep1 panel: 16/16 = 1.00 (every marker above is
+#: present), so ``select_marker_map`` picks this map for the breast panel
+#: unambiguously (1.00 vs brain's 0.583 and IO's 0.571) -- not a close call.
+BREAST_PANEL_MARKER_MAP: Dict[CellType, List[str]] = {
+    CellType.TUMOR: ["EPCAM", "KRT8", "ERBB2", "ESR1"],
+    CellType.IMMUNE: ["PTPRC", "CD68", "AIF1", "CD163"],
+    CellType.ENDOTHELIAL: ["PECAM1", "VWF", "CLDN5"],
+    CellType.STROMAL: ["LUM", "POSTN", "PDGFRA"],
 }
 
 #: Registry, in PREFERENCE ORDER. :func:`select_marker_map` walks this list and
 #: keeps the first map with the highest marker coverage, so the brain panel wins
-#: any tie and remains the default for an unrecognised panel.
+#: any tie and remains the default for an unrecognised panel. The breast entry
+#: is appended LAST, after the two existing entries, so neither existing tie-
+#: break is disturbed (brain_319 vs io_480 ordering, and both vs a truly
+#: unrecognised panel, are exactly as before -- verified in
+#: ``tests/test_breast_marker_panel.py``).
 PANEL_REGISTRY: Tuple[Tuple[str, Dict[CellType, List[str]]], ...] = (
     ("brain_319", BRAIN_PANEL_MARKER_MAP),
     ("io_480", IO_PANEL_MARKER_MAP),
+    ("breast_313", BREAST_PANEL_MARKER_MAP),
 )
 
 

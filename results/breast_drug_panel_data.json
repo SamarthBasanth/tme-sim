@@ -1,0 +1,198 @@
+{
+  "reconstruction_report": {
+    "patient_id": "xenium-gbm-real",
+    "source": "xenium",
+    "n_cells": 167780,
+    "n_tumor": 89785,
+    "grid": [
+      458,
+      628
+    ],
+    "dx_um": 12.0,
+    "extent_um": [
+      7536.0,
+      5496.0
+    ],
+    "celltype_counts": {
+      "TUMOR": 89785,
+      "STROMAL": 38500,
+      "IMMUNE": 25818,
+      "ENDOTHELIAL": 13677,
+      "NECROTIC": 0
+    },
+    "celltype_fractions": {
+      "TUMOR": 0.5351352962212421,
+      "STROMAL": 0.22946715937537251,
+      "IMMUNE": 0.15388008105852902,
+      "ENDOTHELIAL": 0.08151746334485636,
+      "NECROTIC": 0.0
+    },
+    "mean_vascular_density": 0.056717120050179586,
+    "mean_ecm_density": 0.2420827475599886,
+    "mean_oxygen": 0.3457232524278653,
+    "oxygen_mode": "pde",
+    "state_mode": "oxygen",
+    "ecm_markers_used": [
+      "POSTN",
+      "FBLN1"
+    ],
+    "tissue_mask_mode": "geometric",
+    "tissue_disc_radius_um": 30.0,
+    "tissue_coverage_fraction": 0.9312088003782716
+  },
+  "marker_panel_selected": "breast_313",
+  "marker_panel_coverage": {
+    "brain_319": 0.5833333333333334,
+    "io_480": 0.5714285714285714,
+    "breast_313": 1.0
+  },
+  "alpha": 148.60815765445545,
+  "dx_um": 12.0,
+  "rows": [
+    {
+      "name": "doxorubicin",
+      "mw": 543.525,
+      "ic50": 0.5,
+      "ic50_source": "literature",
+      "ic50_confidence": "literature",
+      "ic50_n_cell_lines": null,
+      "bbb": 0.020567870235594195,
+      "diffusivity": 184.74861430191334,
+      "d_eff": 157.9139430070487,
+      "binding": 0.03325045168543613,
+      "clearance": 6.30800204946529e-05,
+      "kill": 0.3542462549423623,
+      "pen": 0.31960750271705046,
+      "mean_auc": 23481.313516656148,
+      "hypoxic": 0.11216795678565462,
+      "mechanism_counts": {
+        "KILLED": 31806,
+        "SURVIVED_UNREACHED": 146,
+        "SURVIVED_UNDERDOSED": 10115,
+        "SURVIVED_RESISTANT": 46737,
+        "SURVIVED_STOCHASTIC": 981,
+        "UNATTRIBUTED": 0,
+        "ALREADY_DEAD": 0,
+        "NOT_TUMOR": 77995
+      },
+      "mechanism_survival_breakdown": {
+        "delivery": 0.002518153124407113,
+        "dose": 0.17445971817382155,
+        "resistance": 0.8061022094206524,
+        "chance": 0.016919919281119026,
+        "unattributed": 0.0
+      },
+      "mechanism_reconciled": true,
+      "runtime_s": 66.78128170967102
+    },
+    {
+      "name": "paclitaxel",
+      "mw": 853.918,
+      "ic50": 0.06858492641188492,
+      "ic50_source": "GDSC",
+      "ic50_confidence": "measured",
+      "ic50_n_cell_lines": 50,
+      "bbb": 0.0191146610720123,
+      "diffusivity": 151.39814916659216,
+      "d_eff": 129.4076212111448,
+      "binding": 0.13873062556165022,
+      "clearance": 9.067690117123381e-05,
+      "kill": 0.3626552319429749,
+      "pen": 0.20384518308574276,
+      "mean_auc": 5242.318932879025,
+      "hypoxic": 0.11216795678565462,
+      "mechanism_counts": {
+        "KILLED": 32561,
+        "SURVIVED_UNREACHED": 2027,
+        "SURVIVED_UNDERDOSED": 12545,
+        "SURVIVED_RESISTANT": 41994,
+        "SURVIVED_STOCHASTIC": 658,
+        "UNATTRIBUTED": 0,
+        "ALREADY_DEAD": 0,
+        "NOT_TUMOR": 77995
+      },
+      "mechanism_survival_breakdown": {
+        "delivery": 0.03542220047532504,
+        "dose": 0.21922619879770724,
+        "resistance": 0.7338529288410457,
+        "chance": 0.01149867188592199,
+        "unattributed": 0.0
+      },
+      "mechanism_reconciled": true,
+      "runtime_s": 49.77777814865112
+    },
+    {
+      "name": "cyclophosphamide",
+      "mw": 261.089,
+      "ic50": 166.6472828349392,
+      "ic50_source": "GDSC",
+      "ic50_confidence": "measured",
+      "ic50_n_cell_lines": 50,
+      "bbb": 0.9734569026014044,
+      "diffusivity": 248.76047325718804,
+      "d_eff": 212.62810194693418,
+      "binding": 0.01560622844722296,
+      "clearance": 0.00010078225752134313,
+      "kill": 0.20839783928273092,
+      "pen": 0.3977139365396289,
+      "mean_auc": 2353416.3540457003,
+      "hypoxic": 0.11216795678565462,
+      "mechanism_counts": {
+        "KILLED": 18711,
+        "SURVIVED_UNREACHED": 173,
+        "SURVIVED_UNDERDOSED": 53480,
+        "SURVIVED_RESISTANT": 17114,
+        "SURVIVED_STOCHASTIC": 307,
+        "UNATTRIBUTED": 0,
+        "ALREADY_DEAD": 0,
+        "NOT_TUMOR": 77995
+      },
+      "mechanism_survival_breakdown": {
+        "delivery": 0.002434082786954442,
+        "dose": 0.7524551875510032,
+        "resistance": 0.24079128795340068,
+        "chance": 0.004319441708641698,
+        "unattributed": 0.0
+      },
+      "mechanism_reconciled": true,
+      "runtime_s": 48.18671369552612
+    },
+    {
+      "name": "tamoxifen",
+      "mw": 371.524,
+      "ic50": 44.72378665427707,
+      "ic50_source": "GDSC",
+      "ic50_confidence": "measured",
+      "ic50_n_cell_lines": 50,
+      "bbb": 0.6020420833507272,
+      "diffusivity": 215.95584008668206,
+      "d_eff": 184.58833021479637,
+      "binding": 0.12302299909844099,
+      "clearance": 0.0001742294506852915,
+      "kill": 0.06976666481038041,
+      "pen": 0.23566253055222897,
+      "mean_auc": 186046.0633247279,
+      "hypoxic": 0.11216795678565462,
+      "mechanism_counts": {
+        "KILLED": 6264,
+        "SURVIVED_UNREACHED": 23674,
+        "SURVIVED_UNDERDOSED": 59687,
+        "SURVIVED_RESISTANT": 115,
+        "SURVIVED_STOCHASTIC": 45,
+        "UNATTRIBUTED": 0,
+        "ALREADY_DEAD": 0,
+        "NOT_TUMOR": 77995
+      },
+      "mechanism_survival_breakdown": {
+        "delivery": 0.283449671340142,
+        "dose": 0.7146346427844494,
+        "resistance": 0.0013768992229499168,
+        "chance": 0.0005387866524586631,
+        "unattributed": 0.0
+      },
+      "mechanism_reconciled": true,
+      "runtime_s": 48.4811372756958
+    }
+  ],
+  "runtime_s": 222.4192271232605
+}
