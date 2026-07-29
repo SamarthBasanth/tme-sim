@@ -52,6 +52,11 @@ export function createMechanismLegend(viewer, { onToggle } = {}) {
       try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch { /* private mode */ }
       card.classList.toggle('collapsed', collapsed);
       collapseBtn.setAttribute('aria-expanded', String(!collapsed));
+      // The label names the action the button performs NEXT, same convention
+      // as the theme toggle — otherwise a screen reader announces "collapse"
+      // forever, including while already collapsed.
+      collapseBtn.setAttribute('aria-label',
+        collapsed ? 'Expand the mechanism breakdown' : 'Collapse the mechanism breakdown');
       collapseBtn.textContent = collapsed ? '▸' : '▾';
     },
   }, collapsed ? '▸' : '▾');

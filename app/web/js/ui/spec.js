@@ -82,7 +82,12 @@ export function createSpecPanel({ store, onSubmit }) {
     const holder = unitText
       ? h('div.with-unit', control, unit(unitText))
       : control;
-    const errEl = h('div.field-err.hidden');
+    // id + role="alert" so the error is BOTH reachable via aria-describedby
+    // (a screen reader visiting the field reads it alongside aria-invalid)
+    // AND announced on its own the moment validation fills it in, for a
+    // field the operator isn't currently on.
+    const errId = forId + '-err';
+    const errEl = h('div.field-err.hidden', { id: errId, role: 'alert' });
     // The control we mark aria-invalid on must be the focusable field itself,
     // not a wrapper: a div with aria-invalid tells assistive tech nothing.
     // The target must be the field the error PATH names, not merely the first
@@ -95,6 +100,7 @@ export function createSpecPanel({ store, onSubmit }) {
       : (control.querySelector('#' + CSS.escape(forId))
         || control.querySelector('input, select, textarea')
         || control);
+    target.setAttribute('aria-describedby', errId);
     fieldEls.set(forId, { control: target, errEl });
     return [lbl(label, forId, title), holder, errEl];
   }
@@ -145,6 +151,16 @@ export function createSpecPanel({ store, onSubmit }) {
         ta.value = ta.value.slice(0, s) + '  ' + ta.value.slice(en);
         ta.selectionStart = ta.selectionEnd = s + 2;
         fromEditor();
+        return;
+      }
+      // Tab is claimed above for indentation (same convention as the TPL
+      // editor, js/editor/editor.js), which would otherwise be a hard
+      // keyboard trap: nothing else here restores normal Tab behaviour.
+      // Escape blurs the field, mirroring the TPL editor's escape hatch, so
+      // the operator always has a keyboard-only way out.
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        ta.blur();
       }
     },
   });

@@ -633,6 +633,21 @@ function wireKeys() {
       case 'ArrowUp': if (viewer) { viewer.panByScreen(0, step); tickOverlays(); e.preventDefault(); } break;
       case 'ArrowDown': if (viewer) { viewer.panByScreen(0, -step); tickOverlays(); e.preventDefault(); } break;
       case 'Escape':
+        // The protocol workspace's own Esc-closes-it handler
+        // (js/ui/protocol.js) never sees this keypress when the TPL editor
+        // has focus: the editor claims Escape first, to blur itself back out
+        // of the Tab-trap it needs for indentation, and stops the event from
+        // bubbling to the workspace root. That leaves the workspace open and
+        // this fallback — reached once focus has landed back on <body> — as
+        // the only remaining path to the "Esc closes it" contract every
+        // workspace is required to honour (docs/UI_ARCHITECTURE.md §2.7).
+        // Checked first so a stray Esc after leaving the editor cannot also
+        // fall through to the viewer commands below and mutate the specimen
+        // hidden behind the open workspace.
+        if (window.__tmesimProtocol && window.__tmesimProtocol.visible) {
+          window.__tmesimProtocol.hide();
+          break;
+        }
         if (e.shiftKey && tools) { tools.clearAll(); break; }
         if (tools && tools.clearActive()) break;
         clearPin();
