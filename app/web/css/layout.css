@@ -27,7 +27,7 @@
    and focus (see tokens.css); an accent-filled glyph that does nothing is the
    one place the interface was spending its only accent on decoration. */
 .brand {
-  padding: 0 var(--pad-3) 0 var(--pad-4);
+  padding: 0 var(--sp-5) 0 var(--sp-7);
   gap: var(--sp-4);
   border-right: 1px solid var(--line-1);
   flex: 0 0 auto;
@@ -48,8 +48,8 @@
 }
 
 .topbar-group {
-  gap: var(--pad-2);
-  padding: 0 var(--pad-3);
+  gap: var(--sp-4);
+  padding: 0 var(--sp-5);
   border-right: 1px solid var(--line-1);
   /* Shrinkable, so a long section description cannot push the theme and help
      controls off the right edge on a narrow window. The identity, the run
@@ -68,7 +68,7 @@
   white-space: nowrap;
   min-width: 0;
 }
-.topbar-spacer { flex: 1 1 auto; min-width: var(--pad-2); }
+.topbar-spacer { flex: 1 1 auto; min-width: var(--sp-4); }
 
 /* --------------------------------------------------------------- main body */
 .body {
@@ -136,12 +136,13 @@
   background: var(--bg-void);
 }
 .stage-toolbar {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: var(--pad-2);
+  gap: var(--sp-4);
   height: var(--h-head);
-  padding: 0 var(--pad-2);
+  padding: 0 var(--sp-4);
   background: var(--bg-2);
   border-bottom: 1px solid var(--line-2);
   overflow-x: auto;
@@ -153,8 +154,42 @@
 /* The one element in the toolbar that IS allowed to grow. `.topbar-spacer`
    cannot do this job here — the rule above has equal specificity and comes
    later, so it silently overrode it and the right-hand group never moved. */
-.stage-toolbar > .tb-spacer { flex: 1 1 auto; min-width: var(--pad-2); }
+.stage-toolbar > .tb-spacer { flex: 1 1 auto; min-width: var(--sp-4); }
 .stage-toolbar::-webkit-scrollbar { height: 0; }
+/* Below a narrow viewport the toolbar cannot fit tools + colour-by +
+   pin-clear and falls back to this same horizontal scroll — but its
+   scrollbar is deliberately hidden (above), so without an edge cue the tail
+   of the toolbar just reads as controls that vanished rather than one
+   scroll away. wireEdgeShadow() (js/util/dom.js) toggles `.can-scroll-l/r`
+   on the toolbar against actual scrollLeft/scrollWidth; `.tb-edge` (in
+   index.html) is the same disclosure-triangle glyph `.sect > summary`
+   already uses for "there is more, collapsed" — not a shadow: an opaque tab
+   is what actually occludes the text it sits over, a translucent one does
+   not, and a shadow was the wrong tool for that anyway ("nothing else casts
+   a shadow", tokens.css 3.5). */
+.tb-edge {
+  display: none;
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 13px;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-2);
+  pointer-events: none;
+  z-index: 1;
+}
+.tb-edge::before {
+  content: "";
+  width: 0; height: 0;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+}
+.tb-edge-l { left: 0; }
+.tb-edge-l::before { border-right: 4px solid var(--fg-3); }
+.tb-edge-r { right: 0; }
+.tb-edge-r::before { border-left: 4px solid var(--fg-3); }
+.stage-toolbar.can-scroll-l .tb-edge-l,
+.stage-toolbar.can-scroll-r .tb-edge-r { display: flex; }
 .canvas-wrap {
   position: relative;
   flex: 1 1 auto;
@@ -245,7 +280,7 @@
 }
 .statusbar .cell {
   display: flex; align-items: center; gap: var(--sp-3);
-  padding: 0 var(--pad-3);
+  padding: 0 var(--sp-5);
   height: 100%;
   border-right: 1px solid var(--line-1);
   white-space: nowrap;
@@ -266,9 +301,9 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: var(--pad-2);
+  gap: var(--sp-4);
   height: var(--h-head);
-  padding: 0 var(--pad-2) 0 var(--pad-3);
+  padding: 0 var(--sp-4) 0 var(--sp-5);
   background: var(--bg-2);
   border-bottom: 1px solid var(--line-1);
   user-select: none;
@@ -291,7 +326,7 @@
   min-height: 0;
   overflow: auto;
 }
-.panel-body.pad { padding: var(--pad-2) var(--pad-3) var(--pad-3); }
+.panel-body.pad { padding: var(--sp-4) var(--sp-5) var(--sp-5); }
 .panel + .panel { border-top: 1px solid var(--line-2); }
 
 /* section inside a rail — collapsible via <details> but OPEN by default and
@@ -299,9 +334,14 @@
 .sect { border-bottom: 1px solid var(--line-2); }
 .sect > summary {
   display: flex; align-items: center; gap: var(--sp-4);
-  height: var(--h-head); padding: 0 var(--pad-2) 0 var(--pad-3);
+  height: var(--h-head); padding: 0 var(--sp-4) 0 var(--sp-5);
   background: var(--bg-2);
-  cursor: default;
+  /* This toggles open/closed like every other <summary> — `cursor: default`
+     here was telling the operator it does not. A section that is tall by
+     design (Caveats: "never truncated, never scrolled inside itself" — see
+     docs/UI_ARCHITECTURE.md 2.4) still needs its one escape hatch, collapsing
+     it on request, to be visibly interactive. */
+  cursor: pointer;
   user-select: none;
   list-style: none;
   font-size: var(--fs-xs);
@@ -310,6 +350,7 @@
   text-transform: uppercase;
   color: var(--fg-1);
 }
+.sect > summary:hover { background: var(--bg-3); }
 .sect > summary::-webkit-details-marker { display: none; }
 .sect > summary::before {
   content: "";
@@ -330,7 +371,7 @@
   text-transform: none;
   color: var(--fg-3);
 }
-.sect-body { padding: var(--pad-2) var(--pad-3) var(--pad-3); }
+.sect-body { padding: var(--sp-4) var(--sp-5) var(--sp-5); }
 
 /* no horizontal body scroll, ever: wide content gets its own container */
 .overflow-x {
@@ -390,9 +431,9 @@
   z-index: 3;
   display: flex;
   align-items: center;
-  gap: var(--pad-2);
+  gap: var(--sp-4);
   height: var(--h-head);
-  padding: 0 var(--pad-2) 0 var(--pad-3);
+  padding: 0 var(--sp-4) 0 var(--sp-5);
   background: var(--bg-0);
   border-top: 1px solid var(--line-2);
   border-bottom: 1px solid var(--line-2);

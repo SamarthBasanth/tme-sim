@@ -14,7 +14,7 @@
 // because a window that saturates 40% of the region is a window that is
 // hiding something, and the operator has to be told.
 
-import { h } from '../util/dom.js';
+import { h, raf } from '../util/dom.js';
 import { auto, pct, clamp } from '../util/fmt.js';
 import { buildHistogram, quantile, rebin } from '../analysis.js';
 import { sample } from '../gl/ramps.js';
@@ -343,6 +343,14 @@ export function createWindowLevel({ viewer, onChange }) {
 
   let drag = null;   // {mode:'lo'|'hi'|'move', x0, lo0, hi0}
 
+  // sync() does a full histogram redraw (rebin, six getComputedStyle reads,
+  // the axis text) plus a clip-fraction scan over every bin. A window drag or
+  // a trackpad wheel gesture can deliver that many pointermove/wheel events
+  // per second; the window value itself still updates every event (that is
+  // what makes the drag feel direct), only the expensive repaint is capped at
+  // one per presented frame.
+  const scheduleSync = raf(() => sync());
+
   cv.addEventListener('pointerdown', (e) => {
     if (!hist) return;
     const r = cv.getBoundingClientRect();
@@ -382,7 +390,7 @@ export function createWindowLevel({ viewer, onChange }) {
     } else {
       viewer.setWindow((drag.lo0 + drag.hi0) / 2 + dv, drag.hi0 - drag.lo0);
     }
-    sync();
+    scheduleSync();
   });
 
   const endDrag = (e) => {
@@ -400,7 +408,7 @@ export function createWindowLevel({ viewer, onChange }) {
     const f = Math.exp(e.deltaY * 0.0012);
     const c = (lo + hi) / 2;
     viewer.setWindow(c, Math.max((hist.max - hist.min) * 1e-4, (hi - lo) * f));
-    sync();
+    scheduleSync();
   }, { passive: false });
 
   const ro = new ResizeObserver(() => draw());

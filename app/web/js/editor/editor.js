@@ -181,7 +181,6 @@ export function createEditor(opts = {}) {
     });
     fill(gutter, gfrag);
 
-    measure();
     syncScroll();
     posEl.textContent = `ln ${cur}, col ${caretCol()}  ·  ${lines.length} ln`;
   }
@@ -471,6 +470,15 @@ export function createEditor(opts = {}) {
   // First paint has to wait for layout so the ruler can be measured.
   requestAnimationFrame(() => { measure(); paint(); });
   paint();
+
+  // charW/lineH are font metrics, not content: they cannot change between
+  // keystrokes, only when the editor is actually resized (a window resize, a
+  // splitter/pane drag, or the workspace sheet going from hidden to visible,
+  // which ResizeObserver reports as a 0->nonzero box change same as a real
+  // resize). measure() used to run inside paint() — a getBoundingClientRect()
+  // pair forced on every single keystroke for a number that was, in the
+  // overwhelming common case, identical to the one already held.
+  if (typeof ResizeObserver === 'function') new ResizeObserver(measure).observe(el);
 
   return {
     el,

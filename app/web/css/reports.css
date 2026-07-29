@@ -15,8 +15,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  gap: var(--pad-2);
-  padding: var(--pad-2) var(--pad-3);
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
   overflow: auto;
 }
 
@@ -25,7 +25,7 @@
   line-height: 1.4;
   color: var(--fg-2);
   border-left: 2px solid var(--accent-dim);
-  padding: var(--sp-2) 0 var(--sp-2) var(--pad-2);
+  padding: var(--sp-2) 0 var(--sp-2) var(--sp-4);
 }
 .rp .rp-lead b { color: var(--fg-0); }
 
@@ -33,10 +33,10 @@
 .rp .rp-drugs {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sp-1) var(--pad-2);
+  gap: var(--sp-1) var(--sp-4);
   border: 1px solid var(--line-1);
   background: var(--bg-2);
-  padding: var(--pad-2);
+  padding: var(--sp-4);
   max-height: 78px;
   overflow-y: auto;
 }
@@ -74,7 +74,7 @@
   color: var(--fg-1);
 }
 #rp-dlg[open] { display: flex; flex-direction: column; }
-#rp-dlg .panel-head { gap: var(--pad-2); }
+#rp-dlg .panel-head { gap: var(--sp-4); }
 
 #rp-dlg .rp-note {
   flex: 0 0 auto;

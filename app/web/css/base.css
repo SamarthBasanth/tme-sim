@@ -67,7 +67,7 @@ button, input, select, textarea {
 hr.rule {
   border: 0;
   border-top: 1px solid var(--line-1);
-  margin: var(--pad-2) 0;
+  margin: var(--sp-4) 0;
 }
 
 /* --- focus ---------------------------------------------------------------
@@ -144,6 +144,6 @@ hr.rule {
 .skip {
   position: absolute; left: -9999px; top: 0; z-index: 200;
   background: var(--accent); color: var(--accent-fg);
-  padding: var(--pad-2) var(--pad-3); font-size: var(--fs-sm);
+  padding: var(--sp-4) var(--sp-5); font-size: var(--fs-sm);
 }
 .skip:focus { left: var(--sp-3); top: var(--sp-3); }

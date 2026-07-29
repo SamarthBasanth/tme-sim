@@ -69,8 +69,11 @@
      ONE scale. Before this existed, gaps and paddings of 3, 4, 5, 6, 7, 8, 9,
      10 and 13 px were used interchangeably across eight stylesheets, which is
      not a scale, it is eight people guessing. Anything off these steps is a
-     bug. --pad-* are the historical names, kept as aliases so the diff stays
-     reviewable; new work uses --sp-*. */
+     bug. The consolidation pass kept --pad-1..4 as aliases to these four
+     steps so the diff stayed reviewable; every call site has since been
+     migrated onto --sp-* directly (a mechanical rename, checked against the
+     alias's own numeric comments so no value moved) and the aliases are gone
+     — one name per step, not two. */
   --sp-1: 2px;
   --sp-2: 3px;
   --sp-3: 4px;
@@ -79,11 +82,6 @@
   --sp-6: 10px;
   --sp-7: 13px;
   --sp-8: 18px;
-
-  --pad-1: var(--sp-2);   /* 3  */
-  --pad-2: var(--sp-4);   /* 6  */
-  --pad-3: var(--sp-5);   /* 8  — was 9, normalised onto the scale */
-  --pad-4: var(--sp-7);   /* 13 */
 
   /* --- height ------------------------------------------------------------
      The audit that produced docs/UI_ARCHITECTURE.md found EIGHT distinct

@@ -302,7 +302,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     // arrive in RunResult.provenance.caveats — that list is per-run and may
     // legitimately be empty. They are rendered unconditionally, below the run's
     // own caveats, so there is no run whose panel omits them.
-    caveatsEl.appendChild(h('div.hr-lbl', { style: { margin: '6px 0 1px', padding: '0 var(--pad-3)' } },
+    caveatsEl.appendChild(h('div.hr-lbl', { style: { margin: '6px 0 1px', padding: '0 var(--sp-5)' } },
       'standing limits · independent of this run'));
     for (const s of STANDING_LIMITS) {
       caveatsEl.appendChild(h('div.caveat.standing', h('span', s)));
@@ -374,7 +374,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
 
   /* ------------------------------------------------------------ root -- */
 
-  const na = (what) => h('div.dim', { style: { padding: 'var(--pad-2) var(--pad-3)' } },
+  const na = (what) => h('div.dim', { style: { padding: 'var(--sp-4) var(--sp-5)' } },
     `${what} is unavailable without WebGL2.`);
 
   const railBody = h('div.rail-body',

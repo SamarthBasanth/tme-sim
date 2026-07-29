@@ -15,7 +15,7 @@
 //              is not homogeneous; a region says what it is an average OF.
 //   distance — because a length on screen means nothing without um.
 
-import { h, clear, fill } from '../util/dom.js';
+import { h, clear, fill, raf } from '../util/dom.js';
 import { auto, num, int, pct, um, NULL_GLYPH, clamp } from '../util/fmt.js';
 import { CELL_TYPES } from '../gl/viewer.js';
 import { sampleLine, rectFieldStats, rectCellStats, buildHistogram } from '../analysis.js';
@@ -326,16 +326,17 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     pctx.fillText(`${auto(hi)}${fn ? ' ' + fieldMeta(fn).unit : ''}`, padL + 1, 1);
   }
 
+  const scheduleProfileRepaint = raf(() => { paintPlot(); drawAnnot(); });
+
   plot.addEventListener('pointermove', (e) => {
     if (!profileData) return;
     const r = plot.getBoundingClientRect();
     profileMark = clamp((e.clientX - r.left - 4) / Math.max(1, r.width - 8), 0, 1);
-    paintPlot();
-    drawAnnot();
+    scheduleProfileRepaint();
   });
   plot.addEventListener('pointerleave', () => {
     if (profileMark === null) return;
-    profileMark = null; paintPlot(); drawAnnot();
+    profileMark = null; scheduleProfileRepaint();
   });
 
   /* ===================================================== distance panel = */
@@ -509,10 +510,17 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     return true;
   }
 
+  // rAF-coalesced: a raw drag can deliver more pointermove events than the
+  // display presents frames, and each paint redoes a canvas clear plus three
+  // getComputedStyle reads (accent/focus/bg). The state (pending.x1/y1) is
+  // still updated synchronously, so the drag never reads as laggy — only the
+  // paint itself is deduped to at most once per frame.
+  const scheduleAnnotDraw = raf(drawAnnot);
+
   function pointerMove(world) {
     if (!pending) return false;
     pending.x1 = world.x; pending.y1 = world.y;
-    drawAnnot();
+    scheduleAnnotDraw();
     return true;
   }
 

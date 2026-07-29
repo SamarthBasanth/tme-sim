@@ -30,21 +30,21 @@
 .proj-rail {
   overflow: auto;
   min-height: 0;
-  padding: 0 var(--pad-2) var(--pad-3);
+  padding: 0 var(--sp-4) var(--sp-5);
   background: var(--bg-1);
 }
 .proj-main {
   overflow: auto;
   min-height: 0;
-  padding: var(--pad-2) var(--pad-3) var(--pad-4);
+  padding: var(--sp-4) var(--sp-5) var(--sp-7);
 }
 
 /* --- rail rows ----------------------------------------------------------- */
 .proj-new {
   display: flex;
-  gap: var(--pad-1);
+  gap: var(--sp-2);
   align-items: center;
-  margin-bottom: var(--pad-2);
+  margin-bottom: var(--sp-4);
 }
 .proj-new > .inp { flex: 1 1 auto; min-width: 0; }
 /* `.sm` exists for .btn but not for .inp; scoped here so a dense rail control
@@ -56,7 +56,7 @@
   border: 1px solid var(--line-1);
   border-left-width: 2px;
   background: var(--bg-2);
-  padding: var(--sp-3) var(--pad-2);
+  padding: var(--sp-3) var(--sp-4);
   margin-bottom: var(--sp-2);
   cursor: pointer;
 }
@@ -68,7 +68,7 @@
 .proj-item-top {
   display: flex;
   align-items: center;
-  gap: var(--pad-1);
+  gap: var(--sp-2);
   font-size: var(--fs-sm);
   min-width: 0;
 }
@@ -103,13 +103,13 @@
 .verdict {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--pad-3);
+  gap: var(--sp-5);
   align-items: start;
   border: 1px solid var(--line-2);
   border-left-width: var(--sp-2);
   background: var(--bg-2);
-  padding: var(--pad-2) var(--pad-3);
-  margin-bottom: var(--pad-2);
+  padding: var(--sp-4) var(--sp-5);
+  margin-bottom: var(--sp-4);
 }
 .verdict-tag {
   font-family: var(--font-mono);
@@ -144,7 +144,7 @@
 .proj-main tr.blocked td.num { color: var(--fg-2); }
 
 .proj-main .rank { color: var(--fg-0); letter-spacing: 0.01em; }
-.proj-main .tblwrap { margin-bottom: var(--pad-1); }
+.proj-main .tblwrap { margin-bottom: var(--sp-2); }
 .proj-main .caveat { border-bottom-color: var(--line-1); }
 .proj-main .hint {
   font-size: var(--fs-micro);

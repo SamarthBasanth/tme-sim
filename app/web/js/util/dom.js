@@ -76,3 +76,24 @@ export function raf(fn) {
     pending = requestAnimationFrame(() => { pending = 0; fn(...a); });
   };
 }
+
+/**
+ * Mark a horizontally-scrollable strip with `.can-scroll-l` / `.can-scroll-r`
+ * when it actually has hidden content on that side, so a themed edge shadow
+ * can say "there is more here" — the strip's own `scrollbar-width: none`
+ * makes the native scrollbar no evidence at all. Written for `.stage-toolbar`,
+ * which overflows on a narrow viewport (a 1280px laptop, not just a wide
+ * monitor) once every tool, the colour-by segment and the pin-clear button no
+ * longer fit; without this the tail of the toolbar reads as simply gone
+ * rather than one wheel-scroll away.
+ */
+export function wireEdgeShadow(el) {
+  const sync = () => {
+    const max = el.scrollWidth - el.clientWidth;
+    cls(el, 'can-scroll-l', el.scrollLeft > 1);
+    cls(el, 'can-scroll-r', el.scrollLeft < max - 1);
+  };
+  el.addEventListener('scroll', raf(sync), { passive: true });
+  if (typeof ResizeObserver === 'function') new ResizeObserver(raf(sync)).observe(el);
+  sync();
+}

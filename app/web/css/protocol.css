@@ -48,8 +48,8 @@
   display: flex;
   align-items: center;
   height: var(--h-head);
-  gap: var(--pad-2);
-  padding: 0 var(--pad-2) 0 var(--pad-3);
+  gap: var(--sp-4);
+  padding: 0 var(--sp-4) 0 var(--sp-5);
   background: var(--bg-2);
   border-bottom: 1px solid var(--line-2);
   white-space: nowrap;
@@ -91,8 +91,8 @@
 .pws-split:hover::after, .pws-split.dragging::after { background: var(--accent-dim); }
 
 .pws-stub {
-  display: flex; align-items: flex-start; gap: var(--pad-2);
-  padding: var(--sp-3) var(--pad-3);
+  display: flex; align-items: flex-start; gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-5);
   background: var(--warn-bg);
   border-bottom: 1px solid var(--line-1);
   border-left: 2px solid var(--warn);
@@ -114,9 +114,9 @@
 }
 .ce-head {
   flex: 0 0 auto;
-  display: flex; align-items: center; gap: var(--pad-2);
+  display: flex; align-items: center; gap: var(--sp-4);
   height: var(--h-head);
-  padding: 0 var(--pad-2) 0 var(--pad-3);
+  padding: 0 var(--sp-4) 0 var(--sp-5);
   background: var(--bg-2);
   border-bottom: 1px solid var(--line-1);
   font-family: var(--font-mono);
@@ -263,14 +263,14 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-1) var(--pad-3);
-  padding: var(--sp-2) var(--pad-3);
+  gap: var(--sp-1) var(--sp-5);
+  padding: var(--sp-2) var(--sp-5);
   background: var(--bg-2);
   border-top: 1px solid var(--line-1);
   font-size: var(--fs-micro);
   color: var(--fg-2);
 }
-.ce-key { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+.ce-key { display: inline-flex; align-items: baseline; gap: var(--sp-3); white-space: nowrap; }
 .ce-key kbd {
   display: inline-block;
   padding: 0 var(--sp-2);
@@ -291,7 +291,7 @@
   grid-template-columns: 13px 44px minmax(0, 1fr);
   gap: var(--sp-3);
   width: 100%;
-  padding: var(--sp-2) var(--pad-2);
+  padding: var(--sp-2) var(--sp-4);
   text-align: left;
   background: transparent;
   border: 0;
@@ -333,7 +333,7 @@
   cursor: pointer;
 }
 .pdiag .fix:hover { background: color-mix(in srgb, currentColor 16%, transparent); }
-.pdiag-empty { padding: var(--sp-3) var(--pad-3); font-size: var(--fs-xs); color: var(--fg-3); }
+.pdiag-empty { padding: var(--sp-3) var(--sp-5); font-size: var(--fs-xs); color: var(--fg-3); }
 
 /* ====================================================== templates ======= */
 
@@ -341,9 +341,9 @@
 .ptpl-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0 var(--pad-2);
+  gap: 0 var(--sp-4);
   width: 100%;
-  padding: var(--sp-3) var(--pad-2);
+  padding: var(--sp-3) var(--sp-4);
   text-align: left;
   background: transparent;
   border: 0;
@@ -373,7 +373,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--sp-2);
-  padding: var(--pad-3);
+  padding: var(--sp-5);
   border: 1px dashed var(--line-2);
   border-radius: var(--radius);
   background: var(--bg-2);
@@ -422,7 +422,7 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: var(--sp-3) var(--pad-2);
+  padding: var(--sp-3) var(--sp-4);
   background: var(--bg-2);
 }
 .pplan-num .k {
@@ -445,7 +445,7 @@
   border: 1px solid var(--crit);
   border-left-width: 2px;
   background: var(--crit-bg);
-  padding: var(--pad-2) var(--pad-3);
+  padding: var(--sp-4) var(--sp-5);
   font-size: var(--fs-xs);
   line-height: 1.45;
   color: var(--fg-1);
@@ -466,8 +466,8 @@
 }
 
 .pconfirm {
-  display: flex; align-items: center; gap: var(--pad-2); flex-wrap: wrap;
-  padding: var(--pad-2) var(--pad-3);
+  display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap;
+  padding: var(--sp-4) var(--sp-5);
   background: var(--bg-2);
   border-top: 1px solid var(--line-2);
 }
@@ -551,8 +551,8 @@
 }
 
 .plegend {
-  display: flex; align-items: center; gap: var(--pad-2); flex-wrap: wrap;
-  padding: var(--sp-3) var(--pad-3);
+  display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap;
+  padding: var(--sp-3) var(--sp-5);
   font-size: var(--fs-micro);
   color: var(--fg-2);
 }
@@ -596,16 +596,16 @@
 /* --- selected run detail ------------------------------------------------ */
 .pdetail { border-top: 1px solid var(--line-2); background: var(--bg-2); }
 .pdetail .hd {
-  display: flex; align-items: center; gap: var(--pad-2);
-  padding: var(--sp-2) var(--pad-3);
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-5);
   border-bottom: 1px solid var(--line-1);
   font-size: var(--fs-xs);
 }
-.pdetail .bd { padding: var(--pad-2) var(--pad-3); }
+.pdetail .bd { padding: var(--sp-4) var(--sp-5); }
 
 .passump {
   margin: 0;
-  padding: var(--sp-3) var(--pad-3) var(--sp-3) calc(var(--pad-3) + var(--sp-6));
+  padding: var(--sp-3) var(--sp-5) var(--sp-3) calc(var(--sp-5) + var(--sp-6));
   font-size: var(--fs-micro);
   line-height: 1.45;
   color: var(--fg-2);

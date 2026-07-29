@@ -180,7 +180,7 @@ export function createSpecPanel({ store, onSubmit }) {
   // fact that a JSON object passed a schema check.
   const okBadge = h('span.chip.st-queued', 'unvalidated');
 
-  const submitRow = h('div.frow', { style: { padding: 'var(--pad-2) var(--pad-3)' } },
+  const submitRow = h('div.frow', { style: { padding: 'var(--sp-4) var(--sp-5)' } },
     submitBtn, validateBtn, h('span.grow'), okBadge);
 
   /* ------------------------------------------------------- job monitor -- */

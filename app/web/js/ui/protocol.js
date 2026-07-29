@@ -435,7 +435,7 @@ export function createProtocolWorkspace() {
           h('tbody', rows, notes))),
       (res.warnings || []).map((w) => h('div.caveat', h('span', w.message || String(w)))),
       (res.caveats || []).map((c) => h('div.caveat.info', h('span', c))),
-      h('div.btn-row', { style: { marginTop: 'var(--pad-2)' } },
+      h('div.btn-row', { style: { marginTop: 'var(--sp-4)' } },
         h('button.btn.sm', { onclick: () => insertDrugBlock(res), title: 'Write a `drug` block for this file into the editor' },
           'insert drug block')),
     );

@@ -21,14 +21,45 @@ import { MECH, MECH_META, LIMITER_LABEL, dominantReason } from '../mechanism.js'
 
 /* ====================================================== legend ========= */
 
+// docs/UI_ARCHITECTURE.md 2.3 records the legend's 300px width as a deliberate
+// cost, permanent for as long as the run carries attribution, and names the
+// one fix that does not compromise that reasoning: "a collapse control on the
+// card, not a mode coupling". This is that control. It defaults to expanded
+// (the finding stays visible with no action required, exactly as decided),
+// persists the operator's choice, and even collapsed keeps the headline
+// number in the title row — collapsing hides the row-by-row breakdown, not
+// the finding itself.
+const COLLAPSE_KEY = 'tmesim.mechleg.collapsed';
+
 export function createMechanismLegend(viewer, { onToggle } = {}) {
   const title = h('div.m-title');
+  const headline = h('span.m-headline');
   const rows = h('div.m-rows');
   const bar = h('div.m-bar');
   const note = h('div.m-note');
+  const body = h('div.m-body', rows, bar, note);
+
+  let collapsed = false;
+  try { collapsed = localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { /* private mode */ }
+
+  const collapseBtn = h('button.m-collapse', {
+    type: 'button',
+    'aria-label': 'Collapse the mechanism breakdown',
+    'aria-expanded': String(!collapsed),
+    title: 'Collapse the row breakdown to reclaim stage width. The headline stays visible either way.',
+    onclick: () => {
+      collapsed = !collapsed;
+      try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch { /* private mode */ }
+      card.classList.toggle('collapsed', collapsed);
+      collapseBtn.setAttribute('aria-expanded', String(!collapsed));
+      collapseBtn.textContent = collapsed ? '▸' : '▾';
+    },
+  }, collapsed ? '▸' : '▾');
+
   const card = h('div.ov.ov-mech.ov-card.mechleg.hidden.interactive',
     { role: 'figure', 'aria-label': 'Mechanism attribution legend' },
-    title, rows, bar, note);
+    title, body);
+  card.classList.toggle('collapsed', collapsed);
 
   let agg = null;
 
@@ -40,11 +71,15 @@ export function createMechanismLegend(viewer, { onToggle } = {}) {
     const nTumor = agg.n_tumor || 0;
     const killed = counts.KILLED || 0;
 
+    headline.textContent = `${pct(killed / (nTumor || 1), 1)}% killed`;
+
     fill(title,
       h('span', 'mechanism'),
+      headline,
       h('span.grow'),
       h('span.mono', { style: { color: 'var(--fg-2)' } },
-        `${int(nTumor)} tumour cells`));
+        `${int(nTumor)} tumour cells`),
+      collapseBtn);
 
     /* --- one row per category ---------------------------------------- */
     const order = [
@@ -158,8 +193,14 @@ export function createMechanismLegend(viewer, { onToggle } = {}) {
 const PLAY_FPS = 8;
 
 export function createTimelapseScrubber({ onFrame }) {
-  const btnPlay = h('button.btn.ghost.sm.s-btn', { title: 'Play / pause (space)' }, '▶');
-  const btnStop = h('button.btn.ghost.sm.s-btn', { title: 'Back to first frame' }, '⏮');
+  // Glyph-only buttons: the character itself is not a usable accessible name
+  // (a screen reader announces the Unicode character, e.g. "black right-
+  // pointing triangle", not "play"), and `title` alone is not dependably
+  // exposed as one either. aria-label carries the real name and tracks the
+  // action the button performs, per docs/UI_ARCHITECTURE.md section 5 ("a
+  // toggle states the state it produces").
+  const btnPlay = h('button.btn.ghost.sm.s-btn', { title: 'Play / pause (space)', 'aria-label': 'Play' }, '▶');
+  const btnStop = h('button.btn.ghost.sm.s-btn', { title: 'Back to first frame', 'aria-label': 'Back to first frame' }, '⏮');
   const range = h('input', {
     type: 'range', min: '0', max: '0', step: '1', value: '0',
     'aria-label': 'Time-lapse frame',
@@ -195,6 +236,7 @@ export function createTimelapseScrubber({ onFrame }) {
     if (!series || timer) return;
     if (i >= series.n_frames - 1) i = 0;
     btnPlay.textContent = '❚❚';
+    btnPlay.setAttribute('aria-label', 'Pause');
     timer = setInterval(() => {
       if (i >= series.n_frames - 1) { pause(); return; }
       go(i + 1);
@@ -205,6 +247,7 @@ export function createTimelapseScrubber({ onFrame }) {
     if (timer) clearInterval(timer);
     timer = 0;
     btnPlay.textContent = '▶';
+    btnPlay.setAttribute('aria-label', 'Play');
   }
 
   btnPlay.addEventListener('click', () => (timer ? pause() : play()));

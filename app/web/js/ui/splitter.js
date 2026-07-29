@@ -3,7 +3,7 @@
 // keyboard user cannot read.
 
 export function makeSplitter(el, {
-  axis = 'x', varName, min = 160, max = 720, invert = false, onChange,
+  axis = 'x', varName, min = 160, max = 720, invert = false, onChange, ariaLabel,
 }) {
   const root = document.documentElement;
   const read = () => parseFloat(getComputedStyle(root).getPropertyValue(varName)) || min;
@@ -19,6 +19,10 @@ export function makeSplitter(el, {
   el.setAttribute('aria-orientation', axis === 'x' ? 'vertical' : 'horizontal');
   el.setAttribute('aria-valuemin', String(min));
   el.setAttribute('aria-valuemax', String(max));
+  // role="separator" carries no accessible name on its own — without one a
+  // screen reader announces "separator, 214" and nothing about what it
+  // resizes or that arrow keys act on it at all.
+  if (ariaLabel) el.setAttribute('aria-label', ariaLabel);
 
   const sync = () => el.setAttribute('aria-valuenow', String(Math.round(read())));
   sync();

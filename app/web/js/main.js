@@ -1,6 +1,6 @@
 // main.js — boot and wiring.
 
-import { h, $, raf } from './util/dom.js';
+import { h, $, raf, wireEdgeShadow } from './util/dom.js';
 import { createStore, INITIAL } from './state.js';
 import * as api from './api.js';
 import { Viewer, CELL_TYPES, COLOR_MODE } from './gl/viewer.js';
@@ -163,9 +163,18 @@ async function boot() {
   inspect.onFieldSelect = selectField;
 
   /* --- splitters ------------------------------------------------------ */
-  makeSplitter($('#split-l'), { axis: 'x', varName: '--rail-l', min: 240, max: 560, onChange: onLayout });
-  makeSplitter($('#split-r'), { axis: 'x', varName: '--rail-r', min: 250, max: 560, invert: true, onChange: onLayout });
-  makeSplitter($('#split-h'), { axis: 'y', varName: '--dock-h', min: 90, max: 560, invert: true, onChange: onLayout });
+  makeSplitter($('#split-l'), {
+    axis: 'x', varName: '--rail-l', min: 240, max: 560, onChange: onLayout,
+    ariaLabel: 'Resize the setup rail. Arrow keys resize, Shift+Arrow resizes further, Home/End snap to the limits.',
+  });
+  makeSplitter($('#split-r'), {
+    axis: 'x', varName: '--rail-r', min: 250, max: 560, invert: true, onChange: onLayout,
+    ariaLabel: 'Resize the read rail. Arrow keys resize, Shift+Arrow resizes further, Home/End snap to the limits.',
+  });
+  makeSplitter($('#split-h'), {
+    axis: 'y', varName: '--dock-h', min: 90, max: 560, invert: true, onChange: onLayout,
+    ariaLabel: 'Resize the run history dock. Arrow keys resize, Shift+Arrow resizes further, Home/End snap to the limits.',
+  });
 
   /* --- chrome --------------------------------------------------------- */
   $('#btn-theme').addEventListener('click', applyThemeChange);
@@ -184,6 +193,10 @@ async function boot() {
   for (const b of $('#tb-colour').children) {
     b.addEventListener('click', () => setColourMode(Number(b.dataset.mode)));
   }
+  // Below ~1150px the toolbar no longer fits its own tools + colour-by +
+  // pin-clear and falls back to its own horizontal scroll (layout.css); mark
+  // the edges so that is visible instead of reading as controls that vanished.
+  wireEdgeShadow($('.stage-toolbar'));
 
   if (viewer) { wireCanvas(canvas); setTool('pick'); }
   syncColourControl();
@@ -445,18 +458,43 @@ function wireCanvas(canvas) {
   let moved = 0, lastX = 0, lastY = 0, pid = null;
   let base = null;                // window at gesture start
 
+  // The canvas fills the fixed centre stage — it is never inside a scrolling
+  // container (html/body are overflow:hidden by contract) — so its rect only
+  // changes on resize, not on every pointer event. pointermove alone can fire
+  // past 100/s while panning; reading layout that often for a rect that is
+  // almost always unchanged was measurable, avoidable work. Cache it and
+  // refresh only when the element itself actually resizes.
+  let rect = canvas.getBoundingClientRect();
+  new ResizeObserver(() => { rect = canvas.getBoundingClientRect(); }).observe(canvas);
+
+  // Same reasoning for the status-bar read-outs this handler paints into on
+  // every hover: three querySelector calls per mousemove, for elements that
+  // never change identity, is three DOM walks the hot path does not need.
+  const tbCursor = $('#tb-cursor');
+  const tbValue = $('#tb-value');
+  const tbValueUnit = $('#tb-value-unit');
+
+  function paintCursorValue(world) {
+    if (!tbValue) return;
+    const name = store.get().fieldName;
+    if (!name || !viewer.field) { tbValue.textContent = NULL_GLYPH; if (tbValueUnit) tbValueUnit.textContent = ''; return; }
+    const v = viewer.sampleField(world.x, world.y);
+    tbValue.textContent = v === null || !Number.isFinite(v) ? NULL_GLYPH : auto(v);
+    if (tbValueUnit) tbValueUnit.textContent = fieldMeta(name).unit;
+  }
+
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const r = canvas.getBoundingClientRect();
+    const r = rect;
     const f = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.02 : 0.0018));
     viewer.zoomAt(e.clientX - r.left, e.clientY - r.top, Math.max(0.3, Math.min(3, f)));
     tickOverlays();
   }, { passive: false });
 
   canvas.addEventListener('pointerdown', (e) => {
-    const r = canvas.getBoundingClientRect();
+    const r = rect;
     const px = e.clientX - r.left, py = e.clientY - r.top;
     canvas.focus();
     moved = 0; lastX = e.clientX; lastY = e.clientY;
@@ -494,7 +532,7 @@ function wireCanvas(canvas) {
   });
 
   canvas.addEventListener('pointermove', (e) => {
-    const r = canvas.getBoundingClientRect();
+    const r = rect;
     const px = e.clientX - r.left, py = e.clientY - r.top;
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
 
@@ -515,8 +553,7 @@ function wireCanvas(canvas) {
     }
 
     const w = viewer.screenToWorld(px, py);
-    const cur = $('#tb-cursor');
-    if (cur) cur.textContent = `${num(w.x, 1)}, ${num(w.y, 1)}`;
+    if (tbCursor) tbCursor.textContent = `${num(w.x, 1)}, ${num(w.y, 1)}`;
     paintCursorValue(w);
     const idx = viewer.pick(px, py);
     if (idx !== viewer.hovered) {
@@ -528,7 +565,7 @@ function wireCanvas(canvas) {
 
   const endGesture = (e) => {
     if (!mode) return;
-    const r = canvas.getBoundingClientRect();
+    const r = rect;
     const was = mode;
     mode = null;
     canvas.classList.remove('panning', 'windowing');
@@ -559,21 +596,8 @@ function wireCanvas(canvas) {
     const info = p !== null ? viewer.cellInfo(p) : null;
     overlays.updateReadout(info, store.get().fieldName, p !== null);
     if (wl) wl.setBrush(info ? info.fieldValue : null);
-    const v = $('#tb-value'); if (v) v.textContent = NULL_GLYPH;
+    if (tbValue) tbValue.textContent = NULL_GLYPH;
   });
-}
-
-/** Field value under the pointer — the imaging read-out, independent of
- *  whether a cell happens to be there. */
-function paintCursorValue(world) {
-  const el = $('#tb-value');
-  const unit = $('#tb-value-unit');
-  if (!el) return;
-  const name = store.get().fieldName;
-  if (!name || !viewer.field) { el.textContent = NULL_GLYPH; unit.textContent = ''; return; }
-  const v = viewer.sampleField(world.x, world.y);
-  el.textContent = v === null || !Number.isFinite(v) ? NULL_GLYPH : auto(v);
-  unit.textContent = fieldMeta(name).unit;
 }
 
 function wireKeys() {

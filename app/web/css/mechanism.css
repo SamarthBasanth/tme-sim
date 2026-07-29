@@ -46,6 +46,36 @@
   margin-bottom: var(--sp-2);
 }
 .mechleg .m-title .grow { flex: 1; }
+.mechleg .m-headline {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--fg-0);
+}
+
+/* Collapse control (docs/UI_ARCHITECTURE.md 2.3): the row breakdown hides,
+   the headline kill number and the card itself do not — collapsing reclaims
+   stage width without pretending the run has no attribution. */
+.mechleg .m-collapse {
+  appearance: none;
+  pointer-events: auto;
+  background: transparent;
+  border: 1px solid var(--line-1);
+  color: var(--fg-2);
+  width: 16px; height: 16px;
+  line-height: 14px;
+  padding: 0;
+  font-size: var(--fs-micro);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.mechleg .m-collapse:hover { background: var(--bg-3); color: var(--fg-0); }
+
+.mechleg.collapsed { min-width: 0; width: max-content; }
+.mechleg.collapsed .m-title { margin-bottom: 0; }
+.mechleg.collapsed .m-body { display: none; }
+.ov-mech.collapsed { max-width: none; }
 
 .mechleg .m-rows { display: grid; gap: 0; }
 .mechleg .m-row {
