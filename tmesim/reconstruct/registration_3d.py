@@ -522,6 +522,7 @@ def register_serial_sections(
     xy_ref: np.ndarray,
     xy_mov: np.ndarray,
     z_spacing_um: float,
+    z_spacing_caveat: str = Z_SPACING_CAVEAT,
     ref_sample_id: str = "ref",
     mov_sample_id: str = "mov",
     ref_cell_ids: Optional[np.ndarray] = None,
@@ -555,6 +556,20 @@ def register_serial_sections(
         in micrometres. Pass :data:`Z_SPACING_UM_ASSUMED` explicitly if using
         the module's placeholder value, so the caller cannot receive an
         unlabelled number - see :data:`Z_SPACING_CAVEAT`.
+    z_spacing_caveat : str
+        The prose caveat attached to the returned
+        :class:`SerialSectionRegistration`, defaulting to
+        :data:`Z_SPACING_CAVEAT` (the Janesick et al. 2023 breast Xenium
+        Rep1/Rep2 caveat this module was first built against). A DIFFERENT
+        dataset's z-spacing provenance is NOT the same claim - e.g. the
+        Greenwald et al. 2024 GBM Visium/CODEX pair
+        (``results/gbm_3d_registration.md``) is "near-adjacent sections,
+        exact micron offset not published" for a different reason (a
+        different paper, different platforms) than the breast pair is. This
+        parameter exists so a caller registering a NEW dataset must pass its
+        OWN caveat rather than silently inheriting one written about a
+        different dataset - this is a documentation-string parameter, not a
+        change to the registration algorithm itself.
     allow_scale : bool
         If True (default) the fit is a similarity transform (rotation + one
         uniform scale + translation); if False it is rigid (scale pinned to
@@ -666,7 +681,7 @@ def register_serial_sections(
         mov_sample_id=mov_sample_id,
         transform=transform,
         z_spacing_um=float(z_spacing_um),
-        z_spacing_caveat=Z_SPACING_CAVEAT,
+        z_spacing_caveat=z_spacing_caveat,
         points_xyz=points_xyz,
         section_id=section_id,
         cell_ids=cell_ids,
