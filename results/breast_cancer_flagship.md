@@ -60,7 +60,19 @@ STROMAL silently collapsing to zero is not a cosmetic label issue: `phenotype_ce
 
 ## 2. The breast drug panel — real molecules, real GDSC potency
 
-**Panel:** `[doxorubicin, paclitaxel, cyclophosphamide, tamoxifen]`.
+> **UPDATE (2026-07-29): the panel has since grown from 4 to 10 drugs.** Everything
+> below describes the original 4-drug pass and is left as written — it is still
+> accurate for those 4 — but `tmesim/molecular/breast_library.py` now also carries
+> docetaxel, epirubicin, 5-fluorouracil, vinorelbine, cisplatin (a real-data
+> platinum-class substitute for carboplatin, which is absent from GDSC2 entirely),
+> and palbociclib (a deliberate cytostatic-vs-cytotoxic contrast case, flagged
+> throughout rather than silently scored like the cytotoxics). Trastuzumab and
+> carboplatin were re-evaluated and remain excluded for the same reasons given
+> below. The current, full 10-drug panel and its validation are in
+> [`results/kill_calibration_breast.md`](kill_calibration_breast.md); this section
+> is kept as the original, narrower proof-of-concept narrative.
+
+**Panel (original, 4-drug pass):** `[doxorubicin, paclitaxel, cyclophosphamide, tamoxifen]`.
 
 - **doxorubicin** — reused **verbatim** from the GBM library: `library.get_molecule("doxorubicin")` → `calibrated_drugparams("doxorubicin", alpha)`, the identical function calls the GBM panel makes. Same SMILES, same literature IC50 (0.5 µM — doxorubicin is not screened in GDSC2 at all, for any tissue), same calibrated perivascular-sink physics. This is the cross-cancer sanity-check drug (§4).
 - **paclitaxel, cyclophosphamide, tamoxifen** — new molecules (`tmesim/molecular/breast_library.py`), real RDKit-parsed SMILES verified against literature MW to <0.1 g/mol (paclitaxel 853.92 vs 853.9; cyclophosphamide 261.09 vs 261.09; tamoxifen 371.52 vs 371.51), compiled through `molecular.compile_drug.molecule_to_drugparams` (the identical structure→diffusivity→permeability→binding pipeline every GBM drug goes through) with a **measured IC50** live-downloaded from GDSC2's breast (BRCA) cell-line dose-response screen (`tmesim/data/acquire_breast.py`, 13,106 BRCA rows, verified live 2026-07-28; same source URL and streaming-filter pattern as the existing glioma acquirer, filtered to `TCGA_DESC=="BRCA"` instead of `{GBM, LGG}`), then run through **the same `calibrated_drugparams`** call (passing an already-compiled `DrugParams` through its passthrough branch, so no calibration code is duplicated) and the same `apply_barrier_to_drugparams`.
