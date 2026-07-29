@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Line } from "@react-three/drei";
 import type { Line2, LineSegments2 } from "three-stdlib";
@@ -70,7 +70,23 @@ function buildRing(spec: RingSpec): Array<[number, number, number]> {
  * recedes again toward the final scene), never toggled, exactly as the
  * shell it replaces.
  */
-export default function AnatomyModel({ lowDetail = false }: { lowDetail?: boolean }) {
+interface AnatomyModelProps {
+  lowDetail?: boolean;
+  /**
+   * Rendered INSIDE the same rotating/scaled group as the rings, not as a
+   * sibling in the parent scene. This group rotates forever
+   * (`rotation.y += delta * 0.02` below) and is scaled non-uniformly
+   * ([1.9, 2.3, 1.7]); any annotation meant to sit on a specific ring point
+   * must be a child so Three.js's normal parent-child transform composition
+   * keeps it correct automatically, instead of a hand-computed world
+   * coordinate that is only ever right at the one instant it was computed
+   * for and drifts from then on. See SceneCanvas.tsx for the anchor point
+   * itself (now in this group's LOCAL space).
+   */
+  children?: ReactNode;
+}
+
+export default function AnatomyModel({ lowDetail = false, children }: AnatomyModelProps) {
   const progressRef = useScrollProgressRef();
   const groupRef = useRef<THREE.Group>(null);
   const lineRefs = useRef<Array<Line2 | LineSegments2 | null>>([]);
@@ -112,6 +128,7 @@ export default function AnatomyModel({ lowDetail = false }: { lowDetail?: boolea
           opacity={0}
         />
       ))}
+      {children}
     </group>
   );
 }

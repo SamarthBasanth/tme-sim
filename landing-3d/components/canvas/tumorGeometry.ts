@@ -43,8 +43,9 @@ export interface NecroticPit {
 
 /** Two off-center, differently sized cavities so the result reads as organic, not symmetric. */
 export const DEFAULT_PITS: readonly NecroticPit[] = [
-  { center: new THREE.Vector3(0.55, 0.4, 0.62).normalize(), angularRadius: 0.4, seed: 11.3 },
-  { center: new THREE.Vector3(-0.48, -0.32, 0.36).normalize(), angularRadius: 0.24, seed: 47.1 },
+  { center: new THREE.Vector3(0.55, 0.4, 0.62).normalize(), angularRadius: 0.46, seed: 11.3 },
+  { center: new THREE.Vector3(-0.48, -0.32, 0.36).normalize(), angularRadius: 0.32, seed: 47.1 },
+  { center: new THREE.Vector3(-0.2, 0.62, -0.5).normalize(), angularRadius: 0.26, seed: 83.7 },
 ];
 
 function pitInfluence(dir: THREE.Vector3, pits: readonly NecroticPit[]): number {
@@ -104,9 +105,9 @@ export function sampleTumorMassPointCloud(radius: number, opts: MassCloudOptions
   const {
     count = 9000,
     seed = 5081,
-    lobeAmp = 0.14,
-    fineAmp = 0.03,
-    pitDepth = 0.09,
+    lobeAmp = 0.26,
+    fineAmp = 0.06,
+    pitDepth = 0.17,
     pits = DEFAULT_PITS,
   } = opts;
 
@@ -146,13 +147,13 @@ export function sampleTumorMassPointCloud(radius: number, opts: MassCloudOptions
     positions[written * 3 + 1] = dir.y * r;
     positions[written * 3 + 2] = dir.z * r;
 
-    const necroticAmount = smoothstep(0.55, 0.88, pit) * smoothstep(1, 0.7, t);
+    const necroticAmount = smoothstep(0.4, 0.8, pit) * smoothstep(1, 0.7, t);
     const rimBand = smoothstep(0.08, 0.42, pit) * smoothstep(0.95, 0.42, pit);
     const marginBand = smoothstep(marginThreshold - 0.18, marginThreshold, t);
 
     let category = CATEGORY_CORE;
     const roll = rand();
-    if (necroticAmount > 0.5 && roll < necroticAmount * 0.8) {
+    if (necroticAmount > 0.3 && roll < necroticAmount * 0.95) {
       category = CATEGORY_NECROTIC;
     } else if ((rimBand > 0.35 || marginBand > 0.35) && roll < Math.max(rimBand, marginBand) * 0.9) {
       category = CATEGORY_ENHANCING;

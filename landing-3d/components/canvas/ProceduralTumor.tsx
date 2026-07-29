@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useScrollProgressRef } from "@/components/scroll/ScrollProgressContext";
@@ -18,6 +18,19 @@ interface ProceduralTumorProps {
   lowDetail?: boolean;
   /** Slows/removes scroll-coupled and ambient rotation for prefers-reduced-motion. */
   reducedMotion?: boolean;
+  /**
+   * Rendered INSIDE coreGroup/edemaGroup/marginGroup respectively, not as
+   * siblings up in SceneCanvas. All three groups (and rootGroup, their
+   * shared parent) animate every frame — rootGroup spins forever, the three
+   * sub-groups translate on scroll-driven separation — so any per-region
+   * annotation has to be an actual child of the group it marks a point on;
+   * Three.js's own parent-child transform composition then keeps the
+   * annotation correct automatically instead of a hand-computed world
+   * coordinate that only matches the geometry at one instant.
+   */
+  coreChildren?: ReactNode;
+  edemaChildren?: ReactNode;
+  marginChildren?: ReactNode;
 }
 
 const VESSEL_COLOR = "#6b1f2c";
@@ -44,6 +57,9 @@ const VESSEL_COLOR = "#6b1f2c";
 export default function ProceduralTumor({
   lowDetail = false,
   reducedMotion = false,
+  coreChildren,
+  edemaChildren,
+  marginChildren,
 }: ProceduralTumorProps) {
   const progressRef = useScrollProgressRef();
   const size = useThree((s) => s.size);
@@ -92,9 +108,9 @@ export default function ProceduralTumor({
 
   const massUniforms = useMemo(
     () => ({
-      uColor0: { value: new THREE.Color("#8a3230") }, // core tissue
-      uColor1: { value: new THREE.Color("#3a1c18") }, // necrotic
-      uColor2: { value: new THREE.Color("#e2685c") }, // enhancing rim
+      uColor0: { value: new THREE.Color("#7a2a24") }, // core tissue
+      uColor1: { value: new THREE.Color("#1c0d0a") }, // necrotic — darker, reads as absence not just "darker red"
+      uColor2: { value: new THREE.Color("#f3846a") }, // enhancing rim — hotter, more saturated
       uSize: { value: 0.046 },
       uSizeScale: { value: 1 },
       uOpacity: { value: 1 },
@@ -214,6 +230,7 @@ export default function ProceduralTumor({
             />
           </mesh>
         ))}
+        {coreChildren}
       </group>
 
       {/* Edema — a sparser, differently-coloured point cloud standing in
@@ -237,6 +254,7 @@ export default function ProceduralTumor({
             blending={THREE.AdditiveBlending}
           />
         </points>
+        {edemaChildren}
       </group>
 
       {/* Margin — very sparse, faint point cloud standing in for
@@ -257,6 +275,7 @@ export default function ProceduralTumor({
             depthWrite={false}
           />
         </points>
+        {marginChildren}
       </group>
     </group>
   );
