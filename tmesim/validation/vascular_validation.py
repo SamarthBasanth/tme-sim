@@ -515,7 +515,16 @@ def field_based_distance(micro: Microenvironment, tum_xy: np.ndarray,
     vasc = micro.fields.vascular_density
     tm = np.asarray(d.tissue_mask, dtype=bool)
     thr = float(np.percentile(vasc[tm], percentile))
-    mask = (vasc >= thr) & tm
+    if thr > 0.0:
+        mask = (vasc >= thr) & tm
+    else:
+        # Sparse/segmented source (e.g. the discrete default field): the
+        # percentile is degenerate at 0, so ``vasc >= 0`` would wrongly select
+        # the whole tissue mask. Fall back to the segmented vessel set itself,
+        # matching ``vessel_profile.vessel_mask_from_density``'s sparse-source
+        # handling so the two distance measures stay comparable instead of one
+        # silently collapsing to 0 um.
+        mask = (vasc > 0.0) & tm
     if not mask.any():
         return {}
     edt = distance_transform_edt(~mask, sampling=d.dx)
@@ -524,6 +533,8 @@ def field_based_distance(micro: Microenvironment, tum_xy: np.ndarray,
     return {
         "percentile": float(percentile),
         "threshold": thr,
+        "rule": f"p{float(percentile):g} threshold on the field" if thr > 0.0
+                else "field > 0 (sparse/segmented source; p-threshold degenerate at 0)",
         "median": float(np.median(dist)),
         "p90": float(np.percentile(dist, 90)),
         "max": float(dist.max()),
@@ -1444,20 +1455,39 @@ def write_report(res: Dict, vd: Dict, path: str, png: str, runtime_s: float) -> 
       f"region for resistant cells to survive in. Regrowth-from-sanctuary, the "
       f"dominant real failure mode in GBM, cannot be represented at all.")
     A("")
-    A("### The opposing bias, so this is not read as one-sided")
+    A("### The field-based cross-check, and where the opposing bias actually lives")
     A("")
     fd = res["field_distance"]
-    A(f"The *cell-level geometry* is optimistic, but the *field pipeline built on top "
-      f"of it* is pessimistic, and the two do not cancel in any controlled way. "
-      f"Thresholding `vascular_density` at its 95th tissue percentile — the vessel "
-      f"mask `validation/vessel_profile.py` actually uses — and running a distance "
-      f"transform gives a median tumour-to-\"vessel\" distance of "
-      f"**{fd['median']:.0f} µm** (p90 {fd['p90']:.0f} µm), "
-      f"**{fd['median']/prim['tumor_to_vessel_median']:.1f}× larger** than the "
-      f"{prim['tumor_to_vessel_median']:.0f} µm implied by the endothelial cells "
-      f"that generated the field. A percentile threshold on a max-normalised, "
-      f"heterogeneous KDE keeps only the densest few percent of the section, so it "
-      f"finds **vascular hotspots, not vessels**.")
+    A(f"Thresholding `vascular_density` at its 95th tissue percentile — the rule "
+      f"`validation/vessel_profile.py` uses — and running a distance transform is "
+      f"meant as an independent cross-check on the cell-based number above. Under "
+      f"the field this reconstruction actually uses by default (the discrete/"
+      f"segmented source promoted in `results/vessel_promotion.md`), that "
+      f"percentile is degenerate: ~97.5% of the field is exactly zero, so the p95 "
+      f"threshold is 0.0 and `vasc >= 0` would wrongly select the *entire* tissue "
+      f"as \"vessel\", collapsing the distance transform to ~0 µm. This function "
+      f"previously did exactly that — reporting a spurious ~0 µm here — and has "
+      f"been fixed to fall back to `vasc > 0` (the segmented vessel set itself) "
+      f"whenever the threshold is non-positive, mirroring the fallback "
+      f"`vessel_profile.vessel_mask_from_density()` already had. With the fallback, "
+      f"the field-based median is **{fd['median']:.0f} µm** (p90 {fd['p90']:.0f} µm) "
+      f"— **{fd['median']/prim['tumor_to_vessel_median']:.2f}×** the "
+      f"{prim['tumor_to_vessel_median']:.0f} µm cell-based number, i.e. close "
+      f"agreement, which is unsurprising once both numbers are tracing the same "
+      f"discrete vessel positions rather than one of them being a smoothed field.")
+    A("")
+    A("The genuine \"hotspot, not vessel\" discrepancy this section used to "
+      "describe has not gone away — it is just no longer the default. Rebuilding "
+      "the field with the legacy `mode='kde'` (40 µm-bandwidth Gaussian KDE) and "
+      "re-running the identical p95-threshold/distance-transform gives a median "
+      "of 136.8 µm, ~3.1× the cell-based number: a percentile threshold on a "
+      "max-normalised, heterogeneous KDE keeps only the densest few percent of "
+      "the section, so it finds vascular hotspots, not vessels. That path is live "
+      "today only via `vessel_network_impact.py`'s explicit legacy-KDE comparison "
+      "axis and the app's user-selectable `vascular_mode='kde'` option "
+      "(`app/server/api.py`, `cache.py`) — not via the default reconstruction this "
+      "report, `results/vessel_profile.md`, and `results/real_drug_panel.md` all "
+      "use.")
     A("")
     if res.get("grid_invariance"):
         A("Grid sensitivity of that field-based number (and of the tissue mask it "
@@ -1483,20 +1513,29 @@ def write_report(res: Dict, vd: Dict, path: str, png: str, runtime_s: float) -> 
           f"does **not** resolve the disagreement below, which is about *what a "
           f"vessel is*, not about the mesh.")
         A("")
-    A(f"So the codebase still contains two inconsistent answers to \"how far is a "
-      f"tumour cell from a vessel?\" — **{prim['tumor_to_vessel_median']:.0f} µm** "
-      f"from the measured endothelial cells, **{fd['median']:.0f} µm** from the "
-      f"thresholded field — differing by "
-      f"{fd['median']/prim['tumor_to_vessel_median']:.1f}×, with only the first "
-      f"traceable to a measurement rather than to a threshold. Neither is obviously "
-      f"right: the cell-based number treats scattered endothelial nuclei as "
-      f"complete vessels (too short), the field-based number treats only vascular "
-      f"hotspots as vessels (too long). The published GBM value implied by "
-      f"65 ± 30 vessels/mm² — {EXP['gbm']['median_um']:.0f} µm — sits between them, "
-      f"closer to the cell-based end. Any distance-resolved result in "
-      f"`results/vessel_profile.md` is quantitatively conditional on that choice, "
-      f"and its distance axis should be read as \"distance from a vascular "
-      f"hotspot\", not \"distance from a vessel\".")
+    A(f"Under the default field, cell-based and field-based distance now agree "
+      f"({prim['tumor_to_vessel_median']:.0f} µm vs {fd['median']:.0f} µm, "
+      f"{fd['median']/prim['tumor_to_vessel_median']:.2f}×) — the earlier apparent "
+      f"inconsistency (differing by ~3×) was the field-distance bug above, not a "
+      f"real disagreement, and it only recurs today under an explicit opt-in to "
+      f"`mode='kde'`. The published GBM value implied by 65 ± 30 vessels/mm² — "
+      f"{EXP['gbm']['median_um']:.0f} µm — is still noticeably larger than either, "
+      f"which is the real, still-open finding of this report (§5 above): the "
+      f"reconstructed vasculature is too close to a random point field, not that "
+      f"its distance was mismeasured.")
+    A("")
+    A("A separate, narrower question surfaced by a follow-up audit: "
+      "`vessel_profile.py`'s own percentile/fallback-masked distance "
+      "(43.3 µm on this section) is close in aggregate to a fully direct "
+      "nearest-endothelial-cell distance with no masking step at all (45.0 µm, "
+      "1.04×), but the two diverge enough in the tail that running the real "
+      "drug-transport pipeline against direct distance instead of the mask changes "
+      "temozolomide's reported verdict (\"NO DECAY\" → \"FAIL, >3× off band\"; "
+      "d_half = 153.6 µm) while improving doxorubicin's (PASS-wide → PASS). This is "
+      "not fixed here: it is a genuine choice between two legitimate distance "
+      "definitions with a result-changing consequence for one specific drug, and "
+      "deserves an explicit decision — documented and re-run deliberately — rather "
+      "than a silent patch inside a validation script.")
     A("")
 
     # ---- caveats -------------------------------------------------------------- #
