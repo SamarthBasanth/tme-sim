@@ -240,6 +240,7 @@ export function createProjectsPanel({ store }) {
           h('span.grow', p.name || NULL_GLYPH),
           h('button.btn.ghost.sm.danger', {
             title: 'Delete this project. Runs are NOT deleted.',
+            'aria-label': `Delete project ${p.id}`,
             onclick: async (e) => {
               e.stopPropagation();
               const out = await guard(`DELETE /api/projects/${p.id}`,
@@ -317,6 +318,7 @@ export function createProjectsPanel({ store }) {
         capChip,
         h('button.btn.ghost.sm.danger', {
           title: 'Remove this specimen. Its runs are NOT deleted.',
+          'aria-label': `Remove specimen ${sp.id}`,
           onclick: async () => {
             const out = await guard('DELETE specimen',
               () => api.deleteSpecimen(project.id, sp.id));
@@ -338,6 +340,7 @@ export function createProjectsPanel({ store }) {
               h('span.mono', rid),
               h('button.btn.ghost.sm', {
                 title: 'Detach. The run itself is untouched.',
+                'aria-label': `Detach run ${rid}`,
                 onclick: async () => {
                   const out = await guard('DELETE run association',
                     () => api.detachRun(project.id, sp.id, rid));

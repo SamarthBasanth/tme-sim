@@ -75,6 +75,24 @@
 
 .rp .rp-err:empty { display: none; }
 
+/* --- the report list --------------------------------------------------- */
+/* `.tblwrap` (components.css) is `overflow: auto; min-height: 0;` — correct
+   for a table that should scroll internally once it has more rows than fit.
+   Inside THIS flex column, though, that `min-height: 0` is also what let the
+   flex algorithm satisfy `.rp-lead` and the (up to 78px) drug picker above it
+   by shrinking `.tblwrap` past its own content height instead of scrolling
+   `.rp-body` for the overflow — the same automatic-minimum-size collapse
+   pass 3 already found and fixed one element up, for `.rp-drugs`
+   (`flex-shrink: 0` there). It was not applied here, and it is worse here:
+   `.rp-drugs` crushed to 46px still showed two rows of checkboxes: `.tblwrap`
+   crushed to ~22px shows ONLY the sticky header, with every report row
+   clipped away entirely and unclickable — confirmed via
+   `elementFromPoint()` on a row's own coordinates resolving to the status
+   bar underneath it, not the row, because the row was never actually
+   painted there. `flex-shrink: 0` makes this column defer to `.rp-body`'s
+   own scroll instead, exactly as it already does for the drug picker. */
+.rp .tblwrap { flex-shrink: 0; }
+
 /* --- the document viewer ---------------------------------------------- */
 /* Surface, border, backdrop and elevation come from the shared `dialog` sheet
    rule in components.css. Only the size and the internal split live here. */

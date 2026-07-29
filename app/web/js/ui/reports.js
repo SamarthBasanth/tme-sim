@@ -31,6 +31,23 @@ const STATUS_CHIP = {
   failed: 'st-failed', cancelled: 'st-cancelled',
 };
 
+/**
+ * `", (N running, M queued)"`, or `''` — the per-arm breakdown the backend's
+ * `progress.by_status` already carries (report.py `ReportManager.progress`)
+ * but that, before this, nothing on screen ever read: the aggregate
+ * `runs_done / runs_total` fraction cannot tell an operator "which arms",
+ * only "how many". Shared by the list row's tooltip and the viewer's
+ * in-progress note so the two don't drift into two different phrasings of
+ * the same number, the way the dock's two `refresh` buttons once did.
+ */
+function armBreakdown(progress) {
+  const by = (progress && progress.by_status) || {};
+  const parts = [];
+  if (by.running) parts.push(`${by.running} running`);
+  if (by.queued) parts.push(`${by.queued} queued`);
+  return parts.length ? ` (${parts.join(', ')})` : '';
+}
+
 export function createReportsPanel({ store, getSection }) {
   let reports = [];
   let selected = null;
@@ -61,7 +78,16 @@ export function createReportsPanel({ store, getSection }) {
   const countEl = h('span.hint');
   function paintHead() {
     const sec = getSection() || NULL_GLYPH;
-    countEl.textContent = `${picked.size} drug${picked.size === 1 ? '' : 's'} · ${sec}`;
+    const label = `${picked.size} drug${picked.size === 1 ? '' : 's'} · ${sec}`;
+    countEl.textContent = label;
+    // This column is the narrowest of the dock's three (reports.css:
+    // minmax(300px, 1.05fr)), and the head row also carries `refresh
+    // reports` and `generate report`. `.panel-head .hint` truncates with an
+    // ellipsis at that width (layout.css) — confirmed on screen shrinking to
+    // "5..." for a real section id, same as the project title pass 3 found
+    // wrapping/clipping and fixed with a hover title; this one just never
+    // got the same fix. One hover away instead of gone.
+    countEl.title = label;
     btnNew.disabled = submitting || picked.size === 0;
   }
 
@@ -93,7 +119,24 @@ export function createReportsPanel({ store, getSection }) {
       toast('ok', `Report ${res.report_id} queued`,
         `${(res.run_ids || []).length} runs: the real arm and the resistance-off counterfactual for each of ${drugs.length} drugs. The reconstruction is built once and shared.`,
         6000);
-      for (const w of (res.warnings || [])) toast('warn', 'Report spec warning', w, 0);
+      // A non-default spec can trigger several of these at once (grid
+      // coarseness, PK window, sensitivity mode, ...). They used to toast one
+      // per warning with ttl=0 (sticky, never auto-dismissed) so the text
+      // would not be lost before anyone opened the report — but `.toasts` is
+      // `position: fixed; right; bottom` (components.css), which is exactly
+      // where this dock column lives, so 3-4 real warnings buried the entire
+      // Therapy Reports panel — status chips, the progress bar, the table,
+      // `generate report` itself — under an unremovable stack the operator
+      // had to dismiss one at a time before they could see the panel they
+      // just used. They now have a permanent home in the report viewer
+      // (paintViewer, below), so the toast can be transient like every other
+      // 'warn' toast in the app instead of standing in for storage.
+      const warns = res.warnings || [];
+      if (warns.length === 1) {
+        toast('warn', 'Report spec warning', warns[0]);
+      } else if (warns.length > 1) {
+        toast('warn', `${warns.length} report spec warnings`, 'Open the report to read them.');
+      }
       selected = res.report_id;
       await refresh();
     } catch (err) {
@@ -141,7 +184,7 @@ export function createReportsPanel({ store, getSection }) {
         h('td',
           h('span.chip.' + (STATUS_CHIP[r.status] || 'st-queued'), r.status),
           r.status === 'running'
-            ? h('span.rp-prog', { title: `${p.runs_done || 0} of ${p.runs_total || 0} runs done${p.stage ? ' · ' + p.stage : ''}` },
+            ? h('span.rp-prog', { title: `${p.runs_done || 0} of ${p.runs_total || 0} runs done${armBreakdown(p)}${p.stage ? ' · ' + p.stage : ''}` },
               h('i', { style: { width: pct(p.fraction || 0, 0) + '%' } }))
             : null),
         h('td', { title: r.section }, r.section || NULL_GLYPH),
@@ -203,7 +246,14 @@ export function createReportsPanel({ store, getSection }) {
       dlgNote.appendChild(h('div.caveat' + (r.status === 'failed' ? '.crit' : '.info'),
         h('span', r.status === 'failed'
           ? `This report failed: ${r.error || 'no message returned'}`
-          : `Building — ${p.runs_done || 0} of ${p.runs_total || 0} arms complete${p.stage ? ` (${p.stage})` : ''}. The document renders when every arm is done; a partial panel is not a ranking.`)));
+          : `Building — ${p.runs_done || 0} of ${p.runs_total || 0} arms complete${armBreakdown(p)}${p.stage ? ` · ${p.stage}` : ''}. The document renders when every arm is done; a partial panel is not a ranking.`)));
+    }
+    // Spec warnings from submission time (POST /api/reports) — see the
+    // comment in submit() for why they no longer live in a stack of sticky
+    // toasts. They apply for the life of the report, same as the limits
+    // below, so they render the same way every time this paints.
+    for (const w of (r.warnings || [])) {
+      dlgNote.appendChild(h('div.caveat', h('span', h('b', 'spec warning: '), w)));
     }
     // The limits travel with the summary too, so they are visible before the
     // document has finished rendering.
