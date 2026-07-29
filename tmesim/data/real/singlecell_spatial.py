@@ -291,8 +291,12 @@ def load(
     if cells_path is None:
         raise FileNotFoundError(
             f"Missing cached cells file: {os.path.join(path, _CELLS_FILE)}. "
-            "Download the Xenium GBM files into data_cache/xenium_gbm/ first "
-            "(see docs/real_data/singlecell_spatial.md)."
+            f"No Xenium cell/matrix/panel files were found under {path!r}. "
+            "This loader is shared by every Xenium section (GBM, breast, ...); "
+            "for the GBM section see docs/real_data/singlecell_spatial.md, and "
+            "pass the right --sample / sample= for a different section (e.g. "
+            "the breast cache is normally at "
+            "data_cache/xenium_breast_janesick/rep1 — see docs/QUICKSTART.md)."
         )
 
     # Ensure the MEX triple is extracted from the tarball.

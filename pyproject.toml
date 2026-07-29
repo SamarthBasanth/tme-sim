@@ -19,6 +19,15 @@ dependencies = [
                     # without this at decode time, not at import time.
 ]
 
+[project.scripts]
+# `pip install -e .` registers this as a real command, e.g.:
+#   vivum reconstruct --source xenium --dx 12
+#   vivum compare-drugs --drugs temozolomide,cisplatin,doxorubicin
+#   vivum studio
+# Equivalent to `python -m tmesim.cli ...` (tmesim/cli.py); see that module's
+# docstring and docs/QUICKSTART.md for the full command list.
+vivum = "tmesim.cli:main"
+
 [project.optional-dependencies]
 # The local tmesim Studio application (app/server/ + app/web/). Additive: the
 # simulation engine, the CLI experiments and the rest of the test suite do not

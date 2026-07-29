@@ -81,7 +81,14 @@ external-validation readers; see [`docs/REPRODUCE.md`](docs/REPRODUCE.md) §1.
 ## Quickstart
 
 Every command below was executed in this repo before being documented; the
-runtimes are measured, not estimated.
+runtimes are measured, not estimated. New to this repo?
+[`docs/QUICKSTART.md`](docs/QUICKSTART.md) is a shorter, install-to-first-result
+walkthrough (CLI + Python API), aimed at someone who has never seen this
+codebase's module layout.
+
+`pip install -e .` also registers a `vivum` console script — `vivum --help` is
+the exact same tool as `python -m tmesim.cli --help` below, just installed
+rather than run as a module; either form works everywhere on this page.
 
 ```bash
 # What the CLI offers.
@@ -89,6 +96,12 @@ python -m tmesim.cli --help
 
 # The 10 library GBM drugs with structure-derived descriptors (no data, ~0.5 s).
 python -m tmesim.cli molecules
+
+# Compare several drugs on ONE reconstructed section (new: compare-drugs).
+python -m tmesim.cli compare-drugs --drugs temozolomide,cisplatin,doxorubicin
+
+# Launch the Studio web UI (needs `pip install -e '.[app]'`).
+python -m tmesim.cli studio
 
 # Download the auto-acquirable open datasets into ./data_cache/  (~2 min, ~90 MB).
 python -m tmesim.cli acquire
@@ -401,6 +414,7 @@ green throughout.
 | Question | File |
 |---|---|
 | **What is the current state, honestly?** | [`results/SESSION_AUDIT.md`](results/SESSION_AUDIT.md) |
+| I'm new here — how do I install this and get a first result? | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) |
 | How do I reproduce all of this? | [`docs/REPRODUCE.md`](docs/REPRODUCE.md) |
 | Where did every byte of data come from, and how do I re-download it? | [`docs/DATA_INVENTORY.md`](docs/DATA_INVENTORY.md) |
 | What is the model, mathematically? | [`docs/MATHEMATICAL_MODEL.md`](docs/MATHEMATICAL_MODEL.md) |

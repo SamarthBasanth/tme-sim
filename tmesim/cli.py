@@ -1,13 +1,17 @@
-"""Command-line interface for **tmesim** — the glioblastoma tumor-microenvironment
-drug-response simulator (REAL data only).
+"""Command-line interface for **tmesim** / **Vivum** — the glioblastoma +
+breast-cancer tumor-microenvironment drug-response simulator (REAL data only).
 
-Run as a module::
+Installed as the ``vivum`` console script (``pip install -e .``), or run as a
+module directly — both are equivalent::
 
-    python -m tmesim.cli reconstruct --source xenium --dx 30
-    python -m tmesim.cli simulate --source xenium --drug temozolomide
-    python -m tmesim.cli molecules
-    python -m tmesim.cli molecular-run --drug doxorubicin --source xenium
-    python -m tmesim.cli acquire --out data_cache
+    vivum reconstruct --source xenium --dx 12
+    python -m tmesim.cli reconstruct --source xenium --dx 12
+
+    vivum compare-drugs --drugs temozolomide,cisplatin,doxorubicin
+    vivum studio
+
+See ``docs/QUICKSTART.md`` for a full copy-pasteable walkthrough (install,
+first run, and the underlying Python API for notebook use).
 
 Subcommands
 -----------
@@ -19,6 +23,13 @@ Subcommands
     Reconstruct a real microenvironment, compile a REAL calibrated drug
     (calibrated_drugparams -> binding-site barrier), run the mechanistic
     transport+kill simulation, print kill fraction / penetration, save a figure.
+``compare-drugs``
+    Reconstruct a real microenvironment ONCE and simulate several drugs on the
+    SAME reconstruction, printing (and optionally saving) a comparison table.
+    Works for any drug in the molecular library — GBM
+    (:data:`tmesim.molecular.library.GBM_DRUGS`) by default, or breast
+    (:data:`tmesim.molecular.breast_library.BREAST_DRUGS`) via ``--library breast``
+    — so a newly added drug is picked up automatically, with no CLI change.
 ``molecules``
     List the library GBM drugs with structure-derived descriptors (no simulation).
 ``molecular-run``
@@ -26,6 +37,10 @@ Subcommands
     hindrance -> BBB/binding) and simulate it on a REAL reconstructed patient.
 ``acquire``
     Best-effort live download of open glioblastoma datasets into a cache dir.
+``studio``
+    Launch the tmesim Studio web backend (thin delegate to
+    ``python -m app.server``; needs the optional ``pip install -e '.[app]'``
+    extra).
 
 Design notes
 ------------
@@ -36,10 +51,17 @@ Design notes
 * ``--seed`` is global and threaded into the simulation config for determinism.
 * The commands use a *reduced* ``PDEConfig.total_time`` so the CLI finishes
   quickly; the full-fidelity window lives in the library defaults.
+* The repository root is put on ``sys.path`` unconditionally at startup (see
+  ``_ensure_repo_root_on_path``) so ``vivum studio`` can find the ``app``
+  package regardless of the caller's current working directory. Commands that
+  read or write real data (``data_cache/``, ``results/``) still resolve those
+  paths relative to the current working directory, so run ``vivum`` from the
+  repository root (exactly as ``python -m tmesim.cli`` already required).
 """
 from __future__ import annotations
 
 import argparse
+import csv
 import os
 import sys
 from typing import List, Optional
@@ -51,6 +73,29 @@ from typing import List, Optional
 _FAST_TOTAL_TIME = 1800.0     # 30 simulated minutes
 _FAST_SAVE_EVERY = 200        # snapshot cadence (PDE steps)
 _DEFAULT_DRUG = "temozolomide"
+
+# The open breast Xenium section (Janesick et al. 2023, PMID 38114474) used by
+# ``experiments/breast_drug_panel.py``. Only used as the ``--sample`` default
+# when ``--library breast`` is selected and the caller did not pass ``--sample``
+# explicitly — the Xenium loader's own default sample is the GBM section.
+_BREAST_SAMPLE_PATH = os.path.join(
+    "data_cache", "xenium_breast_janesick", "rep1"
+)
+
+
+def _ensure_repo_root_on_path() -> str:
+    """Put the repository root on ``sys.path`` so ``import app`` (Studio) works
+    regardless of the caller's current working directory.
+
+    Mirrors ``app/server/__main__.py``'s own ``_ensure_repo_on_path`` so the two
+    entry points behave identically. Data/results paths used elsewhere in this
+    CLI are still resolved relative to the CWD (as they always have been) —
+    this only affects whether the optional ``app`` package can be imported.
+    """
+    root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    return root
 
 
 # --------------------------------------------------------------------------- #
@@ -179,6 +224,204 @@ def cmd_simulate(args: argparse.Namespace) -> int:
     print(f"  {os.path.abspath(micro_png)}")
     print(f"  {os.path.abspath(sim_png)}")
     return 0
+
+
+# --------------------------------------------------------------------------- #
+# compare-drugs
+# --------------------------------------------------------------------------- #
+def _compile_drug_for_comparison(name: str, alpha: float, library: str):
+    """Compile ONE drug through the calibrated real-data pipeline, for either
+    library.
+
+    ``library='gbm'`` — ``tmesim.molecular.library.get_molecule`` +
+    ``validation.calibration.calibrated_drugparams(name, alpha)``: the exact
+    calls ``experiments/real_drug_panel.py`` and this module's own
+    ``_compile_real_drug`` make.
+
+    ``library='breast'`` — doxorubicin is REUSED VERBATIM from the GBM branch
+    (same molecule, same calibrated physics; it is not breast-specific).
+    Every other breast drug is compiled from
+    ``tmesim.molecular.breast_library.get_molecule_breast`` with a REAL
+    GDSC2-breast IC50 (``tmesim.molecular.potency_breast.resolve_ic50``), then
+    calibrated through the SAME ``calibrated_drugparams`` call (which accepts
+    an already-built ``DrugParams`` and applies the identical alpha-scaled
+    perivascular-sink calibration a library-name lookup would). This is the
+    identical composition ``experiments/breast_drug_panel.py::compile_breast_drug``
+    uses; no calibration code is duplicated here.
+
+    Returns ``(molecule, DrugParams)``. Raises on an unknown / uncompilable
+    drug name — the caller decides whether that is fatal for the whole run.
+    """
+    from tmesim.molecular.binding_site_barrier import apply_barrier_to_drugparams
+    from tmesim.molecular.library import get_molecule as get_molecule_gbm
+    from tmesim.validation.calibration import calibrated_drugparams
+
+    key = name.strip().lower()
+    if library == "gbm" or key == "doxorubicin":
+        dp = calibrated_drugparams(key, alpha)
+        mol = get_molecule_gbm(key)
+    else:
+        from tmesim.molecular.breast_library import get_molecule_breast
+        from tmesim.molecular.compile_drug import molecule_to_drugparams
+        from tmesim.molecular.potency_breast import resolve_ic50 as resolve_ic50_breast
+        from tmesim.validation.pk_reality import DEFAULT_ECM
+
+        mol = get_molecule_breast(key)
+        ic50_info = resolve_ic50_breast(key)
+        dp_uncal = molecule_to_drugparams(
+            mol, ecm_reference=DEFAULT_ECM, ic50=ic50_info["ic50_uM"]
+        )
+        dp = calibrated_drugparams(dp_uncal, alpha)
+    dp = apply_barrier_to_drugparams(dp, mol)
+    return mol, dp
+
+
+def cmd_compare_drugs(args: argparse.Namespace) -> int:
+    """Reconstruct a real microenvironment ONCE and simulate several drugs on
+    that SAME reconstruction, so every kill/exposure difference is attributable
+    to drug physics rather than to re-reconstructing the tissue. Prints a
+    comparison table, sorted by predicted kill fraction, and optionally saves
+    it as CSV.
+
+    This is a thin orchestration wrapper: no science is reimplemented here —
+    every number comes from the same ``reconstruct_real`` / ``calibrate_alpha``
+    / ``calibrated_drugparams`` / ``simulate_response`` calls the underlying
+    experiment scripts (``experiments/real_drug_panel.py``,
+    ``experiments/breast_drug_panel.py``) use.
+    """
+    from tmesim.core import SimConfig
+    from tmesim.reconstruct.real_pipeline import (
+        reconstruct_real,
+        reconstruction_report,
+    )
+    from tmesim.sim.engine import simulate_response
+    from tmesim.validation.calibration import calibrate_alpha
+
+    library = args.library
+    sample = args.sample
+    if library == "breast" and sample is None:
+        sample = _BREAST_SAMPLE_PATH
+        if not os.path.isdir(sample):
+            print(f"[compare-drugs] --library breast needs the Janesick breast "
+                  f"Xenium cache at {sample!r}, which is not present. Pass "
+                  f"--sample <path> to point at your own cache, or see "
+                  f"docs/QUICKSTART.md for how this one was downloaded.")
+            return 1
+
+    print(f"[compare-drugs] reconstructing REAL microenvironment "
+          f"(source={args.source}, sample={sample}, dx={args.dx} um) — once, "
+          f"reused for every drug ...")
+    micro = reconstruct_real(source=args.source, sample=sample, dx_um=args.dx)
+    report = reconstruction_report(micro)
+    _print_report(report)
+
+    if args.drugs:
+        drug_names = [d.strip().lower() for d in args.drugs.split(",") if d.strip()]
+    else:
+        if library == "breast":
+            from tmesim.molecular.breast_library import BREAST_DRUGS as _LIB
+        else:
+            from tmesim.molecular.library import GBM_DRUGS as _LIB
+        drug_names = sorted(_LIB)
+    if not drug_names:
+        print("[compare-drugs] no drugs to compare (empty --drugs list).")
+        return 1
+
+    alpha = calibrate_alpha()
+    print(f"\n[compare-drugs] alpha = {alpha:.4f} "
+          "(perivascular-sink constant, fit once on doxorubicin, shared by "
+          "every drug below) ...")
+
+    rows: List[dict] = []
+    for name in drug_names:
+        print(f"  compiling + simulating {name:16s} ...", end="", flush=True)
+        try:
+            mol, dp = _compile_drug_for_comparison(name, alpha, library)
+            cfg = _build_sim_config(args.seed, total_time=args.total_time)
+            cfg.drug = dp
+            if args.plasma is not None:
+                cfg.pk.plasma_peak = float(args.plasma)
+            result = simulate_response(micro, cfg)
+        except Exception as exc:
+            # A drug library is actively growing (see docs/QUICKSTART.md); one
+            # bad or not-yet-wired entry should not sink the whole comparison.
+            print(f" SKIPPED ({type(exc).__name__}: {exc})")
+            continue
+        rows.append(dict(
+            drug=name,
+            mw=float(mol.get("mw")) if mol.get("mw") is not None else float("nan"),
+            ic50_uM=float(dp.ic50),
+            bbb_penetrance=float(dp.bbb_penetrance),
+            diffusivity_um2_s=float(dp.diffusivity),
+            kill_fraction=float(result.kill_fraction),
+            penetration_index=float(result.extras.get("penetration_index", float("nan"))),
+            mean_auc_uM_s=float(result.extras.get("mean_auc", float("nan"))),
+        ))
+        print(f" kill={rows[-1]['kill_fraction']:.4f}  "
+              f"ic50={rows[-1]['ic50_uM']:.3g} uM  "
+              f"mean_auc={rows[-1]['mean_auc_uM_s']:.3g}")
+
+    if not rows:
+        print("\n[compare-drugs] every requested drug failed to compile/simulate; "
+              "nothing to report.")
+        return 1
+
+    rows.sort(key=lambda r: r["kill_fraction"], reverse=True)
+    cols = ["drug", "mw", "ic50_uM", "bbb_penetrance", "diffusivity_um2_s",
+            "kill_fraction", "penetration_index", "mean_auc_uM_s"]
+    print("\n=== drug comparison (sorted by predicted kill_fraction, best first) ===")
+    print("PREDICTIONS on a real reconstructed section, not validated clinical "
+          "outcomes — see docs/QUICKSTART.md.")
+    hdr = f"{'drug':16s} {'MW':>8s} {'IC50(uM)':>9s} {'bbb':>6s} " \
+          f"{'D_eff':>8s} {'pen_idx':>8s} {'mean_auc':>10s} {'kill':>7s}"
+    print(hdr); print("-" * len(hdr))
+    for r in rows:
+        print(f"{r['drug']:16s} {r['mw']:8.0f} {r['ic50_uM']:9.3g} "
+              f"{r['bbb_penetrance']:6.3f} {r['diffusivity_um2_s']:8.1f} "
+              f"{r['penetration_index']:8.3f} {r['mean_auc_uM_s']:10.3g} "
+              f"{r['kill_fraction']:7.4f}")
+
+    if args.csv:
+        os.makedirs(os.path.dirname(os.path.abspath(args.csv)) or ".", exist_ok=True)
+        with open(args.csv, "w", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=cols)
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"\n[compare-drugs] comparison table written: {os.path.abspath(args.csv)}")
+
+    return 0
+
+
+# --------------------------------------------------------------------------- #
+# studio
+# --------------------------------------------------------------------------- #
+def cmd_studio(args: argparse.Namespace) -> int:
+    """Launch the tmesim Studio web backend.
+
+    Thin delegate to ``app.server.__main__`` (the existing, already-working
+    Studio entry point, normally run as ``python -m app.server``) — nothing
+    about the server is reimplemented here. Needs the optional ``app`` extra
+    (``pip install -e '.[app]'``); a clear message is printed and this command
+    exits 1 rather than crashing with an ImportError traceback if that extra
+    is not installed.
+    """
+    _ensure_repo_root_on_path()
+    try:
+        from app.server.__main__ import main as _studio_main
+    except ImportError as exc:
+        print("[studio] the Studio web backend needs the optional 'app' extra "
+              f"(fastapi / uvicorn / httpx), which is not installed ({exc}).")
+        print("[studio] install it with:  pip install -e '.[app]'")
+        print("[studio] then re-run:      vivum studio")
+        return 1
+
+    argv: List[str] = ["--host", args.host, "--port", str(args.port),
+                       "--log-level", args.log_level]
+    if args.reload:
+        argv.append("--reload")
+    if args.cache_size is not None:
+        argv += ["--cache-size", str(args.cache_size)]
+    return int(_studio_main(argv))
 
 
 # --------------------------------------------------------------------------- #
@@ -389,9 +632,10 @@ def _add_real_source_args(p: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     """Construct the top-level argument parser with all subcommands."""
     parser = argparse.ArgumentParser(
-        prog="tmesim",
-        description="tmesim — glioblastoma tumor-microenvironment drug-response "
-                    "simulator (REAL data only).",
+        prog="vivum",
+        description="Vivum (tmesim) — glioblastoma + breast-cancer tumor-"
+                    "microenvironment drug-response simulator (REAL data "
+                    "only). Also runnable as `python -m tmesim.cli`.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--seed", type=int, default=0,
@@ -399,7 +643,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(
         dest="command",
-        metavar="{reconstruct,simulate,molecules,molecular-run,acquire}")
+        metavar="{reconstruct,simulate,compare-drugs,molecules,molecular-run,"
+                 "acquire,studio}")
     sub.required = True
 
     # reconstruct
@@ -425,6 +670,54 @@ def build_parser() -> argparse.ArgumentParser:
     p_sim.add_argument("--total-time", dest="total_time", type=float, default=None,
                        help="PDE exposure window in seconds (default: fast CLI window)")
     p_sim.set_defaults(func=cmd_simulate)
+
+    # compare-drugs
+    p_cmp = sub.add_parser(
+        "compare-drugs",
+        help="reconstruct ONE real section and compare several drugs on it",
+        description="Reconstruct a real microenvironment once and simulate "
+                    "several drugs on that SAME reconstruction, printing (and "
+                    "optionally saving) a comparison table sorted by predicted "
+                    "kill fraction. Works for any drug in the molecular "
+                    "library, so a newly added drug needs no CLI change.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    _add_real_source_args(p_cmp)
+    p_cmp.add_argument("--library", choices=["gbm", "breast"], default="gbm",
+                       help="which molecular drug library to draw the default "
+                            "drug list from, and how to compile a requested "
+                            "drug that is not in GBM_DRUGS")
+    p_cmp.add_argument("--drugs", default=None,
+                       help="comma-separated drug names to compare (case-"
+                            "insensitive). Default: every drug in the selected "
+                            "--library (GBM_DRUGS or BREAST_DRUGS)")
+    p_cmp.add_argument("--plasma", dest="plasma", type=float, default=None,
+                       help="override PK plasma_peak (uM), shared by every drug")
+    p_cmp.add_argument("--total-time", dest="total_time", type=float, default=None,
+                       help="PDE exposure window in seconds (default: fast CLI window)")
+    p_cmp.add_argument("--csv", default=None,
+                       help="path to write the comparison table as CSV "
+                            "(default: print only, do not save)")
+    p_cmp.set_defaults(func=cmd_compare_drugs)
+
+    # studio
+    p_studio = sub.add_parser(
+        "studio",
+        help="launch the tmesim Studio web backend (needs the 'app' extra)",
+        description="Launch the tmesim Studio web backend — a thin delegate "
+                    "to 'python -m app.server'. Needs 'pip install -e .[app]'.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p_studio.add_argument("--host", default="127.0.0.1",
+                          help="bind address (local diagnostic workstation "
+                               "app, not a network service — pass explicitly "
+                               "to expose it beyond localhost)")
+    p_studio.add_argument("--port", type=int, default=8000, help="bind port")
+    p_studio.add_argument("--reload", action="store_true",
+                          help="uvicorn autoreload (development)")
+    p_studio.add_argument("--log-level", default="info",
+                          choices=("critical", "error", "warning", "info", "debug"))
+    p_studio.add_argument("--cache-size", type=int, default=None,
+                          help="max cached reconstructions (default 4)")
+    p_studio.set_defaults(func=cmd_studio)
 
     # acquire
     p_acq = sub.add_parser(
