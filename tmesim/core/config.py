@@ -213,7 +213,62 @@ class SimConfig:
 #: ``cell_state_impact.md``) actually uses for temozolomide.
 TMZ_HYPOXIA_RESISTANCE: float = 0.80
 
-# A small default glioblastoma-relevant drug library. Agents may extend this.
+# A default glioblastoma-relevant drug library. Agents may extend this.
+#
+# PROVENANCE NOTE (read before adding/consuming an entry). The first three
+# entries below (temozolomide-like, doxorubicin-like, cisplatin-like) are the
+# ORIGINAL Stage-0 entries: biologically-plausible, HAND-SET numbers, not
+# computed from any molecular pipeline or GDSC data, and their ``binding`` /
+# ``clearance`` predate the perivascular-sink calibration in
+# ``validation.calibration`` (they carry the Stage-0 ~1e-4 1/s loss rate that
+# ``validation.pk_reality`` showed over-predicts penetration by ~15x for
+# doxorubicin -- see that module's docstring). They are kept exactly as they
+# were; nothing about them changes here.
+#
+# The entries added below them (lomustine-like ... irinotecan-like) are
+# DIFFERENT IN KIND: each is a FROZEN SNAPSHOT of
+# ``validation.calibration.calibrated_drugparams(name, alpha)`` --
+# i.e. real RDKit/Stokes-Einstein/Brownian-dynamics structure -> transport
+# (``molecular.compile_drug``), real GDSC2-glioma-measured or curated-
+# literature potency (``molecular.potency.resolve_ic50`` -- see that module for
+# exact sourcing/citations per drug), and the SAME single doxorubicin-fit
+# perivascular-sink constant every real-data report in this repo uses
+# (``alpha = 148.608...``, frozen at compile time below; re-derive with
+# ``validation.calibration.calibrate_alpha()`` if the doxorubicin anchor is
+# ever revised -- these constants would then need refreezing to match).
+# ``hill=1.2`` for every one of them is not a per-drug fit: it is
+# ``molecular.compile_drug._DEFAULT_HILL``, the pipeline's constant, carried
+# through unchanged -- an honest reflection of what the real pipeline actually
+# outputs, not an invented per-drug shape parameter.
+#
+# CONSEQUENCE OF MIXING THE TWO STYLES IN ONE DICT: the new entries' loss
+# rates (``binding``/``clearance``) are ~30-300x FASTER than the original
+# three's Stage-0 defaults, because they carry the calibration fix the
+# original three never received. A cross-drug comparison built directly on
+# this dict (e.g. iterating ``DRUG_LIBRARY.values()``) is therefore NOT an
+# apples-to-apples potency/penetration comparison across ALL ten entries --
+# only within each style group. For a fair, validated cross-drug comparison,
+# do what ``experiments/real_drug_panel.py`` already does for every drug
+# (including the original three, by name): call
+# ``validation.calibration.calibrated_drugparams`` directly rather than
+# reading this dict. ``DRUG_LIBRARY`` remains useful as a quick, named,
+# frozen-in-time reference (e.g. for ``treatment.drugs.get_drug`` / tests /
+# simple demos) where reproducibility of a fixed snapshot matters more than
+# picking up upstream recalibration automatically.
+#
+# ``bevacizumab`` (anti-VEGF IgG, ~149 kDa) was evaluated for this expansion
+# and DELIBERATELY EXCLUDED, for a reason distinct from "no data found": it is
+# not directly cytotoxic (no cell-kill IC50 exists for it in a kill-fraction
+# sense -- GDSC/any cytotoxicity screen has no entry for it, and none should
+# be expected, since it acts by VEGF sequestration/anti-angiogenesis, not by
+# killing tumour cells at a target concentration). Forcing a number into
+# ``ic50`` would misrepresent its mechanism inside a Hill-curve kill model
+# built for cytotoxics. It remains available and useful elsewhere in this
+# repo as the delivery-limited/antibody size-extreme demonstration
+# (``molecular.library.GBM_DRUGS["bevacizumab"]``, ``results/molecular_findings.md``:
+# effective_D ~1 um^2/s, bbb_penetrance ~0.000, "a large macromolecule
+# essentially cannot reach the tumor by passive transport") -- that is the
+# correct home for it, not this kill-fraction drug library.
 DRUG_LIBRARY: Dict[str, DrugParams] = {
     "temozolomide-like": DrugParams(
         name="temozolomide-like", diffusivity=300.0, molecular_weight=194.0,
@@ -225,4 +280,94 @@ DRUG_LIBRARY: Dict[str, DrugParams] = {
     "cisplatin-like": DrugParams(
         name="cisplatin-like", diffusivity=350.0, molecular_weight=300.0,
         ic50=8.0, hill=1.3, bbb_penetrance=0.15, clearance=2e-4),
+
+    # --- Real molecular-compile + GDSC/literature-calibrated entries -------
+    # Frozen snapshots of calibrated_drugparams(name, alpha=148.60815765445545)
+    # (alpha fit once on doxorubicin's e-fold penetration length; see
+    # validation.calibration). Potency provenance (GDSC2 glioma-measured vs.
+    # curated literature, with citations) is in molecular.potency; run
+    # ``python -m tmesim.molecular.potency`` or see molecular/potency.py's
+    # LITERATURE_IC50 table for the exact sources.
+
+    # Nitrosourea (CCNU), oral GBM alkylator (PCV / lomustine regimens).
+    # IC50: literature order-of-magnitude anchor (50 uM); real comparative
+    # potency vs TMZ/ACNU across GBM lines in Yamamuro S et al., Cancer Sci
+    # 2021;112(11):4736-47, PMID 34536314 (numeric values not independently
+    # extracted from the paywalled figure -- see molecular/potency.py note).
+    "lomustine-like": DrugParams(
+        name="lomustine-like", diffusivity=259.2, molecular_weight=233.7,
+        ic50=50.0, hill=1.2, bbb_penetrance=0.973, binding=1.941e-2,
+        clearance=1.086e-4),
+
+    # Nitrosourea (BCNU), lipophilic alkylator (Gliadel wafers). IC50:
+    # literature order-of-magnitude anchor (30 uM); real BCNU/ACNU
+    # cytotoxicity (apoptosis + DNA double-strand breaks) in GBM lines U87MG/
+    # U138MG confirmed in Batista LFZ et al., Cancer Res 2007;67(24):11886-95,
+    # PMID 18089819 (no numeric IC50 in that abstract; see molecular/potency.py
+    # note on the wide 30-615 uM spread found across sources for this drug).
+    "carmustine-like": DrugParams(
+        name="carmustine-like", diffusivity=268.3, molecular_weight=214.1,
+        ic50=30.0, hill=1.2, bbb_penetrance=0.955, binding=1.038e-2,
+        clearance=9.298e-5),
+
+    # Methylating pro-drug requiring metabolic activation (PCV regimen).
+    # IC50: 500 uM, the WEAKEST-SOURCED literature entry in this library --
+    # no citable glioma-cell-line IC50 with a verifiable PMID was found; this
+    # is a mechanism-based order-of-magnitude guess (see molecular/potency.py
+    # note, PMID 1596582 for the activation mechanism in a non-glioma system).
+    "procarbazine-like": DrugParams(
+        name="procarbazine-like", diffusivity=264.7, molecular_weight=221.3,
+        ic50=500.0, hill=1.2, bbb_penetrance=0.885, binding=1.998e-2,
+        clearance=9.101e-5),
+
+    # Vinca alkaloid (microtubule inhibitor); historically part of PCV.
+    # IC50: 0.05 uM (50 nM), a GENERAL vinca-alkaloid potency anchor, not a
+    # glioma-specific measurement -- real GBM activity (U87/U251) confirmed in
+    # Filippi-Chiela EC et al., Toxicol In Vitro 2022;85:105472, PMID 36116745,
+    # but that paper reports no numeric IC50 (see molecular/potency.py note).
+    # Structure-derived bbb_penetrance is correctly very low (0.023): vincristine
+    # is large (MW 825) and does not cross the BBB well.
+    "vincristine-like": DrugParams(
+        name="vincristine-like", diffusivity=155.0, molecular_weight=825.0,
+        ic50=0.05, hill=1.2, bbb_penetrance=0.023, binding=8.906e-2,
+        clearance=8.938e-5),
+
+    # Antifolate antimetabolite. IC50 12.0 uM is REAL, MEASURED GDSC2 glioma
+    # data (median across n=49 glioma cell lines; molecular.potency). Note the
+    # structure-derived bbb_penetrance is correctly very low (0.0225): methotrexate
+    # is large, highly polar (TPSA ~211, 5 H-bond donors) and is well known
+    # clinically to cross the BBB poorly (it is dosed intrathecally for CNS
+    # disease) -- the model reproduces this qualitative fact from structure alone.
+    "methotrexate-like": DrugParams(
+        name="methotrexate-like", diffusivity=198.9, molecular_weight=454.4,
+        ic50=12.0, hill=1.2, bbb_penetrance=0.0225, binding=2.663e-2,
+        clearance=6.946e-5),
+
+    # Topoisomerase-II poison (VP-16). IC50 5.0 uM is a representative point
+    # inside a REAL measured range: 48h IC50 spans 0.6-29 uM across GBM lines
+    # M059K/M059J/T98G depending on the tumour's own TOP2A expression (Sevim H
+    # et al., J Cancer Res Clin Oncol 2011;137(11):1705-12, PMID 21904904) --
+    # this drug's real glioma potency is a ~48x range, not a point; see
+    # molecular/potency.py for the full note.
+    "etoposide-like": DrugParams(
+        name="etoposide-like", diffusivity=178.6, molecular_weight=588.6,
+        ic50=5.0, hill=1.2, bbb_penetrance=0.039, binding=2.385e-2,
+        clearance=7.484e-5),
+
+    # Topoisomerase-I inhibitor PRO-DRUG (camptothecin analogue; clinically
+    # combined with bevacizumab for recurrent GBM). IC50 11.58 uM is REAL,
+    # MEASURED GDSC2 glioma data (median across n=50 glioma cell lines).
+    # HONESTY: irinotecan is cleaved by carboxylesterases to the ~1000x more
+    # potent SN-38; this pipeline has no prodrug-metabolism step, so diffusivity
+    # / bbb_penetrance describe the PARENT molecule (irinotecan), not SN-38 --
+    # the GDSC assay doses/measures irinotecan directly, so its cytotoxicity
+    # tier is unaffected. Structure-derived bbb_penetrance (0.151) lands close
+    # to the REAL measured irinotecan CSF:plasma AUC ratio (14 +/- 3%, nonhuman
+    # primates; Blaney JM et al., Cancer Chemother Pharmacol 1998;41(6):464-8,
+    # PMID 9554590) -- a genuine, if modest, external cross-check on this
+    # project's structure-only BBB rule. See molecular/potency.py for the full note.
+    "irinotecan-like": DrugParams(
+        name="irinotecan-like", diffusivity=178.9, molecular_weight=586.7,
+        ic50=11.58, hill=1.2, bbb_penetrance=0.151, binding=6.012e-2,
+        clearance=1.141e-4),
 }

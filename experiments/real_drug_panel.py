@@ -1,14 +1,16 @@
 """REAL DRUG PANEL on the REAL Xenium glioblastoma microenvironment.
 
 This is the real-geometry version of the drug comparison (no synthetic cohort):
-the FULL panel [temozolomide, lomustine, cisplatin, methotrexate, doxorubicin] is
-simulated on ONE and the SAME real tumor -- the open 10x Xenium GBM section
-(40,887 measured cells, threshold-gated marker typing, REAL vascular field from
-endothelial cells, REAL ECM field from the panel's collagen/matrix transcripts,
-real-perfusion oxygen). The real microenvironment is reconstructed ONCE and reused
-for all five drugs, so every kill/penetration difference is attributable to the
-drug's own physics (size -> mesh diffusivity, real GDSC IC50 potency, structure ->
-perivascular sink, binding-site barrier, BBB penetrance) on identical tissue.
+the FULL panel (see ``PANEL`` below -- ten real GBM chemotherapeutics spanning
+alkylators/nitrosoureas, a platinum, an antifolate, topoisomerase poisons, a
+vinca alkaloid and an anthracycline) is simulated on ONE and the SAME real
+tumor -- the open 10x Xenium GBM section (40,887 measured cells, threshold-gated
+marker typing, REAL vascular field from endothelial cells, REAL ECM field from
+the panel's collagen/matrix transcripts, real-perfusion oxygen). The real
+microenvironment is reconstructed ONCE and reused for every drug, so every
+kill/penetration difference is attributable to the drug's own physics (size ->
+mesh diffusivity, real GDSC IC50 potency, structure -> perivascular sink,
+binding-site barrier, BBB penetrance) on identical tissue.
 
 Each drug is compiled through the SAME pipeline the flagship single-drug run uses:
   calibrate_alpha()  (single perivascular-sink constant, fit ONCE on doxorubicin)
@@ -38,14 +40,16 @@ Both tables are printed and written. Rank with the uniform table.
 
 HONESTY (read this): the predicted kills here are PREDICTIONS with NO outcome label
 to validate against. This open Xenium section is an UNTREATED resection -- there is
-no paired measured drug response for any of these five drugs. What is real is the
+no paired measured drug response for any of these drugs. What is real is the
 GEOMETRY (real cells, real vasculature, real matrix, real oxygen), the DRUG PHYSICS
 (structure-compiled transport + a doxorubicin-calibrated perivascular sink,
 revalidated out-of-sample on mitoxantrone), and the POTENCY (real GDSC/literature
 IC50). The kill numbers are what the validated physics predicts on real tissue --
-NOT validated outcomes. Do not read the ranking as clinical efficacy. The section
-is also deeply hypoxic (~94% of tumor cells hypoxic), which mechanistically
-suppresses kill for EVERY drug and compresses the panel.
+NOT validated outcomes. Do not read the ranking as clinical efficacy. Under the
+current geometric (dx-independent) tissue mask this section's predicted hypoxic
+fraction is ~0% (see the "Tissue mask" section of the written report) -- an
+uncalibrated oxygen-model artifact, not a claim about this tumor's true biology;
+no conclusion here should rest on the hypoxic fraction either way.
 
 RESOLUTION (read this too): per the grid-refinement audit in
 ``results/numerical_rigor.md``, ``kill_fraction`` is grid-converged by dx <= 20 um
@@ -83,7 +87,10 @@ from tmesim.reconstruct.real_pipeline import (
 from tmesim.sim.engine import simulate_response
 from tmesim.validation.calibration import calibrate_alpha, calibrated_drugparams
 
-PANEL = ["temozolomide", "lomustine", "cisplatin", "methotrexate", "doxorubicin"]
+PANEL = [
+    "temozolomide", "lomustine", "carmustine", "procarbazine", "cisplatin",
+    "methotrexate", "etoposide", "vincristine", "irinotecan", "doxorubicin",
+]
 
 # Per-cell sensitivity modes. 'uniform' is the HEADLINE (fair cross-drug) mode;
 # 'determinant' is reported alongside it so the confound is visible, never hidden.
@@ -247,7 +254,7 @@ def main(dx_um: float = DX_UM):
 
     fig.suptitle(
         "REAL drug panel on the REAL Xenium glioblastoma microenvironment  "
-        "(one tumor, five drugs)  —  PREDICTIONS, not validated outcomes\n"
+        f"(one tumor, {len(PANEL)} drugs)  —  PREDICTIONS, not validated outcomes\n"
         f"grid-CONVERGED dx = {report['dx_um']:.0f} µm · "
         f"α = {alpha:.1f} (e-fold convention) · "
         f"per-cell sensitivity mode = '{RANKING_MODE}' (identical for every drug "
@@ -311,6 +318,18 @@ def main(dx_um: float = DX_UM):
 def _ranking_line(rows) -> str:
     ordered = sorted(rows, key=lambda r: r["kill"], reverse=True)
     return " > ".join(f"**{r['name']}** ({r['kill']:.4f})" for r in ordered)
+
+
+def _dox_tmz_auc_ratio(rows) -> float:
+    """temozolomide's mean AUC / doxorubicin's mean AUC (>=1 on every run seen so
+    far: TMZ's high bbb_penetrance vastly outweighs doxorubicin's). Computed from
+    the actual run rather than hardcoded so this stays correct as the panel grows."""
+    by_name = {r["name"]: r for r in rows}
+    tmz = by_name.get("temozolomide")
+    dox = by_name.get("doxorubicin")
+    if not tmz or not dox or dox["mean_auc"] <= 0:
+        return float("nan")
+    return float(tmz["mean_auc"] / dox["mean_auc"])
 
 
 def build_markdown(report, alpha, rows, best_kill, best_pen, hypoxic_frac,
@@ -521,17 +540,19 @@ def build_markdown(report, alpha, rows, best_kill, best_pen, hypoxic_frac,
         "tissue is a *scale-invariant shape* statistic — it measures how uniform the "
         "exposure field is, not how much drug arrives. Once the perivascular boundary "
         "layer is actually resolved, that shape is set by the **vascular geometry**, "
-        "which is identical for all five drugs, and these drugs' D_eff values differ "
-        "by only ~1.5× (175–263 µm²/s) — far too little to reshape the field.",
+        "which is identical for every drug in the panel, and these drugs' D_eff values "
+        f"differ by only ~{max(r['d_eff'] for r in rows) / max(min(r['d_eff'] for r in rows), 1e-30):.1f}× "
+        f"({min(r['d_eff'] for r in rows):.0f}–{max(r['d_eff'] for r in rows):.0f} µm²/s) "
+        "— far too little to reshape the field.",
         f"- **Delivery differences are real, but they live in the AUC, not the index.** "
         f"Mean exposure spans {min(r['mean_auc'] for r in rows):.3g}–"
         f"{max(r['mean_auc'] for r in rows):.3g} µM·s "
         f"(~{max(r['mean_auc'] for r in rows) / max(min(r['mean_auc'] for r in rows), 1e-30):.0f}×), "
         "driven by BBB penetrance and the calibrated perivascular sink. Doxorubicin "
-        "really is delivery-starved on this section — its mean AUC is ~120× below "
-        "temozolomide's — but that shows up as a *lower absolute exposure*, not as a "
-        "flatter spatial profile. **Quote mean AUC, not penetration_index, when "
-        "comparing drugs.**",
+        "really is delivery-starved on this section — its mean AUC is "
+        f"~{_dox_tmz_auc_ratio(rows):.0f}× below temozolomide's — but that shows up as "
+        "a *lower absolute exposure*, not as a flatter spatial profile. **Quote mean "
+        "AUC, not penetration_index, when comparing drugs.**",
         f"- **Best predicted kill (mode = `{RANKING_MODE}`):** "
         f"**{best_kill['name']}** "
         f"(kill_fraction {best_kill['kill']:.4f}, penetration_index {best_kill['pen']:.3f}, "

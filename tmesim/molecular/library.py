@@ -34,6 +34,17 @@ GBM_DRUGS: Dict[str, str] = {
     "etoposide":    "COc1cc(cc(OC)c1O)C1c2cc3OCOc3cc2C(OC2OC4COC(C)OC4C(O)C2O)C2COC(=O)C12",  # MW ~589
     # Vinca alkaloid (microtubule inhibitor); PubChem canonical SMILES.
     "vincristine":  "CCC1(CC2CC(C3=C(CCN(C2)C1)C4=CC=CC=C4N3)(C5=C(C=C6C(=C5)C78CCN9C7C(C=CC9)(C(C(C8N6C=O)(C(=O)OC)O)OC(=O)C)CC)OC)C(=O)OC)O",  # MW ~825
+    # Topoisomerase-I inhibitor prodrug (camptothecin derivative); PubChem CID
+    # 60838 canonical SMILES. MW ~586.7 (verified in RDKit, matches the
+    # literature free-base MW of 586.68). NOTE (honesty): irinotecan itself is
+    # a prodrug -- it is cleaved by tissue/serum carboxylesterases to the ~1000x
+    # more potent topoisomerase-I poison SN-38. This pipeline has no prodrug
+    # metabolism step, so the compiled DrugParams describe the PARENT molecule
+    # (irinotecan) only; both its GDSC2 potency (cell assays dose irinotecan
+    # directly, so intracellular conversion is baked into the measured IC50) and
+    # its structure-derived BBB penetrance are for irinotecan, not SN-38. See
+    # ``results/real_drug_panel.md`` for the honesty note this produces.
+    "irinotecan":   "CCC1=C2CN3C(=CC4=C(C3=O)COC(=O)C4(CC)O)C2=NC5=C1C=C(C=C5)OC(=O)N6CCC(CC6)N7CCCCC7",  # MW ~587
     # Macromolecule marker: anti-VEGF monoclonal antibody (~149 kDa).
     # Sentinel string, NOT a parseable SMILES -> forces the antibody path.
     "bevacizumab":  "ANTIBODY:bevacizumab",

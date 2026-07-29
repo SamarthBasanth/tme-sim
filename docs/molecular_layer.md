@@ -155,8 +155,11 @@ above.
 
 - **`GBM_DRUGS: dict[str, str]`** — name → SMILES for real GBM-relevant agents:
   temozolomide, lomustine (CCNU), carmustine (BCNU), procarbazine, methotrexate,
-  doxorubicin, cisplatin, etoposide, vincristine, plus one macromolecule marker
-  (`bevacizumab`, `is_antibody=True`, MW ≈ 149 000) to anchor the *size extreme*.
+  doxorubicin, cisplatin, etoposide, vincristine, irinotecan (a topoisomerase-I
+  inhibitor prodrug; note its compiled DrugParams describe the parent molecule,
+  not its active metabolite SN-38 — see `molecular/potency.py`), plus one
+  macromolecule marker (`bevacizumab`, `is_antibody=True`, MW ≈ 149 000) to
+  anchor the *size extreme*.
 - **`get_molecule(name) -> Molecule`** (KeyError-safe listing of valid names),
   **`all_molecules() -> list[Molecule]`** — both go through
   `descriptors.from_smiles`.

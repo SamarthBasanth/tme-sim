@@ -58,6 +58,7 @@ _FALLBACK_TABLE: Dict[str, Dict[str, float]] = {
     "cisplatin": {"mw": 298.03, "logp": 0.20, "tpsa": 52.04, "hbd": 2, "hba": 2, "rotatable_bonds": 0, "aromatic_rings": 0, "formal_charge": 0, "is_antibody": False},
     "etoposide": {"mw": 588.56, "logp": 1.34, "tpsa": 160.83, "hbd": 3, "hba": 13, "rotatable_bonds": 5, "aromatic_rings": 2, "formal_charge": 0, "is_antibody": False},
     "vincristine": {"mw": 824.97, "logp": 3.52, "tpsa": 171.17, "hbd": 3, "hba": 12, "rotatable_bonds": 8, "aromatic_rings": 3, "formal_charge": 0, "is_antibody": False},
+    "irinotecan": {"mw": 586.689, "logp": 4.091, "tpsa": 114.2, "hbd": 1, "hba": 9, "rotatable_bonds": 4, "aromatic_rings": 3, "formal_charge": 0, "is_antibody": False},
     # Macromolecule marker: therapeutic IgG monoclonal antibody (~149 kDa).
     # No small-molecule SMILES; descriptors are population/known values.
     "bevacizumab": {"mw": 149000.0, "logp": -1.0, "tpsa": 0.0, "hbd": 0, "hba": 0, "rotatable_bonds": 0, "aromatic_rings": 0, "formal_charge": 0, "is_antibody": True},

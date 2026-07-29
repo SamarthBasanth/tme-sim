@@ -37,10 +37,27 @@ salt forms. We match by:
     vincristine, CCNU/BCNU for the nitrosoureas).
 For the current cached glioma screen the matches that actually resolve are:
     temozolomide -> 'Temozolomide', cisplatin -> 'Cisplatin',
-    methotrexate -> 'Methotrexate'.
+    methotrexate -> 'Methotrexate', irinotecan -> 'Irinotecan' (n=50 GBM/LGG
+    cell lines in GDSC2 -- verified directly against the cache: 50 rows, all
+    TCGA_DESC in {GBM, LGG}).
 Everything else in the library (doxorubicin, etoposide, vincristine, lomustine,
 carmustine, procarbazine, bevacizumab) is absent from this glioma screen and
 falls through to the literature table or the flagged default.
+
+Honesty note on irinotecan specifically: it is a PRODRUG, cleaved by tissue
+carboxylesterases to the ~1000x more potent topoisomerase-I poison SN-38
+(Kawato et al. 1991, Cancer Res 51(16):4187-91). The GDSC2 assay doses cells
+with irinotecan directly, so intracellular conversion is baked into the
+measured IC50 the same way it is in the clinic -- this is a genuine measured
+in-vitro potency for irinotecan-as-dosed, not a mismatch. What this pipeline
+cannot model is the prodrug conversion itself (no metabolism network -- see
+``compile_drug`` module docstring), so the compiled DrugParams (diffusivity,
+BBB penetrance) describe the irinotecan PARENT molecule, not SN-38. Irinotecan itself is known to cross the BBB poorly: in a nonhuman-primate PK
+study the AUC(CSF)/AUC(plasma) ratio for irinotecan lactone was 14+/-3%, and
+SN-38 lactone (undetectable/estimated <=8%) crosses even less (Blaney et al.,
+Cancer Chemother Pharmacol 1998;41(6):464-8, PMID 9554590) -- consistent with
+what this project's structure-only BBB rule predicts for the compiled
+irinotecan molecule (see ``results/real_drug_panel.md``).
 """
 from __future__ import annotations
 
@@ -66,6 +83,7 @@ _GDSC_ALIASES: Dict[str, List[str]] = {
     "lomustine": ["lomustine", "ccnu"],
     "carmustine": ["carmustine", "bcnu"],
     "procarbazine": ["procarbazine", "matulane"],
+    "irinotecan": ["irinotecan", "cpt-11", "cpt11", "camptosar"],
     # bevacizumab (antibody) has no cytotoxic IC50 in a cell-line viability screen.
 }
 
@@ -88,40 +106,80 @@ LITERATURE_IC50: Dict[str, Dict] = {
     "etoposide": {
         "ic50_uM": 5.0,
         "note": (
-            "Topoisomerase-II poison (VP-16); glioma cell-line IC50 ~1-10 uM. "
-            "Literature range from GBM in-vitro cytotoxicity studies."
+            "Topoisomerase-II poison (VP-16). REAL numeric anchor: Sevim H, "
+            "Parkinson JF, McDonald KL, J Cancer Res Clin Oncol 2011;137(11):"
+            "1705-12, PMID 21904904 -- 48h IC50 in glioblastoma lines spans "
+            "M059K (high TOP2A) 0.6 uM, M059J 2 uM, T98G (low TOP2A) 29 uM, i.e. "
+            "sensitivity varies ~48x with the tumour's own topoisomerase-II-alpha "
+            "expression. 5.0 uM is kept as a representative order-of-magnitude "
+            "point inside that measured range (geometric mean of the 3 lines "
+            "~4.2 uM), not a single 'true' IC50 -- this drug's real glioma "
+            "potency is a range, not a point."
         ),
     },
     "vincristine": {
         "ic50_uM": 0.05,
         "note": (
             "Vinca alkaloid (microtubule inhibitor); highly potent, low-nM to "
-            "~0.1 uM in cell lines. Historically part of the PCV regimen for "
-            "glioma. Range from vinca-alkaloid cytotoxicity literature."
+            "~0.1 uM in cell lines generally, and historically part of the PCV "
+            "regimen for glioma. Real activity in GBM cell lines (U87, U251) is "
+            "confirmed by Filippi-Chiela EC et al., Toxicol In Vitro 2022 Dec;"
+            "85:105472, PMID 36116745 ('clinically relevant doses of VCR' induce "
+            "apoptosis/mitotic catastrophe/senescence) but that paper's abstract "
+            "does not state a numeric IC50, and a targeted search did not turn up "
+            "a citable GBM-specific nM/uM figure -- 0.05 uM (50 nM) is a "
+            "general vinca-alkaloid potency anchor, not a glioma-specific "
+            "measurement. Flagged as the weaker end of the literature tier."
         ),
     },
     "carmustine": {
         "ic50_uM": 30.0,
         "note": (
             "Nitrosourea (BCNU), lipophilic alkylator used in GBM (Gliadel "
-            "wafers); glioma cell-line IC50 tens of uM. Literature order-of-"
-            "magnitude anchor."
+            "wafers). Real cytotoxicity (apoptosis + DNA double-strand breaks) "
+            "in GBM lines U87MG (p53 wild-type) and U138MG (p53 mutant) is "
+            "confirmed by Batista LFZ et al., Cancer Res 2007;67(24):11886-95, "
+            "PMID 18089819, but that paper's abstract gives no numeric IC50. A "
+            "separate source (a pharmaceutical patent's comparator assay, not "
+            "peer-reviewed) reports carmustine IC50 of 300-615 uM across three "
+            "other GBM lines (NCH37/82/89) -- a real measurement but from a "
+            "lower-trust source and an order of magnitude above the value used "
+            "here. 30 uM is kept as a conservative order-of-magnitude anchor; "
+            "the true glioma-line spread for this drug may run much wider "
+            "(tens to hundreds of uM) than a single number suggests."
         ),
     },
     "lomustine": {
         "ic50_uM": 50.0,
         "note": (
-            "Nitrosourea (CCNU), oral GBM alkylator (PCV / lomustine arms); "
-            "glioma cell-line IC50 tens of uM. Literature order-of-magnitude "
-            "anchor."
+            "Nitrosourea (CCNU), oral GBM alkylator (PCV / lomustine arms). Real "
+            "comparative potency vs. temozolomide and nimustine (ACNU) across "
+            "GBM lines U87/U251/U343 and their TMZ-resistant variants is "
+            "reported in Yamamuro S et al., Cancer Sci 2021;112(11):4736-47, "
+            "PMID 34536314 (CCNU/ACNU remain effective in TMZ-resistant cells), "
+            "but the numeric IC50s are in a figure inside the paywalled full "
+            "text and were not independently extracted here -- flagged rather "
+            "than fabricated. 50 uM is kept as a tens-of-uM order-of-magnitude "
+            "anchor consistent with this drug class."
         ),
     },
     "procarbazine": {
         "ic50_uM": 500.0,
         "note": (
-            "Methylating pro-drug requiring hepatic activation; weak direct "
-            "cytotoxicity in vitro (hundreds of uM). Literature order-of-"
-            "magnitude anchor."
+            "Methylating pro-drug: the parent compound is oxidized to azoxy-"
+            "procarbazine isomers (methylazoxy- and benzylazoxy-procarbazine, "
+            "the latter cytotoxic species) partly non-enzymatically and partly "
+            "via an initial cytochrome-P450 step (Swaffar DS et al., Oncol Res "
+            "1992;4(2):49-58, PMID 1596582 -- CCRF-CEM leukaemia cells, NOT "
+            "glioma). Direct in-vitro exposure of the unmetabolized parent can "
+            "therefore understate its clinical potency, consistent with weak "
+            "direct cytotoxicity in vitro (hundreds of uM) on mechanistic "
+            "grounds. A targeted literature search did NOT find a citable "
+            "glioma-cell-line procarbazine IC50 with a verifiable PMID and "
+            "number; this is the WEAKEST-SOURCED entry in this table -- "
+            "honestly flagged as a mechanism-based order-of-magnitude guess "
+            "extrapolated from a non-glioma cell system, not a glioma "
+            "measurement."
         ),
     },
     # temozolomide / cisplatin / methotrexate intentionally omitted here: they

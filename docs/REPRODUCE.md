@@ -335,7 +335,7 @@ Wall-clock on an Apple Silicon laptop, single process, warm data cache.
 | `reconstruct.vessel_network` (self-test) | ~2 min | estimate — runs and passes |
 | `validation.reconstruction_fidelity` | ~3 min | estimate |
 | `experiments/real_simulation.py` | ~4 min | estimate |
-| `experiments/real_drug_panel.py` | ~10 min | estimate (5 drugs × the measured single-drug cost) |
+| `experiments/real_drug_panel.py` | **19.6 min** | measured (10 drugs × 2 sensitivity modes; panel expanded from 5 to 10 drugs — see `results/real_drug_panel.md`) |
 | `validation.delivery_metrics` (full) | 11 min | reported in `results/delivery_metrics.md` |
 | `experiments/cross_tissue.py` | 19.5 min | reported in `results/cross_tissue.md` |
 | `validation.calibration` / `pk_multidrug` / `pharmacology_real` | ~1–3 min each | estimate |
