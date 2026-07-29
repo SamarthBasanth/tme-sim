@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Tumor Atlas — See the Tumor Before You Treat It",
+  title: "Vivum — See Where the Drug Actually Goes",
   description:
-    "A cinematic, scroll-driven 3D tumor visualization concept: anatomical context, segmentation, AI-assisted analysis, and treatment planning in one continuous scene.",
+    "Vivum reconstructs real tumor tissue from spatial biology data and simulates drug transport physics through it — penetration, exposure, and delivery, validated against real measured tissue benchmarks. Built for pharma, biotech, and research teams comparing candidate therapies.",
 };
 
 export default function RootLayout({
