@@ -309,7 +309,7 @@ def write_report(res: Dict, vd: Dict, raw_csr: Dict, clustered_csr: List[Dict],
       f"section (Janesick et al. 2023, PMID 38114474), {res['n_cells']:,} "
       f"measured cells, {res['n_tumor']:,} tumour, {res['n_endo']:,} "
       f"endothelial via `marker_panels.BREAST_PANEL_MARKER_MAP` (PECAM1/VWF/"
-      f"CLDN5 — 3 of the 13 endothelial-associated genes measured on this "
+      f"CLDN5 — 3 of the 15 endothelial-associated genes measured on this "
       f"panel; see caveats). Figure: none generated for this report (the GBM "
       f"figure code hardcodes GBM literature labels; every number quoted below "
       f"is nonetheless computed exactly as that figure's underlying data is). "
@@ -378,10 +378,15 @@ def write_report(res: Dict, vd: Dict, raw_csr: Dict, clustered_csr: List[Dict],
       f"{max(c['tail100_ratio'] for c in clustered_csr):.1f}× — a range GBM's "
       f"own robustness check (§6a there) never had to contend with, because "
       f"GBM's clustering correction barely changed the vessel count at all. "
-      f"See §4 for the full decomposition, including why `vv.verdict()`'s own "
-      f"one-line tail-ratio output (**{vd['csr_tail_ratio']:.2f}×**) mixes two "
-      f"different vessel-density definitions in a way that was harmless for "
-      f"GBM and is not harmless here.")
+      f"See §3.3-3.4 for the full decomposition. `vv.verdict()`'s own one-line "
+      f"tail-ratio output (**{vd['csr_tail_ratio']:.2f}×**) used to mix two "
+      f"different vessel-density definitions (a raw-cell tail fraction divided "
+      f"by a clustered-vessel-density Poisson null) in a way that was small "
+      f"and easy to miss for GBM (~6% effect) but not for breast — this was "
+      f"caught during this same round and `vascular_validation.py::verdict()` "
+      f"has since been fixed to use the clustered-vessel basis throughout; "
+      f"the number above is the CORRECTED, self-consistent output, matching "
+      f"Decomposition B below exactly.")
     A("")
     A("| test | reconstructed | published human breast IDC | verdict |")
     A("|---|---|---|---|")
@@ -764,16 +769,26 @@ def write_report(res: Dict, vd: Dict, raw_csr: Dict, clustered_csr: List[Dict],
       "could be found here, so this report cannot even bound how "
       "representative this one section is of breast IDC generally — a "
       "strictly weaker epistemic position than the GBM report was in.")
-    A(f"- **The panel's richer endothelial gene set (13 genes) is still "
-      f"barely used.** `marker_panels.BREAST_PANEL_MARKER_MAP` types "
-      f"ENDOTHELIAL from only 3 of the 13 endothelial-associated genes "
-      f"measured on this Xenium panel (PECAM1/VWF/CLDN5 — CLEC14A, EGFL7, "
-      f"KDR, RAMP2, MMRN2, SOX17, SOX18, NOSTRIN, AQP1, ESM1, ANGPT2 go "
-      f"unused), exactly as `results/breast_cancer_flagship.md` and "
-      f"`results/vascular_validation.md` §6a already flagged. Endothelial "
-      f"identity moving with a threshold this arbitrary is the same caveat "
-      f"GBM's single-marker PECAM1 gate carried, not a new one, but breast "
-      f"has more unused headroom to fix it with than GBM does.")
+    A(f"- **The panel's richer endothelial gene set (15 genes, not the 13 "
+      f"earlier reports miscounted) is still barely used — and richer typing "
+      f"has since been TRIED and did not help.** `marker_panels."
+      f"BREAST_PANEL_MARKER_MAP` types ENDOTHELIAL from only 3 of the 15 "
+      f"endothelial-associated genes measured on this Xenium panel (PECAM1/"
+      f"VWF/CLDN5 — CLEC14A, EGFL7, KDR, RAMP2, MMRN2, SOX17, SOX18, NOSTRIN, "
+      f"AQP1, ESM1, ANGPT2, CD93 go unused). A follow-up prototype "
+      f"(`results/sweep/endothelial_marker_richness_2026-07-29T19-07-43Z.md`) "
+      f"tried an 8-gene selective composite score against this same section: "
+      f"endothelial count rose ~22% and MVD moved as expected, but the CSR "
+      f"tail ratio — the module's own headline clustering diagnostic — was "
+      f"roughly HALVED (moving toward, not away from, CSR-indistinguishability) "
+      f"at the primary 20 µm linking distance, and went below 1.0 (thinner "
+      f"tail than random) at 25-30 µm, which the 3-gene baseline never does. "
+      f"An uncritical 15-gene kitchen-sink variant gave nearly the same "
+      f"result — gene selectivity wasn't the deciding factor, added coverage "
+      f"was, and it moved the wrong way. This lever is now a tested, honest "
+      f"null, not an untried one; endothelial identity moving with a "
+      f"threshold this arbitrary is still the same caveat GBM's single-marker "
+      f"PECAM1 gate carried.")
     A("- **The clustering correction is doing real, density-changing work "
       "here, which makes every MVD-dependent number linking-distance-"
       "sensitive in a way GBM's was not** (§2.2, §3.3). Any single-number "
@@ -812,13 +827,15 @@ def write_report(res: Dict, vd: Dict, raw_csr: Dict, clustered_csr: List[Dict],
 
     A("## 6. What would fix this")
     A("")
-    A("1. **Use more of the 13 endothelial genes this panel actually "
-      "measures**, rather than 3. This is the one concrete lever breast has "
-      "that GBM's single-PECAM1-gene panel never could — unstarted here, "
-      "flagged in `results/breast_cancer_flagship.md` and "
-      "`results/vascular_validation.md` §6a, and not attempted in this "
-      "report either (`marker_panels.py` is under `tmesim/` and out of "
-      "scope for this task).")
+    A("1. ~~Use more of the 15 endothelial genes this panel actually "
+      "measures, rather than 3.~~ **Tried, and it does not help.** A "
+      "follow-up prototype found richer marker-based typing roughly halves "
+      "the CSR tail ratio (moving toward randomness, not away from it) and "
+      "pushes it below 1.0 at wider linking distances — see the caveat "
+      "above and `results/sweep/endothelial_marker_richness_2026-07-29T19-"
+      "07-43Z.md` for the full sweep. This was the one concrete lever "
+      "breast had that GBM's single-PECAM1-gene panel never could try; it "
+      "is now a tested null, not an open option.")
     A("2. **Find or run a whole-slide, unbiased-sampling breast MVD study** "
       "(the Marien-2016-style follow-up that paper's own Discussion calls "
       "for and that could not be located here) — without it, every absolute-"
