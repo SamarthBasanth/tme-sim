@@ -1,76 +1,22 @@
 # Real drug panel on the real Xenium glioblastoma microenvironment
 
-> ## ⚠ STALE — the absolute numbers in this file no longer match the engine
->
-> **Do not quote an absolute kill, AUC or coverage from this file.** The engine has moved
-> since it was generated. The *ranking* is unaffected and still reproduces exactly.
->
-> | | this file | current engine |
-> |---|---|---|
-> | tumour cells typed | 30,174 | **23,812** |
-> | mean O₂ | 0.295 | **0.352** |
-> | cisplatin `kill_fraction` | 0.3699 | **0.4361666386695784** (~18% higher) |
->
-> **Cause:** the endothelial classifier fix (`matched_null_z` aggregation, which removed an
-> arity bias in marker-gated phenotyping). Fewer cells are typed as tumour and the survivors
-> sit in better-perfused tissue, so mean O₂ rises and kill rises with it.
->
-> **This is not a report-layer bug.** The current value was reproduced *bit-identically* by
-> two independent paths — the static-export builder and `app/server/report.py` — both landing
-> on `0.4361666386695784`, and by re-running the CLI chain by hand on the current tree.
->
-> **Which config that number belongs to.** `0.4361666386695784` is this file's config — the
-> **static source** (`time_resolved = false`). [`results/mechanism_attribution.md`](mechanism_attribution.md)
-> reports `0.43658659499412056` for the same drug and section, and the two are **not** in
-> conflict: that file runs **time-resolved PK** (`plasma_peak = 50 µM`, `half_life = 4 h`).
-> Both were re-run directly and reproduce to the last bit of the mantissa:
->
-> | config | cisplatin | temozolomide |
-> |---|---|---|
-> | static source | `0.4361666386695784` | `0.01835209138249627` |
-> | time-resolved PK | `0.43658659499412056` | `0.01839408701495049` |
->
-> The gap is ~0.1% of kill (≈10 of 23,812 tumour cells). Quote a kill with its PK mode
-> attached; the bare number is ambiguous across the repo.
->
-> This is exactly the failure mode this project's own limits describe: **the ranking is
-> invariant, the level is not.** Regeneration is pending a tree in which
-> `tmesim/reconstruct/real_pipeline.py` is not being actively edited; regenerating against a
-> half-applied engine change would bake in a state that never existed.
->
-> The same staleness applies to [`results/patient_report_xenium.md`](patient_report_xenium.md).
-
-> **Regenerated under the discrete vessel source.** `vascular_mode = discrete`
-> (`reconstruct.real_fields._DEFAULT_VASCULAR_MODE`, promoted in
-> [`results/vessel_promotion.md`](vessel_promotion.md)) · **alpha = 148.6**, the
-> e-folding-length convention `L = d_half / ln 2` · per-cell sensitivity mode =
-> **`uniform` (headline ranking); `determinant` reported separately** · **dx = 12 µm**.
->
-> Every absolute exposure / AUC / coverage / kill below is on the **discrete-source
-> unit** and is NOT comparable with the KDE-era numbers this file carried before this
-> regeneration (the tissue-integrated source total is 3.36x smaller; that is a change
-> of *unit*, not of physics — the dose-matched, geometry-only effect on coverage is
-> <= 0.0166). To recover the old numbers, re-run with `mode='kde'`.
->
-> Headline shift vs the KDE-era file: mean tumour AUC 5.48e+06 -> 1.63e+06 µM·s (cisplatin) and kill 0.9125 -> 0.3699; the **kill ordering is unchanged** — cisplatin > doxorubicin > lomustine > methotrexate > temozolomide.
-
 **Experiment:** `experiments/real_drug_panel.py` (run: `./.venv/bin/python experiments/real_drug_panel.py`)
 
 **Figure:** `results/real_drug_panel.png`
 
 > **Provenance of this run.** Perivascular-sink calibration **α = 148.6** (the e-folding-length convention, `L = d_half/ln 2`; the retired α = 309.6 came from fitting the raw half-distance as if it were an e-fold length and is superseded). Per-cell sensitivity mode = **`uniform`** for the headline ranking — identical for every drug, so the comparison is fair; the drug-specific `determinant` mode is reported separately in §*Sensitivity mode* below. Tissue mask = **geometric** (union of 30 µm discs around the measured cell centroids), which is **independent of the grid spacing** — this replaces the old "grid cells containing ≥ 1 cell" mask and changes the oxygen field and the hypoxic fraction substantially (see §*Tissue mask*).
 
-The full panel **[temozolomide, lomustine, cisplatin, methotrexate, doxorubicin]** is simulated on **one and the same real tumor** — the open 10x Xenium GBM section (40,887 measured cells; tumor 30,174). The real microenvironment is reconstructed **once** and reused for every drug, so all differences come from each drug's own physics on identical tissue (real vasculature, real ECM from collagen/matrix transcripts, real-perfusion oxygen).
+The full panel **[temozolomide, lomustine, cisplatin, methotrexate, doxorubicin]** is simulated on **one and the same real tumor** — the open 10x Xenium GBM section (40,887 measured cells; tumor 23,812). The real microenvironment is reconstructed **once** and reused for every drug, so all differences come from each drug's own physics on identical tissue (real vasculature, real ECM from collagen/matrix transcripts, real-perfusion oxygen).
 
 Each drug is compiled through the same pipeline: `calibrate_alpha()` (single perivascular-sink constant, fit **once** on doxorubicin → α=148.6) → `calibrated_drugparams(name, α)` (real GDSC IC50 + calibrated loss) → `apply_barrier_to_drugparams` (saturable binding-site barrier).
 
 ## Real microenvironment (reconstructed once)
 
 - Source: 10x Xenium GBM — 40,887 real cells, grid (424, 675), dx=12 µm, extent (8100.0, 5088.0) µm.
-- Cell-type fractions: TUMOR 73.8%, ENDOTHELIAL 9.7%, IMMUNE 8.5%, STROMAL 7.9%.
-- Mean vascular density 0.025, mean ECM 0.076, mean oxygen 0.295.
+- Cell-type fractions: TUMOR 58.2%, ENDOTHELIAL 10.5%, IMMUNE 19.5%, STROMAL 11.8%.
+- Mean vascular density 0.027, mean ECM 0.076, mean oxygen 0.352.
 - Tissue mask: **geometric**, radius 30 µm, covering 67.7% of the bounding box (dx-independent — see §*Tissue mask*).
-- **Tumor hypoxic fraction ≈ 12.7%** at this resolution under the grid-independent tissue mask. See §*Tissue mask* — this number moved a great deal when the mask was fixed and the honest reading has changed.
+- **Tumor hypoxic fraction ≈ 0.0%** at this resolution under the grid-independent tissue mask. See §*Tissue mask* — this number moved a great deal when the mask was fixed and the honest reading has changed.
 
 ## Tissue mask — the geometry fix, and what it changed
 
@@ -102,15 +48,15 @@ Per-cell drug sensitivity can be set two ways (`reconstruct.real_pipeline.apply_
 
 | drug | sensitivity (uniform) | sensitivity (determinant) | determinant gene | kill (uniform) | kill (determinant) | comparable across drugs? |
 |---|---:|---:|:--|---:|---:|:--|
-| temozolomide | 1.000 | 1.000 | — (none on panel) | 0.0147 | 0.0147 | ❌ **UPPER BOUND** — no resistance modelled |
-| lomustine | 1.000 | 0.590 | MKI67 | 0.1975 | 0.1190 | scaled by its own determinant |
-| cisplatin | 1.000 | 0.590 | MKI67 | 0.3699 | 0.2197 | scaled by its own determinant |
-| methotrexate | 1.000 | 0.590 | MKI67 | 0.0162 | 0.0096 | scaled by its own determinant |
-| doxorubicin | 1.000 | 0.585 | TOP2A | 0.2165 | 0.1301 | scaled by its own determinant |
+| temozolomide | 1.000 | 1.000 | — (none on panel) | 0.0184 | 0.0184 | ❌ **UPPER BOUND** — no resistance modelled |
+| lomustine | 1.000 | 0.590 | MKI67 | 0.2371 | 0.1429 | scaled by its own determinant |
+| cisplatin | 1.000 | 0.590 | MKI67 | 0.4362 | 0.2549 | scaled by its own determinant |
+| methotrexate | 1.000 | 0.590 | MKI67 | 0.0192 | 0.0120 | scaled by its own determinant |
+| doxorubicin | 1.000 | 0.585 | TOP2A | 0.2595 | 0.1551 | scaled by its own determinant |
 
-**Ranking under `mode='uniform'` (FAIR — this is the ranking):** **cisplatin** (0.3699) > **doxorubicin** (0.2165) > **lomustine** (0.1975) > **methotrexate** (0.0162) > **temozolomide** (0.0147)
+**Ranking under `mode='uniform'` (FAIR — this is the ranking):** **cisplatin** (0.4362) > **doxorubicin** (0.2595) > **lomustine** (0.2371) > **methotrexate** (0.0192) > **temozolomide** (0.0184)
 
-**Ranking under `mode='determinant'` (CONFOUNDED — reported for comparison only, do not cite as a ranking):** **cisplatin** (0.2197) > **doxorubicin** (0.1301) > **lomustine** (0.1190) > **temozolomide** (0.0147) > **methotrexate** (0.0096)
+**Ranking under `mode='determinant'` (CONFOUNDED — reported for comparison only, do not cite as a ranking):** **cisplatin** (0.2549) > **doxorubicin** (0.1551) > **lomustine** (0.1429) > **temozolomide** (0.0184) > **methotrexate** (0.0120)
 
 Read the difference plainly: in `determinant` mode every drug except temozolomide is multiplied by ≈0.585, so their kills drop by roughly that factor while TMZ's does not move at all. Any place TMZ climbs is **entirely** attributable to that, and would reverse the moment MGMT were measurable. `determinant` mode is legitimate for a *within-drug* spatial question ("where on this section does doxorubicin work?"); it is not legitimate for ranking drugs against each other on a panel that measures some of their determinants and not others.
 
@@ -120,25 +66,25 @@ Read the difference plainly: in `determinant` mode every drug except temozolomid
 
 | drug | MW (Da) | real IC50 (µM) | bbb_penetrance | D_eff (µm²/s) | penetration_index | mean AUC (µM·s) | predicted kill |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | 194 | 606 | 0.125 | 265.3 | 0.470 | 6.86e+05 | 0.0147 |
-| lomustine | 234 | 50 | 0.973 | 247.4 | 0.370 | 8.35e+05 | 0.1975 |
-| cisplatin | 298 | 24.6 | 0.858 | 225.4 | 0.420 | 1.63e+06 | 0.3699 |
-| methotrexate | 454 | 12 | 0.023 | 189.8 | 0.331 | 1.41e+04 | 0.0162 |
-| doxorubicin | 544 | 0.5 | 0.021 | 176.3 | 0.310 | 1.03e+04 | 0.2165 |
+| temozolomide | 194 | 606 | 0.125 | 265.3 | 0.511 | 7.37e+05 | 0.0184 |
+| lomustine | 234 | 50 | 0.973 | 247.4 | 0.374 | 8.96e+05 | 0.2371 |
+| cisplatin | 298 | 24.6 | 0.858 | 225.4 | 0.428 | 1.75e+06 | 0.4362 |
+| methotrexate | 454 | 12 | 0.023 | 189.8 | 0.327 | 1.52e+04 | 0.0192 |
+| doxorubicin | 544 | 0.5 | 0.021 | 176.3 | 0.304 | 1.11e+04 | 0.2595 |
 
 IC50 values are the real GDSC/literature potencies that flow in through the molecular layer; MW is from the verified molecular structure; `bbb_penetrance` and `D_eff` are structure-derived (`D_eff = D · (1 − 0.6·ECM)` at the tumor mean ECM = 0.076).
 
 ## Which drug wins on THIS real tumor, and why
 
-- **Penetration does NOT separate these drugs at converged resolution.** `penetration_index` spans only 0.310–0.470 across the whole panel — a spread of 0.161, which is not a meaningful ranking. This is a **correction**: an earlier, unconverged dx = 30 µm run of the same panel appeared to span 0.266–0.396 and was reported as 'temozolomide penetrates best, doxorubicin barely reaches the tumor bulk'. **That ranking was a grid artifact and is retracted.** The reason is definitional: `penetration_index = mean(AUC) / p99(AUC)` over tissue is a *scale-invariant shape* statistic — it measures how uniform the exposure field is, not how much drug arrives. Once the perivascular boundary layer is actually resolved, that shape is set by the **vascular geometry**, which is identical for all five drugs, and these drugs' D_eff values differ by only ~1.5× (175–263 µm²/s) — far too little to reshape the field.
-- **Delivery differences are real, but they live in the AUC, not the index.** Mean exposure spans 1.03e+04–1.63e+06 µM·s (~157×), driven by BBB penetrance and the calibrated perivascular sink. Doxorubicin really is delivery-starved on this section — its mean AUC is ~120× below temozolomide's — but that shows up as a *lower absolute exposure*, not as a flatter spatial profile. **Quote mean AUC, not penetration_index, when comparing drugs.**
-- **Best predicted kill (mode = `uniform`):** **cisplatin** (kill_fraction 0.3699, penetration_index 0.420, IC50 24.6 µM, mean AUC 1.63e+06 µM·s, bbb 0.858). Kill is **delivery × potency**, discounted by whatever oxygen-driven resistance the tissue carries: a drug wins only when it both reaches the cells AND is potent enough at the exposure it achieves. Full ranking: **cisplatin** (0.3699) > **doxorubicin** (0.2165) > **lomustine** (0.1975) > **methotrexate** (0.0162) > **temozolomide** (0.0147). Because every drug carries the same sensitivity in this mode, none of this ordering is a sensitivity artifact — it is delivery and potency only.
+- **Penetration does NOT separate these drugs at converged resolution.** `penetration_index` spans only 0.304–0.511 across the whole panel — a spread of 0.206, which is not a meaningful ranking. This is a **correction**: an earlier, unconverged dx = 30 µm run of the same panel appeared to span 0.266–0.396 and was reported as 'temozolomide penetrates best, doxorubicin barely reaches the tumor bulk'. **That ranking was a grid artifact and is retracted.** The reason is definitional: `penetration_index = mean(AUC) / p99(AUC)` over tissue is a *scale-invariant shape* statistic — it measures how uniform the exposure field is, not how much drug arrives. Once the perivascular boundary layer is actually resolved, that shape is set by the **vascular geometry**, which is identical for all five drugs, and these drugs' D_eff values differ by only ~1.5× (175–263 µm²/s) — far too little to reshape the field.
+- **Delivery differences are real, but they live in the AUC, not the index.** Mean exposure spans 1.11e+04–1.75e+06 µM·s (~157×), driven by BBB penetrance and the calibrated perivascular sink. Doxorubicin really is delivery-starved on this section — its mean AUC is ~120× below temozolomide's — but that shows up as a *lower absolute exposure*, not as a flatter spatial profile. **Quote mean AUC, not penetration_index, when comparing drugs.**
+- **Best predicted kill (mode = `uniform`):** **cisplatin** (kill_fraction 0.4362, penetration_index 0.428, IC50 24.6 µM, mean AUC 1.75e+06 µM·s, bbb 0.858). Kill is **delivery × potency**, discounted by whatever oxygen-driven resistance the tissue carries: a drug wins only when it both reaches the cells AND is potent enough at the exposure it achieves. Full ranking: **cisplatin** (0.4362) > **doxorubicin** (0.2595) > **lomustine** (0.2371) > **methotrexate** (0.0192) > **temozolomide** (0.0184). Because every drug carries the same sensitivity in this mode, none of this ordering is a sensitivity artifact — it is delivery and potency only.
 
 ## Honesty and caveats
 
 - **No outcome label.** This open Xenium section is an **untreated resection**. There is no paired measured drug response for any of these five drugs. The kill/penetration numbers are **predictions of the validated physics on real tissue — not validated outcomes.** Do not read the ranking as clinical efficacy.
 - **What is genuinely real here:** the geometry (real cells, real vasculature, real matrix, real oxygen), the transport physics (structure → mesh diffusivity + a doxorubicin-calibrated perivascular sink, revalidated out-of-sample on mitoxantrone), and the potency (real GDSC/literature IC50).
-- **Hypoxia is now predicted at 12.7%, and that is a statement about the model, not about this tumor.** Every earlier hypoxia number from this pipeline (≈94% at dx = 30 µm, ≈13% at dx = 12 µm) was produced under the grid-dependent occupancy tissue mask, which starved the O₂ supply more and more as the mesh was refined; those numbers are **retracted**. Under the fixed geometric mask the hypoxic fraction is 0.0% at every dx — which is *also* not credible for a GBM section. `OxygenConfig.consumption` has never been calibrated against a measured oxygen tension, so the absolute level is un-anchored in both directions. **No claim in this report depends on the hypoxic fraction, and none should.**
+- **Hypoxia is now predicted at 0.0%, and that is a statement about the model, not about this tumor.** Every earlier hypoxia number from this pipeline (≈94% at dx = 30 µm, ≈13% at dx = 12 µm) was produced under the grid-dependent occupancy tissue mask, which starved the O₂ supply more and more as the mesh was refined; those numbers are **retracted**. Under the fixed geometric mask the hypoxic fraction is 0.0% at every dx — which is *also* not credible for a GBM section. `OxygenConfig.consumption` has never been calibrated against a measured oxygen tension, so the absolute level is un-anchored in both directions. **No claim in this report depends on the hypoxic fraction, and none should.**
 - **Absolute kill fractions are an upper bound.** In the headline `uniform` sensitivity mode no intrinsic per-cell resistance is modelled for any drug. That is what makes the *ranking* fair; it also means every *absolute* kill here is the best case. See §*Sensitivity mode*.
 - **One anchor sets the scale.** The single α is fit to one doxorubicin penetration number; the absolute penetration of every drug rides on that measurement, and the binding proxy is an ordering, not a first-principles rate.
 
