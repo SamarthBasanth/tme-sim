@@ -54,6 +54,10 @@ _MATERIALIZED = [
         "AT10-BRA-5-FO-3_1", "AT10-BRA-5-FO-4_2", "AT10-BRA-5-FO-2_1",
         "AT10-BRA-5-FO-1_1", "AT10-BRA-5-FO-1_2", "AT14-BRA-4-FO-2_1",
         "AT15-BRA-4-FO-C2-S27", "AT15-BRA-4-FO-C3-S34", "AT15-BRA-4-FO-B2-S25",
+        # results/gbmspace_adapter.md §10: four more patients added to the
+        # atlas (AT5, AT7, AT9, AT12), one representative section each.
+        "AT12-BRA-4-FO-4_1", "AT9-BRA-4-FO-1_1", "AT7-BRA-3-FO-3_1",
+        "AT5-BRA-5-FO-1_2",
     )
 ]
 
@@ -200,7 +204,12 @@ def test_materialized_sections_ingest_and_validate(sample_name, path):
 
     rec = ing.ingest(path, sample_id=sample_name, detection=det)
     assert rec.validation["ok"], rec.validation
-    assert rec.n_cells > 1000
+    # Threshold set against the actual spot-count distribution across all 20
+    # sections on disk (780-12,120; results/gbmspace_adapter.md §10): AT5 and
+    # AT9's smallest sections have ~800-900 spots, still a real tissue section,
+    # not near-empty. 500 catches a genuinely broken/near-empty ingest without
+    # excluding real small sections.
+    assert rec.n_cells > 500
     # Two chemistries among the materialized sections (see the _MATERIALIZED
     # docstring above): ~36.6k-gene whole-transcriptome Visium V1, or the
     # ~18k-gene probe-based Visium V5/CytAssist panel. Either is fine; a

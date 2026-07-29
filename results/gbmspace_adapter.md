@@ -554,3 +554,69 @@ after confirms the only tracked-file change is `tests/test_gbmspace_adapter.py`;
 - **No calibration work was done**, same caveat as §8, now applying to 12 sections instead of 3.
 - **H&E images, Ensembl ids**: unchanged from §8 — still not materialized, still a
   symbol-as-placeholder respectively.
+
+## 10. Second follow-on pass: 12 -> 20 sections, 5 -> 9 patients
+
+Three parallel, file-locked ingestion batches (coordinated via
+`data_cache/.gbmspace_claims/<section>.claimed` marker files so concurrent agents never
+double-download) drew from the same full 97-section atlas §9 first sampled. Two succeeded, one
+gives an honest null worth recording as a real finding about the ingestion process itself.
+
+### 10.1 What landed: 8 new sections, 4 new patients (AT5, AT7, AT9, AT12)
+
+| Section | Patient | Spots | Genes | Chemistry |
+|---|---|---|---|---|
+| AT12-BRA-4-FO-4_1 | AT12 (new) | 3,401 | 36,601 | Visium V1 whole-transcriptome |
+| AT9-BRA-4-FO-1_1 | AT9 (new) | 780 | 36,601 | Visium V1 whole-transcriptome |
+| AT7-BRA-3-FO-1_1 | AT7 (new) | 1,712 | 36,601 | Visium V1 whole-transcriptome |
+| AT7-BRA-3-FO-3_1 | AT7 | 2,854 | 36,601 | Visium V1 whole-transcriptome |
+| AT7-BRA-3-FO-1_2 | AT7 | 1,721 | 36,601 | Visium V1 whole-transcriptome |
+| AT5-BRA-5-FO-1_2 | AT5 (new) | 876 | 36,601 | Visium V1 whole-transcriptome |
+| AT11-BRA-6-FO-4_2 | AT11 | 2,704 | 36,601 | Visium V1 whole-transcriptome |
+| AT15-BRA-4-FO-F1-S18 | AT15 | 12,120 | 18,085 | Visium V5/CytAssist probe-based |
+
+Repo total is now **20 sections across 9 patients** (AT10 x5, AT11 x3, AT12 x1, AT14 x1, AT15 x4,
+AT5 x1, AT6 x1, AT7 x3, AT9 x1) — confirmed by listing `data_cache/gbmspace_visium/` directly, not
+by trusting the ingesting agents' own counts. Independently re-ingested one representative section
+per new patient (AT12, AT9, AT7, AT5) myself: all four detect as `platform=visium,
+confidence=1.0`, validate `ok=True`, and carry the same hypoxia panel (VEGFA/CA9/ADM/NDRG1/
+SLC2A1) and MGMT as every prior section. All 20 sections' spot counts were also pulled directly
+(range 780-12,120) to set the test threshold below correctly rather than by guessing.
+
+Same materialize-then-delete-raw discipline as §8/§9: raw `.h5ad` files deleted immediately after
+each section is registered into the Studio catalogue; disk stayed at 17-21 GiB free throughout
+(never near the 10 GiB floor).
+
+### 10.2 A genuine, honest null: one batch's 4 claimed sections were never ingested
+
+One of the three parallel batches claimed 4 sections (`AT5-BRA-5-FO-3_1`, `AT4-BRA5-FO-3_1`,
+`AT13-BRA-3-FO-1_2`, `AT5-BRA-5-FO-2_1`) but its extraction failed identically on two separate
+attempts with `tar: <member>: Not found in archive`, despite that batch having independently
+confirmed those exact member paths and byte sizes moments earlier via its own listing. Checked via
+`ps` that the extraction process was genuinely active (17-18% CPU, growing CPU time) — a real
+truncated/lost-race stream, not a hang, most likely connection contention from three agents
+streaming the same 3.9 GB archive concurrently while the other two batches were successfully
+extracting their own members from the same URL. Per instruction, the batch stopped after the
+second identical failure rather than retrying indefinitely, released all 4 claim markers so those
+sections aren't permanently blocked for a future pass, and confirmed zero partial bytes were
+written to disk. Net effect: those 4 sections remain available, untouched, for a future ingestion
+pass; nothing was lost or left in a broken state.
+
+### 10.3 Test coverage extended, threshold recalibrated against real data
+
+Added one representative section per new patient (AT12, AT9, AT7, AT5) to
+`tests/test_gbmspace_adapter.py::_MATERIALIZED`. This surfaced a real, if minor, test-fragility
+issue: the existing `assert rec.n_cells > 1000` was calibrated against the first 12 sections
+(smallest was AT11 at ~2,700 spots) and failed on AT5 (876) and AT9 (780) — both genuine, valid
+tissue sections, just physically smaller, not a broken ingest. Lowered the threshold to `> 500`
+against the actual spot-count distribution across all 20 sections now on disk (780-12,120) rather
+than loosening it arbitrarily. Full `test_gbmspace_adapter.py` suite: 21 passed.
+
+### 10.4 What was NOT done, honestly (this pass)
+
+- Still only ~24 of the full atlas's 97 sections have ever been pulled across all passes combined
+  (12 from §9, 8 more here); ~73 remain untouched. The 4 sections from the honest-null batch
+  (§10.2) are a specific, ready-to-retry next target.
+- No calibration work was done, same standing caveat as §8/§9, now applying to 20 sections.
+- No new patients' worth of cross-chemistry or cross-region comparison was attempted beyond what
+  §9.4 already flagged as unresolved (the AT15 chemistry confound).
