@@ -261,6 +261,18 @@
   min-width: 0;
   background: var(--bg-1);
   border-top: 1px solid var(--line-2);
+  /* Each column has a floor (`minmax`'s first value) that the track never
+     shrinks below; with the reports column mounted (reports.css) the three
+     floors sum to more width than the dock has at ~1150px and narrower.
+     Grid tracks do not violate their floor, so without this the dock itself
+     overflowed its grid area with nowhere for the excess to go: the
+     Reports column's "generate report" button and the tail of the
+     Comparison table were silently clipped at the viewport edge, invisible
+     and unreachable — the one place in the shell that broke rule 4.3 ("wide
+     content scrolls inside its own container") instead of following it.
+     Screenshot QA at 1152px and 1024px caught it; this restores the same
+     contract the stage toolbar already uses one level up. */
+  overflow-x: auto;
 }
 .dock > .panel { min-width: 0; min-height: 0; }
 .dock-div { background: var(--line-2); }
@@ -320,6 +332,13 @@
   font-size: var(--fs-micro);
   color: var(--fg-3);
   font-family: var(--font-mono);
+  /* A panel-head is a fixed `--h-head` row (see tokens.css 3.3): it does not
+     grow for a second line. A hint that runs out of room must truncate, not
+     wrap — a wrapped line has nowhere to go but on top of the row below it. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .panel-body {
   flex: 1 1 auto;

@@ -75,7 +75,7 @@ export function createProjectsPanel({ store }) {
 
   const railEl = h('div.proj-rail');
   const mainEl = h('div.proj-main');
-  const titleEl = h('span.mono.strong', NULL_GLYPH);
+  const titleEl = h('span.mono.strong.proj-title', { title: '' }, NULL_GLYPH);
   const metricSel = h('select.inp.sm', {
     title: 'Which metric the RANKING is taken over',
     onchange: (e) => { metric = e.target.value; refreshComparison(); },
@@ -182,12 +182,19 @@ export function createProjectsPanel({ store }) {
       h('p.mono.dim', { style: { marginTop: '8px' } },
         './.venv/bin/python -m app.server')));
     titleEl.textContent = NULL_GLYPH;
+    titleEl.title = '';
   }
 
   function render() {
     renderRail();
     renderMain();
-    titleEl.textContent = project ? `${project.id} · ${project.name}` : NULL_GLYPH;
+    const label = project ? `${project.id} · ${project.name}` : NULL_GLYPH;
+    titleEl.textContent = label;
+    // The head row truncates this with an ellipsis (a long project name plus
+    // the rank-by control and the refresh/close buttons do not all fit on
+    // one --h-head line at the dialog's min width) — the full name is still
+    // one hover away.
+    titleEl.title = project ? label : '';
   }
 
   /* --- rail: projects, specimens, run association ---------------------- */

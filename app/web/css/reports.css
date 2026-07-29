@@ -39,6 +39,16 @@
   padding: var(--sp-4);
   max-height: 78px;
   overflow-y: auto;
+  /* `.rp-body` is a flex column shorter than its content at the default dock
+     height, so it is already scrolling (`overflow: auto` above). Without
+     `flex-shrink: 0` this box does not just stay at its own max-height and
+     let the *column* scroll — because `overflow-y: auto` gives it an
+     automatic minimum size of 0 (CSS Flexbox 4.5), the flex algorithm was
+     free to crush it well below 78px to make room for its siblings, clipping
+     a row of checkboxes mid-glyph with no scrollbar ever appearing (the box
+     never got tall enough to need one). Screenshot QA caught this; a plain
+     "it has overflow: auto" code read did not. */
+  flex-shrink: 0;
 }
 .rp .rp-drug {
   font-size: var(--fs-xs);

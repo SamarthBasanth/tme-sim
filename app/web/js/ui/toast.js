@@ -22,7 +22,7 @@ function ensure() {
 export function toast(kind, title, detail, ttl) {
   const el = h('div.toast' + (kind === 'info' ? '' : '.' + kind),
     h('div.bar'),
-    h('div.body',
+    h('div.toast-body',
       h('b', title),
       detail ? h('code', detail) : null),
     h('button.btn.ghost.icon.sm.x', {

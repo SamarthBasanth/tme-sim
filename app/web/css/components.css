@@ -697,9 +697,17 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .toast.err > .bar { background: var(--crit); }
 .toast.warn > .bar { background: var(--warn); }
 .toast.ok > .bar { background: var(--ok); }
-.toast .body { padding: 5px 0 6px 0; line-height: 1.4; color: var(--fg-1); min-width: 0; }
-.toast .body b { display: block; color: var(--fg-0); font-weight: 600; margin-bottom: 1px; }
-.toast .body code { font-size: var(--fs-micro); color: var(--fg-2); word-break: break-all; }
+/* `.toast-body`, not `.body` — the app shell's own top-level `<div class="body"
+   id="body">` (layout.css) is an unscoped `.body` grid container, and a nested
+   `<div class="body">` here would inherit its `display: grid` and its
+   3/4/5-column `grid-template-columns` for nothing: CSS class selectors do
+   not care about the ancestor being a different element entirely. That is
+   exactly what happened before this rename — the toast's `<code>` run id got
+   auto-placed into one of the shell's borrowed 4px splitter-gutter columns
+   and rendered one character per line down the side of the toast. */
+.toast .toast-body { padding: 5px 0 6px 0; line-height: 1.4; color: var(--fg-1); min-width: 0; }
+.toast .toast-body b { display: block; color: var(--fg-0); font-weight: 600; margin-bottom: 1px; }
+.toast .toast-body code { font-size: var(--fs-micro); color: var(--fg-2); word-break: break-all; }
 .toast .x { align-self: start; }
 
 /* ======================================================= misc ========== */

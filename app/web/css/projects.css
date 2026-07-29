@@ -20,6 +20,21 @@
   overflow: hidden;
 }
 
+/* The head row is a fixed --h-head line carrying two labels, a project
+   title of unbounded length, a metric picker and two buttons. Screenshot QA
+   found a real project name ("p_00002 · Two-patient GBM therapy panel")
+   wrapping inside that fixed-height row and overlapping the hint text above
+   it. The title is the one element here with no natural ceiling on its
+   length, so it is the one that gives: it takes the flexible space and
+   truncates instead of wrapping. */
+#proj-dlg .panel-head .proj-title {
+  flex: 1 1 auto;
+  min-width: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .proj-body {
   display: grid;
   grid-template-columns: 336px 1px minmax(0, 1fr);
