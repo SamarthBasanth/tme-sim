@@ -34,6 +34,14 @@ export const COLOR_MODE = { TYPE: 0, FIELD: 1, LABEL: 2 };
 /** Size of the u_labelColor / u_labelVis uniform arrays in shaders.js. */
 const MECH_SLOTS = 8;
 
+// Constant "everything visible" uniform payloads for the hover/selection
+// marker pass (see drawMark() in render()): a pinned or hovered cell is drawn
+// with every channel and every mechanism category forced on, and that mask
+// never varies, so it is allocated once here rather than with `new
+// Float32Array(...)` on every draw call of every frame a marker is showing.
+const ALL_TYPES_VISIBLE = new Float32Array([1, 1, 1, 1, 1]);
+const ALL_LABELS_VISIBLE = new Float32Array(MECH_SLOTS).fill(1);
+
 const TARGET_MS = 1000 / 55;   // engage LOD above this while interacting
 const RELAX_MS = 1000 / 90;    // relax LOD below this
 
@@ -169,14 +177,20 @@ export class Viewer {
     // clamped outside, which is what lets an operator pull structure out of a
     // compressed tail instead of looking at a flat wash.
     this.win = null;
-    this.visible = [1, 1, 1, 1, 1];
+    // Float32Array, not a plain array: this is uploaded to u_typeVis on every
+    // dirty frame, and while the camera is moving that is every presented
+    // frame. A plain array would need `new Float32Array(this.visible)` at
+    // upload time — a fresh 5-element allocation per frame for the whole
+    // length of a pan/zoom gesture. Mutating it in place in setVisible() costs
+    // nothing extra and removes the allocation entirely.
+    this.visible = new Float32Array([1, 1, 1, 1, 1]);
     // Per-cell colour-by-attribute channel (colorMode 2). Currently the
     // mechanism-attribution label. `labels` holds the payload in the ORIGINAL
     // (geometry) cell order for read-out; the GPU buffer holds it in the
     // viewer's internal shuffled order.
     this.labels = null;
     this.labelBuf = null;
-    this.labelVis = new Array(MECH_SLOTS).fill(1);
+    this.labelVis = new Float32Array(MECH_SLOTS).fill(1);   // same reasoning as `visible`
     this.labelCounts = null;
     this.hovered = -1;
     this.selected = -1;
@@ -198,8 +212,35 @@ export class Viewer {
     this.onFrame = null;
     this._syncPx = new Uint8Array(4);
 
+    // Cached CSS box of the canvas, kept current by a ResizeObserver instead
+    // of a live getBoundingClientRect() read at every use. cssSize is read on
+    // the hot path — once per dirty frame via resize(), and again per raw
+    // pointermove via screenToWorld() for the cursor read-out — and every
+    // stage overlay (scale bar text, hover read-out) rewrites its DOM text on
+    // that same frame cadence while the operator is panning. A direct
+    // getBoundingClientRect() there would force a synchronous layout on
+    // almost every call: read, then write, then read again next frame, with
+    // no frame in the gesture where the browser gets to batch the two. A
+    // ResizeObserver on the canvas itself keeps `_cssW`/`_cssH` correct on
+    // every real size change — window resize, rail/dock splitter drag,
+    // initial mount — without a read anywhere in the render or pointer path.
+    this._cssW = 1; this._cssH = 1;
+    this._measureCss();
+    this._ro = null;
+    if (typeof ResizeObserver === 'function') {
+      this._ro = new ResizeObserver(() => this._measureCss());
+      this._ro.observe(this.canvas);
+    }
+
     this.refreshTheme();
     this._loop = this._loop.bind(this);
+  }
+
+  _measureCss() {
+    const r = this.canvas.getBoundingClientRect();
+    this._cssW = Math.max(1, r.width);
+    this._cssH = Math.max(1, r.height);
+    this.dirty = true;
   }
 
   /* ------------------------------------------------------------- theme -- */
@@ -347,7 +388,7 @@ export class Viewer {
     for (let i = 0; i < n; i++) {
       if (labels[i] < MECH_SLOTS) this.labelCounts[labels[i]]++;
     }
-    this.labelVis = new Array(MECH_SLOTS).fill(1);
+    this.labelVis.fill(1);
     this.stats.labelBytes = shuffled.byteLength;
     this.dirty = true;
   }
@@ -356,7 +397,7 @@ export class Viewer {
     const gl = this.gl;
     this.labels = null;
     this.labelCounts = null;
-    this.labelVis = new Array(MECH_SLOTS).fill(1);
+    this.labelVis.fill(1);
     this.stats.labelBytes = 0;
     if (this.vao) {
       gl.bindVertexArray(this.vao);
@@ -493,8 +534,13 @@ export class Viewer {
   /* -------------------------------------------------------------- view -- */
 
   get cssSize() {
-    const r = this.canvas.getBoundingClientRect();
-    return { w: Math.max(1, r.width), h: Math.max(1, r.height) };
+    // No ResizeObserver support: degrade to the direct read every call had
+    // before, rather than risk a stale cached size forever.
+    if (!this._ro) {
+      const r = this.canvas.getBoundingClientRect();
+      return { w: Math.max(1, r.width), h: Math.max(1, r.height) };
+    }
+    return { w: this._cssW, h: this._cssH };
   }
 
   fit(pad = 0.04) {
@@ -696,12 +742,12 @@ export class Viewer {
     gl.uniform2fv(u.u_scale, scale);
     gl.uniform2fv(u.u_offset, offset);
     gl.uniform3fv(u.u_typeColor, this.flatTypeColors);
-    gl.uniform1fv(u.u_typeVis, new Float32Array(this.visible));
+    gl.uniform1fv(u.u_typeVis, this.visible);
     gl.uniform1i(u.u_colorMode, this.colorMode);
     gl.uniform1i(u.u_hasField, this.field ? 1 : 0);
     gl.uniform1i(u.u_hasLabel, this.labels ? 1 : 0);
     gl.uniform3fv(u.u_labelColor, this.flatLabelColors);
-    gl.uniform1fv(u.u_labelVis, new Float32Array(this.labelVis));
+    gl.uniform1fv(u.u_labelVis, this.labelVis);
     gl.uniform2f(u.u_fieldRange, winLo, winHi);
     gl.uniform4f(u.u_force, 0, 0, 0, 0);
     gl.uniform1f(u.u_alpha, this.pointAlpha);
@@ -738,11 +784,11 @@ export class Viewer {
       gl.uniform1f(u.u_round, 1);
       gl.uniform1f(u.u_ring, 1);
       gl.uniform4f(u.u_force, color[0], color[1], color[2], 1);
-      gl.uniform1fv(u.u_typeVis, new Float32Array([1, 1, 1, 1, 1]));
+      gl.uniform1fv(u.u_typeVis, ALL_TYPES_VISIBLE);
       // A pinned cell must stay visible even when its channel — or its
       // mechanism category — is toggled off; otherwise the marker silently
       // vanishes and the read-out describes something the operator cannot see.
-      gl.uniform1fv(u.u_labelVis, new Float32Array(MECH_SLOTS).fill(1));
+      gl.uniform1fv(u.u_labelVis, ALL_LABELS_VISIBLE);
       gl.drawArrays(gl.POINTS, idx, 1);
     };
     if (this.selected >= 0) drawMark(this.selected, this.markColor, Math.max(16, psz + 10));
