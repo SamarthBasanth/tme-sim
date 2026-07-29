@@ -84,7 +84,24 @@ class OxygenConfig:
 
 @dataclass
 class PDConfig:
-    """Pharmacodynamics: how accumulated exposure maps to cell kill."""
+    """Pharmacodynamics: how accumulated exposure maps to cell kill.
+
+    ``hypoxia_resistance`` and ``quiescent_resistance`` are UNVALIDATED PRIORS
+    with no citation (flagged in-repo at ``validation/kill_calibration.py:1954,1997``).
+    A literature search (``results/sweep/state_multiplier_literature_check_*.md``)
+    found real, GBM-cell-line, hypoxia-vs-normoxia temozolomide data (Musah-Eroje &
+    Watson 2019, PMID 30694423; Wang et al. 2017, PMID 28801626; Ahmed et al. 2018,
+    PMID 29492900) that converges on a much SMALLER hypoxia effect for TMZ
+    specifically than 0.35 implies -- IC50 shifts of only ~1.1-1.4x, and one clean
+    null result in the matched-2D-oxygen comparison closest to what this multiplier
+    represents. For ``quiescent_resistance``, no quantitative fold-change was found
+    anywhere in the literature for any of this project's three drugs -- only
+    mechanistic support for the direction (<1). Neither value has been changed:
+    the literature numbers are IC50/survival shifts, not kill-probability
+    multipliers, and converting between them requires picking an operating point
+    on the Hill curve this project's own exposures would need to supply (see that
+    file's "Metric mismatch" section) -- a modeling decision, not a lookup.
+    """
 
     hypoxia_resistance: float = 0.35  # multiplier on kill for hypoxic cells (<1)
     quiescent_resistance: float = 0.5
