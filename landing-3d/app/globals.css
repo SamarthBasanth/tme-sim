@@ -173,10 +173,55 @@ body::after {
 }
 
 .narrative-section__body {
+  position: relative;
   max-width: 34rem;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+}
+
+/*
+ * Soft scrim behind the text block itself (not a full-viewport overlay, so
+ * it reads as a deliberate vignette rather than a flat panel). The 3D model
+ * is centered in the scene at every scroll stop, so headline copy — worst
+ * in the center-aligned hero and final-CTA sections, where the text block
+ * sits directly over it — otherwise crosses bright specular highlights on
+ * the tumor surface with no contrast guarantee. Sized larger than the text
+ * (negative inset) and blurred so the edge is invisible.
+ */
+.narrative-section__body::before {
+  content: "";
+  position: absolute;
+  inset: -1.75rem -2.25rem;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(4, 5, 7, 0.86) 0%,
+    rgba(4, 5, 7, 0.86) 38%,
+    rgba(4, 5, 7, 0.55) 62%,
+    rgba(4, 5, 7, 0) 88%
+  );
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+/*
+ * Center sections (Hero, CTA) put the text block directly over the model,
+ * which now has real surface texture rather than a flat highlight — a soft
+ * fade is not enough contrast guarantee against a mottled, moving surface.
+ * This scrim carries a genuinely opaque plateau under the text itself, not
+ * just a darkened tint, so legibility does not depend on what the model is
+ * doing underneath at that scroll position.
+ */
+.narrative-section--center .narrative-section__body::before {
+  inset: -2.75rem -5rem;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(3, 4, 6, 0.94) 0%,
+    rgba(3, 4, 6, 0.94) 42%,
+    rgba(3, 4, 6, 0.65) 66%,
+    rgba(3, 4, 6, 0) 92%
+  );
 }
 
 .narrative-section--left .narrative-section__body {
@@ -438,33 +483,37 @@ body::after {
 .annotation-label {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  padding-left: 0.6rem;
-  border-left: 1px solid var(--accent-dim);
+  gap: 0.18rem;
+  padding: 0.4rem 0.65rem;
+  border-left: 2px solid var(--accent);
   white-space: nowrap;
   transform: translateY(0);
+  background: rgba(7, 8, 10, 0.68);
+  backdrop-filter: blur(6px);
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
 }
 
 .annotation-label--left {
   border-left: none;
-  border-right: 1px solid var(--accent-dim);
-  padding-left: 0;
-  padding-right: 0.6rem;
+  border-right: 2px solid var(--accent);
   align-items: flex-end;
   text-align: right;
+  border-radius: 4px 0 0 4px;
 }
 
 .annotation-label__title {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--ink);
 }
 
 .annotation-label__detail {
   font-family: var(--font-mono);
-  font-size: 0.62rem;
-  color: var(--ink-faint);
+  font-size: 0.64rem;
+  color: rgba(243, 245, 246, 0.72);
 }
 
 /* --------------------------------------------------------------------- */

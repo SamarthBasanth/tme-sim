@@ -47,7 +47,7 @@ export default function Annotation({
     const o = groupOpacity.current;
     if (lineRef.current) {
       const material = lineRef.current.material as LineMaterial;
-      material.opacity = o * 0.55;
+      material.opacity = o * 0.9;
       material.transparent = true;
     }
     if (htmlWrapRef.current) {
@@ -58,7 +58,7 @@ export default function Annotation({
 
   return (
     <>
-      <Line ref={lineRef} points={[anchor, labelPoint]} color="#cfe3ea" lineWidth={1} />
+      <Line ref={lineRef} points={[anchor, labelPoint]} color="#bdeaf7" lineWidth={1.75} />
       <Html position={labelPoint} center={false} zIndexRange={[10, 0]} sprite={false}>
         <div
           ref={htmlWrapRef}
