@@ -620,6 +620,16 @@ def measure(micro: Microenvironment) -> Dict:
             "tumor_to_vessel_p90": float(np.percentile(d_tv, 90)),
             "tumor_to_vessel_p95": float(np.percentile(d_tv, 95)),
             "tumor_to_vessel_max": float(d_tv.max()),
+            # Tail fractions at the CLUSTERED-VESSEL level (from ``d_tv``, distance
+            # to the nearest putative VESSEL OBJECT), matching the density basis of
+            # ``mvd_per_mm2`` above. Kept distinct from ``tumor_to_endo_stats``'
+            # ``frac_gt_*`` (raw endothelial-CELL distance, ``d_te``): mixing the two
+            # is exactly the denominator mismatch ``verdict()`` used to make (a raw
+            # cell-density tail fraction divided by a clustered-vessel-density
+            # Poisson null) — see ``verdict()`` for the fix.
+            "tumor_to_vessel_frac_gt_100": float((d_tv > 100).mean()),
+            "tumor_to_vessel_frac_gt_150": float((d_tv > 150).mean()),
+            "tumor_to_vessel_frac_gt_200": float((d_tv > 200).mean()),
             "aspect_median": float(np.median(ar)) if ar.size else float("nan"),
             "aspect_p90": float(np.percentile(ar, 90)) if ar.size else float("nan"),
             "centroids": cent,
@@ -715,7 +725,6 @@ def make_figure(res: Dict, path: str) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(15.5, 11.0), constrained_layout=True)
 
     prim = res["primary"]
-    st = res["tumor_to_endo_stats"]
 
     # ---- (a) distance-to-nearest-vessel histogram -------------------------- #
     ax = axes[0, 0]
@@ -744,8 +753,9 @@ def make_figure(res: Dict, path: str) -> None:
     ax.set_ylabel("tumour cells")
     ax.set_title(
         f"(a) Reconstructed tumour-cell → vessel distance\n"
-        f"only {100*st['frac_gt_100']:.1f}% of {res['n_tumor']:,} tumour cells lie "
-        f">100 µm from a vessel; max {st['max']:.0f} µm",
+        f"only {100*prim['tumor_to_vessel_frac_gt_100']:.1f}% of {res['n_tumor']:,} "
+        f"tumour cells lie >100 µm from a vessel; "
+        f"max {prim['tumor_to_vessel_max']:.0f} µm",
         loc="left", fontsize=10.5)
     ax.legend(handles=[
         Patch(color=C_BAND, alpha=0.30,
@@ -965,7 +975,6 @@ LIT_RANGES: Dict[str, Tuple[float, float]] = {
 def comparison_rows(res: Dict) -> List[Dict]:
     """The reconstructed-vs-published rows drawn in panel (c)."""
     prim = res["primary"]
-    st = res["tumor_to_endo_stats"]
     sweep = res["vessels"]
     kde_abs = {a["threshold"]: a["frac_geom_mask"] for a in res["kde"]["absolute"]}
 
@@ -975,6 +984,7 @@ def comparison_rows(res: Dict) -> List[Dict]:
     mvd_lo, mvd_hi = rng([v["mvd_per_mm2"] for v in sweep])
     sp_lo, sp_hi = rng([v["spacing_sqrt_area"] for v in sweep])
     md_lo, md_hi = rng([v["tumor_to_vessel_median"] for v in sweep])
+    tg_lo, tg_hi = rng([v["tumor_to_vessel_frac_gt_100"] for v in sweep])
 
     rows = [
         {
@@ -1011,12 +1021,17 @@ def comparison_rows(res: Dict) -> List[Dict]:
                      f"{EXP['gbm']['median_um']:.0f} µm",
         },
         {
+            # Clustered-VESSEL-object tail fraction (from prim, i.e. d_tv), not the
+            # raw endothelial-CELL tail fraction (st["frac_gt_100"], from d_te) —
+            # LIT_RANGES["frac_gt_100_pct"] is a Poisson tail at the published MVD
+            # (a vessel density), so the reconstructed side must be on the same
+            # vessel-object density basis. See verdict()'s docstring for the fix.
             "label": "tumour cells >100 µm\nfrom a vessel (%)",
             "lit_lo": LIT_RANGES["frac_gt_100_pct"][0],
             "lit_hi": LIT_RANGES["frac_gt_100_pct"][1],
-            "rec": 100 * st["frac_gt_100"],
-            "rec_lo": 100 * st["frac_gt_100"], "rec_hi": 100 * st["frac_gt_100"],
-            "annot": f"{100*st['frac_gt_100']:.1f}% vs "
+            "rec": 100 * prim["tumor_to_vessel_frac_gt_100"],
+            "rec_lo": 100 * tg_lo, "rec_hi": 100 * tg_hi,
+            "annot": f"{100*prim['tumor_to_vessel_frac_gt_100']:.1f}% vs "
                      f"{100*EXP['gbm']['frac_gt_100']:.0f}%",
         },
         {
@@ -1032,20 +1047,41 @@ def comparison_rows(res: Dict) -> List[Dict]:
 
 
 def verdict(res: Dict) -> Dict:
-    """The honest bottom line, computed rather than asserted."""
+    """The honest bottom line, computed rather than asserted.
+
+    DENOMINATOR-BASIS FIX: every ratio below compares against either the
+    published GBM MVD (Marien 2016, a CD31+ VESSEL-object count, PMID 27583442)
+    or a Poisson null built from this reconstruction's own MVD
+    (``q_rec = prim["mvd_per_mm2"]``, also a clustered VESSEL-object density).
+    Both halves of every ratio must therefore be on the clustered-VESSEL-object
+    density basis, not the raw endothelial-CELL density basis — "MVD" and "a
+    published/self CSR null at this MVD" are vessel-count concepts by
+    definition (see the module docstring's CELLS-ARE-NOT-LUMENS correction).
+    ``prim["tumor_to_vessel_median"]`` already used the vessel-object distance
+    correctly; the tail statistics below previously used
+    ``res["tumor_to_endo_stats"]["frac_gt_100"]`` — the RAW endothelial-CELL
+    tail fraction (from ``d_te``, computed before DBSCAN clustering) — against
+    these vessel-density Poisson nulls, an apples-to-oranges mismatch. It is
+    fixed here by using ``prim["tumor_to_vessel_frac_gt_100"]`` (the tail
+    fraction computed from ``d_tv``, distance to the nearest clustered VESSEL
+    OBJECT) instead, matching the median ratio's basis. This was invisible for
+    GBM because raw-cell and clustered-vessel densities are close there (only
+    ~18% of endothelial cells sit in a >=4-cell object); it is NOT invisible
+    for tissues where clustering does more work (e.g. breast IDC, ~52%) — see
+    ``results/vascular_validation_breast.md`` §3.
+    """
     prim = res["primary"]
-    st = res["tumor_to_endo_stats"]
     q_rec = prim["mvd_per_mm2"]
     poisson_at_rec = poisson_distance_stats(q_rec)
 
     mvd_ratio = q_rec / GBM_MVD_MEAN
     med_ratio = prim["tumor_to_vessel_median"] / EXP["gbm"]["median_um"]
-    tail_ratio = st["frac_gt_100"] / EXP["gbm"]["frac_gt_100"]
+    tail_ratio = prim["tumor_to_vessel_frac_gt_100"] / EXP["gbm"]["frac_gt_100"]
     # How close is the reconstruction to complete spatial randomness at its OWN
     # density? ~1.0 means "indistinguishable from a random vessel arrangement",
     # i.e. it carries essentially no vascular heterogeneity.
     csr_ratio = prim["tumor_to_vessel_median"] / poisson_at_rec["median_um"]
-    tail_csr = st["frac_gt_100"] / poisson_at_rec["frac_gt_100"]
+    tail_csr = prim["tumor_to_vessel_frac_gt_100"] / poisson_at_rec["frac_gt_100"]
     return {
         "mvd_ratio_vs_gbm": float(mvd_ratio),
         "median_ratio_vs_gbm": float(med_ratio),
@@ -1060,7 +1096,8 @@ def verdict(res: Dict) -> Dict:
             <= prim["tumor_to_vessel_median"]
             <= LIT_RANGES["median_distance_gbm_um"][1]),
         "tail_in_gbm_range": bool(
-            LIT_RANGES["frac_gt_100_pct"][0] <= 100 * st["frac_gt_100"]
+            LIT_RANGES["frac_gt_100_pct"][0]
+            <= 100 * prim["tumor_to_vessel_frac_gt_100"]
             <= LIT_RANGES["frac_gt_100_pct"][1]),
     }
 
@@ -1104,18 +1141,19 @@ def write_report(res: Dict, vd: Dict, path: str, png: str, runtime_s: float) -> 
     # ---- verdict ------------------------------------------------------------ #
     A("## Verdict")
     A("")
-    A("**The reconstruction gets the vessel SPACING roughly right and the vessel "
-      "ARRANGEMENT wrong.** Against the best available anchor — Yoshii & "
-      "Sugiyama's directly-measured Voronoi intercapillary distance in human "
-      "glioma (PMID 3359450) — the reconstructed vessel-to-vessel spacing is in "
-      "the correct regime: tighter than normal brain, the same order as measured "
-      "glioma. Microvessel density is within ~1.7× of the published whole-slide "
-      "GBM value (PMID 27583442), the same order. But the *arrangement* is nearly "
-      "structureless: the median tumour-to-vessel distance is within 1% of what a "
-      "**completely random (Poisson) vessel field at the same density** would give, "
-      "and the far tail is only ~1.7× heavier than that null — whereas real GBM is "
-      "defined by strong vascular clustering, with hypoxic, pseudopalisading, "
-      "poorly-perfused zones between vascular hotspots. The consequence is a "
+    A(f"**The reconstruction gets the vessel SPACING roughly right and the vessel "
+      f"ARRANGEMENT wrong.** Against the best available anchor — Yoshii & "
+      f"Sugiyama's directly-measured Voronoi intercapillary distance in human "
+      f"glioma (PMID 3359450) — the reconstructed vessel-to-vessel spacing is in "
+      f"the correct regime: tighter than normal brain, the same order as measured "
+      f"glioma. Microvessel density is within ~{vd['mvd_ratio_vs_gbm']:.1f}× of the "
+      f"published whole-slide GBM value (PMID 27583442), the same order. But the "
+      f"*arrangement* is nearly structureless: the median tumour-to-vessel distance "
+      f"is within 1% of what a **completely random (Poisson) vessel field at the "
+      f"same density** would give, and the far tail is only "
+      f"~{vd['csr_tail_ratio']:.2f}× heavier than that null — whereas real GBM is "
+      f"defined by strong vascular clustering, with hypoxic, pseudopalisading, "
+      f"poorly-perfused zones between vascular hotspots. The consequence is a "
       "systematic, one-directional bias: the model "
       "**under-represents the poorly-delivered tail of the tumour**, even though "
       "its average vessel spacing is defensible.")
@@ -1128,7 +1166,8 @@ def write_report(res: Dict, vd: Dict, path: str, png: str, runtime_s: float) -> 
     A(f"| median tumour-cell → vessel distance | **{prim['tumor_to_vessel_median']:.0f} µm** | "
       f"{EXP['gbm']['median_um']:.0f} µm (48–79) implied by that MVD | "
       f"{'PASS' if vd['median_in_gbm_range'] else 'SHORT by ' + format(1/vd['median_ratio_vs_gbm'], '.1f') + '×'} |")
-    A(f"| tumour cells >100 µm from a vessel | **{100*st['frac_gt_100']:.1f}%** | "
+    A(f"| tumour cells >100 µm from a vessel | "
+      f"**{100*prim['tumor_to_vessel_frac_gt_100']:.1f}%** | "
       f"{100*EXP['gbm']['frac_gt_100']:.0f}% (5–33%) implied by that MVD, and "
       f"*more* in real clustered GBM | "
       f"{'PASS' if vd['tail_in_gbm_range'] else 'UNDER-REPRESENTED by ' + format(1/vd['tail_ratio_vs_gbm'], '.1f') + '×'} |")
@@ -1307,22 +1346,45 @@ def write_report(res: Dict, vd: Dict, path: str, png: str, runtime_s: float) -> 
 
     A("### 3.4 Distance from tumour cells to the nearest vessel")
     A("")
-    A(f"Over all {res['n_tumor']:,} tumour cells, to the nearest putative vessel "
-      f"({VESSEL_LINK_UM:.0f} µm linking):")
+    A(f"Over all {res['n_tumor']:,} tumour cells, two ways — to the nearest "
+      f"endothelial CELL (raw, before any clustering) and to the nearest putative "
+      f"VESSEL OBJECT ({VESSEL_LINK_UM:.0f} µm linking). Both are reported "
+      f"explicitly, per the cells-are-not-lumens correction (module docstring), "
+      f"rather than quoting only one under a label that fits the other:")
     A("")
-    A("| statistic | value (µm) |")
-    A("|---|---|")
+    A("| statistic | nearest endothelial CELL (raw, µm) | "
+      "nearest VESSEL OBJECT (clustered, µm) |")
+    A("|---|---|---|")
     for k, lab in (("median", "median"), ("mean", "mean"), ("p75", "p75"),
                    ("p90", "p90"), ("p95", "p95"), ("p99", "p99"), ("max", "max")):
-        A(f"| {lab} | {st[k]:.1f} |")
-    A(f"| fraction >100 µm | {100*st['frac_gt_100']:.2f}% |")
-    A(f"| fraction >150 µm | {100*st['frac_gt_150']:.2f}% |")
-    A(f"| fraction >200 µm | {100*st['frac_gt_200']:.2f}% |")
+        vk = {"median": "tumor_to_vessel_median", "p90": "tumor_to_vessel_p90",
+              "p95": "tumor_to_vessel_p95",
+              "max": "tumor_to_vessel_max"}.get(k)
+        vcell = f"{prim[vk]:.1f}" if vk else "—"
+        A(f"| {lab} | {st[k]:.1f} | {vcell} |")
+    A(f"| fraction >100 µm | {100*st['frac_gt_100']:.2f}% | "
+      f"{100*prim['tumor_to_vessel_frac_gt_100']:.2f}% |")
+    A(f"| fraction >150 µm | {100*st['frac_gt_150']:.2f}% | "
+      f"{100*prim['tumor_to_vessel_frac_gt_150']:.2f}% |")
+    A(f"| fraction >200 µm | {100*st['frac_gt_200']:.2f}% | "
+      f"{100*prim['tumor_to_vessel_frac_gt_200']:.2f}% |")
     A("")
-    A(f"Insensitive to the linking distance (median {min(v['tumor_to_vessel_median'] for v in res['vessels']):.1f}"
-      f"–{max(v['tumor_to_vessel_median'] for v in res['vessels']):.1f} µm across the "
-      f"whole sweep) and **exactly invariant to `dx`**, because it is computed from "
-      f"cell coordinates rather than from the grid.")
+    A(f"The two are close here ({st['median']:.1f} vs "
+      f"{prim['tumor_to_vessel_median']:.1f} µm median) because GBM's clustering "
+      f"correction barely bites (§3.2: only "
+      f"{100*prim['frac_ec_in_multicell']:.0f}% of endothelial cells sit in a "
+      f"≥4-cell object) — they are NOT expected to stay this close in tissue where "
+      f"clustering does more work (breast IDC: 52%, "
+      f"`results/vascular_validation_breast.md` §2.2). Every ratio elsewhere in "
+      f"this report (`verdict()`, the table above, panel (a)) uses the VESSEL "
+      f"OBJECT column, matching the vessel-count basis of the published MVD "
+      f"literature it is compared against. The clustered-vessel median is "
+      f"insensitive to the linking distance (median "
+      f"{min(v['tumor_to_vessel_median'] for v in res['vessels']):.1f}"
+      f"–{max(v['tumor_to_vessel_median'] for v in res['vessels']):.1f} µm across "
+      f"the whole sweep) and, like the raw-cell number, **exactly invariant to "
+      f"`dx`**, because both are computed from cell coordinates rather than from "
+      f"the grid.")
     A("")
 
     A("### 3.5 Vascular area fraction from the KDE")
@@ -1412,7 +1474,8 @@ def write_report(res: Dict, vd: Dict, path: str, png: str, runtime_s: float) -> 
       f"{100*pa['frac_gt_100']:.1f}% of tissue beyond 100 µm. The reconstruction "
       f"gives {prim['tumor_to_vessel_median']:.1f} µm "
       f"({vd['csr_median_ratio']:.2f}× that) and "
-      f"{100*st['frac_gt_100']:.1f}% ({vd['csr_tail_ratio']:.2f}× that).")
+      f"{100*prim['tumor_to_vessel_frac_gt_100']:.1f}% "
+      f"({vd['csr_tail_ratio']:.2f}× that).")
     A("")
     A("**The reconstructed vasculature is, to within a few percent, a random point "
       "field.** It has no vascular hotspots and no avascular zones — the two "
@@ -1428,8 +1491,10 @@ def write_report(res: Dict, vd: Dict, path: str, png: str, runtime_s: float) -> 
       "compounding reasons, in order of size:")
     A("")
     A(f"1. **The poorly-delivered tail is missing.** Only "
-      f"{100*st['frac_gt_100']:.1f}% of tumour cells sit >100 µm from a vessel and "
-      f"{100*st['frac_gt_150']:.2f}% beyond 150 µm — the Thomlinson–Gray necrosis "
+      f"{100*prim['tumor_to_vessel_frac_gt_100']:.1f}% of tumour cells sit "
+      f">100 µm from a vessel and "
+      f"{100*prim['tumor_to_vessel_frac_gt_150']:.2f}% beyond 150 µm — the "
+      f"Thomlinson–Gray necrosis "
       f"distance. Even a *homogeneous* vessel field at the published GBM MVD puts "
       f"{100*EXP['gbm']['frac_gt_100']:.0f}% beyond 100 µm and "
       f"{100*EXP['gbm']['frac_gt_150']:.1f}% beyond 150 µm, and real clustered GBM "
@@ -1589,14 +1654,27 @@ def write_report(res: Dict, vd: Dict, path: str, png: str, runtime_s: float) -> 
       "bandwidth to try.** Repeating this sweep with more bandwidths would not be "
       "expected to change the answer — the mechanism (a coordinate-level "
       "diagnostic that a field-smoothing choice cannot touch) rules that out by "
-      "construction. The two concrete levers that *could* move it, neither of "
-      "which has been tried yet, are: (a) richer marker-based endothelial cell "
-      "IDENTIFICATION (exploiting Xenium panels' full endothelial gene sets, not "
-      "just a single gate, per the breast lead above), and (b) changing the "
-      "vessel-clustering/object model itself (the DBSCAN linking step in "
+      "construction. Two concrete levers that could move it were identified: "
+      "(a) richer marker-based endothelial cell IDENTIFICATION, and (b) changing "
+      "the vessel-clustering/object model itself (the DBSCAN linking step in "
       "`measure()`) rather than anything about the density field it is paired "
-      "with. Both are open, unstarted work, not next items in this same "
-      "bandwidth sweep.")
+      "with. **Both have since been tried, and both are honest nulls — this "
+      "closes the loop rather than leaving it open.** (a): a follow-up prototype "
+      "on breast's richer 15-endothelial-gene panel (only 3 used by default) "
+      "found that a well-justified 8-gene composite score raises endothelial "
+      "count ~22% but roughly HALVES the CSR tail ratio at the primary linking "
+      "distance — moving toward randomness, not away from it "
+      "(`results/sweep/endothelial_marker_richness_2026-07-29T19-07-43Z.md`, "
+      "and `results/vascular_validation_breast.md` §5). (b): a follow-up sweep "
+      "across DBSCAN eps/min_samples, HDBSCAN, and a spatially-varying empirical "
+      "null found every parameterization that keeps vessel density in the "
+      "literature-plausible range lands GBM at median ratio 0.86-1.12x and tail "
+      "ratio 0.56-1.44x — indistinguishable from CSR either way "
+      "(`results/sweep/vessel_object_model_2026-07-29T19-07-08Z.md`). Together "
+      "these results upgrade the finding from \"untested levers exist\" to "
+      "\"the near-random arrangement is a real property of the measured "
+      "endothelial cell positions, not an artifact of any identification or "
+      "clustering choice tried here.\"")
     A("")
 
     # ---- caveats -------------------------------------------------------------- #
@@ -1662,13 +1740,17 @@ def write_report(res: Dict, vd: Dict, path: str, png: str, runtime_s: float) -> 
     A("3. Calibrate the PECAM1 gate so that the *clustered vessel* density matches "
       "65 ± 30/mm², rather than leaving the endothelial fraction to fall wherever a "
       "z-score of 1.0 puts it.")
-    A("4. **Not a KDE-bandwidth or field-construction problem, per §6a.** The "
+    A("4. **Not a KDE-bandwidth or field-construction problem, and not a "
+      "cell-identification or clustering-model problem either, per §6a.** The "
       "random-arrangement finding survives every field-construction choice "
-      "tested (9 bandwidths, discrete, adaptive-kNN) because the diagnostic it's "
-      "measured with never reads the field. The two real remaining levers are "
-      "richer marker-based endothelial cell identification (§6a) and changing "
-      "the vessel-clustering/CSR-null construction (`measure()`'s DBSCAN object "
-      "model) itself — both unstarted.")
+      "tested (9 bandwidths, discrete, adaptive-kNN), every endothelial "
+      "marker-richness choice tested (breast's 3-gene default vs. an 8-gene "
+      "composite), and every vessel-clustering/CSR-null construction tested "
+      "(DBSCAN eps/min_samples sweep, HDBSCAN, an empirical spatially-varying "
+      "null). It is a real property of the measured endothelial cell "
+      "positions themselves — the honest next step is questioning the cell "
+      "positions/segmentation upstream of all of this, not any downstream "
+      "analysis choice.")
     A("")
     A("---")
     A("")
@@ -1695,7 +1777,7 @@ def main() -> Dict:
     print("  checking grid invariance (re-reconstructing at dx = 30 / 20 / 12 um) ...")
     res["grid_invariance"] = grid_invariance()
     vd = verdict(res)
-    prim, st = res["primary"], res["tumor_to_endo_stats"]
+    prim = res["primary"]
 
     print(f"  cells {res['n_cells']:,}  endothelial {res['n_endo']:,} "
           f"({100*res['endo_frac_of_cells']:.2f}%)  "
@@ -1708,9 +1790,11 @@ def main() -> Dict:
     print(f"  intervessel spacing        {prim['spacing_sqrt_area']:.0f} um  vs "
           f"{EXP['gbm']['spacing_um']:.0f} um implied by that MVD")
     print(f"  tumour -> vessel distance  median {prim['tumor_to_vessel_median']:.0f} "
-          f"um, p90 {prim['tumor_to_vessel_p90']:.0f}, max {st['max']:.0f}  vs "
+          f"um, p90 {prim['tumor_to_vessel_p90']:.0f}, "
+          f"max {prim['tumor_to_vessel_max']:.0f}  vs "
           f"median {EXP['gbm']['median_um']:.0f} um implied")
-    print(f"  >100 um from a vessel      {100*st['frac_gt_100']:.1f}%  vs "
+    print(f"  >100 um from a vessel      "
+          f"{100*prim['tumor_to_vessel_frac_gt_100']:.1f}%  vs "
           f"{100*EXP['gbm']['frac_gt_100']:.0f}% implied (and more in real GBM)")
     print(f"  vs complete spatial randomness at its OWN density: "
           f"median {vd['csr_median_ratio']:.2f}x, tail(>100um) "
