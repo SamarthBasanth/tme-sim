@@ -34,6 +34,17 @@ import { sample, gradientCss } from '../gl/ramps.js';
 const RAMP = 'viridis';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+/**
+ * Diagnostic codes that mean "this program is otherwise valid, it just
+ * expands to more runs than `max_runs` allows." `plan` is the ONLY surface
+ * that shows the run count, the cost estimate and the one-line `allow runs
+ * N` remedy for that refusal (see `renderPlan`'s `.prefusal` card) — so when
+ * this is the only thing wrong, `plan`/`Run…` must stay clickable. Any other
+ * error still blocks them: planning a script that does not parse is not
+ * useful.
+ */
+const BUDGET_CODES = new Set(['over-budget', 'over-allowance', 'max_runs_exceeded']);
+
 /* ------------------------------------------------------------ helpers --- */
 
 function svg(tag, attrs, ...kids) {
@@ -44,6 +55,31 @@ function svg(tag, attrs, ...kids) {
     el.appendChild(c.nodeType ? c : document.createTextNode(String(c)));
   }
   return el;
+}
+
+/**
+ * The real reason behind a ProtocolError, when the route answered with a
+ * structured `detail` object rather than a string.
+ *
+ * `js/protocol/api.js`'s own `detailOf()` only unwraps `detail` when it is a
+ * string or a FastAPI validation array — routes on this surface (upload, run)
+ * raise `HTTPException(detail={message, diagnostics})`, an OBJECT, so that
+ * unwrap falls through and `err.message` collapses to the bare
+ * "400 Bad Request" / "413 Payload Too Large" status line. The full body is
+ * still sitting on `err.payload` (api.js keeps it precisely so a caller can
+ * do this), so read it here rather than widening the frozen wire contract.
+ */
+function errDetail(err) {
+  const d = err && err.payload && err.payload.detail;
+  if (d && typeof d === 'object' && !Array.isArray(d)) {
+    const parts = [];
+    if (d.message) parts.push(d.message);
+    for (const diag of d.diagnostics || []) {
+      if (diag && diag.message && diag.message !== d.message) parts.push(diag.message);
+    }
+    if (parts.length) return parts.join(' — ');
+  }
+  return (err && err.message) || String(err);
 }
 
 const metricMeta = (key, fromPlan) => {
@@ -301,11 +337,20 @@ export function createProtocolWorkspace() {
     const all = errors.concat(warnings);
     renderDiags(all);
     const ok = res.ok !== undefined ? !!res.ok : errors.length === 0;
-    btnRun.disabled = !ok;
-    btnPlan.disabled = !ok;
+    const budgetOnly = !ok && errors.length > 0 && errors.every((d) => BUDGET_CODES.has(d.code));
+    const plannable = ok || budgetOnly;
+    btnRun.disabled = !plannable;
+    btnPlan.disabled = !plannable;
+    btnPlan.title = budgetOnly
+      ? 'POST /api/protocol/plan — this sweep is otherwise valid; plan shows the run count, the cost, and the allow-runs remedy.'
+      : 'POST /api/protocol/plan — expands the sweep and states the cost. Nothing runs.';
+    btnRun.title = budgetOnly
+      ? 'Plan shows the refusal and its remedy; nothing is queued until you confirm a run count that no longer exceeds max_runs.'
+      : 'Plan, then ask for confirmation before queueing anything (Ctrl+Enter)';
     editor.setStatus(
       ok ? (warnings.length ? `valid · ${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : 'valid')
-        : `${errors.length} error${errors.length === 1 ? '' : 's'}`,
+        : budgetOnly ? `${errors.length} error${errors.length === 1 ? '' : 's'} · plan to see the remedy`
+          : `${errors.length} error${errors.length === 1 ? '' : 's'}`,
       ok ? (warnings.length ? 'warn' : 'ok') : 'err');
   }
 
@@ -372,10 +417,11 @@ export function createProtocolWorkspace() {
     try {
       res = await papi.upload(file);
     } catch (err) {
+      const detail = errDetail(err);
       fill(uploadOut, h('div.caveat.crit', h('span',
         h('b', 'Upload refused. '),
-        err.message || String(err))));
-      notifyError('POST /api/protocol/upload failed', err);
+        detail)));
+      notifyError('POST /api/protocol/upload failed', { message: detail, status: err.status });
       return;
     }
     uploadData = res;
@@ -496,8 +542,13 @@ export function createProtocolWorkspace() {
     planSource = editor.value;
 
     // Plan errors and refusals are diagnostics on their line, not a toast.
+    // `p.refusal` is PROJECTED from one of `p.errors` (see _refusal() in
+    // protocol_wire.py, which picks the budget error or the first error
+    // verbatim) — concatenating both without deduping showed the identical
+    // sentence twice, once as `[over-budget]` and once as `[max_runs_exceeded]`.
+    const errs = (p.errors || []).map((d) => normDiag(d, 'error'));
     const diags = []
-      .concat((p.errors || []).map((d) => normDiag(d, 'error')))
+      .concat(p.refusal ? errs.filter((d) => !(d.line === (p.refusal.line || 1) && d.message === p.refusal.message)) : errs)
       .concat((p.warnings || []).map((d) => normDiag(d, 'warning')));
     if (p.refusal) {
       diags.unshift(normDiag({
@@ -626,9 +677,15 @@ export function createProtocolWorkspace() {
     try {
       res = await papi.start(editor.value, p.run_count);
     } catch (err) {
-      const line = err.payload && err.payload.refusal ? err.payload.refusal.line : 1;
-      renderDiags([normDiag({ line, severity: 'error', message: err.message, code: err.status ? `HTTP ${err.status}` : 'refused' }, 'error')]);
-      fill(resultsOut, h('div.caveat.crit', h('span', h('b', 'Refused. '), err.message)));
+      // `err.payload` is the raw response BODY, i.e. `{detail: {...}}` for an
+      // HTTPException — the refusal (when present) lives at `.detail.refusal`,
+      // not at the top level.
+      const detail = err.payload && err.payload.detail;
+      const line = (detail && detail.refusal && detail.refusal.line) || 1;
+      const message = errDetail(err);
+      renderDiags([normDiag({ line, severity: 'error', message, code: err.status ? `HTTP ${err.status}` : 'refused' }, 'error')]);
+      fill(resultsOut, h('div.caveat.crit', h('span', h('b', 'Refused. '), message)));
+      notifyError('POST /api/protocol/run failed', { message, status: err.status });
       return;
     }
     sweepId = res.sweep_id;
@@ -1086,7 +1143,14 @@ export function createProtocolWorkspace() {
     visible = false;
     root.hidden = true;
     const b = document.getElementById('btn-protocol');
-    if (b) b.setAttribute('aria-pressed', 'false');
+    if (b) {
+      b.setAttribute('aria-pressed', 'false');
+      // The other two workspaces are native <dialog>s, which restore focus
+      // to their launcher on close for free. This one is a plain hidden div,
+      // so without this it drops focus to <body> and the operator loses
+      // their place — do the same restoration by hand for parity.
+      b.focus();
+    }
   }
   const toggle = () => (visible ? hide() : show());
 
