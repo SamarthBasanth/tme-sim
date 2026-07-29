@@ -13,6 +13,10 @@ dependencies = [
     "scikit-learn",
     "requests",
     "tifffile",
+    "imagecodecs",  # tifffile's LZW/JPEG2000/etc decoders; required to read
+                    # real OME-TIFF CODEX exports (data.adapters.codex) - the
+                    # Greenwald/Tirosh 2024 files are LZW-compressed and raise
+                    # without this at decode time, not at import time.
 ]
 
 [project.optional-dependencies]

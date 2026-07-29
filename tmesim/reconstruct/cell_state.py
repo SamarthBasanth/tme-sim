@@ -274,6 +274,19 @@ NEIGHBOURHOOD_MIN_CELLS = 10
 #: neither this module's marker machinery nor the default's PDE. It is listed here
 #: because this tuple is the one enumeration of the state routes, and
 #: ``results/cell_state_impact.md`` scores all three against the same bar.
+#:
+#: A FOURTH route, ML-imputed hypoxia, exists but is DELIBERATELY NOT a member of
+#: this tuple. ``STATE_MODES`` is mirrored, and asserted equal, in
+#: ``app/server/cache.py`` and ``tmesim/protocol/ast.py`` (three independent
+#: copies kept in lockstep by ``tests/test_app_server.py`` and
+#: ``tests/test_protocol.py``) — extending the DSL/server surface for a route
+#: this session validated on THREE real Visium sections was judged out of
+#: proportion to that evidence base. ``tmesim.ml.panel_imputation`` and
+#: ``reconstruct.real_pipeline.install_ml_imputed_hypoxia`` implement the same
+#: opt-in / refuse-unless-requested / distinct-provenance-tag discipline this
+#: tuple's routes use, as an explicit function a caller applies to an ALREADY
+#: reconstructed ``Microenvironment`` rather than as a ``state_mode=`` string.
+#: See ``results/panel_gap_imputation_sweep.md``.
 STATE_MODES: Tuple[str, ...] = ("oxygen", "vessel_distance", "markers")
 
 

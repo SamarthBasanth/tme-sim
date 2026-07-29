@@ -48,6 +48,7 @@ import numpy as np
 
 from ..core import (
     CellPopulation,
+    CellState,
     CellType,
     Microenvironment,
     OxygenConfig,
@@ -70,6 +71,7 @@ from .cell_state import (
     state_fractions_from_states,
     state_from_markers_micro,
 )
+from .marker_panels import select_marker_map
 from .real_fields import (
     _DEFAULT_VASCULAR_MODE,
     add_oxygen,
@@ -456,6 +458,181 @@ def _install_states(
             "non-hypoxic expression."
         ),
         "state_detail": slim,
+    }
+
+
+#: Panels this session's sweep (``results/panel_gap_imputation_sweep.md``,
+#: ``tmesim.ml.panel_imputation.TARGET_REGISTRY['hypoxia_composite']``) actually
+#: trained and honestly validated as a HYPOXIC-gap panel. Only these are
+#: accepted by :func:`install_ml_imputed_hypoxia` — extending it to a panel this
+#: session never scored would be silently promoting an unvalidated guess.
+_ML_HYPOXIA_VALIDATED_PANELS = ("brain_319",)
+
+#: The honest, section-held-out validation numbers for the hypoxia_composite /
+#: brain_319 route, copied from ``results/panel_gap_imputation_sweep.md`` so
+#: they travel with every ``install_ml_imputed_hypoxia`` call without paying to
+#: refit sklearn at runtime. See that file for the full per-fold breakdown, the
+#: cheap single-gene baseline each fold beat, and the exact data snapshot date.
+_HYPOXIA_ML_VALIDATION = {
+    "loso_pooled_r2": 0.6925,
+    "loso_pooled_pearson_r": 0.8324,
+    "loso_note": (
+        "3-fold leave-one-section-out on GBM-Space Visium (3 real whole-"
+        "transcriptome sections). Every fold beat the best single-gene "
+        "baseline."
+    ),
+    "cross_panel_gse_366_r2": 0.2384,
+    "cross_panel_gse_366_pearson_r": 0.5571,
+    "cross_panel_gse_366_note": (
+        "Independent single-cell Xenium section (366-gene GSE324268), took no "
+        "part in training. Target ground truth from 4/5 hypoxia genes "
+        "(VEGFA/CA9/ADM/SLC2A1; NDRG1 absent from this panel too)."
+    ),
+    "cross_panel_io_480_r2": 0.0511,
+    "cross_panel_io_480_pearson_r": 0.2698,
+    "cross_panel_io_480_note": (
+        "Independent single-cell Xenium section (480-gene IO panel). Target "
+        "ground truth from VEGFA alone (the only hypoxia gene that panel "
+        "carries) and only 60 feature genes overlap with the 319-gene "
+        "template — read this number as the honest floor, not the ceiling."
+    ),
+    "as_of": "data snapshot 2026-07-28; see results/panel_gap_imputation_sweep.md",
+}
+
+
+def install_ml_imputed_hypoxia(
+    micro: Microenvironment,
+    expression,
+    genes,
+    validation: Optional[Dict] = None,
+) -> Dict:
+    """OPT-IN: layer an ML-IMPUTED HYPOXIC call onto an ALREADY-reconstructed
+    Microenvironment, for a panel whose measured-marker route leaves HYPOXIC
+    UNMEASURED.
+
+    NOT a ``state_mode`` (deliberately — see the note on ``STATE_MODES`` in
+    ``cell_state.py`` for why the shared DSL/server enum was not extended) and
+    NEVER called by :func:`reconstruct_real` or any ``state_mode=`` value. A
+    caller invokes this explicitly, on a ``Microenvironment`` it already built
+    (typically with ``state_mode='markers'`` or ``'oxygen'``), only when it
+    specifically wants the ML estimate in place of "UNMEASURED".
+
+    Method: :func:`tmesim.ml.panel_imputation.impute_gene_score` predicts a
+    continuous hypoxia ENRICHMENT SCORE (mean log1p z of VEGFA/CA9/ADM/NDRG1/
+    SLC2A1, i.e. ``cell_state.HYPOXIA_MARKERS``) from a RandomForestRegressor
+    trained on GBM-Space Visium (3 real whole-transcriptome sections,
+    leave-one-section-out validated — see :data:`_HYPOXIA_ML_VALIDATION`). A
+    cell is called HYPOXIC iff its score is above THIS section's own mean (the
+    same "enrichment above the section rate" convention
+    ``cell_state.neighbourhood_positive_fraction`` already uses) — there is no
+    calibrated absolute cutoff here either.
+
+    REFUSES (raises ``ValueError``) rather than silently doing anything if:
+      * the panel does not resolve to a panel this session validated as a
+        hypoxia gap (currently only the 319-gene brain panel — see
+        :data:`_ML_HYPOXIA_VALIDATED_PANELS`);
+      * ``expression`` / ``genes`` do not row-align to ``micro.cells``.
+
+    NEVER overwrites a MEASURED hypoxia call. If ``state_from_markers`` finds
+    hypoxia markers already present on this panel (call_level != UNMEASURED —
+    e.g. this function was pointed at the wrong panel by mistake), this
+    function makes NO CHANGE to ``micro.cells.state`` and says so in the
+    returned dict's ``applied=False`` / ``reason``.
+
+    Mutates ``micro.cells.state`` in place for the UNMEASURED-hypoxia case
+    only: a DEAD cell is never resurrected, and only cells the measured route
+    left un-called for hypoxia are eligible to become HYPOXIC.
+
+    Returns
+    -------
+    dict with ``applied`` (bool), ``kind='ml_imputed'`` (a provenance tier
+    distinct from measured / computed / literature / assumed — see
+    ``app/web/js/ui/provenance.js`` for the taxonomy this deliberately does
+    NOT reuse), ``state_is_measured=False``, the validation numbers, the
+    resulting state fractions, and a caveat paragraph stating exactly how much
+    to trust the magnitude.
+    """
+    n = int(expression.shape[0])
+    if int(np.asarray(genes).size) and expression.shape[0] != int(micro.cells.n):
+        raise ValueError(
+            f"expression has {n} rows but micro.cells has {micro.cells.n} cells; "
+            "refusing to impute onto a misaligned reconstruction"
+        )
+
+    genes_arr = np.asarray(genes, dtype=str)
+    out = state_from_markers_micro(micro, expression, genes_arr)
+    hyp_cov = out["coverage"]["hypoxia"]
+
+    if hyp_cov["call_level"] != "UNMEASURED":
+        micro.cells.state = np.asarray(out["states"], dtype=np.int8)
+        return {
+            "kind": "ml_imputed",
+            "applied": False,
+            "state_is_measured": True,
+            "reason": (
+                f"hypoxia is already MEASURED on this panel (call_level="
+                f"{hyp_cov['call_level']!r}, present={hyp_cov['present']}); an "
+                "INFERRED value must never overwrite a MEASURED one, so "
+                "install_ml_imputed_hypoxia made no change to cells.state."
+            ),
+        }
+
+    _panel_map, panel_name, _cov = select_marker_map(genes_arr)
+    if panel_name not in _ML_HYPOXIA_VALIDATED_PANELS:
+        raise ValueError(
+            f"install_ml_imputed_hypoxia refuses: this panel resolves to "
+            f"marker map {panel_name!r}, but the ml_imputed hypoxia route was "
+            f"only honestly validated for {_ML_HYPOXIA_VALIDATED_PANELS} "
+            "(results/panel_gap_imputation_sweep.md). Extending it to another "
+            "panel needs its own held-out validation, not a silent reuse of "
+            "this one's."
+        )
+
+    from ..ml.panel_imputation import impute_gene_score
+
+    val = validation if validation is not None else _HYPOXIA_ML_VALIDATION
+    result = impute_gene_score(
+        expression, genes_arr, target="hypoxia_composite",
+        gap_panel=panel_name, validation=val,
+    )
+    score = np.asarray(result["score"], dtype=np.float64)
+    hyp_call = score > 0.0
+
+    states = np.asarray(out["states"], dtype=np.int8).copy()
+    not_dead = states != int(CellState.DEAD)
+    states[hyp_call & not_dead] = int(CellState.HYPOXIC)
+    micro.cells.state = states
+
+    tumor = np.asarray(micro.cells.cell_type) == int(CellType.TUMOR)
+    return {
+        "kind": "ml_imputed",
+        "applied": True,
+        "state_is_measured": False,
+        "gap_panel": panel_name,
+        "hypoxia_provenance": result["provenance"],
+        "n_ml_hypoxic": int((hyp_call & not_dead).sum()),
+        "fractions": {
+            "all": state_fractions_from_states(states),
+            "tumor": state_fractions_from_states(states, tumor),
+        },
+        "caveat": (
+            "ml_imputed HYPOXIC calls are an ENRICHMENT SCORE thresholded at "
+            "this section's own mean, NOT a calibrated hypoxic fraction — same "
+            "convention as cell_state.py's 'neighbourhood' call level, for the "
+            "same reason: there is no absolute cutoff here that is a "
+            "measurement either. The model's own honest, section-held-out "
+            f"validation: pooled R^2={val['loso_pooled_r2']:.3f} / "
+            f"r={val['loso_pooled_pearson_r']:.3f} WITHIN Visium (GBM-Space "
+            "leave-one-section-out), degrading to R^2="
+            f"{val['cross_panel_gse_366_r2']:.3f} / r="
+            f"{val['cross_panel_gse_366_pearson_r']:.3f} on an independent "
+            "single-cell Xenium section and R^2="
+            f"{val['cross_panel_io_480_r2']:.3f} / r="
+            f"{val['cross_panel_io_480_pearson_r']:.3f} on a second — read the "
+            "cross-panel numbers as the honest ceiling on what this route buys "
+            "over 'UNMEASURED', not the within-Visium number. See "
+            "results/panel_gap_imputation_sweep.md."
+        ),
     }
 
 
