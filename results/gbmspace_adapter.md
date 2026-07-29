@@ -620,3 +620,30 @@ than loosening it arbitrarily. Full `test_gbmspace_adapter.py` suite: 21 passed.
 - No calibration work was done, same standing caveat as §8/§9, now applying to 20 sections.
 - No new patients' worth of cross-chemistry or cross-region comparison was attempted beyond what
   §9.4 already flagged as unresolved (the AT15 chemistry confound).
+
+## 11. Third batch (A) finally landed: 20 -> 24 sections, 9 -> 10 patients (AT3)
+
+The one ingestion batch from §10 that was still running when §10 was written (a slow streamed
+listing of the 97-section atlas — first attempt used `curl | tar tzvf -`, which is unreliable
+piped to a non-tty and silently under-enumerated to 65/97 members with malformed size columns for
+the first 36 entries; redone with Python's `tarfile` module streaming over the URL, which correctly
+parsed all 97 headers) eventually completed and claimed 4 sections via the same
+`data_cache/.gbmspace_claims/` protocol: `AT3-BRA5-FO-1_2` (321 spots), `AT3-BRA5-FO-4_1` (2,040
+spots) — **AT3, a new patient** — plus `AT5-BRA-5-FO-1_1` (813 spots) and `AT7-BRA-3-FO-3_2`
+(2,374 spots), both additional sections for patients already added in §10.
+
+Repo total is now **24 sections across 10 patients**, confirmed by listing
+`data_cache/gbmspace_visium/` directly. Independently re-ingested both AT3 sections myself:
+`AT3-BRA5-FO-4_1` (2,040 spots) and `AT3-BRA5-FO-1_2` (321 spots, the smallest section in the
+whole atlas so far) both detect `platform=visium, confidence=1.0`, validate `ok=True`, and carry
+the same hypoxia panel and MGMT as every other section. Added `AT3-BRA5-FO-4_1` (the larger of the
+two, safely above the §10.3 threshold) to `test_gbmspace_adapter.py::_MATERIALIZED` as AT3's
+representative case; full suite: 22 passed. `AT3-BRA5-FO-1_2` at 321 spots is genuinely below the
+`> 500` threshold set in §10.3 — a real, valid, very small section, not included in the
+parametrized test, consistent with that threshold's own stated purpose (catching broken ingests,
+not excluding real small tissue).
+
+Disk stayed at 19-21 GiB free throughout, never near the 10 GiB floor.
+
+Still-untouched atlas coverage: ~73 of 97 sections remain unpulled after four batches across two
+passes (§9, §10, this section).

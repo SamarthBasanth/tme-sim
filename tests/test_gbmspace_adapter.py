@@ -58,6 +58,8 @@ _MATERIALIZED = [
         # atlas (AT5, AT7, AT9, AT12), one representative section each.
         "AT12-BRA-4-FO-4_1", "AT9-BRA-4-FO-1_1", "AT7-BRA-3-FO-3_1",
         "AT5-BRA-5-FO-1_2",
+        # results/gbmspace_adapter.md §11: AT3, one more new patient.
+        "AT3-BRA5-FO-4_1",
     )
 ]
 
