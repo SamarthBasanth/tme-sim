@@ -13,10 +13,10 @@ This report re-runs the **flagship five-drug panel** [temozolomide, lomustine, c
 | **Primary section** | `data_cache/gse324268_xenium` — 851,509 cells (515,887 tumour), 366-gene panel |
 | **Cell state** | MEASURED: proliferation `per_cell` over ['MKI67', 'TOP2A'], hypoxia `per_cell` over ['VEGFA', 'CA9', 'ADM', 'SLC2A1'] — **nothing UNMEASURED** |
 | **Measured tumour state fractions** | VIABLE 13.43% / QUIESCENT 33.99% / HYPOXIC 52.58% |
-| **Cross-drug ranking (markers)** | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide |
-| **Same ranking as the published 319-gene run?** | **YES** — invariant across BOTH the section and the state route |
-| **Temozolomide, MGMT unmeasured (the old assumption)** | kill 0.0764 |
-| **Temozolomide, MGMT MEASURED on this section** | kill 0.0320 (sensitivity 0.4175) |
+| **Cross-drug ranking (markers)** | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate |
+| **Same ranking as the published 319-gene run?** | **NO** — see §4 |
+| **Temozolomide, MGMT unmeasured (the old assumption)** | kill 0.1168 |
+| **Temozolomide, MGMT MEASURED on this section** | kill 0.0485 (sensitivity 0.4175) |
 | **Is absolute kill now defensible?** | see §6 — **no, but the reason has moved** |
 
 > **This is a different patient on a different panel.** Nothing here transfers from or to the 319-gene section as biology, and neither section carries a drug-response outcome label. What travels is the ORDERING and the machinery; the levels do not.
@@ -78,15 +78,15 @@ Five drugs, `sensitivity_mode='uniform'` (identical for every drug, so it cancel
 
 | drug | IC50 (uM) | BBB | mean tumour AUC (uM*s) | therapeutic_coverage_1x | **kill (markers)** | kill (oxygen) | ceiling (markers) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | 606 | 0.125 | 3.35e+06 | 0.0000 | **0.0764** | 0.0882 | 0.4883 |
+| temozolomide | 606 | 0.125 | 3.35e+06 | 0.0000 | **0.1168** | 0.0973 | 0.7249 |
 | lomustine | 50 | 0.973 | 4.01e+06 | 0.9975 | **0.3885** | 0.4167 | 0.4883 |
 | cisplatin | 24.6 | 0.858 | 7.88e+06 | 0.9999 | **0.4649** | 0.4920 | 0.4883 |
 | methotrexate | 12 | 0.023 | 6.74e+04 | 0.0003 | **0.0774** | 0.0900 | 0.4883 |
 | doxorubicin | 0.5 | 0.021 | 4.92e+04 | 0.9953 | **0.4027** | 0.4310 | 0.4883 |
 
-**Ranking by kill, `markers` route:** **cisplatin** (0.4649) > **doxorubicin** (0.4027) > **lomustine** (0.3885) > **methotrexate** (0.0774) > **temozolomide** (0.0764)
+**Ranking by kill, `markers` route:** **cisplatin** (0.4649) > **doxorubicin** (0.4027) > **lomustine** (0.3885) > **temozolomide** (0.1168) > **methotrexate** (0.0774)
 
-**Ranking by kill, `oxygen` route (same cells, same transport):** **cisplatin** (0.4920) > **doxorubicin** (0.4310) > **lomustine** (0.4167) > **methotrexate** (0.0900) > **temozolomide** (0.0882)
+**Ranking by kill, `oxygen` route (same cells, same transport):** **cisplatin** (0.4920) > **doxorubicin** (0.4310) > **lomustine** (0.4167) > **temozolomide** (0.0973) > **methotrexate** (0.0900)
 
 **Ranking by `therapeutic_coverage_1x`:** cisplatin > lomustine > doxorubicin > methotrexate > temozolomide
 
@@ -94,15 +94,15 @@ Five drugs, `sensitivity_mode='uniform'` (identical for every drug, so it cancel
 
 | drug | IC50 (uM) | BBB | mean tumour AUC (uM*s) | therapeutic_coverage_1x | **kill (markers)** | kill (oxygen) | ceiling (markers) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | 606 | 0.125 | 2.87e+06 | 0.0000 | **0.0639** | 0.0644 | 0.4592 |
+| temozolomide | 606 | 0.125 | 2.87e+06 | 0.0000 | **0.1042** | 0.0797 | 0.7520 |
 | lomustine | 50 | 0.973 | 3.46e+06 | 0.9702 | **0.3536** | 0.3486 | 0.4592 |
 | cisplatin | 24.6 | 0.858 | 6.79e+06 | 0.9987 | **0.4330** | 0.4248 | 0.4592 |
 | methotrexate | 12 | 0.023 | 5.8e+04 | 0.0000 | **0.0649** | 0.0657 | 0.4592 |
 | doxorubicin | 0.5 | 0.021 | 4.22e+04 | 0.9691 | **0.3654** | 0.3603 | 0.4592 |
 
-**Ranking by kill, `markers` route:** **cisplatin** (0.4330) > **doxorubicin** (0.3654) > **lomustine** (0.3536) > **methotrexate** (0.0649) > **temozolomide** (0.0639)
+**Ranking by kill, `markers` route:** **cisplatin** (0.4330) > **doxorubicin** (0.3654) > **lomustine** (0.3536) > **temozolomide** (0.1042) > **methotrexate** (0.0649)
 
-**Ranking by kill, `oxygen` route (same cells, same transport):** **cisplatin** (0.4248) > **doxorubicin** (0.3603) > **lomustine** (0.3486) > **methotrexate** (0.0657) > **temozolomide** (0.0644)
+**Ranking by kill, `oxygen` route (same cells, same transport):** **cisplatin** (0.4248) > **doxorubicin** (0.3603) > **lomustine** (0.3486) > **temozolomide** (0.0797) > **methotrexate** (0.0657)
 
 **Ranking by `therapeutic_coverage_1x`:** cisplatin > lomustine > doxorubicin > temozolomide > methotrexate
 
@@ -132,21 +132,24 @@ Five drugs, `sensitivity_mode='uniform'` (identical for every drug, so it cancel
 
 | section | route | ranking by predicted kill |
 |---|---|---|
-| `gse324268_366` | `markers` | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide |
-| `gse324268_366` | `oxygen` | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide |
-| `io_480` | `markers` | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide |
-| `io_480` | `oxygen` | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide |
+| `gse324268_366` | `markers` | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate |
+| `gse324268_366` | `oxygen` | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate |
+| `io_480` | `markers` | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate |
+| `io_480` | `oxygen` | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate |
 | `brain_319` | `markers` | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide |
 | `brain_319` | `oxygen` | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide |
 
-**The ranking is INVARIANT across all 6 (section x route) combinations tested: cisplatin > doxorubicin > lomustine > methotrexate > temozolomide.** That is a materially stronger statement than either prior report could make. The mechanism is the same one both of them identified: the resistance multipliers are SHARED across drugs — every drug pays the same x0.5 in the same QUIESCENT cells and the same x0.35 in the same HYPOXIC cells — so the state term very largely cancels out of a comparison and does not cancel at all out of a level.
+**The ranking is NOT invariant.** The distinct orderings observed are:
+
+* cisplatin > doxorubicin > lomustine > methotrexate > temozolomide — `brain_319`/markers, `brain_319`/oxygen
+* cisplatin > doxorubicin > lomustine > temozolomide > methotrexate — `gse324268_366`/markers, `gse324268_366`/oxygen, `io_480`/markers, `io_480`/oxygen
 
 **But the invariance is not equally safe at every adjacent pair, and the narrowest gap should be quoted with it.** The engine draws kills as Bernoulli trials over tumour cells, so a gap of order the sampling scale `sqrt(p(1-p)/n)` is not a resolved ordering:
 
 | section | tightest adjacent pair (markers route) | gap | Bernoulli sigma | gap / sigma |
 |---|---|---:|---:|---:|
-| `gse324268_366` | methotrexate vs temozolomide | 0.0010 | 0.00037 | 2.7 |
-| `io_480` | methotrexate vs temozolomide | 0.0010 | 0.00034 | 3.0 |
+| `gse324268_366` | doxorubicin vs lomustine | 0.0142 | 0.00068 | 20.8 |
+| `io_480` | doxorubicin vs lomustine | 0.0117 | 0.00065 | 17.9 |
 | `brain_319` | methotrexate vs temozolomide | 0.0014 | 0.00098 | 1.5 |
 
 Every other adjacent pair is far wider. So the ordering is solid at the top — cisplatin's lead over the next drug is orders of magnitude above the sampling scale on every section — and the **methotrexate / temozolomide boundary at the bottom is the one place the ranking rests on a small margin**. §5 shows that measuring MGMT opens that particular gap decisively, which is the substantive reason to care about it here.
@@ -157,12 +160,12 @@ Every other adjacent pair is far wider. So the ordering is solid at the top — 
 
 | section | drug | kill (oxygen) | kill (markers) | ratio |
 |---|---|---:|---:|---:|
-| `gse324268_366` | temozolomide | 0.0882 | 0.0764 | 0.87x |
+| `gse324268_366` | temozolomide | 0.0973 | 0.1168 | 1.20x |
 | `gse324268_366` | lomustine | 0.4167 | 0.3885 | 0.93x |
 | `gse324268_366` | cisplatin | 0.4920 | 0.4649 | 0.94x |
 | `gse324268_366` | methotrexate | 0.0900 | 0.0774 | 0.86x |
 | `gse324268_366` | doxorubicin | 0.4310 | 0.4027 | 0.93x |
-| `io_480` | temozolomide | 0.0644 | 0.0639 | 0.99x |
+| `io_480` | temozolomide | 0.0797 | 0.1042 | 1.31x |
 | `io_480` | lomustine | 0.3486 | 0.3536 | 1.01x |
 | `io_480` | cisplatin | 0.4248 | 0.4330 | 1.02x |
 | `io_480` | methotrexate | 0.0657 | 0.0649 | 0.99x |
@@ -173,7 +176,7 @@ Every other adjacent pair is far wider. So the ordering is solid at the top — 
 | `brain_319` | methotrexate | 0.0192 | 0.0233 | 1.21x |
 | `brain_319` | doxorubicin | 0.2595 | 0.3073 | 1.18x |
 
-Across the 15 (section x drug) cells above the state route moves the level by 0.86x-1.21x. Across SECTIONS it moves far more: the same drug's marker-route kill spans up to 3.5x (temozolomide, 0.0764 / 0.0639 / 0.0219).
+Across the 15 (section x drug) cells above the state route moves the level by 0.86x-1.31x. Across SECTIONS it moves far more: the same drug's marker-route kill spans up to 5.3x (temozolomide, 0.1168 / 0.1042 / 0.0219).
 
 **A finding worth naming: the state route matters LESS on the sections that can actually measure it.** On the two markers-capable sections the oxygen and marker routes give kills within 0.86x-1.02x of each other; on the 319-gene section, where the marker route has to fall back to a neighbourhood rule and the oxygen route's VIABLE band is a mask artefact, they differ by 1.18x-1.21x. The route disagreement on the incumbent section is not a measurement of how much cell state matters — it is a measurement of how badly that panel constrains it.
 
@@ -217,17 +220,17 @@ This section's tumour is therefore **MGMT-EXPRESSING** (bulk-equivalent 4.85 CPM
 
 | MGMT input | sensitivity | TMZ kill (markers route) | x vs uniform | rank in the 5-drug panel |
 |---|---:|---:|---:|---|
-| none (uniform 1.0 — the old assumption) | 1.0000 | 0.0764 | 1.00x | #5 of 5 — **UPPER BOUND** |
-| **MEASURED, bridged (primary)** | 0.4175 | 0.0320 | 0.42x | #5 of 5 |
-| binary `unmethylated` | 0.3923 | 0.0300 | 0.39x | #5 of 5 |
-| naive panel CPM (rejected) | 0.1039 | 0.0081 | 0.11x | #5 of 5 |
-| bridged, 95% CI on lambda | 0.1769-0.9851 | 0.0137-0.0753 | — | #5 of 5 |
+| none (uniform 1.0 — the old assumption) | 1.0000 | 0.1168 | 1.00x | #4 of 5 — **UPPER BOUND** |
+| **MEASURED, bridged (primary)** | 0.4175 | 0.0485 | 0.42x | #5 of 5 |
+| binary `unmethylated` | 0.3923 | 0.0455 | 0.39x | #5 of 5 |
+| naive panel CPM (rejected) | 0.1039 | 0.0124 | 0.11x | #5 of 5 |
+| bridged, 95% CI on lambda | 0.1769-0.9851 | 0.0208-0.1150 | — | #5 of 5 to #4 of 5 |
 
 **Read the rank column carefully.** `results/mgmt_scalar.md` found that supplying a measured MGMT returns TMZ from an artificially-inflated #4 to #5 — but that promotion was specific to `determinant` mode, where TMZ's four competitors are scaled down by their own measured determinants and TMZ alone is not. This run is in `uniform` mode, where no drug is scaled, so TMZ starts last on delivery x potency alone and the measurement cannot demote it further. **What MGMT changes here is the MAGNITUDE and the LABEL, not the rank**: a number that was flagged *'no intrinsic resistance modelled'* now carries the resistance value used, its CI, and where it came from.
 
-**It does, however, make the placement itself robust, and that IS the same correction `results/mgmt_scalar.md` describes.** Without MGMT, temozolomide (0.0764) sits below methotrexate (0.0774) by only 0.0010 — 2.7x the Bernoulli sampling scale on 515,887 tumour cells, i.e. a placement that is nearly a coin-flip. With the measured MGMT scalar the gap opens to 0.0454 (123x sigma). That mirrors the finding in `results/mgmt_scalar.md` exactly — there the measurement moved TMZ off an artificially-inflated #4 and opened a 0.5 pp gap to 7-9 pp; here it cannot move the rank because `uniform` mode never inflated it, but it converts a marginal last place into a decisive one.
+**It does, however, make the placement itself robust, and that IS the same correction `results/mgmt_scalar.md` describes.** Without MGMT, temozolomide (0.1168) sits below methotrexate (0.0774) by only -0.0394 — -88.2x the Bernoulli sampling scale on 515,887 tumour cells, i.e. a placement that is nearly a coin-flip. With the measured MGMT scalar the gap opens to 0.0289 (65x sigma). That mirrors the finding in `results/mgmt_scalar.md` exactly — there the measurement moved TMZ off an artificially-inflated #4 and opened a 0.5 pp gap to 7-9 pp; here it cannot move the rank because `uniform` mode never inflated it, but it converts a marginal last place into a decisive one.
 
-**And it is not a small correction.** The measured scalar cuts temozolomide's predicted kill by 2.4x (0.0764 -> 0.0320). Every temozolomide kill previously published by this project — `results/real_drug_panel.md`, `results/dose_schedule.md`, `results/kill_calibration.md`, `results/heldout_patient.md` — is an upper bound in this dimension, exactly as `results/kill_calibration.md` limitation 8 says it is. This is the first run in the project where that bound is replaced by a measurement rather than restated as a caveat.
+**And it is not a small correction.** The measured scalar cuts temozolomide's predicted kill by 2.4x (0.1168 -> 0.0485). Every temozolomide kill previously published by this project — `results/real_drug_panel.md`, `results/dose_schedule.md`, `results/kill_calibration.md`, `results/heldout_patient.md` — is an upper bound in this dimension, exactly as `results/kill_calibration.md` limitation 8 says it is. This is the first run in the project where that bound is replaced by a measurement rather than restated as a caveat.
 
 **What this does NOT establish.** The mapping is fitted on n = 17 paired cultures with a 95% CI on lambda spanning 0.006-0.680, i.e. a factor of >100 in slope; the direction is solid, the magnitude is approximate. The cultures are dissociated 2-D monolayers. The panel-to-bulk bridge assumes unbiased relative capture by the Xenium probe set, which is not established — the honest reading of the bridge is that it fixes an order-of-magnitude unit error, not that it calibrates a level. And the TCGA sections supplying the bridge are different patients.
 
@@ -292,10 +295,10 @@ Deterministic — the only randomness is the engine's seeded generator (`seed = 
 
 | section | cells | grid | reconstruction | 5 transport solves | total |
 |---|---:|---|---:|---:|---:|
-| `gse324268_366` | 851,509 | 1196x880 | 147 s | 50.7 min | 53.5 min |
-| `io_480` | 816,769 | 905x956 | 109 s | 44.6 min | 46.7 min |
-| `brain_319` | 40,887 | 424x675 | 2 s | 4.6 min | 4.6 min |
-| **all** | | | | | **104.7 min** |
+| `gse324268_366` | 851,509 | 1196x880 | 88 s | 33.0 min | 34.6 min |
+| `io_480` | 816,769 | 905x956 | 24 s | 15.8 min | 16.3 min |
+| `brain_319` | 40,887 | 424x675 | 2 s | 3.6 min | 3.7 min |
+| **all** | | | | | **54.7 min** |
 
 **Files added by this work (nothing under `tmesim/` was modified):**
 
