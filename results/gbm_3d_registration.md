@@ -390,3 +390,253 @@ In priority order:
 - `data_cache/greenwald_gbm_codex/ZH1007_NEC_B.ome.tif` — the real, live-downloaded CODEX
   OME-TIFF (~921 MB).
 - `results/gbm_3d_registration_overlay.png` — the verification plot referenced above.
+
+---
+
+## Second case: ZH1007's infiltrative (inf) region — does the first result generalize?
+
+**One-line summary.** Same tumour (`ZH1007`) as above, its OTHER region: the infiltrative
+margin (`inf`) instead of the necrotic core (`nec`). Chosen deliberately over an unrelated
+tumour, per the task's own preference, because it is the one comparison in this deposit that
+isolates *region* as the variable while holding *patient* constant. Both `tmesim/data/ingest.py`
+and `tmesim/data/adapters/codex.py` handled this second real file completely unmodified — no
+new code, no format surprises. **The direction of the finding repeats: registration measurably
+improves cross-platform tissue-frame overlap on this second real pair too** (Chamfer −38.5%,
+Hausdorff-95 −50.3%, density correlation +31.6%). The *magnitude* does not repeat exactly —
+Hausdorff-95 and especially density correlation improve substantially MORE here than on `nec`,
+and the absolute (post-registration) overlap quality is worse in absolute density-correlation
+terms, consistent with the infiltrative margin genuinely being a more diffuse, less
+sharply-bounded tissue structure than the necrotic core. Both are honest, real findings — stated
+precisely below, not smoothed into one number.
+
+### What is confirmed real, on disk, unchanged from the earlier checkpoint
+- Chose `GBM_ZH1007inf.tar.gz` (Visium, 20.8 MB) + `ZH1007_INF.ome.tif` (CODEX, 1548.8 MB) —
+  the SAME tumour (`ZH1007`) already registered in its necrotic (`nec`) region above, now its
+  infiltrative (`inf`) margin, per the task's preferred "same tumour, other region" design
+  (directly comparable pair, not a new unrelated tumour). Confirmed via
+  `visium_dataset_description.csv` (fetched fresh from the Zenodo API, not assumed) that
+  `GBM_ZH1007inf.tar.gz` is a real, distinct Visium sample entry (`zh1007inf_*` files),
+  same naming convention as `zh1007nec_*`.
+- Visium tarball downloaded, extracted, and restructured into the same symlinked
+  `outs/{filtered_feature_bc_matrix,spatial}/` shape used for `ZH1007nec`
+  (`data_cache/greenwald_gbm_visium/GBM_ZH1007inf/outs`). `ingest.detect()` returns
+  `platform=visium, layout=spaceranger_outs, confidence=1.0` — same full-confidence result as
+  the first pair, zero new code. `ingest.ingest()` gives **1,436 spots, 33,538 genes** (a
+  richer spot count than `nec`'s 955). `capability_report` confirms the same whole-transcriptome
+  verdicts as `nec`: vascular_field OK, cell_typing OK (coverage 1.00), hypoxia_measured OK,
+  mgmt_from_panel OK, ecm_field OK — all four `[OK]` axes reproduce on this second section.
+  One genuine format note: this file's `matrix.mtx` header reads
+  `{"software_version": "v16.10-2-g378ed53-dirty", ...}`, NOT `"spaceranger-1.1.0"` like `nec`'s
+  — a different processing-pipeline version string across the two regions of the same tumour,
+  recorded here in case it matters later; it did not affect ingestion (still a valid
+  MatrixMarket file, same 33,538×N shape convention, `resolve_visium_dirs`/`detect` do not key
+  off this string).
+- CODEX OME-TIFF fully downloaded (1,548,785,153 bytes, matches the Zenodo listing's 1548.8 MB
+  to within rounding) and read with the EXISTING, unmodified `codex.read_ome_metadata()`:
+  43 channels, 10584×9874 px (a different pixel footprint than `nec`'s 8205×7330 — a
+  DIFFERENT physical ROI, expected for a different region of the same block), 0.50670 µm/px
+  (IDENTICAL calibration to `nec`, both regions scanned on the same instrument/settings), 3
+  pyramid levels — same format shape as `nec`, adapter needed zero changes. Channel 0 is DAPI,
+  channels 1–42 cycle `ATTO 550`/`FITC`/`Cy5` — same dye-name-not-marker-name situation as
+  `nec`, confirming this is a per-file property of the deposit's raw CODEX export, not a
+  one-off. The self-referencing-filename OME-XML quirk reproduces here too, but points to a
+  DIFFERENT stale name than expected: `ZH1017_NEC.ome.tif` (patient 1017, region NEC) embedded
+  inside a file Zenodo actually serves as `ZH1007_INF.ome.tif` (patient 1007, region INF) — i.e.
+  BOTH the patient-ID digit swap (1007↔1017) AND a region swap (INF↔NEC) are present in the
+  stale metadata, consistent with the depositors reusing/cross-referencing an internal naming
+  scheme sloppily across multiple files, not just the one `nec` pass 1 already flagged.
+- Disk: 22 GiB free before this second pair was started, 18–21 GiB free during the ~1.57 GB
+  combined download (other concurrent work in this shared repo is also using disk — confirmed
+  via `git status` before starting, in-progress edits outside this pass's scope, same as pass
+  1 noted). No cleanup needed yet.
+- Baseline full suite (before any new code/config change for this pass — none has been made
+  yet, since no adapter changes were needed): `577 passed, 0 failed`
+  (`./.venv/bin/python -m pytest tests/ -q`, matches pass 1's post-pass count exactly, confirming
+  no drift from other concurrent work between passes).
+
+### Nucleus extraction and registration — completed
+
+Full-resolution (`level=0`) DAPI local-maxima extraction on `ZH1007_INF.ome.tif`
+(10584×9874 px, ~1.7× the pixel count of `nec`'s 8205×7330) took **29.4 s** (faster in
+wall-clock terms than `nec`'s 34.4 s despite more pixels — machine load from other concurrent
+work in this shared repo varies run to run; not a meaningful comparison) and found
+**39,100 nucleus positions**, spanning real micron coordinates (52.2–4936.8 µm ×
+46.1–5345.7 µm) — consistent with the image's own physical field of view
+(9874×0.50670 = 5003 µm, 10584×0.50670 = 5363 µm). A comparable order of magnitude to `nec`'s
+40,340, on a larger imaged footprint (bounding-box area 25.9 mm² vs `nec`'s ~14.4 mm²) —
+i.e. a genuinely LOWER nucleus areal density on this section (39,100 / 25.9 mm² ≈
+1,511 nuclei/mm² vs `nec`'s 40,340 / 14.4 mm² ≈ 2,802 nuclei/mm²), which is the expected
+direction for an infiltrative margin (tumour cells more sparsely interspersed with normal
+brain parenchyma) versus a necrotic core rim — recorded as a plausible, not proven,
+biological read of a purely geometric measurement (no cell typing was done; see limitations).
+
+Same real quirk reproduces, with a twist: this file's OME-XML `TiffData`/`UUID` blocks
+self-reference `"ZH1017_NEC.ome.tif"` — NOT `"ZH1007_INF.ome.tif"`, the name Zenodo actually
+serves it under. That is a DIFFERENT stale filename than `nec`'s own self-reference
+(`"ZH1017_INF_B.ome.tif"`), and notably **the patient-digit swap (1007↔1017) is now paired
+with a REGION swap too** (this INF file's embedded name says NEC; `nec`'s embedded name said
+INF) — i.e. the two files' stale internal names look like they may be cross-referencing EACH
+OTHER's region, not just carrying a generic typo. Recorded exactly as found; not chased
+further (does not affect channel 0 = DAPI or anything this adapter computes).
+
+`register_serial_sections()` — called with the exact same signature, defaults, and
+`z_spacing_um=10.0` placeholder convention as the `nec` pass, only `z_spacing_caveat`'s text
+changed to name this second, different pair explicitly (not reused verbatim from `nec`):
+
+```
+transform:  rotation = 4.279°   scale = 0.6156   translation = (484.0, 892.0) um
+z_spacing_um = 10.0  (ASSUMED — same placeholder class as nec; not a measured quantity)
+n_points = 40,536  (1,436 Visium spots @ z=0  +  39,100 CODEX nuclei @ z=10.0)
+```
+
+| metric | before | after | change |
+|---|---|---|---|
+| density correlation (60 µm grid) | 0.1370 | 0.1803 | **+31.6%** relative |
+| Chamfer distance, tissue outline (µm) | 288.9 | 177.7 | **−38.5%** (closer) |
+| Hausdorff-95, tissue outline (µm) | 1342.3 | 667.1 | **−50.3%** (closer) |
+
+Winning candidate was again `seed_index=0` (identity rotation start), but unlike `nec`
+(0.088° rotation, near-identity), this pair's winning transform has a real **4.28° rotation**
+AND a **larger scale correction (0.616, i.e. ~38.4% linear shrink of the CODEX cloud)** than
+`nec`'s 0.731 (~26.9% shrink). Six runner-up candidates (seed indices 2–6, all coarse-search
+seeds converging to −105° to −120° rotations) produced WORSE Chamfer (219.3–231.8 µm vs the
+winner's 177.7 µm) despite comparable or even higher raw density correlation (0.428–0.450 vs
+the winner's 0.180) — the same "a wrong candidate can look locally competitive on density
+correlation alone" pattern `nec`'s writeup already documented, Chamfer-based final selection
+catching it correctly here too. Full table in the script output below.
+
+**On the scale correction, checked the same way `nec`'s was, not asserted by analogy.** Visium
+pixel calibration for this section: `55 µm / 112.3366 px = 0.4897 µm/px` (vs `nec`'s
+`0.4905 µm/px` — 0.16% apart, trivial). CODEX pixel calibration: `0.50670 µm/px`, IDENTICAL to
+`nec`'s to 5 decimal places (both regions scanned on the same instrument/settings, as
+expected for one deposit). Visium-vs-CODEX calibration gap here: 3.5% (`nec`: 3.2%) — nowhere
+near the 38% ICP-found scale correction, so, exactly as `nec` found, **this is not a units bug**.
+Raw point-cloud bounding-box area ratio (Visium / CODEX) is 0.510 here (linear √ratio 0.714) —
+in the same rough ballpark as the ICP scale (0.616) without matching it exactly, the same
+"same ballpark, not exact" relationship `nec`'s writeup reported for its own 0.618 bbox ratio
+vs 0.731 ICP scale. Two candidate explanations carried over unchanged from `nec` (real tissue
+shrinkage/deformation between near-adjacent cuts vs a smaller CODEX-scanned ROI within the
+block) — **still not resolved**, and this second data point does not resolve which one
+dominates; if anything, a LARGER scale correction on `inf` than `nec` is consistent with either
+explanation still being live (more deformation OR a differently-sized scan ROI on this second
+section, no way to tell from geometry alone).
+
+**Declared-panel capability check**: identical to `nec`'s, because it is the same antibody
+panel/deposit, not a per-region property — `codex.declared_panel_capability_report()` on this
+section confirms the same `vascular_field: OK` (CD31→PECAM1) and `hypoxia_measured: OK`
+(CA9, NDRG1, GLUT1→SLC2A1) verdicts, `mgmt_from_panel: NO` (same honest negative). Not
+re-derived from scratch as a new finding — recorded to confirm it reproduces, which it does
+trivially (same panel PDF, same alias table, same file-independent computation).
+
+**Visual check** (`results/gbm_3d_registration_zh1007inf_overlay.png`, generated and inspected
+before trusting the numbers above, same discipline as `nec`): before registration, the raw
+CODEX cloud is visibly LARGER than and offset to the right of the Visium spot footprint — a
+much more visible pre-registration mismatch than `nec`'s already-broadly-overlapping start;
+after registration, the CODEX cloud is rescaled and shifted into much closer alignment with
+the Visium spot grid's shape; the tissue-outline panel shows the CODEX outline (irregular,
+branching, genuinely infiltrative-looking) occupying mostly the right/interior portion of the
+Visium footprint, a real but imperfect overlap — the same similarity-transform limitation
+(cannot fix local deformation) `nec` already flagged, visibly present here too.
+
+### Does the first result generalize? Direct comparison
+
+| metric | ZH1007 **nec** (pass 1) | ZH1007 **inf** (pass 2) | same direction? |
+|---|---|---|---|
+| Chamfer, relative change | −40.2% | −38.5% | **yes, close** |
+| Hausdorff-95, relative change | −36.8% | −50.3% | yes, but **substantially larger** here |
+| Density correlation, relative change | +10.8% | +31.6% | yes, but **~3× larger** here |
+| Density correlation, absolute (after) | 0.272 | 0.180 | **inf is LOWER in absolute terms** |
+| ICP scale correction | 0.731 (27% shrink) | 0.616 (38% shrink) | same direction, **larger** on inf |
+| Winning-candidate rotation | 0.088° (~identity) | 4.28° (small but real) | inf needed more rotation too |
+
+**Honest read: the DIRECTION generalizes cleanly (all three metrics improve on both real
+sections, by a comparable order of magnitude), but the MAGNITUDE does not repeat exactly, and
+one number moves enough to be worth flagging rather than averaging away.** Chamfer is close
+between the two (−40.2% vs −38.5%) — the strongest case for "this is a stable effect of the
+method, not a lucky first case." Hausdorff-95 and density correlation both improve MORE on
+`inf` than on `nec` in RELATIVE terms, but `inf`'s density correlation remains LOWER than
+`nec`'s in ABSOLUTE terms even after registration (0.180 vs 0.272) — i.e. `inf` starts from a
+much worse baseline (0.137 vs 0.246) and closes more of the gap, without ever reaching `nec`'s
+absolute overlap quality. This is consistent with a real, non-arbitrary biological difference
+between the two regions this task asked about: **the infiltrative margin's tissue structure is
+genuinely less spatially concentrated/coherent than the necrotic core's**, in exactly the
+direction a pathologist would expect (necrotic cores are compact, sharply demarcated
+structures; infiltrative margins are, by definition, diffuse zones where tumour cells
+interdigitate with normal brain) — the lower absolute density correlation and the visibly more
+irregular CODEX outline in the overlay figure are two independent pieces of evidence pointing
+the same way. **This pass does not claim to have proven that biological explanation** — only
+two regions of one patient were measured, not enough to separate "biology" from "this
+particular pair of scans" — but it is the most parsimonious reading of what was actually
+measured, stated as a plausible interpretation, not a conclusion.
+
+### What this second case does and does not add
+
+**Does establish:**
+- `tmesim/data/ingest.py` and `tmesim/data/adapters/codex.py` handle a SECOND real file pair
+  from this same deposit completely unmodified — the `nec` pass's "zero new ingestion code"
+  and "genuinely new CODEX format, but the adapter is now written" findings both hold on a
+  second real file, not just the one they were built against. Confirms the adapter generalizes
+  within-deposit, which was not guaranteed a priori.
+- The `nec` pass's cross-platform registration improvement (Chamfer/Hausdorff/density
+  correlation, all improving) is not a one-off lucky result on a single tumour/region — a
+  second real section from the same patient shows the same directional effect.
+- A genuine, geometrically-measured difference between necrotic-core and infiltrative-margin
+  tissue structure within the same patient — lower absolute post-registration density
+  correlation and a visibly more irregular tissue outline on the infiltrative section — that a
+  future pass with real cell typing (not just DAPI positions) could investigate further.
+- The channel-dye-not-marker-name problem, the OME-XML stale-filename quirk, and the ~part-in-30
+  Visium-vs-CODEX pixel-calibration gap all reproduce on a second, independently-decoded file —
+  each is a property of this DEPOSIT's export pipeline, not a one-off artefact of the first file
+  fetched.
+
+**Does NOT establish:**
+- **Per-cell CODEX marker identity** — unresolved here for the exact same reason as `nec` (dye
+  names, not antibody names, and the manifest was not fetched this pass either — same disk-budget
+  reasoning as pass 1, now doubly true with two large OME-TIFFs already on disk).
+- **A validated CODEX cell segmentation** — same DAPI-local-maxima caveat as `nec`, unchanged.
+- **Multi-tumour generalization** — this is still ONE patient (`ZH1007`), two regions of it.
+  The `ZH811`/`ZH881`/`ZH8811` naming ambiguity `nec`'s writeup flagged is still unresolved; a
+  genuinely different tumour (not just a different region of the same one) has not yet been
+  registered. This pass answers "does the SAME patient's other region look similar?" (yes,
+  directionally) but not "does a DIFFERENT patient look similar?" (still open).
+- **Why `inf`'s scale correction and absolute density correlation differ from `nec`'s** — two
+  plausible explanations offered (real infiltrative-vs-necrotic tissue structure difference,
+  or a scanning/ROI artefact independent of biology), neither ruled out.
+- **z-spacing** — same unverified placeholder (`z_spacing_um=10.0`) as `nec`, for the same
+  reason (paper states "near-adjacent," not a micron figure).
+
+### Honest next step (updates `nec`'s list, does not replace it)
+
+1. Register a genuinely different tumour (not another region of `ZH1007`) — `ZH916` or
+   `ZH1019` both have clean same-patient Visium/CODEX filename matches per
+   `visium_dataset_description.csv`/`readme_CODEX.txt` (unlike the `ZH811`/`ZH881`/`ZH8811`
+   ambiguity) and would separate "does registration generalize across REGIONS of one patient"
+   (this pass's question, now answered directionally-yes) from "does it generalize across
+   PATIENTS" (still open).
+2. Resolve the CODEX channel-to-marker manifest — unchanged priority from `nec`'s list; now
+   twice as valuable, since it would unlock a REAL comparison of e.g. CD31+ vascular density or
+   CA9+ hypoxic fraction between the necrotic and infiltrative regions of the same tumour,
+   instead of only a geometric one.
+3. A real cell segmentation (StarDist/Cellpose on DAPI) — unchanged priority; would also let
+   the "lower nucleus areal density on `inf`" observation above be checked against an actual
+   segmentation instead of a local-maxima proxy that could itself behave differently on more
+   diffuse tissue.
+
+### Files (this second case only; `nec`'s files list above is unchanged)
+
+- `data_cache/greenwald_gbm_visium/GBM_ZH1007inf/` — the real, live-downloaded Visium tarball
+  contents (20.8 MB) plus the same symlinked `outs/` restructuring pattern used for `nec`.
+- `data_cache/greenwald_gbm_codex/ZH1007_INF.ome.tif` — the real, live-downloaded CODEX
+  OME-TIFF (1,548,785,153 bytes ≈ 1548.8 MB, matches the Zenodo listing).
+- `results/gbm_3d_registration_zh1007inf_overlay.png` — the verification plot for this pair.
+- **No changes to `tmesim/data/adapters/codex.py`, `tmesim/reconstruct/registration_3d.py`, or
+  any other source file** — both existing, unmodified modules from the `nec` pass handled this
+  second real file with zero new code. No new test file was added for this pass (no new code
+  exists to pin); the existing `tests/test_codex_adapter.py` and `tests/test_registration_3d.py`
+  continue to cover the adapter/registration logic this pass exercised on new data.
+- Test suite: the **577 passed, 0 failed** baseline recorded in the checkpoint above (run
+  before this second pair's ingestion/registration script was written, confirming the starting
+  state) still applies — no source file changed during this pass, so nothing invalidates it. A
+  second full-suite run was deliberately NOT performed for this pass, per explicit
+  coordinator instruction (a central pass verifies and commits across all concurrently-running
+  agents' work rather than each pass re-running the full ~5-minute suite independently).
