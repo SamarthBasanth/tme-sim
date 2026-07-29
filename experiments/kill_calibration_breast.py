@@ -15,9 +15,17 @@ Tissue: the real Xenium breast section already used by the breast flagship
 ``tmesim.reconstruct.real_pipeline.reconstruct_real`` call GBM uses, at the
 same grid-converged ``dx = 12 um``.
 
-Drugs: the breast flagship's panel -- doxorubicin (IC50 reused verbatim from
-the GBM library, literature tier), paclitaxel / cyclophosphamide / tamoxifen
-(IC50 measured live from GDSC2's breast (BRCA) screen, 50 cell lines each).
+Drugs: the expanded 10-drug breast panel -- doxorubicin (IC50 reused verbatim
+from the GBM library, literature tier), paclitaxel / cyclophosphamide /
+tamoxifen / docetaxel / epirubicin / 5-fluorouracil / vinorelbine / palbociclib
+(new molecules in ``tmesim.molecular.breast_library``, IC50 measured live from
+GDSC2's breast (BRCA) screen, 50-51 cell lines each), and cisplatin (molecule
+reused verbatim from the GBM library, IC50 measured live from the breast BRCA
+screen, n=50 -- the real-data substitute for carboplatin, which is absent
+from GDSC2 entirely). palbociclib (CDK4/6 inhibitor) is a genuine
+cytostatic-vs-cytotoxic mechanism contrast case, run through the identical
+pipeline but flagged with that category-mismatch caveat throughout the
+generated report.
 
 Run:    ./.venv/bin/python experiments/kill_calibration_breast.py
 Writes: results/kill_calibration_breast.md
@@ -98,18 +106,34 @@ SEED = 0
 NOMINAL_PEAK_UM = 50.0
 NOMINAL_HALF_LIFE_S = 3600.0 * 4
 
-DRUGS: Tuple[str, ...] = ("doxorubicin", "paclitaxel", "cyclophosphamide", "tamoxifen")
+DRUGS: Tuple[str, ...] = (
+    "doxorubicin", "paclitaxel", "cyclophosphamide", "tamoxifen",
+    "docetaxel", "epirubicin", "5-fluorouracil", "vinorelbine",
+    "cisplatin", "palbociclib",
+)
 IC50_SOURCE_TAG = {
     "doxorubicin": "literature (reused verbatim from GBM library; not in GDSC2 at all)",
     "paclitaxel": "GDSC2 breast (BRCA), n=50 cell lines, measured",
     "cyclophosphamide": "GDSC2 breast (BRCA), n=50 cell lines, measured",
     "tamoxifen": "GDSC2 breast (BRCA), n=50 cell lines, measured",
+    "docetaxel": "GDSC2 breast (BRCA), n=51 cell lines, measured",
+    "epirubicin": "GDSC2 breast (BRCA), n=50 cell lines, measured",
+    "5-fluorouracil": "GDSC2 breast (BRCA), n=51 cell lines, measured",
+    "vinorelbine": "GDSC2 breast (BRCA), n=50 cell lines, measured",
+    "cisplatin": "GDSC2 breast (BRCA), n=50 cell lines, measured (molecule reused verbatim from GBM library)",
+    "palbociclib": "GDSC2 breast (BRCA), n=51 cell lines, measured (CDK4/6i -- cytostatic mechanism, see caveat)",
 }
 
 GDSC_ALIASES = {
     "paclitaxel": ["paclitaxel", "taxol"],
     "cyclophosphamide": ["cyclophosphamide", "endoxan", "cytoxan", "ctx"],
     "tamoxifen": ["tamoxifen", "nolvadex"],
+    "docetaxel": ["docetaxel", "taxotere"],
+    "epirubicin": ["epirubicin"],
+    "5-fluorouracil": ["5-fluorouracil", "5-fu", "fluorouracil"],
+    "vinorelbine": ["vinorelbine", "navelbine"],
+    "cisplatin": ["cisplatin", "cddp", "ddp", "cis-platinum", "cisplatinum"],
+    "palbociclib": ["palbociclib", "ibrance", "pd-0332991", "pd0332991"],
 }
 
 
@@ -129,6 +153,18 @@ def compile_breast_drug(name: str, alpha: float):
             "ic50_uM": float(dp.ic50), "source": "literature",
             "confidence": "literature", "n_cell_lines": None,
         }
+    elif key == "cisplatin":
+        # Molecule reused VERBATIM from the GBM library (same SMILES/structure
+        # as the GBM panel's own cisplatin), but compiled with a REAL,
+        # MEASURED breast (BRCA) GDSC2 IC50 rather than the GBM literature
+        # value -- unlike doxorubicin, cisplatin IS screened in GDSC2's
+        # breast panel (n=50), so the tissue-specific measured number is used.
+        # This is the real-data substitute for carboplatin (evaluated and
+        # rejected: absent from GDSC2 entirely, see breast_library.py).
+        mol = get_molecule_gbm("cisplatin")
+        ic50_info = resolve_ic50_breast(key)
+        dp_uncal = molecule_to_drugparams(mol, ic50=ic50_info["ic50_uM"])
+        dp = calibrated_drugparams(dp_uncal, alpha)
     else:
         mol = get_molecule_breast(key)
         ic50_info = resolve_ic50_breast(key)

@@ -47,6 +47,64 @@ from experiments.kill_calibration_breast import (  # noqa: E402
     run,
 )
 
+#: Breast-specific 3-D:2-D spheroid literature for the newly ADDED drugs
+#: (docetaxel, epirubicin). NOT added to
+#: ``tmesim.validation.kill_calibration.LIT_2D3D`` -- that module is SHARED
+#: with the GBM report and is left byte-for-byte untouched (adding rows there
+#: would silently change the GBM report's own 'solid' class band, n=20,
+#: the next time it is regenerated). Instead this is a breast-report-local
+#: table in the SAME row schema, passed straight into the frozen
+#: ``literature_bridge(rows=...)`` function GBM's own module exports --
+#: no bridge-aggregation code is duplicated, only the citation rows are new.
+#: Both papers were re-verified against PubMed Central full text (not just
+#: the abstract), following the same standard the GBM module's own
+#: ``evidence="full text Table 1"`` rows use.
+DOCETAXEL_BREAST_ROWS = (
+    dict(pmid="29221130", ref="Dubois C, et al. Oncotarget 2017;8(56):95316-95331",
+         system="MDA-MB-231 triple-negative breast (proliferative), Geltrex "
+                "liquid-overlay spheroid vs monolayer, resazurin viability day 5",
+         drug="docetaxel", val2d="0.2 +/- 0.004 uM", val3d=">10 uM (not reached)",
+         fold=58.0, scope=("solid", "drug:docetaxel"),
+         evidence="full text (paper states verbatim 'a ratio 3D/2D > 58 fold')",
+         note="LOWER BOUND -- 3-D IC50 not reached at the highest tested "
+              "concentration (10 uM); the true fold shift could be larger. "
+              "SUM1315 (the paper's OTHER breast line) gave a non-quantifiable "
+              "IC50 in EITHER format (both flat across the dose range), so "
+              "only MDA-MB-231 supplies a usable number from this paper"),
+    dict(pmid="33431915", ref="Gebeyehu A, et al. Sci Rep 2021;11(1):372",
+         system="MDA-MB-231 WT triple-negative breast, 3-D bioprinted hydrogel "
+                "(VitroGel Ink H4-RGD) spheroid vs 2-D monolayer",
+         drug="docetaxel", val2d="1.82 uM", val3d="15.1 uM", fold=8.30,
+         scope=("solid", "drug:docetaxel"),
+         evidence="full text (Results section, values stated directly in text)",
+         note="SAME cell line as the Dubois row above, a DIFFERENT 3-D method "
+              "(bioprinted hydrogel vs Geltrex liquid-overlay spheroid), and a "
+              "~7x smaller fold -- real cross-method spread on the identical "
+              "line, not a contradiction between the two papers"),
+)
+EPIRUBICIN_BREAST_ROWS = (
+    dict(pmid="29221130", ref="Dubois C, et al. Oncotarget 2017;8(56):95316-95331",
+         system="MDA-MB-231 triple-negative breast (proliferative), Geltrex "
+                "liquid-overlay spheroid vs monolayer",
+         drug="epirubicin", val2d="0.6 +/- 0.003 uM", val3d="0.6 +/- 0.1 uM",
+         fold=1.0, scope=("solid", "drug:epirubicin"),
+         evidence="full text (paper states 3-D was 'as sensitive as' 2-D)",
+         note="NO 3-D penalty at all in this line -- the paper's own words, "
+              "not a rounding artefact"),
+    dict(pmid="29221130", ref="Dubois C, et al. Oncotarget 2017;8(56):95316-95331",
+         system="SUM1315 triple-negative breast (non-proliferative), Geltrex "
+                "liquid-overlay spheroid vs monolayer",
+         drug="epirubicin", val2d="0.1 +/- 0.004 uM", val3d="7.6 +/- 0.5 uM",
+         fold=76.0, scope=("solid", "drug:epirubicin"),
+         evidence="full text (IC50 values stated directly: 0.1 vs 7.6 uM)",
+         note="the paper's own prose separately claims '140 fold less "
+              "sensitive' for this row, but 7.6/0.1 = 76 by direct division "
+              "of ITS OWN stated IC50 values. Reported as 76x here -- the "
+              "number actually checkable from the values given -- and this "
+              "discrepancy is flagged rather than silently adopting the "
+              "larger, uncheckable 140x the abstract-level prose claims"),
+)
+
 DRUG_LIT_SCOPE = {
     # doxorubicin: reuse the SAME cross-tumour-type band the GBM report used
     # for this drug (doxorubicin's own physical/chemical identity does not
@@ -61,6 +119,37 @@ DRUG_LIT_SCOPE = {
     "paclitaxel": {"kind": "drug_field", "value": "paclitaxel"},
     "cyclophosphamide": None,
     "tamoxifen": None,
+    # docetaxel / epirubicin: NEW breast-specific bridges built for this
+    # panel expansion (see the two row tuples just above) -- both drugs have
+    # n=2 breast-specific (not just cross-tumour) 3-D:2-D measurements.
+    "docetaxel": {"kind": "rows", "value": DOCETAXEL_BREAST_ROWS},
+    "epirubicin": {"kind": "rows", "value": EPIRUBICIN_BREAST_ROWS},
+    # 5-fluorouracil: ALREADY in the shared LIT_2D3D table (added for the GBM
+    # report's own 'solid tumours' context band) with its OWN drug field, one
+    # row (Koch et al., colorectal, cross-tumour-type, fold=7.5) -- reused
+    # here exactly like paclitaxel's own drug-matched-but-cross-tumour row.
+    "5-fluorouracil": {"kind": "drug_field", "value": "5-fluorouracil"},
+    # vinorelbine: a structured PubMed search (spheroid/monolayer/3D/2D/IC50,
+    # several phrasings) found ZERO 3-D:2-D comparisons for this drug, in any
+    # tumour type -- an honest null, same treatment as cyclophosphamide/
+    # tamoxifen.
+    "vinorelbine": None,
+    # cisplatin: molecule reused verbatim from the GBM library, so its
+    # EXISTING drug:cisplatin band in the shared, untouched LIT_2D3D table
+    # (n=5, cross-tumour-type: 4 Koch et al. colorectal lines + 1 Trigub et
+    # al. HeLa spheroid) is reused exactly as doxorubicin's own band is --
+    # a genuine like-for-like reuse across a molecule that does not change
+    # between tissues.
+    "cisplatin": {"kind": "scope", "value": "drug:cisplatin"},
+    # palbociclib: a structured PubMed search (palbociclib + spheroid/3D +
+    # monolayer/2D + IC50, several phrasings) found ZERO 3-D:2-D comparisons
+    # -- consistent with, and arguably explained by, the category mismatch
+    # this drug is included to expose: the whole 3-D:2-D SPHEROID-RESISTANCE
+    # literature is a question asked of CYTOTOXIC Hill-kill drugs, and may
+    # simply not be the question asked of a predominantly cytostatic CDK4/6
+    # inhibitor (see kill_calibration_breast.py's docstring and
+    # breast_library.py's module docstring for the full honest treatment).
+    "palbociclib": None,
 }
 
 
@@ -86,6 +175,11 @@ def drug_specific_bridge(name: str) -> Optional[Dict]:
         return None
     if spec["kind"] == "scope":
         b = literature_bridge(scope=spec["value"])
+    elif spec["kind"] == "rows":
+        # A breast-report-local row tuple (docetaxel/epirubicin) -- passed
+        # straight through the SAME frozen aggregation function the
+        # scope/drug_field branches use; no bridge maths is duplicated.
+        b = literature_bridge(rows=spec["value"])
     else:
         rows = [r for r in LIT_2D3D if r.get("drug") == spec["value"]]
         b = literature_bridge(rows=rows) if rows else None
@@ -217,43 +311,83 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
     pac_headline = pd_["paclitaxel"]["headline"]
     cyc_headline = pd_["cyclophosphamide"]["headline"]
     tam_headline = pd_["tamoxifen"]["headline"]
+    dtx_headline = pd_["docetaxel"]["headline"]
+    epi_headline = pd_["epirubicin"]["headline"]
+    fu_headline = pd_["5-fluorouracil"]["headline"]
+    vnr_headline = pd_["vinorelbine"]["headline"]
+    cis_headline = pd_["cisplatin"]["headline"]
+    plb_headline = pd_["palbociclib"]["headline"]
 
     n_tested = sum(1 for v in ratio_section.values() if v["testable"])
     verdicts = {n: v["test"]["verdict"] for n, v in ratio_section.items() if v["testable"]}
+    n_drugs = len(DRUGS)
 
     A("# Breast-cancer kill calibration: the 3-D:2-D ratio test, on the real Xenium section\n")
     A("**Breast-cancer analogue of `results/kill_calibration.md` (the GBM module) — same "
       "engine, same falsifiable test, same honesty standard, run on `results/breast_cancer_"
-      "flagship.md`'s real Xenium breast section and its real four-drug panel. This module "
+      f"flagship.md`'s real Xenium breast section and its extended {n_drugs}-drug panel "
+      "(expanded from the original 4-drug panel specifically to be a credible pharma/biotech "
+      "drug-comparison tool — see `results/breast_cancer_flagship.md` §2 for the full "
+      "selection/rejection writeup on every new drug). This module "
       "(`experiments/kill_calibration_breast.py` / `experiments/kill_calibration_breast_"
       "report.py`) is a driver script only: every physics, PK/PD, calibration and "
       "reconstruction function it calls is imported unmodified from `tmesim/` — nothing "
       "under `tmesim/` was changed to produce this report.**\n")
     A("> ### Headline\n>")
-    A(f"> **The 3-D:2-D ratio test is genuinely testable for only 2 of the 4 panel drugs.** "
-      f"Doxorubicin (reusing the SAME cross-tumour-type literature band the GBM report used, "
-      f"since the molecule itself doesn't change between tissues) predicts a 3-D:2-D kill "
-      f"ratio of **{dox_headline['ratio_exact']:.4f}** (implied IC50 fold "
-      f"**{dox_headline['implied_ic50_fold']:.2f}x**) against a measured band of 1-19x "
-      f"(n=5, cross-tumour-type) — **{ratio_section['doxorubicin']['test']['verdict']}**. "
-      f"Paclitaxel predicts a ratio of **{pac_headline['ratio_exact']:.4f}** (implied fold "
-      f"**{pac_headline['implied_ic50_fold']:.2f}x**); the one breast-specific spheroid "
-      f"measurement in the literature (PMID 41422245, MDA-MB-231/468 + MCF-7, n=1 point "
-      f"estimate, not a range) reports **25x**, and against the broader cross-tumour-type "
-      f"band (0.4-25x, n=20) the model's prediction is **"
-      f"{ratio_section['paclitaxel']['test_solid']['verdict']}**.\n>")
-    A(f"> **Cyclophosphamide and tamoxifen cannot be tested at all — an honest null, not a "
-      f"gap papered over.** A structured PubMed search (this report; see §1) found ZERO "
-      f"published 3-D-vs-2-D spheroid/monolayer potency comparisons for either drug, in any "
-      f"tumour type. This is not a thin band like GBM's single-paper temozolomide anchor — "
-      f"it is NO band. Cyclophosphamide is additionally a pro-drug requiring hepatic CYP2B6 "
-      f"activation absent from *any* in-vitro assay (2-D or 3-D), which makes the entire "
-      f"3-D:2-D paradigm a poor mechanistic fit for it independent of data availability; "
-      f"tamoxifen is a SERM whose primary action is receptor blockade / cytostasis, not the "
-      f"cytotoxic-Hill-kill process this test (and this whole pipeline's kill model) is built "
-      f"to represent. Their predicted ratios are reported below for completeness, checked only "
-      f"against the broad, non-drug-matched 'solid tumours generally' band, and are NOT scored "
-      f"pass/fail.\n>")
+    A(f"> **The 3-D:2-D ratio test is genuinely testable for {n_tested} of the {n_drugs} panel "
+      f"drugs** (up from 2 of 4 in the original panel). Doxorubicin and cisplatin reuse the "
+      f"SAME cross-tumour-type literature bands the GBM report used (the molecules themselves "
+      f"don't change between tissues); docetaxel and epirubicin get NEW, genuinely "
+      f"breast-specific bands built for this expansion (Dubois et al. 2017, PMID 29221130, "
+      f"MDA-MB-231/SUM1315 TNBC spheroids); paclitaxel and 5-fluorouracil reuse existing "
+      f"single-point/single-row literature. Doxorubicin: ratio "
+      f"**{dox_headline['ratio_exact']:.4f}** (implied fold "
+      f"**{dox_headline['implied_ic50_fold']:.2f}x**) vs 1-19x (n=5, cross-tumour-type) — "
+      f"**{ratio_section['doxorubicin']['test']['verdict']}**. Cisplatin: ratio "
+      f"**{cis_headline['ratio_exact']:.4f}** (implied fold "
+      f"**{cis_headline['implied_ic50_fold']:.2f}x**) vs the SAME GBM drug:cisplatin band "
+      f"(n=5, cross-tumour-type, folds 0.4-6.0x) — **"
+      f"{ratio_section['cisplatin']['test']['verdict']}**. Docetaxel: ratio "
+      f"**{dtx_headline['ratio_exact']:.4f}** (implied fold "
+      f"**{dtx_headline['implied_ic50_fold']:.2f}x**) vs its own NEW breast-specific band "
+      f"(n=2, MDA-MB-231, folds 8.3-58x) — **"
+      f"{ratio_section['docetaxel']['test']['verdict'] if ratio_section['docetaxel']['testable'] and ratio_section['docetaxel']['band_is_drug_matched'] else ratio_section['docetaxel']['test_solid']['verdict']}**. "
+      f"Epirubicin: ratio **{epi_headline['ratio_exact']:.4f}** (implied fold "
+      f"**{epi_headline['implied_ic50_fold']:.2f}x**) vs its own NEW breast-specific band "
+      f"(n=2, MDA-MB-231/SUM1315, folds 1.0-76x) — **"
+      f"{ratio_section['epirubicin']['test']['verdict'] if ratio_section['epirubicin']['testable'] and ratio_section['epirubicin']['band_is_drug_matched'] else ratio_section['epirubicin']['test_solid']['verdict']}**. "
+      f"Paclitaxel: ratio **{pac_headline['ratio_exact']:.4f}** (implied fold "
+      f"**{pac_headline['implied_ic50_fold']:.2f}x**); the one breast-specific point estimate "
+      f"(PMID 41422245, 25x, n=1) has no spread to test, so the formal verdict uses the broad "
+      f"cross-tumour band (0.4-25x, n=20) — **"
+      f"{ratio_section['paclitaxel']['test_solid']['verdict']}**. 5-fluorouracil: ratio "
+      f"**{fu_headline['ratio_exact']:.4f}** (implied fold "
+      f"**{fu_headline['implied_ic50_fold']:.2f}x**) vs its own single cross-tumour-type row "
+      f"(Koch et al., colorectal, fold=7.5, n=1, no spread) — formal verdict also falls back "
+      f"to the broad band — **{ratio_section['5-fluorouracil']['test_solid']['verdict']}**.\n>")
+    A(f"> **Cyclophosphamide, tamoxifen and vinorelbine cannot be tested at all — an honest "
+      f"null, not a gap papered over.** A structured PubMed search (this report; see §1) found "
+      f"ZERO published 3-D-vs-2-D spheroid/monolayer potency comparisons for any of the three, "
+      f"in any tumour type. This is not a thin band like GBM's single-paper temozolomide "
+      f"anchor — it is NO band. Cyclophosphamide is additionally a pro-drug requiring hepatic "
+      f"CYP2B6 activation absent from *any* in-vitro assay (2-D or 3-D); tamoxifen is a SERM "
+      f"whose primary action is receptor blockade / cytostasis, not the cytotoxic-Hill-kill "
+      f"process this test is built to represent. Their predicted ratios are reported below for "
+      f"completeness, checked only against the broad, non-drug-matched 'solid tumours "
+      f"generally' band, and are NOT scored pass/fail.\n>")
+    A(f"> **Palbociclib is a deliberate mechanism-category contrast case, not just another "
+      f"honest null.** This CDK4/6 inhibitor has a REAL, measured GDSC2-breast IC50 (n=51 "
+      f"cell lines) — unlike trastuzumab, no potency number had to be skipped or invented — "
+      f"but its predominant mechanism is CYTOSTATIC G1-phase cell-cycle arrest, not cytotoxic "
+      f"cell killing, and this pipeline's entire kill-fraction machinery is a Hill-type "
+      f"CYTOTOXIC dose-response model that does not distinguish 'arrested' from 'dead'. Its "
+      f"predicted 3-D:2-D ratio is **{plb_headline['ratio_exact']:.4f}** (implied fold "
+      f"**{plb_headline['implied_ic50_fold']:.2f}x**), reported for completeness against the "
+      f"broad 'solid tumours' band exactly like the honest nulls above, but the number itself "
+      f"should be read as a CYTOSTATIC growth-inhibition signal being forced through a "
+      f"cytotoxic-kill lens — a genuine category mismatch this task asked to be surfaced "
+      f"honestly rather than silently forced, and it is the ONE judgement call in this report "
+      f"that is a modelling boundary rather than a data-availability gap. See §1 and §6.\n>")
     A(f"> **State-label bound generalises.** Exactly as in the GBM report, relabelling the "
       f"QUIESCENT fraction over its full possible range moves `F_state` only within "
       f"[{pdc['hypoxia_resistance']:.2f}, 1.0] by construction (the bounded engine "
@@ -262,8 +396,8 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       f"cell-state mix ({sb['QUIESCENT']['fraction']*100:.1f}% quiescent, "
       f"{sb['HYPOXIC']['fraction']*100:.1f}% hypoxic here vs 90.0%/0.0% on the GBM section).\n>")
     A(f"> **No breast-specific patient-derived ex-vivo anchor exists in this repo** (unlike "
-      f"GBM's GSE232173), so — unlike temozolomide in the GBM report — none of these four "
-      f"drugs get a re-anchored intrinsic potency here; all four anchors are the "
+      f"GBM's GSE232173), so — unlike temozolomide in the GBM report — none of these "
+      f"{n_drugs} drugs get a re-anchored intrinsic potency here; every anchor is the "
       f"GDSC2-breast (or literature) monolayer IC50 with its own between-line spread as the "
       f"error bar, the SAME treatment the GBM report gave cisplatin and doxorubicin.\n>")
     A(f"> **The clinical/pCR comparison in §7 is explicitly NOT a validation.** "
@@ -279,16 +413,22 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       f"{r['n_tumor']:,} tumour. This tumour is annotated ER+/HER2+/PR− in Janesick *et al.* "
       f"`dt = {res['dt_s']:.0f} s`, window {res['window_s']/3600:.0f} h, convection on, seed "
       f"{res['seed']}.\n")
-    A(f"* **Drugs** — the breast flagship's panel (`results/breast_cancer_flagship.md` §2): "
-      f"doxorubicin (IC50 reused verbatim from the GBM library — literature tier, NOT "
-      f"GDSC2-measured, since doxorubicin is not in GDSC2 at all for any tissue), paclitaxel / "
-      f"cyclophosphamide / tamoxifen (IC50 measured live from GDSC2's breast BRCA screen, 50 "
-      f"cell lines each). `calibrated_drugparams(name_or_DrugParams, alpha=148.61)` then "
+    A(f"* **Drugs** — the extended {n_drugs}-drug breast panel (`results/breast_cancer_"
+      f"flagship.md` §2): doxorubicin (IC50 reused verbatim from the GBM library — literature "
+      f"tier, NOT GDSC2-measured, since doxorubicin is not in GDSC2 at all for any tissue), "
+      f"paclitaxel / cyclophosphamide / tamoxifen / docetaxel / epirubicin / 5-fluorouracil / "
+      f"vinorelbine / palbociclib (IC50 measured live from GDSC2's breast BRCA screen, 50-51 "
+      f"cell lines each), and cisplatin (molecule reused verbatim from the GBM library, IC50 "
+      f"measured live from the SAME breast BRCA screen, n=50 — the real-data substitute for "
+      f"carboplatin, absent from GDSC2 entirely across every tissue, not just breast). "
+      f"`calibrated_drugparams(name_or_DrugParams, alpha=148.61)` then "
       f"`apply_barrier_to_drugparams`: the identical compilation pipeline the breast drug "
       f"panel uses, itself identical to GBM's. One transport solve per drug (the PDE is "
       f"linear in the source), re-run through the engine's own unmodified kill mapping "
       f"(`cells.pkpd.apply_drug_kill`). Nothing in core/physics/engine/molecular/reconstruct "
-      f"is modified.\n")
+      f"is modified. Trastuzumab was RE-EVALUATED for this expansion and remains excluded "
+      f"(no cytotoxic potency number, see §1); carboplatin and capecitabine were evaluated and "
+      f"rejected (absent from GDSC2 entirely; see `tmesim/molecular/breast_library.py`).\n")
     A(f"* **Cell-state bands on this section** (from the oxygen solve, the shipping "
       f"`state_mode='oxygen'` default — same route the GBM report uses): "
       f"VIABLE {sb['VIABLE']['fraction']*100:.2f}%, "
@@ -309,8 +449,8 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       f"literature-informed override of 0.80 for **temozolomide only** "
       f"(`TMZ_HYPOXIA_RESISTANCE`, `core/config.py:214`) — confirmed by direct inspection "
       f"(`validation/calibration.py:189`, `if name == \"temozolomide\":`) that NONE of this "
-      f"panel's four drugs (doxorubicin, paclitaxel, cyclophosphamide, tamoxifen) receive a "
-      f"per-drug override, so this change has ZERO numeric effect on this report — every "
+      f"panel's {n_drugs} drugs receive a per-drug override, so this change has ZERO "
+      f"numeric effect on this report — every "
       f"number below uses the same global 0.35/0.50 multipliers the GBM report itself used. "
       f"`tmesim/validation/vessel_profile.py` had also just landed a distance-methodology "
       f"change (nearest-endothelial-cell `cKDTree` query replacing a percentile-threshold-EDT "
@@ -320,16 +460,22 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       f"enter any number here.\n")
 
     # ------------------------------------------------------------------- 1.
-    A("## 1. The bridge parameter — what 3-D:2-D literature actually exists for these four drugs\n")
+    A(f"## 1. The bridge parameter — what 3-D:2-D literature actually exists for these {n_drugs} drugs\n")
     A("A structured PubMed search (`cyclophosphamide spheroid monolayer IC50`, `tamoxifen "
       "spheroid monolayer breast cancer IC50`, `4-hydroperoxycyclophosphamide spheroid`, "
-      "`endocrine therapy tamoxifen 3D spheroid culture ... monolayer`, and variants) returned "
-      "**zero** results for cyclophosphamide or tamoxifen, in any tumour type. This was not a "
-      "single narrow query: the alkylating-agent-general and SERM-general variants were also "
-      "searched and also returned nothing drug-matched. Doxorubicin and paclitaxel DO have "
-      "data:\n")
+      "`endocrine therapy tamoxifen 3D spheroid culture ... monolayer`, `vinorelbine spheroid "
+      "monolayer IC50`, `palbociclib spheroid monolayer 3D IC50`, and variants) returned "
+      "**zero** results for cyclophosphamide, tamoxifen, vinorelbine or palbociclib, in any "
+      "tumour type. This was not a single narrow query: alkylating-agent-general and "
+      "SERM-general variants were also searched for the original two, and both broad and "
+      "breast-specific phrasings were tried for vinorelbine and palbociclib. Six of the ten "
+      "drugs DO have data:\n")
     dox_b = ratio_section["doxorubicin"]["specific_bridge"]
     pac_b = ratio_section["paclitaxel"]["specific_bridge"]
+    dtx_b = ratio_section["docetaxel"]["specific_bridge"]
+    epi_b = ratio_section["epirubicin"]["specific_bridge"]
+    fu_b = ratio_section["5-fluorouracil"]["specific_bridge"]
+    cis_b = ratio_section["cisplatin"]["specific_bridge"]
     solid_b = ratio_section["doxorubicin"]["solid_bridge"]
     A(f"* **doxorubicin** (n={dox_b['n']}, cross-tumour-type — colorectal + osteosarcoma, "
       f"the SAME rows the GBM report itself used, since this is a molecule-level, not "
@@ -338,23 +484,68 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       f"One 2021;16(1):e0244513 (PMID **33395433**, 4 colorectal lines, full-text Table 1) "
       f"and Jubelin C *et al.* Front Bioeng Biotechnol 2023;11:1260049 (PMID **37869710**, "
       f"MNNG/HOS osteosarcoma, abstract-stated values, the largest shift in the set at 18.8x).\n")
-    A(f"* **paclitaxel** (n={pac_b['n']}, **breast-specific** — the only drug in this panel "
-      f"whose 3-D:2-D literature is itself breast tissue): Mutahar AZI *et al.* J Transl Med "
-      f"2025;23(1):1428 (PMID **41422245**), MDA-MB-231, MDA-MB-468 (triple-negative) and "
-      f"MCF-7 (luminal) spheroids vs 2-D monolayer, independently re-verified against the "
-      f"PubMed abstract: *'Transition from 2D monolayer to 3D spheroid culture markedly "
-      f"increased paclitaxel resistance, with IC50 values elevated by roughly 25-fold.'* This "
-      f"is a single POINT estimate across the three lines collectively (not a per-line range, "
-      f"unlike GBM's 6-row temozolomide table), so it cannot supply a band on its own — "
-      f"reported prominently below, but the formal test uses the broader class band.\n")
+    A(f"* **cisplatin** (n={cis_b['n']}, cross-tumour-type — colorectal + HeLa, the SAME "
+      f"drug:cisplatin band the GBM report already assembled, reused verbatim here since "
+      f"cisplatin's molecule is reused verbatim from the GBM library): median fold "
+      f"**{cis_b['fold_median']:.2f}x**, range **{cis_b['fold_min']:.1f}-"
+      f"{cis_b['fold_max']:.2f}x** — the band itself spans BOTH directions (3-D more resistant "
+      f"AND, in one Koch et al. colorectal line, 3-D more SENSITIVE, fold 0.4). Sources: Koch "
+      f"J *et al.* PLoS One 2021;16(1):e0244513 (PMID **33395433**) and Trigub MM *et al.* "
+      f"Bull Exp Biol Med 2020;168(4):583-588 (PMID **32152850**, HeLa spheroid). A BREAST-"
+      f"specific check was also made for this expansion: Dubois *et al.* 2017 (PMID "
+      f"**29221130**) tested cisplatin on MDA-MB-231 and SUM1315 TNBC lines in both formats, "
+      f"but explicitly states *'IC50 could not be determined for either cell culture'* for "
+      f"MDA-MB-231, and SUM1315's own dose-response does not cleanly cross 50% viability in "
+      f"either format either — i.e. a genuinely NON-QUANTIFIABLE breast-specific result, "
+      f"consistent with (not contradicting) the existing band's own mixed-direction signal. "
+      f"It is reported here as corroborating context, not folded into the quantitative band.\n")
+    A(f"* **docetaxel** (n={dtx_b['n']}, **breast-specific** — a NEW bridge built for this "
+      f"panel expansion): median fold **{dtx_b['fold_median']:.1f}x**, range "
+      f"**{dtx_b['fold_min']:.1f}-{dtx_b['fold_max']:.1f}x**. Sources: Dubois C *et al.* "
+      f"Oncotarget 2017;8(56):95316-95331 (PMID **29221130**), MDA-MB-231 TNBC, Geltrex "
+      f"liquid-overlay spheroid vs monolayer, resazurin viability — 2-D IC50 0.2 uM, 3-D IC50 "
+      f">10 uM (not reached; the paper itself states *'a ratio 3D/2D > 58 fold'*, a LOWER "
+      f"bound); and Gebeyehu A *et al.* Sci Rep 2021;11(1):372 (PMID **33431915**), the SAME "
+      f"cell line, a DIFFERENT 3-D method (bioprinted VitroGel hydrogel), 2-D IC50 1.82 uM, "
+      f"3-D IC50 15.1 uM (fold 8.3x) — real cross-method spread on identical cells, not a "
+      f"contradiction. The paper's OTHER breast line (SUM1315) gave a non-quantifiable IC50 "
+      f"in either format, so only MDA-MB-231 supplies numbers here.\n")
+    A(f"* **epirubicin** (n={epi_b['n']}, **breast-specific**, both rows from the SAME paper "
+      f"as docetaxel's above): median fold **{epi_b['fold_median']:.1f}x**, range "
+      f"**{epi_b['fold_min']:.1f}-{epi_b['fold_max']:.1f}x**. Dubois *et al.* 2017 (PMID "
+      f"**29221130**) report MDA-MB-231 2-D IC50 0.6 uM vs 3-D IC50 0.6 uM — **NO 3-D penalty "
+      f"at all** in this line (the paper's own words: 3-D was 'as sensitive as' 2-D) — and "
+      f"SUM1315 2-D IC50 0.1 uM vs 3-D IC50 7.6 uM (a real, large shift). Note: the paper's "
+      f"own abstract-level prose separately claims '140-fold less sensitive' for the SUM1315 "
+      f"row, but 7.6/0.1 = 76 by direct division of its OWN stated IC50 values — this report "
+      f"uses 76x (the number actually checkable from the values given), flagging the "
+      f"discrepancy rather than silently adopting the paper's larger, uncheckable 140x claim.\n")
+    A(f"* **paclitaxel** (n={pac_b['n']}, **breast-specific** — the drug this panel already "
+      f"had a breast-specific point for): Mutahar AZI *et al.* J Transl Med 2025;23(1):1428 "
+      f"(PMID **41422245**), MDA-MB-231, MDA-MB-468 (triple-negative) and MCF-7 (luminal) "
+      f"spheroids vs 2-D monolayer, independently re-verified against the PubMed abstract: "
+      f"*'Transition from 2D monolayer to 3D spheroid culture markedly increased paclitaxel "
+      f"resistance, with IC50 values elevated by roughly 25-fold.'* This is a single POINT "
+      f"estimate across the three lines collectively (not a per-line range), so it cannot "
+      f"supply a band on its own — reported prominently, but the formal test uses the "
+      f"broader class band.\n")
+    A(f"* **5-fluorouracil** (n={fu_b['n']}, cross-tumour-type — the SAME row already present "
+      f"in the shared `LIT_2D3D` table, added for the GBM report's own context band, reused "
+      f"here as a drug-matched-but-not-breast-specific single point): Koch J *et al.* PLoS "
+      f"One 2021;16(1):e0244513 (PMID **33395433**), four colorectal lines, per-line folds "
+      f"7.5 / 6.0 / 10.0 / 1.2, averaged fold **{fu_b['fold_median']:.1f}x** (the only drug in "
+      f"that panel with a statistically significant averaged 3-D shift, p=0.027). A single "
+      f"point, not a range, so — like paclitaxel — the formal test falls back to the broad "
+      f"class band.\n")
     A(f"* **the broader 'solid tumours generally' band** (n={solid_b['n']}, reused verbatim "
       f"from `tmesim.validation.kill_calibration.LIT_2D3D`, the same 20-row cross-drug set "
-      f"the GBM report assembled): median fold **{solid_b['fold_median']:.1f}x**, range "
-      f"**{solid_b['fold_min']:.1f}-{solid_b['fold_max']:.1f}x**. Used here as the FORMAL test "
-      f"band for paclitaxel (since its own band is a single point) and as CONTEXT ONLY "
-      f"(not a verdict) for cyclophosphamide and tamoxifen, which have no band of their own "
-      f"at all.\n")
-    A("**Two things that must not be glossed over.**\n")
+      f"the GBM report assembled — byte-for-byte unmodified by this expansion): median fold "
+      f"**{solid_b['fold_median']:.1f}x**, range **{solid_b['fold_min']:.1f}-"
+      f"{solid_b['fold_max']:.1f}x**. Used as the FORMAL test band for paclitaxel and "
+      f"5-fluorouracil (single points) and as CONTEXT ONLY (not a verdict) for "
+      f"cyclophosphamide, tamoxifen, vinorelbine and palbociclib, which have no band of their "
+      f"own at all.\n")
+    A("**Things that must not be glossed over.**\n")
     A("1. **Cyclophosphamide's absence is not a search-quality failure.** It is a pro-drug: "
       "the parent compound is not meaningfully cytotoxic in any cell-culture format (2-D or "
       "3-D) without hepatic CYP2B6 activation to 4-hydroxycyclophosphamide, which is why its "
@@ -371,6 +562,30 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       "kill as 'not being modelled as a direct high-potency cytotoxic in this framework.' The "
       "absence of 3-D:2-D spheroid literature for it may be because that literature question "
       "is not the one asked of a SERM.\n")
+    A("3. **Vinorelbine's absence looks like plain data scarcity, not a mechanistic tell.** "
+      "Unlike cyclophosphamide/tamoxifen, nothing about vinorelbine's mechanism (a vinca "
+      "alkaloid microtubule destabiliser, mechanistically similar to paclitaxel's stabiliser "
+      "action) predicts an absence of 3-D:2-D literature — paclitaxel and docetaxel (also "
+      "tubulin-targeting) both have real bridges. This is reported as a genuine literature "
+      "gap, not a mechanistic prediction.\n")
+    A("4. **Palbociclib's absence is the one honest null that IS a mechanistic prediction, "
+      "not just missing data — and it is the deliberate category-mismatch case this "
+      "expansion was asked to surface.** Palbociclib DOES have a real, measured GDSC2-breast "
+      "IC50 (n=51 cell lines; unlike trastuzumab, no potency number is missing). What is "
+      "missing is 3-D:2-D SPHEROID-RESISTANCE literature specifically, and that absence is "
+      "plausibly explained by the drug's own pharmacology: the 3-D:2-D paradigm this whole "
+      "test relies on measures a shift in CYTOTOXIC potency (a Hill-type kill curve moving "
+      "right in 3-D), and palbociclib's primary action is CYTOSTATIC G1-phase arrest, not "
+      "cell killing (Klein ME *et al.* Cancer Cell 2018;34(1):9-20, PMID **29731395**, "
+      "'CDK4/6 Inhibitors: The Mechanism of Action May Not Be as Simple as Once Thought' — "
+      "even this review's own title concedes the simple cytostatic-arrest picture is "
+      "incomplete, but cytotoxic cell killing is not palbociclib's dominant, FDA-labelled "
+      "mechanism). A GDSC viability-assay IC50 for palbociclib is real and usable as an input "
+      "to this pipeline's Hill-kill formula, but the resulting `kill_fraction` OUTPUT should "
+      "not be read the same way as a DNA-damaging or microtubule-poisoning drug's "
+      "`kill_fraction` — it is better read as a proliferation/viability-inhibition signal "
+      "than a genuine cell-death fraction. This is a real category mismatch, flagged here "
+      "rather than forced into the same interpretive bucket as the other nine drugs.\n")
 
     # ------------------------------------------------------------------- 2.
     A("## 2. Factor decomposition of the model's own kill\n")
@@ -400,26 +615,34 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
     A("| drug | reporting concentration | predicted 3-D:2-D ratio | implied IC50 fold | "
       "band used | band range | verdict |\n"
       "|---|---|---:|---:|---|---|---|")
+    # Which drugs' OWN drug-matched/point bridge literature is itself breast
+    # tissue (docetaxel/epirubicin: new for this expansion; paclitaxel:
+    # already breast-specific in the original panel) vs cross-tumour-type
+    # (doxorubicin, cisplatin: reused GBM bands; 5-fluorouracil: the existing
+    # colorectal row) -- so the table's own "drug-matched" label is accurate
+    # for each drug, not a copy-pasted assumption.
+    BREAST_SPECIFIC_BRIDGE = {"paclitaxel", "docetaxel", "epirubicin"}
     for name in DRUGS:
         row = ratio_section[name]
         h = row["headline"]
+        tissue_tag = "breast-specific" if name in BREAST_SPECIFIC_BRIDGE else "cross-tumour-type"
         # Formal PASS/FAIL uses a drug-matched band ONLY if that band has real
-        # spread (n>1); paclitaxel's own literature is a single point (n=1,
-        # fold=25 exactly), which cannot be tested against as an interval, so
-        # its formal verdict falls back to the broad 'solid' class band too --
-        # exactly like cyclophosphamide/tamoxifen, just with a real point to
-        # quote alongside it.
+        # spread (n>1); paclitaxel's and 5-fluorouracil's own literature is a
+        # single point (n=1), which cannot be tested against as an interval,
+        # so their formal verdicts fall back to the broad 'solid' class band
+        # too -- exactly like cyclophosphamide/tamoxifen, just with a real
+        # point to quote alongside it.
         if row["testable"] and row["band_is_drug_matched"]:
             band = row["band"]
             t = row["test"]
             A(f"| {name} | 1xIC50 | **{h['ratio_exact']:.4f}** | "
-              f"{h['implied_ic50_fold']:.2f}x | drug-matched (cross-tumour-type) | "
+              f"{h['implied_ic50_fold']:.2f}x | drug-matched ({tissue_tag}) | "
               f"{band['fold_lo']:.1f}-{band['fold_hi']:.1f}x | **{t['verdict']}** |")
         elif row["testable"] and not row["band_is_drug_matched"]:
             band = row["band_solid"]
             t = row["test_solid"]
             A(f"| {name} | 1xIC50 | {h['ratio_exact']:.4f} | {h['implied_ic50_fold']:.2f}x | "
-              f"single POINT only (breast-specific, {row['specific_bridge']['fold_median']:.0f}x, "
+              f"single POINT only ({tissue_tag}, {row['specific_bridge']['fold_median']:.1f}x, "
               f"n=1, no spread to test) -> broad 'solid' class band used instead | "
               f"{band['fold_lo']:.1f}-{band['fold_hi']:.1f}x | **{t['verdict']}** "
               f"(vs the broad band; not a drug-matched verdict) |")
@@ -432,24 +655,43 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
               f"(context only: {t['verdict']} vs the non-matched band) |")
     A("")
     dox_t = ratio_section["doxorubicin"]["test"]["verdict"]
+    cis_t = ratio_section["cisplatin"]["test"]["verdict"]
+    dtx_row = ratio_section["docetaxel"]
+    dtx_t = dtx_row["test"]["verdict"] if dtx_row["testable"] and dtx_row["band_is_drug_matched"] else dtx_row["test_solid"]["verdict"]
+    epi_row = ratio_section["epirubicin"]
+    epi_t = epi_row["test"]["verdict"] if epi_row["testable"] and epi_row["band_is_drug_matched"] else epi_row["test_solid"]["verdict"]
     pac_solid_t = ratio_section["paclitaxel"]["test_solid"]["verdict"]
-    A(f"**VERDICT: partial generalisation, not a clean 3/3 (or 4/4) repeat of the GBM "
-      f"result.** Doxorubicin's verdict is **{dox_t}** against its own (cross-tumour-type) "
-      f"band — this is the strongest result in this section because it is the SAME molecule "
-      f"and the SAME literature band the GBM report already used, just driven through "
-      f"different measured tissue geometry, so it is a genuine repeat, not a new test. "
-      f"Paclitaxel's own breast-specific data point (25x) has no spread to test against, but "
-      f"its ratio {_verb(pac_solid_t)} the broad cross-tumour band (0.4-25x) that its point "
-      f"estimate sits at the very top of. Cyclophosphamide and tamoxifen are honest nulls: "
-      f"the test the GBM report ran cannot be run on them at all with data currently in the "
-      f"literature, and that is reported as a finding, not hidden.\n")
+    fu_solid_t = ratio_section["5-fluorouracil"]["test_solid"]["verdict"]
+    n_pass = sum(1 for n in ("doxorubicin", "cisplatin", "docetaxel", "epirubicin",
+                             "paclitaxel", "5-fluorouracil")
+                if (ratio_section[n]["test"]["verdict"]
+                    if ratio_section[n]["testable"] and ratio_section[n]["band_is_drug_matched"]
+                    else ratio_section[n]["test_solid"]["verdict"]) == "PASS")
+    A(f"**VERDICT: partial generalisation across an expanded panel, not a clean sweep.** "
+      f"Of the 6 formally-testable drugs, **{n_pass}/6 land inside their comparison band** "
+      f"(PASS). Doxorubicin's verdict is **{dox_t}** against its own (cross-tumour-type) "
+      f"band — the strongest result in this section because it is the SAME molecule and the "
+      f"SAME literature band the GBM report already used, just driven through different "
+      f"measured tissue geometry. Cisplatin, whose molecule is likewise reused verbatim from "
+      f"the GBM library, verdicts **{cis_t}** against that same GBM-assembled band. Docetaxel "
+      f"and epirubicin get NEW, genuinely breast-specific bands built for this expansion — "
+      f"docetaxel verdicts **{dtx_t}**, epirubicin verdicts **{epi_t}**. Paclitaxel's own "
+      f"breast-specific data point (25x) has no spread to test against, but its ratio "
+      f"{_verb(pac_solid_t)} the broad cross-tumour band (0.4-25x) that its point estimate "
+      f"sits at the very top of. 5-fluorouracil's own single cross-tumour point (7.5x) "
+      f"{_verb(fu_solid_t)} the broad band too. Cyclophosphamide, tamoxifen and vinorelbine "
+      f"are honest nulls: the test the GBM report ran cannot be run on them at all with data "
+      f"currently in the literature. Palbociclib's ratio is shown for completeness against "
+      f"the broad band only — see §1 for why it is a genuine mechanism-category mismatch "
+      f"rather than an ordinary honest null, and why NO verdict (pass or fail) on it should "
+      f"be read as validating or falsifying anything about its cytostatic pharmacology.\n")
 
     # ------------------------------------------------------------------- 4.
     A("## 4. The anchor, and the absolute kills\n")
     A("**No breast-specific patient-derived ex-vivo viability dataset exists in this repo's "
       "cache** (the GBM report's anchor, GSE232173/PMID 37620410, is glioma-specific; no "
       "breast analogue was found in `data_cache/hunt` or `data_cache/`). So unlike "
-      "temozolomide in the GBM report, none of these four drugs get a RE-ANCHORED potency "
+      f"temozolomide in the GBM report, none of these {n_drugs} drugs get a RE-ANCHORED potency "
       "here — every anchor below is an ALREADY-2-D measurement (GDSC2 breast monolayer, or a "
       "quoted literature range for doxorubicin) with its own between-line spread as the "
       "error bar, the identical treatment the GBM report gave cisplatin and doxorubicin "
@@ -480,7 +722,7 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
               f"{g['q1_uM']:.4g}-{g['q3_uM']:.4g} uM, full range "
               f"{g['min_uM']:.4g}-{g['max_uM']:.4g} uM.\n")
 
-    A("**Fast-path vs engine-path (Bernoulli sampling) cross-check, all four drugs:**\n")
+    A(f"**Fast-path vs engine-path (Bernoulli sampling) cross-check, all {n_drugs} drugs:**\n")
     A("| drug | analytic expected kill | engine-path kill (`apply_drug_kill`, one Bernoulli "
       "draw) | abs delta | one-sigma Bernoulli scale (n tumour cells) |\n"
       "|---|---:|---:|---:|---:|")
@@ -526,6 +768,12 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       "'this tissue with more/less quiescence' but 'this tissue with hypoxia also zeroed "
       "out'. The bound this produces is still a valid upper bound on how far the QUIESCENT "
       "label alone can move the answer, just not a strict ceteris-paribus one.\n")
+    A(f"**Scope of this sweep, unchanged by the panel expansion.** The sweep below is still "
+      f"run for exactly two representative drugs (paclitaxel and doxorubicin), not all "
+      f"{n_drugs} — the bound it demonstrates is a property of the (unrevised) global "
+      f"`PDConfig` multipliers, not of any individual drug's own transport or potency, so it "
+      f"generalises to the other {n_drugs - 2} panel drugs by the same construction without "
+      f"needing to be re-run on each one.\n")
     ref_idx_pac = min(range(len(sweep_pac)),
                       key=lambda i: abs(sweep_pac[i]["quiescent_fraction"] - sb["QUIESCENT"]["fraction"]))
     base_kill_pac = sweep_pac[ref_idx_pac]["kill_3d"]
@@ -569,60 +817,84 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       "list: (1) the multipliers themselves "
       f"(x{pdc['hypoxia_resistance']:.2f}/x{pdc['quiescent_resistance']:.2f}) are unvalidated "
       "priors with no citation, and this section's bound is conditional on them; (2) the "
-      "delivery/state split (§2) is only constrained as a product; (3) NONE of the four "
-      "drugs here have a measured breast patient-derived ex-vivo anchor (worse than GBM, "
-      "which has one for temozolomide); (4) no outcome label — Rep1 is an untreated "
-      "resection.\n")
+      f"delivery/state split (§2) is only constrained as a product; (3) NONE of the "
+      f"{n_drugs} drugs here have a measured breast patient-derived ex-vivo anchor (worse "
+      f"than GBM, which has one for temozolomide); (4) no outcome label — Rep1 is an "
+      f"untreated resection.\n")
 
     # ------------------------------------------------------------------- 6.
     A("## 6. Limitations\n")
     A("1. **No outcome validation.** Rep1 is an untreated resection. Every kill number here "
       "is a prediction with nothing to score it against — identical to GBM's own limitation "
       "1.\n")
-    A("2. **No breast-specific patient-derived ex-vivo anchor exists anywhere in this "
-      "project's data cache.** All four drugs' potency anchors are already-2-D monolayer "
-      "measurements (GDSC2 breast, or a quoted literature range), not a re-anchored, "
-      "disease-matched, patient-derived measurement. This is a WEAKER anchoring position than "
-      "the GBM report's temozolomide row.\n")
-    A("3. **Two of four drugs have no 3-D:2-D literature at all** (cyclophosphamide, "
-      "tamoxifen) — reported as an honest null in §1, not papered over with a borrowed band. "
-      "Cyclophosphamide's absence likely reflects a real mechanistic mismatch (pro-drug, "
-      "needs hepatic activation absent from any in-vitro format); tamoxifen's may reflect "
-      "that the whole cytotoxic-Hill-kill 3-D:2-D paradigm is not the right question for a "
-      "SERM.\n")
-    A("4. **Paclitaxel's own literature is a single point (n=1), not a range.** Unlike GBM's "
-      "6-row temozolomide table, there is no spread to test against for the one drug with a "
-      "breast-specific number; the formal pass/fail in §3 falls back to the broader, "
-      "non-drug-matched 'solid tumours' band.\n")
+    A(f"2. **No breast-specific patient-derived ex-vivo anchor exists anywhere in this "
+      f"project's data cache.** All {n_drugs} drugs' potency anchors are already-2-D "
+      f"monolayer measurements (GDSC2 breast, or a quoted literature range), not a "
+      f"re-anchored, disease-matched, patient-derived measurement. This is a WEAKER "
+      f"anchoring position than the GBM report's temozolomide row.\n")
+    A("3. **Four of ten drugs have no 3-D:2-D literature at all** (cyclophosphamide, "
+      "tamoxifen, vinorelbine, palbociclib) — reported as an honest null in §1, not papered "
+      "over with a borrowed band. Cyclophosphamide's absence likely reflects a real "
+      "mechanistic mismatch (pro-drug, needs hepatic activation absent from any in-vitro "
+      "format); tamoxifen's may reflect that the whole cytotoxic-Hill-kill 3-D:2-D paradigm "
+      "is not the right question for a SERM; vinorelbine's looks like plain literature "
+      "scarcity (no mechanistic reason predicts it, unlike the other three); palbociclib's "
+      "is the deliberate category-mismatch case (§1 item 4) — the ONE null in this list that "
+      "is a genuine mechanism boundary of the whole kill-fraction model, not just a gap in "
+      "what's been published.\n")
+    A("4. **Paclitaxel's and 5-fluorouracil's own literature are each a single point (n=1), "
+      "not a range.** Unlike GBM's 6-row temozolomide table, there is no spread to test "
+      "against for either drug's own breast-specific/drug-matched number; the formal "
+      "pass/fail in §3 falls back to the broader, non-drug-matched 'solid tumours' band for "
+      "both. Docetaxel and epirubicin, by contrast, DO now have a real n=2 breast-specific "
+      "spread each (new for this panel expansion) — see §1.\n")
     A("5. **This tumour is HER2+ and no anti-HER2 agent is in the panel.** Trastuzumab was "
-      "evaluated and excluded (`results/breast_cancer_flagship.md` §2) for lacking a "
-      "cytotoxic potency number this Hill-kill framework can use. Every clinical comparator "
-      "in §7 that involves HER2+ patients was, in real practice, ALSO given an anti-HER2 "
-      "agent this panel omits — a systematic reason real response should exceed this panel's "
-      "predicted single-agent kill fractions, not a reason to expect agreement.\n")
+      "RE-EVALUATED for this expansion and remains excluded (`results/breast_cancer_"
+      "flagship.md` §2) for lacking a cytotoxic potency number this Hill-kill framework can "
+      "use. Every clinical comparator in §7 that involves HER2+ patients was, in real "
+      "practice, ALSO given an anti-HER2 agent this panel omits — a systematic reason real "
+      "response should exceed this panel's predicted single-agent kill fractions, not a "
+      "reason to expect agreement.\n")
     A("6. **Drugs are simulated singly, at a single 6 h exposure window, never as a "
       "multi-cycle combination regimen.** Real neoadjuvant chemotherapy interleaves these "
-      "agents over 12-24 weeks in specific sequences (AC then paclitaxel, not simultaneously); "
-      "this pipeline has no combination or multi-cycle pharmacodynamic model. §7 states this "
-      "explicitly before showing any clinical number alongside a kill fraction.\n")
-    A("7. **Cell-state multipliers are unvalidated priors** (identical to GBM's limitation "
-      "6), and as of this run had NOT been revised for any of this panel's four drugs "
-      "(§0) — only temozolomide has a literature-informed per-drug override in the current "
-      "checkout.\n")
+      "agents over 12-24 weeks in specific sequences (AC then paclitaxel, FEC, etc., not "
+      "simultaneously); this pipeline has no combination or multi-cycle pharmacodynamic "
+      "model. §7 states this explicitly before showing any clinical number alongside a kill "
+      "fraction.\n")
+    A(f"7. **Cell-state multipliers are unvalidated priors** (identical to GBM's limitation "
+      f"6), and as of this run had NOT been revised for any of this panel's {n_drugs} drugs "
+      f"(§0) — only temozolomide has a literature-informed per-drug override in the current "
+      f"checkout.\n")
     A("8. **`mode='uniform'` throughout** (identical to GBM's limitation 7 and to "
       "`breast_cancer_flagship.md`'s own stated scope) — the `determinant` sensitivity mode "
-      "was not extended to paclitaxel/cyclophosphamide/tamoxifen.\n")
-    A("9. **One calibration constant (`alpha`), fit once on GBM doxorubicin penetration "
-      "depth, reused verbatim** for every drug on this tissue (identical to GBM's limitation "
-      "9 and to the breast flagship's own stated scope) — F_penetration inherits its "
-      "uncertainty for all four drugs here too.\n")
+      "was not extended to any of the non-doxorubicin drugs in this panel, including the six "
+      "newly added ones.\n")
+    A(f"9. **One calibration constant (`alpha`), fit once on GBM doxorubicin penetration "
+      f"depth, reused verbatim** for every drug on this tissue (identical to GBM's limitation "
+      f"9 and to the breast flagship's own stated scope) — F_penetration inherits its "
+      f"uncertainty for all {n_drugs} drugs here too.\n")
     A("10. **Single section, single patient, 2-D grid.** No inter-patient variance, no "
       "out-of-plane transport — identical to GBM's limitation 10.\n")
     A("11. **The bath-matching (p99) convention was not re-swept on this tissue.** GBM's "
       "report found the 3-D:2-D verdict was convention-dependent for cisplatin (pass at p99, "
       "fail at max-exposure reference); this report does not repeat that robustness check on "
-      "breast tissue, so the doxorubicin/paclitaxel verdicts above should be read as p99-"
-      "convention verdicts specifically, not convention-independent ones.\n")
+      "breast tissue, so every verdict in §3 should be read as a p99-convention verdict "
+      "specifically, not a convention-independent one.\n")
+    A("12. **Palbociclib's kill_fraction should not be read as directly comparable to the "
+      "other nine drugs' kill_fraction, even where the number itself is unremarkable.** "
+      "See §1 item 4 and the headline: the model does not know palbociclib is "
+      "predominantly cytostatic, so it applies the same cytotoxic Hill-kill machinery to it "
+      "as to a DNA-damaging or microtubule-poisoning agent. This is a genuine, structural "
+      "category mismatch this task asked to be surfaced rather than hidden or forced into a "
+      "false equivalence with the rest of the panel.\n")
+    A("13. **Docetaxel's and epirubicin's new breast-specific bridges (§1) are each built "
+      "from a SINGLE paper's cell lines (Dubois et al. 2017, plus one Gebeyehu et al. 2021 "
+      "cross-check for docetaxel), not an independently-replicated multi-lab consensus** — "
+      "the 8.3x-58x (docetaxel) and 1.0x-76x (epirubicin) spreads partly reflect genuine "
+      "biological/methodological heterogeneity (different cell lines, different 3-D culture "
+      "methods) and partly reflect the thinness of having only one or two source papers, the "
+      "same honesty caveat the GBM report's own temozolomide table (from a single paper's six "
+      "rows) already carries.\n")
 
     # ------------------------------------------------------------------- 7.
     A("## 7. Clinical/preclinical response literature — what is and is NOT comparable\n")
@@ -671,6 +943,22 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       f"update: 21%) | **11352951**, **12775735** | tamoxifen "
       f"{pd_['tamoxifen']['kill_nominal_engine_path']:.4f} |")
     A("")
+    A(f"**No new clinical/pCR comparators were sourced for the six newly added drugs "
+      f"(docetaxel, epirubicin, 5-fluorouracil, vinorelbine, cisplatin, palbociclib) in this "
+      f"expansion pass** — the three regimen rows above already happen to cover doxorubicin, "
+      f"cyclophosphamide and paclitaxel from the extended panel, and extending §7 further "
+      f"was out of scope for this pass (the required, falsifiable check for new drugs is the "
+      f"3-D:2-D ratio test in §1/§3, not a clinical-response comparison, which this project's "
+      f"own stated validation philosophy already treats as non-authoritative — see the note "
+      f"above). For completeness, every drug's own single-agent nominal kill_fraction is "
+      f"shown below with no clinical rate alongside it:\n")
+    A("| drug | IC50 (uM) | source | nominal kill_fraction |\n"
+      "|---|---:|---|---:|")
+    for name in DRUGS:
+        d = pd_[name]
+        A(f"| {name} | {d['ic50_uM']:.4g} | {d['ic50_source']} | "
+          f"{d['kill_nominal_engine_path']:.4f} |")
+    A("")
     A("**Reading this table honestly.** Every one of this panel's single-agent kill fractions "
       "at the nominal single-dose window is numerically LARGER than the corresponding "
       "clinical pCR/ORR rate reported above (e.g. tamoxifen's predicted kill "
@@ -708,6 +996,26 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
     A("* Mutahar AZI, *et al.* J Transl Med 2025;23(1):1428. PMID **41422245** — "
       "[DOI](https://doi.org/10.1186/s12967-025-07585-x) (paclitaxel 3-D:2-D, breast-"
       "specific)")
+    A("* Trigub MM, *et al.* Bull Exp Biol Med 2020;168(4):583-588. PMID **32152850** — "
+      "[DOI](https://doi.org/10.1007/s10517-020-04757-1) (cisplatin 3-D:2-D, HeLa spheroid, "
+      "reused from the GBM report's drug:cisplatin band)")
+    A("* Dubois C, *et al.* Oncotarget 2017;8(56):95316-95331. PMID **29221130** — "
+      "[DOI](https://doi.org/10.18632/oncotarget.20517) (docetaxel/epirubicin/cisplatin "
+      "3-D:2-D, MDA-MB-231 and SUM1315 TNBC lines — the NEW breast-specific bridge built for "
+      "this panel expansion; docetaxel and epirubicin fold values above are independently "
+      "re-derived from this paper's own full-text-stated IC50 numbers, not just its abstract)")
+    A("* Gebeyehu A, *et al.* Sci Rep 2021;11(1):372. PMID **33431915** — "
+      "[DOI](https://doi.org/10.1038/s41598-020-79325-8) (docetaxel 3-D:2-D, MDA-MB-231, a "
+      "second independent breast-specific measurement using a different 3-D method)")
+    A("* Klein ME, *et al.* Cancer Cell 2018;34(1):9-20. PMID **29731395** — "
+      "[DOI](https://doi.org/10.1016/j.ccell.2018.03.023) ('CDK4/6 Inhibitors: The Mechanism "
+      "of Action May Not Be as Simple as Once Thought' — cited for palbociclib's "
+      "predominantly cytostatic mechanism, the basis of this report's category-mismatch "
+      "caveat)")
+    A("* Ishitsuka H, *et al.* Yakugaku Zasshi 1999;119(12):881-897. PMID **10630095** — "
+      "[DOI](https://doi.org/10.1248/yakushi1947.119.12_881) (capecitabine's three-enzyme "
+      "prodrug activation cascade, cited in `tmesim/molecular/breast_library.py`'s rejection "
+      "rationale for capecitabine)")
     A("* Bear HD, *et al.* J Clin Oncol 2003;21(22):4165-4174. PMID **14559892** — "
       "[DOI](https://doi.org/10.1200/JCO.2003.12.005) (NSABP B-27, AC-alone pCR 13.7%)")
     A("* Dredze LM, *et al.* Breast Cancer Res Treat 2022;193(3):597-612. PMID **35451732** "
@@ -720,8 +1028,9 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       "[DOI](https://doi.org/10.1200/JCO.2003.04.194) (tamoxifen first-line ORR 21%, 32-month "
       "update)")
     A("* Yang W, *et al.* Nucleic Acids Res 2013;41:D955-D961 (GDSC). PMID **23180760** "
-      "(GDSC2 breast BRCA cell-line panel, source of the paclitaxel/cyclophosphamide/"
-      "tamoxifen IC50s)")
+      "(GDSC2 breast BRCA cell-line panel, source of every measured IC50 in this panel: "
+      "paclitaxel, cyclophosphamide, tamoxifen, docetaxel, epirubicin, 5-fluorouracil, "
+      "vinorelbine, cisplatin, palbociclib)")
     A("* Prior work in this repo: `results/kill_calibration.md` (the GBM module this mirrors), "
       "`results/breast_cancer_flagship.md` (the reconstruction and drug panel this reuses), "
       "`results/breast_drug_panel_data.json` (the independent pipeline this report's "

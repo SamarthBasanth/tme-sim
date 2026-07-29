@@ -137,6 +137,11 @@ class TestBreastLibrary:
         "paclitaxel": (850.0, 858.0),
         "cyclophosphamide": (259.0, 263.0),
         "tamoxifen": (369.0, 374.0),
+        "docetaxel": (805.0, 811.0),
+        "epirubicin": (541.0, 546.0),
+        "5-fluorouracil": (128.0, 132.0),
+        "vinorelbine": (776.0, 782.0),
+        "palbociclib": (445.0, 450.0),
     }
 
     @pytest.mark.parametrize("name", sorted(BREAST_DRUGS))
@@ -170,7 +175,9 @@ class TestBreastLibrary:
 # potency_breast.py: real GDSC2 breast (BRCA) IC50 resolution
 # --------------------------------------------------------------------------- #
 class TestPotencyBreast:
-    @pytest.mark.parametrize("name", ["paclitaxel", "cyclophosphamide", "tamoxifen"])
+    @pytest.mark.parametrize("name", ["paclitaxel", "cyclophosphamide", "tamoxifen",
+                                      "docetaxel", "epirubicin", "5-fluorouracil",
+                                      "vinorelbine", "palbociclib", "cisplatin"])
     def test_measured_ic50_from_real_gdsc_breast_cache(self, name):
         _skip_if_missing(BREAST_GDSC_CACHE)
         res = resolve_ic50_breast(name)
@@ -217,7 +224,9 @@ class TestCompileBreastDrug:
         assert dp.molecular_weight == dp_gbm.molecular_weight
         assert ic50_info["source"] == "literature"
 
-    @pytest.mark.parametrize("name", ["paclitaxel", "cyclophosphamide", "tamoxifen"])
+    @pytest.mark.parametrize("name", ["paclitaxel", "cyclophosphamide", "tamoxifen",
+                                      "docetaxel", "epirubicin", "5-fluorouracil",
+                                      "vinorelbine", "palbociclib"])
     def test_new_breast_drug_compiles_to_finite_sane_drugparams(self, mod, alpha, name):
         _skip_if_missing(BREAST_GDSC_CACHE)
         dp, mol, ic50_info = mod.compile_breast_drug(name, alpha)
@@ -230,6 +239,27 @@ class TestCompileBreastDrug:
         assert ic50_info["confidence"] == "measured"
         assert ic50_info["source"] == "GDSC"
 
+    def test_cisplatin_reuses_gbm_molecule_with_breast_measured_ic50(self, mod, alpha):
+        """cisplatin: molecule REUSED VERBATIM from the GBM library (same MW/
+        structure as the GBM panel's own cisplatin), but its potency comes
+        from a REAL, MEASURED breast (BRCA) GDSC2 IC50 -- NOT the GBM
+        literature IC50, unlike doxorubicin (which isn't in GDSC2 at all).
+        This is the real-data substitute for carboplatin (absent from GDSC2
+        entirely, see breast_library.py)."""
+        _skip_if_missing(BREAST_GDSC_CACHE)
+        from tmesim.molecular.library import get_molecule as get_molecule_gbm
+        from tmesim.validation.calibration import calibrated_drugparams
+
+        dp, mol, ic50_info = mod.compile_breast_drug("cisplatin", alpha)
+        dp_gbm_literature = calibrated_drugparams("cisplatin", alpha)
+        # same molecule (MW must match the GBM library's cisplatin exactly)
+        assert dp.molecular_weight == dp_gbm_literature.molecular_weight
+        assert mol.name == get_molecule_gbm("cisplatin").name
+        # but a REAL measured breast IC50, not the GBM literature number
+        assert ic50_info["source"] == "GDSC"
+        assert ic50_info["confidence"] == "measured"
+        assert ic50_info["n_cell_lines"] >= 10
+
     def test_compiled_drugs_differ_in_ic50_ordering_as_expected(self, mod, alpha):
         """Sanity check on the real, not invented, IC50 ordering: paclitaxel
         (a highly potent taxane) should be far more potent (lower IC50) than
@@ -238,6 +268,15 @@ class TestCompileBreastDrug:
         dp_ptx, _, _ = mod.compile_breast_drug("paclitaxel", alpha)
         dp_cyc, _, _ = mod.compile_breast_drug("cyclophosphamide", alpha)
         assert dp_ptx.ic50 < dp_cyc.ic50
+
+    def test_docetaxel_more_potent_than_cyclophosphamide(self, mod, alpha):
+        """A second real ordering check on a newly added drug: docetaxel (a
+        taxane, like paclitaxel) should also be far more potent than
+        cyclophosphamide's weak in-vitro pro-drug IC50."""
+        _skip_if_missing(BREAST_GDSC_CACHE)
+        dp_dtx, _, _ = mod.compile_breast_drug("docetaxel", alpha)
+        dp_cyc, _, _ = mod.compile_breast_drug("cyclophosphamide", alpha)
+        assert dp_dtx.ic50 < dp_cyc.ic50
 
 
 # --------------------------------------------------------------------------- #

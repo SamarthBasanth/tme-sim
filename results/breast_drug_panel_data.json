@@ -83,7 +83,7 @@
         "unattributed": 0.0
       },
       "mechanism_reconciled": true,
-      "runtime_s": 66.78128170967102
+      "runtime_s": 90.50911784172058
     },
     {
       "name": "paclitaxel",
@@ -119,7 +119,7 @@
         "unattributed": 0.0
       },
       "mechanism_reconciled": true,
-      "runtime_s": 49.77777814865112
+      "runtime_s": 81.12333011627197
     },
     {
       "name": "cyclophosphamide",
@@ -155,7 +155,7 @@
         "unattributed": 0.0
       },
       "mechanism_reconciled": true,
-      "runtime_s": 48.18671369552612
+      "runtime_s": 98.38973498344421
     },
     {
       "name": "tamoxifen",
@@ -191,8 +191,224 @@
         "unattributed": 0.0
       },
       "mechanism_reconciled": true,
-      "runtime_s": 48.4811372756958
+      "runtime_s": 81.16103410720825
+    },
+    {
+      "name": "docetaxel",
+      "mw": 807.89,
+      "ic50": 0.0566993234737221,
+      "ic50_source": "GDSC",
+      "ic50_confidence": "measured",
+      "ic50_n_cell_lines": 51,
+      "bbb": 0.01900170082738329,
+      "diffusivity": 156.27996809004105,
+      "d_eff": 133.58035765174637,
+      "binding": 0.14908810369044526,
+      "clearance": 8.688894691920521e-05,
+      "kill": 0.3706075625104416,
+      "pen": 0.20124184322282132,
+      "mean_auc": 4849.75122104943,
+      "hypoxic": 0.11216795678565462,
+      "mechanism_counts": {
+        "KILLED": 33275,
+        "SURVIVED_UNREACHED": 1948,
+        "SURVIVED_UNDERDOSED": 11611,
+        "SURVIVED_RESISTANT": 42308,
+        "SURVIVED_STOCHASTIC": 643,
+        "UNATTRIBUTED": 0,
+        "ALREADY_DEAD": 0,
+        "NOT_TUMOR": 77995
+      },
+      "mechanism_survival_breakdown": {
+        "delivery": 0.03447177490709609,
+        "dose": 0.2054680587506636,
+        "resistance": 0.7486816492656168,
+        "chance": 0.011378517076623606,
+        "unattributed": 0.0
+      },
+      "mechanism_reconciled": true,
+      "runtime_s": 81.89543604850769
+    },
+    {
+      "name": "epirubicin",
+      "mw": 543.525,
+      "ic50": 0.8411910287790403,
+      "ic50_source": "GDSC",
+      "ic50_confidence": "measured",
+      "ic50_n_cell_lines": 50,
+      "bbb": 0.020567870235594195,
+      "diffusivity": 184.74861430191334,
+      "d_eff": 157.9139430070487,
+      "binding": 0.03325045168543613,
+      "clearance": 6.30800204946529e-05,
+      "kill": 0.2908837779139054,
+      "pen": 0.31960750271705046,
+      "mean_auc": 23481.313516656148,
+      "hypoxic": 0.11216795678565462,
+      "mechanism_counts": {
+        "KILLED": 26117,
+        "SURVIVED_UNREACHED": 319,
+        "SURVIVED_UNDERDOSED": 21827,
+        "SURVIVED_RESISTANT": 40635,
+        "SURVIVED_STOCHASTIC": 887,
+        "UNATTRIBUTED": 0,
+        "ALREADY_DEAD": 0,
+        "NOT_TUMOR": 77995
+      },
+      "mechanism_survival_breakdown": {
+        "delivery": 0.005010366275051832,
+        "dose": 0.34282528114594457,
+        "resistance": 0.6382327071684363,
+        "chance": 0.013931645410567317,
+        "unattributed": 0.0
+      },
+      "mechanism_reconciled": true,
+      "runtime_s": 85.42642188072205
+    },
+    {
+      "name": "5-fluorouracil",
+      "mw": 130.078,
+      "ic50": 201.17979284381485,
+      "ic50_source": "GDSC",
+      "ic50_confidence": "measured",
+      "ic50_n_cell_lines": 51,
+      "bbb": 0.63269194223888,
+      "diffusivity": 323.8095404393241,
+      "d_eff": 276.77631849791084,
+      "binding": 0.005513078981384142,
+      "clearance": 7.292642332266728e-05,
+      "kill": 0.27047947875480316,
+      "pen": 0.4781796569911275,
+      "mean_auc": 4277928.931436205,
+      "hypoxic": 0.11216795678565462,
+      "mechanism_counts": {
+        "KILLED": 24285,
+        "SURVIVED_UNREACHED": 29,
+        "SURVIVED_UNDERDOSED": 24679,
+        "SURVIVED_RESISTANT": 40265,
+        "SURVIVED_STOCHASTIC": 527,
+        "UNATTRIBUTED": 0,
+        "ALREADY_DEAD": 0,
+        "NOT_TUMOR": 77995
+      },
+      "mechanism_survival_breakdown": {
+        "delivery": 0.00044274809160305345,
+        "dose": 0.3767786259541985,
+        "resistance": 0.6147328244274809,
+        "chance": 0.008045801526717557,
+        "unattributed": 0.0
+      },
+      "mechanism_reconciled": true,
+      "runtime_s": 84.79216980934143
+    },
+    {
+      "name": "vinorelbine",
+      "mw": 778.947,
+      "ic50": 0.08712660397742822,
+      "ic50_source": "GDSC",
+      "ic50_confidence": "measured",
+      "ic50_n_cell_lines": 50,
+      "bbb": 0.03259068257864541,
+      "diffusivity": 158.76657795478795,
+      "d_eff": 135.70578830759266,
+      "binding": 0.1235267898522487,
+      "clearance": 0.00011135864912496214,
+      "kill": 0.400846466559002,
+      "pen": 0.21454207934454772,
+      "mean_auc": 10035.43307381047,
+      "hypoxic": 0.11216795678565462,
+      "mechanism_counts": {
+        "KILLED": 35990,
+        "SURVIVED_UNREACHED": 1062,
+        "SURVIVED_UNDERDOSED": 7934,
+        "SURVIVED_RESISTANT": 44205,
+        "SURVIVED_STOCHASTIC": 594,
+        "UNATTRIBUTED": 0,
+        "ALREADY_DEAD": 0,
+        "NOT_TUMOR": 77995
+      },
+      "mechanism_survival_breakdown": {
+        "delivery": 0.019741611673947394,
+        "dose": 0.14748582582024353,
+        "resistance": 0.8217306441119063,
+        "chance": 0.01104191839390278,
+        "unattributed": 0.0
+      },
+      "mechanism_reconciled": true,
+      "runtime_s": 80.67304491996765
+    },
+    {
+      "name": "cisplatin",
+      "mw": 298.03,
+      "ic50": 82.41570389441263,
+      "ic50_source": "GDSC",
+      "ic50_confidence": "measured",
+      "ic50_n_cell_lines": 50,
+      "bbb": 0.8576798963736021,
+      "diffusivity": 236.18442715353106,
+      "d_eff": 201.87872211980581,
+      "binding": 0.008710359202449943,
+      "clearance": 7.59974390611852e-05,
+      "kill": 0.36659798407306343,
+      "pen": 0.4328985180932462,
+      "mean_auc": 3698105.6924979533,
+      "hypoxic": 0.11216795678565462,
+      "mechanism_counts": {
+        "KILLED": 32915,
+        "SURVIVED_UNREACHED": 34,
+        "SURVIVED_UNDERDOSED": 3118,
+        "SURVIVED_RESISTANT": 52528,
+        "SURVIVED_STOCHASTIC": 1190,
+        "UNATTRIBUTED": 0,
+        "ALREADY_DEAD": 0,
+        "NOT_TUMOR": 77995
+      },
+      "mechanism_survival_breakdown": {
+        "delivery": 0.0005978547564621066,
+        "dose": 0.05482679796026024,
+        "resistance": 0.923650430807104,
+        "chance": 0.02092491647617373,
+        "unattributed": 0.0
+      },
+      "mechanism_reconciled": true,
+      "runtime_s": 61.00622487068176
+    },
+    {
+      "name": "palbociclib",
+      "mw": 447.543,
+      "ic50": 59.979089911119175,
+      "ic50_source": "GDSC",
+      "ic50_confidence": "measured",
+      "ic50_n_cell_lines": 51,
+      "bbb": 0.578756414591833,
+      "diffusivity": 200.11076033801277,
+      "d_eff": 171.04474273064608,
+      "binding": 0.044354404560997165,
+      "clearance": 0.00010525462510012649,
+      "kill": 0.13399788383360245,
+      "pen": 0.3045365536113434,
+      "mean_auc": 495261.94356838585,
+      "hypoxic": 0.11216795678565462,
+      "mechanism_counts": {
+        "KILLED": 12031,
+        "SURVIVED_UNREACHED": 5292,
+        "SURVIVED_UNDERDOSED": 70291,
+        "SURVIVED_RESISTANT": 1961,
+        "SURVIVED_STOCHASTIC": 210,
+        "UNATTRIBUTED": 0,
+        "ALREADY_DEAD": 0,
+        "NOT_TUMOR": 77995
+      },
+      "mechanism_survival_breakdown": {
+        "delivery": 0.06806080716104637,
+        "dose": 0.9040177997273452,
+        "resistance": 0.0252205674306145,
+        "chance": 0.0027008256809939036,
+        "unattributed": 0.0
+      },
+      "mechanism_reconciled": true,
+      "runtime_s": 54.53869295120239
     }
   ],
-  "runtime_s": 222.4192271232605
+  "runtime_s": 812.074471950531
 }

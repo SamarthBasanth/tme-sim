@@ -18,14 +18,21 @@ contexts in one table.
 
 GDSC coverage on the live breast (BRCA) screen, verified 2026-07-28 by
 streaming the real GDSC2 CSV and counting: paclitaxel, cyclophosphamide,
-tamoxifen, docetaxel, epirubicin and 5-fluorouracil are all present with 50-51
-breast cell lines each. Doxorubicin is NOT in GDSC2 at all (neither the glioma
-nor the breast screen carries it -- it is simply not one of the ~200+ drugs
-GDSC2 tested), which is why the breast drug panel
+tamoxifen, docetaxel, epirubicin, 5-fluorouracil, vinorelbine, palbociclib and
+cisplatin are all present with 50-51 breast cell lines each (re-verified
+2026-07-29 for the panel-expansion pass -- vinorelbine 50, palbociclib 51,
+cisplatin 50). Doxorubicin is NOT in GDSC2 at all (neither the glioma nor the
+breast screen carries it -- it is simply not one of the ~200+ drugs GDSC2
+tested), which is why the breast drug panel
 (``experiments/breast_drug_panel.py``) reuses the GBM panel's own
 literature-tier doxorubicin IC50 (0.5 uM, ``tmesim.molecular.potency.
 LITERATURE_IC50``) verbatim rather than inventing a second, breast-specific
 number for the same drug and the same literature evidence.
+
+Carboplatin and capecitabine were checked against the FULL, un-filtered live
+GDSC2 CSV (every tissue, not just BRCA) and confirmed ABSENT entirely -- see
+``tmesim/molecular/breast_library.py``'s module docstring for the full
+rejection rationale for both.
 
 Units: IC50 in micromolar (uM) throughout.
 """
@@ -47,6 +54,15 @@ _GDSC_ALIASES: Dict[str, List[str]] = {
     "docetaxel": ["docetaxel", "taxotere"],
     "epirubicin": ["epirubicin"],
     "5-fluorouracil": ["5-fluorouracil", "5-fu", "fluorouracil"],
+    "vinorelbine": ["vinorelbine", "navelbine"],
+    "palbociclib": ["palbociclib", "ibrance", "pd-0332991", "pd0332991"],
+    # cisplatin: the molecule itself is reused VERBATIM from
+    # tmesim.molecular.library (the GBM panel's own compiled cisplatin), but
+    # its BREAST potency is resolved through THIS module (measured GDSC2
+    # BRCA, n=50 lines) rather than the GBM literature IC50 -- see
+    # experiments/breast_drug_panel.py's / kill_calibration_breast.py's
+    # compile_breast_drug() special case.
+    "cisplatin": ["cisplatin", "cddp", "ddp", "cis-platinum", "cisplatinum"],
 }
 
 # ---------------------------------------------------------------------------
@@ -81,6 +97,65 @@ LITERATURE_IC50: Dict[str, Dict] = {
             "Selective ER modulator; cytotoxic (not just cytostatic) IC50 in "
             "breast cancer cell-line panels is typically single-digit to tens "
             "of uM. Backup only -- GDSC-measured normally wins."
+        ),
+    },
+    "docetaxel": {
+        "ic50_uM": 0.05,
+        "note": (
+            "2nd-generation taxane; low-nM to low-uM in breast cancer cell "
+            "lines (Dubois et al. 2017, PMID 29221130, report 2-D IC50 "
+            "0.2-1.8 uM in MDA-MB-231 monolayer). Backup only -- GDSC-measured "
+            "normally wins."
+        ),
+    },
+    "epirubicin": {
+        "ic50_uM": 0.3,
+        "note": (
+            "Anthracycline, a stereoisomer of doxorubicin (same MW/formula); "
+            "breast cell-line 2-D IC50 in the same sub-uM range as doxorubicin "
+            "(Dubois et al. 2017, PMID 29221130, report 0.1-0.6 uM in "
+            "MDA-MB-231/SUM1315 monolayer). Backup only -- GDSC-measured "
+            "normally wins."
+        ),
+    },
+    "5-fluorouracil": {
+        "ic50_uM": 20.0,
+        "note": (
+            "Antimetabolite (thymidylate synthase inhibitor); typically "
+            "single-digit to tens of uM in monolayer cell-line assays (Koch "
+            "et al. 2021, PMID 33395433, report 7.5-75 uM across four "
+            "colorectal lines). Backup only -- GDSC-measured normally wins."
+        ),
+    },
+    "vinorelbine": {
+        "ic50_uM": 0.05,
+        "note": (
+            "Vinca alkaloid (microtubule destabiliser); low-nM to low-uM in "
+            "sensitive cell lines, similar order to other tubulin-targeting "
+            "agents in this panel (paclitaxel, docetaxel). Backup only -- "
+            "GDSC-measured normally wins."
+        ),
+    },
+    "palbociclib": {
+        "ic50_uM": 1.0,
+        "note": (
+            "CDK4/6 inhibitor; predominantly CYTOSTATIC (G1-arrest), not "
+            "cytotoxic -- see this module's and breast_library.py's own "
+            "category-mismatch caveat. Cell-viability-assay IC50 in "
+            "RB-proficient breast lines typically sub-uM to low-uM. Backup "
+            "only -- GDSC-measured normally wins."
+        ),
+    },
+    "cisplatin": {
+        "ic50_uM": 10.0,
+        "note": (
+            "Platinum crosslinker; molecule REUSED VERBATIM from "
+            "tmesim.molecular.library (identical to the GBM panel's "
+            "cisplatin). Backup value matches the GBM module's own cisplatin "
+            "literature backup (tmesim.molecular.potency.LITERATURE_IC50) for "
+            "consistency; breast cell-line IC50 typically single-digit to "
+            "tens of uM. Backup only -- GDSC-measured (BRCA, n=50) normally "
+            "wins."
         ),
     },
 }
@@ -205,13 +280,16 @@ if __name__ == "__main__":
     print("=" * 74)
     print("potency_breast.resolve_ic50 self-test: real GDSC breast (BRCA) potency")
     print("=" * 74)
-    for name in ("paclitaxel", "cyclophosphamide", "tamoxifen", "totally_unknown_drug"):
+    _ALL_MEASURED = ("paclitaxel", "cyclophosphamide", "tamoxifen", "docetaxel",
+                     "epirubicin", "5-fluorouracil", "vinorelbine",
+                     "palbociclib", "cisplatin")
+    for name in _ALL_MEASURED + ("totally_unknown_drug",):
         res = resolve_ic50(name)
         n = res.get("n_cell_lines", "-")
         print(f"{name:20s} ic50={res['ic50_uM']:>10.4f} uM  {res['source']:>10s} "
               f"{res['confidence']:>12s}  n_lines={n}")
         assert res["ic50_uM"] > 0.0 and math.isfinite(res["ic50_uM"])
-    for name in ("paclitaxel", "cyclophosphamide", "tamoxifen"):
+    for name in _ALL_MEASURED:
         r = resolve_ic50(name)
         assert r["source"] == "GDSC" and r["confidence"] == "measured", name
         assert r["n_cell_lines"] > 0

@@ -15,7 +15,22 @@ panel), already cached at ``data_cache/xenium_breast_janesick/rep1`` by an
 earlier task (``results/registration_3d_breast_poc.md``) -- read-only here, no
 re-download.
 
-Panel: [doxorubicin, paclitaxel, cyclophosphamide, tamoxifen].
+Panel: [doxorubicin, paclitaxel, cyclophosphamide, tamoxifen, docetaxel,
+epirubicin, 5-fluorouracil, vinorelbine, cisplatin, palbociclib] -- expanded
+from the original 4-drug panel (see ``results/breast_cancer_flagship.md`` for
+that panel's own writeup) to a 10-drug panel credible for pharma/biotech drug
+comparison. docetaxel / epirubicin / 5-fluorouracil / vinorelbine are new
+molecules in ``tmesim.molecular.breast_library`` with real, measured GDSC2
+breast (BRCA) IC50s; cisplatin reuses the GBM library's molecule verbatim but
+with a real, measured breast-specific IC50 (a real-data substitute for
+carboplatin, which is absent from GDSC2 entirely -- see
+``tmesim/molecular/breast_library.py`` for the full rejection rationale, also
+covering capecitabine); palbociclib (CDK4/6 inhibitor) is a genuine
+mechanism-category contrast case -- cytostatic, not cytotoxic -- included
+deliberately to expose that boundary to a pharma audience rather than hidden.
+Trastuzumab was RE-EVALUATED and remains excluded (no cytotoxic IC50 exists
+for a biologic in GDSC or the literature this pipeline's Hill-kill model can
+use).
 
   * doxorubicin -- REUSED VERBATIM from the GBM library
     (``tmesim.molecular.library.get_molecule`` +
@@ -93,7 +108,11 @@ from tmesim.validation.calibration import (
 )
 from tmesim.validation.pk_reality import DEFAULT_ECM
 
-PANEL = ["doxorubicin", "paclitaxel", "cyclophosphamide", "tamoxifen"]
+PANEL = [
+    "doxorubicin", "paclitaxel", "cyclophosphamide", "tamoxifen",
+    "docetaxel", "epirubicin", "5-fluorouracil", "vinorelbine",
+    "cisplatin", "palbociclib",
+]
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.abspath(os.path.join(_HERE, ".."))
@@ -115,7 +134,19 @@ def compile_breast_drug(name: str, alpha: float):
     ``library.get_molecule("doxorubicin")`` VERBATIM -- the identical function
     calls ``experiments/real_drug_panel.py`` makes.
 
-    paclitaxel / cyclophosphamide / tamoxifen: a fresh Molecule from
+    cisplatin: molecule REUSED VERBATIM from ``tmesim.molecular.library``
+    (the GBM panel's own compiled cisplatin -- same SMILES, same structure),
+    but compiled with a REAL, MEASURED GDSC2-BREAST (BRCA) IC50
+    (``potency_breast.resolve_ic50``), not the GBM literature IC50 -- unlike
+    doxorubicin, cisplatin IS screened in GDSC2's breast panel (n=50 cell
+    lines), so the measured-tissue-specific number is used in preference to
+    reusing GBM's own literature-tier value. This is the real-data
+    substitute for carboplatin (evaluated and rejected -- absent from GDSC2
+    entirely, across every tissue; see ``tmesim/molecular/breast_library.py``
+    for the full rationale).
+
+    paclitaxel / cyclophosphamide / tamoxifen / docetaxel / epirubicin /
+    5-fluorouracil / vinorelbine / palbociclib: a fresh Molecule from
     ``breast_library`` compiled with a REAL GDSC2-breast IC50
     (``potency_breast.resolve_ic50``), then passed as an already-built
     ``DrugParams`` into ``calibrated_drugparams`` -- which recognises an
@@ -123,6 +154,13 @@ def compile_breast_drug(name: str, alpha: float):
     perivascular-sink calibration to it that a library-name lookup would (see
     ``tmesim.validation.calibration._compile``'s passthrough branch). No
     calibration code is duplicated or reimplemented.
+
+    palbociclib is a CDK4/6 inhibitor, predominantly CYTOSTATIC rather than
+    cytotoxic -- included as a genuine category-mismatch contrast case (see
+    ``tmesim/molecular/breast_library.py``'s module docstring); it goes
+    through the IDENTICAL compilation and simulation pipeline as every other
+    drug here (nothing is special-cased in the physics/kill model), but its
+    kill_fraction output should be read with that mechanism caveat attached.
     """
     key = name.strip().lower()
     if key == "doxorubicin":
@@ -138,6 +176,13 @@ def compile_breast_drug(name: str, alpha: float):
                 "glioma nor the breast BRCA subset carries it)."
             ),
         }
+    elif key == "cisplatin":
+        mol = get_molecule_gbm("cisplatin")
+        ic50_info = resolve_ic50_breast(key)
+        dp_uncal = molecule_to_drugparams(
+            mol, ecm_reference=DEFAULT_ECM, ic50=ic50_info["ic50_uM"]
+        )
+        dp = calibrated_drugparams(dp_uncal, alpha)
     else:
         mol = get_molecule_breast(key)
         ic50_info = resolve_ic50_breast(key)
@@ -240,7 +285,9 @@ def main(dx_um: float = DX_UM):
     all_tissue_auc = np.concatenate([r["auc_field"][tissue] for r in rows])
     vmax = float(np.percentile(all_tissue_auc, 99.0)) or 1.0
 
-    fig = plt.figure(figsize=(17, 9))
+    # Width scales with panel size so a 10-drug panel doesn't cram 10 AUC
+    # heatmaps into a figure sized for the original 4-drug panel.
+    fig = plt.figure(figsize=(max(17, 2.0 * len(PANEL)), 9))
     gs = GridSpec(2, len(PANEL), figure=fig, height_ratios=[1.15, 1.0],
                   hspace=0.28, wspace=0.12)
     im = None
