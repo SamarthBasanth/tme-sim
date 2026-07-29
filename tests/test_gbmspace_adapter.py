@@ -60,6 +60,10 @@ _MATERIALIZED = [
         "AT5-BRA-5-FO-1_2",
         # results/gbmspace_adapter.md §11: AT3, one more new patient.
         "AT3-BRA5-FO-4_1",
+        # results/sweep/gbmspace_batch_followup_*: AT4 and AT13, the last two
+        # patients in the full 97-section atlas not previously represented -
+        # one representative section each.
+        "AT4-BRA5-FO-4_1", "AT13-BRA-3-FO-1_1",
     )
 ]
 

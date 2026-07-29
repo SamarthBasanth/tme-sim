@@ -647,3 +647,29 @@ Disk stayed at 19-21 GiB free throughout, never near the 10 GiB floor.
 
 Still-untouched atlas coverage: ~73 of 97 sections remain unpulled after four batches across two
 passes (§9, §10, this section).
+
+## 12. Fourth pass: full atlas patient coverage reached — 24 -> 30 sections, 10 -> 12 patients
+
+Claimed and ingested 6 more sections, all from the atlas's last two previously-unrepresented
+patients: `AT13-BRA-3-FO-1_1`, `AT13-BRA-3-FO-1_2`, `AT13-BRA-3-FO-4_2` (AT13, new) and
+`AT4-BRA5-FO-1_1`, `AT4-BRA5-FO-2_1`, `AT4-BRA5-FO-4_1` (AT4, new). All validated `ok=True`,
+all Studio-registered, all reconstruct cleanly. **Every one of the atlas's 12 patient codes is
+now represented by at least one section in this repo** — 30 of 97 sections total, 67 remain
+unpulled, but further ingestion now adds sections-per-patient depth, not new-patient diversity.
+
+A third, previously undocumented chemistry/pipeline label was found on 4 of the 6 new sections:
+`"Spatial 3' v1"` / spaceranger-1.3.0 (same 36,601-gene panel, an older processing lineage than
+the two chemistries §9.3 already found) — documented, not investigated further.
+
+One process error caught and fixed: the ingesting agent's registration script initially omitted
+the `gbmspace_` id prefix for these 6 sections; caught by cross-checking against the established
+naming convention, fixed via unregister + re-register, confirmed correct in a fresh process. While
+investigating, 4 *pre-existing* stray duplicate registry entries from an unrelated earlier session
+(same missing-prefix bug: `at3_bra5_fo_1_2`, `at3_bra5_fo_4_1`, `at5_bra_5_fo_1_1`,
+`at7_bra_3_fo_3_2`) were found but left untouched (out of scope for that pass) — harmless
+duplicates in the runtime Studio registry, not a data-correctness problem, and not part of any
+git-tracked state; a concrete low-risk cleanup item for whichever pass next touches the registry.
+
+Added one representative section each for AT4 and AT13 to
+`test_gbmspace_adapter.py::_MATERIALIZED`; full suite: 24 passed (independently re-run, matching
+the claim exactly). Disk stayed at 19.28-19.51 GiB free throughout.
