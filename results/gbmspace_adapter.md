@@ -343,3 +343,214 @@ after:  ./.venv/bin/python -m pytest tests/ -q  ->  529 passed, 1 warning in 259
 - **No calibration work was done.** `OxygenConfig.consumption`'s un-anchored status, noted in
   `results/real_drug_panel.md`, is unchanged by this pass and applies identically to every
   number in §6.
+
+---
+
+## 9. Follow-on pass: the rest of the "selected" tarball, plus a taste of the full atlas
+
+This section reports a later pass whose job was exactly what §8 above flagged as not done:
+scale past the 3 proof-of-concept sections now that disk space allowed it (24 GiB free at the
+start of this pass, checked directly; 20 GiB free at the end). Same adapter
+(`tmesim/data/adapters/gbmspace.py`), same registration path (`ingest_registry.register`), same
+reconstruction call (`reconstruct_from_visium`) — nothing in §1–8 needed correcting, and no file
+under `tmesim/core`, `tmesim/physics`, `tmesim/sim`, or `tmesim/molecular` was touched. The only
+tracked-file change is `tests/test_gbmspace_adapter.py` (extended, not rewritten — see §9.5).
+
+### 9.1 One correction to §1: the "selected" tarball has 9 sections, not 10
+
+§1 above said "10 sections total" for `spatial_data_visium_selected.tar.gz` but its own table
+lists 9 `.h5ad` members. Re-listing the archive directly in this pass (`curl | tar tzvf -`,
+zero bytes retained) confirms **9** is correct — the same 9 rows §1's table already had; "10"
+there was simply a miscount (plausibly counting `anndata_selected/README.md` as a section).
+This changes nothing about what was already ingested; it just means this pass's 6 new sections
+bring the "selected" tarball to **9 of 9 — full coverage**, not 9 of 10.
+
+### 9.2 What was ingested: 6 more sections from "selected", 3 more from the full atlas
+
+**"Selected" tarball, the remaining 6 members** (downloaded via one streamed `tar xzf -` pulling
+all 6 named members out of a single pass over the compressed stream — not 6 separate downloads,
+and not the full archive written to disk):
+
+| Section | Raw `.h5ad` | Genes (Gene Expression) | Chemistry | Spots |
+|---|---:|---:|---|---:|
+| `AT10-BRA-5-FO-1_1` | 253 MB | 36,601 | Visium V1 Slide / spaceranger-2.0.0 | 2,956 |
+| `AT10-BRA-5-FO-1_2` | 290 MB | 36,601 | Visium V1 Slide / spaceranger-2.0.0 | 3,999 |
+| `AT14-BRA-4-FO-2_1` | 223 MB | 36,601 | Visium V1 Slide / spaceranger-2.0.0 | 3,534 |
+| `AT15-BRA-4-FO-C2-S27` | 856 MB | **18,085** | **Visium V5 Slide / spaceranger-2.1.0** | 9,697 |
+| `AT15-BRA-4-FO-C3-S34` | 812 MB | **18,085** | **Visium V5 Slide / spaceranger-2.1.0** | 11,709 |
+| `AT15-BRA-4-FO-B2-S25` | 648 MB | **18,085** | **Visium V5 Slide / spaceranger-2.1.0** | 10,356 |
+
+**Full atlas tarball (`spatial_data_visium.tar.gz`, 97 sections, 3.9 GB), 3 sections** —
+pursued per the task's step 3, within a stated, small budget: only the first 7 members of the
+archive's internal ordering were in scope (confirmed by streaming `tar tzvf -` first), so
+extracting the 3 wanted members required streaming through at most that much of the compressed
+file, not the full 3.9 GB. Picked deliberately from **patients not otherwise represented**
+(the "selected" tarball's 9 sections span only 3 patients — AT10, AT14, AT15):
+
+| Section | Raw `.h5ad` | Genes | Chemistry | Spots | Patient |
+|---|---:|---:|---|---:|---|
+| `AT11-BRA-6-FO-1_2` | 114 MB | 36,601 | Visium V1 Slide / spaceranger-2.0.0 | 3,609 | AT11 (new) |
+| `AT11-BRA-6-FO-2_1` | 65 MB | 36,601 | Visium V1 Slide / spaceranger-2.0.0 | 3,753 | AT11 (new) |
+| `AT6-BRA-3-FO-2_2` | 87 MB | 36,601 | Visium V1 Slide / spaceranger-2.0.0 | 2,297 | AT6 (new) |
+
+**`AT11-BRA-6-FO-2_1` is the exact same file `results/gbmspace_ingestion.md` probed months
+earlier** (65,048,148 bytes, 3,753 spots — both numbers match that report's §2/§3 exactly). It
+was extracted to a scratch directory then, inspected with `h5py`, and deleted without being
+ingested, because at that point no adapter existed yet. This pass is the first time that
+specific file has actually gone through the pipeline.
+
+**Disk discipline**: each raw `.h5ad` was deleted immediately after `materialize_spaceranger_dir`
+converted it (same pattern as the first 3 sections — the materialized MEX triple is far smaller
+than the source file). Peak transient disk use was one raw file at a time (largest: 856 MB for
+`AT15-BRA-4-FO-C2-S27`) plus whatever had already been materialized; free space never dropped
+below **17.5 GiB** at any point this pass's ingestion scripts logged it. Final state: **9
+sections** materialized under `data_cache/gbmspace_visium/` (978 MB total, including the one
+154 MB raw `.h5ad` kept for tests since the first pass) **+ 3 more** (total 12 real GBM-Space
+sections now in this repo), **20 GiB free** at the end. The full 97-section tarball itself was
+never downloaded in bulk — only 3 named members were ever pulled from its compressed stream.
+
+**Stopping point, stated honestly**: this pass stopped at 9 (all of "selected") + 3 (from the
+full atlas) not because disk ran out — 20 GiB free remained comfortable headroom — but because
+the task's own framing treated the full 97-section atlas as a "few sections, worth evaluating"
+add-on once the selected tarball was exhausted, not a second full scale-up pass. 12 real
+sections across 5 patients was judged enough to answer the generalization question (§9.4) without
+further engineering; pulling more of the full atlas remains a mechanical repeat of the same
+`gbmspace.register(h5ad_path)` call per member, exactly as §8 already said about the selected
+tarball.
+
+### 9.3 A finding that wasn't anticipated: two different Visium chemistries in this one source
+
+The first pass's report (and its adapter docstring) implicitly assumed one GBM-Space chemistry —
+Visium V1 Slide, spaceranger-2.0.0, 36,601-gene whole-transcriptome panel — because all 3
+sections it ingested happened to share it. **This pass's 3 `AT15-BRA-4-FO-*` sections do not**:
+`inspect_section()` reports `chemistry = "Visium V5 Slide"`, `software_version =
+"spaceranger-2.1.0"`, and a 18,085-gene panel (confirmed by direct re-download-and-inspect of
+one of the three, `AT15-BRA-4-FO-B2-S25`, specifically to check this rather than guess from the
+gene count alone — `obs/sample` provenance string
+`spaceranger210_count_47450_GBM_SPA13740723_GRCh38-2020-A`, same `GRCh38-2020-A` reference,
+different Space Ranger version and slide chemistry).
+
+18,085 genes is consistent with 10x Genomics' probe-based Visium (CytAssist / FFPE) Human
+Transcriptome Probe Set, as distinct from the poly-A-capture whole-transcriptome chemistry the
+other 9 sections in this repo's GBM-Space collection use. This adapter handles both without any
+code change — `inspect_section()` already filters to `feature_types == "Gene Expression"`
+generically, whatever that block's width turns out to be — but it is a real, previously-unknown
+heterogeneity in the source data, not a bug. **MGMT and the full hypoxia marker panel
+(`VEGFA`, `CA9`, `ADM`, `NDRG1`, `SLC2A1`) are present on both panels**, confirmed for every one
+of the 6 new "selected"-tarball sections via the same `capability_report()` path as the first 3
+— the smaller probe panel does not drop either axis. `tests/test_gbmspace_adapter.py`'s
+`n_genes > 36000` assertion (which would have failed on the 3 `AT15` sections) was loosened to
+`n_genes > 15000` with a comment explaining why, rather than silently narrowing the parametrized
+section list to dodge the difference.
+
+### 9.4 Reconstruction on all 9 new sections: does the earlier hypoxia finding generalize?
+
+`reconstruct_from_visium` — unmodified — ran cleanly on all 9 new sections (the task asked for
+"at least 2"; all 9 were run, since the marginal cost per section is small once the pipeline is
+confirmed working). Same geometric-route state-banding computation as §6 above (steady-state O₂
+from the reconstructed `vascular_density` field, then `update_cell_states`), reported the same
+way:
+
+| Section | Patient | Chemistry | mean_vascular | n_cells (placed) | tumor % | VIABLE | QUIESCENT | HYPOXIC |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| `AT10-BRA-5-FO-3_1` *(1st pass)* | AT10 | whole-transcriptome | 0.020 | 39,248 | 51.3% | 11.1% | 64.7% | **24.2%** |
+| `AT10-BRA-5-FO-4_2` *(1st pass)* | AT10 | whole-transcriptome | 0.015 | — | — | 4.5% | 34.5% | **61.1%** |
+| `AT10-BRA-5-FO-2_1` *(1st pass)* | AT10 | whole-transcriptome | 0.045 | — | — | 36.1% | 58.8% | **5.1%** |
+| `AT10-BRA-5-FO-1_1` | AT10 | whole-transcriptome | 0.039 | 35,451 | 64.3% | 47.4% | 49.8% | **2.8%** |
+| `AT10-BRA-5-FO-1_2` | AT10 | whole-transcriptome | 0.035 | 47,956 | 61.1% | 17.8% | 82.2% | **0.0%** |
+| `AT14-BRA-4-FO-2_1` | AT14 | whole-transcriptome | 0.351 | 42,456 | 41.3% | 100.0% | 0.0% | **0.0%** |
+| `AT11-BRA-6-FO-1_2` | AT11 | whole-transcriptome | 0.050 | 43,203 | 41.4% | 80.5% | 19.5% | **0.0%** |
+| `AT11-BRA-6-FO-2_1` | AT11 | whole-transcriptome | 0.055 | 44,958 | 9.4% | 100.0% | 0.0% | **0.0%** |
+| `AT6-BRA-3-FO-2_2` | AT6 | whole-transcriptome | 0.024 | 27,521 | 30.1% | 79.2% | 20.8% | **0.0%** |
+| `AT15-BRA-4-FO-C2-S27` | AT15 | probe-based (V5) | 0.019 | 116,286 | 67.1% | 6.5% | 12.9% | **80.6%** |
+| `AT15-BRA-4-FO-C3-S34` | AT15 | probe-based (V5) | 0.046 | 140,435 | 88.1% | 15.0% | 32.9% | **52.1%** |
+| `AT15-BRA-4-FO-B2-S25` | AT15 | probe-based (V5) | 0.038 | 124,216 | 57.6% | 36.7% | 22.6% | **40.7%** |
+
+**Honest answer to the question this section was asked: it generalizes partially, not
+universally, and it correlates with something that wasn't controlled for.**
+
+- **Non-zero geometric hypoxic fractions recur**: 7 of 12 real GBM-Space sections now show a
+  non-zero hypoxic band (2.8%–80.6%), so the original finding — that this source produces
+  materially different, non-degenerate hypoxic fractions unlike the 0.0% every built-in
+  Visium/Xenium section in this repo reports — is not a fluke of the original 3 sections. The
+  single highest value seen anywhere in this repo, **80.6%**, comes from this expanded set, not
+  the original 3.
+- **It is not universal**: 5 of 12 sections show the same 0.0% the built-in sections show —
+  `AT10-BRA-5-FO-1_2` (same patient as three non-zero sections), all of `AT14`, both of `AT11`,
+  and `AT6`. Three of the repo's now-5 GBM-Space patients (AT14, AT11, AT6) show **zero** hypoxic
+  signal across all their sections (4 sections, 3 patients) — every non-zero-or-higher-than-5%
+  section in this table comes from just 2 patients, AT10 and AT15.
+- **A confound this pass cannot rule out**: all 3 of the highest hypoxic values (40.7–80.6%) come
+  from the 3 sections that also share the different, probe-based Visium chemistry (§9.3) —
+  a chemistry no other section in this comparison uses. Whether that reflects genuine tumor
+  biology (AT15's tumor really is more hypovascular) or a processing artifact (probe-based
+  capture producing a systematically different deconvolved ENDOTHELIAL fraction than poly-A
+  capture, which is what `mean_vascular` — and therefore the O₂ field and the hypoxic band — is
+  computed from) cannot be distinguished from this pass alone. This is flagged, not resolved;
+  resolving it would need either same-chemistry sections from an AT15-like hypovascular patient,
+  or a same-tissue Visium V1/V5 comparison, neither of which exists in this dataset.
+  Restricting to the 9 whole-transcriptome sections alone (removing that confound) still shows a
+  non-zero hypoxic band in 4 of 9 (2.8%–61.1%), so the qualitative finding survives even with the
+  probe-based sections set aside entirely — just at lower magnitudes.
+- **`mean_vascular` is not a clean single predictor even within one chemistry**: restricted to
+  the 9 whole-transcriptome sections, hypoxic fraction falls roughly as `mean_vascular` rises
+  (0.015→61.1%, 0.020→24.2%, 0.035→0.0%, 0.039→2.8%, 0.045→5.1%, 0.050→0.0%, 0.055→0.0%) — a
+  real, mostly-monotonic trend — but `AT6-BRA-3-FO-2_2` breaks it (`mean_vascular` 0.024, among
+  the lowest in the set, yet 0.0% hypoxic, not the ~50%+ the trend would predict). One exception
+  in nine points is not disqualifying, but it means "just look at vascular density" is not a
+  reliable summary of what this uncalibrated model does section-to-section — consistent with
+  `results/real_drug_panel.md`'s standing caveat that `OxygenConfig.consumption` has never been
+  calibrated against measured oxygen tension, restated here because this expanded set makes the
+  model's sensitivity to something other than mean vascular density more visible, not less.
+
+**What this is still not**: not a marker-based hypoxia measurement (§6's caveat applies
+unchanged — GBM-Space's per-cell marker route is off by construction for all 12 sections, spot-
+level data), not a calibrated result, and not evidence either way on the chemistry confound. It
+is a wider, still-qualitative replication: real GBM-Space tissue, across 5 real patients now
+instead of 1, keeps producing non-zero and sometimes very large geometric hypoxic fractions that
+every other real section in this repo (Xenium flagship, both built-in Visium sections) reports as
+exactly 0.0% — while also, in the majority of new sections, reproducing that same 0.0%. Both
+halves of that sentence are the honest finding; reporting only the high numbers would overclaim.
+
+### 9.5 Studio registration, tests, and the full suite
+
+All 9 new sections registered via `app.server.ingest_registry.register()` — unmodified — under
+ids `gbmspace_at10_bra_5_fo_1_1` … `gbmspace_at6_bra_3_fo_2_2` (same `gbmspace_<slug>` pattern as
+the first 3). Confirmed in a fresh process, same check as §5: `ingest_registry.load_store()`
+re-wires all **12** `gbmspace_*` ids into `tmesim.data.real.visium`'s registry, and
+`reconstruct_from_visium(...)` resolves each one with no manual setup. The Studio catalogue now
+carries 12 GBM-Space sections alongside the 7 built-in ones.
+
+`tests/test_gbmspace_adapter.py` was extended, not rewritten: `_MATERIALIZED` now lists all 9
+sections that survive a fresh checkout (the original 3 plus this pass's 6 "selected"-tarball
+ones; the 3 full-atlas ones are not added to this list since, per the existing convention, only
+sections actually shipped/reproducible from a clean `data_cache/` checkout belong there — same
+reasoning as the single kept raw `.h5ad`). The one assertion that would have broken on the new
+probe-based sections (`rec.n_genes > 36000`) was loosened to `> 15000` with a comment explaining
+the two-chemistry finding, rather than quietly dropped or narrowed to dodge it.
+
+```
+before this pass: ./.venv/bin/python -m pytest tests/ -q  ->  577 passed, 1 warning in 278.55s
+after this pass:  ./.venv/bin/python -m pytest tests/ -q  ->  583 passed, 1 warning in 275.60s
+```
+
++6 tests (the `_MATERIALIZED` parametrization grew from 3 to 9 entries — 3 tests × 6 new
+sections), 0 regressions, 0 skips (all caches present in this checkout). `git status` before and
+after confirms the only tracked-file change is `tests/test_gbmspace_adapter.py`; no file under
+`tmesim/core`, `tmesim/physics`, `tmesim/sim`, `tmesim/molecular`, `app/web/`, `marketing/`,
+`landing-3d/`, `tmesim/ml/`, or `tmesim/data/adapters/codex.py` was touched.
+
+### 9.6 What was NOT done, honestly (this pass)
+
+- **Only 3 of the full atlas's ~97 sections were pulled**, deliberately, per the task's framing
+  of that tarball as a "worth evaluating, within a clear budget" add-on rather than a second
+  full scale-up. 94 sections remain untouched; pulling more is the same mechanical
+  `gbmspace.register(h5ad_path)` call §8 already described, now proven to work across two
+  different Visium chemistries as well.
+- **The chemistry confound in §9.4 was flagged, not resolved.** Distinguishing "AT15 patient
+  biology" from "probe-based capture artifact" needs data this pass does not have (either a
+  same-chemistry hypovascular patient, or the same tissue run on both chemistries) and was not
+  pursued further here.
+- **No calibration work was done**, same caveat as §8, now applying to 12 sections instead of 3.
+- **H&E images, Ensembl ids**: unchanged from §8 — still not materialized, still a
+  symbol-as-placeholder respectively.

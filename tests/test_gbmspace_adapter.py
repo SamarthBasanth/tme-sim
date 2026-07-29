@@ -10,14 +10,16 @@ Two tiers of real data:
   on-disk CSR, the obsm/spatial axis convention) is tested against genuine
   bytes rather than a hand-built fixture. Tests that need it are skipped if
   it is not present in a given checkout.
-* :data:`_MATERIALIZED` — the 3 sections this task actually ingested and
-  registered, under ``data_cache/gbmspace_visium/<SAMPLE>/``. These are what
+* :data:`_MATERIALIZED` — the 9 sections ingested and registered across two
+  passes (3 in the first pass, 6 more in a follow-on pass that finished off
+  every ``.h5ad`` member of the "selected" tarball), under
+  ``data_cache/gbmspace_visium/<SAMPLE>/``. These are what
   ``results/gbmspace_adapter.md`` reports numbers from; the tests here assert
   those numbers are reproducible, not just that the code runs.
 
 See ``results/gbmspace_ingestion.md`` (the format-mismatch discovery) and
-``results/gbmspace_adapter.md`` (what was built on top of it) for the full
-account this adapter is the code for.
+``results/gbmspace_adapter.md`` (what was built on top of it, §1-8 the first
+pass and §9 the follow-on) for the full account this adapter is the code for.
 """
 from __future__ import annotations
 
@@ -38,10 +40,21 @@ _RAW_H5AD = os.path.join(
     _REPO, "data_cache", "gbmspace_visium", "_raw_h5ad", "AT10-BRA-5-FO-3_1.h5ad"
 )
 
-#: (sample_name, materialized dir) for the 3 sections ingested in this pass.
+#: (sample_name, materialized dir) for the 3 sections ingested in the first
+#: pass, plus the 6 more added in the follow-on pass that finished off the
+#: "selected" tarball (9 of 9 .h5ad members - see results/gbmspace_adapter.md
+#: §9). Three of these (the AT15-BRA-4-FO-* ones) turned out to carry a
+#: smaller ~18k-gene probe-based panel (Visium V5/CytAssist chemistry) rather
+#: than the ~36.6k-gene whole-transcriptome panel the first 3 sections use -
+#: the marker assertions below only check for specific genes, not panel size,
+#: so this list is not split by chemistry.
 _MATERIALIZED = [
     (sid, os.path.join(_REPO, "data_cache", "gbmspace_visium", sid))
-    for sid in ("AT10-BRA-5-FO-3_1", "AT10-BRA-5-FO-4_2", "AT10-BRA-5-FO-2_1")
+    for sid in (
+        "AT10-BRA-5-FO-3_1", "AT10-BRA-5-FO-4_2", "AT10-BRA-5-FO-2_1",
+        "AT10-BRA-5-FO-1_1", "AT10-BRA-5-FO-1_2", "AT14-BRA-4-FO-2_1",
+        "AT15-BRA-4-FO-C2-S27", "AT15-BRA-4-FO-C3-S34", "AT15-BRA-4-FO-B2-S25",
+    )
 ]
 
 #: The whole point: markers the incumbent Xenium panels (319/480-gene) carry
@@ -188,7 +201,11 @@ def test_materialized_sections_ingest_and_validate(sample_name, path):
     rec = ing.ingest(path, sample_id=sample_name, detection=det)
     assert rec.validation["ok"], rec.validation
     assert rec.n_cells > 1000
-    assert rec.n_genes > 36000
+    # Two chemistries among the materialized sections (see the _MATERIALIZED
+    # docstring above): ~36.6k-gene whole-transcriptome Visium V1, or the
+    # ~18k-gene probe-based Visium V5/CytAssist panel. Either is fine; a
+    # near-empty panel would not be.
+    assert rec.n_genes > 15000
 
     cap = rec.capability
     # The point of this whole adapter: hypoxia AND MGMT are measurable on a
