@@ -155,6 +155,14 @@ highest-value structural fix outstanding. Literature basis is established:
   systematic rather than patient-specific. The two quantities this project cited as its
   external validations are exactly the two that fail, and both fail through constants
   entangled with the grid and with panel sparsity in a way one section could never expose.
+  **UPDATE (this pass this text is stale on one point):** `results/heldout_patient.md` was
+  regenerated after later fixes (discrete-vessel promotion `ceb96c0`, classifier-arity fix
+  `4ad221f`, plus this pass's own vessel-distance/oxygen fixes). Re-run, the endothelial-
+  fraction-vs-volume-EM claim now **REPLICATES** (7.07% vs 8.0%, against section 1's
+  10.50%) — a genuine, incidental improvement, not yet earned by design. The vascular
+  area fraction claim (now 10.98% vs 2.1%, 5.2x) and MVD (not reproduced on either
+  section) are unchanged and still fail for the reasons described above. Do not cite
+  4.18%/0.52x for the endothelial-fraction check; cite the current 7.07%/0.88x instead.
 - **Numerics**: mass conserved to ~1e-13 on the real irregular mask; dt-converged; kill
   fraction grid-converged beyond dx<=20 um. Production resolution is **dx = 12 um** (also
   the finest grid satisfying the advection CFL at dt = 10 s).
