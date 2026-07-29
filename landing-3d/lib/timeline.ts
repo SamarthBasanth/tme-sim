@@ -140,13 +140,27 @@ function trapezoid(t: number, r0: number, r1: number, f0: number, f1: number) {
 // Scene 3 — Segmentation
 // ---------------------------------------------------------------------------
 
-/** 0 = fused mass, 1 = fully separated core / edema / margin. */
+/**
+ * 0 = fused mass, 1 = fully separated core / edema / margin.
+ *
+ * The fall-back used to run all the way to p=1, i.e. the exact end of
+ * scroll. But `ctaCopyOpacity` below reaches full opacity much earlier
+ * (by 5/6 + (1/6)*0.35), so for a wide stretch of the final section the
+ * "Bring this into your own workflow" headline and "Request a Demo"
+ * button were fully legible while the core point cloud was still sitting
+ * in its separated position — offset -0.55 in Y (see ProceduralTumor.tsx's
+ * `coreGroup.position.set(0, -0.55 * sep, 0)`) — low enough to visibly
+ * drop across and obscure the CTA button. Finishing the fall-back well
+ * before the copy is fully opaque (with margin for the per-frame damping
+ * lag in ProceduralTumor/GLTFTumor) lets the mass fully recompose before
+ * the final CTA becomes the visual focus.
+ */
 export const separationAmount = (p: number): number =>
   sampleCurve(p, [
     [2 / 6, 0],
     [3 / 6, 1],
     [5 / 6, 1],
-    [1, 0],
+    [5 / 6 + (1 / 6) * 0.2, 0],
   ]);
 
 export const segmentationLabelOpacity = (p: number): number =>

@@ -1,51 +1,91 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
+import { Billboard } from "@react-three/drei";
 import * as THREE from "three";
 import { useScrollProgressRef } from "@/components/scroll/ScrollProgressContext";
 import { criticalStructureOpacity, highlightOpacity } from "@/lib/timeline";
 import { damp } from "@/lib/scrollMath";
 
-/** Small emissive marker that "ignites" as the AI-analysis scan plane sweeps past it. */
+/**
+ * Small emissive marker that "ignites" as the AI-analysis scan plane sweeps
+ * past it — a flagged-region indicator during AI Analysis / Treatment
+ * Planning, not decoration.
+ *
+ * Previously a filled sphere with a second ring orbiting it in a fixed
+ * horizontal plane (`rotation={[Math.PI / 2, 0, 0]}`): from most camera
+ * angles a plane-locked ring around a small sphere reads exactly like a
+ * miniature Saturn rather than a clinical marker — flagged (and left
+ * unresolved) in the prior visual pass, then independently re-reported.
+ * Rebuilt as a camera-facing (`Billboard`, so it never tilts into a
+ * Saturn-ring silhouette regardless of viewing angle) crosshair/reticle: a
+ * small pulsing dot, a thin ring tight against it, and four short radial
+ * tick marks — the standard "flagged point" convention in medical and
+ * technical imaging overlays.
+ */
 export function HighlightMarker({ position }: { position: readonly [number, number, number] }) {
   const progressRef = useScrollProgressRef();
-  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
-  const ringRef = useRef<THREE.Mesh>(null);
+  const dotMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
+  const ringMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
+  const tickMaterialRef = useRef<THREE.LineBasicMaterial>(null);
+  const billboardRef = useRef<THREE.Group>(null);
   const opacitySmoothed = useRef(0);
+
+  // Four short radial ticks just outside the ring, at 45/135/225/315deg —
+  // a crosshair/reticle silhouette, built once as a single LineSegments
+  // geometry (disconnected pairs) rather than four separate Line elements.
+  const tickGeometry = useMemo(() => {
+    const inner = 0.052;
+    const outer = 0.08;
+    const positions: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const cx = Math.cos(angle);
+      const cy = Math.sin(angle);
+      positions.push(cx * inner, cy * inner, 0, cx * outer, cy * outer, 0);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    return geometry;
+  }, []);
+
+  useEffect(() => () => tickGeometry.dispose(), [tickGeometry]);
 
   useFrame((state, delta) => {
     const target = highlightOpacity(progressRef.current);
     opacitySmoothed.current = damp(opacitySmoothed.current, target, 4, delta);
     const o = opacitySmoothed.current;
-    if (materialRef.current) {
-      materialRef.current.opacity = o;
-      materialRef.current.emissiveIntensity = 0.6 + o * 1.4;
-    }
-    if (ringRef.current) {
-      ringRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 2) * 0.06 * o);
-      const ringMat = ringRef.current.material as THREE.MeshBasicMaterial;
-      ringMat.opacity = o * 0.5;
-    }
+    const pulse = 1 + Math.sin(state.clock.elapsedTime * 2.4) * 0.08 * o;
+
+    if (dotMaterialRef.current) dotMaterialRef.current.opacity = o;
+    if (ringMaterialRef.current) ringMaterialRef.current.opacity = o * 0.85;
+    if (tickMaterialRef.current) tickMaterialRef.current.opacity = o * 0.7;
+    if (billboardRef.current) billboardRef.current.scale.setScalar(pulse);
   });
 
   return (
     <group position={position}>
-      <mesh>
-        <sphereGeometry args={[0.05, 16, 16]} />
-        <meshStandardMaterial
-          ref={materialRef}
-          color="#f2b23a"
-          emissive="#f2b23a"
-          transparent
-          opacity={0}
-          depthWrite={false}
-        />
-      </mesh>
-      <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.09, 0.11, 32]} />
-        <meshBasicMaterial color="#f2b23a" transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
+      <Billboard ref={billboardRef}>
+        <mesh>
+          <circleGeometry args={[0.03, 20]} />
+          <meshBasicMaterial ref={dotMaterialRef} color="#f2b23a" transparent opacity={0} depthWrite={false} />
+        </mesh>
+        <mesh>
+          <ringGeometry args={[0.044, 0.05, 32]} />
+          <meshBasicMaterial
+            ref={ringMaterialRef}
+            color="#f2b23a"
+            transparent
+            opacity={0}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+        <lineSegments geometry={tickGeometry}>
+          <lineBasicMaterial ref={tickMaterialRef} color="#f2b23a" transparent opacity={0} depthWrite={false} />
+        </lineSegments>
+      </Billboard>
     </group>
   );
 }
