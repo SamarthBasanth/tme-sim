@@ -22,7 +22,26 @@ sparse direct solve gives the exact steady state (no iteration/CFL concerns).
     sink:       consumption * rho_tum  (proportional to LOCAL tumor-cell density)
 
 Units follow the project convention: length um, diffusivity um^2/s. The oxygen
-field is dimensionless relative saturation in [0, 1] (1 = fully oxygenated).
+field is dimensionless relative saturation in [0, 1] (1 = fully oxygenated,
+0 = anoxia).
+
+MMHG REFERENCE POINT (read this before comparing O to any measured pO2)
+-------------------------------------------------------------------------
+``O`` had no defined physical unit until now. ``O = 1`` is DEFINED to represent
+:data:`REFERENCE_PO2_MMHG` (35 mmHg, normal -- non-tumour-bearing -- human brain
+TISSUE pO2, Erecinska & Silver 2001, PMID 11718758), not arterial/plasma pO2
+(~100 mmHg): the PDE's ``vasc`` field is a vascular-density source term feeding
+a tissue compartment, not a blood compartment, so the tissue anchor is the
+correct physical match, and it is the anchor at which the EXISTING
+``cells.agents.update_cell_states`` bands (``t=0.2`` HYPOXIC, ``[0.2,0.4)``
+QUIESCENT, ``>=0.4`` VIABLE) convert to a biologically plausible range
+(~7 / [7,14) / >=14 mmHg) rather than the arterial anchor's absurd one (~20 /
+[20,40) / >=40 mmHg, which would call normal brain tissue "hypoxic"). See
+``results/sweep/oxygen_mmhg_reference_proposal_2026-07-29T05-54-00Z.md`` for
+the full derivation and both anchors' threshold tables. This conversion is a
+DECLARATION about what the existing [0,1] number has always implicitly meant --
+it changes no solved value of ``O``, no threshold, and no downstream label.
+:func:`to_mmhg` is the one place to apply it.
 
 GRID INDEPENDENCE OF THE SINK (fixed; read this)
 ------------------------------------------------
@@ -70,6 +89,47 @@ is no more credible than the 0.94 the coarse grid used to report. Both the old
 ladder (0.94 -> 0.07 over dx = 30 -> 8 um) and the new 0.0 are un-calibrated model
 output. What these fixes establish is that the answer no longer depends on the
 numerical grid -- NOT that its level is right.
+
+A LITERATURE PASS SHARPENED THIS UNCERTAINTY RATHER THAN RESOLVING IT
+------------------------------------------------------------------------
+Two follow-up literature checks each produced a real, unit-matched estimate for
+``consumption``, and they disagree by roughly an order of magnitude IN OPPOSITE
+DIRECTIONS relative to the current default (0.02 /s):
+
+- Watabe et al. 2017 (rat C6 glioma, 15O-PET tumoral metabolic rate of oxygen,
+  PMID 28210996, https://doi.org/10.1186/s13550-017-0263-6): TMRO2 = 1.9-2.8 mL
+  O2/100 mL tissue/min, a real glioma-TISSUE-level (not cell-line, not a
+  different tumor type) measurement in directly comparable units. Converting via
+  the :data:`REFERENCE_PO2_MMHG` anchor above implies ``consumption`` should be
+  roughly **12-25x HIGHER** than 0.02.
+- A different reaction-diffusion-model estimate (Diepart et al., via Milotti
+  2017) using the same linear-in-O functional form this module uses implies
+  ``consumption`` should be roughly **4-100x LOWER** than 0.02.
+
+Neither estimate is obviously wrong -- both are real, sourced, unit-matched
+numbers -- and they bracket the current default from opposite sides by up to
+two orders of magnitude combined. This is a SHARPER, more specific form of
+"uncalibrated" than before (a quantified disagreement range with real sources
+on both ends), not a resolution of it, and no value has been picked. See
+``results/sweep/oxygen_ocr_literature_second_pass_2026-07-29T05-54-00Z.md``.
+
+THE SINK'S FUNCTIONAL FORM IS A SEPARATE, ALSO-UNRESOLVED AXIS
+-------------------------------------------------------------------
+This module's sink is first-order in O (``consumption * rho_tum * O``); most of
+the cited oxygen-consumption literature (e.g. Grimes, Fletcher & Partridge 2014,
+PMID 26064525) instead uses a Michaelis-Menten form, ``a_max * O/(O + Km)``,
+which does not vanish as O -> 0. A standalone prototype (unmodified
+``solve_oxygen``, Picard-iterated MM sink, real flagship reconstruction) found
+this is NOT a minor correction: sweeping the literature-plausible half-saturation
+range swings the predicted hypoxic tumor FRACTION from the current 0.0 to
+0.69-1.0, the opposite extreme. Neither 0.0 nor 69-100% is obviously correct
+relative to the real human-GBM pO2 literature. This axis and the
+``consumption``-magnitude uncertainty above are COUPLED, not independently
+fixable: recalibrating ``consumption`` alone, without addressing the functional-
+form mismatch, is unlikely to reproduce a realistic pO2 profile. See
+``results/sweep/oxygen_functional_form_prototype_2026-07-29T05-54-00Z.md``.
+Neither the functional form nor ``consumption`` has been changed in this module;
+picking either without the other would be false precision, not a fix.
 """
 from __future__ import annotations
 
@@ -101,6 +161,45 @@ from ..core import CellState, Microenvironment, OxygenConfig
 #: between ~0.0 and ~0.6). What this fix establishes is that the answer no longer
 #: depends on the numerical grid -- not that the absolute level is calibrated.
 TUMOR_REFERENCE_AREA_UM2 = 144.0
+
+#: mmHg partial pressure that ``O = 1`` is DEFINED to represent. Anchored to
+#: NORMAL (non-tumour-bearing) human brain TISSUE pO2 -- not arterial/plasma
+#: pO2 -- because ``solve_oxygen``'s source term represents flux from vessels
+#: INTO tissue, so ``O`` is a tissue-compartment quantity throughout; see the
+#: module docstring's "MMHG REFERENCE POINT" section for why the arterial
+#: anchor (~100 mmHg) was rejected.
+#:
+#: Value = 35.0 mmHg. Source: Erecinska M, Silver IA. "Tissue oxygen tension
+#: and brain sensitivity to hypoxia." Respir Physiol 2001;128(3):263-276.
+#: PMID 11718758, DOI 10.1016/s0034-5687(01)00306-1. Corroborated by (a) the
+#: clinical PbtO2 (Licox-probe) monitoring literature's normal range of
+#: 20-40 mmHg and (b) this project's own Beppu et al. 2002 GBM readings
+#: (peritumoral ~59.8 mmHg, arterial ~109.2 mmHg, both above this
+#: normal-tissue anchor, the expected ordering) -- see
+#: ``results/oxygen_calibration_landscape.md`` §1 and
+#: ``results/sweep/oxygen_mmhg_reference_proposal_2026-07-29T05-54-00Z.md``.
+#:
+#: HONEST CAVEAT: like :data:`TUMOR_REFERENCE_AREA_UM2`, this is a SINGLE POINT
+#: anchor for a quantity that varies severalfold across individuals, brain
+#: regions and measurement technique (Nozue et al. 1997, PMID 9290690, found
+#: 1.5-5.6 mmHg tumour-pO2 spread across labs on an identical protocol). It
+#: fixes what O=1 MEANS; it does NOT calibrate ``OxygenConfig.consumption``,
+#: which independently sets where the SOLVED O actually lands on this new
+#: scale -- see that field's own uncalibrated-level caveat above.
+REFERENCE_PO2_MMHG = 35.0
+
+
+def to_mmhg(oxygen: np.ndarray) -> np.ndarray:
+    """Convert a dimensionless oxygen field/array to mmHg via :data:`REFERENCE_PO2_MMHG`.
+
+    Pure linear rescale (``oxygen * REFERENCE_PO2_MMHG``). Touches nothing in
+    ``solve_oxygen`` or ``label_hypoxia`` -- no threshold, no solved value, and
+    no test-observable behavior changes. Exists so a caller who wants to
+    compare the model's O to a measured pO2 (e.g. the four glioma studies in
+    ``results/oxygen_calibration_landscape.md``) has one canonical place to do
+    it instead of each re-deriving the anchor.
+    """
+    return np.asarray(oxygen, dtype=np.float64) * REFERENCE_PO2_MMHG
 
 
 def _tumor_density(micro: Microenvironment) -> np.ndarray:
