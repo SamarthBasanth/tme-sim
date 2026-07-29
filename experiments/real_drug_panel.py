@@ -566,11 +566,11 @@ def build_markdown(report, alpha, rows, best_kill, best_pen, hypoxic_frac,
         "",
         "## Honesty and caveats",
         "",
-        "- **No outcome label.** This open Xenium section is an **untreated "
-        "resection**. There is no paired measured drug response for any of these five "
-        "drugs. The kill/penetration numbers are **predictions of the validated "
-        "physics on real tissue — not validated outcomes.** Do not read the ranking as "
-        "clinical efficacy.",
+        f"- **No outcome label.** This open Xenium section is an **untreated "
+        f"resection**. There is no paired measured drug response for any of these "
+        f"{len(PANEL)} drugs. The kill/penetration numbers are **predictions of the "
+        "validated physics on real tissue — not validated outcomes.** Do not read the "
+        "ranking as clinical efficacy.",
         "- **What is genuinely real here:** the geometry (real cells, real "
         "vasculature, real matrix, real oxygen), the transport physics (structure → "
         "mesh diffusivity + a doxorubicin-calibrated perivascular sink, revalidated "
