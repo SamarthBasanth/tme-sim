@@ -415,6 +415,7 @@ green throughout.
 |---|---|
 | **What is the current state, honestly?** | [`results/SESSION_AUDIT.md`](results/SESSION_AUDIT.md) |
 | I'm new here — how do I install this and get a first result? | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) |
+| I want to script drug/dose/sweep experiments, MATLAB-style | [`PROTOCOL_LANGUAGE.md`](PROTOCOL_LANGUAGE.md) (spec) + Studio's "protocol" tab (editor) |
 | How do I reproduce all of this? | [`docs/REPRODUCE.md`](docs/REPRODUCE.md) |
 | Where did every byte of data come from, and how do I re-download it? | [`docs/DATA_INVENTORY.md`](docs/DATA_INVENTORY.md) |
 | What is the model, mathematically? | [`docs/MATHEMATICAL_MODEL.md`](docs/MATHEMATICAL_MODEL.md) |

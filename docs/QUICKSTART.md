@@ -172,6 +172,66 @@ use a different port; `vivum studio --help` for the full option list. This is
 a thin delegate to the existing `python -m app.server` entry point — nothing
 about the server itself changed.
 
+### 2d. TPL — a small scripting language for defining and sweeping experiments
+
+Studio's **"protocol"** tab (top nav) is a real code editor, not just a form:
+syntax highlighting, line-numbered diagnostics, `Cmd+Enter` to plan+run,
+`Cmd+S` to validate, `F8`/`Shift+F8` to jump between warnings. Its own spec
+describes the design stance directly: **"MATLAB-adjacent in feel — assignment,
+ranges, loops over parameters, an interactive run — but domain-specific... no
+arbitrary control flow, no user functions, no I/O. Every construct maps onto a
+real quantity in the model."** Full grammar and reference:
+[`PROTOCOL_LANGUAGE.md`](../PROTOCOL_LANGUAGE.md).
+
+A complete program — define a drug, define a dosing protocol, sweep a
+parameter, run it, assert a hypothesis:
+
+```
+drug TMZ from library "temozolomide"
+  ic50 from gdsc                  # measured; errors if TMZ is absent from the screen
+end
+
+protocol single_dose
+  route oral
+  dose 150 mg/m2
+  every 24 h
+  repeat 1
+end
+
+sweep dx from 12 to 60 um step 12  # 5 runs, one axis
+
+run TMZ with single_dose on xenium_319
+  sensitivity uniform              # NO-RESISTANCE UPPER BOUND, not an expected response
+  report coverage, kill, mean_auc, penetration_length
+end
+
+expect coverage > 0.2              # recorded, never enforced — state the hypothesis first
+```
+
+Paste that into the editor (or start from one of the 6 built-in templates —
+"single drug", "dose sweep", "Stupp-like multi-cycle", and others) and hit
+`Cmd+Enter`. `plan` shows the expanded run count and estimated cost and waits
+for explicit confirmation before anything queues — nothing runs by accident.
+Every refusal is a parse error with a line and column, never a silent
+fallback; the same caveats this project attaches to every `results/*.md`
+report (e.g. "ABSOLUTE KILL MUST NOT BE QUOTED FROM this section under any
+state route") appear as inline diagnostics at the exact line that would
+trigger them, so they're visible at the point of use, not just in a
+separately-read report.
+
+The same three routes the editor uses are also a plain HTTP API, if you want
+to script protocol runs without the browser:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/protocol/validate \
+  -H "Content-Type: application/json" \
+  -d '{"source": "drug TMZ from library \"temozolomide\"\n  ic50 from gdsc\nend\n\nprotocol single_dose\n  route oral\n  dose 150 mg/m2\n  every 24 h\n  repeat 1\nend\n\nrun TMZ with single_dose on xenium_319\n  dx 12 um\n  sensitivity uniform\n  report coverage, kill\nend\n"}'
+```
+
+`/api/protocol/plan` (expand the sweep, show run count + cost, launch
+nothing) and `/api/protocol/run` (submit for real) follow the same shape —
+see `app/server/protocol_api.py`'s module docstring for the full route table.
+
 ---
 
 ## 3. Second example: the Python API (for a notebook)
