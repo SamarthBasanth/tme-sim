@@ -98,10 +98,11 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from tmesim.cells.agents import update_cell_states
-from tmesim.cells.pkpd import apply_drug_kill
+from tmesim.cells.pkpd import apply_drug_kill, effective_hypoxia_resistance
 from tmesim.core import (
     CellState,
     CellType,
+    DrugParams,
     Microenvironment,
     OxygenConfig,
     PDConfig,
@@ -306,19 +307,28 @@ def _reproduction_gate(rows: Sequence[Dict]) -> List[Dict]:
 
 
 def _ceiling(states: np.ndarray, sensitivity: np.ndarray, tumor: np.ndarray,
-             pd: PDConfig, sensitivity_scalar: Optional[float] = None) -> float:
+             pd: PDConfig, sensitivity_scalar: Optional[float] = None,
+             drug: Optional[DrugParams] = None) -> float:
     """The kill CEILING: ``mean_i[max_kill_rate * sensitivity_i * resistance_i]``.
 
     As exposure -> infinity the Hill term saturates, so no dose can exceed this.
     With uniform sensitivity it IS the state labelling, which is exactly the
     quantity this whole re-anchoring is about.
+
+    ``drug``, if given, is resolved through ``cells.pkpd.effective_hypoxia_resistance``
+    so a per-drug ``hypoxia_resistance`` override (temozolomide has one) is
+    honoured -- unlike the flagship 319-gene section, ``gse324268_xenium`` (this
+    module's PRIMARY section) carries real hypoxia-response markers and a
+    genuinely nonzero HYPOXIC band, so this matters numerically here.
     """
+    r_hyp = (effective_hypoxia_resistance(drug, pd) if drug is not None
+             else pd.hypoxia_resistance)
     st = np.asarray(states)[tumor]
     sens = np.asarray(sensitivity, dtype=np.float64)[tumor]
     if sensitivity_scalar is not None:
         sens = np.clip(sens * float(sensitivity_scalar), 0.0, 1.0)
     res = np.ones(st.size, dtype=np.float64)
-    res[st == int(CellState.HYPOXIC)] = pd.hypoxia_resistance
+    res[st == int(CellState.HYPOXIC)] = r_hyp
     res[st == int(CellState.QUIESCENT)] = pd.quiescent_resistance
     per_cell = pd.max_kill_rate * sens * res
     per_cell = np.where(st == int(CellState.DEAD), 0.0, per_cell)
@@ -574,9 +584,9 @@ def run_section(key: str, dx_um: float = DX_UM,
             "kill_oxygen": float(res.kill_fraction),
             "kill_markers": float(kill_markers),
             "ceiling_oxygen": _ceiling(engine_states, micro.cells.sensitivity,
-                                       tumor, pdcfg),
+                                       tumor, pdcfg, drug=dp),
             "ceiling_markers": _ceiling(marker_states, micro.cells.sensitivity,
-                                        tumor, pdcfg),
+                                        tumor, pdcfg, drug=dp),
             "mean_tumor_auc": float(auc_sum["mean_tumor_auc"]),
             "coverage_1x": float(cov["coverage_1x"]),
             "coverage_0.5x": float(cov["coverage_0.5x"]),
@@ -597,7 +607,7 @@ def run_section(key: str, dx_um: float = DX_UM,
                         sensitivity_scalar=s),
                     "ceiling_markers": _ceiling(
                         marker_states, micro.cells.sensitivity, tumor, pdcfg,
-                        sensitivity_scalar=s),
+                        sensitivity_scalar=s, drug=dp),
                 }
             # CI band on the primary (bridged) route.
             lo, hi = mgmt["routes"]["bridged"]["ci95"]

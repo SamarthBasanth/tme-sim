@@ -334,12 +334,12 @@ def drug_panel_block(micro, alpha: float, mean_ecm: float,
     pde = PDEConfig(**PDE_KWARGS)
     rows: List[Dict] = []
     # Distance-from-vessel is GEOMETRY: identical for every drug on this tissue,
-    # and the distance transform is the expensive part of the penetration fit.
-    # Compute it once, from the same p95 vessel threshold compute_all would use.
-    tissue = np.asarray(micro.domain.tissue_mask, dtype=bool)
-    vasc = np.asarray(micro.fields.vascular_density, dtype=np.float64)
-    vm = DM.vessel_mask_from_density(vasc, tissue, percentile=DM.VESSEL_PERCENTILE)
-    distance_um = DM.distance_from_vessel_um(vm["mask"], micro.domain.dx)
+    # and it is the expensive part of the penetration fit. Compute it once.
+    # PRIMARY metric: direct nearest-endothelial-cell distance (see
+    # results/vessel_profile.md's dedicated distance-metric-change section);
+    # this replaces the LEGACY percentile-mask distance compute_all used to
+    # default to.
+    distance_um = DM.direct_vessel_distance_um(micro.domain, DM.endothelial_xy(micro.cells))
     for name in panel:
         dp = calibrated_drugparams(name, alpha)
         dp = apply_barrier_to_drugparams(dp, get_molecule(name))
@@ -1158,9 +1158,12 @@ def write_report(res: Dict, path: str = _OUT_MD,
     A(f"| the perivascular-sink calibration **α = {res['alpha']:.1f}** was fit once "
       "on doxorubicin against section 1 and is **not** refitted here | the drug "
       "IC50s are external (GDSC/literature) and are the same numbers on both |")
-    A("| every threshold in `delivery_metrics` (the p95 vessel threshold, the 1× "
-      "IC50 coverage bar) | `dx = 12 µm` was chosen for grid convergence on "
-      "section 1; convergence is **not** re-established here (§6) |")
+    A("| the fixed thresholds in `delivery_metrics` (the 1× IC50 coverage bar; "
+      "the vessel-distance axis is now the PRIMARY direct-cell metric and has no "
+      "threshold at all — see `results/vessel_profile.md`'s dedicated "
+      "distance-metric-change section) | `dx = 12 µm` was chosen for grid "
+      "convergence on section 1; convergence is **not** re-established here "
+      "(§6) |")
     A("")
 
     # --- §1 -------------------------------------------------------------------

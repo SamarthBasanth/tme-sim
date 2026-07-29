@@ -110,26 +110,52 @@ Neither estimate is obviously wrong -- both are real, sourced, unit-matched
 numbers -- and they bracket the current default from opposite sides by up to
 two orders of magnitude combined. This is a SHARPER, more specific form of
 "uncalibrated" than before (a quantified disagreement range with real sources
-on both ends), not a resolution of it, and no value has been picked. See
+on both ends). See
 ``results/sweep/oxygen_ocr_literature_second_pass_2026-07-29T05-54-00Z.md``.
 
-THE SINK'S FUNCTIONAL FORM IS A SEPARATE, ALSO-UNRESOLVED AXIS
--------------------------------------------------------------------
-This module's sink is first-order in O (``consumption * rho_tum * O``); most of
+**Resolution adopted (see ``results/oxygen_sensitivity_band.md``):** rather than
+pick a single point in this range -- which would be false precision, not a fix
+-- ``consumption`` remains at its current default (0.02, UNCHANGED) and the full
+literature-defensible band this section derives (roughly 0.0002-0.5, combining
+both estimates' brackets) has been swept end-to-end on the real flagship
+reconstruction, for both sink forms, and reported as a sensitivity table. That
+turns "we don't know" into "here is the quantified shape of the disagreement" --
+a real resolution of the uncertainty's SHAPE, even though no single point in the
+band is established as correct without real human GBM pO2 or OCR data this
+project does not have.
+
+THE SINK'S FUNCTIONAL FORM IS A SEPARATE, RELATED AXIS -- NOW AN AVAILABLE OPTION
+-----------------------------------------------------------------------------------
+This module's DEFAULT sink is still first-order in O
+(``consumption * rho_tum * O``, ``OxygenConfig.sink_form = "linear"``); most of
 the cited oxygen-consumption literature (e.g. Grimes, Fletcher & Partridge 2014,
-PMID 26064525) instead uses a Michaelis-Menten form, ``a_max * O/(O + Km)``,
-which does not vanish as O -> 0. A standalone prototype (unmodified
-``solve_oxygen``, Picard-iterated MM sink, real flagship reconstruction) found
-this is NOT a minor correction: sweeping the literature-plausible half-saturation
-range swings the predicted hypoxic tumor FRACTION from the current 0.0 to
-0.69-1.0, the opposite extreme. Neither 0.0 nor 69-100% is obviously correct
-relative to the real human-GBM pO2 literature. This axis and the
-``consumption``-magnitude uncertainty above are COUPLED, not independently
-fixable: recalibrating ``consumption`` alone, without addressing the functional-
-form mismatch, is unlikely to reproduce a realistic pO2 profile. See
-``results/sweep/oxygen_functional_form_prototype_2026-07-29T05-54-00Z.md``.
-Neither the functional form nor ``consumption`` has been changed in this module;
-picking either without the other would be false precision, not a fix.
+PMID 26064525) instead uses a Michaelis-Menten form,
+``consumption * rho_tum * O / (O + mm_half_saturation)``, which does not vanish
+as O -> 0. A standalone prototype (Picard-iterated MM sink, real flagship
+reconstruction) found this is NOT a minor correction: sweeping the literature-
+plausible half-saturation range swings the predicted hypoxic tumor FRACTION from
+0.0 to 0.69-1.0, the opposite extreme, holding ``consumption`` fixed. See
+``results/sweep/oxygen_functional_form_prototype_2026-07-29T05-54-00Z.md`` for
+that prototype and ``results/oxygen_sensitivity_band.md`` for the production
+version's full grid over both this axis and ``consumption`` together.
+
+**What changed in this module:** the Michaelis-Menten form is now an available,
+documented, OPT-IN option -- ``OxygenConfig(sink_form="michaelis_menten")`` --
+solved with a proper Newton-Raphson iteration (see :func:`_solve_michaelis_menten`),
+not the prototype's throwaway Picard script. ``sink_form`` defaults to
+``"linear"``, so every existing call site, test and published ``results/`` number
+is UNCHANGED (:func:`solve_oxygen`'s linear branch is bit-identical to the
+pre-existing code).
+
+**What did NOT change:** which functional form, and which ``consumption`` value,
+is CORRECT for this tissue. Neither 0.0 nor 69-100% hypoxic fraction is obviously
+right relative to the real human-GBM pO2 literature (``results/
+oxygen_calibration_landscape.md`` Sec.1), and the two axes are coupled (Sec.5 of
+the prototype report). Resolving that needs real human GBM pO2 or tissue-level
+OCR data this project does not have -- seeing the disagreement quantified across
+a defensible grid (``results/oxygen_sensitivity_band.md``) is the honest
+resolution available without inventing a number; picking a single point on that
+grid and presenting it as calibrated would be false precision.
 """
 from __future__ import annotations
 
@@ -187,6 +213,13 @@ TUMOR_REFERENCE_AREA_UM2 = 144.0
 #: which independently sets where the SOLVED O actually lands on this new
 #: scale -- see that field's own uncalibrated-level caveat above.
 REFERENCE_PO2_MMHG = 35.0
+
+#: Valid values for ``OxygenConfig.sink_form``. "linear" is the ORIGINAL,
+#: default sink (``consumption * rho_tum * O``); "michaelis_menten" is the
+#: opt-in alternative (``consumption * rho_tum * O / (O + mm_half_saturation)``,
+#: Grimes, Fletcher & Partridge 2014, PMID 26064525). See the module docstring
+#: section "THE SINK'S FUNCTIONAL FORM..." and :func:`solve_oxygen`.
+SINK_FORMS = ("linear", "michaelis_menten")
 
 
 def to_mmhg(oxygen: np.ndarray) -> np.ndarray:
@@ -277,26 +310,147 @@ def _build_laplacian(ny: int, nx: int, dx: float) -> sp.csr_matrix:
     return L
 
 
+def _solve_michaelis_menten(
+    L: sp.csr_matrix,
+    D: float,
+    source: np.ndarray,
+    reaction_bulk: np.ndarray,
+    K: float,
+    max_iter: int,
+    tol: float,
+) -> tuple[np.ndarray, int, float]:
+    """Newton-Raphson solve of the Michaelis-Menten oxygen sink variant.
+
+    Solves, on the flattened (ravel'd) grid::
+
+        D*lap(O) + supply*vasc*(1-O) - consumption*rho_tum*O/(O+K) = 0
+
+    where ``source = supply*vasc`` and ``reaction_bulk = consumption*rho_tum``
+    (both precomputed by the caller). Written as a residual in the same sign
+    convention :func:`solve_oxygen`'s linear branch uses for its ``A @ O = b``::
+
+        R(O) = (-D*L + diag(source)) @ O + reaction_bulk*O/(O+K) - source
+
+    The first term is a FIXED linear operator (``M``, below) -- it does not
+    depend on ``O`` -- so only the sink's derivative changes between iterations.
+    Newton's method linearizes ``R`` about the current iterate::
+
+        J(O) = M + diag(reaction_bulk * K / (O+K)^2)
+
+    since ``d/dO [O/(O+K)] = K/(O+K)^2 > 0``, so ``J`` is ``M`` (already
+    diagonally dominant / SPD-like, same operator the linear sink factors)
+    plus a nonnegative diagonal -- a well-conditioned linear solve at every
+    step, not new numerical machinery. Each step solves ``J @ delta = -R(O)``
+    with the SAME sparse direct solver (`spsolve`) the linear sink uses, then
+    updates ``O <- clip(O + step*delta, 0, 1)`` with a backtracking line
+    search (halve the damping ``step`` until the residual norm decreases) so
+    the iteration cannot diverge even from a poor start; clipping to [0, 1]
+    keeps every intermediate iterate in the domain the O/(O+K) linearization
+    is valid on. Seeded from ``O = 1`` (fully oxygenated; matches the source-
+    only path the linear solve's RHS represents before any sink acts).
+
+    Converges when ``max|delta| < tol``. This is standard Newton-Raphson for a
+    smooth, monotone saturating nonlinearity -- quadratic local convergence, so
+    it is expected (and, on the real flagship reconstruction, measured) to take
+    a handful of iterations rather than the 15-40 Picard iterations the
+    prototype needed for the same problem (``results/sweep/
+    oxygen_functional_form_prototype_2026-07-29T05-54-00Z.md``). Raises
+    ``RuntimeError`` rather than silently returning an unconverged field if
+    ``max_iter`` is exhausted -- an unconverged nonlinear oxygen field is worse
+    than an explicit failure.
+
+    Returns
+    -------
+    (oxygen, n_iter, resid) : the flattened oxygen field, iterations used, and
+    the final max|delta| (for diagnostics / the sensitivity-band report).
+    """
+    if K <= 0.0:
+        raise ValueError(f"mm_half_saturation must be > 0, got {K}")
+    if max_iter < 1:
+        raise ValueError(f"mm_max_iter must be >= 1, got {max_iter}")
+
+    # Fixed linear part of the operator: -D*L + diag(supply*vasc). Assembled
+    # once and reused every Newton step -- only the sink's diagonal changes.
+    M = (-D * L) + sp.diags(source, format="csr")
+
+    def residual(o: np.ndarray) -> np.ndarray:
+        return M @ o + reaction_bulk * o / (o + K) - source
+
+    oxygen = np.ones_like(source)  # warm start: fully oxygenated
+    resid = residual(oxygen)
+    resid_norm = float(np.max(np.abs(resid))) if resid.size else 0.0
+
+    n_iter = 0
+    delta_norm = np.inf
+    for n_iter in range(1, int(max_iter) + 1):
+        deriv = reaction_bulk * K / (oxygen + K) ** 2
+        J = M + sp.diags(deriv, format="csr")
+        delta = spsolve(J.tocsc(), -resid)
+        delta_norm = float(np.max(np.abs(delta))) if delta.size else 0.0
+
+        # Backtracking line search: halve the step until the residual norm
+        # actually decreases (or the step is negligibly small).
+        step = 1.0
+        while True:
+            trial = np.clip(oxygen + step * delta, 0.0, 1.0)
+            trial_resid = residual(trial)
+            trial_norm = float(np.max(np.abs(trial_resid))) if trial_resid.size else 0.0
+            if trial_norm <= resid_norm or step < 1e-4:
+                break
+            step *= 0.5
+
+        oxygen, resid, resid_norm = trial, trial_resid, trial_norm
+
+        if delta_norm * step < tol:
+            break
+    else:
+        raise RuntimeError(
+            f"Michaelis-Menten oxygen sink did not converge in {max_iter} Newton "
+            f"iterations (K={K}, final max|delta|={delta_norm:.3e}, "
+            f"max|residual|={resid_norm:.3e}); increase cfg.mm_max_iter or "
+            f"loosen cfg.mm_tol."
+        )
+
+    return oxygen, n_iter, delta_norm
+
+
 def solve_oxygen(micro: Microenvironment, cfg: OxygenConfig) -> np.ndarray:
     """Solve the steady-state reaction-diffusion oxygen field.
 
-    Solves ``D*lap(O) + supply*vasc*(1-O) - consumption*rho_tum*O = 0`` on the
-    domain grid with no-flux boundaries, where ``vasc`` is
-    ``micro.fields.vascular_density`` (the O2 source) and ``rho_tum`` is the local
-    tumor-cell AREAL density from :func:`_tumor_density` (the O2 sink) -- cells per
-    :data:`TUMOR_REFERENCE_AREA_UM2`, which is independent of the grid spacing.
-    The linear system
+    Solves ``D*lap(O) + supply*vasc*(1-O) - sink(O) = 0`` on the domain grid
+    with no-flux boundaries, where ``vasc`` is ``micro.fields.vascular_density``
+    (the O2 source) and the sink is one of two functional forms selected by
+    ``cfg.sink_form``:
 
-        (-D*L + diag(supply*vasc + consumption*rho_tum)) @ O = supply*vasc
+    - ``"linear"`` (DEFAULT, unchanged behavior): ``sink(O) = consumption*rho_tum*O``,
+      proportional to O everywhere. The resulting linear system
 
-    is symmetric positive-definite and solved directly with a sparse solver.
+          (-D*L + diag(supply*vasc + consumption*rho_tum)) @ O = supply*vasc
+
+      is symmetric positive-definite and solved directly with a single sparse
+      solve -- no iteration, no CFL concern. This branch is BIT-IDENTICAL to the
+      pre-existing code (same operations, same order) for any ``cfg`` that
+      leaves ``sink_form`` at its default.
+    - ``"michaelis_menten"`` (opt-in): ``sink(O) = consumption*rho_tum*O/(O+K)``
+      where ``K = cfg.mm_half_saturation`` (Grimes, Fletcher & Partridge 2014,
+      PMID 26064525). Nonlinear in O, so it is solved by Newton-Raphson
+      iteration (:func:`_solve_michaelis_menten`) reusing the same sparse
+      direct solver at every step. See the module docstring's "THE SINK'S
+      FUNCTIONAL FORM..." section and ``results/oxygen_sensitivity_band.md``
+      for why this is not a minor correction on the real flagship section.
+
+    ``rho_tum`` is the local tumor-cell AREAL density from :func:`_tumor_density`
+    -- cells per :data:`TUMOR_REFERENCE_AREA_UM2`, which is independent of the
+    grid spacing -- for both sink forms.
 
     Parameters
     ----------
     micro : Microenvironment
         Provides the domain, ``fields.vascular_density`` and the cell population.
     cfg : OxygenConfig
-        ``diffusivity`` (um^2/s), ``supply`` and ``consumption`` rate constants.
+        ``diffusivity`` (um^2/s), ``supply`` and ``consumption`` rate constants,
+        plus ``sink_form`` / ``mm_half_saturation`` / ``mm_max_iter`` / ``mm_tol``
+        (only consulted when ``sink_form == "michaelis_menten"``).
 
     Returns
     -------
@@ -319,20 +473,35 @@ def solve_oxygen(micro: Microenvironment, cfg: OxygenConfig) -> np.ndarray:
     D = float(cfg.diffusivity)
     supply = float(cfg.supply)
     consumption = float(cfg.consumption)
+    sink_form = str(getattr(cfg, "sink_form", "linear")).strip().lower()
+    if sink_form not in SINK_FORMS:
+        raise ValueError(f"cfg.sink_form={sink_form!r} must be one of {SINK_FORMS}")
 
     L = _build_laplacian(ny, nx, domain.dx)
 
-    source = (supply * vasc).ravel()                          # RHS b
-    reaction = (supply * vasc + consumption * rho_tum).ravel()  # O-proportional loss
+    source = (supply * vasc).ravel()                    # RHS b == supply*vasc
+    reaction_bulk = (consumption * rho_tum).ravel()      # consumption*rho_tum
 
-    # A = -D * L + diag(reaction). (-L is positive-definite; reaction >= 0.)
-    A = (-D * L) + sp.diags(reaction, format="csr")
-
-    # If there is no source and no reaction anywhere the system is singular; guard.
-    if not np.any(source) and not np.any(reaction):
+    # If there is no source and no tumor sink anywhere the system is singular
+    # for EITHER sink form (both reduce to sink(O) == 0 identically); guard
+    # once, identically, for both. (Equivalent, for "linear", to the original
+    # guard on `not any(source + reaction_bulk)`, since both terms are >= 0.)
+    if not np.any(source) and not np.any(reaction_bulk):
         return domain.zeros()
 
-    oxygen = spsolve(A.tocsc(), source)
+    if sink_form == "linear":
+        reaction = source + reaction_bulk  # O-proportional loss
+        # A = -D * L + diag(reaction). (-L is positive-definite; reaction >= 0.)
+        A = (-D * L) + sp.diags(reaction, format="csr")
+        oxygen = spsolve(A.tocsc(), source)
+    else:
+        K = float(cfg.mm_half_saturation)
+        max_iter = int(cfg.mm_max_iter)
+        tol = float(cfg.mm_tol)
+        oxygen, _n_iter, _resid = _solve_michaelis_menten(
+            L, D, source, reaction_bulk, K, max_iter, tol
+        )
+
     oxygen = np.asarray(oxygen, dtype=np.float64).reshape(ny, nx)
     np.clip(oxygen, 0.0, 1.0, out=oxygen)
     return oxygen

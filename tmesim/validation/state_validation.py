@@ -1788,6 +1788,20 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
       "the quiescent band alone. If the oxygen field or the banding is wrong, "
       "every absolute kill number in this repository inherits the error.")
     A("")
+    A(f"**Note on the {t2['pd_config']['hypoxia_resistance']:g} figure above.** "
+      "That is the GLOBAL `PDConfig` default reported here for context; "
+      "temozolomide specifically now carries a literature-informed PER-DRUG "
+      "override of 0.80 (`core.config.DRUG_LIBRARY`, `PDConfig` docstring; "
+      "`results/sweep/state_multiplier_literature_check_*.md`), converted "
+      "Hill-curve-consistently from real GBM hypoxia-vs-TMZ IC50-shift data at "
+      "this project's own operating point. It changes nothing in THIS report: "
+      "every conclusion above turns on the oxygen-field / cell-state-banding "
+      "machinery upstream of the multiplier, not its value, and (as section 2 "
+      "below and `results/kill_calibration.md` both independently confirm) the "
+      "HYPOXIC band is empty or near-empty on every real section this project "
+      "currently reconstructs, so neither multiplier's value moves any number "
+      "here.")
+    A("")
     A("Both tests drive the **frozen production path** "
       "(`reconstruct.real_pipeline.reconstruct_real` → `physics.solve_oxygen` → "
       "`cells.agents.update_cell_states`). Nothing is re-implemented here.")

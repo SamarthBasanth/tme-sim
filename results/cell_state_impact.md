@@ -12,7 +12,7 @@
 | **Panels that measure hypoxia at all** | 2 of 3 — on the 319-gene flagship section hypoxia is UNMEASURED |
 | **VIABLE-fraction swing across mask x dx (flagship section)** | oxygen **unbounded (the band empties at one setting)**, vessel-distance 1.00x, markers **1.00x** |
 | **Temozolomide kill across routes** | 0.0184 to 0.0315 (1.71x) |
-| **Temozolomide kill CEILING across routes** | 0.5502 to 0.9550 (1.74x) |
+| **Temozolomide kill CEILING across routes** | 0.5502 to 0.9561 (1.74x) |
 | **Cross-drug ranking** | **INVARIANT** across all three routes |
 | **Recommendation** | see §5 |
 
@@ -179,7 +179,7 @@ The **ceiling** is the kill fraction as exposure -> infinity: the Hill term satu
 
 | drug | IC50 (uM) | kill (oxygen) | kill (vessel_distance) | kill (markers) | ceiling (oxygen) | ceiling (vessel_distance) | ceiling (markers) |
 |---|---|---|---|---|---|---|---|
-| temozolomide | 606 | 0.0184 | 0.0315 | 0.0219 | 0.5502 | 0.9550 | 0.6490 |
+| temozolomide | 606 | 0.0184 | 0.0315 | 0.0219 | 0.5502 | 0.9561 | 0.6490 |
 | cisplatin | 24.6 | 0.4362 | 0.7614 | 0.5155 | 0.5502 | 0.9550 | 0.6490 |
 | doxorubicin | 0.5 | 0.2595 | 0.4593 | 0.3073 | 0.5502 | 0.9550 | 0.6490 |
 
@@ -265,7 +265,7 @@ Anything whose numbers depend on the per-cell band occupancy, i.e. on the `PDCon
 python -m tmesim.validation.cell_state_impact
 ```
 
-Deterministic — the only randomness is the engine's seeded generator (`seed = 0`). Runtime ~21 min, dominated by the reconstructions of the two ~800k-cell sections across the dx sweep.
+Deterministic — the only randomness is the engine's seeded generator (`seed = 0`). Runtime ~15 min, dominated by the reconstructions of the two ~800k-cell sections across the dx sweep.
 
 **Files added or changed by this work:**
 

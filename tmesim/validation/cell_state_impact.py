@@ -79,10 +79,11 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from ..cells.agents import update_cell_states
-from ..cells.pkpd import apply_drug_kill
+from ..cells.pkpd import apply_drug_kill, effective_hypoxia_resistance
 from ..core import (
     CellState,
     CellType,
+    DrugParams,
     Microenvironment,
     OxygenConfig,
     PDConfig,
@@ -504,7 +505,8 @@ def _kill_from_states(micro, states: np.ndarray, transport, cfg: SimConfig,
 
 
 def _ceiling_decomposition(states: np.ndarray, sensitivity: np.ndarray,
-                           tumor: np.ndarray, pd: PDConfig) -> Dict:
+                           tumor: np.ndarray, pd: PDConfig,
+                           drug: Optional[DrugParams] = None) -> Dict:
     """The kill CEILING and its per-band decomposition — ``dose_schedule.md`` §1.3.
 
     As exposure -> infinity the Hill term saturates at ``max_kill_rate``, so the
@@ -512,12 +514,19 @@ def _ceiling_decomposition(states: np.ndarray, sensitivity: np.ndarray,
     resistance``. The ceiling is the mean of that over tumour cells and each
     band's contribution is its share of that mean. No dose can exceed it, and for
     a drug with uniform sensitivity it IS the state labelling.
+
+    ``drug``, if given, is resolved through ``cells.pkpd.effective_hypoxia_resistance``
+    so a per-drug ``hypoxia_resistance`` override (temozolomide has one) is
+    honoured -- this reimplements ``apply_drug_kill``'s resistance math in
+    closed form (at infinite exposure) rather than calling it.
     """
+    r_hyp = (effective_hypoxia_resistance(drug, pd) if drug is not None
+             else pd.hypoxia_resistance)
     st = np.asarray(states)[tumor]
     sens = np.asarray(sensitivity, dtype=np.float64)[tumor]
     n = int(st.size)
     res = np.ones(n, dtype=np.float64)
-    res[st == int(CellState.HYPOXIC)] = pd.hypoxia_resistance
+    res[st == int(CellState.HYPOXIC)] = r_hyp
     res[st == int(CellState.QUIESCENT)] = pd.quiescent_resistance
     per_cell = pd.max_kill_rate * sens * res
     per_cell = np.where(st == int(CellState.DEAD), 0.0, per_cell)
@@ -604,7 +613,7 @@ def downstream_effect(
                  else _kill_from_states(
                      micro, states[route], res.transport, cfg, dp)["kill_fraction"])
             ceil = _ceiling_decomposition(
-                states[route], micro.cells.sensitivity, tumor, pdcfg)
+                states[route], micro.cells.sensitivity, tumor, pdcfg, drug=dp)
             per_route[route] = {
                 "kill_fraction": float(k),
                 "ceiling": ceil["ceiling"],

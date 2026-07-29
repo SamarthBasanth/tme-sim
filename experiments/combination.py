@@ -127,7 +127,9 @@ from tmesim.reconstruct.real_pipeline import reconstruct_real, reconstruction_re
 from tmesim.sim.engine import simulate_response
 from tmesim.validation.calibration import calibrate_alpha, calibrated_drugparams
 from tmesim.validation.vessel_profile import (
+    direct_vessel_distance_um,
     distance_from_vessel_um,
+    endothelial_xy,
     vessel_mask_from_density,
 )
 
@@ -397,11 +399,17 @@ def compute_payload(dx_um: float) -> Dict:
             print(f" E[kill]={a['expected_kill']:.4f}  engine={a['engine_kill']:.4f}"
                   f"  mean_auc={a['mean_auc']:.3g}")
 
-    # Vessel-distance map: the delivery axis.
+    # Vessel-distance map: the delivery axis. PRIMARY metric: direct
+    # nearest-endothelial-cell distance (see results/vessel_profile.md's
+    # dedicated distance-metric-change section); replaces the LEGACY
+    # percentile-mask distance this script used before.
     tissue = np.asarray(micro.domain.tissue_mask, dtype=bool)
+    endo_xy = endothelial_xy(micro.cells)
+    dist_field = direct_vessel_distance_um(micro.domain, endo_xy)
+    # LEGACY mask, kept only for the informational area-fraction field below
+    # (cheap: geometry only, no simulation).
     vm = vessel_mask_from_density(micro.fields.vascular_density, tissue,
                                   percentile=VESSEL_PERCENTILE)
-    dist_field = distance_from_vessel_um(vm["mask"], float(micro.domain.dx))
     col, row = micro.domain.to_index(labeled.x, labeled.y)
 
     return dict(
@@ -410,7 +418,10 @@ def compute_payload(dx_um: float) -> Dict:
         extent=tuple(float(v) for v in micro.domain.extent_um),
         cell_dist=dist_field[row, col][tumor],
         s_intrinsic=s_intrinsic,
-        vessel={"area_fraction": vm["area_fraction"], "n_vessel_px": vm["n_vessel_px"]},
+        vessel={"area_fraction": vm["area_fraction"],  # LEGACY mask, reference only
+                "n_vessel_px": vm["n_vessel_px"],       # LEGACY mask, reference only
+                "n_endothelial_cells": int(endo_xy.shape[0]),
+                "distance_metric": "direct-cell (PRIMARY)"},
         hypoxic=float(arms[(DRUGS[0], 1.0)]["hypoxic"]),
     )
 
@@ -988,13 +999,17 @@ def build_markdown(payload: Dict, ana: Dict, n_shuffle: int) -> str:
 
     A("## Where each drug actually kills (the delivery axis)")
     A("")
-    A(f"Vessel mask = the p{VESSEL_PERCENTILE:.0f} threshold on the real "
-      f"endothelial-KDE vascular density "
-      f"({payload['vessel']['area_fraction']*100:.1f}% of tissue area, "
-      f"{payload['vessel']['n_vessel_px']:,} pixels); distance is the Euclidean "
-      f"transform in um. Per tumor-cell distance bin: mean exposure AUC "
-      f"(normalised to the perivascular bin), mean kill probability, and the "
-      f"shared cell-intrinsic factor.")
+    A(f"Distance-to-vessel is the **PRIMARY** metric: a direct nearest-neighbour "
+      f"distance to the nearest real measured endothelial cell "
+      f"({payload['vessel'].get('n_endothelial_cells', 0):,} endothelial cells; no "
+      f"threshold, no mask) — see `results/vessel_profile.md`'s dedicated "
+      f"distance-metric-change section. For reference, the LEGACY "
+      f"p{VESSEL_PERCENTILE:.0f} threshold on the real endothelial-KDE vascular "
+      f"density covers {payload['vessel']['area_fraction']*100:.1f}% of tissue area "
+      f"({payload['vessel']['n_vessel_px']:,} pixels), but that mask is no longer "
+      f"what the distance bins below are computed from. Per tumor-cell distance "
+      f"bin: mean exposure AUC (normalised to the perivascular bin), mean kill "
+      f"probability, and the shared cell-intrinsic factor.")
     A("")
     A(f"Bin widths are 12 um (= dx) out to 120 um, then 40 um, then 100 um: tumor "
       f"cells on this section sit a MEDIAN of {ana['dist_median']:.0f} um from the "
@@ -1078,7 +1093,7 @@ def build_markdown(payload: Dict, ana: Dict, n_shuffle: int) -> str:
     A(f"1. **The delivery gradients are real but nearly IDENTICAL in shape.** All "
       f"three agents' exposure falls to half within "
       f"{min(hr[n]['half_distance_um'] for n in DRUGS):.0f}-"
-      f"{max(hr[n]['half_distance_um'] for n in DRUGS):.0f} um of the vessel mask "
+      f"{max(hr[n]['half_distance_um'] for n in DRUGS):.0f} um of the nearest vessel "
       f"and the normalised profiles lie almost on top of one another. This is the "
       f"confound `results/vessel_profile.md` already documented: with a fast "
       f"perivascular sink the tissue field is close to reaction-dominated "
@@ -1158,11 +1173,16 @@ def build_markdown(payload: Dict, ana: Dict, n_shuffle: int) -> str:
       "uses a static source at the time-averaged plasma level, so schedule "
       "(sequential vs concurrent — which matters enormously in real combination "
       "therapy) cannot be represented at all.")
-    A("- **The vessel mask is a threshold on a 40 um-bandwidth endothelial KDE**, "
-      "not a measured lumen, and `results/vessel_profile.md` documents that most "
-      "of the apparent perivascular gradient on this section is vessel/KDE "
-      "geometry rather than drug transport. The distance axis inherits both "
-      "limitations.")
+    A("- **The distance-to-vessel axis is now the PRIMARY direct-cell metric** "
+      "(a real endothelial cell centroid, not a segmented lumen boundary or a "
+      "KDE threshold — see `results/vessel_profile.md`'s dedicated "
+      "distance-metric-change section for the switch and its effect size). That "
+      "removes the KDE-bandwidth part of the old caveat, not the "
+      "cell-centroid-vs-lumen part. `results/vessel_profile.md` also documents "
+      "that most of the apparent perivascular gradient on this section is "
+      "vascular-source-field geometry (proportional to `vascular_density`, which "
+      "IS still a KDE/discrete field) rather than drug transport; the delivery "
+      "SOURCE term, not the distance axis, carries that limitation now.")
     A("- **Overlap statistics depend on the coupling.** Under independent draws, "
       "overlap shrinks automatically as kill probabilities shrink, which is "
       "precisely why the null RATIOS, not the raw Jaccard, are the reported test "

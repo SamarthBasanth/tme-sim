@@ -122,8 +122,10 @@ from .vessel_profile import (
     MIN_BIN_COUNT,
     NEAR_WINDOW_UM,
     VESSEL_PERCENTILE,
+    direct_vessel_distance_um,
     distance_from_vessel_um,
     distance_profile,
+    endothelial_xy,
     fit_exponential,
     fit_exponential_plus_floor,
     usable_bins,
@@ -420,10 +422,21 @@ def penetration_length_fit(auc_field: np.ndarray,
     """METRIC 4 — the exponential decay length ``L`` (um) of AUC vs
     distance-from-nearest-vessel on the REAL section.
 
-    The vessel mask (a percentile threshold on the measured endothelial-KDE
-    ``vascular_density``), the Euclidean distance transform, the 10 um distance
-    binning and the fits are all REUSED from :mod:`validation.vessel_profile`, so
-    this number cannot drift away from the perivascular-gradient report.
+    **Distance metric (changed 2026-07-29).** When ``distance_um`` is not
+    supplied, this now defaults to the PRIMARY direct nearest-endothelial-cell
+    distance (:func:`validation.vessel_profile.direct_vessel_distance_um`), not
+    the old percentile-mask distance. The old percentile-threshold-on-
+    ``vascular_density`` pipeline (:func:`vessel_mask_from_density` ->
+    :func:`distance_from_vessel_um`, still selectable by passing a
+    percentile-mask ``distance_um`` explicitly) is retained as a documented
+    LEGACY metric; see ``results/vessel_profile.md``'s dedicated "distance
+    metric change" section for the full head-to-head numbers and why the switch
+    was made (a percentile on a density field measures "distance to the
+    densest few percent of the field", not "distance to a vessel", and the two
+    diverge sharply in the tail this metric's own fit is most sensitive to).
+    The 10 um distance binning and the fits are all REUSED from
+    :mod:`validation.vessel_profile`, so this number cannot drift away from the
+    perivascular-gradient report.
 
     Two fits are returned because they answer different questions:
 
@@ -447,9 +460,10 @@ def penetration_length_fit(auc_field: np.ndarray,
     """
     tissue = np.asarray(micro.domain.tissue_mask, dtype=bool)
     vasc = np.asarray(micro.fields.vascular_density, dtype=np.float64)
+    _distance_was_supplied = distance_um is not None
     if distance_um is None:
-        vm = vessel_mask_from_density(vasc, tissue, percentile=vessel_percentile)
-        distance_um = distance_from_vessel_um(vm["mask"], micro.domain.dx)
+        distance_um = direct_vessel_distance_um(micro.domain,
+                                                endothelial_xy(micro.cells))
 
     def _fit(field: np.ndarray) -> Dict:
         prof = distance_profile(field, distance_um, tissue)
@@ -470,6 +484,8 @@ def penetration_length_fit(auc_field: np.ndarray,
         }
 
     out = {"vessel_percentile": float(vessel_percentile),
+           "distance_metric": ("caller-supplied" if _distance_was_supplied
+                               else "direct-cell (PRIMARY)"),
            "min_bin_count": int(MIN_BIN_COUNT),
            "drug": _fit(np.asarray(auc_field, dtype=np.float64))}
     if include_source_null:
@@ -735,10 +751,16 @@ def run(dx_ladder: Sequence[float] = DX_LADDER,
         print(f"  grid {rep['grid']}  {rep['n_cells']:,} real cells "
               f"(tumor {rep['n_tumor']:,})")
         # Geometry: identical for every drug -> compute the distance map ONCE.
+        # PRIMARY metric: direct nearest-endothelial-cell distance (see
+        # results/vessel_profile.md's dedicated distance-metric-change section).
+        endo_xy = endothelial_xy(micro.cells)
+        dist = direct_vessel_distance_um(micro.domain, endo_xy)
+        # LEGACY mask, kept only for the informational area-fraction line below
+        # (cheap: geometry only, no simulation).
         vm = vessel_mask_from_density(micro.fields.vascular_density,
                                       micro.domain.tissue_mask)
-        dist = distance_from_vessel_um(vm["mask"], micro.domain.dx)
-        print(f"  vessel mask: {vm['n_vessel_px']:,} px "
+        print(f"  vessel distance [PRIMARY, direct-cell, {endo_xy.shape[0]:,} "
+              f"endothelial cells]  ·  LEGACY mask: {vm['n_vessel_px']:,} px "
               f"({vm['area_fraction']*100:.1f}% of tissue) at p{vm['percentile']:.0f}")
 
         rows: Dict[str, Dict] = {}
@@ -1346,8 +1368,14 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     A("")
     sn = rows[0]["penetration_length"]["source_null"]
     A(f"`L` is the decaying component of `C₀·exp(−d/L)+floor` fitted to the binned "
-      f"AUC-vs-distance profile at the p{rows[0]['penetration_length']['vessel_percentile']:.0f} "
-      f"vessel threshold ({rows[0]['vessel_area_fraction']*100:.1f}% of tissue area). "
+      f"AUC-vs-distance profile, where distance is now the **PRIMARY** direct "
+      f"nearest-endothelial-cell metric (computed once per grid resolution via "
+      f"`direct_vessel_distance_um` and shared across drugs) — not the LEGACY "
+      f"p{rows[0]['penetration_length']['vessel_percentile']:.0f} "
+      f"percentile-mask threshold this report used before "
+      f"({rows[0].get('vessel_area_fraction', float('nan'))*100:.1f}% of tissue area "
+      f"under that legacy mask, kept here for reference only; see "
+      f"`results/vessel_profile.md` for the full head-to-head). "
       f"**SOURCE NULL** (identical fit on the raw `vascular_density` field): "
       f"L = {sn['L_um']:.1f} µm.")
     A("")

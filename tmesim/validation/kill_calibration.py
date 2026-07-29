@@ -63,7 +63,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from ..cells.agents import update_cell_states
-from ..cells.pkpd import apply_drug_kill
+from ..cells.pkpd import apply_drug_kill, effective_hypoxia_resistance
 from ..core import (
     CellState,
     DrugParams,
@@ -448,10 +448,21 @@ def kill_ratio_to_ic50_fold(ratio: float, c_bath: float, ic50: float,
 # --------------------------------------------------------------------------- #
 # 2. THE DECOMPOSITION
 # --------------------------------------------------------------------------- #
-def resistance_vector(state: np.ndarray, pd_cfg: PDConfig) -> np.ndarray:
-    """The engine's own cell-state resistance multiplier (``pkpd.py`` 135-137)."""
+def resistance_vector(state: np.ndarray, pd_cfg: PDConfig,
+                      drug: Optional[DrugParams] = None) -> np.ndarray:
+    """The engine's own cell-state resistance multiplier (``pkpd.py`` 135-137).
+
+    ``drug``, if given, is resolved through ``cells.pkpd.effective_hypoxia_resistance``
+    so a per-drug ``hypoxia_resistance`` override (temozolomide has one, see
+    ``core.config.DRUG_LIBRARY``) is honoured here too -- this function
+    duplicates ``apply_drug_kill``'s resistance math in closed form rather than
+    calling it, so it must independently resolve the same override or it would
+    silently fall back to the stale global default for every drug.
+    """
+    r_hyp = (effective_hypoxia_resistance(drug, pd_cfg) if drug is not None
+             else pd_cfg.hypoxia_resistance)
     r = np.ones(np.asarray(state).shape, dtype=np.float64)
-    r[state == int(CellState.HYPOXIC)] = pd_cfg.hypoxia_resistance
+    r[state == int(CellState.HYPOXIC)] = r_hyp
     r[state == int(CellState.QUIESCENT)] = pd_cfg.quiescent_resistance
     return r
 
@@ -853,7 +864,7 @@ def run(dx_um: float = DX_UM, drugs: Sequence[str] = DRUGS,
         d["decomposition"] = []
         for lab, cb in zip(labels, baths):
             dec = decompose(e_unit, sens_uniform,
-                            resistance_vector(state_t, pd_cfg),
+                            resistance_vector(state_t, pd_cfg, drug=drug),
                             cb, drug.ic50, drug.hill, pd_cfg.max_kill_rate)
             dec["label"] = lab
             dec["implied_ic50_fold"] = kill_ratio_to_ic50_fold(
@@ -895,6 +906,7 @@ def run(dx_um: float = DX_UM, drugs: Sequence[str] = DRUGS,
         d["_e_unit"] = e_unit
         d["_sens_uniform"] = sens_uniform
         d["_sens_det"] = sens_det
+        d["_drug"] = drug
         per_drug[name] = d
 
     if use_cache:
@@ -989,7 +1001,7 @@ def absolute_kills(res: Dict, anchors: Dict) -> Dict:
     pd_cfg = res["_pd_cfg"]
     labeled = res["_labeled"]
     tumor = res["_tumor"]
-    resist = resistance_vector(np.asarray(labeled.state)[tumor], pd_cfg)
+    state_t = np.asarray(labeled.state)[tumor]
     pm = res["nominal_plasma_mean_uM"]
 
     out: Dict[str, Dict] = {}
@@ -997,6 +1009,10 @@ def absolute_kills(res: Dict, anchors: Dict) -> Dict:
         a = anchors.get(name)
         if a is None:
             continue
+        # per-drug: honours a per-drug hypoxia_resistance override (temozolomide
+        # has one -- see core.config.DRUG_LIBRARY) instead of always using the
+        # global pd_cfg default.
+        resist = resistance_vector(state_t, pd_cfg, drug=d.get("_drug"))
         e_unit, sens = d["_e_unit"], d["_sens_uniform"]
         row = {"anchor": a, "plasma_mean_uM": pm,
                "ic50_library_uM": d["ic50_uM"], "hill": d["hill"]}
@@ -1164,7 +1180,10 @@ def build_markdown(res: Dict, analysis: Dict) -> str:
              "modified.")
     L.append(f"* **Cell-state bands on this section** (from the oxygen solve): "
              f"VIABLE {sb['VIABLE']['fraction']*100:.1f}%, "
-             f"HYPOXIC {sb['HYPOXIC']['fraction']*100:.1f}% (x{pdc['hypoxia_resistance']}), "
+             f"HYPOXIC {sb['HYPOXIC']['fraction']*100:.1f}% (x{pdc['hypoxia_resistance']} "
+             "global default -- temozolomide itself now uses a literature-informed "
+             "per-drug override of x0.80, see `core.config.PDConfig` docstring; "
+             "moot here since this band is empty), "
              f"QUIESCENT {sb['QUIESCENT']['fraction']*100:.1f}% "
              f"(x{pdc['quiescent_resistance']}).\n")
 
@@ -1484,7 +1503,6 @@ def analyse(res: Dict) -> Dict:
     pd_cfg = res["_pd_cfg"]
     labeled, tumor = res["_labeled"], res["_tumor"]
     state_t = np.asarray(labeled.state)[tumor]
-    resist = resistance_vector(state_t, pd_cfg)
 
     A["exvivo"] = ex = exvivo_viability()
     A["anchors"] = anchors = build_anchors(res, ex)
@@ -1498,6 +1516,9 @@ def analyse(res: Dict) -> Dict:
     for name, d in res["per_drug"].items():
         h = d["headline"]
         cb, ic, hh = h["c_bath_uM"], d["ic50_uM"], d["hill"]
+        # per-drug: honours a per-drug hypoxia_resistance override (temozolomide
+        # has one) instead of always using the global pd_cfg default.
+        resist = resistance_vector(state_t, pd_cfg, drug=d.get("_drug"))
         rs = {}
         for tag, pct in (("max", 100.0), ("p95", 95.0)):
             dec = decompose(d["_e_unit"], d["_sens_uniform"], resist, cb, ic, hh,
@@ -1633,7 +1654,13 @@ def _prose(res: Dict, A: Dict) -> Dict:
 
     # bound on how far the cell-state term can possibly move things
     pdc = res["pd_config"]
-    worst_mult = min(pdc["hypoxia_resistance"], pdc["quiescent_resistance"])
+    # This whole function is a TEMOZOLOMIDE-specific narrative (state_dep below
+    # is a TMZ-only sweep), so the bound must use TMZ's own effective hypoxia
+    # multiplier (0.80, a per-drug override -- see core.config.DRUG_LIBRARY),
+    # not the stale GLOBAL pdc["hypoxia_resistance"] default (0.35, still
+    # correct for cisplatin/doxorubicin but not for TMZ).
+    tmz_hyp = effective_hypoxia_resistance(tmz.get("_drug"), res["_pd_cfg"])
+    worst_mult = min(tmz_hyp, pdc["quiescent_resistance"])
     state_bound = 1.0 / worst_mult
     sd = A["state_dep"]
     state_realised = (max(r["kill_3d"] for r in sd)
@@ -1680,7 +1707,8 @@ def _prose(res: Dict, A: Dict) -> Dict:
         f"anchor itself.\n>\n"
         f"> **The surprise is which term blocks it — with one important "
         f"qualification.** The cell-state label is "
-        f"*bounded by construction*: the multipliers are x{pdc['hypoxia_resistance']} "
+        f"*bounded by construction*: the multipliers are x{tmz_hyp:g} (temozolomide's "
+        f"own per-drug hypoxia_resistance, see `core.config.DRUG_LIBRARY`) "
         f"and x{pdc['quiescent_resistance']}, so no revision of *which* cells are "
         f"labelled quiescent can move absolute kill by more than "
         f"**{state_bound:.1f}x**, and over the full 0-100 % quiescent sweep it "
@@ -1689,8 +1717,12 @@ def _prose(res: Dict, A: Dict) -> Dict:
         f"anchor's inter-patient spread than by the cell-state label** — which "
         f"inverts the expectation in `results/dose_schedule.md`. What the "
         f"cell-state work must deliver is not primarily the *fraction* but a "
-        f"defence of the *multipliers themselves* (x0.35 / x0.5), which are "
-        f"unvalidated priors in `PDConfig` and are NOT bounded by anything above.\n>\n"
+        f"defence of the *multipliers themselves* (x{tmz_hyp:g} / "
+        f"x{pdc['quiescent_resistance']}), which are "
+        f"unvalidated priors in `PDConfig` and are NOT bounded by anything above "
+        f"(the hypoxia one specifically now has a literature-informed conversion "
+        f"behind it for TMZ, see that field's docstring, though it remains a "
+        f"modelling judgement call, not a citation lookup).\n>\n"
         f"> **Independently corroborated.** The concurrent cell-state workstream "
         f"(`results/cell_state_impact.md`, landed during this run) measures the same "
         f"term three different ways on the same section and gets "
@@ -1923,7 +1955,8 @@ def _prose(res: Dict, A: Dict) -> Dict:
 
     blocking_commentary = (
         f"**The bound.** Because the engine applies cell state as a bounded "
-        f"multiplier (x{pdc['hypoxia_resistance']} hypoxic, "
+        f"multiplier (x{tmz_hyp:g} hypoxic for temozolomide specifically -- its own "
+        f"per-drug override, `core.config.DRUG_LIBRARY` -- "
         f"x{pdc['quiescent_resistance']} quiescent, x1 viable), relabelling cells "
         f"can move `F_state` only between {worst_mult:g} and 1.0. Over the full "
         f"0-100 % quiescent sweep above, temozolomide's absolute 3-D kill moves "

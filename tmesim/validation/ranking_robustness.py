@@ -92,7 +92,7 @@ import numpy as np
 from scipy import stats
 
 from ..cells.agents import update_cell_states
-from ..cells.pkpd import apply_drug_kill
+from ..cells.pkpd import apply_drug_kill, effective_hypoxia_resistance
 from ..core import CellState, DrugParams, OxygenConfig, PDConfig, PDEConfig, SimConfig
 from ..molecular import potency as _potency
 from ..molecular.binding_site_barrier import apply_barrier_to_drugparams
@@ -400,7 +400,7 @@ def build_kernels(
             times = np.asarray(res.transport.times, dtype=np.float64)
             duration = float(times[-1]) if times.size and times[-1] > 0.0 else 1.0
             resistance = np.ones(states.size, dtype=np.float64)
-            resistance[states == CellState.HYPOXIC] = pd_cfg.hypoxia_resistance
+            resistance[states == CellState.HYPOXIC] = effective_hypoxia_resistance(dp, pd_cfg)
             resistance[states == CellState.QUIESCENT] = pd_cfg.quiescent_resistance
             sr = np.asarray(micro.cells.sensitivity, dtype=np.float64) * resistance
             out[name] = KillKernel(

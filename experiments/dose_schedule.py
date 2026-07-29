@@ -100,9 +100,10 @@ import numpy as np
 from matplotlib.lines import Line2D
 
 from tmesim.cells.agents import update_cell_states
-from tmesim.cells.pkpd import apply_drug_kill
+from tmesim.cells.pkpd import apply_drug_kill, effective_hypoxia_resistance
 from tmesim.core import (
     CellState,
+    DrugParams,
     Microenvironment,
     PDConfig,
     PDEConfig,
@@ -125,9 +126,11 @@ from tmesim.sim.engine import simulate_response
 from tmesim.treatment.drugs import delivery_source, plasma_profile
 from tmesim.validation.calibration import calibrate_alpha, calibrated_drugparams
 from tmesim.validation.vessel_profile import (
+    direct_vessel_distance_um,
     distance_from_vessel_um,
     distance_profile,
     empirical_half_distance_um,
+    endothelial_xy,
     fit_exponential,
     fit_exponential_plus_floor,
     usable_bins,
@@ -377,7 +380,7 @@ def kill_at(work, labeled_cells, tr: TransportResult, drug, pd_cfg: PDConfig,
     )
 
 
-def kill_ceiling(labeled_cells, pd_cfg: PDConfig) -> float:
+def kill_ceiling(labeled_cells, pd_cfg: PDConfig, drug: Optional[DrugParams] = None) -> float:
     """The maximum kill fraction ANY dose can reach on this tumor.
 
     As exposure -> infinity the Hill term saturates at ``pd.max_kill_rate`` and the
@@ -385,10 +388,18 @@ def kill_ceiling(labeled_cells, pd_cfg: PDConfig) -> float:
     ``R`` the hypoxia / quiescence resistance factor. Averaged over tumor cells
     this is the asymptote of the dose-response curve — a property of the
     SENSITIVITY MODEL and the tissue's oxygenation, not of delivery.
+
+    ``drug``, if given, is resolved through ``cells.pkpd.effective_hypoxia_resistance``
+    so a per-drug ``hypoxia_resistance`` override (temozolomide has one) is
+    honoured -- this reimplements ``apply_drug_kill``'s resistance math in
+    closed form (at infinite exposure) rather than calling it, so it must
+    resolve the same override independently.
     """
+    r_hyp = (effective_hypoxia_resistance(drug, pd_cfg) if drug is not None
+             else pd_cfg.hypoxia_resistance)
     tumor = labeled_cells.tumor_mask()
     resistance = np.ones(labeled_cells.n, dtype=np.float64)
-    resistance[labeled_cells.state == CellState.HYPOXIC] = pd_cfg.hypoxia_resistance
+    resistance[labeled_cells.state == CellState.HYPOXIC] = r_hyp
     resistance[labeled_cells.state == CellState.QUIESCENT] = pd_cfg.quiescent_resistance
     p = np.clip(pd_cfg.max_kill_rate * labeled_cells.sensitivity * resistance, 0.0, 1.0)
     bands = {"VIABLE": None, "HYPOXIC": CellState.HYPOXIC,
@@ -405,7 +416,7 @@ def kill_ceiling(labeled_cells, pd_cfg: PDConfig) -> float:
             mean_p=float(pt[sel].mean()) if sel.any() else 0.0,
             contribution=float(pt[sel].sum()) / n_t,
             resistance_multiplier=(1.0 if code is None else
-                                   (pd_cfg.hypoxia_resistance
+                                   (r_hyp
                                     if code == CellState.HYPOXIC
                                     else pd_cfg.quiescent_resistance)),
         )
@@ -635,11 +646,18 @@ def run(dx_um: float = DX_UM) -> Dict:
             print(f"      !! {name}: {info.get('comparability')}")
 
     # Vessel-distance map (shared by both drugs; depends only on the tissue).
+    # PRIMARY metric: direct nearest-endothelial-cell distance (see
+    # results/vessel_profile.md's dedicated distance-metric-change section);
+    # replaces the LEGACY percentile-mask distance this script used before.
+    endo_xy = endothelial_xy(micro.cells)
+    distance_um = direct_vessel_distance_um(micro.domain, endo_xy)
+    # LEGACY mask, kept only for the informational area-fraction metadata below
+    # (cheap: geometry only, no simulation).
     vmask = vessel_mask_from_density(micro.fields.vascular_density,
                                      micro.domain.tissue_mask)
-    distance_um = distance_from_vessel_um(vmask["mask"], dx_um)
-    print(f"    vessel mask: {vmask['area_fraction']*100:.1f}% of tissue "
-          f"(p{vmask['percentile']:.0f} of vascular density)")
+    print(f"    vessel distance [PRIMARY, direct-cell, {endo_xy.shape[0]:,} "
+          f"endothelial cells]  ·  LEGACY mask: {vmask['area_fraction']*100:.1f}% "
+          f"of tissue (p{vmask['percentile']:.0f} of vascular density)")
 
     pde_dose = PDEConfig(dt=DT_S, total_time=WINDOW_DOSE_S, convection=True,
                          save_every=10, time_resolved=TIME_RESOLVED)
@@ -668,8 +686,9 @@ def run(dx_um: float = DX_UM) -> Dict:
             mean_oxygen=float(rep["mean_oxygen"]),
             hypoxic_tumor_fraction=hypoxic_frac,
             quiescent_tumor_fraction=quiescent_frac,
-            vessel_area_fraction=float(vmask["area_fraction"]),
-            vessel_percentile=float(vmask["percentile"]),
+            vessel_area_fraction=float(vmask["area_fraction"]),  # LEGACY mask, reference only
+            vessel_percentile=float(vmask["percentile"]),  # LEGACY mask, reference only
+            distance_metric="direct-cell (PRIMARY)",
             distance_median_um=float(np.median(distance_um[np.asarray(
                 micro.domain.tissue_mask, dtype=bool)])),
             distance_p90_um=float(np.percentile(distance_um[np.asarray(
@@ -687,7 +706,7 @@ def run(dx_um: float = DX_UM) -> Dict:
         # This drug's own per-cell sensitivity, on the oxygen-labeled cells.
         labeled = labeled_base.copy()
         labeled.sensitivity = sens_by_drug[name].copy()
-        ceiling, ceiling_breakdown = kill_ceiling(labeled, pd_cfg)
+        ceiling, ceiling_breakdown = kill_ceiling(labeled, pd_cfg, drug=drug)
         print(f"\n[4] {name}: D={drug.diffusivity:.1f} um^2/s  IC50={drug.ic50:.2f} uM  "
               f"hill={drug.hill}  bbb={drug.bbb_penetrance:.3f}  "
               f"k_loss={k_loss:.3e} /s  (tau = {1.0/k_loss:.0f} s)")
@@ -1423,10 +1442,15 @@ def write_report(out: Dict, path: str) -> None:
       "geometry-only effect on coverage is <= 0.0166). To recover the old numbers, re-run "
       "with `mode='kde'`.")
     A(">")
-    A(f"> Note the consequence of promotion: the p{meta['vessel_percentile']:.0f} "
-      f"'vessel mask' used for the depth statistics resolves to "
+    A(f"> **Depth/distance statistics now use the PRIMARY metric** — direct "
+      "nearest-endothelial-cell distance, not a percentile-threshold vessel mask "
+      "(see `results/vessel_profile.md`'s dedicated distance-metric-change "
+      f"section). For reference, the LEGACY p{meta['vessel_percentile']:.0f} "
+      f"percentile mask this script used before resolves to "
       f"**{meta['vessel_area_fraction']*100:.1f}% of tissue**, i.e. essentially the "
-      f"segmented vessel mask itself, rather than the broad p95 contour of a smooth KDE.")
+      "segmented vessel mask itself, rather than the broad p95 contour of a smooth "
+      "KDE — but that number is no longer what the depth statistics below are "
+      "computed from.")
     A("")
     A("**Predicted dose-response, fractionation and infusion-duration behaviour for "
       "temozolomide and cisplatin on the real 10x Xenium glioblastoma section.** This "
@@ -1512,16 +1536,21 @@ def write_report(out: Dict, path: str) -> None:
       f"oxygen solve {meta['hypoxic_tumor_fraction']*100:.1f}% of tumor cells are hypoxic "
       f"and {meta['quiescent_tumor_fraction']*100:.1f}% quiescent (both carry reduced "
       f"drug kill).")
-    A(f"* **Vascular geometry.** Vessel mask = top {100 - meta['vessel_percentile']:.0f}% "
-      f"of the endothelial-derived vascular-density field "
-      f"({meta['vessel_area_fraction']*100:.1f}% of tissue area). Distance from the "
-      f"nearest vessel over tissue: median "
+    A(f"* **Vascular geometry.** Distance from the nearest vessel is now the "
+      f"**PRIMARY** metric — direct distance to the nearest real measured "
+      f"endothelial cell (`{meta.get('distance_metric', 'direct-cell (PRIMARY)')}`), "
+      f"not a percentile-threshold mask (see `results/vessel_profile.md`'s "
+      f"dedicated distance-metric-change section). Over tissue: median "
       f"{meta.get('distance_median_um', float('nan')):.0f} um, p90 "
       f"{meta.get('distance_p90_um', float('nan')):.0f} um, max "
-      f"{meta.get('distance_max_um', float('nan')):.0f} um. This is the geometry the "
-      f"drug's penetration has to cover — though see section 3: on this section most of "
-      f"the far tissue is reached by a diffuse source floor rather than by a diffusion "
-      f"front, which changes how that comparison should be read.")
+      f"{meta.get('distance_max_um', float('nan')):.0f} um. For reference, the "
+      f"LEGACY top {100 - meta['vessel_percentile']:.0f}% percentile-threshold mask "
+      f"on the endothelial-derived vascular-density field covers "
+      f"{meta['vessel_area_fraction']*100:.1f}% of tissue area. The PRIMARY distance "
+      f"is the geometry the drug's penetration has to cover — though see section 3: "
+      f"on this section most of the far tissue is reached by a diffuse source floor "
+      f"rather than by a diffusion front, which changes how that comparison should "
+      f"be read.")
     A(f"* **Drugs.** `calibrated_drugparams(name, alpha = {meta['alpha']:.2f})` "
       "(single perivascular-sink constant, fit once on doxorubicin) then "
       "`apply_barrier_to_drugparams` — the identical compilation pipeline "
@@ -2479,8 +2508,10 @@ def write_report(out: Dict, path: str) -> None:
     A("6. **The perivascular gradient partly inherits the source-field shape** (the "
       "source-null column in section 3). Depth numbers are order-of-magnitude.")
     A("7. **Vascular density is a KDE of measured endothelial cell positions**, not a "
-      "measured vessel lumen or a measured perfusion map; the vessel mask is a "
-      f"percentile threshold (p{meta['vessel_percentile']:.0f}).")
+      "measured vessel lumen or a measured perfusion map. The depth/distance axis "
+      "(item above) is now the PRIMARY direct-cell distance rather than a "
+      f"percentile-threshold mask (LEGACY, p{meta['vessel_percentile']:.0f}, kept "
+      "only for reference); neither is a measured vessel lumen segmentation.")
     A("8. **Single section, single patient, 2D.** No inter-patient variability, no "
       "out-of-plane transport, and the nominal plasma level is a shared reference rather "
       "than a per-drug clinical PK model — supratherapeutic for cisplatin in particular.")

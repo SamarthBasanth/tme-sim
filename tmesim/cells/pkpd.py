@@ -39,7 +39,11 @@ The Hill probability is then modulated multiplicatively::
 
 * ``sensitivity`` — per-cell intrinsic sensitivity in [0,1] (MGMT status,
   resistance clones, ...). A fully resistant cell (0) is never killed.
-* ``R_hypoxia   = pd.hypoxia_resistance``   if the cell is HYPOXIC else 1.0.
+* ``R_hypoxia   = effective_hypoxia_resistance(drug, pd)`` if the cell is
+  HYPOXIC else 1.0 — i.e. ``drug.hypoxia_resistance`` when the drug sets a
+  PER-DRUG override (temozolomide does, see ``core.config.DRUG_LIBRARY`` and
+  ``core.config.PDConfig`` docstrings for the literature-derived operating-point
+  conversion), else the global ``pd.hypoxia_resistance`` default.
 * ``R_quiescence = pd.quiescent_resistance`` if the cell is QUIESCENT else 1.0.
 
 Both resistance factors are < 1, so hypoxic / quiescent cells survive more often
@@ -80,6 +84,26 @@ from ..core import (
     PDConfig,
     TransportResult,
 )
+
+
+def effective_hypoxia_resistance(drug: DrugParams, pd: PDConfig) -> float:
+    """Resolve the hypoxia-kill multiplier actually in force for ``drug``.
+
+    ``drug.hypoxia_resistance`` (see ``core.config.DrugParams`` docstring) is a
+    per-drug override: if set (not ``None``), it wins over the global
+    ``pd.hypoxia_resistance`` default. Only temozolomide sets it in
+    ``core.config.DRUG_LIBRARY`` as of the literature-informed recalibration in
+    ``results/sweep/state_multiplier_literature_check_*.md`` / ``PDConfig``'s own
+    docstring; every other drug falls through to the (still-uncited)
+    ``pd.hypoxia_resistance`` default unchanged. Any module that recomputes the
+    hypoxia/quiescence resistance vector directly instead of going through
+    :func:`apply_drug_kill` (several ``tmesim.validation`` reports do, for
+    closed-form ceiling/decomposition math that never calls the Bernoulli-kill
+    path) MUST call this instead of reading ``pd.hypoxia_resistance`` directly,
+    or it will silently ignore the per-drug override.
+    """
+    override = getattr(drug, "hypoxia_resistance", None)
+    return float(override) if override is not None else float(pd.hypoxia_resistance)
 
 
 def apply_drug_kill(
@@ -155,8 +179,9 @@ def apply_drug_kill(
     p_hill = pd.max_kill_rate * E_h / (E50_h + E_h + 1e-300)
 
     # --- modulation: sensitivity + hypoxia / quiescence resistance -----------
+    r_hypoxia = effective_hypoxia_resistance(drug, pd)
     resistance = np.ones(n, dtype=np.float64)
-    resistance[cells.state == CellState.HYPOXIC] = pd.hypoxia_resistance
+    resistance[cells.state == CellState.HYPOXIC] = r_hypoxia
     resistance[cells.state == CellState.QUIESCENT] = pd.quiescent_resistance
 
     modulation = cells.sensitivity * resistance
@@ -191,7 +216,7 @@ def apply_drug_kill(
             "hill": h,
             "max_kill_rate": float(pd.max_kill_rate),
             "duration_s": duration,
-            "hypoxia_resistance": float(pd.hypoxia_resistance),
+            "hypoxia_resistance": float(r_hypoxia),
             "quiescent_resistance": float(pd.quiescent_resistance),
         })
 

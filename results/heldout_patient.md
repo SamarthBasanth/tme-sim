@@ -2,7 +2,7 @@
 
 Every validated result in this project was developed on **one** tissue: the 319-gene 10x Xenium GBM section (40,887 cells). This report re-runs the entire pipeline — reconstruction, vessel segmentation, the five-drug simulation and the hypoxia check — on a **second real patient the pipeline was never developed on**: the 480-gene Immuno-Oncology Xenium GBM section (816,769 cells). Both sections are driven through the identical frozen production path at the identical settings, so **section 1's numbers here are re-derived, not quoted**.
 
-**4 of 7 claims that could be scored as generalisation replicate.** A further 2 fail on **both** sections — those are not generalisation failures, they are claims that do not hold in this configuration at all, and they are called out separately because conflating the two would be the easiest way to make this report say something it should not. The headline, one line each:
+**3 of 7 claims that could be scored as generalisation replicate.** A further 2 fail on **both** sections — those are not generalisation failures, they are claims that do not hold in this configuration at all, and they are called out separately because conflating the two would be the easiest way to make this report say something it should not. The headline, one line each:
 
 | what | section 1 (development) | section 2 (held out) | verdict |
 |---|---|---|:--|
@@ -10,7 +10,7 @@ Every validated result in this project was developed on **one** tissue: the 319-
 | ENDOTHELIAL areal density (the oxygen/drug SOURCE) is comparable | 153.94 cells/mm2 | 645.15 cells/mm2 | **CONTEXT** |
 | Vascular area fraction matches measured 2.1 +/- 0.3% (PMID 36611806) | 1.25 % | 10.98 % | **DOES NOT REPLICATE** |
 | MVD lands in the published human GBM range 35-95/mm2 (PMID 27583442) | 110.79 vessels/mm2 | 233.27 vessels/mm2 | **NOT REPRODUCED ON EITHER** |
-| Kill ordering is cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide  | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide  | **REPLICATES** |
+| Kill ordering is cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide  | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate  | **DOES NOT REPLICATE** |
 | therapeutic_coverage @1x IC50 recovers the kill ordering | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate  | cisplatin > lomustine > doxorubicin > temozolomide > methotrexate  | **NOT REPRODUCED ON EITHER** |
 | therapeutic_coverage @1x IC50 is still a DISCRIMINATING headline metric | 3/5 drugs pinned at 0 or >0.9  | 5/5 drugs pinned at 0 or >0.9  | **DOES NOT REPLICATE** |
 | The ordering is NOT simply the IC50 ordering read back out | doxorubicin > methotrexate > cisplatin > lomustine > temozolomide  | doxorubicin > methotrexate > cisplatin > lomustine > temozolomide  | **HOLDS** |
@@ -158,7 +158,7 @@ Five drugs, **uniform** per-cell sensitivity (the only fair cross-drug mode — 
 
 | drug | IC50 (µM) | BBB | D_eff (µm²/s) | mean tumour AUC (µM·s) | **coverage @1× IC50** | coverage @0.5×/2× | median E/IC50 | **kill** |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| temozolomide | 606.047 | 0.125 | 201.7 | 2.87e+06 | **0.0000** | 0.000 / 0.000 | 0.21 | **0.0644** |
+| temozolomide | 606.047 | 0.125 | 201.7 | 2.87e+06 | **0.0000** | 0.000 / 0.000 | 0.21 | **0.0797** |
 | lomustine | 50 | 0.973 | 188.1 | 3.46e+06 | **0.9702** | 0.998 / 0.819 | 3.04 | **0.3486** |
 | cisplatin | 24.5503 | 0.858 | 171.4 | 6.79e+06 | **0.9987** | 0.999 / 0.999 | 12.30 | **0.4248** |
 | methotrexate | 12 | 0.023 | 144.3 | 5.8e+04 | **0.0000** | 0.012 / 0.000 | 0.21 | **0.0657** |
@@ -168,7 +168,7 @@ Five drugs, **uniform** per-cell sensitivity (the only fair cross-drug mode — 
 
 | ranked by | section 1 | section 2 (HELD OUT) | same? |
 |---|---|---|:--:|
-| simulated **kill** | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | ✅ |
+| simulated **kill** | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate | ❌ |
 | **coverage @1× IC50** | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate | cisplatin > lomustine > doxorubicin > temozolomide > methotrexate | ❌ |
 | mean tumour AUC (delivery alone) | cisplatin > lomustine > temozolomide > methotrexate > doxorubicin | cisplatin > lomustine > temozolomide > methotrexate > doxorubicin | ✅ |
 | 1/IC50 (potency alone) | doxorubicin > methotrexate > cisplatin > lomustine > temozolomide | doxorubicin > methotrexate > cisplatin > lomustine > temozolomide | ✅ |
@@ -178,7 +178,7 @@ Five drugs, **uniform** per-cell sensitivity (the only fair cross-drug mode — 
 
 **Published ordering** (`results/real_drug_panel.md`, uniform mode): cisplatin > doxorubicin > lomustine > methotrexate > temozolomide. Section 1's kill fractions here (temozolomide 0.0184, lomustine 0.2371, cisplatin 0.4362, methotrexate 0.0192, doxorubicin 0.2595) reproduce that report's numbers exactly, which is the check that this harness is running the same pipeline and not a variant of it.
 
-**The kill ordering is IDENTICAL on both patients.** That is the headline, and the immediate next question is whether it is identical for a *trivial* reason.
+**The kill ordering CHANGES on the second patient.** A different ordering on a different real tumour is a legitimate finding — real inter-patient heterogeneity — not a failure. What follows is the check on whether the change is biology or bookkeeping.
 
 ### 3.4 Is the ordering trivially the IC50 ordering?
 
@@ -188,13 +188,13 @@ An ordering that just reproduces the potency ranking would be reproducible by a 
 |---|---:|---:|
 | IC50 fold range across the panel | 1212× | 1212× |
 | mean-tumour-AUC fold range | 158× | 161× |
-| ρ(kill, 1/IC50) — potency alone | +0.50 | +0.50 |
-| ρ(kill, mean AUC) — delivery alone | +0.30 | +0.30 |
-| ρ(kill, AUC/IC50) — the product | +1.00 | +1.00 |
-| kill spread (max − min) | 0.418 | 0.360 |
+| ρ(kill, 1/IC50) — potency alone | +0.50 | +0.20 |
+| ρ(kill, mean AUC) — delivery alone | +0.30 | +0.40 |
+| ρ(kill, AUC/IC50) — the product | +1.00 | +0.90 |
+| kill spread (max − min) | 0.418 | 0.359 |
 | coverage spread (max − min) | 0.995 | 0.999 |
 
-**It is NOT the IC50 ordering.** Potency alone would rank doxorubicin > methotrexate > cisplatin > lomustine > temozolomide; the simulation ranks cisplatin > doxorubicin > lomustine > methotrexate > temozolomide. Delivery spans 161× and potency 1212×, and the product AUC/IC50 tracks kill at ρ = +1.00 — the delivery × potency claim from `results/SESSION_AUDIT.md` §4 survives on the held-out patient.
+**It is NOT the IC50 ordering.** Potency alone would rank doxorubicin > methotrexate > cisplatin > lomustine > temozolomide; the simulation ranks cisplatin > doxorubicin > lomustine > temozolomide > methotrexate. Delivery spans 161× and potency 1212×, and the product AUC/IC50 tracks kill at ρ = +0.90 — the delivery × potency claim from `results/SESSION_AUDIT.md` §4 survives on the held-out patient.
 
 ### 3.5 Why the absolute numbers move so much, and why that is NOT a ranking result
 
@@ -322,14 +322,14 @@ State occupancy over all cells at this configuration: **VIABLE** 0.00%, **HYPOXI
 | cisplatin — mean tumour AUC (µM·s) | 1.82e+06 | 6.79e+06 | 3.73× |
 | methotrexate — mean tumour AUC (µM·s) | 1.57e+04 | 5.8e+04 | 3.68× |
 | doxorubicin — mean tumour AUC (µM·s) | 1.15e+04 | 4.22e+04 | 3.67× |
-| temozolomide — kill | 0.0184 | 0.0644 | 3.51× |
+| temozolomide — kill | 0.0184 | 0.0797 | 4.34× |
 | lomustine — kill | 0.2371 | 0.3486 | 1.47× |
 | cisplatin — kill | 0.4362 | 0.4248 | 0.97× |
 | methotrexate — kill | 0.0192 | 0.0657 | 3.42× |
 | doxorubicin — kill | 0.2595 | 0.3603 | 1.39× |
-| kill ordering | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | **IDENTICAL** |
+| kill ordering | cisplatin > doxorubicin > lomustine > methotrexate > temozolomide | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate | **DIFFERENT** |
 | coverage ordering | cisplatin > doxorubicin > lomustine > temozolomide > methotrexate | cisplatin > lomustine > doxorubicin > temozolomide > methotrexate | **DIFFERENT** |
-| ρ(kill, AUC/IC50) | +1.00 | +1.00 | delivery × potency |
+| ρ(kill, AUC/IC50) | +1.00 | +0.90 | delivery × potency |
 | **HYPOXIA** | | | |
 | hypoxia-response genes on panel | none | VEGFA, HIF1A | the 319 panel cannot test this at all |
 | ρ(simulated O₂, hypoxia score) | n/a | -0.1523 |  |
@@ -344,13 +344,13 @@ State occupancy over all cells at this configuration: **VIABLE** 0.00%, **HYPOXI
 Two of these are confirmations of a *negative* result — the hypoxia rows confirm that the reaction-diffusion solve is out-predicted by a distance transform. 'Confirmed' means the prior finding reproduced, not that the model performed well.
 
 * **ENDOTHELIAL fraction matches human volume-EM 8.0% (PMID 38723085)** — 7.07% is 1.13x from 8.0% (inside the declared 1.5x tolerance); section 1 was 10.50% (1.31x)
-* **Kill ordering is cisplatin > doxorubicin > lomustine > methotrexate > temozolomide** — identical on both sections
-* **The ordering is NOT simply the IC50 ordering read back out** — potency alone would rank doxorubicin > methotrexate > cisplatin > lomustine > temozolomide; the simulation ranks cisplatin > doxorubicin > lomustine > methotrexate > temozolomide. rho(kill, 1/IC50) = +0.50, rho(kill, AUC/IC50) = +1.00
+* **The ordering is NOT simply the IC50 ordering read back out** — potency alone would rank doxorubicin > methotrexate > cisplatin > lomustine > temozolomide; the simulation ranks cisplatin > doxorubicin > lomustine > temozolomide > methotrexate. rho(kill, 1/IC50) = +0.20, rho(kill, AUC/IC50) = +0.90
 * **VEGFA is the most anti-correlated gene on the panel; HIF1A is null** — VEGFA rho -0.2004, HIF1A rho +0.0140
 
 ### 6.2 Does NOT generalise
 
 * **Vascular area fraction matches measured 2.1 +/- 0.3% (PMID 36611806)** — 10.98% vs 2.1% is 5.23x and lies OUTSIDE the published 1.8-2.4% band; section 1 gave 1.25% (0.59x, also outside but only just)
+* **Kill ordering is cisplatin > doxorubicin > lomustine > methotrexate > temozolomide** — section 2 reorders to cisplatin > doxorubicin > lomustine > temozolomide > methotrexate
 * **therapeutic_coverage @1x IC50 is still a DISCRIMINATING headline metric** — coverage has saturated at BOTH ends in this configuration — every drug is either effectively 0 or above 0.9, on both sections — so it is behaving as a binary indicator rather than a graded metric. `results/delivery_metrics.md` flagged this saturation as a 'latent, not active' weakness; at this exposure scale it is ACTIVE.
 * **Simulated oxygen is BEATEN by a distance-to-nearest-vessel baseline (state_validation.md Test 1)** — the solved field now wins
 
@@ -370,7 +370,7 @@ These are the rows where the held-out patient behaved exactly like the developme
 
 ### 6.5 The one-paragraph reading
 
-**The response layer travels; the reconstruction layer does not.** The drug ordering and the delivery × potency structure behind it survive a second real patient on a different panel — but they were always going to be robust, because they are dominated by drug properties (IC50, BBB penetrance, molecular weight) that are identical on both sections, and the tissue only modulates them. The quantities that are genuinely *about the tissue* — the endothelial cell-type fraction and the vascular area fraction, i.e. the two numbers this project cites as its external validations — are the ones that fail to replicate. That is the honest asymmetry, and it points at where the next work is: the reconstruction's external anchors are section-specific, and the two constants that produce them (the typing threshold and the 7.5 µm vessel radius) are entangled with the grid and with panel sparsity in a way that a single section could never expose.
+**The response ordering moved, and the reconstruction layer did not travel either.** The drug ordering and the delivery × potency structure behind it survive a second real patient on a different panel — but they were always going to be robust, because they are dominated by drug properties (IC50, BBB penetrance, molecular weight) that are identical on both sections, and the tissue only modulates them. The quantities that are genuinely *about the tissue* — the endothelial cell-type fraction and the vascular area fraction, i.e. the two numbers this project cites as its external validations — are the ones that fail to replicate. That is the honest asymmetry, and it points at where the next work is: the reconstruction's external anchors are section-specific, and the two constants that produce them (the typing threshold and the 7.5 µm vessel radius) are entangled with the grid and with panel sparsity in a way that a single section could never expose.
 
 ## 7. Caveats — what could make these conclusions wrong
 
@@ -390,7 +390,7 @@ These are the rows where the held-out patient behaved exactly like the developme
 ./.venv/bin/python -m tmesim.validation.heldout_patient
 ```
 
-Deterministic (`seed = 0` in every `SimConfig`; permutation seed 0). Runtime 26 min, dominated by 10 PDE solves — 16 min of it on section 2's 905×956 grid.
+Deterministic (`seed = 0` in every `SimConfig`; permutation seed 0). Runtime 39 min, dominated by 10 PDE solves — 25 min of it on section 2's 905×956 grid.
 
 **Files added by this validation (nothing else was modified):**
 

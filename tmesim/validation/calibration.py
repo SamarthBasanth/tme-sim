@@ -88,6 +88,7 @@ from typing import Dict, Optional, Union
 import numpy as np
 
 from ..core import DrugParams
+from ..core.config import TMZ_HYPOXIA_RESISTANCE
 from ..molecular import descriptors as _descriptors
 from ..molecular import library
 from ..molecular.compile_drug import molecule_to_drugparams
@@ -166,6 +167,15 @@ def _compile(drug: Union[str, DrugParams], ecm_reference: float = DEFAULT_ECM) -
     A ``DrugParams`` passes through unchanged; a library name is compiled through
     the real molecular pipeline; the special name ``"mitoxantrone"`` is compiled
     from :data:`MITOXANTRONE_SMILES` (it is not in the GBM library).
+
+    Applies the same TMZ-specific ``hypoxia_resistance`` literature override as
+    ``core.config.DRUG_LIBRARY["temozolomide-like"]`` (see that constant's and
+    ``PDConfig``'s docstrings for the operating-point derivation) -- this is the
+    real, GDSC-calibrated molecular-compile pathway every real-data report
+    (``kill_calibration.md``, ``real_drug_panel.md``, ``dose_schedule.md``,
+    ``cell_state_impact.md``) actually uses for "temozolomide", so the override
+    has to be set HERE too, not just on the synthetic library entry, or every
+    real-drug-panel run would silently keep using the uncited global default.
     """
     if isinstance(drug, DrugParams):
         return drug
@@ -174,7 +184,10 @@ def _compile(drug: Union[str, DrugParams], ecm_reference: float = DEFAULT_ECM) -
         mol = _descriptors.from_smiles(MITOXANTRONE_NAME, MITOXANTRONE_SMILES)
     else:
         mol = library.get_molecule(name)
-    return molecule_to_drugparams(mol, ecm_reference=ecm_reference)
+    dp = molecule_to_drugparams(mol, ecm_reference=ecm_reference)
+    if name == "temozolomide":
+        dp = dataclasses.replace(dp, hypoxia_resistance=TMZ_HYPOXIA_RESISTANCE)
+    return dp
 
 
 # ---------------------------------------------------------------------------

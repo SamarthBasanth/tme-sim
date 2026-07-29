@@ -13,6 +13,7 @@ Everything runs on small grids / short windows to stay fast.
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from tmesim.core import DrugParams, OxygenConfig, PDEConfig
 from tmesim.physics.diffusion import simulate_drug_transport
@@ -134,6 +135,62 @@ def test_label_hypoxia_marks_core_cells(radial_micro_factory):
     label_hypoxia(micro, oxygen, cfg)
     n_hypoxic = int((micro.cells.state == int(CellState.HYPOXIC)).sum())
     assert n_hypoxic > 0, "no cells were labeled hypoxic despite a hypoxic core"
+
+
+# --------------------------------------------------------------------------- #
+# (3b) Oxygen: opt-in Michaelis-Menten sink form (default stays "linear")
+# --------------------------------------------------------------------------- #
+def test_default_sink_form_is_linear_and_unchanged(radial_micro_factory):
+    """``OxygenConfig()`` must keep solving the ORIGINAL linear-sink system --
+    the new ``sink_form`` option must not perturb the default in any way."""
+    micro, _, _ = radial_micro_factory(ny=48, nx=48, n_tumor=6000, seed=2)
+    cfg = OxygenConfig()
+    assert cfg.sink_form == "linear"
+    oxygen_default = solve_oxygen(micro, cfg)
+    oxygen_explicit = solve_oxygen(micro, OxygenConfig(sink_form="linear"))
+    assert np.array_equal(oxygen_default, oxygen_explicit)
+
+
+def test_michaelis_menten_sink_is_an_available_opt_in_option(radial_micro_factory):
+    """The MM sink form must be selectable, produce a valid, deterministic
+    field, and (holding consumption fixed) draw MORE oxygen down than the
+    linear sink -- consistent with a non-self-throttling sink term."""
+    micro, _, _ = radial_micro_factory(ny=48, nx=48, n_tumor=6000, seed=2)
+    cfg_linear = OxygenConfig()
+    cfg_mm = OxygenConfig(sink_form="michaelis_menten", mm_half_saturation=0.05)
+
+    o_linear = solve_oxygen(micro, cfg_linear)
+    o_mm = solve_oxygen(micro, cfg_mm)
+    o_mm_again = solve_oxygen(micro, cfg_mm)
+
+    assert o_mm.shape == micro.domain.shape
+    assert o_mm.min() >= 0.0 and o_mm.max() <= 1.0
+    assert np.array_equal(o_mm, o_mm_again), "MM sink solve is not deterministic"
+    # Not bit-identical to the linear sink (it is a materially different PDE).
+    assert not np.array_equal(o_linear, o_mm)
+    # Where there is tumor, the non-self-throttling MM sink pulls O2 lower.
+    tum_mask = micro.cells.tumor_mask()
+    col, row = micro.domain.to_index(micro.cells.x[tum_mask], micro.cells.y[tum_mask])
+    assert float(o_mm[row, col].mean()) < float(o_linear[row, col].mean())
+
+
+def test_sink_form_rejects_unknown_values(radial_micro_factory):
+    micro, _, _ = radial_micro_factory(ny=30, nx=30, n_tumor=2000, seed=3)
+    cfg = OxygenConfig(sink_form="quadratic")
+    with pytest.raises(ValueError):
+        solve_oxygen(micro, cfg)
+
+
+def test_michaelis_menten_raises_rather_than_silently_returning_unconverged(
+    radial_micro_factory,
+):
+    """A production nonlinear solver must fail loudly, not return a field that
+    never reached tolerance."""
+    micro, _, _ = radial_micro_factory(ny=30, nx=30, n_tumor=2000, seed=4)
+    cfg = OxygenConfig(sink_form="michaelis_menten", mm_half_saturation=0.02,
+                       mm_max_iter=1, mm_tol=1e-14)
+    with pytest.raises(RuntimeError):
+        solve_oxygen(micro, cfg)
 
 
 # --------------------------------------------------------------------------- #

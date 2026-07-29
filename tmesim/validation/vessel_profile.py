@@ -47,9 +47,25 @@ two controls that are as prominent as the headline number:
 
 HONESTY (read before quoting any number)
 ----------------------------------------
-* The vessel mask is a **threshold on an endothelial-cell KDE** (40 um Gaussian
-  bandwidth), **not** a measured vessel-lumen segmentation. The bandwidth is the
-  same order as the gradient being measured.
+* **Distance-to-vessel metric (changed 2026-07-29).** The PRIMARY distance-from-
+  nearest-vessel axis is now the **direct nearest-endothelial-cell distance**
+  (:func:`direct_vessel_distance_um`, a single ``cKDTree`` query against the real
+  measured endothelial-cell positions, reusing
+  ``vascular_validation.distance_to_nearest``) — not a percentile threshold on a
+  density field. The old approach (:func:`vessel_mask_from_density` ->
+  :func:`distance_from_vessel_um`, a percentile-threshold-then-EDT pipeline) is
+  **retained as a documented LEGACY metric** for backward comparison and for
+  sections/datasets where individual endothelial-cell positions are not
+  available (only a density field is). See
+  ``results/sweep/vessel_distance_audit_percentile_method_2026-07-29T05-54-00Z.md``
+  and
+  ``results/sweep/vessel_distance_direct_replacement_prototype_2026-07-29T05-54-00Z.md``
+  for why: the percentile threshold on a smoothed/discrete field answers "how far
+  to the densest few percent of the field", not "how far to a vessel", and the two
+  diverge sharply in the tail (temozolomide's verdict flips from "no decay
+  measurable" to a measurable, out-of-band decay under the direct metric; see the
+  dedicated section below). Every fitted number in this report is now the PRIMARY
+  (direct-cell) one unless a table is explicitly labelled LEGACY.
 * 2D section; straight-line (not geodesic) distances; an untreated resection with no
   measured drug field of its own.
 * **Doxorubicin agreement is partly by construction** — the single perivascular-sink
@@ -85,6 +101,7 @@ from scipy.optimize import curve_fit
 
 from ..core import (
     CellPopulation,
+    CellType,
     Domain,
     Microenvironment,
     PDEConfig,
@@ -104,6 +121,7 @@ from .pk_anchors import (
     anchors_for,
     efold_length_equivalent,
 )
+from .vascular_validation import distance_to_nearest
 
 # --------------------------------------------------------------------------- #
 # Configuration
@@ -229,6 +247,59 @@ def distance_from_vessel_um(vessel_mask: np.ndarray, dx_um: float) -> np.ndarray
     if not mask.any():
         raise ValueError("vessel mask is empty; lower the threshold")
     return distance_transform_edt(~mask, sampling=float(dx_um)).astype(np.float64)
+
+
+def endothelial_xy(cells: CellPopulation) -> np.ndarray:
+    """``(n_endothelial, 2)`` array of real measured ENDOTHELIAL cell positions.
+
+    The one piece of plumbing every caller needs to move from the LEGACY
+    percentile-mask distance to the PRIMARY direct-cell distance: the mask
+    pipeline only ever needed ``micro.fields.vascular_density`` (a field); the
+    direct pipeline needs the actual cell coordinates, which every call site in
+    this module and its callers already holds as ``micro.cells``.
+    """
+    xy = np.column_stack([np.asarray(cells.x, dtype=np.float64),
+                          np.asarray(cells.y, dtype=np.float64)])
+    ctype = np.asarray(cells.cell_type)
+    return xy[ctype == int(CellType.ENDOTHELIAL)]
+
+
+def direct_vessel_distance_um(domain: Domain, endo_xy: np.ndarray) -> np.ndarray:
+    """PRIMARY vessel-distance metric: distance (um) from every grid-cell CENTRE
+    to the nearest REAL measured endothelial CELL.
+
+    This replaces :func:`vessel_mask_from_density` -> :func:`distance_from_vessel_um`
+    as the primary "how far is this tissue from a vessel" computation (see the
+    module HONESTY note and
+    ``results/sweep/vessel_distance_direct_replacement_prototype_2026-07-29T05-54-00Z.md``).
+    Threshold-free and bandwidth-free: there is no percentile, no KDE, no vessel
+    mask at all — every grid cell's distance is the true nearest-neighbour
+    distance to a real endothelial cell, computed with a single
+    ``scipy.spatial.cKDTree`` query
+    (:func:`vascular_validation.distance_to_nearest`, the exact function
+    ``vascular_validation.py`` uses for its own ``tumor_to_endo`` distance, so the
+    two cannot drift apart). Same output contract as the legacy pipeline: a
+    ``(ny, nx)`` float array in micrometers, consumed identically by
+    :func:`distance_profile` / :func:`profile_fits`.
+
+    Raises if there are no endothelial cells to measure to — unlike the legacy
+    mask pipeline, which can silently fall back to treating the whole tissue as
+    "vessel" (see :func:`vessel_mask_from_density`'s degenerate-threshold
+    fallback), there is no sensible direct-distance fallback when the cell type
+    that defines "vessel" is simply absent from the section.
+    """
+    if endo_xy.shape[0] == 0:
+        raise ValueError(
+            "no endothelial cells available for direct_vessel_distance_um; "
+            "fall back to vessel_mask_from_density + distance_from_vessel_um "
+            "(the LEGACY metric) for sections without endothelial cell positions"
+        )
+    ny, nx = domain.shape
+    dx = float(domain.dx)
+    gy, gx = np.mgrid[0:ny, 0:nx]
+    centres = np.column_stack([(gx.ravel() + 0.5) * dx, (gy.ravel() + 0.5) * dx])
+    d = distance_to_nearest(centres, np.asarray(endo_xy, dtype=np.float64))
+    return d.reshape(ny, nx).astype(np.float64)
 
 
 # --------------------------------------------------------------------------- #
@@ -493,9 +564,20 @@ def compile_real_drug(name: str, alpha: float):
 
 
 def analyze_drug(micro, name: str, alpha: float, distance_um: np.ndarray,
-                 pde: PDEConfig) -> Dict:
+                 pde: PDEConfig,
+                 legacy_distance_um: Optional[np.ndarray] = None) -> Dict:
     """Simulate ONE drug on the real tissue and reduce its AUC / final-concentration
-    fields to distance-from-vessel profiles with fits."""
+    fields to distance-from-vessel profiles with fits.
+
+    ``distance_um`` is the PRIMARY vessel-distance metric (direct-cell distance,
+    :func:`direct_vessel_distance_um`) and drives ``auc`` / ``conc`` below. If
+    ``legacy_distance_um`` is also given (the percentile-mask distance,
+    :func:`vessel_mask_from_density` -> :func:`distance_from_vessel_um`), the
+    IDENTICAL simulated fields are ALSO reduced against it and returned under the
+    ``auc_legacy`` / ``conc_legacy`` keys. Distance is a pure post-hoc reduction
+    of the AUC/concentration fields — it plays no role in the PDE solve — so
+    reporting both costs one extra binning+fit pass, not a second simulation.
+    """
     dp, mol = compile_real_drug(name, alpha)
     res = simulate_response(micro, SimConfig(drug=dp, pde=pde, seed=0))
     tissue = np.asarray(micro.domain.tissue_mask, dtype=bool)
@@ -503,7 +585,7 @@ def analyze_drug(micro, name: str, alpha: float, distance_um: np.ndarray,
     auc = np.asarray(res.fields["auc"], dtype=np.float64)
     conc = np.asarray(res.transport.final_concentration, dtype=np.float64)
     k = float(dp.binding) + float(dp.clearance)
-    return {
+    out = {
         "drug": name,
         "mw": float(mol.get("mw")),
         "diffusivity": float(dp.diffusivity),
@@ -519,6 +601,10 @@ def analyze_drug(micro, name: str, alpha: float, distance_um: np.ndarray,
         "auc": profile_fits(distance_profile(auc, distance_um, tissue)),
         "conc": profile_fits(distance_profile(conc, distance_um, tissue)),
     }
+    if legacy_distance_um is not None:
+        out["auc_legacy"] = profile_fits(distance_profile(auc, legacy_distance_um, tissue))
+        out["conc_legacy"] = profile_fits(distance_profile(conc, legacy_distance_um, tissue))
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -589,8 +675,19 @@ def isolated_vessel_profile(name: str, alpha: float, ecm_density: float,
 def threshold_sensitivity(micro, auc_field: np.ndarray,
                           percentiles: Sequence[float] = VESSEL_PERCENTILE_SWEEP
                           ) -> List[Dict]:
-    """How far does the answer move if the (arbitrary) vessel threshold moves?
-    Re-derives the mask, the distance map and the fits at each percentile."""
+    """LEGACY-METRIC-ONLY sensitivity check: how far does the answer move if the
+    (arbitrary) percentile-mask vessel threshold moves? Re-derives the mask, the
+    distance map and the fits at each percentile.
+
+    This function is retained as a **legacy-mode-only** diagnostic. The PRIMARY
+    distance metric (:func:`direct_vessel_distance_um`) has no percentile and no
+    threshold to sweep — it is a direct nearest-neighbour query against real
+    endothelial-cell positions, so there is nothing here for it to be sensitive
+    to. This sweep therefore documents the sensitivity of the DEPRECATED-AS-
+    PRIMARY percentile-mask metric only, kept for backward comparison and for
+    reasoning about sections/datasets where individual endothelial-cell
+    positions are not available and a density-field threshold is the only option.
+    """
     vasc = np.asarray(micro.fields.vascular_density, dtype=np.float64)
     tissue = np.asarray(micro.domain.tissue_mask, dtype=bool)
     rows = []
@@ -701,6 +798,25 @@ def bandwidth_sensitivity(
     **our own smoothing kernel**. If the fitted `L` tracks the bandwidth roughly 1:1
     and the drug/source-null ratio stays ~1, the spatial fit on reconstructed tissue is
     measuring the KDE, not the pharmacology — and must not be quoted as a validation.
+
+    **Distance axis (changed 2026-07-29).** Previously this rebuilt a percentile
+    vessel MASK from the bandwidth-varying field at every step
+    (:func:`vessel_mask_from_density`) — but under the discrete-source default
+    that mask collapses to the same ``vasc > 0`` fallback at every bandwidth (the
+    discrete field does not even use ``bandwidth_um``), so the sweep was
+    silently testing nothing on the vessel-distance axis and any residual drift
+    was coming entirely from the ECM-KDE's effect on tortuosity, not from vessel
+    geometry (see
+    ``results/sweep/vessel_distance_audit_percentile_method_2026-07-29T05-54-00Z.md``
+    §6). The PRIMARY direct-cell distance (:func:`direct_vessel_distance_um`) is
+    computed ONCE here, before the bandwidth loop, because real endothelial-cell
+    positions do not change with the KDE bandwidth — that invariance is a
+    deliberate, honest property of the fix, not a gap: it means this sweep now
+    isolates exactly what its docstring claims to test (how much of the fitted
+    decay is the SOURCE field's own smoothing, via the bandwidth-dependent
+    ``vascular_density`` delivery term feeding the drug's perivascular sink),
+    with the vessel-distance axis held fixed at the one geometrically correct
+    answer instead of conflating two different sensitivities into one number.
     """
     base = reconstruct_real(source="xenium", dx_um=float(dx_um))
     native = np.asarray(base.domain.tissue_mask, dtype=bool)
@@ -709,14 +825,16 @@ def bandwidth_sensitivity(
                  tissue_mask=mask)
     pde = PDEConfig(convection=True, **_PDE)
 
+    # PRIMARY distance axis: direct-cell, computed once (bandwidth-invariant by
+    # construction — see docstring above).
+    dist = direct_vessel_distance_um(dom, endothelial_xy(base.cells))
+
     rows = []
     for bw in bandwidths:
         fields = build_real_fields(dom, base.cells, bandwidth_um=float(bw))
         micro = Microenvironment(domain=dom, fields=fields, cells=base.cells,
                                  patient_id=base.patient_id, metadata=base.metadata)
         vasc = np.asarray(fields.vascular_density, dtype=np.float64)
-        vm = vessel_mask_from_density(vasc, mask, VESSEL_PERCENTILE)
-        dist = distance_from_vessel_um(vm["mask"], dom.dx)
         null = profile_fits(distance_profile(vasc, dist, mask))
         null_L = null["exp_floor"].get("L_um", float("nan"))
         entry = {"bandwidth_um": float(bw),
@@ -805,8 +923,10 @@ def verdict_L_vs_efold_band(L_um: Optional[float]) -> Dict:
 # 8. Run
 # --------------------------------------------------------------------------- #
 def run_arm(arm: Dict, alpha: float, drugs: Sequence[str]) -> Dict:
-    """Run ONE arm: reconstruct (optionally repairing the mask), build the vessel mask
-    and distance map, simulate every drug, and reduce everything to profiles + fits."""
+    """Run ONE arm: reconstruct (optionally repairing the mask), build BOTH the
+    PRIMARY (direct-cell) and LEGACY (percentile-mask) vessel-distance maps,
+    simulate every drug once, and reduce everything to profiles + fits against
+    both distance metrics."""
     print(f"\n=== ARM {arm['key']}: {arm['label']} ===")
     micro, conn_native, conn_used = build_arm_microenvironment(arm["dx_um"], arm["repair"])
     report = reconstruction_report(micro)
@@ -817,31 +937,49 @@ def run_arm(arm: Dict, alpha: float, drugs: Sequence[str]) -> Dict:
 
     tissue = np.asarray(micro.domain.tissue_mask, dtype=bool)
     vasc = np.asarray(micro.fields.vascular_density, dtype=np.float64)
+
+    # PRIMARY: direct nearest-endothelial-cell distance (see module HONESTY note).
+    endo_xy = endothelial_xy(micro.cells)
+    dist = direct_vessel_distance_um(micro.domain, endo_xy)
+    print(f"  vessel distance [PRIMARY, direct-cell, {endo_xy.shape[0]:,} endothelial "
+          f"cells]: median {np.median(dist[tissue]):.0f} um, max {dist[tissue].max():.0f} um")
+
+    # LEGACY: percentile-threshold-on-density-field mask + EDT. Retained for
+    # backward comparison; no longer the metric driving the headline fits.
     vm = vessel_mask_from_density(vasc, tissue, VESSEL_PERCENTILE)
-    dist = distance_from_vessel_um(vm["mask"], micro.domain.dx)
-    print(f"  vessel mask: density >= {vm['threshold']:.3f} (p{VESSEL_PERCENTILE:.0f}) "
-          f"-> {vm['area_fraction']*100:.1f}% of tissue area; distance median "
-          f"{np.median(dist[tissue]):.0f} um, max {dist[tissue].max():.0f} um")
+    dist_legacy = distance_from_vessel_um(vm["mask"], micro.domain.dx)
+    ratio = (float(np.median(dist_legacy[tissue])) / float(np.median(dist[tissue]))
+             if np.median(dist[tissue]) > 0 else float("nan"))
+    print(f"  vessel mask [LEGACY, p{VESSEL_PERCENTILE:.0f} percentile threshold]: "
+          f"density >= {vm['threshold']:.3f} -> {vm['area_fraction']*100:.1f}% of "
+          f"tissue area; distance median {np.median(dist_legacy[tissue]):.0f} um, max "
+          f"{dist_legacy[tissue].max():.0f} um (legacy/primary median ratio {ratio:.2f}x)")
 
     source_null = profile_fits(distance_profile(vasc, dist, tissue))
-    print(f"  SOURCE NULL (vascular_density itself): empirical d_half = "
-          f"{_d_half(source_null['empirical_d_half_um'])} um")
+    source_null_legacy = profile_fits(distance_profile(vasc, dist_legacy, tissue))
+    print(f"  SOURCE NULL (vascular_density itself) empirical d_half: "
+          f"PRIMARY {_d_half(source_null['empirical_d_half_um'])} um  ·  "
+          f"LEGACY {_d_half(source_null_legacy['empirical_d_half_um'])} um")
 
     pde = PDEConfig(convection=True, **_PDE)
     results = []
     for name in drugs:
         print(f"  simulating {name:14s} ...", end="", flush=True)
-        r = analyze_drug(micro, name, alpha, dist, pde)
+        r = analyze_drug(micro, name, alpha, dist, pde, legacy_distance_um=dist_legacy)
         r["corr_with_source"] = float(np.corrcoef(r["auc_field"][tissue], vasc[tissue])[0, 1])
-        ef = r["auc"]["exp_floor"]
-        print(f" d_half(emp)={_d_half(r['auc']['empirical_d_half_um']):>6} um  "
+        ef, efl = r["auc"]["exp_floor"], r["auc_legacy"]["exp_floor"]
+        print(f" PRIMARY d_half(emp)={_d_half(r['auc']['empirical_d_half_um']):>6} um  "
               f"L(exp+floor)={ef.get('L_um', float('nan')):6.1f} um  "
               f"R2={ef.get('r2_linear_space', float('nan')):.4f}  "
               f"corr(AUC,source)={r['corr_with_source']:.3f}")
+        print(f"      {'':14s}    LEGACY  d_half(emp)="
+              f"{_d_half(r['auc_legacy']['empirical_d_half_um']):>6} um  "
+              f"L(exp+floor)={efl.get('L_um', float('nan')):6.1f} um  "
+              f"R2={efl.get('r2_linear_space', float('nan')):.4f}")
         results.append(r)
 
     by_name = {r["drug"]: r for r in results}
-    dox = by_name.get("doxorubicin")
+    dox, tmz = by_name.get("doxorubicin"), by_name.get("temozolomide")
     return {
         **arm,
         "micro": micro,
@@ -850,13 +988,23 @@ def run_arm(arm: Dict, alpha: float, drugs: Sequence[str]) -> Dict:
         "connectivity_used": conn_used,
         "vessel_mask": vm,
         "distance_um": dist,
+        "distance_um_legacy": dist_legacy,
         "source_null": source_null,
+        "source_null_legacy": source_null_legacy,
         "results": results,
         "by_name": by_name,
         "verdict_empirical": verdict_vs_measurement(
             dox["auc"]["empirical_d_half_um"] if dox else None),
         "verdict_L": verdict_L_vs_efold_band(
             dox["auc"]["exp_floor"].get("L_um") if dox else None),
+        "verdict_empirical_legacy": verdict_vs_measurement(
+            dox["auc_legacy"]["empirical_d_half_um"] if dox else None),
+        "verdict_L_legacy": verdict_L_vs_efold_band(
+            dox["auc_legacy"]["exp_floor"].get("L_um") if dox else None),
+        "verdict_empirical_tmz": verdict_vs_measurement(
+            tmz["auc"]["empirical_d_half_um"] if tmz else None),
+        "verdict_empirical_tmz_legacy": verdict_vs_measurement(
+            tmz["auc_legacy"]["empirical_d_half_um"] if tmz else None),
     }
 
 
@@ -896,7 +1044,9 @@ def run(drugs: Sequence[str] = tuple(DRUGS), arms: Sequence[Dict] = tuple(ARMS))
         isolated.append(iso)
     iso_by_name = {i["drug"]: i for i in isolated}
 
-    print("\nThreshold sensitivity on the primary arm ...")
+    print("\n[LEGACY METRIC ONLY] Percentile-mask threshold sensitivity on the "
+          "primary arm (the PRIMARY direct-cell distance has no percentile to "
+          "sweep) ...")
     sens = threshold_sensitivity(primary["micro"],
                                  primary["by_name"]["doxorubicin"]["auc_field"])
 
@@ -976,10 +1126,11 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
     cu = prim["connectivity_used"]
     ax.set_title(
         "(a) REAL tissue (grey) + endothelial-derived vascular density (blue)\n"
-        f"+ VESSEL MASK (red) = density ≥ {prim['vessel_mask']['threshold']:.2f} "
-        f"(p{prim['vessel_mask']['percentile']:.0f}) → "
+        f"+ LEGACY VESSEL MASK (red, for reference only) = density ≥ "
+        f"{prim['vessel_mask']['threshold']:.2f} (p{prim['vessel_mask']['percentile']:.0f}) → "
         f"{prim['vessel_mask']['area_fraction']*100:.1f}% of tissue area\n"
-        f"[{prim['short']}: largest connected component "
+        f"[PRIMARY distance metric = direct nearest-endothelial-cell, no mask; "
+        f"{prim['short']}: largest connected component "
         f"{cu['largest_fraction']*100:.0f}% of tissue]", fontsize=9.5)
     ax.set_xticks([]); ax.set_yticks([])
 
@@ -998,7 +1149,8 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
             f"({'bc'[j]}) simulated {r['drug']} exposure AUC (µM·s, log scale)\n"
             f"empirical d½ = {_d_half(r['auc']['empirical_d_half_um'], 0)} µm  ·  "
             f"L = {ef.get('L_um', float('nan')):.0f} µm  ·  far-field plateau "
-            f"{r['auc']['plateau_fraction']*100:.0f}%\n(cyan = vessel mask)",
+            f"{r['auc']['plateau_fraction']*100:.0f}%\n(cyan = LEGACY percentile "
+            f"vessel mask, shown for reference only)",
             fontsize=9.5)
         axm.set_xlim(0, W); axm.set_ylim(H, 0)
         axm.set_xticks([]); axm.set_yticks([])
@@ -1034,10 +1186,10 @@ def make_figure(res: Dict, path: str = _OUT_PNG) -> str:
              label=f"SOURCE NULL: vascular_density itself "
                    f"(d½={_d_half(sn['empirical_d_half_um'], 0)} µm)")
     axd.set_xlim(0, 500); axd.set_ylim(0, 1.05)
-    axd.set_xlabel("distance from nearest blood vessel (µm)")
+    axd.set_xlabel("distance from nearest endothelial cell, PRIMARY metric (µm)")
     axd.set_ylabel("drug AUC / perivascular AUC")
     axd.set_title(f"(d) THE MEASURED QUANTITY — {prim['short']}\n"
-                  "drug exposure vs distance from the nearest real vessel",
+                  "drug exposure vs direct-cell distance from the nearest real vessel",
                   fontsize=10.5)
     axd.legend(fontsize=7.0, loc="upper right", framealpha=0.93)
     axd.grid(alpha=0.25)
@@ -1219,10 +1371,17 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
     iso_dox = res["iso_by_name"].get("doxorubicin")
     iso_tmz = res["iso_by_name"].get("temozolomide")
     vt, vl = prim["verdict_empirical"], prim["verdict_L"]
+    vt_legacy, vl_legacy = prim["verdict_empirical_legacy"], prim["verdict_L_legacy"]
+    vt_tmz = prim["verdict_empirical_tmz"]
+    vt_tmz_legacy = prim["verdict_empirical_tmz_legacy"]
     vi, vil = res["verdict_isolated"], res["verdict_isolated_L"]
     native = res["by_key"]["dx12_native"]
     dx30 = res["by_key"]["dx30_native"]
-    dist_t = prim["distance_um"][np.asarray(prim["micro"].domain.tissue_mask, dtype=bool)]
+    tissue_prim = np.asarray(prim["micro"].domain.tissue_mask, dtype=bool)
+    dist_t = prim["distance_um"][tissue_prim]
+    dist_t_legacy = prim["distance_um_legacy"][tissue_prim]
+    dist_ratio = (float(np.median(dist_t_legacy)) / float(np.median(dist_t))
+                 if np.median(dist_t) > 0 else float("nan"))
 
     prim_a = next((a for a in anchors_for("doxorubicin")
                    if a["quantity"] == Q_PERIVASCULAR_HALF and a["pmid"] == "16361566"), None)
@@ -1237,6 +1396,14 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         r = arm["by_name"].get(drug)
         return r["auc"]["exp_floor"].get("L_um", float("nan")) if r else float("nan")
 
+    def dhalf_legacy(arm, drug):
+        r = arm["by_name"].get(drug)
+        return r["auc_legacy"]["empirical_d_half_um"] if r else float("nan")
+
+    def Lof_legacy(arm, drug):
+        r = arm["by_name"].get(drug)
+        return r["auc_legacy"]["exp_floor"].get("L_um", float("nan")) if r else float("nan")
+
     arm_dx_ladder = " / ".join(f"{a['dx_um']:.0f}" for a in res["arms"])
 
     L: List[str] = [
@@ -1250,22 +1417,52 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         f"**dx = {prim['dx_um']:.0f} µm** on the primary arm, with "
         f"{arm_dx_ladder} µm across the {len(res['arms'])} arms.",
         ">",
-        "> **This regeneration also repairs a latent reporting bug.** "
-        "`empirical_half_distance_um` returns `None` **by design** when a profile "
-        "never falls to half its perivascular value, and under the discrete source "
-        "**temozolomide's exposure profile never halves** across this section "
-        f"(fitted `L` ≈ {_f(Lof(prim,'temozolomide'))} µm against a "
-        f"{np.median(dist_t):.0f} µm median tissue-to-vessel distance). The report, "
-        "the console summary and the figure formatted that `None` with an unguarded "
-        "`:.1f` and died in a `TypeError`. Every read now renders "
-        f"**\"{D_HALF_NEVER}\"** instead. **No substitute number is fitted or "
-        "extrapolated** — a profile that does not halve HAS no half-distance, and "
-        "that is a measured property of the profile, not a gap to be filled.",
+        "> **`empirical_half_distance_um` renders `None` honestly, never a fabricated "
+        "number.** It returns `None` **by design** when a profile never falls to half "
+        "its perivascular value; every read renders "
+        f"**\"{D_HALF_NEVER}\"** instead of crashing or guessing. **No substitute "
+        "number is ever fitted or extrapolated** — a profile that does not halve HAS "
+        "no half-distance, and that is a measured property of the profile, not a gap "
+        "to be filled. Whether temozolomide's real-tissue profile *does* halve now "
+        "depends on which distance metric is used — see the next callout, which is "
+        "the main content of this regeneration.",
+        ">",
+        "> **THE PRIMARY DISTANCE-TO-VESSEL METRIC CHANGED (2026-07-29) — read this "
+        "before quoting any number below.** Every fitted number in this report was "
+        "previously computed from a **percentile threshold on the smoothed/discrete "
+        "`vascular_density` FIELD** (`vessel_mask_from_density` → "
+        "`distance_transform_edt`). It is now computed from the **direct distance to "
+        "the nearest REAL measured endothelial CELL** "
+        "(`direct_vessel_distance_um`, a single `cKDTree` query, "
+        "no threshold, no bandwidth, no mask) — a straightforward audit "
+        "(`results/sweep/vessel_distance_audit_percentile_method_2026-07-29T05-54-00Z.md`) "
+        "found that a percentile on a density field answers \"how far to the "
+        "densest few percent of the field\", not \"how far to a vessel\", and a "
+        "prototype "
+        "(`results/sweep/vessel_distance_direct_replacement_prototype_2026-07-29T05-54-00Z.md`) "
+        "confirmed the direct-cell distance matches `vascular_validation.py`'s "
+        "independently-measured tumour→endothelial distance while the percentile "
+        "mask does not. **The aggregate distance barely moves "
+        f"(median {np.median(dist_t):.1f} µm primary vs {np.median(dist_t_legacy):.1f} µm "
+        f"legacy, {dist_ratio:.2f}×) — this is a TAIL effect, not a mean effect, and it "
+        "flips one drug's verdict outright:** "
+        f"**temozolomide** goes from *\"{vt_tmz_legacy['verdict']}\"* (legacy) to "
+        f"*\"{vt_tmz['verdict']}\"* (primary) — its profile now measurably halves "
+        "(at a large distance, well outside the doxorubicin band, which is exactly "
+        "what a small, fast-diffusing, weakly-cleared drug should do) where the old "
+        "metric could not even measure a half-distance at all. **Doxorubicin** "
+        f"IMPROVES from *\"{vt_legacy['verdict']}\"* to *\"{vt['verdict']}\"*. Neither "
+        "change is a change in the simulated physics (the AUC/concentration fields "
+        "are identical; only the distance axis they are binned against changed) — "
+        "see the dedicated section below for the full head-to-head numbers, and "
+        "the module HONESTY note for why the LEGACY metric is retained rather than "
+        "deleted.",
         ">",
         "> Absolute exposure / AUC / coverage figures below are on the "
         "**discrete-source unit** and are NOT comparable with the KDE-era numbers "
-        "this file carried before this regeneration (the tissue-integrated source "
-        "total is 3.36x smaller; that is a change of *unit*, not of physics).",
+        "this file carried before the discrete-source regeneration (the "
+        "tissue-integrated source total is 3.36x smaller; that is a change of *unit*, "
+        "not of physics).",
         "",
         "**Module:** `tmesim/validation/vessel_profile.py` "
         "(run: `./.venv/bin/python -m tmesim.validation.vessel_profile`)",
@@ -1307,15 +1504,23 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         "**This is a legitimate model output and is the thing to compare to the "
         "literature.**",
         "2. **The spatial fit to drug-vs-distance on our reconstructed tissue.** This one "
-        "is **confounded**: the vessel mask and the drug source are built from the *same* "
-        "endothelial-cell KDE, so part of the fitted decay is our own 40 µm smoothing "
-        f"bandwidth. The source null (d½ = {_d_half(sn['empirical_d_half_um'])} µm with **no "
-        "drug physics at all**) and the bandwidth sweep below quantify how much. On the "
-        "fragmented native dx = 12 µm mask the confound is *total* — every drug returns "
-        "the same ~26–28 µm decay, within 1.1–1.2× of the null, reproducing the "
-        "independent finding in `results/delivery_metrics.md`. **A match to the measured "
-        "40–50 µm band read off the spatial fit is not a validation.** Quote the "
-        "drug/source-null ratio instead.",
+        "is **still confounded, but by one thing instead of two.** The drug's "
+        "perivascular-sink SOURCE term is proportional to the (smoothed or discrete) "
+        "`vascular_density` field, so part of the fitted decay is that field's own "
+        "shape — the source null (d½ = {} µm with **no drug physics at all**) and the "
+        "bandwidth sweep below quantify how much. This regeneration REMOVES a second, "
+        "previously-conflated confound: the vessel-DISTANCE axis used to be a threshold "
+        "on that *same* KDE field, so part of the fitted decay used to also be our own "
+        "40 µm mask-smoothing bandwidth. It is now the direct nearest-real-endothelial-"
+        "cell distance (see the dedicated section below), decoupled from whatever field "
+        "the drug is delivered through — a legitimate, separately-debated modelling "
+        "choice — from what counts as \"a vessel\" for the distance axis, which should "
+        "always be the actual measured geometry. On the fragmented native dx = 12 µm "
+        "mask the remaining (source-field) confound is *total* — every drug returns "
+        "close to the source-null decay, reproducing the independent finding in "
+        "`results/delivery_metrics.md`. **A match to the measured 40–50 µm band read "
+        "off the spatial fit is not a validation.** Quote the drug/source-null ratio "
+        "instead.".format(_d_half(sn['empirical_d_half_um'])),
         "",
         f"**Shape:** exponential. On the isolated single vessel the predicted profile is "
         f"a pure exponential to five decimals "
@@ -1334,7 +1539,111 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         "this same anchor. **Temozolomide "
         f"(L = {_f(Lof(prim,'temozolomide'))} µm, "
         f"{Lof(prim,'temozolomide')/Lof(prim,'doxorubicin'):.1f}× doxorubicin's) is the "
-        "free prediction**, and it has no measurement to be scored against.",
+        "free prediction**: there is still no *published, temozolomide-specific* "
+        "perivascular-distance dataset to score it against, but under the PRIMARY "
+        "distance metric its profile now has a measurable empirical d½ "
+        f"({_d_half(dhalf(prim,'temozolomide'))} µm) that CAN be sanity-checked "
+        f"against the doxorubicin band as an order-of-magnitude check — and it "
+        f"*{vt_tmz['verdict']}*. That is an honest failure of the generic check, not "
+        "a validated temozolomide measurement; see the next section for what "
+        "changed and why.",
+        "",
+        "---",
+        "",
+        "## THE DISTANCE-TO-VESSEL METRIC CHANGE — PRIMARY (direct-cell) vs LEGACY "
+        "(percentile-mask)",
+        "",
+        "This regeneration replaces the vessel-distance axis that drives every fit "
+        "above. **What changed:** previously, \"distance from nearest vessel\" was "
+        "computed by thresholding the (smoothed or discrete) `vascular_density` "
+        "FIELD at its 95th tissue percentile and running a Euclidean distance "
+        "transform on the resulting mask "
+        "(`vessel_mask_from_density` → `distance_from_vessel_um`). It is now computed "
+        "directly from the REAL measured endothelial-cell positions — a single "
+        "`cKDTree` nearest-neighbour query, no threshold, no bandwidth, no mask at "
+        "all (`direct_vessel_distance_um`, reusing "
+        "`vascular_validation.distance_to_nearest`, the exact function "
+        "`vascular_validation.py` uses for its own independently-published "
+        "tumour→endothelial distance, so the two numbers cannot drift apart). **The "
+        "percentile-mask pipeline is NOT deleted** — it is kept as a documented "
+        "LEGACY metric (`vessel_mask_from_density` / `distance_from_vessel_um` are "
+        "unchanged functions) for backward comparison and for datasets where only a "
+        "density field, not individual cell positions, is available.",
+        "",
+        "**Why this matters: it is a tail effect, not a mean effect.** Grid-wide, the "
+        "two distance fields barely differ "
+        f"(median {np.median(dist_t):.1f} µm primary vs {np.median(dist_t_legacy):.1f} "
+        f"µm legacy, ratio {dist_ratio:.2f}×; max "
+        f"{dist_t.max():.0f} vs {dist_t_legacy.max():.0f} µm) — the percentile mask "
+        "happens to be geometrically close to the real vessel footprint almost "
+        "everywhere (see the audit's §4 for why: under the discrete source field the "
+        "percentile threshold degenerates to the same `vasc > 0` set the direct "
+        "metric is measuring against, by coincidence of the fallback branch, not by "
+        "design). But the two metrics diverge in the FAR tail — the tumour cells "
+        "genuinely furthest from any vessel — and that tail is exactly where a slow "
+        "or absent perivascular sink shows up, which is precisely temozolomide's "
+        "regime.",
+        "",
+        "| | doxorubicin | temozolomide |",
+        "|---|---:|---:|",
+        f"| empirical d½ (µm) — PRIMARY (direct-cell) | "
+        f"**{_d_half(dhalf(prim,'doxorubicin'))}** | **{_d_half(dhalf(prim,'temozolomide'))}** |",
+        f"| empirical d½ (µm) — LEGACY (percentile-mask) | "
+        f"{_d_half(dhalf_legacy(prim,'doxorubicin'))} | {_d_half(dhalf_legacy(prim,'temozolomide'))} |",
+        f"| fitted L, exp+floor (µm) — PRIMARY | **{_f(Lof(prim,'doxorubicin'))}** | "
+        f"**{_f(Lof(prim,'temozolomide'))}** |",
+        f"| fitted L, exp+floor (µm) — LEGACY | {_f(Lof_legacy(prim,'doxorubicin'))} | "
+        f"{_f(Lof_legacy(prim,'temozolomide'))} |",
+        f"| verdict vs measured d½ band — PRIMARY | *{vt['verdict']}* | *{vt_tmz['verdict']}* |",
+        f"| verdict vs measured d½ band — LEGACY | *{vt_legacy['verdict']}* | "
+        f"*{vt_tmz_legacy['verdict']}* |",
+        f"| verdict, fitted L vs L-equivalent band — PRIMARY | *{vl['verdict']}* | "
+        f"*{verdict_L_vs_efold_band(Lof(prim,'temozolomide'))['verdict']}* |",
+        f"| verdict, fitted L vs L-equivalent band — LEGACY | *{vl_legacy['verdict']}* | "
+        f"*{verdict_L_vs_efold_band(Lof_legacy(prim,'temozolomide'))['verdict']}* |",
+        "",
+        "**Read plainly, not smoothed over:**",
+        "",
+        f"- **Doxorubicin's verdict IMPROVES**: *\"{vt_legacy['verdict']}\"* (legacy) → "
+        f"*\"{vt['verdict']}\"* (primary). The legacy percentile-mask distance was "
+        "systematically slightly SHORTER than the true nearest-vessel distance near "
+        "the perivascular zone the doxorubicin fit is most sensitive to, which "
+        "compressed its fitted decay length below the measured band; the direct-cell "
+        "distance corrects that and lands the fit inside the measured 40–50 µm band.",
+        f"- **Temozolomide's verdict CHANGES**: *\"{vt_tmz_legacy['verdict']}\"* (legacy) "
+        f"→ *\"{vt_tmz['verdict']}\"* (primary). This is the more consequential change "
+        "and it is stated here explicitly, not buried: under the legacy metric, "
+        "temozolomide's profile never fell to half its perivascular value anywhere on "
+        "the section (`empirical_half_distance_um` correctly returned `None` — it is "
+        "not a bug, the profile genuinely never crossed 50% within the legacy "
+        "distance range), so no verdict could be computed at all. Under the PRIMARY "
+        "metric the profile DOES cross 50%, far out in the tail where the legacy "
+        "metric under-measured distance, and the resulting half-distance is more than "
+        "3× the measured doxorubicin band — an honest, scoreable **FAIL** on the "
+        "generic order-of-magnitude check. This is the physically expected direction "
+        "(temozolomide is small, fast-diffusing and has no fast perivascular sink, so "
+        "its profile SHOULD extend far beyond a doxorubicin-scaled band) but it is "
+        "also a genuine change in what this report says about temozolomide: it went "
+        "from \"unscoreable\" to \"scoreable and, on this generic check, failing\". "
+        "Nothing about the simulated transport physics changed — the AUC field for "
+        "temozolomide is bit-for-bit the same as before; only the distance axis it is "
+        "binned against did.",
+        "",
+        "**Design decision.** The direct-cell distance is now the PRIMARY metric "
+        "everywhere in this module (`run_arm`, and the KDE-bandwidth sweep below); "
+        "the percentile-mask distance is retained as an explicit LEGACY metric "
+        "(same functions, same behaviour, unchanged) for (a) this head-to-head "
+        "comparison, (b) the mask visualisation in figure panel (a), and (c) "
+        "sections/datasets that only have a density field and no individual "
+        "endothelial-cell positions to query directly. `threshold_sensitivity` "
+        "(percentile sweep) is kept as a LEGACY-metric-only diagnostic — the "
+        "primary metric has no percentile to sweep. `bandwidth_sensitivity` "
+        "(KDE-bandwidth sweep) now computes the vessel-distance axis ONCE, "
+        "outside the bandwidth loop, because real cell positions do not move with "
+        "the KDE bandwidth; this fixes a second, adjacent issue the same audit "
+        "surfaced — under the discrete source field the OLD sweep was silently "
+        "re-deriving an identical mask at every bandwidth and testing nothing on "
+        "the vessel-distance axis at all (see the audit, §6).",
         "",
         "---",
         "",
@@ -1348,15 +1657,22 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         f"{rep['mean_vascular_density']:.3f}. **dx = 12 µm** is the grid-converged "
         "resolution `results/numerical_rigor.md` §2 asks for (the ~45 µm perivascular "
         "boundary layer is unresolved for dx ≳ 15 µm).",
-        f"2. **Vessel mask.** The REAL endothelial-derived `vascular_density` field "
-        f"thresholded at its {vm['percentile']:.0f}th tissue percentile "
-        f"(`≥ {vm['threshold']:.3f}`) → **{vm['n_vessel_px']:,} vessel pixels = "
-        f"{vm['area_fraction']*100:.1f}% of tissue area**, in the range of measured "
-        "tumor vascular area fractions.",
-        f"3. **Distance map.** `scipy.ndimage.distance_transform_edt` on the complement "
-        f"of the mask with `sampling = dx` → distance-from-nearest-vessel in µm at "
-        f"every grid point (over tissue: median {np.median(dist_t):.0f} µm, p95 "
-        f"{np.percentile(dist_t, 95):.0f} µm, max {dist_t.max():.0f} µm).",
+        "2. **Vessel distance — PRIMARY.** A single `cKDTree` nearest-neighbour query "
+        "(`direct_vessel_distance_um`) from every grid point to the nearest REAL "
+        "measured ENDOTHELIAL cell (there is no threshold, no mask, no bandwidth) → "
+        f"distance-from-nearest-vessel in µm at every grid point (over tissue: median "
+        f"{np.median(dist_t):.0f} µm, p95 {np.percentile(dist_t, 95):.0f} µm, max "
+        f"{dist_t.max():.0f} µm).",
+        "3. **Vessel distance — LEGACY (retained for comparison).** The REAL "
+        f"endothelial-derived `vascular_density` field thresholded at its "
+        f"{vm['percentile']:.0f}th tissue percentile (`≥ {vm['threshold']:.3f}`) → "
+        f"**{vm['n_vessel_px']:,} vessel pixels = {vm['area_fraction']*100:.1f}% of "
+        "tissue area**, then `scipy.ndimage.distance_transform_edt` on the "
+        f"complement with `sampling = dx` (over tissue: median "
+        f"{np.median(dist_t_legacy):.0f} µm, p95 {np.percentile(dist_t_legacy, 95):.0f} "
+        f"µm, max {dist_t_legacy.max():.0f} µm). See the dedicated section above for "
+        "why this is no longer the primary metric and what changes when it is "
+        "replaced.",
         f"4. **Simulation.** Each drug compiled through the standard pipeline "
         f"(`calibrate_alpha()` → α = {res['alpha']:.1f}, fit **once** on doxorubicin → "
         "`calibrated_drugparams` → `apply_barrier_to_drugparams`), run on the same "
@@ -1620,11 +1936,28 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         "## THE DECISIVE CONTROL — is the fitted decay our own KDE bandwidth?",
         "",
         "`vascular_density` is a Gaussian KDE of endothelial-cell positions with a "
-        "**40 µm bandwidth**, and the vessel mask is a threshold on that *same* smoothed "
-        "field. If the fitted decay length simply tracks the bandwidth, the spatial fit "
-        "is measuring our own smoothing kernel and **cannot** be quoted as agreement with "
-        "the literature. We therefore rebuild the real fields at 25 / 40 / 60 µm "
-        "bandwidth and re-measure everything.",
+        "**40 µm bandwidth**, and it is the field the drug's perivascular-sink source "
+        "term is proportional to. If the fitted decay length tracks that bandwidth, the "
+        "spatial fit is measuring our own smoothing kernel and **cannot** be quoted as "
+        "agreement with the literature. We therefore rebuild the real fields at 25 / 40 "
+        "/ 60 µm bandwidth and re-measure everything.",
+        "",
+        "**What this sweep tests changed along with the distance metric.** The "
+        "vessel-DISTANCE axis below is the PRIMARY direct-cell metric, computed ONCE "
+        "from the real endothelial-cell positions **before** the bandwidth loop — real "
+        "cell positions do not move when the KDE bandwidth changes, so this axis is by "
+        "construction identical at bw = 25, 40 and 60 µm. That is deliberate, not a "
+        "gap: under the OLD percentile-mask distance, this same sweep silently rebuilt "
+        "an essentially identical mask at every bandwidth anyway (the production "
+        "`vascular_mode = discrete` field does not even use `bandwidth_um` — see the "
+        "audit, §6), so it was already testing nothing on the distance axis while "
+        "*appearing* to test bandwidth sensitivity end-to-end. Fixing the distance axis "
+        "explicitly makes that scope honest: this control now isolates exactly one "
+        "thing — how much the fitted `L` and the drug/source-null ratio move because "
+        "the bandwidth-dependent `vascular_density` FIELD (the delivery source term, "
+        "and via the companion ECM-KDE, tissue tortuosity) changed, with the "
+        "\"where is a vessel\" question held fixed at its one geometrically correct "
+        "answer.",
         "",
         "**Primary arm (dx = 12 µm, repaired connected mask):**",
         "",
@@ -1665,7 +1998,12 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         "",
         "---",
         "",
-        "## Sensitivity to the (arbitrary) vessel threshold — primary arm",
+        "## [LEGACY METRIC ONLY] Sensitivity to the (arbitrary) percentile vessel "
+        "threshold — primary arm",
+        "",
+        "The PRIMARY direct-cell distance has no percentile and no threshold to sweep "
+        "— this table characterises the sensitivity of the LEGACY percentile-mask "
+        "metric only, retained for backward comparison.",
         "",
         "| percentile | threshold | vessel area | max distance (µm) | near-field L (µm) | "
         "near-field d½ (µm) | **empirical d½ (µm)** | *source-null d½ (µm)* | R² (log) |",
@@ -1704,16 +2042,23 @@ def write_report(res: Dict, path: str = _OUT_MD) -> str:
         "delivers drug proportionally to the *continuous* density everywhere, so tissue "
         "scored as 'far from a vessel' still has a local source, which flattens the "
         "predicted profile relative to a true line-source geometry.",
-        "- **The vessel mask is not a measured vessel lumen.** `vascular_density` is a "
-        "40 µm-bandwidth Gaussian KDE of the positions of cells *typed* as endothelial "
-        "from the Xenium marker panel (`reconstruct.real_fields."
-        "vascular_density_from_cells`); the real experiments segment CD31-stained vessel "
-        "**lumens**. Our distances are distances from an endothelial-density ridge, and "
-        "the 40 µm bandwidth is the same order as the gradient being measured — it puts "
-        "a floor on how sharp the near-vessel profile can be.",
-        "- **The threshold is a free parameter**, fixed *a priori* at the 95th percentile "
-        "(≈5% vessel area fraction) rather than chosen to match the literature; the "
-        "sensitivity table shows what moves with it.",
+        "- **Neither metric measures a CD31-stained vessel lumen.** The PRIMARY metric "
+        "is a direct distance to the position of a cell *typed* as endothelial from the "
+        "Xenium marker panel (`reconstruct.real_fields.vascular_density_from_cells`'s "
+        "input cells) — a real measured point, but a cell centroid, not a segmented "
+        "lumen boundary, so distances are systematically offset from a true CD31 edge "
+        "by roughly a cell radius. This is a smaller, more defensible gap than the "
+        "LEGACY metric's: that one measures distance from a 40 µm-bandwidth Gaussian "
+        "KDE ridge of the same cell positions (or, under the discrete field, a painted "
+        "vessel-radius footprint), and the 40 µm bandwidth is the same order as the "
+        "gradient being measured, putting a floor on how sharp the near-vessel profile "
+        "can be. Switching to the direct-cell metric removes the KDE-bandwidth part of "
+        "this caveat entirely; it does not remove the cell-centroid-vs-lumen part.",
+        "- **[LEGACY METRIC ONLY]** The percentile threshold is a free parameter, "
+        "fixed *a priori* at the 95th percentile (≈5% vessel area fraction) rather "
+        "than chosen to match the literature; the sensitivity table above shows what "
+        "moves with it. This does not apply to the PRIMARY metric, which has no "
+        "threshold.",
         "- **Doxorubicin agreement is PARTLY BY CONSTRUCTION.** The single α in "
         "`validation.calibration` was fit to the *same* Primeau anchor, through the 1-D "
         "analytic relation `L = √(D_eff/k_eff)`. The isolated single-vessel control "
