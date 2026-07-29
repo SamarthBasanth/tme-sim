@@ -258,3 +258,17 @@ well-understood follow-on now that the exact schema (§3) is documented, not a f
    present and confirmed) means GBM-Space is worth prioritizing over other census candidates
    specifically **because** it is the first real GBM section in this repo that would carry both
    axes `results/cell_state_impact.md` found the flagship panel missing, simultaneously.
+
+---
+
+## 9. Update: the adapter this report deferred was built in a later pass
+
+Next step 1 above (a dedicated `.h5ad` → Space Ranger adapter) was carried out in a
+follow-on task. See **`results/gbmspace_adapter.md`** for the full account: 3 sections were
+downloaded, an `h5py`-only adapter (`tmesim/data/adapters/gbmspace.py`) was written, all 3
+were ingested and validated through the unmodified `tmesim.data.ingest` pipeline, registered
+into the Studio section catalogue, and run end to end through reconstruction and a drug
+simulation. Nothing in this report (§1–§8) needed correcting for that to work — the schema
+documented in §3 above held exactly, including the one detail this report flagged as unread
+("the standalone JSON file the loader opens by name" vs. the nested `uns/spatial` HDF5 group),
+which is exactly what the adapter's `materialize_spaceranger_dir` bridges.
