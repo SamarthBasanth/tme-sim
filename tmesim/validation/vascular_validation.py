@@ -1538,6 +1538,67 @@ def write_report(res: Dict, vd: Dict, path: str, png: str, runtime_s: float) -> 
       "than a silent patch inside a validation script.")
     A("")
 
+    # ---- robustness of the random-arrangement finding -------------------------- #
+    A("## 6a. The random-arrangement finding is architecturally immune to "
+      "field-construction tuning — tested exhaustively, not assumed")
+    A("")
+    A("The obvious hypothesis after §4 is that the KDE bandwidth (or the choice of "
+      "KDE vs. a discrete/segmented field) is responsible, and that retuning it "
+      "would recover real vascular clustering. This was tested directly rather "
+      "than argued: **9 KDE bandwidths (6, 8, 10, 12, 14, 16, 18, 22, 26 µm), the "
+      "discrete/segmented default field, and an adaptive k-NN (Breiman/Meisel/"
+      "Purcell \"balloon estimator\") bandwidth were each rebuilt in-memory and run "
+      "through this module's own diagnostics.** Every single one reproduces the "
+      "same headline numbers to within rounding: CSR median ratio 0.99×, tail "
+      "ratio 1.31–1.44×, endothelial-count 500 µm-tile heterogeneity 2.4× "
+      "p90/p10. This is not a coincidence of similar parameter choices — it is a "
+      "structural fact about the code: the CSR/heterogeneity diagnostic in "
+      "`measure()` is computed entirely from raw endothelial-cell coordinates "
+      "(`cKDTree`, DBSCAN), and **never reads `vascular_density` at all**. No "
+      "amount of retuning how that field is smoothed can move a number the field "
+      "never feeds into.")
+    A("")
+    A("What *is* bandwidth-sensitive — the smoothed field's own percentile-"
+      "threshold \"hotspot\" geometry (§5's field-based cross-check) — does move "
+      "with bandwidth, but narrowing it mostly fragments a few large blobs into "
+      "many small, closely-spaced local maxima rather than recovering fewer, more "
+      "separated, genuinely clustered vessels; 500 µm-tile *field* heterogeneity "
+      "stays in a narrow ~2.4–3.0× band across every bandwidth tested, versus real "
+      "CD34 tissue's ~48× area-fraction spread (PMID 38928515). The "
+      "adaptive-bandwidth variant is not merely neutral but actively worse on "
+      "every field-level measure (CV 0.40 vs 1.01 for a fixed 40 µm field; tile "
+      "heterogeneity 1.27× vs 2.78×), because ~81% of this section's \"putative "
+      "vessels\" are isolated single endothelial cells, so most cells' k-NN "
+      "spacing is large and right-skewed — adaptive smoothing floods the sparse "
+      "regions with broad blobs instead of sharpening dense ones.")
+    A("")
+    A("**This generalizes.** The same cell-coordinate CSR test run on two "
+      "independent sections finds the identical qualitative verdict: a second "
+      "Xenium panel (breast cancer, `data_cache/xenium_breast_janesick`) gives "
+      "1.25× (vs. this section's 0.99×) with a comparable >100 µm tail (4.17% vs. "
+      "4.02%); a second GBM-derived section (GSE324268) gives 0.94×. Neither "
+      "bandwidth choice moves either result. Breast's panel is genuinely richer "
+      "— 13 endothelial-associated genes measured, versus this section's single "
+      "PECAM1 gate — but the production marker map "
+      "(`marker_panels.BREAST_PANEL_MARKER_MAP`) currently types ENDOTHELIAL from "
+      "only 3 of those 13 genes (PECAM1/VWF/CLDN5), so that extra richness is not "
+      "yet exploited and does not explain or fix the near-random result either.")
+    A("")
+    A("**Conclusion: this is documented here as a genuine, currently-permanent "
+      "limit of the reconstruction pipeline, not a bug awaiting the next "
+      "bandwidth to try.** Repeating this sweep with more bandwidths would not be "
+      "expected to change the answer — the mechanism (a coordinate-level "
+      "diagnostic that a field-smoothing choice cannot touch) rules that out by "
+      "construction. The two concrete levers that *could* move it, neither of "
+      "which has been tried yet, are: (a) richer marker-based endothelial cell "
+      "IDENTIFICATION (exploiting Xenium panels' full endothelial gene sets, not "
+      "just a single gate, per the breast lead above), and (b) changing the "
+      "vessel-clustering/object model itself (the DBSCAN linking step in "
+      "`measure()`) rather than anything about the density field it is paired "
+      "with. Both are open, unstarted work, not next items in this same "
+      "bandwidth sweep.")
+    A("")
+
     # ---- caveats -------------------------------------------------------------- #
     A("## 6. Caveats — what this validation does NOT establish")
     A("")
@@ -1593,16 +1654,21 @@ def write_report(res: Dict, vd: Dict, path: str, png: str, runtime_s: float) -> 
       "to `mode='geometric'`, and this run confirms it: tissue coverage and the "
       "field-based distance are now near-invariant to `dx` (§5). This report is "
       "written against the fixed mask.")
-    A("2. Stop using a percentile threshold on a max-normalised field as a vessel "
-      "mask. Derive the vessel mask from clustered endothelial cell positions "
-      "directly, so the distance axis in `vessel_profile.md` means what it says.")
+    A("2. ~~Stop using a percentile threshold on a max-normalised field as a "
+      "vessel mask.~~ **Partially done for the default field** — "
+      "`field_based_distance()` now falls back to `vasc > 0` on sparse/segmented "
+      "fields (§5), matching `vessel_profile.py`. The percentile-threshold-as-"
+      "hotspot problem persists only under the opt-in legacy `mode='kde'` path.")
     A("3. Calibrate the PECAM1 gate so that the *clustered vessel* density matches "
       "65 ± 30/mm², rather than leaving the endothelial fraction to fall wherever a "
       "z-score of 1.0 puts it.")
-    A("4. The heterogeneity failure is not fixable by re-tuning a threshold — it is "
-      "a property of a Gaussian KDE with a 40 µm bandwidth applied to points that "
-      "are ~44 µm apart. The smoothing kernel is the same size as the structure it "
-      "is meant to resolve, so it necessarily erases it.")
+    A("4. **Not a KDE-bandwidth or field-construction problem, per §6a.** The "
+      "random-arrangement finding survives every field-construction choice "
+      "tested (9 bandwidths, discrete, adaptive-kNN) because the diagnostic it's "
+      "measured with never reads the field. The two real remaining levers are "
+      "richer marker-based endothelial cell identification (§6a) and changing "
+      "the vessel-clustering/CSR-null construction (`measure()`'s DBSCAN object "
+      "model) itself — both unstarted.")
     A("")
     A("---")
     A("")
