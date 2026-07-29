@@ -5,7 +5,6 @@ export default function Home() {
     <main>
       <header className="site-header">
         <span className="site-header__mark">TUMOR ATLAS</span>
-        <span className="site-header__tagline">3D visualization concept</span>
       </header>
       <ScrollExperience />
     </main>

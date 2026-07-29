@@ -18,15 +18,30 @@
   --accent-dim: rgba(127, 209, 224, 0.5);
   --warn: #f2b23a;
 
-  --font-sans: var(--font-geist-sans), "Helvetica Neue", Arial, sans-serif;
-  --font-mono: var(--font-geist-mono), "SF Mono", "IBM Plex Mono", monospace;
+  /*
+   * Swiss neo-grotesque identity face, taken deliberately from the real
+   * tmesim Studio product (app/web/css/tokens.css) rather than invented
+   * fresh: Helvetica Neue / Neue Haas Grotesk Text lineage, system-
+   * available, no Google Fonts network dependency. This is the lineage of
+   * instrument and wayfinding lettering — it reads as clinical/instrument
+   * rather than product-marketing, which is the same reason the Studio
+   * itself avoids Inter (large x-height, loose default tracking) and any
+   * geometric/humanist face with personality. Every numeral and data value
+   * still goes through the monospace stack below.
+   */
+  --font-sans:
+    "Helvetica Neue", "Neue Haas Grotesk Text", "Nimbus Sans", Arimo,
+    "Liberation Sans", Arial, sans-serif;
+  --font-mono:
+    "SF Mono", "IBM Plex Mono", "Roboto Mono", "DejaVu Sans Mono", Menlo,
+    Consolas, "Courier New", monospace;
 }
 
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--ink);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 * {
@@ -106,19 +121,6 @@ body::after {
   letter-spacing: 0.22em;
   font-weight: 600;
   color: var(--ink);
-}
-
-.site-header__tagline {
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-}
-
-@media (max-width: 640px) {
-  .site-header__tagline {
-    display: none;
-  }
 }
 
 /* --------------------------------------------------------------------- */

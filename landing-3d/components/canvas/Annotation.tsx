@@ -3,7 +3,8 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html, Line } from "@react-three/drei";
-import type { Line2, LineMaterial, LineSegments2 } from "three-stdlib";
+import type { Line2, LineSegments2 } from "three-stdlib";
+import * as THREE from "three";
 import { damp } from "@/lib/scrollMath";
 import { useScrollProgressRef } from "@/components/scroll/ScrollProgressContext";
 
@@ -18,10 +19,15 @@ interface AnnotationProps {
 }
 
 /**
- * A clinical-style leader line + label anchored to a 3D point (tumor core,
- * edema margin, ...). Reads scroll progress itself and derives its own
- * visibility via `getOpacity` (one of the authored curves in
- * lib/timeline.ts), eased here per-frame so labels never pop.
+ * A clinical-instrument-style callout: a small reticle marking the exact
+ * anchor point on the tumour, and an elbowed (dogleg) leader line into the
+ * label rather than one straight diagonal spoke. This is deliberately not
+ * "a line radiating from a hub to a node" — the convention it replaces,
+ * which combined with the old wireframe shell read as a generic network
+ * globe — but the routed-callout convention used for point annotations in
+ * technical and medical figures. Reads scroll progress itself and derives
+ * its own visibility via `getOpacity` (one of the authored curves in
+ * lib/timeline.ts), eased here per-frame so callouts never pop.
  */
 export default function Annotation({
   anchor,
@@ -34,6 +40,7 @@ export default function Annotation({
   const progressRef = useScrollProgressRef();
   const groupOpacity = useRef(0);
   const lineRef = useRef<Line2 | LineSegments2>(null);
+  const reticleRef = useRef<THREE.Mesh>(null);
   const htmlWrapRef = useRef<HTMLDivElement>(null);
 
   const labelPoint: [number, number, number] = [
@@ -41,14 +48,23 @@ export default function Annotation({
     anchor[1] + labelOffset[1],
     anchor[2] + labelOffset[2],
   ];
+  // Dogleg: travel horizontally from the anchor first, then into the label
+  // — a leader line that reads as deliberately routed rather than a spoke
+  // pointing straight back at a central hub.
+  const elbow: [number, number, number] = [labelPoint[0], anchor[1], anchor[2]];
 
   useFrame((_, delta) => {
     groupOpacity.current = damp(groupOpacity.current, getOpacity(progressRef.current), 5, delta);
     const o = groupOpacity.current;
     if (lineRef.current) {
-      const material = lineRef.current.material as LineMaterial;
-      material.opacity = o * 0.9;
+      const material = lineRef.current.material as THREE.Material & { opacity: number; transparent: boolean };
+      material.opacity = o * 0.85;
       material.transparent = true;
+    }
+    if (reticleRef.current) {
+      const material = reticleRef.current.material as THREE.Material & { opacity: number };
+      material.opacity = o * 0.9;
+      reticleRef.current.scale.setScalar(0.85 + o * 0.15);
     }
     if (htmlWrapRef.current) {
       htmlWrapRef.current.style.opacity = String(o);
@@ -58,7 +74,24 @@ export default function Annotation({
 
   return (
     <>
-      <Line ref={lineRef} points={[anchor, labelPoint]} color="#bdeaf7" lineWidth={1.75} />
+      <mesh ref={reticleRef} position={anchor} rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.026, 0.036, 24]} />
+        <meshBasicMaterial
+          color="#bdeaf7"
+          transparent
+          opacity={0}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      <Line
+        ref={lineRef}
+        points={[anchor, elbow, labelPoint]}
+        color="#bdeaf7"
+        lineWidth={1.25}
+        transparent
+        opacity={0}
+      />
       <Html position={labelPoint} center={false} zIndexRange={[10, 0]} sprite={false}>
         <div
           ref={htmlWrapRef}

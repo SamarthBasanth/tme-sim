@@ -1,5 +1,5 @@
 /**
- * Procedural, GBM-referenced tumor geometry + vertex-color builders.
+ * Procedural, GBM-referenced tumor point clouds + vessel curves.
  *
  * Grounded in how glioblastoma actually reads on contrast-enhanced MRI and
  * in gross/3D-printed surgical-planning specimens (BraTS challenge
@@ -10,18 +10,23 @@
  * and is famous for *ring enhancement* — a necrotic, non-enhancing core
  * (hypointense on T1Gd) surrounded by a brighter, irregular enhancing rim
  * (BraTS label convention: NCR=necrotic core, ET=enhancing tumor,
- * ED=peritumoral edema). Since we can't literally render the interior of an
- * opaque mesh, that anatomy is stylized here as one or two shallow,
- * noise-jittered necrotic "cavities" sunk into the lobulated surface, each
- * ringed by a brighter enhancing band right at its edge — the single most
- * recognizable GBM signature, made visible on the surface itself instead of
- * requiring a cutaway.
+ * ED=peritumoral edema).
  *
- * All noise is evaluated once per vertex inside `useMemo` (never per
- * frame) using the deterministic CPU noise in `lib/noise.ts`.
+ * Rendered as a point cloud instead of a displaced mesh — matching how the
+ * real product (app/web/js/gl/viewer.js + shaders.js) actually renders a
+ * tumour specimen: individual per-cell points, not a smooth surface. Each
+ * point samples a category (0 = core tissue, 1 = necrotic, 2 =
+ * enhancing/margin rim) so a single draw can be coloured like the real
+ * viewer's category-attribute channel. Points fill a *volume*, not just a
+ * shell: density is biased toward the interior and thinned toward an
+ * irregular, noise-jittered outer boundary, so the point cloud itself
+ * carries the tumour's lobulated silhouette rather than relying on an
+ * invisible mesh boundary underneath it.
+ *
+ * All noise is evaluated once per point inside `useMemo` (never per frame)
+ * using the deterministic CPU noise in `lib/noise.ts`.
  */
 import * as THREE from "three";
-import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { fbm3, warpedFbm3 } from "@/lib/noise";
 import { mulberry32 } from "@/lib/prng";
 
@@ -55,11 +60,30 @@ function pitInfluence(dir: THREE.Vector3, pits: readonly NecroticPit[]): number 
   return best;
 }
 
-const NECROTIC = new THREE.Color("#42221e");
-const BASE_TISSUE = new THREE.Color("#8a2e2e");
-const ENHANCING = new THREE.Color("#e2685c");
+/** Uniform random direction on the unit sphere, seeded PRNG in, unit Vector3 out. */
+function randomDirection(rand: () => number, out: THREE.Vector3): THREE.Vector3 {
+  const z = rand() * 2 - 1;
+  const theta = rand() * Math.PI * 2;
+  const s = Math.sqrt(Math.max(0, 1 - z * z));
+  return out.set(s * Math.cos(theta), s * Math.sin(theta), z);
+}
 
-export interface MassOptions {
+/** Category codes shared by the point-cloud shader (see pointCloudShader.ts). */
+export const CATEGORY_CORE = 0;
+export const CATEGORY_NECROTIC = 1;
+export const CATEGORY_ENHANCING = 2;
+
+export interface PointCloudData {
+  positions: Float32Array;
+  /** Per-point category, 0..2 — see CATEGORY_* above. */
+  categories: Float32Array;
+  /** Per-point 0..1 seeded random value, used for size/opacity variance. */
+  jitter: Float32Array;
+}
+
+export interface MassCloudOptions {
+  count?: number;
+  seed?: number;
   lobeAmp?: number;
   fineAmp?: number;
   pitDepth?: number;
@@ -67,109 +91,163 @@ export interface MassOptions {
 }
 
 /**
- * The tumor mass proper (necrotic core + enhancing rim, conceptually one
- * contiguous solid — real ring enhancement is the outer boundary of the
- * core, not a separate object). Returns a merged/indexed, smooth-normaled
- * geometry with a `color` attribute for `vertexColors`.
+ * The tumor mass as a point cloud: category 0 (core tissue) fills most of
+ * the volume, category 1 (necrotic) clusters near the pit centres close to
+ * the surface — the point-cloud analogue of the old mesh's necrotic
+ * dimples — and category 2 (enhancing/margin rim) is denser right at the
+ * pit boundary and at the mass's own outer margin, standing in for BraTS
+ * ring enhancement. The outer boundary is rejection-thinned with a
+ * noise-jittered threshold so the silhouette itself is ragged, not a hard
+ * sphere clipped by an invisible surface.
  */
-export function createLobulatedMass(
-  radius: number,
-  detail: number,
-  opts: MassOptions = {},
-): THREE.BufferGeometry {
-  const { lobeAmp = 0.14, fineAmp = 0.03, pitDepth = 0.09, pits = DEFAULT_PITS } = opts;
+export function sampleTumorMassPointCloud(radius: number, opts: MassCloudOptions = {}): PointCloudData {
+  const {
+    count = 9000,
+    seed = 5081,
+    lobeAmp = 0.14,
+    fineAmp = 0.03,
+    pitDepth = 0.09,
+    pits = DEFAULT_PITS,
+  } = opts;
 
-  let geometry: THREE.BufferGeometry = new THREE.IcosahedronGeometry(radius, detail);
-  geometry = mergeVertices(geometry);
-
-  const posAttr = geometry.attributes.position;
-  const colorArr = new Float32Array(posAttr.count * 3);
+  const rand = mulberry32(seed);
+  const positions = new Float32Array(count * 3);
+  const categories = new Float32Array(count);
+  const jitter = new Float32Array(count);
   const dir = new THREE.Vector3();
-  const tmpColor = new THREE.Color();
 
-  for (let i = 0; i < posAttr.count; i++) {
-    dir.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i)).normalize();
+  const maxAttempts = count * 8;
+  let written = 0;
+  let attempts = 0;
+
+  while (written < count && attempts < maxAttempts) {
+    attempts++;
+    randomDirection(rand, dir);
 
     const coarse = warpedFbm3(dir.x * 1.1, dir.y * 1.1, dir.z * 1.1, 0.7, 4);
     const fine = fbm3(dir.x * 5.5, dir.y * 5.5, dir.z * 5.5, 3);
     const pit = pitInfluence(dir, pits);
+    const localRadius = radius * (1 + coarse * lobeAmp + fine * fineAmp - pit * pitDepth);
+    if (localRadius <= 0) continue;
 
-    const displacement = radius * (coarse * lobeAmp + fine * fineAmp - pit * pitDepth);
-    const r = radius + displacement;
-    posAttr.setXYZ(i, dir.x * r, dir.y * r, dir.z * r);
+    // Roughly-uniform volumetric fill (cbrt keeps number density constant
+    // with r), then a noise-jittered rejection band near the boundary so
+    // the margin itself reads as irregular rather than a clipped sphere.
+    const t = Math.cbrt(rand());
+    const marginNoise = fbm3(dir.x * 4 + 12.7, dir.y * 4, dir.z * 4 + 12.7, 3);
+    const marginThreshold = 0.86 + marginNoise * 0.08;
+    if (t > marginThreshold) {
+      const acceptProb = 1 - (t - marginThreshold) / (1 - marginThreshold);
+      if (rand() > acceptProb * acceptProb) continue;
+    }
 
-    // Base tissue, mottled (heterogeneous, not one flat color).
-    const mottle = fbm3(dir.x * 3.2 + 91, dir.y * 3.2, dir.z * 3.2 + 91, 3);
-    tmpColor.copy(BASE_TISSUE).lerp(ENHANCING, 0.16 + mottle * 0.12);
+    const r = localRadius * t;
+    positions[written * 3] = dir.x * r;
+    positions[written * 3 + 1] = dir.y * r;
+    positions[written * 3 + 2] = dir.z * r;
 
-    // Enhancing rim: a bright band peaking right at the pit boundary.
-    const rimBand = smoothstep(0.1, 0.45, pit) * smoothstep(0.95, 0.45, pit);
-    tmpColor.lerp(ENHANCING, THREE.MathUtils.clamp(rimBand * 1.8, 0, 1));
+    const necroticAmount = smoothstep(0.55, 0.88, pit) * smoothstep(1, 0.7, t);
+    const rimBand = smoothstep(0.08, 0.42, pit) * smoothstep(0.95, 0.42, pit);
+    const marginBand = smoothstep(marginThreshold - 0.18, marginThreshold, t);
 
-    // Necrotic fill inside the pit — desaturated/darker, not black: this is
-    // a shallow dimple read as tissue, not a crater or a rendering glitch.
-    const necroticAmount = smoothstep(0.45, 0.85, pit);
-    tmpColor.lerp(NECROTIC, necroticAmount * 0.72);
+    let category = CATEGORY_CORE;
+    const roll = rand();
+    if (necroticAmount > 0.5 && roll < necroticAmount * 0.8) {
+      category = CATEGORY_NECROTIC;
+    } else if ((rimBand > 0.35 || marginBand > 0.35) && roll < Math.max(rimBand, marginBand) * 0.9) {
+      category = CATEGORY_ENHANCING;
+    }
 
-    // Cheap curvature-based AO: crevices (negative fine noise) read very
-    // slightly darker — kept subtle so it reads as surface texture, not
-    // self-shadowed cavities going to black.
-    const ao = THREE.MathUtils.mapLinear(THREE.MathUtils.clamp(fine, -1, 1), -1, 1, 0.88, 1.04);
-    tmpColor.multiplyScalar(ao);
-
-    colorArr[i * 3] = tmpColor.r;
-    colorArr[i * 3 + 1] = tmpColor.g;
-    colorArr[i * 3 + 2] = tmpColor.b;
+    categories[written] = category;
+    jitter[written] = rand();
+    written++;
   }
 
-  posAttr.needsUpdate = true;
-  geometry.setAttribute("color", new THREE.BufferAttribute(colorArr, 3));
-  geometry.computeVertexNormals();
-  return geometry;
+  if (written === count) return { positions, categories, jitter };
+  return {
+    positions: positions.subarray(0, written * 3),
+    categories: categories.subarray(0, written),
+    jitter: jitter.subarray(0, written),
+  };
+}
+
+export interface HaloCloudOptions {
+  count?: number;
+  seed?: number;
+  /** Domain-warp frequency + offset for the bounding-volume noise field. */
+  freq?: number;
+  offset?: number;
+  ampNoise?: number;
+  /** [inner, outer] fraction of the local radius points are sampled between. */
+  shell?: [number, number];
+  shellGamma?: number;
 }
 
 /**
- * Soft, low-frequency-only irregular blob for the edema halo — deliberately
- * lower amplitude / lower frequency than the mass so it reads as a diffuse
- * swelling, not a second hard lobulated sphere. Rendered by a separate
- * fresnel-driven shader (see ProceduralTumor) that fades it to nothing well
- * before its literal mesh boundary, so this geometry only needs to avoid a
- * perfectly spherical *silhouette* — the translucency does the rest.
+ * A sparse, shell-biased point cloud for a diffuse halo volume (edema, or
+ * the faint outer margin shell) — deliberately lower density and a
+ * different radial fill than the mass cloud so it reads as a diffuse
+ * swelling wrapping the mass, not a second solid cell population.
  */
-export function createEdemaGeometry(radius: number, detail: number): THREE.BufferGeometry {
-  let geometry: THREE.BufferGeometry = new THREE.IcosahedronGeometry(radius, detail);
-  geometry = mergeVertices(geometry);
-  const posAttr = geometry.attributes.position;
+function sampleHaloPointCloud(radius: number, opts: HaloCloudOptions = {}): PointCloudData {
+  const {
+    count = 2200,
+    seed = 6203,
+    freq = 0.75,
+    offset = 40,
+    ampNoise = 0.16,
+    shell = [0.55, 1],
+    shellGamma = 0.6,
+  } = opts;
+
+  const rand = mulberry32(seed);
+  const positions = new Float32Array(count * 3);
+  const categories = new Float32Array(count);
+  const jitter = new Float32Array(count);
   const dir = new THREE.Vector3();
-  for (let i = 0; i < posAttr.count; i++) {
-    dir.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i)).normalize();
-    const n = warpedFbm3(dir.x * 0.75 + 40, dir.y * 0.75, dir.z * 0.75 + 40, 0.8, 3);
-    const r = radius * (1 + n * 0.16);
-    posAttr.setXYZ(i, dir.x * r, dir.y * r, dir.z * r);
+  const [shellLo, shellHi] = shell;
+
+  for (let i = 0; i < count; i++) {
+    randomDirection(rand, dir);
+    const n = warpedFbm3(dir.x * freq + offset, dir.y * freq, dir.z * freq + offset, 0.8, 3);
+    const localRadius = radius * (1 + n * ampNoise);
+    const t = shellLo + Math.pow(rand(), shellGamma) * (shellHi - shellLo);
+    const r = localRadius * t;
+
+    positions[i * 3] = dir.x * r;
+    positions[i * 3 + 1] = dir.y * r;
+    positions[i * 3 + 2] = dir.z * r;
+    categories[i] = CATEGORY_CORE;
+    jitter[i] = rand();
   }
-  posAttr.needsUpdate = true;
-  geometry.computeVertexNormals();
-  return geometry;
+
+  return { positions, categories, jitter };
 }
 
-/**
- * Faint outer margin shell — very subtle irregular boundary indicator
- * (replaces a crystalline wireframe cage, which read as artificial/plastic).
- */
-export function createMarginGeometry(radius: number, detail: number): THREE.BufferGeometry {
-  let geometry: THREE.BufferGeometry = new THREE.IcosahedronGeometry(radius, detail);
-  geometry = mergeVertices(geometry);
-  const posAttr = geometry.attributes.position;
-  const dir = new THREE.Vector3();
-  for (let i = 0; i < posAttr.count; i++) {
-    dir.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i)).normalize();
-    const n = warpedFbm3(dir.x * 0.6 + 80, dir.y * 0.6, dir.z * 0.6 + 80, 0.7, 3);
-    const r = radius * (1 + n * 0.08);
-    posAttr.setXYZ(i, dir.x * r, dir.y * r, dir.z * r);
-  }
-  posAttr.needsUpdate = true;
-  geometry.computeVertexNormals();
-  return geometry;
+/** Sparser, differently-coloured point cloud standing in for peritumoral edema. */
+export function sampleEdemaPointCloud(radius: number, count = 2200): PointCloudData {
+  return sampleHaloPointCloud(radius, {
+    count,
+    seed: 6203,
+    freq: 0.75,
+    offset: 40,
+    ampNoise: 0.16,
+    shell: [0.55, 1],
+    shellGamma: 0.6,
+  });
+}
+
+/** Very sparse, faint point cloud standing in for surrounding-tissue margin. */
+export function sampleMarginPointCloud(radius: number, count = 1200): PointCloudData {
+  return sampleHaloPointCloud(radius, {
+    count,
+    seed: 9012,
+    freq: 0.6,
+    offset: 80,
+    ampNoise: 0.08,
+    shell: [0.82, 1],
+    shellGamma: 0.75,
+  });
 }
 
 export interface VesselCurveOptions {
@@ -209,12 +287,12 @@ export function createVesselCurves(opts: VesselCurveOptions = {}): THREE.Catmull
       );
       dir = dir.clone().add(wobble).normalize();
       // Deliberately well inside the nominal mass radius: the mass surface
-      // itself is heavily noise-displaced (see createLobulatedMass) and can
-      // dip well below `radius` locally, so a curve pinned just outside
-      // `radius` would poke through empty space wherever the surface dips
-      // — read as a stray floating line rather than a vessel under the
-      // tissue. Sitting further inside keeps it plausibly "just under the
-      // surface" everywhere instead.
+      // itself is heavily noise-displaced (see sampleTumorMassPointCloud)
+      // and can dip well below `radius` locally, so a curve pinned just
+      // outside `radius` would poke through empty space wherever the
+      // surface dips — read as a stray floating line rather than a vessel
+      // under the tissue. Sitting further inside keeps it plausibly "just
+      // under the surface" everywhere instead.
       const r = radius * (0.62 + rand() * 0.12);
       points.push(dir.clone().multiplyScalar(r));
     }
