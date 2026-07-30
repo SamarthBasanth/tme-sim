@@ -28,7 +28,7 @@ This is an out-of-sample test of the **pipeline**, not of a fitted model. Being 
 | the reconstruction was never inspected on it while the marker gate, the typing threshold or the 30 µm tissue-mask radius were chosen | the IO-panel **marker map** in `reconstruct/marker_panels.py` was written for this section (in `results/state_validation.md`), by choosing among measured candidate marker sets — see §1.2 |
 | the 20 µm vessel linking distance and the 7.5 µm vessel radius were fixed against section 1 and are used here unchanged | the oxygen solver's `consumption` constant has never been fitted to a measured oxygen tension on **either** section |
 | the perivascular-sink calibration **α = 148.6** was fit once on doxorubicin against section 1 and is **not** refitted here | the drug IC50s are external (GDSC/literature) and are the same numbers on both |
-| every threshold in `delivery_metrics` (the p95 vessel threshold, the 1× IC50 coverage bar) | `dx = 12 µm` was chosen for grid convergence on section 1; convergence is **not** re-established here (§6) |
+| the fixed thresholds in `delivery_metrics` (the 1× IC50 coverage bar; the vessel-distance axis is now the PRIMARY direct-cell metric and has no threshold at all — see `results/vessel_profile.md`'s dedicated distance-metric-change section) | `dx = 12 µm` was chosen for grid convergence on section 1; convergence is **not** re-established here (§6) |
 
 ## 1. Reconstruction — does the marker-gated classifier survive a different panel?
 
@@ -103,7 +103,7 @@ Three candidate explanations for the endothelial gap, and what separates them:
 
 **Section 2 scores 10.98% — 5.23× the measured value, and 8.82× section 1's.** That is outside the published band by a wide margin, and it is the clearest single failure of generalisation in this report.
 
-The cause is not mysterious, and it is worth stating precisely because it is *not* 'the second patient is more vascular by that factor'. The area fraction is (number of vessel objects) × (area painted per object) ÷ (tissue area). Section 2 has 57,733 endothelial cells over 89.5 mm² versus section 1's 4,295 over 27.9 mm² — 4.19× the areal density — and the fixed 7.5 µm radius converts that density directly into painted area. The radius is a **grid-constrained constant**: at dx = 12 µm one grid cell already has an equivalent disc radius of 6.8 µm, so 7.5 µm is the smallest radius that reliably paints ≥1 cell per vessel. On a denser section that floor is hit by more vessels, and the area fraction inflates. **The 1.19× agreement on section 1 was therefore partly a coincidence of that section's endothelial density matching the grid-imposed radius.**
+The cause is not the fixed-7.5-µm-per-cell painting an earlier version of this paragraph described — that path was superseded by `vessel_geometry.py`'s sub-grid, data-derived radius model (see `results/vessel_geometry_fix.md`), which is what §2.1's numbers above are already computed from. A dedicated follow-up (`results/sweep/vascular_area_fraction_generalization_2026-07-30T03-18-42Z.md`) tested whether ANY non-circular, section-invariant function from a vessel object's own cell count to its radius could close this gap — six candidates, including literature-motivated flattened and capped variants, on this section plus a third independent GBM section — and found a genuine null: every candidate that helps this held-out section pulls the development section further from target, because the two errors run in opposite directions (development: 0.59× too low; both other sections: 5.2× too high) while every candidate radius model moves monotonically in the same direction on all three. The radius that WOULD hit 2.1% on each section separately is 7.28 / 3.12 / 2.57 µm — a near-perfect inverse rank correlation with each section's own microvessel density, directionally consistent with a real published finding (Halshtok Neiman et al., *Clin Neuroradiol* 2021, PMID 34940899). But using this project's own MVD to calibrate its own vessel radius would be circular: §6.3 below independently flags MVD itself as an unresolved, both-sections-fail segmentation defect. Conditioning one flagged defect on another is not a fix, so none was applied — this remains open, honestly.
 
 ### 2.2 Vessel objects and the clustering that makes them comparable to histology
 
@@ -390,7 +390,7 @@ These are the rows where the held-out patient behaved exactly like the developme
 ./.venv/bin/python -m tmesim.validation.heldout_patient
 ```
 
-Deterministic (`seed = 0` in every `SimConfig`; permutation seed 0). Runtime 39 min, dominated by 10 PDE solves — 25 min of it on section 2's 905×956 grid.
+Deterministic (`seed = 0` in every `SimConfig`; permutation seed 0). Runtime 18 min, dominated by 10 PDE solves — 13 min of it on section 2's 905×956 grid.
 
 **Files added by this validation (nothing else was modified):**
 
