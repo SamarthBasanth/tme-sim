@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import SceneCanvas from "@/components/canvas/SceneCanvas";
 import MetricOverlay from "@/components/ui/MetricOverlay";
 import { SECTION_COPY } from "@/lib/copy";
+import { STUDIO_URL } from "@/lib/env";
 
 /**
  * `prefers-reduced-motion: reduce` fallback. No Lenis, no ScrollTrigger, no
@@ -42,7 +43,7 @@ export default function ReducedMotionExperience({ isMobile }: { isMobile: boolea
           </span>
           <h1>{SECTION_COPY[0].headline}</h1>
           <p>{SECTION_COPY[0].body}</p>
-          <a className="cta-button" href="#section-2">
+          <a className="cta-button" href={STUDIO_URL}>
             Explore the model
           </a>
         </div>

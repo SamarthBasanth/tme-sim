@@ -15,6 +15,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { SECTION_COUNT, metricPanelOpacity, sectionVisual } from "@/lib/timeline";
 import { SECTION_COPY } from "@/lib/copy";
+import { STUDIO_URL } from "@/lib/env";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -136,15 +137,9 @@ function Experience() {
           >
             <h1>{SECTION_COPY[0].headline}</h1>
             <p>{SECTION_COPY[0].body}</p>
-            <button
-              type="button"
-              className="cta-button"
-              onClick={() =>
-                lenisRef.current?.scrollTo(window.innerHeight * 1.02, { duration: 1.4 })
-              }
-            >
+            <a className="cta-button" href={STUDIO_URL}>
               Explore the model
-            </button>
+            </a>
           </NarrativeSection>
 
           <NarrativeSection
