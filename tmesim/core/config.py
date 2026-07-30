@@ -363,7 +363,7 @@ DRUG_LIBRARY: Dict[str, DrugParams] = {
     # the GDSC assay doses/measures irinotecan directly, so its cytotoxicity
     # tier is unaffected. Structure-derived bbb_penetrance (0.151) lands close
     # to the REAL measured irinotecan CSF:plasma AUC ratio (14 +/- 3%, nonhuman
-    # primates; Blaney JM et al., Cancer Chemother Pharmacol 1998;41(6):464-8,
+    # primates; Blaney S et al., Cancer Chemother Pharmacol 1998;41(6):464-8,
     # PMID 9554590) -- a genuine, if modest, external cross-check on this
     # project's structure-only BBB rule. See molecular/potency.py for the full note.
     "irinotecan-like": DrugParams(
