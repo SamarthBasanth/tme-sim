@@ -88,6 +88,7 @@ async function rawFetch(method, path, { body, form } = {}) {
       init.headers['content-type'] = 'application/json';
       init.body = JSON.stringify(body);
     }
+    if (coreApi.apiKey) init.headers['x-api-key'] = coreApi.apiKey;
     const res = await fetch(coreApi.base + path, init);
     if (!res.ok) {
       let payload = null;

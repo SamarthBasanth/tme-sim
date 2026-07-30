@@ -967,3 +967,42 @@ html[data-mode="stub"] .scalebar .txt::after {
   content: " \00b7 synthetic";
   color: var(--synthetic);
 }
+
+/* ============================================== access-key gate ========= */
+/* The only overlay in this app that covers the whole viewport rather than
+   sitting inside the canvas (see ui/apikey.js's module comment for why). */
+.gate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg-0) 88%, transparent);
+  backdrop-filter: blur(2px);
+}
+.gate-card {
+  max-width: 380px;
+  width: calc(100% - var(--sp-8) * 2);
+  background: var(--bg-1);
+  box-shadow: 0 8px 32px color-mix(in srgb, black 40%, transparent);
+}
+.gate-card .inp {
+  height: var(--h-ctl);
+  padding: 0 var(--sp-4);
+  background: var(--bg-0);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  color: var(--fg-0);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+.gate-card .inp:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.gate-error {
+  margin-top: var(--sp-4);
+  color: var(--crit);
+  font-size: var(--fs-xs);
+}

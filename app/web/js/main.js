@@ -18,6 +18,8 @@ import { toast, notifyError } from './ui/toast.js';
 import { fieldMeta } from './fields.js';
 import { setSynthetic, setActiveRun } from './ui/provenance.js';
 import { num, int, auto, bytes, NULL_GLYPH } from './util/fmt.js';
+import { ensureAuthenticated } from './ui/apikey.js';
+import { shouldShowWelcome, createWelcomeOverlay } from './ui/welcome.js';
 
 const store = createStore({ ...INITIAL });
 
@@ -208,6 +210,13 @@ async function boot() {
   api.api.onModeChange = paintBackendState;
 
   /* --- data ----------------------------------------------------------- */
+  // Blocks here (showing the access-key gate) if the backend is reachable
+  // but requires a key this browser doesn't have or has wrong. A no-op when
+  // no key is configured (the ordinary local/no-auth case) or when the
+  // backend is genuinely unreachable (probe() below falls back to stub, as
+  // before this gate existed).
+  await ensureAuthenticated(api.probe);
+
   const probe = await api.probe();
   paintBackendState(api.api);
   if (!probe.live) {
@@ -238,6 +247,14 @@ async function boot() {
   if (done) openRun(done.run_id);
 
   if (viewer) viewer.start();
+
+  if (shouldShowWelcome()) {
+    const welcome = createWelcomeOverlay({
+      onGoToProtocol: () => { const b = $('#btn-protocol'); if (b) b.click(); },
+    });
+    document.body.appendChild(welcome.node);
+  }
+
   setInterval(paintStatusBar, 250);
   setInterval(refreshRuns, 6000);
   // Reports poll fast while arms are in flight, slowly when idle. A report is

@@ -36,6 +36,8 @@ export class ApiError extends Error {
   }
 }
 
+const API_KEY_STORAGE = 'tmesim_api_key';
+
 export const api = {
   base: '',
   stub: false,
@@ -43,7 +45,25 @@ export const api = {
   reachable: null,
   lastLatencyMs: null,
   onModeChange: null,
+  /** Set once probe() gets a 401 -- a real server that requires a key we
+   * don't have (or have wrong), as distinct from "unreachable" (status 0/5xx),
+   * which falls back to stub data instead. main.js shows the access-key gate
+   * when this is true and clears it once a working key is stored. */
+  authRequired: false,
+  apiKey: (() => {
+    try { return localStorage.getItem(API_KEY_STORAGE) || ''; }
+    catch { return ''; }
+  })(),
 };
+
+/** Persist a new key (or clear with '') and use it on every subsequent call. */
+export function setApiKey(key) {
+  api.apiKey = key || '';
+  try {
+    if (api.apiKey) localStorage.setItem(API_KEY_STORAGE, api.apiKey);
+    else localStorage.removeItem(API_KEY_STORAGE);
+  } catch { /* localStorage unavailable (private mode, etc.) -- key still works this session */ }
+}
 
 function setStub(on, why) {
   if (api.stub === on) return;
@@ -58,11 +78,13 @@ async function rawFetch(method, path, { body, binary, signal } = {}) {
   if (signal) signal.addEventListener('abort', () => ctrl.abort(), { once: true });
   const t0 = performance.now();
   try {
+    const headers = body !== undefined
+      ? { 'content-type': 'application/json', accept: binary ? 'application/octet-stream' : 'application/json' }
+      : { accept: binary ? 'application/octet-stream' : 'application/json' };
+    if (api.apiKey) headers['x-api-key'] = api.apiKey;
     const res = await fetch(api.base + path, {
       method,
-      headers: body !== undefined
-        ? { 'content-type': 'application/json', accept: binary ? 'application/octet-stream' : 'application/json' }
-        : { accept: binary ? 'application/octet-stream' : 'application/json' },
+      headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: ctrl.signal,
       cache: 'no-store',
@@ -143,10 +165,23 @@ export async function probe() {
   try {
     const secs = await rawFetch('GET', '/api/sections');
     api.reachable = true;
+    api.authRequired = false;
     setStub(false);
     return { live: true, sections: secs };
   } catch (err) {
+    // A 401 means a REAL, reachable server that requires a key we don't have
+    // (or have wrong) -- fundamentally different from "not answering at
+    // all," and must not be papered over with fake stub data: that would
+    // silently show an operator plausible-looking numbers that are not this
+    // server's real reconstruction. Surface it and let main.js gate the app
+    // on a correct key instead.
+    if (err instanceof ApiError && err.status === 401) {
+      api.reachable = true;
+      api.authRequired = true;
+      return { live: false, authRequired: true, sections: [] };
+    }
     api.reachable = false;
+    api.authRequired = false;
     mock.seedHistory();
     setStub(true, err instanceof ApiError && err.status ? `backend ${err.status}` : 'backend unreachable');
     return { live: false, sections: await fromMock('GET', '/api/sections', {}) };

@@ -280,7 +280,10 @@ export function createReportsPanel({ store, getSection }) {
 
   async function download(id) {
     try {
-      const res = await fetch(api.reportHtmlUrl(id), { cache: 'no-store' });
+      const res = await fetch(api.reportHtmlUrl(id), {
+        cache: 'no-store',
+        headers: api.api.apiKey ? { 'x-api-key': api.api.apiKey } : {},
+      });
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const blob = new Blob([await res.text()], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
