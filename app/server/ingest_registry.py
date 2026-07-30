@@ -60,7 +60,19 @@ def _store_path() -> str:
 
 
 def load_store() -> "OrderedDict[str, Dict]":
-    """The persisted ingested-section table, read once per process."""
+    """The persisted ingested-section table, read once per process.
+
+    "Once per process" is load-bearing, not just an optimisation: if a
+    SEPARATE process registers a new section (a data-ingestion script, or a
+    second `python -m app.server` briefly started to run `/api/sections/scan`)
+    while a long-running Studio server is already up, that server's `_store`
+    is stale until it restarts -- confirmed live: a Studio instance running
+    since before this session's GBM-Space ingestion work only exposed the 7
+    built-in sections via `/api/sections`, not the 30 sections a fresh
+    process could see immediately from the same on-disk file. There is no
+    live-reload here; restart the server to pick up sections registered by
+    another process.
+    """
     global _store
     with _lock:
         if _store is None:

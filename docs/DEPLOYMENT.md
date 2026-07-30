@@ -105,6 +105,33 @@ follow `docs/REPRODUCE.md` §2b inside the running container to fetch it.
 
 ---
 
+## 1d. Restart to pick up sections ingested by another process
+
+`app/server/ingest_registry.py` reads the ingested-section table (real
+GBM-Space / breast / etc. sections, on top of the 7 built-in ones) **once per
+process** and caches it in memory. If a long-running Studio server is already
+up and a separate process registers a new section — a data-ingestion script,
+or `POST /api/sections/scan` hit against a short-lived second instance — the
+running server keeps serving its stale, older list until restarted. There is
+no live-reload. If `/api/sections` looks thinner than you expect (only the 7
+built-ins, none of the sections you know you've ingested), restart the
+server before assuming the data is missing.
+
+To register a section that already has real data in `data_cache/` but isn't
+in the dropdown yet (this repo's breast-cancer Xenium section, for example,
+was ingested via direct Python calls in earlier work rather than through this
+route, so it needed registering separately):
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/sections/scan \
+  -H "Content-Type: application/json" \
+  -d '{"path": "data_cache/<your-section-dir>", "register": true, "section_id": "<id>", "label": "<label>"}'
+```
+
+This persists to `app/runs/_ingested_sections.json` (gitignored, local state)
+and is picked up immediately by the process that ran the scan — other
+already-running processes still need the restart above.
+
 ## 2. What is NOT handled for you
 
 * **TLS.** This serves plain HTTP. Put a reverse proxy in front for anything
