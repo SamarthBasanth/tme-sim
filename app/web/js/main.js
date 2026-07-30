@@ -242,18 +242,27 @@ async function boot() {
 
   await refreshRuns();
 
-  // Open the newest completed run so the workstation is not empty on arrival.
-  const done = store.get().runs.find((r) => r.status === 'done');
+  // Open the newest completed SINGLE-SPEC run so the workstation is not empty
+  // on arrival. Protocol (TPL) runs are deliberately excluded here: they have
+  // no single `/api/runs/{id}/geometry` payload the way a regular RunSpec run
+  // does (a sweep can be many points, not one reconstruction), so opening one
+  // here 404s on geometry load and leaves the viewer looking broken with only
+  // a small corner toast explaining why -- confirmed live: the newest run in
+  // this workstation's own history was a protocol run and did exactly that.
+  const done = store.get().runs.find((r) => r.status === 'done' && r.spec && r.spec.kind !== 'protocol');
   if (done) openRun(done.run_id);
 
   if (viewer) viewer.start();
 
-  if (shouldShowWelcome()) {
+  const openTour = () => {
     const welcome = createWelcomeOverlay({
       onGoToProtocol: () => { const b = $('#btn-protocol'); if (b) b.click(); },
     });
     document.body.appendChild(welcome.node);
-  }
+  };
+  if (shouldShowWelcome()) openTour();
+  const tourBtn = $('#btn-tour');
+  if (tourBtn) tourBtn.addEventListener('click', openTour);
 
   setInterval(paintStatusBar, 250);
   setInterval(refreshRuns, 6000);

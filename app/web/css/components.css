@@ -1006,3 +1006,32 @@ html[data-mode="stub"] .scalebar .txt::after {
   color: var(--crit);
   font-size: var(--fs-xs);
 }
+
+/* ============================================== onboarding tour ========= */
+.tour-card { max-width: 420px; }
+.tour-body p { margin: 0; }
+.tour-dots {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+}
+.tour-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+.tour-dot.active { background: var(--accent); }
+
+/* Applied to whatever real UI element the current tour step is talking
+   about (e.g. the SECTION dropdown, the Submit run button) so a claim like
+   "the dropdown top-left" has something for the eye to actually land on,
+   rather than trusting the user to find it from a text description alone. */
+.tour-highlight {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+  position: relative;
+  z-index: 1001; /* above .gate-overlay's backdrop (z-index 1000) */
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
+}

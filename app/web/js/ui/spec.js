@@ -187,6 +187,7 @@ export function createSpecPanel({ store, onSubmit }) {
   /* ------------------------------------------------------------ submit -- */
 
   const submitBtn = h('button.btn.primary', {
+    id: 'btn-submit-run',
     onclick: () => onSubmit(store.get().spec),
     title: 'POST /api/runs',
   }, 'Submit run');
