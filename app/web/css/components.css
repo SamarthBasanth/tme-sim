@@ -1008,7 +1008,27 @@ html[data-mode="stub"] .scalebar .txt::after {
 }
 
 /* ============================================== onboarding tour ========= */
-.tour-card { max-width: 420px; }
+/* A floating popover, NOT a full-screen modal -- position: fixed, anchored
+   next to the real element each step is about (see welcome.js's
+   positionCard()), with no backdrop over the rest of the dashboard. The
+   shadow (heavier than .notice's default) is what reads it as "floating
+   above the UI" instead of a normal docked panel, since there is no dim
+   backdrop doing that job here. */
+.tour-popover {
+  position: fixed;
+  z-index: 1001; /* above .gate-overlay (1000), if the auth gate is also up */
+  max-width: 340px;
+  background: var(--bg-1);
+  box-shadow: 0 8px 28px color-mix(in srgb, black 35%, transparent),
+              0 0 0 1px var(--line-2);
+}
+.tour-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+.tour-head h3 { margin: 0; }
 .tour-body p { margin: 0; }
 .tour-dots {
   display: flex;
@@ -1032,6 +1052,6 @@ html[data-mode="stub"] .scalebar .txt::after {
   outline-offset: 2px;
   border-radius: var(--radius);
   position: relative;
-  z-index: 1001; /* above .gate-overlay's backdrop (z-index 1000) */
+  z-index: 1001;
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
 }
