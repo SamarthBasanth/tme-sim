@@ -59,7 +59,7 @@ from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from .cache import (
     OXYGEN_MODES,
@@ -1130,6 +1130,25 @@ def create_app(manager: Optional[JobManager] = None,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Optional shared-secret gate on every /api/* route, OFF by default (empty
+    # env var) so the local single-user workflow this app was built for is
+    # completely unaffected. __main__.py sets TMESIM_STUDIO_API_KEY when a
+    # non-loopback --host is requested without an explicit --api-key, so a
+    # remote deployment can never come up silently unauthenticated. Static
+    # files (the frontend itself) are deliberately NOT gated, so the page can
+    # load and prompt for the key rather than failing to render at all.
+    api_key = os.environ.get("TMESIM_STUDIO_API_KEY", "").strip()
+    if api_key:
+        @app.middleware("http")
+        async def _require_api_key(request: Request, call_next):
+            if request.url.path.startswith("/api/") and request.method != "OPTIONS":
+                if request.headers.get("x-api-key", "") != api_key:
+                    return JSONResponse(
+                        {"detail": "missing or incorrect X-API-Key header"},
+                        status_code=401,
+                    )
+            return await call_next(request)
     jobs = manager if manager is not None else JobManager()
     store = projects if projects is not None else PROJECT_STORE
     reports = reports if reports is not None else ReportManager(jobs)
