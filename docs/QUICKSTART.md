@@ -343,3 +343,4 @@ micro = reconstruct_real(
 | What is the model, mathematically? | [`docs/MATHEMATICAL_MODEL.md`](MATHEMATICAL_MODEL.md) |
 | How do the pieces fit together? | [`docs/architecture.md`](architecture.md) |
 | How should I compare drugs correctly? | [`results/delivery_metrics.md`](../results/delivery_metrics.md) |
+| My whole team needs to reach Studio, not just my machine | [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) |
