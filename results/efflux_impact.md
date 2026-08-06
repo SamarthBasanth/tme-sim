@@ -1,5 +1,49 @@
 # Active efflux (P-gp / BCRP) — implemented, cited, and it does NOT help
 
+> ### Re-validated under corrected transport physics — the rejection SURVIVES, with stronger evidence
+>
+> This rejection was measured under the ONE-WAY delivery law (`S = PS*Cp`),
+> which `results/breast_kp_validation.md` later showed was structurally wrong.
+> There was a real mechanistic reason to expect the verdict to change: efflux
+> multiplies `bbb_penetrance`, hence PS, and under the one-way law PS appeared
+> only in the source, so efflux was a pure downward RESCALE of delivery. Under
+> `PDEConfig(transvascular_exchange=True)` PS appears on BOTH sides, so the
+> steady state `PS*Cp/(PS + clearance + binding)` responds SUB-LINEARLY and
+> saturates. Efflux should therefore hurt less. It was worth checking.
+>
+> **The predicted mechanism is real and measurable, and it is not enough.**
+> Under one-way the ratio is EXACTLY linear in PS (verified to 8 significant
+> figures, confirming efflux is a pure rescale). Under exchange the saturation
+> appears and is substantial for permeable drugs — adavosertib's efflux
+> penalty softens 0.262 → 0.388, temozolomide 0.738 → 0.877. But **eribulin**,
+> the drug that drives the failure, has `PS << clearance + binding`, sits in
+> the linear regime, and its penalty barely moves (0.0333 → 0.0349): efflux
+> still crushes it ~30x, from over-predicted 3.08x to under-predicted 0.108x.
+> The saturation helps precisely the drugs efflux was already nearly harmless
+> for, and not the one it breaks.
+>
+> **12 of 12 comparisons worsen** — pooled, microdialysis-only and
+> homogenate-only subsets, across both transport laws and both penetrance
+> constructions (leak-inclusive and structure-only). GM |fold| penalty from
+> efflux: pooled 1.417x worse one-way → 1.377x worse under exchange.
+>
+> **The one escape hatch this report honestly flagged is now closed.** It noted
+> efflux helps once adavosertib is dropped (1.714 → 1.657). Scored through the
+> actual engine that no longer holds in either arm: ex-adavosertib under
+> exchange 2.041 → 2.480 (worse); ex-eribulin 2.669 → 3.143 (worse). Under
+> corrected physics eribulin, not adavosertib, is the dominant casualty.
+>
+> Note the scorecard below is ANALYTIC (`R = clip(bbb_penetrance + L*D, 0, 1)`,
+> never touching the PDE), so the flag cannot reach it; the re-validation
+> re-scored all six drugs through `simulate_response` on real tissue instead,
+> and validated that harness against two independently published numbers
+> before trusting it.
+>
+> **Conclusion: keep efflux default-OFF.** The evidence is stronger than when
+> this was written — 8/8 configurations under one analytic law has become
+> 12/12 comparisons spanning two transport laws, two penetrance constructions
+> and three subsets, plus a leave-one-out that removes the original caveat.
+
 **Verdict up front: implemented as a zero-free-parameter, fully cited mechanism, scored against both measured human datasets, and left DEFAULT-OFF because it makes the one scorecard it can act on worse and cannot act on the other at all.**
 
 | scorecard | before | after efflux | verdict |
