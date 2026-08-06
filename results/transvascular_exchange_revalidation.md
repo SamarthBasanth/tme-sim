@@ -168,15 +168,40 @@ re-runs. Both reports now carry conditional-retraction notices.
   robustness, not the informativeness. The fragile half (palbociclib,
   irinotecan, etoposide, methotrexate, vincristine, elasticity 0.74–0.99) gets
   almost no benefit.
-* **NEW RESOLUTION REQUIREMENT.** Exchange introduces a perivascular length
-  scale `sqrt(D_eff/(PS + clearance + binding))`. For doxorubicin that is
-  ~52 um and dx = 12 um resolves it. For `bbb_penetrance` >~ 0.6 (lomustine,
-  carmustine, procarbazine, ribociclib) it collapses to **~15-17 um**, and the
-  converged spacing drops to **~8-10 um**. Those are exactly the drugs that
-  move most in §4.1 — so the ON-arm magnitudes there are at the edge of
-  resolution. The error direction DEEPENS the reordering (an under-resolved
-  boundary layer over-estimates tissue concentration), so the reordering is
-  not an artefact, but its magnitude is not converged.
+* **~~NEW RESOLUTION REQUIREMENT~~ — MEASURED, AND THIS ENTRY WAS WRONG.**
+  Exchange does introduce a perivascular length scale
+  `sqrt(D_eff/(PS + clearance + binding))` that collapses to ~15-17 um for
+  `bbb_penetrance` >~ 0.6, and this section originally predicted, from that,
+  that dx = 12 um would be inadequate and that finer grids would push the
+  ON-arm values **DOWN** (reasoning: an under-resolved boundary layer
+  over-estimates tissue concentration, which would DEEPEN the §4.1
+  reordering).
+
+  **Both halves of that prediction are false.** Swept dx = 12 / 10 / 8 um on
+  the real GBM section, exchange on, for exactly the flagged drugs, with
+  doxorubicin as a low-permeability control:
+
+  | drug | bbb_pen | ratio@12 | ratio@10 | ratio@8 | 12→8 |
+  |---|---:|---:|---:|---:|---:|
+  | lomustine | 0.973 | 0.4584 | 0.4623 | 0.4671 | **+1.9%** |
+  | carmustine | 0.955 | 0.6041 | 0.6080 | 0.6123 | **+1.4%** |
+  | procarbazine | 0.885 | 0.4374 | 0.4407 | 0.4453 | **+1.8%** |
+  | ribociclib | 0.800 | 0.2609 | 0.2636 | 0.2677 | **+2.6%** |
+  | cisplatin | 0.858 | 0.6184 | 0.6223 | 0.6266 | **+1.3%** |
+  | doxorubicin (control) | 0.021 | 0.0165 | 0.0163 | 0.0165 | −0.2% |
+
+  Values move **UP**, not down, and by only **1.3-2.6%** — so dx = 12 um is
+  adequate after all and this entry overstated the risk. The doxorubicin
+  control is flat (−0.2% ratio, −0.0% kill), confirming the sweep measures the
+  boundary layer rather than a generic grid artefact.
+
+  **The §4.1 reordering is unaffected**, though not for the reason originally
+  given. Kills move +1.0% to +2.0%, and the decisive cisplatin/doxorubicin
+  swap persists at dx = 8 (cisplatin 0.2335 vs doxorubicin 0.2547, versus
+  0.2311 vs 0.2547 at dx = 12). The reordering is not a resolution artefact.
+
+  Retained rather than deleted because the original reasoning was recorded as
+  a falsifiable prediction and it failed; deleting it would erase the check.
 * **Attribution degenerates to two categories.** When exposure drops below
   IC50 population-wide, RESISTANCE and CHANCE go to exactly zero cells because
   the exposure bands take precedence. Under bounded physics that is most of

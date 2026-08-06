@@ -120,18 +120,20 @@ class PDEConfig:
     #: invariant to 1e-4 even at ``dt*PS = 1245``, the advective CFL trip point
     #: is bit-identical, and the solver's zero-clamp was observed never to fire.
     #:
-    #: RESOLUTION CAVEAT, and it is a real one. The term introduces a new
-    #: perivascular length scale ``sqrt(D_eff/(PS + clearance + binding))``
-    #: INSIDE perfused cells. For calibrated doxorubicin that is ~52 um and
-    #: dx = 12 um resolves it fine (successive change at dx=12 is 0.0041 with
-    #: the term on vs 0.0044 with it off -- the convergence threshold does not
-    #: move). But for the MOST PERMEABLE drugs in the library
-    #: (``bbb_penetrance`` >~ 0.6: lomustine, carmustine, procarbazine,
-    #: ribociclib) it collapses to ~15-17 um, i.e. barely one grid cell per
-    #: e-fold at dx = 12. For those drugs the converged spacing with this flag
-    #: ON is ~8-10 um, NOT the usual 12. Do not cite
-    #: ``results/numerical_rigor.md`` section 2's dx = 12 justification for a
-    #: high-permeability drug with this flag on without re-running finer.
+    #: RESOLUTION. The term introduces a new perivascular length scale
+    #: ``sqrt(D_eff/(PS + clearance + binding))`` inside perfused cells, which
+    #: collapses to ~15-17 um for the most permeable drugs (``bbb_penetrance``
+    #: >~ 0.6: lomustine, carmustine, procarbazine, ribociclib) -- barely one
+    #: grid cell per e-fold at dx = 12. An earlier version of this note
+    #: predicted from that geometry alone that dx = 12 would be inadequate and
+    #: that finer grids would push values DOWN. **Measured, and both halves
+    #: were wrong**: sweeping dx = 12/10/8 um on real GBM tissue moves those
+    #: drugs' interstitial:plasma ratios UP by only 1.3-2.6 % (lomustine +1.9,
+    #: carmustine +1.4, procarbazine +1.8, ribociclib +2.6, cisplatin +1.3),
+    #: with a low-permeability doxorubicin control flat at -0.2 %. **dx = 12 um
+    #: is adequate with this flag on.** Kills move +1.0 to +2.0 % and the
+    #: cross-drug reordering this change causes persists unchanged at dx = 8.
+    #: See ``results/transvascular_exchange_revalidation.md`` section 5.
     transvascular_exchange: bool = False
 
 
