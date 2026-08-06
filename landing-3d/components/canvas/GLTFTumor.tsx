@@ -22,6 +22,9 @@ import { damp } from "@/lib/scrollMath";
  * with no naming convention still renders correctly, just without the
  * "regions pull apart" beat in Scene 3.
  */
+/** World-unit point size for point-cloud assets; see the fixup effect below. */
+const POINT_SIZE_UNITS = 0.009;
+
 export default function GLTFTumor({
   url,
   reducedMotion = false,
@@ -33,6 +36,56 @@ export default function GLTFTumor({
   const progressRef = useScrollProgressRef();
 
   const cloned = useMemo(() => scene.clone(true), [scene]);
+
+  /**
+   * Point-cloud assets need their material fixed up on load. The glTF spec has
+   * no point-size property, so GLTFLoader always builds `PointsMaterial` with
+   * `size = 1, sizeAttenuation = false` -- i.e. 1 screen pixel per point,
+   * which renders 40k real cells as a barely-visible dust on a dark ground.
+   *
+   * POINT_SIZE_UNITS is in WORLD units with attenuation on, so it is a real
+   * physical size rather than a screen artefact: the exporter's scale is
+   * ~3111 um per scene unit, and the reconstruction grid is dx = 12 um, so one
+   * grid cell is ~0.0039 units. The value below is a few grid cells across,
+   * which closes the gaps between neighbouring cells without smearing the
+   * tissue structure (the section outline, the tears, and the vessel tracks
+   * traced by endothelial cells all have to stay legible -- that visible
+   * structure is the entire argument for using a real section here).
+   */
+  /**
+   * Is this a PLANAR asset? The real Xenium export is one measured tissue
+   * section, so every point has y == 0 exactly -- there is no measured depth
+   * and none was invented. Laid in the XZ plane (the exporter's convention) it
+   * is edge-on to the camera and renders as a flat sliver, which reads as a
+   * broken model rather than as what it is.
+   *
+   * A tissue section IS a flat slice, so the honest presentation is to stand
+   * it up facing the viewer, like a slide, rather than to fake volume. Detect
+   * planarity from the data instead of hardcoding it, so a genuinely
+   * volumetric asset dropped in later is left alone.
+   */
+  const isPlanar = useMemo(() => {
+    const box = new THREE.Box3().setFromObject(cloned);
+    const size = box.getSize(new THREE.Vector3());
+    const largest = Math.max(size.x, size.y, size.z);
+    return largest > 0 && Math.min(size.x, size.y, size.z) / largest < 0.02;
+  }, [cloned]);
+
+  useEffect(() => {
+    cloned.traverse((obj) => {
+      if (obj instanceof THREE.Points) {
+        const mat = obj.material as THREE.PointsMaterial;
+        mat.size = POINT_SIZE_UNITS;
+        mat.sizeAttenuation = true;
+        mat.transparent = true;
+        mat.opacity = 0.95;
+        // Real cells overlap in projection; without this the far side of the
+        // section punches holes through the near side as points sort badly.
+        mat.depthWrite = false;
+        mat.needsUpdate = true;
+      }
+    });
+  }, [cloned]);
 
   const rootGroup = useRef<THREE.Group>(null);
   const autoRotation = useRef(0);
@@ -54,7 +107,9 @@ export default function GLTFTumor({
   useEffect(() => {
     return () => {
       cloned.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) {
+        // Points as well as Mesh: the real Xenium asset is a point cloud, and
+        // matching only Mesh here leaked its 40k-vertex geometry on unmount.
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.Points) {
           obj.geometry.dispose();
           const mat = obj.material;
           if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
@@ -75,18 +130,37 @@ export default function GLTFTumor({
     if (regions.margin) regions.margin.position.set(-0.06 * sep, 0.04 * sep, -0.45 * sep);
 
     if (rootGroup.current) {
-      autoRotation.current += delta * (reducedMotion ? 0.035 : 0.12);
-      scrollRotation.current = reducedMotion
-        ? 0
-        : damp(scrollRotation.current, p * 0.6, 2.4, delta);
-      rootGroup.current.rotation.y = autoRotation.current + scrollRotation.current;
+      if (isPlanar) {
+        // A flat section must never turn edge-on, or it vanishes. Instead of
+        // a full spin, OSCILLATE within a shallow angle so the slice keeps
+        // facing the viewer and the parallax still reads as depth.
+        autoRotation.current += delta * (reducedMotion ? 0.06 : 0.22);
+        const sway = Math.sin(autoRotation.current) * (reducedMotion ? 0.05 : 0.16);
+        scrollRotation.current = reducedMotion
+          ? 0
+          : damp(scrollRotation.current, p * 0.35, 2.4, delta);
+        rootGroup.current.rotation.y = sway + scrollRotation.current;
+        rootGroup.current.rotation.x = Math.cos(autoRotation.current * 0.6) * 0.05;
+      } else {
+        autoRotation.current += delta * (reducedMotion ? 0.035 : 0.12);
+        scrollRotation.current = reducedMotion
+          ? 0
+          : damp(scrollRotation.current, p * 0.6, 2.4, delta);
+        rootGroup.current.rotation.y = autoRotation.current + scrollRotation.current;
+      }
       rootGroup.current.position.x = reducedMotion ? 0 : offsetSmoothed.current * 1.15;
     }
   });
 
   return (
     <group ref={rootGroup}>
-      <primitive object={cloned} />
+      {/* Stand a planar section up to face the camera. The exporter lays the
+          measured section in the XZ plane (y == 0); -90 deg about X turns that
+          "floor" into a facing slide without touching a single coordinate, so
+          every distance on screen is still a true measured distance. */}
+      <group rotation={isPlanar ? [-Math.PI / 2, 0, 0] : [0, 0, 0]}>
+        <primitive object={cloned} />
+      </group>
     </group>
   );
 }

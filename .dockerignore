@@ -29,11 +29,21 @@ venv/
 .mypy_cache/
 
 # --- not needed by the server image ---
+#
+# NOTE: Docker only treats a line that STARTS with '#' as a comment -- there is
+# no inline-comment syntax. A trailing "# ..." becomes part of the pattern, so
+# `landing-3d/   # the marketing site` matches nothing and silently copies the
+# directory in. That was true here until it was caught: it would have baked
+# 827 MB of landing-3d/ (including node_modules/) and 169 MB of results/ into
+# the image. Keep every comment on its own line.
 .git/
 .github/
-landing-3d/          # the marketing site is a separate Next.js app
-archive/             # the retired synthetic-era code
-results/             # generated reports and figures
+# the marketing site is a separate Next.js app
+landing-3d/
+# the retired synthetic-era code
+archive/
+# generated reports and figures
+results/
 marketing/
 docs/
 *.md

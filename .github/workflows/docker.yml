@@ -1,0 +1,523 @@
+# Build and smoke-test the Studio image on a real linux/amd64 machine.
+#
+# WHY THIS EXISTS. docs/DEPLOYMENT.md 1c states, honestly, that no image has
+# ever been built from the Dockerfile: Docker is not installed in the
+# environment this project is developed in. Four real defects (a missing
+# .dockerignore, a CMD binding the container's own loopback, undeclared
+# rdkit/h5py deps, an unflushed stdout hiding the auto-generated API key) were
+# found by static audit alone -- but a list of things "still unverified, and
+# needing one real build to settle" remains at the end of that section. This
+# workflow is that one real build. Everything it asserts is an item from that
+# list; when it goes green, that paragraph can shrink.
+#
+# It NEVER pushes. There are no registry credentials in this repo and none
+# should be added -- the image is built, loaded into the runner's local daemon,
+# exercised, and thrown away.
+
+name: docker
+
+on:
+  push:
+    branches: [main]
+    # Paths that provably cannot change the image. landing-3d/, results/,
+    # marketing/, archive/ and docs/ are all excluded by .dockerignore, so the
+    # build context does not even contain them.
+    #
+    # `*.md` matches root-level markdown only (Actions path globs do not cross
+    # `/`). That includes README.md, which .dockerignore's `!README.md` DOES
+    # copy into the image -- but its contents are inert at runtime, so skipping
+    # a README-only push costs no coverage.
+    #
+    # Repeated verbatim under pull_request below: GitHub's workflow parser does
+    # not support YAML anchors/aliases, so the duplication is unavoidable. Keep
+    # the two lists in sync.
+    paths-ignore:
+      - 'landing-3d/**'
+      - 'results/**'
+      - 'marketing/**'
+      - 'archive/**'
+      - 'docs/**'
+      - '*.md'
+  pull_request:
+    paths-ignore:
+      - 'landing-3d/**'
+      - 'results/**'
+      - 'marketing/**'
+      - 'archive/**'
+      - 'docs/**'
+      - '*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ======================================================================== #
+  # 1. The image itself. This job is REQUIRED to pass.
+  # ======================================================================== #
+  image:
+    name: build + smoke-test image (linux/amd64)
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: vivum-studio:ci
+      # A fixed key for the explicit-key container. Not a secret: it only ever
+      # exists inside this ephemeral runner, and the whole point is that the
+      # gate rejects requests that lack it.
+      SMOKE_KEY: ci-smoke-key-not-a-secret
+      SMOKE_CONTAINER: vivum-smoke
+      AUTOKEY_CONTAINER: vivum-autokey
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Settles DEPLOYMENT.md 1c item 1 (does `docker build` complete at all:
+      # build context, apt-get, pip as root) and item 2 (do linux manylinux
+      # cp311 wheels exist for scipy / scikit-image / imagecodecs / h5py /
+      # rdkit -- every wheel tested during the audit was macOS/arm64).
+      #
+      # load: true, push: false -- the image goes into the runner's local
+      # daemon and nowhere else.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          tags: ${{ env.IMAGE }}
+          load: true
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Settles item 8 (final image size), and also tells us whether
+      # .dockerignore is doing its job in gross terms -- the pre-.dockerignore
+      # context alone was ~6.5 GB of tissue data, run history and a macOS
+      # virtualenv, so a multi-gigabyte image here would be a red flag even
+      # before the per-directory assertions below.
+      - name: Image size
+        run: |
+          set -euo pipefail
+          bytes=$(docker image inspect "$IMAGE" --format '{{.Size}}')
+          mb=$((bytes / 1000000))
+          echo "image size: ${mb} MB (${bytes} bytes)"
+          echo "### Image size: ${mb} MB" >> "$GITHUB_STEP_SUMMARY"
+          # `|| true`: head can SIGPIPE the producer, and pipefail would turn a
+          # cosmetic layer listing into a build failure.
+          docker image history "$IMAGE" --format 'table {{.CreatedBy}}\t{{.Size}}' --no-trunc | head -30 || true
+
+      # Settles item 9 -- and this is the one worth being loud about. The
+      # Dockerfile header and docs/DEPLOYMENT.md 1c both CLAIM that no data
+      # cache is baked into the image. That claim is true only for as long as
+      # .dockerignore exists and is correct; deleting a line from it makes a
+      # published statement silently false with no other symptom. So assert it.
+      #
+      # Note data_cache/ and app/runs/ must EXIST (the Dockerfile mkdir -p's
+      # them as mount points, AFTER `COPY . .`) but must be EMPTY. Emptiness,
+      # not absence, is the real test: if .dockerignore vanished, the mkdir
+      # would silently succeed over 5.3 GB of copied tissue data.
+      - name: Assert .dockerignore kept excluded paths out of the image
+        run: |
+          docker run --rm --entrypoint sh "$IMAGE" -c '
+            fail=0
+            for p in .venv landing-3d results archive marketing docs .git \
+                     .export-drive supp.zip app/projects app/reports app/uploads; do
+              if [ -e "/app/$p" ]; then
+                echo "FAIL  present but should be excluded: /app/$p"
+                fail=1
+              else
+                echo "ok    absent: /app/$p"
+              fi
+            done
+            for d in data_cache app/runs; do
+              if [ ! -d "/app/$d" ]; then
+                echo "FAIL  missing mount point: /app/$d"
+                fail=1
+              elif [ -n "$(ls -A "/app/$d")" ]; then
+                echo "FAIL  not empty -- real data was baked into the image: /app/$d"
+                ls -A "/app/$d" | head -20
+                fail=1
+              else
+                echo "ok    empty mount point: /app/$d"
+              fi
+            done
+            # ...and the things that MUST be there.
+            for p in tmesim/__init__.py tmesim/core tmesim/cli.py \
+                     app/server/__main__.py app/server/api.py app/web/index.html; do
+              if [ -e "/app/$p" ]; then echo "ok    present: /app/$p"
+              else echo "FAIL  missing from image: /app/$p"; fail=1; fi
+            done
+            exit $fail
+          '
+
+      # Settles item 3. The Dockerfile installs only libgomp1 and says so
+      # explicitly ("precautionary, not measured"). rdkit has historically
+      # wanted libXrender.so.1 / libXext.so.6 on slim images. Import every
+      # native dependency INSIDE the image, before any server starts, so a
+      # missing shared library fails here with a legible ImportError rather
+      # than as a mystery 500 on the first /api/drugs request.
+      - name: Assert native deps import inside the image
+        run: |
+          docker run --rm --entrypoint python "$IMAGE" -c '
+          import importlib
+          mods = ["numpy", "scipy", "scipy.ndimage", "skimage", "skimage.measure",
+                  "tifffile", "imagecodecs", "h5py", "rdkit", "rdkit.Chem",
+                  "rdkit.Chem.Descriptors", "sklearn", "networkx", "pandas",
+                  "matplotlib", "fastapi", "uvicorn", "httpx"]
+          bad = []
+          for m in mods:
+              try:
+                  importlib.import_module(m)
+                  print("ok   ", m)
+              except Exception as exc:
+                  print("FAIL ", m, type(exc).__name__, exc)
+                  bad.append(m)
+          # The specific regression the rdkit dependency was declared for.
+          from rdkit import Chem
+          from rdkit.Chem import Descriptors
+          mw = Descriptors.MolWt(Chem.MolFromSmiles(
+              "CN(C)C(=O)C1=CC2=CN=C(N=C2N1C3CCCC3)NC4=NC=C(C=C4)N5CCNCC5"))
+          print("ribociclib MW from rdkit:", mw)
+          assert 430.0 < mw < 440.0, mw
+          raise SystemExit(1 if bad else 0)
+          '
+
+      # Settles item 4 (-p actually reaches the app: the CMD binds 0.0.0.0, a
+      # socket on the container's own 127.0.0.1 would be unreachable through a
+      # published port) and item 5 (the API-key gate).
+      #
+      # NOTE the published port is bound to the RUNNER's loopback -- the same
+      # shape docs/DEPLOYMENT.md recommends for a host-local deployment. If the
+      # in-container bind regressed to 127.0.0.1 this step would time out.
+      - name: Start container (explicit API key)
+        run: |
+          set -euo pipefail
+          docker run -d --name "$SMOKE_CONTAINER" \
+            -p 127.0.0.1:8000:8000 \
+            -e TMESIM_STUDIO_API_KEY="$SMOKE_KEY" \
+            "$IMAGE"
+          docker ps --filter "name=$SMOKE_CONTAINER"
+
+      # Poll, never sleep blindly: a fixed sleep either wastes time or produces
+      # a flaky failure that looks like a real one. Bail early -- with the logs
+      # -- if the container is already dead, since then no amount of waiting
+      # helps.
+      #
+      # /api/health is itself behind the key gate (the middleware covers every
+      # /api/* path), so the poll must carry the header.
+      - name: Wait for /api/health
+        run: |
+          set -uo pipefail
+          deadline=$((SECONDS + 180))
+          while [ $SECONDS -lt $deadline ]; do
+            if ! docker inspect -f '{{.State.Running}}' "$SMOKE_CONTAINER" | grep -q true; then
+              echo "::error::container exited before serving /api/health"
+              docker logs "$SMOKE_CONTAINER" || true
+              exit 1
+            fi
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 \
+              -H "X-API-Key: $SMOKE_KEY" http://127.0.0.1:8000/api/health || true)
+            if [ "$code" = "200" ]; then
+              echo "/api/health returned 200 after ${SECONDS}s"
+              curl -s -H "X-API-Key: $SMOKE_KEY" http://127.0.0.1:8000/api/health
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::/api/health never returned 200 within 180s -- last HTTP code was '${code:-none}'."
+          echo "A published port that never answers is the exact symptom of the CMD binding the container's own loopback (docs/DEPLOYMENT.md 1c, defect 2)."
+          docker logs "$SMOKE_CONTAINER" || true
+          exit 1
+
+      # Item 5, stated as the two halves DEPLOYMENT.md 1b promises: 401 without
+      # the header, 200 with it. A wrong key must also be 401 -- otherwise the
+      # comparison is not doing what the doc says.
+      - name: Assert the API-key gate
+        run: |
+          set -euo pipefail
+          code_none=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/sections)
+          code_bad=$(curl -s -o /dev/null -w '%{http_code}' -H 'X-API-Key: wrong' http://127.0.0.1:8000/api/sections)
+          code_ok=$(curl -s -o /dev/null -w '%{http_code}' -H "X-API-Key: $SMOKE_KEY" http://127.0.0.1:8000/api/sections)
+          echo "no header: $code_none | wrong key: $code_bad | correct key: $code_ok"
+          [ "$code_none" = "401" ] || { echo "::error::expected 401 with no X-API-Key, got $code_none"; exit 1; }
+          [ "$code_bad"  = "401" ] || { echo "::error::expected 401 with a wrong X-API-Key, got $code_bad"; exit 1; }
+          [ "$code_ok"   = "200" ] || { echo "::error::expected 200 with the correct X-API-Key, got $code_ok"; exit 1; }
+
+          # The static front end is deliberately NOT gated (app/server/api.py:
+          # the page must load so it can prompt for the key). Assert that too,
+          # since gating it by accident would break first load entirely.
+          code_root=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/)
+          echo "GET / (no header): $code_root"
+          [ "$code_root" = "200" ] || { echo "::error::expected 200 for the static front end, got $code_root"; exit 1; }
+
+      # This image ships NO data_cache by design, so every section is reported
+      # unavailable-with-a-reason. That is CORRECT behaviour, not a failure --
+      # assert only that the endpoint answers with a JSON array and that the
+      # server did not fall over trying to enumerate an absent cache.
+      - name: Assert /api/sections answers with the cache absent
+        run: |
+          set -euo pipefail
+          curl -sf -H "X-API-Key: $SMOKE_KEY" http://127.0.0.1:8000/api/sections -o sections.json
+          jq -e 'type == "array"' sections.json > /dev/null \
+            || { echo "::error::/api/sections did not return a JSON array"; cat sections.json; exit 1; }
+          echo "sections reported: $(jq 'length' sections.json) (availability is expected to be false -- no cache is mounted)"
+          jq -r '.[] | "  \(.id): available=\(.available)"' sections.json | head -20 || true
+
+      # THE RDKIT REGRESSION CHECK. rdkit was an undeclared dependency until
+      # the audit (docs/DEPLOYMENT.md 1c, defect 3). Without it,
+      # molecular.descriptors falls back to a curated table that has no entry
+      # for ribociclib or palbociclib, so both compile to mw=0.0 and /api/drugs
+      # returns them with a `reason` saying they are permanently broken.
+      #
+      # That failure mode is silent from the outside -- the server is healthy,
+      # the endpoint is 200, two drugs are just quietly unusable. So assert the
+      # values, not the status code. Verified locally that these two rows carry
+      # non-null mw and diffusivity even with data_cache absent (IC50 falls
+      # back to curated literature, which does not affect these two fields).
+      - name: Assert /api/drugs -- ribociclib and palbociclib really compiled
+        run: |
+          set -euo pipefail
+          curl -sf -H "X-API-Key: $SMOKE_KEY" http://127.0.0.1:8000/api/drugs -o drugs.json
+          jq -r '.[] | "\(.name)\tmw=\(.mw)\tD=\(.diffusivity_um2_s)\treason=\(.reason)"' drugs.json
+          fail=0
+          for d in ribociclib palbociclib; do
+            row=$(jq -c --arg d "$d" '.[] | select(.name == $d)' drugs.json)
+            if [ -z "$row" ]; then
+              echo "::error::$d is missing from /api/drugs entirely"; fail=1; continue
+            fi
+            ok=$(jq -e '(.mw != null and .mw > 0) and (.diffusivity_um2_s != null and .diffusivity_um2_s > 0) and (.reason == null)' <<<"$row" > /dev/null && echo yes || echo no)
+            if [ "$ok" != "yes" ]; then
+              echo "::error::$d did not compile: $row"
+              echo "This is the rdkit regression from docs/DEPLOYMENT.md 1c defect 3 -- mw collapses to 0.0 when rdkit is missing. Do NOT fix by loosening this assertion."
+              fail=1
+            else
+              echo "ok  $d compiled: $row"
+            fi
+          done
+          exit $fail
+
+      # Settles item 7. PID 1 is `python -m app.server` via the exec-form
+      # ENTRYPOINT, so SIGTERM reaches uvicorn's own handler. If it did not,
+      # `docker stop` would block for its full 30s timeout and then SIGKILL,
+      # which surfaces as exit code 137 -- an in-flight reconstruction would be
+      # killed mid-write on every deploy.
+      - name: Assert graceful shutdown on docker stop
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+          docker stop -t 30 "$SMOKE_CONTAINER" > /dev/null
+          elapsed=$(( $(date +%s) - start ))
+          code=$(docker inspect -f '{{.State.ExitCode}}' "$SMOKE_CONTAINER")
+          echo "docker stop took ${elapsed}s, container exit code ${code}"
+          echo "### Graceful shutdown: ${elapsed}s, exit ${code}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" = "137" ]; then
+            echo "::error::exit 137 -- the container ignored SIGTERM and was SIGKILLed after the timeout."
+            exit 1
+          fi
+          if [ "$elapsed" -ge 15 ]; then
+            echo "::error::docker stop took ${elapsed}s; a signal-handling server should exit in ~1s."
+            exit 1
+          fi
+
+      # Settles item 6, the subtlest of the four fixed defects. CPython
+      # block-buffers stdout when it is a pipe -- which is every `docker run`
+      # without a TTY. The startup banner carries an auto-generated API key
+      # that is printed exactly ONCE and never persisted, so if it sits in an
+      # unflushed buffer the container looks healthy while 401ing every request
+      # with a key nobody can read. ENV PYTHONUNBUFFERED=1 was added for this.
+      #
+      # The test is necessarily "read the key out of a RUNNING container's
+      # logs": at exit the buffer flushes anyway, so only polling mid-run can
+      # distinguish a fixed image from a broken one.
+      - name: Assert the auto-generated key is visible in docker logs
+        run: |
+          set -uo pipefail
+          docker run -d --name "$AUTOKEY_CONTAINER" -p 127.0.0.1:8001:8000 "$IMAGE"
+          key=""
+          deadline=$((SECONDS + 90))
+          while [ $SECONDS -lt $deadline ]; do
+            if ! docker inspect -f '{{.State.Running}}' "$AUTOKEY_CONTAINER" | grep -q true; then
+              echo "::error::the auto-key container exited; its buffer would have flushed on exit, so this proves nothing about buffering"
+              docker logs "$AUTOKEY_CONTAINER" || true
+              exit 1
+            fi
+            key=$(docker logs "$AUTOKEY_CONTAINER" 2>&1 | awk '/^[[:space:]]*api key[[:space:]]/ {print $3; exit}')
+            [ -n "$key" ] && break
+            sleep 2
+          done
+          if [ -z "$key" ]; then
+            echo "::error::no API key line appeared in docker logs while the container was RUNNING."
+            echo "That is docs/DEPLOYMENT.md 1c defect 4: stdout is block-buffered, the key is printed once and never persisted, so it is unrecoverable. Check that ENV PYTHONUNBUFFERED=1 is still in the Dockerfile."
+            docker logs "$AUTOKEY_CONTAINER" || true
+            exit 1
+          fi
+          echo "recovered a generated key of length ${#key} from docker logs after ${SECONDS}s"
+
+          # And it must actually work -- a printed key that the gate rejects
+          # would be worse than no key at all.
+          deadline=$((SECONDS + 120))
+          code=""
+          while [ $SECONDS -lt $deadline ]; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 \
+              -H "X-API-Key: $key" http://127.0.0.1:8001/api/health || true)
+            [ "$code" = "200" ] && break
+            sleep 2
+          done
+          [ "$code" = "200" ] || { echo "::error::the key printed to docker logs was rejected (HTTP $code)"; docker logs "$AUTOKEY_CONTAINER"; exit 1; }
+          nokey=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8001/api/health)
+          [ "$nokey" = "401" ] || { echo "::error::expected 401 without the generated key, got $nokey"; exit 1; }
+          echo "the generated key authenticates, and requests without it are 401"
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: |
+          echo "=== $SMOKE_CONTAINER ==="
+          docker logs "$SMOKE_CONTAINER" 2>&1 || echo "(no such container)"
+          echo "=== $AUTOKEY_CONTAINER ==="
+          docker logs "$AUTOKEY_CONTAINER" 2>&1 || echo "(no such container)"
+          docker ps -a
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm -f "$SMOKE_CONTAINER" "$AUTOKEY_CONTAINER" 2>/dev/null || true
+
+  # ======================================================================== #
+  # 2. INFORMATIONAL ONLY -- cross-platform float reproducibility.
+  # ======================================================================== #
+  #
+  # READ THIS BEFORE "FIXING" A RED HERE.
+  #
+  # This repo's bit-exact reference values were generated on macOS/arm64. On
+  # linux/amd64 they may differ for BLAS and SIMD reasons that have NOTHING to
+  # do with the container, the Dockerfile, or a bug in the simulator -- a
+  # different vectorised reduction order changes the last few ULPs, and any
+  # tolerance-free equality assertion notices. docs/DEPLOYMENT.md 1c says
+  # exactly this: "Treat a bitwise mismatch inside the image as unexplained
+  # until measured, not as a container defect."
+  #
+  # So: this job is `continue-on-error: true`. It is a MEASUREMENT, not a gate.
+  # A failure here is a data point about float reproducibility across
+  # architectures, and the correct response is to investigate and write down
+  # what the difference is -- NOT to widen a tolerance or edit a reference
+  # value so the red goes away. Loosening a reference to silence CI destroys
+  # the only thing those tests are for.
+  #
+  # It deliberately installs libXrender/libXext/libgomp even though the slim
+  # image does not, so that a failure here is attributable to numerics and
+  # never to a missing shared library. The image job above is what tests the
+  # slim image's minimal system-library set.
+  #
+  # SCOPE. Most of the suite needs data_cache/, which is real tissue data,
+  # gitignored, and not available in CI. Measured by running the suite with the
+  # cache hidden: 65 failures and 67 errors come purely from absent data (the
+  # conftest `real_micro` fixture raises FileNotFoundError rather than
+  # skipping, and test_protocol/test_classifier_arity/test_cell_state/
+  # test_oxygen_proxy/test_pipeline/test_mechanism/test_app_* index into
+  # sections that are not there). Running the whole suite here would report a
+  # meaningless red that says nothing about floats. The module list below is
+  # the subset that genuinely runs with no cache -- 202 passed, 81 skipped,
+  # 0 failed locally -- plus a short deselect list for the individual tests in
+  # otherwise-clean modules that reach for real data without a skip guard.
+  #
+  # If a deselected node id disappears (a test is renamed or removed), pytest
+  # ignores the stale --deselect silently; it does not fail the job.
+  reference-tests-linux:
+    name: 'INFORMATIONAL: reference tests on linux/amd64'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: System libraries (generously, so a red here means numerics)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgomp1 libxrender1 libxext6
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[app]'
+          pip install pytest
+
+      # The actual evidence. If a bit-exact test does diverge, this is the
+      # record of what it diverged ON -- BLAS vendor, threading, versions.
+      # Nothing is pinned in pyproject.toml (DEPLOYMENT.md 1c notes this), so
+      # the resolved versions are themselves part of the data point.
+      - name: Environment fingerprint
+        run: |
+          python - <<'PY'
+          import platform, sys
+          print("python  ", sys.version)
+          print("platform", platform.platform(), platform.machine())
+          for mod in ("numpy", "scipy", "sklearn", "skimage", "rdkit", "h5py",
+                      "pandas", "tifffile", "imagecodecs"):
+              try:
+                  m = __import__(mod)
+                  print(f"{mod:12s}", getattr(m, "__version__", "?"))
+              except Exception as exc:
+                  print(f"{mod:12s} IMPORT FAILED: {type(exc).__name__}: {exc}")
+          import numpy as np
+          print("--- numpy build config ---")
+          try:
+              np.show_config()
+          except Exception as exc:
+              print("show_config failed:", exc)
+          PY
+
+      - name: Run the cache-independent subset
+        run: |
+          python -m pytest -q -rfE --durations=15 \
+            tests/test_barrier_and_veto.py \
+            tests/test_breast_drug_panel.py \
+            tests/test_cli.py \
+            tests/test_codex_adapter.py \
+            tests/test_core.py \
+            tests/test_gbmspace_adapter.py \
+            tests/test_immune_sink.py \
+            tests/test_mgmt_scalar.py \
+            tests/test_molecular.py \
+            tests/test_molecular_extra.py \
+            tests/test_physics.py \
+            tests/test_projects.py \
+            tests/test_reality_layer.py \
+            tests/test_registration_3d.py \
+            tests/test_time_resolved_pk.py \
+            tests/test_vessel_network.py \
+            --deselect tests/test_core.py::test_summary_on_real_microenvironment \
+            --deselect tests/test_immune_sink.py::test_default_off_reproduces_the_engine_on_the_real_section \
+            --deselect tests/test_mgmt_scalar.py::test_lambda_matches_a_live_refit_from_the_primary_bytes \
+            --deselect tests/test_mgmt_scalar.py::test_omitting_mgmt_is_bit_identical_to_previous_behaviour \
+            --deselect tests/test_mgmt_scalar.py::test_omitting_mgmt_reproduces_the_same_simulated_kill \
+            --deselect tests/test_mgmt_scalar.py::test_supplying_mgmt_records_it_and_drops_the_upper_bound_flag \
+            --deselect tests/test_mgmt_scalar.py::test_mgmt_is_a_recorded_noop_for_uncalibrated_drugs \
+            --deselect tests/test_mgmt_scalar.py::test_binary_status_can_be_passed_through_the_pipeline \
+            --deselect tests/test_molecular.py::test_compiled_drug_runs_through_tissue_engine \
+            --deselect tests/test_molecular_extra.py::test_compiled_drug_uses_measured_ic50 \
+            --deselect tests/test_time_resolved_pk.py::test_real_tissue_static_path_matches_stored_reference_bitwise \
+            --deselect tests/test_time_resolved_pk.py::test_fractionation_at_matched_exposure_is_no_longer_degenerate
+
+      - name: What a red here means
+        if: failure()
+        run: |
+          {
+            echo '### INFORMATIONAL job failed -- this is not a broken build'
+            echo
+            echo 'These reference values were generated on macOS/arm64. A mismatch on'
+            echo 'linux/amd64 is most likely BLAS/SIMD summation order, not a defect in'
+            echo 'the simulator or the container.'
+            echo
+            echo '**Do not fix this by loosening a tolerance or editing a reference value.**'
+            echo 'Measure the difference, write down its magnitude and cause, and decide'
+            echo 'deliberately whether the reference is platform-specific.'
+          } >> "$GITHUB_STEP_SUMMARY"
