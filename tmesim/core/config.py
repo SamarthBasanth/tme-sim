@@ -85,6 +85,54 @@ class PDEConfig:
     #: ``source_profile`` argument of
     #: :func:`tmesim.physics.diffusion.simulate_drug_transport`.
     time_resolved: bool = False
+    #: Treat vascular delivery as a genuine gradient-driven EXCHANGE,
+    #: ``S = PS*(Cp - C)``, instead of the historical one-way leak ``S = PS*Cp``.
+    #:
+    #: The one-way form has no path back from interstitium to blood, so its
+    #: steady state is ``PS*Cp/(clearance + binding)`` -- unbounded above, and
+    #: measurably wrong: against human breast microdialysis it puts
+    #: 5-fluorouracil at 7.80x plasma (measured 0.61x) and methotrexate at
+    #: 0.057x (measured 0.60x), i.e. wrong in OPPOSITE directions, so no single
+    #: constant can absorb it (``results/breast_kp_validation.md``).
+    #:
+    #: With this on, the same permeability field is subtracted as a first-order
+    #: loss, giving ``C_ss = PS*Cp/(PS + clearance + binding) <= Cp``: bounded
+    #: by the plasma level by construction. No new parameter is introduced --
+    #: it is the SAME ``PS`` the source already uses, applied to both halves of
+    #: the gradient instead of only one.
+    #:
+    #: ``False`` (default) preserves the historical behaviour BIT-FOR-BIT so
+    #: every stored reference result is unaffected. This defaults off because
+    #: turning it on changes every absolute delivery number this project has
+    #: ever published, which is a re-validation exercise, not a flag flip.
+    #:
+    #: NOTE this fixes the FORM of the delivery law, not the VALUE of the
+    #: permeability. ``PS`` is still driven by ``bbb_penetrance``, a
+    #: blood-BRAIN-barrier term that is simply wrong for non-brain tissue.
+    #: Both defects were diagnosed together and are independent.
+    #:
+    #: NUMERICS. Verified against the closed-form steady state
+    #: ``C_ss = PS*Cp/(PS + clearance + binding)`` to 6.3e-15 worst case across
+    #: three orders of magnitude in PS, with the discrete mass budget closing
+    #: to round-off. PS enters ``K`` inside the IMPLICIT operator
+    #: ``A = I - dt*L + dt*K``, so it adds a non-negative diagonal to an
+    #: already-M-matrix and imposes NO new timestep limit: solutions are
+    #: invariant to 1e-4 even at ``dt*PS = 1245``, the advective CFL trip point
+    #: is bit-identical, and the solver's zero-clamp was observed never to fire.
+    #:
+    #: RESOLUTION CAVEAT, and it is a real one. The term introduces a new
+    #: perivascular length scale ``sqrt(D_eff/(PS + clearance + binding))``
+    #: INSIDE perfused cells. For calibrated doxorubicin that is ~52 um and
+    #: dx = 12 um resolves it fine (successive change at dx=12 is 0.0041 with
+    #: the term on vs 0.0044 with it off -- the convergence threshold does not
+    #: move). But for the MOST PERMEABLE drugs in the library
+    #: (``bbb_penetrance`` >~ 0.6: lomustine, carmustine, procarbazine,
+    #: ribociclib) it collapses to ~15-17 um, i.e. barely one grid cell per
+    #: e-fold at dx = 12. For those drugs the converged spacing with this flag
+    #: ON is ~8-10 um, NOT the usual 12. Do not cite
+    #: ``results/numerical_rigor.md`` section 2's dx = 12 justification for a
+    #: high-permeability drug with this flag on without re-running finer.
+    transvascular_exchange: bool = False
 
 
 @dataclass
