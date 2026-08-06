@@ -14,16 +14,23 @@ interface MetricOverlayProps {
 }
 
 /**
- * Compact clinical-style readout for the "AI Analysis" scene. Its own
- * opacity/transform are set imperatively by ScrollExperience (the same
- * ref-driven pattern used for narrative text) rather than via React state,
- * so it stays perfectly in lockstep with the 3D scan-plane animation
- * without triggering re-renders on every scroll frame.
+ * Compact instrument-style readout shown alongside the spatial-attribution
+ * section. Its own opacity/transform are set imperatively by
+ * ScrollExperience (the same ref-driven pattern used for narrative text)
+ * rather than via React state, so it stays in lockstep with the 3D
+ * animation without triggering re-renders on every scroll frame.
  *
- * The values below are illustrative interface content only — the same way
- * a device manufacturer's own product photography shows a plausible sample
- * reading. They are explicitly labeled "sample case" rather than phrased as
- * a real, validated measurement.
+ * The panel's scroll window (metricPanelOpacity, 3/6 -> 4/6) puts it under
+ * section 04, so it shows that section's number and nothing else: relative
+ * drug exposure retained by tumor cells in the macrophage-densest vs the
+ * sparsest quintile of one real section, and the spread between them. The
+ * spread is the point, because a well-mixed compartmental model returns
+ * exactly 1.0 there by construction.
+ *
+ * These are illustrative interface content in the sense that a product
+ * screenshot is: real values from one run, labeled "sample run", never to
+ * be phrased as a predicted patient outcome. Do not add an absolute kill
+ * fraction here; it is not a defensible output.
  */
 const MetricOverlay = forwardRef<HTMLDivElement, MetricOverlayProps>(function MetricOverlay(
   { initiallyHidden = true },
@@ -32,30 +39,35 @@ const MetricOverlay = forwardRef<HTMLDivElement, MetricOverlayProps>(function Me
   return (
     <div ref={ref} className="metric-overlay" style={initiallyHidden ? { opacity: 0 } : undefined}>
       <div className="metric-overlay__header">
-        <span>Analysis preview</span>
-        <span className="metric-overlay__tag">Sample case</span>
+        <span>Relative drug exposure</span>
+        <span className="metric-overlay__tag">Sample run</span>
       </div>
       <dl className="metric-overlay__grid">
         <div className="metric-overlay__row">
-          <dt>Est. volume</dt>
-          <dd>14.2 cm³</dd>
-        </div>
-        <div className="metric-overlay__row">
-          <dt>Model confidence</dt>
+          <dt>Macrophage-dense</dt>
           <dd>
             <span className="metric-overlay__bar">
-              <span className="metric-overlay__bar-fill" style={{ width: "78%" }} />
+              <span className="metric-overlay__bar-fill" style={{ width: "42.91%" }} />
             </span>
-            <span className="metric-overlay__word">High</span>
+            <span className="metric-overlay__word">0.4291</span>
           </dd>
         </div>
         <div className="metric-overlay__row">
-          <dt>Growth trend</dt>
-          <dd>Stable</dd>
+          <dt>Macrophage-sparse</dt>
+          <dd>
+            <span className="metric-overlay__bar">
+              <span className="metric-overlay__bar-fill" style={{ width: "85.92%" }} />
+            </span>
+            <span className="metric-overlay__word">0.8592</span>
+          </dd>
+        </div>
+        <div className="metric-overlay__row">
+          <dt>Spread</dt>
+          <dd>2.0x</dd>
         </div>
       </dl>
       <p className="metric-overlay__footnote">
-        Illustrative output for a sample case — not a diagnosis.
+        One run, one tissue section. A well-mixed model returns 1.0x here.
       </p>
     </div>
   );

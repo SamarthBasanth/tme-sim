@@ -44,7 +44,7 @@ export default function ReducedMotionExperience({ isMobile }: { isMobile: boolea
           <h1>{SECTION_COPY[0].headline}</h1>
           <p>{SECTION_COPY[0].body}</p>
           <a className="cta-button" href={STUDIO_URL}>
-            Explore the model
+            Open the Studio
           </a>
         </div>
       </div>

@@ -10,7 +10,6 @@ import TumorModel from "./TumorModel";
 import AnatomyModel from "./AnatomyModel";
 import Particles from "./Particles";
 import ScanPlane from "./ScanPlane";
-import TrajectoryPath from "./TrajectoryPath";
 import Annotation from "./Annotation";
 import { HighlightMarker, CriticalStructures } from "./Markers";
 import Loader from "./Loader";
@@ -77,7 +76,7 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
                   anchor={[0.16, 0.21, 0.42]}
                   labelOffset={[-0.85, -0.2, 0.35]}
                   label="Tumor core"
-                  detail="Primary mass"
+                  detail="High interstitial pressure"
                   align="left"
                   getOpacity={segmentationLabelOpacity}
                 />
@@ -92,8 +91,8 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
                 <Annotation
                   anchor={[0.54, 0.45, 0.27]}
                   labelOffset={[0.55, 0.2, 0]}
-                  label="Peritumoral edema"
-                  detail="Surrounding swelling"
+                  label="Diffusion front"
+                  detail="Concentration gradient"
                   getOpacity={segmentationLabelOpacity}
                 />
               )
@@ -106,8 +105,8 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
                 <Annotation
                   anchor={[-0.39, 0.2, 1.12]}
                   labelOffset={[-0.85, -0.1, 0.55]}
-                  label="Surrounding tissue"
-                  detail="Margin boundary"
+                  label="Perivascular rim"
+                  detail="Where drug enters"
                   align="left"
                   getOpacity={segmentationLabelOpacity}
                 />
@@ -133,14 +132,23 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
                 <Annotation
                   anchor={[0.875, 0.09, -0.05]}
                   labelOffset={[0.32, 0.25, 0]}
-                  label="Left temporal lobe"
-                  detail="Simplified anatomical context"
+                  label="Tissue context"
+                  detail="Illustrative geometry"
                   getOpacity={anatomyLabelOpacity}
                 />
               </AnatomyModel>
               <Particles count={isMobile ? 320 : 900} />
               <ScanPlane />
-              <TrajectoryPath />
+              {/* TrajectoryPath is deliberately NOT rendered. It traces a
+                  planned path into the mass during section 05 -- which is now
+                  the "stated limits" section, where the copy says in as many
+                  words that Vivum does not predict patient response and makes
+                  no clinical claim. A needle/trajectory animation playing under
+                  that sentence contradicts it. The component is left in the
+                  repo (components/canvas/TrajectoryPath.tsx) rather than
+                  deleted, in case a future scene pass repurposes the draw-on
+                  effect for something this product actually does -- a drug
+                  front advancing outward from a vessel. Re-import it there. */}
               <CriticalStructures />
               <HighlightMarker position={[0.3, 0.25, 0.15]} />
             </>

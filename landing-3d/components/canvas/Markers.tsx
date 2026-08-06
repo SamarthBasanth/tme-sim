@@ -90,7 +90,7 @@ export function HighlightMarker({ position }: { position: readonly [number, numb
   );
 }
 
-/** Faint translucent structures (stand-ins for nearby vessels) revealed during treatment planning. */
+/** Faint translucent structures (stand-ins for nearby vessels), revealed late in the scroll. */
 export function CriticalStructures() {
   const progressRef = useScrollProgressRef();
   const groupRef = useRef<THREE.Group>(null);
