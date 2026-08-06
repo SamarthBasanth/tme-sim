@@ -219,6 +219,64 @@ def delivery_source(
     return vascular * p_eff * float(plasma_conc)
 
 
+def exchange_coefficient(
+    micro: Microenvironment,
+    drug: DrugParams,
+    bbb_disruption: "np.ndarray | float | None" = None,
+    efflux: bool = False,
+) -> np.ndarray:
+    """The permeability-surface-area field ``PS(x, y)`` in 1/s.
+
+    This is exactly :func:`delivery_source` evaluated at ``plasma_conc = 1``,
+    which is not a coincidence: that function is linear in the plasma level, so
+    the coefficient multiplying it IS the transvascular rate constant.
+
+    Why this exists as its own function
+    -----------------------------------
+    ``delivery_source`` is a ONE-WAY leak: ``S = PS*Cp``, with no path back
+    from interstitium to blood. The only losses are ``clearance`` and
+    ``binding``, so the steady state is ``PS*Cp / (clearance + binding)`` --
+    a quantity with no reason whatsoever to sit at or below the plasma level.
+    Measured against human breast microdialysis it does not: 5-fluorouracil is
+    predicted at 7.80x plasma against 0.61x measured, while methotrexate comes
+    out at 0.057x against 0.60x measured, i.e. wrong in OPPOSITE directions
+    (``results/breast_kp_validation.md``).
+
+    The physically correct form is a gradient-driven exchange::
+
+        S = PS * (Cp - C)   =   PS*Cp  -  PS*C
+
+    which is the SAME source minus a first-order loss at the SAME rate. So the
+    fix needs no new parameter and no new physics: build the source as before,
+    and pass this field to ``simulate_drug_transport(exchange_k=...)`` so the
+    ``-PS*C`` half is not silently dropped. The steady state becomes::
+
+        C_ss = PS*Cp / (PS + clearance + binding)  <=  Cp
+
+    bounded by the plasma level by construction, for every drug, at every dose.
+
+    What this does NOT fix
+    ----------------------
+    ``PS`` here is still ``vascular_density * bbb_penetrance``, and
+    ``bbb_penetrance`` is a structure-derived **blood-brain-barrier** term.
+    Applied to breast, which has no such barrier, it is the wrong permeability
+    (see ``results/breast_kp_validation.md`` section 3.1). This function fixes
+    the *form* of the delivery law, not the *value* of the permeability in
+    non-brain tissue. Both were diagnosed together; they are independent.
+
+    Parameters mirror :func:`delivery_source` exactly so the two cannot drift
+    out of step -- pass it the same ``bbb_disruption`` and ``efflux`` you pass
+    there, or the source and the back-flux will use different permeabilities.
+
+    Returns
+    -------
+    np.ndarray
+        (ny, nx) non-negative exchange rate in 1/s.
+    """
+    return delivery_source(micro, drug, 1.0, bbb_disruption=bbb_disruption,
+                           efflux=efflux)
+
+
 if __name__ == "__main__":
     # --- Self-test: exercise the PK model and the delivery source ------------
     import numpy as np

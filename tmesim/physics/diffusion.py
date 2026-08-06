@@ -191,12 +191,19 @@ def simulate_drug_transport(
     velocity: Optional[np.ndarray] = None,
     source_profile: Optional[np.ndarray] = None,
     capture_frames: Optional[int] = None,
+    exchange_k: Optional[np.ndarray] = None,
 ) -> TransportResult:
     """Solve convection-diffusion-reaction for drug concentration ``C(x, y, t)``.
 
     Governing equation (per :mod:`tmesim` architecture contract)::
 
         dC/dt = div(D_eff grad C) - div(v C) + S - (clearance + binding) C
+
+    With ``exchange_k`` supplied, the reaction rate becomes
+    ``(clearance + binding + exchange_k)`` and the equation is the genuine
+    transvascular-exchange form ``S = PS*(Cp - C)`` rather than a one-way leak;
+    see the comment at the ``exchange_k`` handling below for why those are the
+    same thing and what it fixes.
 
     Parameters
     ----------
@@ -306,6 +313,34 @@ def simulate_drug_transport(
     # --- effective diffusivity + reaction rate (both zeroed outside tissue) ---
     d_eff = _effective_diffusivity(drug, micro.fields.ecm_density)
     k = np.full((ny, nx), float(drug.clearance) + float(drug.binding))
+    # Optional transvascular BACK-FLUX. The historical source is one-way:
+    # S = PS*Cp with no return path, so the steady state is set by
+    # (influx)/(loss) and has no reason to sit below the plasma level -- it can
+    # exceed it without bound (measured: results/breast_kp_validation.md, where
+    # 5-FU predicts 7.8x plasma against 0.61x measured). A genuine exchange
+    # term S = PS*(Cp - C) is algebraically just that same source MINUS a
+    # first-order loss PS*C, so it needs no new solver machinery: the caller
+    # passes the SAME PS field here that it used to build ``source``, and it is
+    # added to the existing reaction rate. The steady state then becomes
+    # C_ss = PS*Cp/(PS + clearance + binding) <= Cp, i.e. bounded by the plasma
+    # level BY CONSTRUCTION rather than by luck.
+    #
+    # ``None`` (the default) short-circuits entirely and reproduces the
+    # one-way behaviour bit-for-bit, so every stored reference result is
+    # unaffected unless a caller opts in.
+    if exchange_k is not None:
+        ex = np.asarray(exchange_k, dtype=np.float64)
+        if ex.shape != (ny, nx):
+            raise ValueError(f"exchange_k shape {ex.shape} != grid {(ny, nx)}")
+        if not np.all(np.isfinite(ex)):
+            raise ValueError("exchange_k contains non-finite values")
+        if np.any(ex < 0.0):
+            raise ValueError(
+                f"exchange_k must be non-negative (min {float(ex.min()):.4g}); "
+                "a negative exchange rate would pump drug INTO the tissue "
+                "against its own gradient."
+            )
+        k = k + ex
     k[~tissue] = 0.0
     src = np.where(tissue, source, 0.0)
 

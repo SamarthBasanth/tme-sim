@@ -109,7 +109,7 @@ from ..core import (
 from ..physics.diffusion import simulate_drug_transport
 from ..physics.oxygen import solve_oxygen
 from ..physics.pressure import solve_ifp
-from ..treatment.drugs import delivery_source, get_drug
+from ..treatment.drugs import delivery_source, exchange_coefficient, get_drug
 
 # Number of points in the diagnostic viable-fraction trajectory.
 _N_HISTORY = 6
@@ -317,6 +317,16 @@ def simulate_response(
         source_profile = None
         plasma_delivered_mean = plasma_mean
 
+    # 4b. Optional transvascular BACK-FLUX. The source above is one-way; with
+    #     this on, the same permeability field is also subtracted as a
+    #     first-order loss, which is algebraically S = PS*(Cp - C) and bounds
+    #     tissue concentration by the plasma level. Same PS the source used --
+    #     no new parameter. Default off keeps every stored result bit-exact.
+    #     See PDEConfig.transvascular_exchange and results/breast_kp_validation.md.
+    exchange_k = (exchange_coefficient(work, drug)
+                  if bool(getattr(cfg.pde, "transvascular_exchange", False))
+                  else None)
+
     # 5. Transport PDE -> exposure (AUC) field.
     transport = simulate_drug_transport(
         work,
@@ -326,6 +336,7 @@ def simulate_response(
         velocity=(velocity if cfg.pde.convection else None),
         source_profile=source_profile,
         capture_frames=capture_frames,
+        exchange_k=exchange_k,
     )
 
     # 6. Pharmacodynamic kill over the treatment course.

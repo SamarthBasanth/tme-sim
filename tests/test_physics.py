@@ -211,3 +211,90 @@ def test_pressure_core_ifp_exceeds_margin(radial_micro_factory):
     margin_ifp = float(ifp[margin_mask].mean())
     assert core_ifp > margin_ifp, (
         f"core IFP {core_ifp:.3f} should exceed margin IFP {margin_ifp:.3f}")
+
+
+# --------------------------------------------------------------------------- #
+# (5) Transvascular exchange (PDEConfig.transvascular_exchange / exchange_k)
+# --------------------------------------------------------------------------- #
+def test_exchange_k_none_is_bit_identical(inert_drug, flat_micro_factory):
+    """``exchange_k=None`` must reproduce the one-way path EXACTLY.
+
+    The whole backward-compatibility argument for adding the term rests on
+    this: every stored reference result in the repo was produced on the
+    one-way path, so the default must not move a single bit.
+    """
+    micro = flat_micro_factory()
+    ny, nx = micro.domain.ny, micro.domain.nx
+    src = np.zeros((ny, nx))
+    src[ny // 2, nx // 2] = 1e-3
+    pde = PDEConfig(dt=1.0, total_time=60.0, convection=False, save_every=10)
+
+    a = simulate_drug_transport(micro, inert_drug, src, pde)
+    b = simulate_drug_transport(micro, inert_drug, src, pde, exchange_k=None)
+    assert np.array_equal(a.auc, b.auc)
+
+
+def test_exchange_k_zero_is_bit_identical(inert_drug, flat_micro_factory):
+    """A zero exchange field is also a no-op: ``k + 0.0 == k`` in IEEE-754."""
+    micro = flat_micro_factory()
+    ny, nx = micro.domain.ny, micro.domain.nx
+    src = np.zeros((ny, nx))
+    src[ny // 2, nx // 2] = 1e-3
+    pde = PDEConfig(dt=1.0, total_time=60.0, convection=False, save_every=10)
+
+    a = simulate_drug_transport(micro, inert_drug, src, pde)
+    b = simulate_drug_transport(micro, inert_drug, src, pde,
+                                exchange_k=np.zeros((ny, nx)))
+    assert np.array_equal(a.auc, b.auc)
+
+
+def test_exchange_bounds_tissue_below_plasma(flat_micro_factory):
+    """THE point of the term: with exchange on, tissue concentration can never
+    exceed the plasma level, for any dose, at any time.
+
+    The one-way form has no such bound -- its steady state is
+    ``PS*Cp/(clearance+binding)``, which for a slowly-cleared drug sits far
+    ABOVE plasma (measured: 5-FU at 7.8x plasma in results/breast_kp_validation.md,
+    against 0.61x measured in humans). This test pins the fix, not the symptom:
+    it asserts the bound holds by construction, on a drug with deliberately
+    tiny loss terms where the one-way form blows past plasma.
+    """
+    micro = flat_micro_factory()
+    ny, nx = micro.domain.ny, micro.domain.nx
+    micro.fields.vascular_density = np.full((ny, nx), 0.02)
+
+    # Almost no clearance/binding -> the one-way steady state is enormous.
+    drug = DrugParams(name="slow", diffusivity=200.0, molecular_weight=300.0,
+                      ic50=1.0, hill=1.0, bbb_penetrance=0.5,
+                      binding=1e-7, clearance=1e-7)
+    plasma = 10.0
+    ps = micro.fields.vascular_density * drug.bbb_penetrance   # 1/s
+    src = ps * plasma
+    pde = PDEConfig(dt=1.0, total_time=3600.0, convection=False, save_every=100)
+
+    one_way = simulate_drug_transport(micro, drug, src, pde)
+    exchange = simulate_drug_transport(micro, drug, src, pde, exchange_k=ps)
+
+    tis = micro.domain.tissue_mask
+    c_one = one_way.auc[tis] / pde.total_time
+    c_exc = exchange.auc[tis] / pde.total_time
+
+    # The one-way form must actually breach plasma here, or the test is not
+    # exercising the failure it claims to.
+    assert c_one.max() > plasma, (
+        f"one-way path did not exceed plasma ({c_one.max():.4g} <= {plasma}); "
+        "test no longer exercises the defect it was written for")
+    # The exchange form must not, ever.
+    assert c_exc.max() <= plasma + 1e-9, (
+        f"exchange path breached plasma: {c_exc.max():.6g} > {plasma}")
+
+
+def test_exchange_k_rejects_negative(inert_drug, flat_micro_factory):
+    """A negative exchange rate would pump drug in against its own gradient."""
+    micro = flat_micro_factory()
+    ny, nx = micro.domain.ny, micro.domain.nx
+    pde = PDEConfig(dt=1.0, total_time=10.0, convection=False, save_every=10)
+    bad = np.full((ny, nx), -1e-4)
+    with pytest.raises(ValueError, match="non-negative"):
+        simulate_drug_transport(micro, inert_drug, np.zeros((ny, nx)), pde,
+                                exchange_k=bad)
