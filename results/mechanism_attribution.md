@@ -86,6 +86,57 @@ Identical to the last bit of the mantissa, not to a tolerance.
 
 ---
 
+> ### ⚠ CONDITIONAL RETRACTION NOTICE — added after this report was written
+>
+> **The cisplatin half of §3 inverts under corrected transport physics.** It is
+> not retracted *yet*, because it is still the literal output of the shipped
+> default path — but it will be the moment that default changes, and anyone
+> quoting it should know that now.
+>
+> `results/breast_kp_validation.md` established that the historical vascular
+> source is ONE-WAY (`S = PS*Cp`, no path back from interstitium to blood), so
+> tissue concentration is unbounded above plasma. On this section cisplatin
+> runs at **2.60x plasma on average and 11.53x at maximum** — physically
+> unavailable to a passively delivered drug.
+>
+> That is precisely what produces the 96.42 % RESISTANCE figure below. With
+> every tumour cell driven past IC50 (`coverage_1x = 0.9955`, `p05 E/IC50 =
+> 1.79`), the UNREACHED and UNDERDOSED bands are **empty by construction**, so
+> by the documented precedence rule every survivor *must* fall through to
+> RESISTANCE. The label was forced by the delivery law, not inferred from the
+> biology.
+>
+> Re-run on branch `transvascular-exchange` with
+> `PDEConfig(transvascular_exchange=True)`, which bounds tissue concentration
+> by the plasma level (`C_ss = PS*Cp/(PS + clearance + binding) <= Cp`):
+>
+> | cisplatin, same section | one-way (below) | exchange |
+> |---|---:|---:|
+> | mean tissue / plasma | 2.60x (max 11.53x) | 0.61x (max 0.96x) |
+> | median tumour E/IC50 | 3.19 | 0.79 |
+> | survival: DOSE | 0.44 % | **95.71 %** |
+> | survival: RESISTANCE | **96.42 %** | 3.59 % |
+> | `kill_fraction` | 0.4362 | 0.2311 |
+>
+> **The conclusion flips from "cisplatin is a biology problem" to "cisplatin is
+> a dose problem" — the opposite reading.** 12,943 survivors move out of the
+> resistance bucket, leaving 657.
+>
+> What SURVIVES unchanged: the bit-exact reconciliation against
+> `kill_fraction` (verified 0.0 absolute difference across all 10 re-runs, 0
+> UNATTRIBUTED cells in every arm), and the temozolomide half of §3, which gets
+> *stronger* — TMZ goes from 97.10 % to 100.00 % DELIVERY-limited, because the
+> DOSE bucket empties entirely.
+>
+> One structural side-effect to note before relying on this decomposition:
+> for any drug whose exposure falls below IC50 population-wide, RESISTANCE and
+> CHANCE go to exactly **zero cells**, because the exposure bands take
+> precedence. Under bounded physics that is most of this panel, so
+> "delivery vs dose vs resistance" degenerates to a two-category answer more
+> often than this report implies.
+>
+> Do not quote cisplatin as resistance-limited in any external material.
+
 ## 3. The finding: temozolomide vs cisplatin on the flagship section
 
 Both runs: `xenium_319`, `dx = 12 um`, 6 h, `plasma_peak = 50 uM`, `half_life = 4 h`,
