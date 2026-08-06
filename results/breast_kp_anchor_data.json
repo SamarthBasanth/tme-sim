@@ -1,0 +1,112 @@
+[
+  {
+    "drug": "docetaxel",
+    "mw": 807.89,
+    "bbb_penetrance": 0.01900170082738329,
+    "diffusivity": 156.27996809004105,
+    "binding": 0.14908810369044526,
+    "mean_tumor_auc": 5396.756077408839,
+    "plasma_auc_uM_s": 671651.8532829154,
+    "ratio": 0.008035049782160877
+  },
+  {
+    "drug": "paclitaxel",
+    "mw": 853.918,
+    "bbb_penetrance": 0.0191146610720123,
+    "diffusivity": 151.39814916659216,
+    "binding": 0.13873062556165022,
+    "mean_tumor_auc": 5846.907287712123,
+    "plasma_auc_uM_s": 671651.8532829154,
+    "ratio": 0.008705264876637316
+  },
+  {
+    "drug": "vinorelbine",
+    "mw": 778.947,
+    "bbb_penetrance": 0.03259068257864541,
+    "diffusivity": 158.76657795478795,
+    "binding": 0.1235267898522487,
+    "mean_tumor_auc": 11290.446186143281,
+    "plasma_auc_uM_s": 671651.8532829154,
+    "ratio": 0.016809968037693305
+  },
+  {
+    "drug": "epirubicin",
+    "mw": 543.525,
+    "bbb_penetrance": 0.020567870235594195,
+    "diffusivity": 184.74861430191334,
+    "binding": 0.03325045168543613,
+    "mean_tumor_auc": 27903.959470694917,
+    "plasma_auc_uM_s": 671651.8532829154,
+    "ratio": 0.041545272799152266
+  },
+  {
+    "drug": "doxorubicin",
+    "mw": 543.525,
+    "bbb_penetrance": 0.020567870235594195,
+    "diffusivity": 184.74861430191334,
+    "binding": 0.03325045168543613,
+    "mean_tumor_auc": 27903.959470694917,
+    "plasma_auc_uM_s": 671651.8532829154,
+    "ratio": 0.041545272799152266
+  },
+  {
+    "drug": "methotrexate",
+    "mw": 454.447,
+    "bbb_penetrance": 0.022507057604689518,
+    "diffusivity": 198.87090459138986,
+    "binding": 0.026627955647449165,
+    "mean_tumor_auc": 38361.5000252326,
+    "plasma_auc_uM_s": 671651.8532829154,
+    "ratio": 0.057115155474861526
+  },
+  {
+    "drug": "tamoxifen",
+    "mw": 371.524,
+    "bbb_penetrance": 0.6020420833507272,
+    "diffusivity": 215.95584008668206,
+    "binding": 0.12302299909844099,
+    "mean_tumor_auc": 212416.68830230282,
+    "plasma_auc_uM_s": 671651.8532829154,
+    "ratio": 0.3162601089597946
+  },
+  {
+    "drug": "palbociclib",
+    "mw": 447.543,
+    "bbb_penetrance": 0.578756414591833,
+    "diffusivity": 200.11076033801277,
+    "binding": 0.044354404560997165,
+    "mean_tumor_auc": 585154.5662129521,
+    "plasma_auc_uM_s": 671651.8532829154,
+    "ratio": 0.871217079730846
+  },
+  {
+    "drug": "cyclophosphamide",
+    "mw": 261.089,
+    "bbb_penetrance": 0.9734569026014044,
+    "diffusivity": 248.76047325718804,
+    "binding": 0.01560622844722296,
+    "mean_tumor_auc": 2855454.288450966,
+    "plasma_auc_uM_s": 671651.8532829154,
+    "ratio": 4.251390470366472
+  },
+  {
+    "drug": "cisplatin",
+    "mw": 298.03,
+    "bbb_penetrance": 0.8576798963736021,
+    "diffusivity": 236.18442715353106,
+    "binding": 0.008710359202449943,
+    "mean_tumor_auc": 4513531.871295629,
+    "plasma_auc_uM_s": 671651.8532829154,
+    "ratio": 6.720046776070495
+  },
+  {
+    "drug": "5-fluorouracil",
+    "mw": 130.078,
+    "bbb_penetrance": 0.63269194223888,
+    "diffusivity": 323.8095404393241,
+    "binding": 0.005513078981384142,
+    "mean_tumor_auc": 5235929.905124923,
+    "plasma_auc_uM_s": 671651.8532829154,
+    "ratio": 7.795601068518793
+  }
+]
