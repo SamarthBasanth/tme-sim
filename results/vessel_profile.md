@@ -4,6 +4,49 @@
 >
 > **`empirical_half_distance_um` renders `None` honestly, never a fabricated number.** It returns `None` **by design** when a profile never falls to half its perivascular value; every read renders **"n/a (never halves)"** instead of crashing or guessing. **No substitute number is ever fitted or extrapolated** — a profile that does not halve HAS no half-distance, and that is a measured property of the profile, not a gap to be filled. Whether temozolomide's real-tissue profile *does* halve now depends on which distance metric is used — see the next callout, which is the main content of this regeneration.
 >
+> ### ⚠ THE 2026-07-29 FLAGSHIP RESULT BELOW REVERSES UNDER CORRECTED TRANSPORT PHYSICS
+>
+> Re-run under `PDEConfig(transvascular_exchange=True)` (see
+> `results/transvascular_exchange_revalidation.md`). Not retracted, because the
+> flag is default-off and the numbers below remain the shipped path's literal
+> output — but the headline conclusion of the regeneration announced in the
+> next paragraph does not survive the delivery-law fix.
+>
+> **Temozolomide goes back to NO DECAY.** Exchange removes drug fastest where
+> the source is strongest, which flattens the profile: TMZ's fitted `L` rises
+> **277.4 → 396.3 µm (+43 %)** and its empirical half-distance —
+> **153.6 µm** below — becomes **not measurable at all**. The verdict returns
+> from *FAIL* to *NO DECAY (no half-distance could be measured)*, i.e. exactly
+> the legacy-metric state the 2026-07-29 regeneration was written to announce
+> it had left. The primary-vs-legacy contrast for temozolomide collapses too:
+> under exchange both metrics say "never halves".
+>
+> **And the published result was marginal by construction.** Only 16 distance
+> bins clear `MIN_BIN_COUNT = 30`, so the profile is measurable to ~155–165 µm.
+> The 153.6 µm crossing sat **in the last usable bin**. A result resting on a
+> final-bin crossing is fragile independent of this physics change, and should
+> not have been quoted as a clean verdict flip.
+>
+> **Doxorubicin is unaffected**: all three verdicts identical, numbers shift
+> +1.8–2.2 % (d½ 41.5 → 42.2 µm, L 43.5 → 44.5 µm). The isolated
+> single-vessel control is fully invariant (R²log = 1.00000 both arms) —
+> exchange alters the vessel-line amplitude but not the decay away from it,
+> the same reason the calibration chain survives.
+>
+> **All shape claims survive**: exponential on the isolated vessel,
+> exponential-plus-floor on real tissue, the distance-metric change is
+> orthogonal to exchange, and the source-null confound is unchanged.
+> Temozolomide's qualitative ordering survives and the gap widens (6.4× →
+> 8.9× doxorubicin's L). Every temozolomide fitted length needs regenerating.
+>
+> **One correction to a claim made elsewhere in this repo.** A "pre-existing
+> drift" in the vessel-distance map (tissue p90 85.26 µm vs a published 84.85)
+> was reported during this re-validation effort. It is **not a drift** — it is
+> two different metrics of the same tissue: LEGACY percentile-mask p90 =
+> 84.852814 µm (bit-matching `.dose_schedule_cache.json`) and PRIMARY
+> direct-cell p90 = 85.264116 µm. Both reproduce exactly. No number in this
+> report is affected; it quotes median/p95/max, all of which reproduced.
+
 > **THE PRIMARY DISTANCE-TO-VESSEL METRIC CHANGED (2026-07-29) — read this before quoting any number below.** Every fitted number in this report was previously computed from a **percentile threshold on the smoothed/discrete `vascular_density` FIELD** (`vessel_mask_from_density` → `distance_transform_edt`). It is now computed from the **direct distance to the nearest REAL measured endothelial CELL** (`direct_vessel_distance_um`, a single `cKDTree` query, no threshold, no bandwidth, no mask) — a straightforward audit (`results/sweep/vessel_distance_audit_percentile_method_2026-07-29T05-54-00Z.md`) found that a percentile on a density field answers "how far to the densest few percent of the field", not "how far to a vessel", and a prototype (`results/sweep/vessel_distance_direct_replacement_prototype_2026-07-29T05-54-00Z.md`) confirmed the direct-cell distance matches `vascular_validation.py`'s independently-measured tumour→endothelial distance while the percentile mask does not. **The aggregate distance barely moves (median 45.0 µm primary vs 43.3 µm legacy, 0.96×) — this is a TAIL effect, not a mean effect, and it flips one drug's verdict outright:** **temozolomide** goes from *"NO DECAY (no half-distance could be measured)"* (legacy) to *"FAIL (more than 3x off the measured band)"* (primary) — its profile now measurably halves (at a large distance, well outside the doxorubicin band, which is exactly what a small, fast-diffusing, weakly-cleared drug should do) where the old metric could not even measure a half-distance at all. **Doxorubicin** IMPROVES from *"PASS(wide) (outside 40-50 um, inside the 25-75 um replication band)"* to *"PASS (inside the measured 40-50 um band)"*. Neither change is a change in the simulated physics (the AUC/concentration fields are identical; only the distance axis they are binned against changed) — see the dedicated section below for the full head-to-head numbers, and the module HONESTY note for why the LEGACY metric is retained rather than deleted.
 >
 > Absolute exposure / AUC / coverage figures below are on the **discrete-source unit** and are NOT comparable with the KDE-era numbers this file carried before the discrete-source regeneration (the tissue-integrated source total is 3.36x smaller; that is a change of *unit*, not of physics).
