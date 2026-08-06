@@ -275,6 +275,90 @@ permeability — not simply mis-valued. That distinction matters for how it
 should be fixed: the fix is a tissue-aware permeability, not a global rescale
 of `bbb_penetrance`.
 
+## 6.2 A THIRD DEFECT, found while trying to verify a lead that was itself wrong
+
+A follow-up asked whether `bbb_penetrance` is miscalibrated in absolute
+magnitude in brain — the engine's volume-averaged methotrexate PS is
+6.039e-4 s^-1, against a directly measured intact-BBB value of 3.3e-5 s^-1
+(Ohno K, **Fredericks WR**, Rapoport SI, *Surg Neurol* 1979;12(4):323-8, PMID
+524251 — note the author list, an earlier sweep of ours misattributed this to
+"Ohno, Pettigrew & Rapoport", which is a different paper, PMID 696840).
+
+**That claim is REFUTED, and the refutation is more interesting than the
+claim.** `bbb_penetrance` is NOT a permeability. It is a dimensionless
+brain:plasma PARTITION coefficient, and it says so in three places
+(`core/config.py:25`, `reconstruct/barrier.py:66` — "It is NOT a permeability
+with physical units" — and `molecular/permeability.py`, whose docstring
+calibrates it against measured tissue:plasma ratios). Judged in the units it
+was built in, methotrexate at 0.0225 against a measured 0.178 is if anything
+**low**, not 18x high.
+
+**But the engine uses it as a first-order RATE.** `treatment/drugs.py:228`
+declares `exchange_coefficient` returns "the permeability-surface-area field
+PS(x, y) in 1/s"; `sim/engine.py:44` declares
+`source = vascular_density * bbb_penetrance * plasma_mean (uM/s)`. The
+dimensional audit:
+
+    vascular_density [dimensionless] x bbb_penetrance [dimensionless]
+        x plasma [uM]  =  uM,  NOT uM/s
+
+The engine obtains `s^-1` by an **implicit, undocumented, uncalibrated
+conversion factor of exactly 1 s^-1**. Nothing in the repo derives or
+justifies that scale.
+
+**The repo already contradicts itself about which quantity this is.**
+`results/kill_calibration.md:119` insists the term is "a **rate**, not a
+concentration... **must not be read as** a physical tissue:plasma partition
+coefficient". `results/glioma_regional_pk.md:34` reads it as exactly that
+partition. Both cannot be true.
+
+**The diagnostic that settles it.** Read as RATES, the drugs are mutually
+incoherent: methotrexate is 18.3x above measured, temozolomide 2.10x — an
+**8.7x spread** between two drugs against the same normal rat brain. Read as
+PARTITIONS with the engine's own barrier term on, methotrexate is 0.79x and
+temozolomide 0.82x of measured — a **1.04x spread**. The drug-to-drug
+incoherence exists ONLY under the rate reading. That is the signature of a
+units error, not a calibration error.
+
+**It does NOT cancel from rankings.** Measured temozolomide:methotrexate
+permeability ratio is 48.5x; the engine's is 5.57x, so it **under-separates by
+8.7x** (5.1x after correcting for protein binding). Note this runs OPPOSITE to
+the breast finding, where the engine OVER-separates methotrexate:5-FU by 28.1x
+against a measured 1.02x. The parameter is unreliable in **both** directions,
+which no single rescale can fix. And because `Kp = PS/(PS + k_loss)` saturates
+in PS, no scale factor can convert one reading into the other — the distortion
+is necessarily drug-dependent.
+
+**This defect is structurally invisible to the existing GBM validation, and
+more completely than §5 claimed.** The penetration-length anchor is
+`L = sqrt(D_eff / k)` with `k = clearance + binding`. With
+`transvascular_exchange = False` (the default), **PS appears nowhere in that
+formula at all.** The doxorubicin-fit → mitoxantrone-predicted chain could not
+have caught this at any magnitude of error.
+
+**Consequence for the exchange term added in this branch.** It inherits the
+same implicit scale: `exchange_k` is that dimensionless product, added
+directly to a reaction rate in `1/s`. The term is at least now *consistent* —
+the same quantity drives influx and back-flux, so whatever the true scale
+`k_0` is, it multiplies both halves — but the steady state
+`k_0*PS'*Cp / (k_0*PS' + k)` depends on `k_0`, and `k_0 = 1 s^-1` is
+unjustified. **A calibrated `k_0` would change every exchange-on number in
+this document.** They should be read as conditional on that assumption.
+
+Corroboration for the measured side is solid — three groups, three methods, a
+decade apart: Ohno 1979 (PA 3.3e-5 s^-1 intact, 28e-5 opened), Shapiro 1988
+(PMID 3335031, methotrexate K1 1.3-1.9 uL/g/min cortex, 1.3-8.2 in C6 glioma),
+Groothuis 1983 (PMID 6850641). The "but glioma is leaky" defence fails on
+direct measurement: Shapiro measured methotrexate itself in a rat glioma at
+4.4-28x BELOW the engine.
+
+**Recommended fix, in order:** (a) decide which quantity `bbb_penetrance` is
+and make `config.py`, `barrier.py`, `drugs.py`, `engine.py`,
+`kill_calibration.md` and `glioma_regional_pk.md` agree — they currently do
+not; (b) if the rate reading is kept, introduce an explicit calibrated
+`PS = k_0 * vascular_density * bbb_penetrance` with `k_0` fit to measured PS
+values, not left at an implicit 1.
+
 ## 7. Merge position
 
 **The physics is right and the implementation is correct.** It is verified to
