@@ -193,6 +193,33 @@ The **ceiling** is the kill fraction as exposure -> infinity: the Hill term satu
 | `vessel_distance` | cisplatin > doxorubicin > temozolomide |
 | `markers` | cisplatin > doxorubicin > temozolomide |
 
+> **Re-validated under corrected transport physics
+> (`PDEConfig(transvascular_exchange=True)`, see
+> `results/transvascular_exchange_revalidation.md`). The claim below SURVIVES.
+> The worked example in it does NOT.**
+>
+> * **Ranking invariance across state routes HOLDS** under the corrected
+>   delivery law, in all three routes, verified independently on a fourth code
+>   path. The structural argument in this paragraph — shared multipliers cancel
+>   out of a comparison — is confirmed, not refuted.
+> * **But the CONTENT of the invariant ranking changed.** Under corrected
+>   delivery it is *doxorubicin > cisplatin > temozolomide*, so the worked
+>   example below is **false as written**. Ranking is invariant across state
+>   routes; it is NOT invariant across the delivery law (that re-validation
+>   found the GBM top-1 flips).
+> * **The margin degraded ~3.6x.** The cisplatin/doxorubicin gap the
+>   invariance rests on falls from 40% of the leader (55-109 sigma) to 9-10%
+>   (8-14 sigma). Still not a near-tie, but no longer overwhelming.
+> * **The quoted 0.3252 absolute spread does not survive** (it becomes 0.1962,
+>   −40%) — but the RELATIVE spread is essentially unchanged, 1.7699x →
+>   1.7702x. Re-quote the absolute per delivery law; the multiplier stands.
+> * **The level warning gets STRONGER.** Over {state route} x {delivery law}
+>   jointly, cisplatin's kill spans 0.2311–0.7614, a **3.29x** swing. Band
+>   fractions and kill ceilings are bit-identical in both arms, as expected —
+>   exchange is a transport term and never touches the oxygen solve, vessel
+>   geometry or marker calls.
+> * The "temozolomide kills 1.8%" example becomes 0.72%.
+
 **The ranking is INVARIANT and the levels are not. That is the honest and useful result.** The resistance multipliers are shared across drugs — every drug pays the same `x0.5` in the same QUIESCENT cells — so they very largely cancel out of a comparison and do not cancel at all out of a level. Concretely: a claim of the form *"cisplatin beats doxorubicin beats temozolomide on this tissue"* survives every state route tested here, while a claim of the form *"temozolomide kills 1.8% of tumour cells"* does not survive any of them.
 
 This is the same structure `results/oxygen_demotion.md` §3.2 found for the oxygen ROUTE — ranking identical, levels moving — but roughly 23x larger: that report's kill moved at most 3.4% relative, and changing the state RULE moves it 77%. The reason is structural: swapping the oxygen field nudges a field the bands are then cut from, while swapping the state rule moves the band OCCUPANCIES themselves (§3.1: VIABLE 10.04% -> 91.08% -> 29.80%).
