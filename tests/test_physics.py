@@ -298,3 +298,80 @@ def test_exchange_k_rejects_negative(inert_drug, flat_micro_factory):
     with pytest.raises(ValueError, match="non-negative"):
         simulate_drug_transport(micro, inert_drug, np.zeros((ny, nx)), pde,
                                 exchange_k=bad)
+
+
+# --------------------------------------------------------------------------- #
+# (6) The transvascular rate scale k_0 (treatment.drugs.PS_SCALE_S_INV)
+# --------------------------------------------------------------------------- #
+def test_ps_scale_default_is_bit_identical(flat_micro_factory):
+    """The default 1.0 must not move a single bit.
+
+    PS_SCALE_S_INV exists to make a dimensional error visible, not to change
+    any number. Every stored reference in the repo was produced with the
+    implicit factor of 1, so the explicit default has to reproduce it exactly.
+    """
+    from tmesim.core import DrugParams
+    from tmesim.treatment.drugs import PS_SCALE_S_INV, delivery_source
+
+    assert PS_SCALE_S_INV == 1.0, (
+        "the default must stay 1.0 -- changing it rescales every absolute "
+        "delivery number in results/ and is a re-validation exercise")
+
+    micro = flat_micro_factory()
+    ny, nx = micro.domain.ny, micro.domain.nx
+    micro.fields.vascular_density = np.full((ny, nx), 0.03)
+    drug = DrugParams(name="x", diffusivity=200.0, molecular_weight=300.0,
+                      ic50=1.0, hill=1.0, bbb_penetrance=0.4)
+
+    a = delivery_source(micro, drug, 10.0)
+    b = delivery_source(micro, drug, 10.0, ps_scale=None)
+    c = delivery_source(micro, drug, 10.0, ps_scale=1.0)
+    assert np.array_equal(a, b)
+    assert np.array_equal(a, c)
+
+
+def test_ps_scale_is_linear_and_reaches_exchange(flat_micro_factory):
+    """The scale multiplies the source, and the SAME scale reaches the
+    back-flux field -- otherwise source and exchange would silently model
+    different permeabilities."""
+    from tmesim.core import DrugParams
+    from tmesim.treatment.drugs import delivery_source, exchange_coefficient
+
+    micro = flat_micro_factory()
+    ny, nx = micro.domain.ny, micro.domain.nx
+    micro.fields.vascular_density = np.full((ny, nx), 0.03)
+    drug = DrugParams(name="x", diffusivity=200.0, molecular_weight=300.0,
+                      ic50=1.0, hill=1.0, bbb_penetrance=0.4)
+
+    base = delivery_source(micro, drug, 10.0)
+    assert np.allclose(delivery_source(micro, drug, 10.0, ps_scale=0.25),
+                       base * 0.25, rtol=0, atol=0)
+    # exchange_coefficient IS delivery_source at Cp=1, scale included.
+    assert np.array_equal(
+        exchange_coefficient(micro, drug, ps_scale=0.25),
+        delivery_source(micro, drug, 1.0, ps_scale=0.25))
+
+    with pytest.raises(ValueError, match="non-negative"):
+        delivery_source(micro, drug, 10.0, ps_scale=-1.0)
+
+
+def test_ps_scale_calibration_residual_equals_half_spread():
+    """The calibration's key identity, which is the whole argument for why a
+    better k_0 is NOT the remaining fix.
+
+    A single scale can only remove the systematic bias. What is left is
+    exactly the square root of the disagreement between the per-drug implied
+    scales -- i.e. the engine's cross-drug permeability ORDERING error, which
+    no rescale can touch.
+    """
+    from tmesim.validation.ps_scale import calibrate_ps_scale
+
+    c = calibrate_ps_scale()
+    assert c["n_anchors"] >= 2
+    # The fit must improve on the implicit factor of 1.
+    assert c["gm_fold_after"] < c["gm_fold_before"]
+    # And the residual must be exactly the half-spread, to floating tolerance.
+    assert c["gm_fold_after"] == pytest.approx(c["irreducible_residual"],
+                                               rel=1e-9)
+    assert c["irreducible_residual"] == pytest.approx(
+        c["disagreement_fold"] ** 0.5, rel=1e-12)

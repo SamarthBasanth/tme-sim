@@ -98,12 +98,49 @@ def plasma_profile(pk: PKConfig, times: np.ndarray) -> np.ndarray:
     return contrib.sum(axis=0)
 
 
+#: The transvascular rate scale, in 1/s. THIS CONSTANT EXISTS TO MAKE A
+#: DIMENSIONAL ERROR VISIBLE RATHER THAN IMPLICIT.
+#:
+#: ``delivery_source`` computes ``vascular_density * bbb_penetrance * plasma``
+#: and this module and ``sim/engine.py`` both declare the result to be uM/s.
+#: It is not: ``vascular_density`` is a dimensionless volume fraction and
+#: ``bbb_penetrance`` is a dimensionless PARTITION coefficient (see
+#: ``core/config.py``'s field doc and ``reconstruct/barrier.py``, which states
+#: outright "It is NOT a permeability with physical units"), so the product is
+#: uM. The engine has been getting ``s^-1`` from an unstated factor of exactly
+#: 1 s^-1 that nothing derives.
+#:
+#: **Default 1.0 keeps every existing result BIT-IDENTICAL** (``x * 1.0 == x``
+#: in IEEE-754), so this constant changes nothing until someone opts in.
+#:
+#: The calibrated value is **0.16122 1/s**, fit by
+#: ``tmesim.validation.ps_scale.calibrate_ps_scale`` against independently
+#: MEASURED rodent brain permeability-surface-area products (methotrexate
+#: 3.3e-5 /s, PMID 524251; temozolomide 1.6e-3 /s, PMID 39690422). It is NOT
+#: fit to the breast microdialysis anchor, to any kill fraction, or to any
+#: outcome -- so the breast anchor remains an out-of-sample check.
+#:
+#: Using it moves the geometric-mean fold error against those anchors from
+#: 6.203x to 2.950x. It CANNOT do better: the two anchors imply scales that
+#: disagree by 8.70x, so the residual is exactly sqrt(8.70) = 2.950x. That
+#: leftover is the engine's cross-drug permeability ORDERING being wrong --
+#: and it runs in both directions (brain UNDER-separates TMZ:MTX 5.57x vs a
+#: measured 48.5x; breast OVER-separates MTX:5-FU 28.1x vs a measured 1.02x),
+#: so no rescale fixes it. It needs a better ``bbb_penetrance``.
+#:
+#: Changing this default is a re-validation exercise, not a flag flip: it
+#: rescales every absolute delivery number in ``results/``. See
+#: ``results/transvascular_exchange_revalidation.md`` section 6.2.
+PS_SCALE_S_INV: float = 1.0
+
+
 def delivery_source(
     micro: Microenvironment,
     drug: DrugParams,
     plasma_conc: float,
     bbb_disruption: "np.ndarray | float | None" = None,
     efflux: bool = False,
+    ps_scale: "float | None" = None,
 ) -> np.ndarray:
     """Instantaneous (ny, nx) drug delivery-rate source into the tissue.
 
@@ -205,18 +242,23 @@ def delivery_source(
     """
     vascular = np.asarray(micro.fields.vascular_density, dtype=np.float64)
     penetrance = drug.bbb_penetrance
+    # The dimensional scale. Default 1.0 -> multiplication is a no-op in
+    # IEEE-754, so the historical path stays bit-identical. See PS_SCALE_S_INV.
+    scale = PS_SCALE_S_INV if ps_scale is None else float(ps_scale)
+    if scale < 0.0:
+        raise ValueError(f"ps_scale must be non-negative, got {scale}")
     if efflux:
         # Imported lazily so the default path touches no extra module.
         from tmesim.molecular.efflux import efflux_factor
         penetrance = penetrance * efflux_factor(drug.name)
     if bbb_disruption is None:
-        return vascular * penetrance * float(plasma_conc)
+        return vascular * penetrance * float(plasma_conc) * scale
 
     # Imported lazily: reconstruct depends on treatment, not the other way round.
     from tmesim.reconstruct.barrier import effective_penetrance
 
     p_eff = effective_penetrance(penetrance, bbb_disruption)
-    return vascular * p_eff * float(plasma_conc)
+    return vascular * p_eff * float(plasma_conc) * scale
 
 
 def exchange_coefficient(
@@ -224,6 +266,7 @@ def exchange_coefficient(
     drug: DrugParams,
     bbb_disruption: "np.ndarray | float | None" = None,
     efflux: bool = False,
+    ps_scale: "float | None" = None,
 ) -> np.ndarray:
     """The permeability-surface-area field ``PS(x, y)`` in 1/s.
 
@@ -274,7 +317,7 @@ def exchange_coefficient(
         (ny, nx) non-negative exchange rate in 1/s.
     """
     return delivery_source(micro, drug, 1.0, bbb_disruption=bbb_disruption,
-                           efflux=efflux)
+                           efflux=efflux, ps_scale=ps_scale)
 
 
 if __name__ == "__main__":
