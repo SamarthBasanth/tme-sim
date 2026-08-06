@@ -89,19 +89,104 @@ docker run -p 8000:8000 \
   vivum-studio --host 0.0.0.0
 ```
 
-**Honesty note on this section specifically:** the `Dockerfile` was written
-and its *pip install step* verified locally (an editable install from
-`pyproject.toml` alone needs pip >= 21.3 / PEP 660 support — confirmed this
-fails with an old pip and works once upgraded, which is why the Dockerfile
-upgrades pip before installing). Docker itself is not installed in the
-environment this was written in, so **the full containerized build has not
-been run end-to-end**. Build it once yourself and open an issue/fix a layer
-if something in the base-image step doesn't match what's described here.
+**Honesty note on this section specifically.** Docker is still not installed
+in the environment this was written in, so **no image has ever been built
+from this `Dockerfile` and no container has ever been run.** What *has* been
+verified, by reproducing the Dockerfile's steps outside a container in
+throwaway Python 3.11 virtualenvs:
+
+* The dependency layer resolves and installs. `pip install -e '.[app]'` from
+  `pyproject.toml` plus a stub `tmesim/__init__.py` succeeds on Python 3.11
+  (it needs pip >= 21.3 / PEP 660 — confirmed an old pip fails with a
+  confusing "setup.py not found", which is why the Dockerfile upgrades pip
+  first).
+* The layer-caching trick is sound: installing editable against a stub
+  package and copying the rest of `tmesim/` in afterwards still imports
+  correctly, because setuptools' editable finder maps the top-level package
+  directory.
+* The `data_cache/` mount target is right. The loaders resolve
+  `data_cache/...` relative to the working directory, so `WORKDIR /app` plus
+  `-v $(pwd)/data_cache:/app/data_cache` lands where the code looks. With the
+  cache absent, `/api/sections` reports each section unavailable *with a
+  reason* rather than failing to boot. (Corollary: do not override the
+  container's working directory.)
+* `app/runs/`, the static front end at `/`, and the `TMESIM_STUDIO_API_KEY`
+  gate (401 without the header, 200 with it) all behave correctly at the
+  paths the image uses.
+* Python 3.11 — the base image's version, newer than the 3.9 used for
+  development — runs the suite green when the full dependency set is present.
+
+**Four real defects were found and fixed this way, without ever building the
+image**, which is worth stating because it is the argument for doing this
+audit at all:
+
+1. **There was no `.dockerignore`.** Docker does not read `.gitignore`, so
+   `COPY . .` was baking in `data_cache/` (5.3 GB of real tissue), `app/runs/`
+   (647 MB of run history) and a 618 MB macOS virtualenv — making this
+   section's own "does NOT ship any data cache" claim false, and the build
+   context large enough to be impractical. Fixed by adding `.dockerignore`.
+2. **The default `CMD` bound the container's own loopback** (`--host
+   127.0.0.1`), which is unreachable through a published port, so the
+   documented `docker run -p 8000:8000 …` produced a container nothing could
+   talk to. Now binds `0.0.0.0`; use `-p 127.0.0.1:8000:8000` to keep it
+   host-local.
+3. **`rdkit` and `h5py` were undeclared runtime dependencies.** Measured on an
+   otherwise-identical environment: without `rdkit`, 61 tests fail, `ribociclib`
+   and `palbociclib` compile to `mw=0.0` and are permanently unusable, and
+   bit-exact reference results shift; without `h5py`, GBM-Space ingestion
+   cannot even import. Both now declared in `pyproject.toml`.
+4. **The auto-generated API key never reached `docker logs`.** CPython
+   block-buffers stdout when it is a pipe, so the startup banner (and the key,
+   which is printed once and never persisted) stayed in an unflushed buffer
+   while uvicorn's stderr logs appeared normally — a container that looks
+   healthy while 401ing every request with a key nobody can read. Fixed with
+   `ENV PYTHONUNBUFFERED=1`.
+
+**Still unverified, and needing one real build to settle:** that
+`docker build` completes at all (build context, `apt-get`, pip as root); that
+linux `manylinux` wheels exist and install for `scipy`/`scikit-image`/
+`imagecodecs`/`h5py`/`rdkit` on cp311 (every wheel tested here was
+macOS/arm64); whether those wheels need shared libraries absent from
+`python:3.11-slim` (the `libgomp1` line is precautionary, not measured, and
+rdkit has historically wanted `libXrender`/`libXext` on slim images); that
+`-p 8000:8000` actually reaches the app; bind-mount ownership and SELinux
+relabeling; BuildKit cache reuse; PID-1 signal handling on `docker stop`; and
+final image size.
+
+One thing a build will **not** settle: this repo's bit-exact reference tests
+were generated on macOS/arm64. On linux/amd64 they may differ for BLAS/SIMD
+reasons unrelated to the container. Treat a bitwise mismatch inside the image
+as unexplained until measured, not as a container defect.
+
+**Also note, given the above:** no dependency version is pinned anywhere, so
+two builds a month apart resolve different numpy/scipy versions and are not
+numerically identical. If you need reproducibility, pin or ship a
+`constraints.txt`.
+
+Build it once yourself and open an issue if any of this doesn't hold.
 
 `data_cache/` is gitignored and not baked into the image (this project's
 "real data, explicitly acquired, never silently bundled" rule extends to the
-container) — mount your own populated cache, or run `vivum acquire` /
-follow `docs/REPRODUCE.md` §2b inside the running container to fetch it.
+container) — mount your own populated cache, or fetch it inside the running
+container. Note the `ENTRYPOINT` is `python -m app.server`, so
+`docker run vivum-studio vivum acquire` does **not** work (it becomes
+`python -m app.server vivum acquire` and exits 2). Use:
+
+```bash
+docker exec <container> vivum acquire
+```
+
+**Writable state does not survive container replacement.** Run history,
+`app/runs/_ingested_sections.json` (the file §1d tells you to populate),
+`app/projects/`, `app/reports/` and `app/uploads/` all live inside the
+image's filesystem. Mount them if you want them to persist:
+
+```bash
+docker run -p 127.0.0.1:8000:8000 \
+  -v $(pwd)/data_cache:/app/data_cache \
+  -v vivum_runs:/app/app/runs \
+  vivum-studio
+```
 
 ---
 

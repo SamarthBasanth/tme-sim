@@ -17,6 +17,21 @@ dependencies = [
                     # real OME-TIFF CODEX exports (data.adapters.codex) - the
                     # Greenwald/Tirosh 2024 files are LZW-compressed and raise
                     # without this at decode time, not at import time.
+    "rdkit",        # molecular.descriptors: SMILES -> the cheminformatics
+                    # descriptors the whole molecular compile pathway is built
+                    # on. Previously UNDECLARED and only soft-required, because
+                    # descriptors._FALLBACK_TABLE happened to carry a curated
+                    # entry for every shipped drug. That stopped being true
+                    # when ribociclib and palbociclib were added: neither is in
+                    # the fallback table, so without rdkit they compile to
+                    # mw=0.0 and /api/drugs reports them permanently broken
+                    # ("mw must be positive, got 0.0"). Also silently changes
+                    # bit-exact reference results for the other drugs, since
+                    # the fallback MWs are rounded relative to rdkit's.
+    "h5py",         # data.adapters.gbmspace: a hard top-level import, so a
+                    # checkout without it cannot even COLLECT
+                    # tests/test_gbmspace_adapter.py, let alone ingest
+                    # GBM-Space Visium.
 ]
 
 [project.scripts]

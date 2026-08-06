@@ -1,0 +1,45 @@
+# Docker does NOT read .gitignore, so everything gitignored has to be repeated
+# here or `COPY . .` bakes it into the image.
+#
+# This file is load-bearing for a CLAIM, not just for build speed: the
+# Dockerfile header and docs/DEPLOYMENT.md 1c both state that data_cache/ is
+# not baked into the image and must be mounted. Without this file that
+# statement was false -- `COPY . .` was copying 5.3 GB of real tissue data,
+# 647 MB of run history, and a 618 MB macOS virtualenv into the image.
+
+# --- real data: mounted at runtime, never baked in (this is the claim) ---
+data_cache/
+.export-drive/
+supp.zip
+
+# --- writable runtime state: belongs in a volume, not a layer ---
+app/runs/
+app/projects/
+app/reports/
+app/uploads/
+
+# --- host-specific / wrong-platform ---
+.venv/
+venv/
+**/__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- not needed by the server image ---
+.git/
+.github/
+landing-3d/          # the marketing site is a separate Next.js app
+archive/             # the retired synthetic-era code
+results/             # generated reports and figures
+marketing/
+docs/
+*.md
+!README.md
+
+# --- editor / OS noise ---
+.DS_Store
+.idea/
+.vscode/
