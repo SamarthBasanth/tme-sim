@@ -482,7 +482,19 @@ def execute_run(spec: Dict, ctx: _Ctx,
         }
 
     pot = resolve_ic50(drug_name)
-    mol = get_molecule(drug_name)
+    try:
+        mol = get_molecule(drug_name)
+    except KeyError:
+        # "palbociclib" is curated in molecular.breast_library, not here (the
+        # two drug libraries are kept disjoint), but is a valid GBM-context
+        # drug too -- calibration._compile already special-cases it. See
+        # app/server/api.py's drug_rows() for the fuller comment.
+        if drug_name == "palbociclib":
+            from tmesim.molecular.breast_library import get_molecule_breast
+
+            mol = get_molecule_breast(drug_name)
+        else:
+            raise
     dp = apply_barrier_to_drugparams(
         calibrated_drugparams(drug_name, alpha), mol
     )

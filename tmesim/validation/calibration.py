@@ -182,6 +182,20 @@ def _compile(drug: Union[str, DrugParams], ecm_reference: float = DEFAULT_ECM) -
     name = str(drug).strip().lower()
     if name == MITOXANTRONE_NAME:
         mol = _descriptors.from_smiles(MITOXANTRONE_NAME, MITOXANTRONE_SMILES)
+    elif name == "palbociclib":
+        # Structure curated in molecular.breast_library, not here -- the two
+        # drug libraries are kept disjoint by test_disjoint_from_gbm_library
+        # (a name must never have two silently-diverging definitions). This is
+        # deliberate GBM-context reuse of that SAME real molecule (identical
+        # SMILES; see core.config.DRUG_LIBRARY's "palbociclib-like" comment),
+        # the same cross-library pattern doxorubicin/cisplatin already use in
+        # the opposite direction. potency.resolve_ic50 below is unaffected by
+        # which library supplied the structure -- it looks the name up in the
+        # glioma GDSC cache directly, so this correctly gets THIS tissue's own
+        # measured IC50 (52.19 uM), not the breast one (59.98 uM).
+        from ..molecular.breast_library import get_molecule_breast
+
+        mol = get_molecule_breast(name)
     else:
         mol = library.get_molecule(name)
     dp = molecule_to_drugparams(mol, ecm_reference=ecm_reference)

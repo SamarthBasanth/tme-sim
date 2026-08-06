@@ -127,9 +127,18 @@ def drug_rows(force: bool = False) -> List[Dict]:
         return _drug_rows_cache
 
     from tmesim.molecular.binding_site_barrier import apply_barrier_to_drugparams
+    from tmesim.molecular.breast_library import get_molecule_breast
     from tmesim.molecular.library import GBM_DRUGS, get_molecule
     from tmesim.molecular.potency import resolve_ic50
     from tmesim.validation.calibration import calibrate_alpha, calibrated_drugparams
+
+    def _get_molecule_any(name: str):
+        try:
+            return get_molecule(name)
+        except KeyError:
+            if name in _CROSS_LIBRARY_GBM_DRUGS:
+                return get_molecule_breast(name)
+            raise
 
     try:
         alpha = float(calibrate_alpha())
@@ -138,7 +147,7 @@ def drug_rows(force: bool = False) -> List[Dict]:
         alpha, alpha_error = None, f"{type(exc).__name__}: {exc}"
 
     rows: List[Dict] = []
-    for name in sorted(GBM_DRUGS):
+    for name in sorted(set(GBM_DRUGS) | set(_CROSS_LIBRARY_GBM_DRUGS)):
         row: Dict = {
             "name": name,
             "mw": None,
@@ -156,7 +165,7 @@ def drug_rows(force: bool = False) -> List[Dict]:
             "reason": None,
         }
         try:
-            mol = get_molecule(name)
+            mol = _get_molecule_any(name)
             row["mw"] = _num(mol.get("mw"))
             row["logp"] = _num(mol.get("logp"))
             row["is_antibody"] = bool(mol.get("is_antibody"))
@@ -187,7 +196,7 @@ def drug_rows(force: bool = False) -> List[Dict]:
         else:
             try:
                 dp = apply_barrier_to_drugparams(
-                    calibrated_drugparams(name, alpha), get_molecule(name))
+                    calibrated_drugparams(name, alpha), _get_molecule_any(name))
                 row["bbb_penetrance"] = _num(dp.bbb_penetrance)
                 row["diffusivity_um2_s"] = _num(dp.diffusivity)
                 # The compiled ic50 is the resolved one; report it from the
@@ -213,10 +222,19 @@ def _num(v):
     return f if math.isfinite(f) else None
 
 
+#: Drugs curated in molecular.breast_library, not molecular.library.GBM_DRUGS
+#: (the two are kept disjoint by test_disjoint_from_gbm_library), that are
+#: nonetheless valid GBM-context drugs -- calibration._compile special-cases
+#: each of these the same way it special-cases mitoxantrone. Single source of
+#: truth for every GBM-context drug lookup in this module (_known_drugs,
+#: drug_rows) so a name can never appear in one and be rejected by the other.
+_CROSS_LIBRARY_GBM_DRUGS = ("palbociclib",)
+
+
 def _known_drugs() -> List[str]:
     from tmesim.molecular.library import GBM_DRUGS
 
-    return sorted(GBM_DRUGS)
+    return sorted(set(GBM_DRUGS) | set(_CROSS_LIBRARY_GBM_DRUGS))
 
 
 # --------------------------------------------------------------------------- #
