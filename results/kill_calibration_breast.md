@@ -284,6 +284,8 @@ Doxorubicin moves **2.00x** (0.1117-0.2235) over the same sweep. Compare both ag
 
 ## 6. Limitations
 
+0. **ADDED AFTER PUBLICATION — the transport side of this tissue is now measurably wrong.** This report tests the 3-D:2-D *potency-ratio* claim and nothing here is retracted by the following, but a separate external anchor has since been run on the SAME section and the engine failed it: predicted interstitial:plasma AUC misses the measured human microdialysis value by 12.8x (too high) for 5-fluorouracil and 10.5x (too low) for methotrexate, in opposite directions, with two structural causes diagnosed — a blood-**brain**-barrier permeability being applied to breast tissue, and a one-way delivery source with no back-flux. See `results/breast_kp_validation.md`. Consequence for THIS report: the `F_penetration` factor in every §2 decomposition, and therefore every absolute 3-D kill number in §4, inherits that error. The 3-D:2-D RATIO verdicts in §3 are far more robust, because the ratio is taken between two runs of the same drug on the same tissue, so a per-drug delivery scale factor largely cancels — but "largely" is not "exactly", and no one has quantified the residual.
+
 1. **No outcome validation.** Rep1 is an untreated resection. Every kill number here is a prediction with nothing to score it against — identical to GBM's own limitation 1.
 
 2. **No breast-specific patient-derived ex-vivo anchor exists anywhere in this project's data cache.** All 10 drugs' potency anchors are already-2-D monolayer measurements (GDSC2 breast, or a quoted literature range), not a re-anchored, disease-matched, patient-derived measurement. This is a WEAKER anchoring position than the GBM report's temozolomide row.

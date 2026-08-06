@@ -179,3 +179,22 @@ penetration depth, but to test the engine's predicted mean tumour interstitial
 AUC against the 0.60 ratio, with the CV = 100 % spread as the error bar and
 the plasma-does-not-predict-interstitium finding as an explicit falsification
 condition.
+
+## 6. That test has now been run, and the model FAILED it
+
+**See `results/breast_kp_validation.md`** (driver:
+`experiments/breast_kp_anchor.py`). Summary of the outcome:
+
+| drug | predicted | measured | verdict |
+|---|---:|---|---|
+| 5-fluorouracil | 7.7956 | 0.61 ± 0.11 | **12.8x too HIGH** |
+| methotrexate | 0.0571 | 0.60 ± 0.20 | **10.5x too LOW** |
+
+The two errors run in **opposite** directions, so no single constant fixes
+them. The model spreads the panel over 970x where the measurement finds one
+number. Two structural causes were diagnosed: a blood-**brain**-barrier
+permeability applied to breast tissue, and a one-way delivery source with no
+back-flux, which leaves the interstitial:plasma ratio unconstrained.
+
+The anchor did its job on first contact. This is the value of §1 — not that
+it confirmed the model, but that it did not.
