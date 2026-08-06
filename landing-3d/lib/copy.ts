@@ -47,7 +47,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "04",
     eyebrow: "Spatial attribution",
     headline: "The mean is not the finding. The spread is.",
-    body: "In one section, tumor cells in the macrophage-densest quintile hold 0.4291 of drug exposure. In the sparsest, 0.8592. That is a 2.0x spread inside a single tumor. A well-mixed compartmental model returns exactly 1.0 there, by construction. Geometry produces quantities a compartment cannot express.",
+    body: "In one section, tumor cells in the macrophage-densest quintile hold about 0.43 of drug exposure. In the sparsest, about 0.86. That is a 2.0x spread inside a single tumor, and it falls monotonically across every quintile between them. A well-mixed compartmental model returns exactly 1.0 there, by construction. Geometry produces quantities a compartment cannot express.",
     align: "left",
   },
   {

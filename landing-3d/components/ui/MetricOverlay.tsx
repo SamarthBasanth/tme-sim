@@ -49,7 +49,7 @@ const MetricOverlay = forwardRef<HTMLDivElement, MetricOverlayProps>(function Me
             <span className="metric-overlay__bar">
               <span className="metric-overlay__bar-fill" style={{ width: "42.91%" }} />
             </span>
-            <span className="metric-overlay__word">0.4291</span>
+            <span className="metric-overlay__word">~0.43</span>
           </dd>
         </div>
         <div className="metric-overlay__row">
@@ -58,7 +58,7 @@ const MetricOverlay = forwardRef<HTMLDivElement, MetricOverlayProps>(function Me
             <span className="metric-overlay__bar">
               <span className="metric-overlay__bar-fill" style={{ width: "85.92%" }} />
             </span>
-            <span className="metric-overlay__word">0.8592</span>
+            <span className="metric-overlay__word">~0.86</span>
           </dd>
         </div>
         <div className="metric-overlay__row">
@@ -67,7 +67,7 @@ const MetricOverlay = forwardRef<HTMLDivElement, MetricOverlayProps>(function Me
         </div>
       </dl>
       <p className="metric-overlay__footnote">
-        One run, one tissue section. A well-mixed model returns 1.0x here.
+        One run, one tissue section, monotone across all five quintiles. A well-mixed model returns 1.0x here.
       </p>
     </div>
   );
