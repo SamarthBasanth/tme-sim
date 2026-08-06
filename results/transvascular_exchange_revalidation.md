@@ -231,6 +231,50 @@ Affected: `pk_reality`, `kill_calibration`, `immune_sink_impact`,
 `experiments/dose_schedule`. Had this not been guarded against, five of the
 eleven re-validations would have silently reported "nothing changed".
 
+### 6.1 A THIRD category: modules that touch no PDE at all
+
+Beyond `simulate_response` (flag works) and direct `simulate_drug_transport`
+(flag is a no-op, pass `exchange_k` instead), there is a third class that
+never invokes the transport solver in any form, so there is no injection
+point and `exchange_k` is not an available remedy either.
+
+Confirmed for **`gist_imatinib`** (and its transitive dependencies
+`pk_reality.penetration_length_um` and `calibration.calibrate_alpha`, both
+closed-form). Its prediction is an analytic 1-D Krogh slab,
+`E = (L/R)*tanh(R/L)`. Verified by forcing `PDEConfig.__init__.__defaults__`
+so every config anywhere in the call tree carries the flag, and instrumenting
+call counters: `simulate_drug_transport` 0 calls, `delivery_source` 0,
+`exchange_coefficient` 0, and the entire result payload **byte-identical**
+between arms. A positive control under the same patch on a
+`simulate_response` path moved mean AUC 14.1x, proving the forcing mechanism
+was live rather than inert.
+
+**These modules must be reported as UN-TESTABLE, not as unaffected.** "Robust
+under exchange" and "never evaluates the delivery law" are very different
+statements and must not be pooled in a coverage count. `glioma_regional_pk`
+is also analytic (assumption A1 is a closed-form structure score), so it
+belongs here too.
+
+**Why GIST specifically cannot see the defect**, which generalises: its target
+is a RATIO, `C_tumour / C_normal`. The plasma term cancels exactly, so any
+breach of `C <= Cp` present in both numerator and denominator divides out.
+That is precisely why 5 of 11 GBM drugs and 3 of 10 breast drugs were caught
+and imatinib was not. Computed off-module, imatinib **would** show the same
+pathology — 11.71x plasma uncalibrated, 1.96x calibrated, at the vascular
+densities the repo's own fixtures use.
+
+**And a reframe worth keeping.** Imatinib's `bbb_penetrance` is 0.5237,
+ranking 8th of 13 — above temozolomide, cisplatin and doxorubicin, and 23x
+methotrexate. As a blood-brain-barrier number that is wrong by one to two
+orders of magnitude (imatinib's CSF:plasma is ~0.01-0.1; it is a P-gp
+substrate and the score is structure-only). But for GIST, where imatinib
+genuinely does distribute well into peripheral tissue (Vd ~295 L), a high
+value is arguably closer to right. The defect is that the parameter is
+**MISLABELLED** — a brain-specific quantity used as a general tissue
+permeability — not simply mis-valued. That distinction matters for how it
+should be fixed: the fix is a tissue-aware permeability, not a global rescale
+of `bbb_penetrance`.
+
 ## 7. Merge position
 
 **The physics is right and the implementation is correct.** It is verified to
