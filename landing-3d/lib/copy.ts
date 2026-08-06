@@ -54,7 +54,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "05",
     eyebrow: "Stated limits",
     headline: "Every run ships its own caveats.",
-    body: "Ranking compounds on the same tissue is invariant and defensible. Absolute kill fraction is not, and every run says so: a caveats panel states what each number can and cannot be read as. Validation is against measured tissue penetration depths and tissue:plasma ratios, not clinical outcomes. Vivum does not predict patient response, and its null results are published.",
+    body: "Ranking compounds on the same tissue is far more robust than any absolute number, and it is the output to trust. It is not unconditionally invariant, and we can tell you exactly where it breaks: correcting the transvascular delivery law re-weights the panel by permeability and changes the top pick on glioblastoma. That is written up, not buried. Absolute kill fraction is not defensible at all, and every run says so in its own caveats panel. Vivum does not predict patient response, and its null results are published.",
     align: "right",
   },
   {

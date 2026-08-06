@@ -1,0 +1,238 @@
+# Transvascular exchange: the full re-validation
+
+**One physics change, eleven independent re-validations.** This is the
+consolidated record of what a corrected vascular delivery law does to every
+published result in this repo. It is the evidence base for whether branch
+`transvascular-exchange` can be merged, and for what has to be rewritten if
+its flag is ever defaulted on.
+
+**Nothing here is speculative.** Every number below was measured by re-running
+the module in question both ways on real tissue. Every re-validation
+reproduced its module's published baseline first, and no comparison was
+trusted until the two arms were proven to genuinely differ (see §6 — the
+verification trap fired for real, repeatedly).
+
+---
+
+## 1. The change
+
+`tmesim/treatment/drugs.py::delivery_source` is a ONE-WAY leak::
+
+    S = PS * Cp                      (no path back from interstitium to blood)
+
+so the steady state is `PS*Cp / (clearance + binding)` — unbounded above the
+plasma level. The physically correct form is gradient-driven exchange::
+
+    S = PS * (Cp - C)  =  PS*Cp  -  PS*C
+
+which is the SAME source minus a first-order loss at the SAME rate, so it
+needs no new parameter. `PDEConfig(transvascular_exchange=True)` adds that
+second half via `exchange_coefficient` and `simulate_drug_transport`'s
+`exchange_k`. Steady state becomes `PS*Cp/(PS + clearance + binding) <= Cp`,
+bounded by construction. Default is off and bit-for-bit identical.
+
+**Why it was made:** `results/breast_kp_validation.md` — the model missed a
+measured human microdialysis anchor by 12.8x too high (5-FU) and 10.5x too low
+(methotrexate), in OPPOSITE directions, so no calibration constant could
+absorb it.
+
+## 2. How wrong the one-way law was
+
+Not a breast-specific defect. On the GBM flagship, **5 of 11 drugs were
+predicted above plasma concentration** — which passive delivery cannot do:
+
+| drug | one-way | exchange |
+|---|---:|---:|
+| cisplatin | **2.7122** | 0.6184 |
+| carmustine | **2.5360** | 0.6041 |
+| lomustine | **1.3881** | 0.4584 |
+| procarbazine | **1.2272** | 0.4374 |
+| temozolomide | **1.1403** | 0.4979 |
+
+Panel spread 386x → 90x on GBM; 970x → 104x on breast. Max cellwise
+AUC/plasma-AUC **72.6 → 1.02**.
+
+## 3. What SURVIVES
+
+| result | verdict |
+|---|---|
+| **Numerics** | Closed-form steady state reproduced to **6.3e-15** worst case across 9 configs, `dt*PS` to 973. Mass budget closes to round-off. No new timestep limit (PS enters the implicit operator). Advective CFL trip point bit-identical. Non-negativity **observed** — the zero-clamp fired 0 times in 720 steps. |
+| **GBM calibration chain** | **alpha unchanged (148.60815765445545).** Doxorubicin anchor holds; held-out mitoxantrone PASSES for every representative-PS choice, including a degenerate one. Correct analytic treatment is PS = 0, because PS and the source are the same field and the analytic length is defined only where it vanishes. Two agents reached this independently. |
+| **GBM 3-D:2-D kill calibration** | **3/3 PASS**, none near a boundary. |
+| **Breast 3-D:2-D kill calibration** | **5/6 PASS + docetaxel FAIL, zero flips.** Docetaxel moves the wrong way to be rescued. |
+| **Immune-sink spatial spread** | Ratio 2.0025x → 1.9794x (−1.15%), monotone across all five quintiles in all four runs, still above the ENTIRE 20-permutation null range. The mesh swing is larger than the physics swing. |
+| **Dose-schedule structure** | Every schedule conclusion survives with its number roughly halved. Bound-vs-measured agreement holds (0.3387% vs 0.3792% ON, same relation as OFF). |
+| **Mechanism reconciliation** | Bit-exact against `kill_fraction` in all 10 arms, 0 unattributed cells. |
+
+### 3.1 Two places it makes the model BETTER
+
+* **GBM 3-D:2-D delivery/state split moves toward the literature.** The report
+  itself flagged as an unresolved defect that the model over-attributes the
+  3-D penalty to delivery. Under exchange: temozolomide 56% → 38%, cisplatin
+  54% → 27%, doxorubicin 62% → 62%. Delivery stays dominant **only for
+  doxorubicin** — precisely Durand 1986's published ordering (PMID 2425117,
+  "penetration was a problem only for doxorubicin").
+* **Partition scorecard improves on the modality-matched rows.** Scoring only
+  the microdialysis (free-drug) rows, which are the ones commensurable with
+  what the engine computes: GM |fold error| **5.235x → 3.969x**, 3x band 0/3 →
+  1/3, 10x band 3/3 → 3/3. No regression. The apparent regression in the
+  pooled score is entirely one tissue-homogenate row (adavosertib, measured
+  2.46) — homogenate measures TOTAL drug and can exceed 1 by definition, while
+  the engine computes FREE interstitial, which cannot. `glioma_regional_pk.md`
+  §42 already states that rule. Scoring against it penalises the model for
+  being right.
+
+## 4. What BREAKS
+
+### 4.1 "Ranking is invariant" is FALSE as written — the headline casualty
+
+| GBM, kill_fraction | Spearman | Kendall |
+|---|---:|---:|
+| off vs on | +0.9273 | +0.8222 |
+
+High correlation, and it does not save the claim. **Top-1 changes
+(cisplatin → vincristine). Top-3 set changes.** Four of 45 pairs swap, and two
+of them cross gaps of **40.5% and 35.6% of the leader's kill** against a
+Bernoulli sd of ~0.003 — roughly 50-sigma reversals, not near-ties.
+
+The Monte-Carlo ranking panel is worse: **P(cisplatin rank 1) 0.9277 →
+0.3965**, P(doxorubicin rank 1) 0.0430 → 0.5586, modal order reverses. The
+module's own pre-declared "decision-grade" bar (leader above 0.90, runner-up
+below 0.10) is met OFF and destroyed ON.
+
+On breast, top-1 survives (vinorelbine) but the top-3 set changes and 7 of 45
+pairs are discordant.
+
+**Why no constant can absorb it.** The attenuation is
+`(clearance+binding)/(PS + clearance+binding)`, and PS is driven by
+`bbb_penetrance`, which spans **47x** across the GBM panel. AUC ON/OFF runs
+from 0.228 (cisplatin) to 0.975 (vincristine). This is a **differential
+re-weighting by permeability**, not a global rescale. The ranking's historical
+robustness — to alpha, to the 3.36x KDE→discrete source change, to the
+cell-state route — does not generalise, because every one of those
+perturbations was **common-mode** and this one is **drug-specific**.
+
+**Delivery-rank invariance does not imply kill-rank invariance.** On breast,
+AUC ranking is perfectly preserved (rho = 1.000) while kill ranking scrambles
+(rho = 0.830), because the Hill map saturates: drugs on the plateau lose
+almost no kill when AUC drops, drugs on the steep limb lose most of theirs.
+Any future claim must say WHICH quantity it is about.
+
+### 4.2 Cisplatin's mechanism verdict inverts — in four independent code paths
+
+Published in two places as delivery-solved: `mechanism_attribution.md` §3
+(RESISTANCE 96.42%) and `dose_schedule.md` (SENSITIVITY-limited, on 99.55%
+IC50 coverage). Both rest on tissue sitting at 2.71x plasma. Bounded:
+
+| cisplatin | one-way | exchange |
+|---|---:|---:|
+| survival: RESISTANCE | 96.42% | 3.59% |
+| survival: DOSE | 0.44% | **95.71%** |
+| IC50 coverage at 1x | 99.55% | **4.67%** |
+
+**"Cisplatin is a biology problem" becomes "cisplatin is a dose problem."**
+Reproduced independently by the mechanism, 3-D:2-D, ranking, and dose-schedule
+re-runs. Both reports now carry conditional-retraction notices.
+
+### 4.3 Invalidated rather than rescaled
+
+* Every absolute AUC and kill (temozolomide −56%, cisplatin −77%,
+  doxorubicin −3.5%).
+* `dose_schedule.md` §3's whole delivery-geometry table. Exchange removes drug
+  fastest exactly where the source is strongest, so it FLATTENS the field:
+  temozolomide penetration index 0.5112 → 0.7140 (**+40%**). The qualitative
+  claims survive; the numbers do not.
+* "At high enough dose >95% of tumour cells clear IC50 for both drugs" fails
+  for temozolomide: 30x coverage 97.80% → **3.43%**.
+* The landing page's quoted `delivery 0.172, dose 0.825, resistance 0.003`
+  (run `r_00067`) becomes `0.423 / 0.577 / 0.000`.
+
+## 5. New limits the fix does not remove, and one it creates
+
+* **It fixes the FORM of the delivery law, not the VALUE of the
+  permeability.** PS is still `bbb_penetrance`, a blood-BRAIN-barrier term.
+  Methotrexate does not improve on breast (0.10x → 0.09x of measured) because
+  its defect is the wrong permeability, not the wrong law. Two independent
+  defects; one fixed.
+* **PS and `bbb_penetrance` are perfectly confounded.** Scaling
+  `vascular_density` by f gives a BIT-IDENTICAL PS field to scaling
+  `bbb_penetrance` by f. The model cannot distinguish a wrong vessel map from
+  a wrong permeability. Separating them needs an independent absolute
+  measurement this project does not have.
+* **Sensitivity improves, unevenly, and "robust" can mean "degenerate".**
+  Elasticity of AUC to PS is exactly **1.0000** under the one-way form for
+  every drug, and drops to 0.085–0.966 under exchange — never rises. But
+  temozolomide and cisplatin become robust only because they SATURATE
+  (Kp → 0.91–0.96, i.e. ~= Cp): the model is now saying "equilibrates with
+  blood", which is stable and carries little spatial information. Trust the
+  robustness, not the informativeness. The fragile half (palbociclib,
+  irinotecan, etoposide, methotrexate, vincristine, elasticity 0.74–0.99) gets
+  almost no benefit.
+* **NEW RESOLUTION REQUIREMENT.** Exchange introduces a perivascular length
+  scale `sqrt(D_eff/(PS + clearance + binding))`. For doxorubicin that is
+  ~52 um and dx = 12 um resolves it. For `bbb_penetrance` >~ 0.6 (lomustine,
+  carmustine, procarbazine, ribociclib) it collapses to **~15-17 um**, and the
+  converged spacing drops to **~8-10 um**. Those are exactly the drugs that
+  move most in §4.1 — so the ON-arm magnitudes there are at the edge of
+  resolution. The error direction DEEPENS the reordering (an under-resolved
+  boundary layer over-estimates tissue concentration), so the reordering is
+  not an artefact, but its magnitude is not converged.
+* **Attribution degenerates to two categories.** When exposure drops below
+  IC50 population-wide, RESISTANCE and CHANCE go to exactly zero cells because
+  the exposure bands take precedence. Under bounded physics that is most of
+  the panel.
+* **A quantisation hazard.** With the flag on, temozolomide's schedule spread
+  prints `0.00e+00` — cosmetically identical to a solver artefact
+  `dose_schedule.md` was rewritten to retract. It is not that artefact
+  (continuous spread 0.3792%, monotone), but kill is quantised at 1/23,812 and
+  the level fell 2.6x. Keep the up-dose ladder or a spurious zero gets
+  republished.
+
+## 6. The verification trap, which fired for real
+
+Several modules call `simulate_drug_transport` DIRECTLY rather than through
+`simulate_response`, so `PDEConfig(transvascular_exchange=True)` is a **silent
+no-op** for them. Confirmed by explicit control, the cleanest being
+`dose_schedule`:
+
+| run | auc_sum |
+|---|---:|
+| exchange OFF | 1.554447793e+09 |
+| **flag set, `exchange_k` NOT passed** | **1.554447793e+09 — bit-identical** |
+| honest ON (`exchange_k` passed) | 6.86608671e+08 |
+
+Affected: `pk_reality`, `kill_calibration`, `immune_sink_impact`,
+`vessel_profile`, `numerical_rigor`, `experiments/regimen`,
+`experiments/dose_schedule`. Had this not been guarded against, five of the
+eleven re-validations would have silently reported "nothing changed".
+
+## 7. Merge position
+
+**The physics is right and the implementation is correct.** It is verified to
+machine precision, it removes a defect that put half the GBM panel at
+physically unavailable concentrations, it leaves the calibration chain intact,
+and it moves two independent benchmarks toward measured reality.
+
+**It is not merge-ready as a DEFAULT**, for one reason: it changes the top-1
+drug recommendation, which is the decision this product exists to support, and
+the claim "ranking is invariant" has to be rewritten across the repo and the
+landing page before that ships. Regenerating every affected results doc is a
+prerequisite, not a follow-up.
+
+**Recommended sequencing:** keep the flag opt-in and default-off (as it is);
+rewrite the ranking claim now (done for the landing page in this branch);
+re-run the high-permeability drugs at dx = 8-10 um to converge the §4.1
+magnitudes; then regenerate the affected reports and flip the default in a
+single commit that also updates the marketing copy.
+
+## 8. Provenance
+
+Eleven parallel re-validations, each reproducing its module's published
+baseline before comparing, each proving its two arms differed. Modules
+covered: calibration chain, glioma partition scorecard, GBM 3-D:2-D, breast
+3-D:2-D, mechanism attribution, numerical rigour, ranking robustness,
+dose schedule + time-resolved PK, PS sensitivity, immune-sink, and a
+cross-panel level/ranking sweep. Sources: `experiments/breast_kp_anchor.py`,
+`results/breast_kp_validation.md`, `results/breast_transport_anchors.md`, and
+the conditional-retraction notices now carried in
+`results/mechanism_attribution.md` and `results/dose_schedule.md`.
