@@ -376,10 +376,33 @@ DRUG_LIBRARY: Dict[str, DrugParams] = {
     # Nature 2026, DOI 10.1038/s41586-026-10843-7 -- their patient-derived GBM
     # organoid CRISPR + drug panel found CDK6 dependency, and CDK4/6-inhibitor
     # sensitivity, ENRICHED IN CDKN2A-DEFICIENT glioblastoma specifically (Fig.
-    # 3g-i, Extended Data Fig. 6h-k; GR_AOC dose-response across 7
-    # patient-derived models: 5 CDKN2A-loss [BT145, BT179, BT286, BT320,
-    # BT444], 2 CDKN2A-neutral [BT187, BT224]; abemaciclib P=7.1e-4,
-    # palbociclib P=0.021, ribociclib P=0.051 (NS)).
+    # 3g-i, Extended Data Fig. 6h-k; GR_AOC across 7 patient-derived models:
+    # 5 CDKN2A-loss [BT145, BT179, BT286, BT320, BT444], 2 CDKN2A-neutral
+    # [BT187, BT224]; abemaciclib P=7.1e-4, palbociclib P=0.021, ribociclib
+    # P=0.051 (NS)).
+    #
+    # Verified against that paper's OWN deposited Source Data (Fig. 3h sheet,
+    # Springer MOESM10), not just its prose: the per-model GR_AOC values
+    # recompute to the published group means (loss vs neutral 0.358/0.058
+    # abemaciclib, 0.252/-0.033 palbociclib, 0.154/-0.070 ribociclib). Three
+    # things that recomputation surfaced which the prose does not say:
+    #   (1) RIBOCICLIB's loss group is n=4, not 5 -- BT444 has no ribociclib
+    #       data at all. Its P=0.051 is a 4-vs-2 comparison.
+    #   (2) Several GR50s are RIGHT-CENSORED at the 10 uM top dose (BT320
+    #       palbo; BT187 and BT224 palbo+ribo), so "10" there is a bound, not
+    #       a fitted value.
+    #   (3) Culture format is NOT balanced against CDKN2A status (4 of 5 loss
+    #       models are 3-D spheroid/ULA; the 2 neutral models split 1 spheroid
+    #       / 1 adherent-Matrigel) -- i.e. a geometry/transport variable is
+    #       entangled with the genotype contrast. Checked directly rather than
+    #       assumed: the effect holds WITHIN both format strata and in the
+    #       same direction for every drug, and the entanglement runs AGAINST
+    #       the finding (the mostly-spheroid loss group is the MORE sensitive
+    #       one, whereas diffusion limitation would make 3-D look LESS
+    #       sensitive). So the confound does not manufacture the result; it
+    #       makes it conservative. Recorded because it is exactly the kind of
+    #       transport-vs-genotype entanglement this simulator exists to
+    #       separate.
     #
     # HONESTY on what the single ic50 below can and can't represent: it is the
     # REAL, MEASURED GDSC2 glioma IC50 (median across n=51 GBM/LGG cell lines
