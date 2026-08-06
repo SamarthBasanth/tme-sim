@@ -1,5 +1,47 @@
 # DOSE & SCHEDULE on ONE REAL TUMOR
 
+> ## SCOPE NOTICE — what a corrected delivery law does to this report
+>
+> Re-run under `PDEConfig(transvascular_exchange=True)` (branch
+> `transvascular-exchange`; see `results/breast_kp_validation.md` for why the
+> one-way source was wrong). Summary of what holds and what does not:
+>
+> * **Every SCHEDULE conclusion survives**, with its number roughly halved.
+>   Fractionation stays small, non-zero and monotone in n; the effect is still
+>   exactly the terminal residual, still bounded by tissue-time/window, and the
+>   bound-vs-measured agreement that is this module's strongest evidence still
+>   holds (0.3387 % bound vs 0.3792 % measured ON, the same relation as
+>   0.7668 % vs 0.7724 % OFF). The bolus-reaches-deeper refutation survives
+>   with a LARGER margin. Schedule-is-third-order-vs-dose is reinforced.
+> * **The direction is the opposite of what was expected.** Corrected physics
+>   roughly halves the effective tissue half-life (temozolomide 233 s → ~126 s;
+>   cisplatin becomes faster than any plasma curve tested). Because the whole
+>   schedule effect IS the terminal residual, a faster tissue makes schedule
+>   matter LESS, not more.
+> * **Washout stops being single-exponential.** With `k_eff = k_loss + PS(x,y)`
+>   spatially varying, temozolomide's fitted half-life drifts 126 → 156 s
+>   across the window as the slow avascular mode takes over. The one-way source
+>   gave a clean single exponential. This is new behaviour, not a rescaling.
+> * **INVALIDATED, not merely rescaled:** every absolute AUC and kill in this
+>   file (temozolomide −56 %, cisplatin −77 %, doxorubicin −3.5 %), and the
+>   whole section-3 delivery-geometry table — exchange removes drug fastest
+>   exactly where the source is strongest, so it flattens the field and the
+>   temozolomide penetration index rises 0.5112 → 0.7140 (+40 %). Section 3's
+>   *qualitative* claims all survive; its numbers do not.
+> * **Cisplatin's verdict flips** (see the conditional-retraction box at that
+>   drug's section below), and the headline "at high enough dose >95 % of
+>   tumour cells clear IC50 for both drugs" FAILS for temozolomide, whose 30x
+>   coverage goes 97.80 % → 3.43 %.
+>
+> **⚠ HAZARD IF REGENERATING THIS REPORT WITH THE FLAG ON.** Temozolomide's
+> leg-A kill spread at the reference dose prints as `0.00e+00` again —
+> cosmetically identical to the solver artefact this very file was rewritten to
+> retract (see below). It is NOT that artefact returning: the continuous
+> exposure spread is 0.3792 %, non-zero and still monotone in n, but kill is
+> quantised at 1/23,812 = 4.2e-05 and the kill level fell 2.6x, so the effect
+> now sits under the counting quantum. The up-dose ladder already in this
+> module recovers it. Keep the ladder, or you will re-publish a spurious zero.
+>
 > ## THIS VERSION SUPERSEDES THE STATIC-SOURCE VERSION OF THIS FILE
 >
 > **What changed.** Every earlier version of this report was produced with a transport solver driven by a *static* source: the engine collapsed the whole multi-dose plasma profile to a single time-averaged level before the tissue ever saw it. Two schedules with the same cumulative plasma exposure were therefore **bit-identical inputs**, and the reported kill spread across 1 / 3 / 10 fractions, and across a 192-fold plasma-half-life range, was `0.00e+00` — *exactly* zero, to machine precision.
@@ -324,6 +366,30 @@ At the nominal dose 0.0% of tumor cells clear IC50, rising to 97.8% by 30x — t
 Geometry check: near-field exposure decay length **L = 292 um** (d ≤ p90) vs median distance-to-vessel **43 um** and p90 **85 um**. IC50 depth at 1x: — (below IC50 even at the vessel wall) um; at 30x: 146 um — but see section 3: with a far-field plateau at 0.56 of the perivascular value, the large depths are the FLOOR clearing IC50, not a diffusion front reaching further.
 
 ### cisplatin
+
+> **⚠ CONDITIONAL RETRACTION — this verdict inverts under corrected transport
+> physics.** Not retracted yet, because it remains the literal output of the
+> shipped default path, but it will be the moment that default changes.
+>
+> The "99.6 % of tumour cells above IC50" figure this verdict rests on is
+> produced by the one-way delivery law, which lets tissue concentration exceed
+> plasma without bound (`results/breast_kp_validation.md`). Cisplatin runs at
+> **2.71x plasma** on this section, which passive delivery cannot do. With
+> `PDEConfig(transvascular_exchange=True)`, IC50 coverage at 1x falls
+> **99.55 % → 4.67 %**, kill goes 78.4 % → 43.1 % of ceiling, saturation moves
+> from ~3x to ~10x, and the 30x/1x kill ratio goes 1.25 → 2.22. **At the
+> nominal dose cisplatin becomes DOSE-limited** — the opposite operational
+> reading.
+>
+> Note this is the direction the "Important qualification" paragraph below
+> already anticipated on clinical-dose grounds. Corrected physics says it
+> applies at the nominal dose too, not only down at clinical Cmax.
+>
+> The same inversion was reproduced independently in
+> `results/mechanism_attribution.md` §3 (RESISTANCE 96.42 % → 3.59 %,
+> DOSE 0.44 % → 95.71 %) and in the GBM 3-D:2-D and cross-drug ranking
+> re-runs. Four independent code paths, same result. Do not quote cisplatin as
+> sensitivity-limited or resistance-limited in external material.
 
 **NEITHER dose- nor delivery-limited — it is SENSITIVITY-limited.**
 
