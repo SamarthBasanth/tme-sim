@@ -370,4 +370,51 @@ DRUG_LIBRARY: Dict[str, DrugParams] = {
         name="irinotecan-like", diffusivity=178.9, molecular_weight=586.7,
         ic50=11.58, hill=1.2, bbb_penetrance=0.151, binding=6.012e-2,
         clearance=1.141e-4),
+
+    # CDK4/6 inhibitors. Added following Neiswender/Shibue/Vazquez et al.,
+    # "A dependency map enhanced with next-generation 3D cancer models",
+    # Nature 2026, DOI 10.1038/s41586-026-10843-7 -- their patient-derived GBM
+    # organoid CRISPR + drug panel found CDK6 dependency, and CDK4/6-inhibitor
+    # sensitivity, ENRICHED IN CDKN2A-DEFICIENT glioblastoma specifically (Fig.
+    # 3g-i, Extended Data Fig. 6h-k; GR_AOC dose-response across 7
+    # patient-derived models: 5 CDKN2A-loss [BT145, BT179, BT286, BT320,
+    # BT444], 2 CDKN2A-neutral [BT187, BT224]; abemaciclib P=7.1e-4,
+    # palbociclib P=0.021, ribociclib P=0.051 (NS)).
+    #
+    # HONESTY on what the single ic50 below can and can't represent: it is the
+    # REAL, MEASURED GDSC2 glioma IC50 (median across n=51 GBM/LGG cell lines
+    # per drug; tmesim.molecular.potency), an UNSELECTED population average
+    # that does NOT stratify by CDKN2A status. The Nature 2026 finding above is
+    # that potency is genotype-dependent -- CDKN2A-loss tumours are more
+    # sensitive than this number implies, CDKN2A-neutral tumours less so. This
+    # library, and the Hill kill model it feeds, has no per-tumour genotype
+    # covariate, so a single ic50 necessarily collapses that real
+    # heterogeneity; do not read a run's kill_fraction for these two drugs as
+    # CDKN2A-status-aware.
+    #
+    # palbociclib's STRUCTURE is reused from ``molecular.breast_library.
+    # BREAST_DRUGS["palbociclib"]`` (same real drug -- the two libraries are
+    # kept disjoint on purpose, see that file and ``molecular.library``'s
+    # comment at the CDK4/6 entry), compiled here with THIS library's own
+    # glioma-context GDSC2 IC50 (52.19 uM) instead of the breast library's
+    # GDSC2-breast IC50 (59.98 uM, see ``results/kill_calibration_breast.md``)
+    # -- same molecule, genuinely different measured potency per tissue's own
+    # cell-line panel, the same cross-library reuse pattern already
+    # established for doxorubicin/cisplatin.
+    "palbociclib-like": DrugParams(
+        name="palbociclib-like", diffusivity=200.11076033801277,
+        molecular_weight=447.543, ic50=52.186247378767696, hill=1.2,
+        bbb_penetrance=0.578756414591833, binding=0.044354404560997165,
+        clearance=0.00010525462510012649),
+    "ribociclib-like": DrugParams(
+        name="ribociclib-like", diffusivity=202.4826355721452,
+        molecular_weight=434.548, ic50=50.042017373304844, hill=1.2,
+        bbb_penetrance=0.7995183083447064, binding=0.03993226707215974,
+        clearance=0.0001034244781996349),
+    # abemaciclib is DELIBERATELY EXCLUDED despite being the strongest hit in
+    # the Nature 2026 CDKN2A analysis (P=7.1e-4): no glioma cell-viability
+    # IC50 (GDSC-measured or citable literature) was found for it -- only its
+    # CDK4/CDK6 biochemical kinase-inhibition constants (Ki ~0.002/0.010 uM),
+    # a different unit of measurement (enzyme affinity, not cell-kill potency)
+    # that would misrepresent this drug's Hill-curve potency if forced in.
 }

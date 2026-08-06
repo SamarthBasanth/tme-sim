@@ -45,6 +45,29 @@ GBM_DRUGS: Dict[str, str] = {
     # its structure-derived BBB penetrance are for irinotecan, not SN-38. See
     # ``results/real_drug_panel.md`` for the honesty note this produces.
     "irinotecan":   "CCC1=C2CN3C(=CC4=C(C3=O)COC(=O)C4(CC)O)C2=NC5=C1C=C(C=C5)OC(=O)N6CCC(CC6)N7CCCCC7",  # MW ~587
+    # CDK4/6 inhibitor. Added following Neiswender/Shibue/Vazquez et al.,
+    # Nature 2026 (DOI 10.1038/s41586-026-10843-7), whose patient-derived GBM
+    # organoid CRISPR + drug panel found CDK6 dependency -- and CDK4/6-inhibitor
+    # sensitivity for exactly this compound plus palbociclib and abemaciclib --
+    # enriched in CDKN2A-deficient glioblastoma (Fig. 3g-i, Extended Data Fig.
+    # 6h-k; GR_AOC P=7.1e-4 abemaciclib, P=0.021 palbociclib, P=0.051 (NS)
+    # ribociclib across 7 patient-derived models). PubChem canonical SMILES,
+    # RDKit-verified MW to <0.1 g/mol of literature.
+    #
+    # palbociclib is DELIBERATELY NOT re-declared here even though the same
+    # Nature 2026 GBM finding covers it too: it is already curated in
+    # ``molecular.breast_library.BREAST_DRUGS`` (a genuine name collision, not
+    # a coincidence -- same real drug). The two libraries are kept disjoint by
+    # a dedicated test (``test_breast_drug_panel.py::test_disjoint_from_gbm_
+    # library``) precisely so a name never has two silently-diverging
+    # structural definitions. ``core.config.DRUG_LIBRARY["palbociclib-like"]``
+    # reuses the breast library's molecule directly (identical structure --
+    # SMILES doesn't change by tissue) and resolves ITS OWN glioma-context
+    # IC50 on top, the same cross-library-reuse pattern already established
+    # for doxorubicin/cisplatin (curated once, reused by name with a
+    # tissue-specific potency override) -- see that entry's comment for the
+    # exact mechanics.
+    "ribociclib":   "CN(C)C(=O)C1=CC2=CN=C(N=C2N1C3CCCC3)NC4=NC=C(C=C4)N5CCNCC5",  # MW ~434.5, PubChem CID 44631912
     # Macromolecule marker: anti-VEGF monoclonal antibody (~149 kDa).
     # Sentinel string, NOT a parseable SMILES -> forces the antibody path.
     "bevacizumab":  "ANTIBODY:bevacizumab",
