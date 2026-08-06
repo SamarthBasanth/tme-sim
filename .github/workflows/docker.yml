@@ -412,6 +412,17 @@ jobs:
   # never to a missing shared library. The image job above is what tests the
   # slim image's minimal system-library set.
   #
+  # For the same reason it installs with `-c constraints.txt`. pyproject.toml
+  # declares bounds, not versions, so an unconstrained install here resolves
+  # whatever PyPI is serving today -- and a red would then have TWO candidate
+  # explanations, cross-platform float divergence (the thing this job measures)
+  # and plain version drift (which is not interesting and is nobody's bug).
+  # Pinning removes the second one, so a red means the first. This narrows what
+  # the job measures; it does not weaken it, and it emphatically does not touch
+  # the reference values themselves. Everything above still applies: a failure
+  # is still a data point, and the response is still to measure it, never to
+  # widen a tolerance.
+  #
   # SCOPE. Most of the suite needs data_cache/, which is real tissue data,
   # gitignored, and not available in CI. Measured by running the suite with the
   # cache hidden: 65 failures and 67 errors come purely from absent data (the
@@ -447,13 +458,21 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -e '.[app]'
-          pip install pytest
+          pip install -c constraints.txt -e '.[app]'
+          pip install -c constraints.txt pytest
 
       # The actual evidence. If a bit-exact test does diverge, this is the
       # record of what it diverged ON -- BLAS vendor, threading, versions.
-      # Nothing is pinned in pyproject.toml (DEPLOYMENT.md 1c notes this), so
-      # the resolved versions are themselves part of the data point.
+      #
+      # With constraints.txt applied, the numeric versions printed here should
+      # MATCH the reference environment exactly (numpy 2.0.2, scipy 1.13.1,
+      # pandas 2.3.3, scikit-image 0.24.0, scikit-learn 1.6.1, ...). If they do
+      # not, the constraints did not take effect and any red below is version
+      # drift, not the cross-platform float question -- check that before
+      # concluding anything. Everything that legitimately still differs from the
+      # macOS/arm64 reference machine -- CPU, BLAS vendor and threading, libm --
+      # is exactly what this job exists to measure, and show_config() is the
+      # record of it.
       - name: Environment fingerprint
         run: |
           python - <<'PY'

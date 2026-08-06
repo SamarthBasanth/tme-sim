@@ -33,11 +33,82 @@ git clone <this-repo> tme-sim
 cd tme-sim
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -e .
+pip install -c constraints.txt -e .
 ```
 
 That installs numpy, scipy, matplotlib, pandas, scikit-image, networkx,
 scikit-learn, requests and tifffile (see `pyproject.toml`).
+
+### 1a. `constraints.txt` — why the `-c` is not optional
+
+**`pyproject.toml` declares bounds. `constraints.txt` declares versions.** If you
+intend to *reproduce a number* rather than merely run the code, you need the
+second one.
+
+This matters more here than in most projects, because this repo's references are
+**bit-exact**. `tests/test_time_resolved_pk.py` compares against a stored
+`tests/data/static_source_reference.json` with no tolerance at all, and `results/`
+quotes values to 10+ significant figures. A change of ~1e-14 in a solver AUC — the
+size of a different vectorised reduction order in a newer numpy — is amplified
+through the nonlinear kill model into a visible difference.
+
+Measured, 2026-08: resolving the dependency set fresh gave
+
+| | fresh resolve | reference environment (`.venv`, and what every number in `results/` was made with) |
+|---|---|---|
+| numpy | 2.4.6 | **2.0.2** |
+| scipy | 1.17.1 | **1.13.1** |
+| pandas | 3.0.5 | **2.3.3** |
+| scikit-image | 0.26.0 | **0.24.0** |
+| scikit-learn | 1.9.0 | **1.6.1** |
+| matplotlib | 3.11.1 | **3.9.4** |
+
+**5 of 6 bitwise-reference failures disappeared once the versions were pinned back
+to the reference set** — e.g. a solver AUC of `20642672.153042123` against a stored
+`20642672.15304199`. Without the `-c`, two installs a month apart are not
+numerically identical.
+
+What is in the file, and what is deliberately not:
+
+* **Pinned exactly** — anything that can move a float: `numpy`, `scipy`,
+  `scikit-image`, `scikit-learn`, `pandas`, `networkx`, `h5py`, `tifffile`,
+  `imagecodecs`, `rdkit`, `pyarrow`, `openpyxl`, `statsmodels`, plus `joblib` and
+  `threadpoolctl` (they set scikit-learn's chunk size and the BLAS thread count, and
+  a different thread count is a different summation tree — same numpy, different
+  last ULP). `matplotlib` is pinned too, but only for byte-identical figures; **no
+  number in `results/` is computed by matplotlib**, so a mismatch there is never a
+  reason to distrust a value.
+* **Not pinned** — `pytest` (a test runner cannot change a float),
+  `fastapi`/`uvicorn`/`httpx` (they serve JSON over numbers computed elsewhere, and
+  release often enough that pinning them would make the file rot faster than the
+  numerics it protects), and every transitive/platform-specific wheel
+  (`pillow`, `fonttools`, `certifi`, …). That last exclusion is the point: a raw
+  `pip freeze` is unusable on a second platform six weeks later.
+
+A constraints file only *bounds* what pip installs — it never installs anything by
+itself. So `-c constraints.txt` is safe to add to any `pip install` in this repo,
+including the optional extras below, and packages listed there that you do not want
+simply stay absent.
+
+**To regenerate it** (after a deliberate, verified upgrade — not casually):
+
+```bash
+./.venv/bin/python -m pip freeze          # the reference environment
+```
+
+Hand-copy the new versions of the packages already listed in `constraints.txt` into
+it. **Do not replace the file with the freeze output.** Then re-run the bit-exact
+tests, and if a stored reference now differs, *that is the finding* — investigate
+and record it. Do not update the reference value to match the new library.
+
+```bash
+./.venv/bin/python -m pytest tests/test_time_resolved_pk.py tests/test_physics.py
+```
+
+`Dockerfile` and `.github/workflows/docker.yml` both install with `-c
+constraints.txt`, so the image and the informational cross-platform reference job
+are pinned the same way. That is what makes a red in that job mean *genuine
+linux/amd64 float divergence* rather than version drift.
 
 ### Extras that `pyproject.toml` does not declare
 
@@ -45,12 +116,12 @@ Three packages are imported by the codebase but are **missing from
 `pyproject.toml`**. Install them or the corresponding modules degrade or fail:
 
 ```bash
-pip install rdkit openpyxl statsmodels
+pip install -c constraints.txt -e '.[validation]'
 ```
 
 | package | imported by | what happens without it |
 |---|---|---|
-| `rdkit` | `molecular.descriptors`, `validation.moncayo_explant` | descriptors fall back to a tabulated row; the `source` column in `cli molecules` reads `fallback_table` instead of `rdkit` |
+| `rdkit` | `molecular.descriptors`, `validation.moncayo_explant` | **now a CORE dependency, no longer optional** — declared in `pyproject.toml` since ribociclib and palbociclib were added, because neither has a `_FALLBACK_TABLE` entry and both compile to `mw=0.0` without it |
 | `openpyxl` | `validation.gbm_tmz_exvivo` | cannot read the `.xlsx` supplements |
 | `statsmodels` | `validation.moncayo_explant` | the mixed-effects fit cannot run |
 
@@ -59,7 +130,7 @@ Reading some `data_cache/hunt/` formats additionally needs `xlrd` (legacy `.xls`
 `.rds` PharmacoSet). Install them only if you are working with Tier B data:
 
 ```bash
-pip install xlrd pyxlsb rdata
+pip install -c constraints.txt xlrd pyxlsb rdata
 ```
 
 The harness preflight reports which extras are present, so you find out in
@@ -451,8 +522,8 @@ concentration and no microenvironment) and `moncayo_explant.{md,png}`.
 | symptom | cause / fix |
 |---|---|
 | `python interpreter not found at .../.venv/bin/python` | create the venv (§1) or set `PY=$(which python)` |
-| `tmesim is not importable` | `pip install -e .` inside the venv |
-| preflight prints `optional extras MISSING` | `pip install rdkit openpyxl statsmodels` (§1) |
+| `tmesim is not importable` | `pip install -c constraints.txt -e .` inside the venv |
+| preflight prints `optional extras MISSING` | `pip install -c constraints.txt -e '.[validation]'` (§1) |
 | `MISSING: data_cache/xenium_gbm/...` | run the manual `curl` commands in §2b |
 | `WARN: data_cache/xenium_gbm_io/ absent` | optional; the IO-panel reconstruct step is skipped. Fetch it in §2b if you want it |
 | `WARN: only N/3 GSE194329 Visium sections cached` | the cross-tissue stage needs GBM1/2/3; fetch them in §2b |

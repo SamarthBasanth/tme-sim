@@ -3,21 +3,68 @@ name = "tmesim"
 version = "0.1.0"
 description = "Stage 0 kill-test: patient-specific glioblastoma microenvironment reconstruction, drug-transport simulation, and validation against a cheap baseline."
 requires-python = ">=3.9"
+# VERSIONS: bounds here, exact pins in constraints.txt. Read this before adding a
+# `==` below.
+#
+# This project asserts bit-exact stored references (tests/test_time_resolved_pk.py
+# has tolerance-free equality assertions, and results/ quotes 10+ significant
+# figures), so the *installed* versions are load-bearing -- resolving this file
+# fresh in 2026-08 gave numpy 2.4.6 / scipy 1.17.1 / pandas 3.0.5 against the
+# 2.0.2 / 1.13.1 / 2.3.3 every published number was made with, and that alone
+# broke 5 of 6 bitwise references.
+#
+# But the fix for that is NOT to pin exactly here. This file has to stay
+# installable across Pythons and platforms; a `==` in an install_requires becomes
+# an unsatisfiable conflict for anyone who depends on this package alongside
+# anything else. So:
+#
+#   here             lower bounds = the oldest version we are willing to claim
+#                    works (the audited release's series, or the audited release
+#                    itself where the project is date-versioned and has no series).
+#                    Upper bounds ONLY where a major is known to change behaviour.
+#   constraints.txt  the exact audited versions, applied with
+#                    `pip install -c constraints.txt -e '.[app]'`. That is what
+#                    the Dockerfile and CI use, and what you want if you intend
+#                    to reproduce a number rather than merely run the code.
+#
+# Every floor below is satisfiable on BOTH ends of `requires-python = ">=3.9"`
+# and the Dockerfile's python:3.11-slim: each audited version declares
+# Requires-Python >=3.9 and ships cp311 manylinux x86_64 wheels (checked, not
+# assumed). numpy 2.0.2 and matplotlib 3.9.4 are the last releases supporting
+# 3.9, so on 3.9 these floors resolve to exactly the audited versions; on 3.11
+# they leave room to move.
+#
+# Caps are deliberately sparse -- an unnecessary cap is the thing that makes a
+# package uninstallable two years later. Only two are asserted, both for measured
+# reasons; see the comments on numpy and pandas.
 dependencies = [
-    "numpy",
-    "scipy",
-    "matplotlib",
-    "pandas",
-    "scikit-image",
-    "networkx",
-    "scikit-learn",
-    "requests",
-    "tifffile",
-    "imagecodecs",  # tifffile's LZW/JPEG2000/etc decoders; required to read
+    "numpy>=2.0,<3",       # <3: numpy 2.0 was itself a documented ABI and
+                           # behaviour break, and this codebase's float results
+                           # are asserted bitwise. A numpy 3 is not something to
+                           # opt into silently.
+    "scipy>=1.13",         # no cap: no incompatible major exists or is announced
+    "matplotlib>=3.9",     # figures only; nothing in results/*.md is computed here
+    "pandas>=2.3,<3",      # <3: MEASURED. A fresh resolve pulls pandas 3.0.5,
+                           # whose new default string dtype and copy-on-write
+                           # semantics change aggregation dtypes -- which changes
+                           # the tables, not just the API.
+    "scikit-image>=0.24",  # pre-1.0 and moves on minors, but no measured break,
+                           # so no cap. constraints.txt is what makes it exact.
+    "networkx>=3.2",
+    "scikit-learn>=1.6",
+    "requests>=2.32",
+    "tifffile>=2024.8.30",      # date-versioned: no series to floor at, so the
+                                # floor is the audited release itself.
+    "imagecodecs>=2024.12.30",  # tifffile's LZW/JPEG2000/etc decoders; required to read
                     # real OME-TIFF CODEX exports (data.adapters.codex) - the
                     # Greenwald/Tirosh 2024 files are LZW-compressed and raise
                     # without this at decode time, not at import time.
-    "rdkit",        # molecular.descriptors: SMILES -> the cheminformatics
+    "rdkit>=2025.9.2",  # date-versioned, and the floor is the audited release
+                    # rather than something older because descriptor values feed
+                    # bit-exact references: an older rdkit that happens to work
+                    # is a claim nobody here has measured.
+                    #
+                    # molecular.descriptors: SMILES -> the cheminformatics
                     # descriptors the whole molecular compile pathway is built
                     # on. Previously UNDECLARED and only soft-required, because
                     # descriptors._FALLBACK_TABLE happened to carry a curated
@@ -28,7 +75,7 @@ dependencies = [
                     # ("mw must be positive, got 0.0"). Also silently changes
                     # bit-exact reference results for the other drugs, since
                     # the fallback MWs are rounded relative to rdkit's.
-    "h5py",         # data.adapters.gbmspace: a hard top-level import, so a
+    "h5py>=3.14",   # data.adapters.gbmspace: a hard top-level import, so a
                     # checkout without it cannot even COLLECT
                     # tests/test_gbmspace_adapter.py, let alone ingest
                     # GBM-Space Visium.
@@ -44,16 +91,41 @@ dependencies = [
 vivum = "tmesim.cli:main"
 
 [project.optional-dependencies]
+# Readers and fitters that PRODUCE PUBLISHED NUMBERS but are only imported
+# lazily, by specific validation modules. They were undeclared entirely until
+# now, which is the same defect class as the rdkit one: a fresh install can
+# run the engine but silently cannot reproduce parts of results/.
+#
+# Declared as an EXTRA rather than a core dependency because the Studio image
+# does not need them (docs/DEPLOYMENT.md is explicit that validation reruns are
+# out of scope for the container) and they are heavy. They ARE pinned in
+# constraints.txt, so anyone who installs them gets the audited version --
+# constraints bound what is installed, they never install anything themselves.
+#   pip install -c constraints.txt -e '.[validation]'
+validation = [
+    "statsmodels>=0.14",  # validation.moncayo_explant: the mixed-effects fit
+                          # IS a published result, not a convenience.
+    "openpyxl>=3.1",      # validation.gbm_tmz_exvivo: reads the .xlsx supplements.
+    "pyarrow>=17.0",      # pandas' parquet engine, for data.real.mgmt_spatial's
+                          # per-cell table and data.ingest.
+]
 # The local tmesim Studio application (app/server/ + app/web/). Additive: the
 # simulation engine, the CLI experiments and the rest of the test suite do not
 # import any of these, so a checkout without the extra behaves exactly as before
 # and tests/test_app_server.py skips itself.
 #   ./.venv/bin/python -m pip install -e '.[app]'
 #   ./.venv/bin/python -m app.server
+#
+# Floors only, no caps, and deliberately ABSENT from constraints.txt: these three
+# serve JSON over numbers computed elsewhere, so no version of them can move a
+# value in results/. They also release far more often than the numeric stack, so
+# pinning them would make constraints.txt rot faster than the thing it exists to
+# protect. The floors just rule out releases old enough to predate the APIs used
+# (starlette's TestClient shape, uvicorn's programmatic Server).
 app = [
-    "fastapi",
-    "uvicorn",
-    "httpx",   # required by starlette's TestClient (tests/test_app_server.py)
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "httpx>=0.27",   # required by starlette's TestClient (tests/test_app_server.py)
 ]
 
 [build-system]

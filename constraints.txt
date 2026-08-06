@@ -1,0 +1,108 @@
+# Exact versions of the numerically load-bearing dependencies.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# This repo asserts BIT-EXACT stored reference results (tests/test_time_resolved_pk.py
+# compares against tests/data/static_source_reference.json with no tolerance at all,
+# and results/ quotes numbers to 10+ significant figures). A ~1e-14 relative change in
+# a solver AUC -- the kind you get from a different vectorised reduction order in a new
+# numpy -- is amplified through the nonlinear kill model and shows up as a failure.
+#
+# `pyproject.toml` on its own does NOT give you that. It declares bounds, not versions,
+# so two `pip install`s a month apart resolve different numpy/scipy/pandas and are not
+# numerically identical. Measured, 2026-08: resolving the dependency set fresh gave
+# numpy 2.4.6 / scipy 1.17.1 / pandas 3.0.5 / scikit-image 0.26.0 / scikit-learn 1.9.0
+# against the 2.0.2 / 1.13.1 / 2.3.3 / 0.24.0 / 1.6.1 that every published number in
+# results/ was actually produced with; 5 of 6 bitwise-reference failures disappeared
+# once the versions below were applied.
+#
+# USE
+# ---
+#   pip install -c constraints.txt -e '.[app]'
+#
+# A constraints file only BOUNDS what pip installs -- it never installs anything by
+# itself. So listing a package here that you do not need is free: it just means that
+# *if* something pulls it in, you get the audited version.
+#
+# The division of labour:
+#   pyproject.toml   -- what the package needs, loosely, so it stays installable.
+#   constraints.txt  -- what the published numbers were made with, exactly.
+#
+# HOW TO REGENERATE -- see docs/REPRODUCE.md 1a. Short version: this is a hand-curated
+# subset of `pip freeze` from the environment that produced results/. Do not replace it
+# with a raw freeze; that drags in platform-specific wheels and transitive churn and
+# rots within weeks.
+#
+# Reference environment: CPython 3.9.6, macOS 15.7.3 / arm64 (the venv at ./.venv).
+# Every version below also has a cp311 manylinux x86_64 wheel -- checked against PyPI,
+# not assumed -- so the Dockerfile (python:3.11-slim) and the linux CI job install this
+# same set from wheels, with no compiler in the image.
+#
+# Pinning versions is NOT the same as pinning results across machines. It removes
+# version drift; it does not remove CPU, BLAS vendor or BLAS thread count. The
+# macOS/arm64 -> linux/amd64 question is exactly what the informational job in
+# .github/workflows/docker.yml exists to measure, and it is still open.
+
+# --------------------------------------------------------------------------- #
+# 1. Numerically load-bearing. A change here can change a published number.
+#    These MUST be exact.
+# --------------------------------------------------------------------------- #
+numpy==2.0.2            # every array op; reduction order / SIMD paths change per minor
+scipy==1.13.1           # ndimage, sparse, optimize -- the transport and fit internals
+scikit-image==0.24.0    # mask morphology + measure; pre-1.0, behaviour moves on minors
+scikit-learn==1.6.1     # deconvolution / clustering; algorithm defaults move on minors
+pandas==2.3.3           # groupby + aggregation order and dtype promotion feed the tables
+networkx==3.2.1         # vessel-network graph algorithms (reconstruct.vessel_network)
+h5py==3.14.0            # GBM-Space Visium HDF5 reader -- the bytes that enter the model
+tifffile==2024.8.30     # OME-TIFF CODEX decode
+imagecodecs==2024.12.30 # the actual LZW/JPEG2000 codecs behind tifffile
+rdkit==2025.9.2         # SMILES -> MW/logP/TPSA. Descriptor implementations change
+                        # between releases, and every compiled drug's transport
+                        # parameters are derived from them.
+pyarrow==21.0.0         # parquet reader for the MGMT spatial per-cell table
+openpyxl==3.1.5         # .xlsx reader for validation.gbm_tmz_exvivo's supplements
+statsmodels==0.14.6     # the mixed-effects fit in validation.moncayo_explant IS a
+                        # published number, not a convenience
+
+# Not obviously numeric, but they are:
+joblib==1.5.3           # scikit-learn's parallel chunking -- chunk size decides the
+threadpoolctl==3.6.0    # summation order; threadpoolctl sets the BLAS thread count,
+                        # and a different thread count is a different reduction tree.
+                        # Same numpy + different thread count = different last ULP.
+
+# --------------------------------------------------------------------------- #
+# 2. Presentation only. Pinned for byte-identical figures, NOT because a number
+#    depends on it.
+# --------------------------------------------------------------------------- #
+# Judgement: matplotlib is included because results/ ships PNGs and a regenerated
+# figure that differs by a font-hinting pixel is noise nobody should have to
+# investigate. But a mismatch HERE is never a reason to distrust a number -- no value
+# in any results/*.md is computed by matplotlib. Bumping this line is safe; bumping
+# anything in section 1 is not.
+matplotlib==3.9.4
+
+# --------------------------------------------------------------------------- #
+# 3. Tier B data readers -- not imported by tmesim/, listed only so that if you
+#    follow docs/REPRODUCE.md 1 and install them for data_cache/hunt/ work, you
+#    get the audited versions. Constraints do not install; these stay absent
+#    unless you ask for them.
+# --------------------------------------------------------------------------- #
+xlrd==2.0.2
+pyxlsb==1.0.10
+rdata==0.11.2
+
+# --------------------------------------------------------------------------- #
+# DELIBERATELY NOT PINNED
+# --------------------------------------------------------------------------- #
+# pytest                -- a test runner cannot change a float. Pinning it only means
+#                          you cannot try a new pytest without editing this file.
+# fastapi, uvicorn,     -- the Studio app serves JSON over numbers computed elsewhere.
+# httpx, starlette,        It touches nothing in results/, and these four release far
+# pydantic                 more often than anything above; pinning them would make this
+#                          file rot faster than the numerics it exists to protect.
+# requests              -- fetches bytes; the bytes are checked by size/accession in
+#                          docs/DATA_INVENTORY.md, not by requests' version.
+# pillow, imageio,      -- transitive, platform-specific wheels. pip resolves them
+# fonttools, kiwisolver,   compatibly from the pinned parents above. Pinning transitive
+# contourpy, certifi,      dependencies is what makes a `pip freeze` dump unusable on a
+# urllib3, packaging, ...  second platform six weeks later.

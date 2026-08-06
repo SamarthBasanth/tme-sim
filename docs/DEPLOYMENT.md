@@ -158,10 +158,21 @@ were generated on macOS/arm64. On linux/amd64 they may differ for BLAS/SIMD
 reasons unrelated to the container. Treat a bitwise mismatch inside the image
 as unexplained until measured, not as a container defect.
 
-**Also note, given the above:** no dependency version is pinned anywhere, so
-two builds a month apart resolve different numpy/scipy versions and are not
-numerically identical. If you need reproducibility, pin or ship a
-`constraints.txt`.
+**Also note, given the above:** this used to say that no dependency version was
+pinned anywhere, so two builds a month apart resolved different numpy/scipy
+versions and were not numerically identical. That was measured and true — a
+fresh resolve gave numpy 2.4.6 / scipy 1.17.1 / pandas 3.0.5 against the
+2.0.2 / 1.13.1 / 2.3.3 every published number was produced with, and 5 of 6
+bitwise-reference failures went away once the versions were pinned back.
+
+There is now a **`constraints.txt`** at the repo root pinning the numerically
+load-bearing packages exactly, and the `Dockerfile` installs with
+`-c constraints.txt`. Two builds a month apart now install the same numeric
+stack. What that does *not* settle is the cross-architecture question in the
+paragraph above: the references were generated on macOS/arm64, and pinning the
+versions does not pin the CPU, the BLAS vendor or its thread count. See
+[`REPRODUCE.md` §1a](REPRODUCE.md) for what is pinned, what deliberately is
+not, and how to regenerate it.
 
 Build it once yourself and open an issue if any of this doesn't hold.
 

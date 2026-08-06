@@ -52,10 +52,23 @@ WORKDIR /app
 # that an old pip fails here with a confusing "setup.py not found" error even
 # though this project has no setup.py by design; upgrading pip first avoids
 # depending on whatever pip version happens to ship with the base image.
-COPY pyproject.toml ./
+#
+# -c constraints.txt is what makes this image REPRODUCIBLE rather than merely
+# buildable. pyproject.toml declares bounds, not versions, so without it two
+# builds a month apart resolve different numpy/scipy/pandas and are not
+# numerically identical -- which matters here because this repo asserts
+# bit-exact reference results (see constraints.txt's header, and
+# docs/REPRODUCE.md 1a). constraints.txt must therefore be COPYed into this
+# same dependency layer, alongside pyproject.toml and BEFORE the install; it
+# changes about as rarely, so the layer-cache behaviour is unchanged.
+#
+# Every version it pins has a cp311 manylinux x86_64 wheel (checked against
+# PyPI, not assumed), so this resolves from wheels on python:3.11-slim with no
+# compiler in the image.
+COPY pyproject.toml constraints.txt ./
 COPY tmesim/__init__.py tmesim/__init__.py
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -e '.[app]'
+    && pip install --no-cache-dir -c constraints.txt -e '.[app]'
 
 COPY . .
 # data_cache/ and app/runs/ are gitignored (real tissue data, run history) --
