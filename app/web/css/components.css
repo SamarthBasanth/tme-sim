@@ -293,17 +293,20 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   gap: 0;
   font-size: var(--fs-sm);
 }
+/* --sp-1, not the 1.5px that was here: tokens.css is explicit that anything
+   off the spacing scale is a bug, and a half-pixel block padding is also what
+   made a forty-row read-out one solid grey mass with no line rhythm at all. */
 .kv > dt {
   color: var(--fg-2);
   font-size: var(--fs-xs);
-  padding: 1.5px var(--sp-4) 1.5px 0;
+  padding: var(--sp-1) var(--sp-4) var(--sp-1) 0;
   white-space: nowrap;
   border-bottom: 1px solid var(--line-0);
   display: flex; align-items: center;
 }
 .kv > dd {
   color: var(--fg-0);
-  padding: 1.5px 0;
+  padding: var(--sp-1) 0;
   text-align: right;
   border-bottom: 1px solid var(--line-0);
   font-family: var(--font-mono);
@@ -313,12 +316,17 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 }
 .kv > dt:last-of-type, .kv > dd:last-of-type { border-bottom: 0; }
 
-/* metric block — value, unit, provenance chip, one line of source */
+/* metric block — value, unit, provenance chip, one line of source.
+   This is the product's signature pattern and it is not being replaced; it is
+   being given an internal rank. Four metrics all set at --fs-lg is a list, not
+   an answer: nothing says which number the run was actually asked for. The
+   first metric is promoted to --fs-xl — the token tokens.css has always
+   carried, commented "headline metric", and which until now nothing used. */
 .metric {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0 var(--sp-4);
-  padding: var(--sp-3) 0;
+  padding: var(--sp-4) 0;
   border-bottom: 1px solid var(--line-0);
   align-items: baseline;
 }
@@ -334,6 +342,17 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   line-height: 1.1;
 }
 .metric .m-val.null { color: var(--fg-3); font-size: var(--fs-sm); }
+.metric.lead {
+  padding-top: var(--sp-2);
+  padding-bottom: var(--sp-5);
+  border-bottom-color: var(--line-1);
+}
+.metric.lead .m-name {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--fg-0);
+}
+.metric.lead .m-val { font-size: var(--fs-xl); }
 .metric .m-meta {
   grid-column: 1 / -1;
   min-width: 0;
@@ -360,29 +379,101 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .delta.down::before { content: "\2193 "; }
 .delta.flat::before { content: "\2013 "; }
 
-/* ======================================================== caveat list === */
+/* ======================================================== caveat list ===
+   A caveat is load-bearing honesty, so nothing in here hides one: no
+   collapse, no line clamp, no "show more", no dismiss. What changed is the
+   SHAPE.
+
+   Ten caveats rendered as ten amber-FILLED prose blocks made the right rail
+   one continuous amber wash that occupied more area — and therefore read as
+   more important — than the METRICS above it, which are the actual answer.
+   Area is not severity. So:
+
+     · the tinted field is gone from the ordinary caveat. The hue survives in
+       the 2 px rule and the glyph, which is where it can still be counted
+       from across the room without becoming the page;
+     · the tint is RESERVED for `sev-2`, the hard stops — the handful of
+       caveats that say a number must not leave this screen. Now the fill
+       means something, and there are three of them, not ten;
+     · each caveat is given the same three-part structure the METRIC block
+       opposite already uses (label / value / provenance line), so the eye
+       lands in the same place every time:
+
+           [glyph] NN  SUBJECT             the thing being qualified
+                       results/….md §1.2   its citation, lifted out of the
+                                           prose where it read as noise
+                       prose               every remaining word, unabridged
+
+   The full unmodified string is also on the element's `title`, so the
+   verbatim sentence is one hover away from the restructured one. */
 .caveats { display: flex; flex-direction: column; gap: 0; }
 .caveat {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr);
-  gap: var(--sp-4);
-  padding: var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-3);
+  grid-template-columns: 13px minmax(0, 1fr);
+  column-gap: var(--sp-4);
+  row-gap: var(--sp-1);
+  padding: var(--sp-4) var(--sp-5) var(--sp-4) var(--sp-3);
   overflow-wrap: anywhere;
   font-size: var(--fs-xs);
-  line-height: 1.4;
+  line-height: var(--lh-body);
   color: var(--fg-1);
   border-left: 2px solid var(--warn);
-  background: var(--warn-bg);
-  border-bottom: 1px solid var(--line-0);
+  background: transparent;
+  border-bottom: 1px solid var(--line-1);
 }
+/* The glyph owns column 1 and one row. EVERY child — whether a call site
+   passes the historical single <span> or the structured subject/ref/body —
+   stacks in column 2 under this one rule, so both markups lay out. */
+.caveat > * { grid-column: 2; min-width: 0; }
 .caveat::before {
   content: "!";
+  grid-column: 1;
+  grid-row: 1;
   font-family: var(--font-mono);
   font-weight: 700;
   color: var(--warn);
   text-align: center;
   font-size: var(--fs-xs);
+  line-height: var(--lh-body);
 }
+
+/* --- the three parts --------------------------------------------------- */
+/* Deliberately NOT text-transform: uppercase. Half of these subjects are
+   identifiers (`oxygen_mode=markers`, `cell_state (oxygen)`) whose case is
+   part of the name, and the other half are already shouting. */
+.caveat .cv-key {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--fg-0);
+}
+.caveat .cv-n {
+  flex: 0 0 auto;
+  font-weight: 400;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.caveat .cv-subj { min-width: 0; overflow-wrap: anywhere; }
+.caveat .cv-ref {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+.caveat .cv-body { color: var(--fg-1); }
+
+/* --- severity ----------------------------------------------------------
+   Two steps, and they are read off the glyph and the rule — never off how
+   much room a caveat takes up.
+     sev-1  a stated limit of this run        amber rule, neutral field
+     sev-2  a hard stop: this number must not amber rule + the only fill in
+            be quoted                         the list, and a stop glyph */
+.caveat.sev-2 { background: var(--warn-bg); border-left-width: 3px; }
+.caveat.sev-2::before { content: "\25A0"; }
+.caveat.sev-2 .cv-key { color: var(--warn); }
+
 .caveat.info { border-left-color: var(--info); background: var(--info-bg); }
 .caveat.info::before { content: "i"; color: var(--info); }
 .caveat.crit { border-left-color: var(--crit); background: var(--crit-bg); }
@@ -392,6 +483,49 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
    block so it is clear they did not come out of this run. */
 .caveat.standing { border-left-color: var(--fg-2); background: transparent; }
 .caveat.standing::before { content: "\00a7"; color: var(--fg-2); }
+.caveat.standing.sev-2 { border-left-color: var(--warn); background: var(--warn-bg); }
+.caveat.standing.sev-2::before { content: "\25A0"; color: var(--warn); }
+
+/* The tally in the Caveats section header. It is the one thing in the panel
+   that answers "how bad is this run" without reading three hundred words, so
+   it sits in the header where the eye already is. */
+.cv-tally {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  color: var(--fg-2);
+}
+.cv-tally .hard { color: var(--warn); font-weight: 700; }
+
+/* The index strip above the list. It counts what follows and conceals none of
+   it — the panel's own header says "not collapsible for a reason", and this is
+   how you make a thing skimmable without also making it optional. */
+.cv-index {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: var(--h-th);
+  padding: 0 var(--sp-5);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--fg-2);
+  white-space: nowrap;
+  user-select: none;
+  cursor: help;
+}
+.cv-index b { color: var(--fg-0); font-weight: 700; }
+.cv-index .hard, .cv-index .hard b { color: var(--warn); }
+.cv-index .sep { color: var(--fg-3); }
+.cv-index .dim { color: var(--fg-3); }
 
 /* ========================================================== progress ==== */
 .progress {
@@ -507,28 +641,93 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   font-family: var(--font-mono);
 }
 
+/* The validator emits four multi-sentence warnings on a typical spec. Rendered
+   unbounded at the tail of a rail that is already 1364 px of content in an
+   815 px column, the last one was simply sawn in half by the bottom of the
+   scroller with no cue that anything followed — it read as broken text, not as
+   scrolled text. It now owns its own bounded scroll, exactly as the protocol
+   panel's `.pdiags` already does (protocol.css), and carries a count header so
+   "there are four of these" is answered before you scroll. */
 .diag-list { display: flex; flex-direction: column; }
+.diag-list:not(:empty) { border-top: 1px solid var(--line-1); }
+.diag-scroll {
+  display: flex;
+  flex-direction: column;
+  max-height: 116px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Permanently visible, for the same reason the dock's table wrappers get one
+     (layout.css): an overlay scrollbar is invisible at rest, so a bounded
+     region reads as text that was cut rather than text that scrolls — which is
+     the exact complaint this whole box exists to answer. */
+}
+/* The continuation cue. Not a shadow and not a fade — an explicit row that
+   says how the box behaves and scrolls it when pressed. Same job as `.tb-edge`
+   on the stage toolbar and the same reason: the platform's overlay scrollbar
+   paints nothing at rest, so "bounded" and "clipped" are indistinguishable
+   without one. */
+.diag-more {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+  height: var(--h-th);
+  padding: 0 var(--sp-5);
+  background: var(--bg-2);
+  border: 0;
+  border-top: 1px solid var(--line-1);
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  text-align: left;
+  cursor: pointer;
+}
+.diag-more[hidden] { display: none; }
+.diag-more:hover { background: var(--bg-3); color: var(--fg-0); }
+.diag-more .g { color: var(--fg-3); }
+.diag-more.at-end { cursor: default; }
+.diag-more.at-end .g { visibility: hidden; }
+.diag-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: var(--h-th);
+  padding: 0 var(--sp-5);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line-1);
+  font-size: var(--fs-micro);
+  font-family: var(--font-mono);
+  color: var(--fg-2);
+  user-select: none;
+}
+.diag-head .n-err  { color: var(--crit); font-weight: 700; }
+.diag-head .n-warn { color: var(--warn); font-weight: 700; }
 .diag {
   display: grid;
   grid-template-columns: 11px minmax(0, 1fr);
   gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
   overflow-wrap: anywhere;
   white-space: normal;
   font-size: var(--fs-xs);
   font-family: var(--font-mono);
-  line-height: 1.35;
+  line-height: var(--lh-body);
   border-bottom: 1px solid var(--line-0);
   text-align: left;
   width: 100%;
+  /* fg-1, not the semantic hue. A four-sentence warning set entirely in amber
+     is four sentences of decoration: the hue stops meaning "warning" and
+     starts meaning "paragraph". The severity lives in the glyph and the rule;
+     the words are words. */
+  color: var(--fg-1);
   background: transparent;
   border-left: 2px solid transparent;
   cursor: pointer;
 }
-.diag.err  { color: var(--crit); border-left-color: var(--crit); background: var(--crit-bg); }
-.diag.warn { color: var(--warn); border-left-color: var(--warn); background: var(--warn-bg); }
-.diag::before { content: "\00d7"; font-weight: 700; text-align: center; }
-.diag.warn::before { content: "!"; }
+.diag.err  { border-left-color: var(--crit); }
+.diag.warn { border-left-color: var(--warn); }
+.diag::before { content: "\00d7"; font-weight: 700; text-align: center; color: var(--crit); }
+.diag.warn::before { content: "!"; color: var(--warn); }
 .diag:hover { background: var(--bg-3); }
 .diag.err:hover  { background: var(--crit-bg); border-left-width: 4px; }
 .diag.warn:hover { background: var(--warn-bg); border-left-width: 4px; }
@@ -575,6 +774,12 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   width: 100%;
   border: 1px solid var(--line-2);
   image-rendering: pixelated;
+  /* The overlay's opacity carries the value (see FIELD_FS in gl/shaders.js),
+     so the swatch gradient is drawn with alpha too. It has to composite over
+     the SAME colour the canvas does — the viewport surround, not this card —
+     or the low end of the legend is a different colour from the low end of the
+     image it is labelling. */
+  background-color: var(--bg-void);
 }
 .legend .l-ticks {
   display: flex; justify-content: space-between;
@@ -590,6 +795,16 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-micro);
   color: var(--warn);
+  margin-top: 1px;
+}
+/* How the ramp is encoded, as opposed to a caveat about it. The opacity ramp
+   is always on and is not a warning state, so it takes fg-2 and not --warn;
+   it escalates to .l-win only when a narrowed window makes "invisible" cover
+   clamped data as well as zero. */
+.legend .l-enc {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--fg-2);
   margin-top: 1px;
 }
 

@@ -30,9 +30,19 @@ export function createOverlays(viewer) {
     while (px < 46 && guard++ < 8) { lenUm = nice125(lenUm * 2.2); px = lenUm * zoom; }
     while (px > 190 && guard++ < 16) { lenUm = nice125(lenUm / 2.2); px = lenUm * zoom; }
     barEl.style.width = px.toFixed(1) + 'px';
-    barTxt.textContent = lenUm >= 1000
+    const len = lenUm >= 1000
       ? `${num(lenUm / 1000, lenUm % 1000 === 0 ? 0 : 2)} mm`
       : `${num(lenUm, lenUm < 1 ? 2 : 0)} um`;
+    // The scale bar is exact; the DOTS are not, once a cell is smaller than a
+    // pixel. Say so on the same element rather than letting the bar imply that
+    // everything in the frame is to scale. See MIN_POINT_CSS_PX in gl/viewer.js.
+    const over = viewer.pointOversize;
+    barTxt.textContent = over > 1.1 ? `${len} · cells ${num(over, 1)}× scale` : len;
+    scalebar.title = over > 1.1
+      ? `Scale bar is exact. Cells are ${num(over, 1)}× life size: a ${num(viewer.cellDiamUm, 0)} um `
+        + `cell is ${num(viewer.trueDiamCssPx, 2)} px at this zoom, below the 1.75 px legibility `
+        + 'floor. Apparent density is inflated by roughly the square of that. Zoom in to see them to scale.'
+      : 'Scale bar is exact. Cells are drawn to scale at this zoom.';
   }
 
   /* ---------------------------------------------------------- legend --- */
@@ -56,7 +66,7 @@ export function createOverlays(viewer) {
     const meta = fieldMeta(legendName);
     legend.classList.remove('hidden');
     fill(legTitle, h('span', meta.label), h('span.unit', meta.unit));
-    legRamp.style.backgroundImage = gradientCss(viewer.rampName);
+    legRamp.style.backgroundImage = gradientCss(viewer.rampName, 24, viewer.fieldAlphaRamp);
 
     const [lo, hi] = viewer.windowRange();
     fill(legTicks,
@@ -73,8 +83,20 @@ export function createOverlays(viewer) {
       h('span', `${legendField.rows}×${legendField.cols} @ ${num(legendField.dx, 1)} um`),
       ' ',
       chip(fp.kind, fp.why),
+      // The overlay's opacity carries the value as well as its hue, so the
+      // legend has to say that the bottom of the ramp is nothing at all —
+      // otherwise a transparent region reads as "no data" when it is a
+      // measured zero. And when the window floor is above the data floor,
+      // "invisible" additionally covers everything clamped below it.
+      viewer.fieldAlphaRamp
+        ? h(windowed ? 'div.l-win' : 'div.l-enc', {
+          title: 'The overlay fades to fully transparent at the bottom of the window: '
+            + 'opacity is linear in the value, with no contrast stretch. Bare background '
+            + 'therefore means a value at or below the window floor, not missing data.',
+        }, windowed ? '0 opacity at window floor' : 'transparent = 0')
+        : null,
       windowed
-        ? h('div.l-win', { title: 'The colour ramp is mapped across the window, not the full data range. Values outside it are clamped.' },
+        ? h('div.l-win', { title: 'The colour ramp is mapped across the window, not the full data range. Values outside it are clamped — and, with the opacity ramp on, drawn as nothing.' },
           'windowed · data ', auto(legendField.min), ' → ', auto(legendField.max))
         : null);
   }
@@ -159,7 +181,7 @@ export function createOverlays(viewer) {
     updateScalebar, updateLegend, updateReadout, refreshWindow,
     setEmpty(on) { empty.classList.toggle('hidden', !on); },
     refreshRamp() {
-      legRamp.style.backgroundImage = gradientCss(viewer.rampName);
+      legRamp.style.backgroundImage = gradientCss(viewer.rampName, 24, viewer.fieldAlphaRamp);
     },
   };
 }

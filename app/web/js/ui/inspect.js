@@ -40,6 +40,110 @@ function metricUnit(key) {
   return m.fmt === 'pct' ? '%' : m.unit;
 }
 
+/* ---------------------------------------------------------- caveats ------
+ * The caveats panel must stay COMPLETE — every word of every caveat on screen,
+ * nothing collapsed, nothing dismissible, nothing clamped. It does not have to
+ * stay a paragraph dump, and as a paragraph dump it was losing: ten tinted
+ * blocks of prose occupied more of the rail than the metrics did, so the panel
+ * read as "this run is mostly warnings" long before anyone had read one.
+ *
+ * These strings are not arbitrary prose. They are written to a house shape:
+ *
+ *     <subject>: <VERDICT> (<citation>): <argument>
+ *
+ * with the subject usually an identifier (`oxygen_mode=markers`,
+ * `cell_state (oxygen)`) or a shouted headline, and the citation always a
+ * parenthesis of repo paths. Three fields, run together into one sentence.
+ * splitCaveat() takes them back apart so they can be laid out as three lines
+ * instead of parsed out of a paragraph by eye.
+ *
+ * Every branch is conservative: if a caveat does not match the shape it falls
+ * through with `subject = null` and the whole string is rendered as the body.
+ * Nothing is ever dropped — the citation is MOVED, not deleted, and the
+ * original untouched string goes on the element's `title` so the verbatim
+ * sentence is always one hover away from the restructured one.
+ */
+
+/** A caveat that says a number must not leave the screen, not merely that it
+ *  is qualified. These are the only ones that keep a tinted field. */
+const CV_HARD = /\bMUST NOT\b|\bNOT FOR CLINICAL USE\b|\bNOT DEFENSIBLE\b|\bNOT BE QUOTED\b|\bNEVER BE\b/;
+
+function splitCaveat(text) {
+  const raw = String(text).trim();
+  let rest = raw;
+
+  // 1. the citation. Always a parenthesis containing a repo path; inside a
+  //    sentence it reads as noise, above one it reads as provenance.
+  let ref = null;
+  const m = rest.match(/\(([^()]*\.md[^()]*)\)/);
+  if (m) {
+    ref = m[1].trim();
+    rest = (rest.slice(0, m.index) + rest.slice(m.index + m[0].length))
+      .replace(/\s+([:;,.])/g, '$1')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  // 2. the subject. Three shapes, tried in order of how sure we can be:
+  //      a) an explicit "<label>: rest" prefix short enough to be a label
+  //         rather than the first half of the sentence;
+  //      b) a shouted headline — a run of at least TWO consecutive all-caps
+  //         words ("ABSOLUTE KILL IS NOT DEFENSIBLE"). Two, because a single
+  //         shouted word is emphasis inside a sentence, not a title: lifting
+  //         "ABSOLUTE" out of "ABSOLUTE kill_fraction is an upper bound" gives
+  //         a heading that says nothing and a body that starts mid-clause;
+  //      c) a leading identifier — `key=value` or lower_snake_case, which in
+  //         these strings is always the thing being qualified.
+  let subject = null;
+  const colon = rest.indexOf(':');
+  if (colon > 0 && colon <= 88 && !/\.\s/.test(rest.slice(0, colon))) {
+    subject = rest.slice(0, colon).trim();
+    rest = rest.slice(colon + 1).trim();
+  } else {
+    const W = "[A-Z][A-Z0-9_'/-]*";
+    const caps = rest.match(new RegExp(`^(${W}(?:[ ,]+${W}){1,18})`));
+    const ident = rest.match(/^([a-z][a-z0-9]*(?:_[a-z0-9]+)+(?:=[A-Za-z0-9_.'-]+)?)(?=\s)/);
+    if (caps && caps[1].length >= 8 && caps[1].length <= 96) {
+      subject = caps[1].replace(/[,\s]+$/, '');
+      rest = rest.slice(subject.length);
+    } else if (ident) {
+      subject = ident[1];
+      rest = rest.slice(subject.length);
+    }
+  }
+  // The split lands wherever the sentence happened to break, so the body can
+  // start on the punctuation that used to join it to its heading.
+  rest = rest.replace(/^[\s.,;:—–-]+/, '');
+
+  // A subject that swallowed the entire caveat is not a subject.
+  if (subject && !rest) { rest = subject; subject = null; }
+
+  return { subject, ref, body: rest, raw, hard: CV_HARD.test(raw) };
+}
+
+/**
+ * @param {string} text  the caveat, verbatim from the backend
+ * @param {number} n     1-based index within its block
+ * @param {string} extra extra class(es) — 'standing' for a project-level limit
+ */
+function caveatNode(text, n, extra) {
+  const c = splitCaveat(text);
+  const cls = '.caveat' + (extra ? '.' + extra : '') + (c.hard ? '.sev-2' : '.sev-1');
+  return h('div' + cls, { title: c.raw },
+    c.subject
+      ? h('div.cv-key',
+        h('span.cv-n', String(n).padStart(2, '0')),
+        h('span.cv-subj', c.subject))
+      : null,
+    c.ref ? h('div.cv-ref', c.ref) : null,
+    h('div.cv-body',
+      // With no subject line there is no numbered row to hang the index on, so
+      // it leads the body instead. The list stays countable either way.
+      c.subject ? null : h('span.cv-n', String(n).padStart(2, '0') + '  '),
+      c.body),
+  );
+}
+
 export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   windowLevelEl, profileEl, regionEl, distanceEl }) {
   /* ------------------------------------------------------- channels ---- */
@@ -197,6 +301,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   const metricsEl = h('div');
   const provEl = h('dl.kv');
   const caveatsEl = h('div.caveats');
+  const tallyEl = h('span.cv-tally');
   const reportEl = h('dl.kv');
   const errorEl = h('div.hidden');
 
@@ -212,12 +317,18 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       metricsEl.appendChild(h('div.dim', { style: { fontSize: 'var(--fs-xs)', padding: '4px 0' } },
         `Run ${run.run_id} is ${run.status}; no metrics yet.`));
     } else {
+      // METRICS is declared in the order the operator asks the questions, so
+      // the first entry is the one the run was submitted to answer. It is set
+      // at --fs-xl; the rest stay at --fs-lg. Same pattern, same provenance
+      // chip, same one-line source — one rank of emphasis, so the panel has a
+      // place for the eye to land instead of four equal numbers.
+      let first = true;
       for (const key of Object.keys(METRICS)) {
         const v = run.metrics[key];
         const m = METRICS[key];
         const p = metricProvenance(key, run);
         const isNull = v === null || v === undefined;
-        metricsEl.appendChild(h('div.metric',
+        metricsEl.appendChild(h('div.metric' + (first ? '.lead' : ''),
           h('div.m-name', m.label),
           h('div.m-val' + (isNull ? '.null' : ''),
             fmtMetric(key, v),
@@ -226,6 +337,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
             chip(p.kind, p.why),
             h('span.m-src', m.src)),
         ));
+        first = false;
       }
       const extra = Object.keys(run.metrics).filter((k) => !(k in METRICS));
       for (const key of extra) {
@@ -288,25 +400,47 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       }
     }
 
-    /* caveats — always fully visible, never truncated, never behind a toggle */
+    /* caveats — always fully visible, never truncated, never behind a toggle.
+       Restructured, not reduced: see splitCaveat() above. */
     clear(caveatsEl);
     const cav = (pv && pv.caveats) || [];
+    const hard = [...cav, ...STANDING_LIMITS].filter((c) => CV_HARD.test(String(c))).length;
+
+    // An index strip, not a summary — it counts what is below it and hides
+    // none of it. This is the one line that answers "how qualified is this
+    // run" before three hundred words have been read, which is exactly the
+    // question a wall of prose was refusing to answer at a glance.
+    caveatsEl.appendChild(h('div.cv-index', {
+      title: 'Every caveat below is shown in full — none is collapsed, clamped or dismissible. '
+        + '"Hard stop" counts the ones that say a number must not be quoted off this screen at '
+        + 'all, as distinct from the ones that qualify how it should be read.',
+    },
+      h('span', h('b', String(cav.length + STANDING_LIMITS.length)), ' stated'),
+      h('span.sep', '·'),
+      h('span' + (hard ? '.hard' : ''), h('b', String(hard)), ' hard stop', hard === 1 ? '' : 's'),
+      h('span.grow'),
+      h('span.dim', 'none hidden')));
+
     if (!cav.length) {
       caveatsEl.appendChild(h('div.caveat.info', h('span',
         run ? 'The backend returned no caveats for this run. That is itself worth checking — a run with zero stated caveats is unusual.'
           : 'Caveats appear here for the selected run.')));
     } else {
-      for (const c of cav) caveatsEl.appendChild(h('div.caveat', h('span', String(c))));
+      cav.forEach((c, i) => caveatsEl.appendChild(caveatNode(String(c), i + 1)));
     }
     // Standing limits are true of the PROJECT, not of this run, so they cannot
     // arrive in RunResult.provenance.caveats — that list is per-run and may
     // legitimately be empty. They are rendered unconditionally, below the run's
     // own caveats, so there is no run whose panel omits them.
-    caveatsEl.appendChild(h('div.hr-lbl', { style: { margin: '6px 0 1px', padding: '0 var(--sp-5)' } },
+    caveatsEl.appendChild(h('div.hr-lbl', { style: { margin: 'var(--sp-6) 0 var(--sp-1)', padding: '0 var(--sp-5)' } },
       'standing limits · independent of this run'));
-    for (const s of STANDING_LIMITS) {
-      caveatsEl.appendChild(h('div.caveat.standing', h('span', s)));
-    }
+    STANDING_LIMITS.forEach((s, i) => caveatsEl.appendChild(caveatNode(s, i + 1, 'standing')));
+
+    // The section header gets the severity count only. `--h-head` is one fixed
+    // 24 px row (tokens.css 3.3) and it already carries a title and a hint —
+    // anything longer than two tokens wraps out of its own box.
+    clear(tallyEl);
+    if (hard) tallyEl.appendChild(h('span.hard', `${hard} hard`));
 
     /* reconstruction report */
     const rep = (run && run.report) || null;
@@ -385,7 +519,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
         h('div.sect-body', errorEl, metricsEl)),
 
       h('details.sect', { open: true },
-        h('summary', 'Caveats', h('span.hint', 'not collapsible for a reason')),
+        h('summary', 'Caveats', tallyEl, h('span.hint', 'not collapsible for a reason')),
         h('div.sect-body', { style: { padding: '0' } }, caveatsEl)),
 
       h('details.sect', { open: true },

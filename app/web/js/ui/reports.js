@@ -337,7 +337,6 @@ export function createReportsPanel({ store, getSection }) {
   const root = h('div.panel.rp',
     h('div.panel-head',
       h('h2', 'Therapy reports'),
-      countEl,
       h('span.grow'),
       h('button.btn.ghost.sm', {
         onclick: refresh,
@@ -351,6 +350,12 @@ export function createReportsPanel({ store, getSection }) {
         h('sub', '2'),
         '-resistance term of the attribution is measured, not asserted. The document carries its own limits: ',
         h('b', 'the ranking is the output; the absolute kill is not.')),
+      // The selection count used to live in the panel head, where it was
+      // competing with two unshrinkable buttons for a 300 px column: it
+      // ellipsed to "5..." at the real dock width, and the overflow it caused
+      // pushed `generate report` off the right edge of the viewport entirely.
+      // It belongs next to the thing it counts anyway.
+      h('div.rp-count', h('span.lbl', 'panel'), countEl),
       drugBox,
       errEl,
       h('div.tblwrap', table)),

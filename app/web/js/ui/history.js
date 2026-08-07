@@ -153,7 +153,11 @@ export function createHistoryPanel({ onOpen, onRefresh }) {
         h('td.mono', { style: d.same ? null : { color: 'var(--accent)' } }, d.vb),
       ))),
     );
-    cmpEl.appendChild(h('div.tblwrap', specTbl));
+    // `.cmp-fields` — three columns of single short words in a 240 px dock
+    // column. It WRAPS (layout.css); it must never ellipse, because `unifo`
+    // and `unifor` are two different modes and a truncated mode name is a
+    // wrong answer rather than a short one.
+    cmpEl.appendChild(h('div.tblwrap.cmp-fields', specTbl));
     if (!changed.length) {
       cmpEl.appendChild(h('div.caveat.info', h('span',
         'The two specs are identical. Any metric difference is run-to-run nondeterminism, which for a seeded engine should be exactly zero — if it is not, that is a finding.')));
@@ -197,7 +201,11 @@ export function createHistoryPanel({ onOpen, onRefresh }) {
         h('th.right', 'Δ abs'), h('th.right', 'Δ rel'))),
       h('tbody', rows),
     );
-    cmpEl.appendChild(h('div.tblwrap', mTbl));
+    // `.cmp-metrics` — seven columns, four of them numeric and two of them
+    // provenance chips. This one cannot wrap (a seven-column table folded into
+    // 240 px sets its own headings one letter per line), so it keeps its
+    // natural width and scrolls, with a permanently visible scrollbar.
+    cmpEl.appendChild(h('div.tblwrap.cmp-metrics', mTbl));
 
     /* --- caveats union -------------------------------------------------- */
     const ca = (A.provenance && A.provenance.caveats) || [];

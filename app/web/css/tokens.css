@@ -207,14 +207,35 @@
   --synthetic-bg: hsl(310 82% 64% / 0.16);
 
   /* --- categorical: cell type ------------------------------------------
-     Separable at 1-2 px point size against both backgrounds and distinct for
-     the common dichromacies. No red/green pairing carries meaning alone — the
-     channel legend always ships the name. Identity, not state. */
-  --ch-tumor:       hsl(348 78% 62%);
-  --ch-stromal:     hsl( 42 78% 58%);
-  --ch-immune:      hsl(140 52% 55%);
-  --ch-endothelial: hsl(205 82% 62%);
-  --ch-necrotic:    hsl(220  8% 48%);
+     HUE IS NOT A FREE CHOICE HERE. It is taken from
+     `tmesim.viz.explainer.CELLTYPE_COLORS`, which is what every figure in
+     results/ and the landing GLB are painted with:
+
+         TUMOR #e34948 red · STROMAL #008300 green · IMMUNE #2a78d6 blue
+         ENDOTHELIAL #4a3aa7 indigo · NECROTIC #7f7f7f grey
+
+     These tokens previously carried STROMAL=amber / IMMUNE=green /
+     ENDOTHELIAL=blue, i.e. the palette was rotated one slot against every
+     published figure: green meant IMMUNE in Studio and STROMAL in the papers.
+     Reading a Studio screenshot next to a results/ panel gave you the wrong
+     cell type. That is fixed; the hue is now the figures' hue exactly.
+
+     Only LIGHTNESS is a display choice, and it is set per theme so each class
+     clears ~3.2:1 against `--bg-void` — the WebGL viewport surround, not the
+     panel background, because that is what these actually sit on. The spread
+     is deliberate rather than flat: IMMUNE (blue 213) and ENDOTHELIAL (indigo
+     249) are only 36 deg apart and at a 2 px point size hue alone does not
+     separate them, so they are pushed to a 1.52:1 luminance ratio (was 1.11:1,
+     i.e. indistinguishable). TUMOR is 58% of the cells on a Xenium section
+     and is deliberately NOT the brightest class — the majority class should
+     not blow out the four minority classes that carry the spatial structure.
+     Every count is stated numerically in the channel legend, so the ladder
+     changes salience, never the reported abundance. */
+  --ch-tumor:       hsl(  0 62% 57%);   /* #d54f4e  4.70:1 on --bg-void */
+  --ch-stromal:     hsl(120 62% 38%);   /* #249b24  5.40:1 */
+  --ch-immune:      hsl(213 66% 49%);   /* #2a75ce  4.20:1 */
+  --ch-endothelial: hsl(249 48% 69%);   /* #958ad6  6.40:1 */
+  --ch-necrotic:    hsl(213  7% 39%);   /* #5c636a  3.20:1 */
 
   /* --- categorical: mechanism attribution -------------------------------
      The four SURVIVAL mechanisms are what the view exists to tell apart, so
@@ -314,11 +335,13 @@
   --synthetic:    hsl(310 78% 40%);
   --synthetic-bg: hsl(310 78% 46% / 0.14);
 
-  --ch-tumor:       hsl(348 72% 46%);
-  --ch-stromal:     hsl( 36 86% 38%);
-  --ch-immune:      hsl(146 58% 30%);
-  --ch-endothelial: hsl(210 80% 42%);
-  --ch-necrotic:    hsl(220  8% 42%);
+  /* Same CELLTYPE_COLORS hues, same contrast targets, re-solved against the
+     LIGHT `--bg-void` (hsl(210 16% 84%)). See the dark block for why. */
+  --ch-tumor:       hsl(  0 62% 41%);   /* #aa2928  4.70:1 on --bg-void */
+  --ch-stromal:     hsl(120 62% 23%);   /* #165e16  5.40:1 */
+  --ch-immune:      hsl(213 66% 41%);   /* #2362ad  4.20:1 */
+  --ch-endothelial: hsl(249 48% 41%);   /* #45369b  6.40:1 */
+  --ch-necrotic:    hsl(213  7% 46%);   /* #6d757e  3.20:1 */
 
   /* All-pairs CVD separation on the light mid-grey surround is dE 36.6. */
   --mech-killed:       hsl(212 10% 45%);
@@ -392,11 +415,12 @@
     --synthetic:    hsl(310 78% 40%);
     --synthetic-bg: hsl(310 78% 46% / 0.14);
 
-    --ch-tumor:       hsl(348 72% 46%);
-    --ch-stromal:     hsl( 36 86% 38%);
-    --ch-immune:      hsl(146 58% 30%);
-    --ch-endothelial: hsl(210 80% 42%);
-    --ch-necrotic:    hsl(220  8% 42%);
+    /* CELLTYPE_COLORS hues, re-solved against the light --bg-void. */
+    --ch-tumor:       hsl(  0 62% 41%);
+    --ch-stromal:     hsl(120 62% 23%);
+    --ch-immune:      hsl(213 66% 41%);
+    --ch-endothelial: hsl(249 48% 41%);
+    --ch-necrotic:    hsl(213  7% 46%);
 
     --mech-killed:       hsl(212 10% 45%);
     --mech-unreached:    #2a78d6;

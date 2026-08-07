@@ -30,6 +30,23 @@
 .rp .rp-lead b { color: var(--fg-0); }
 
 /* --- drug picker ------------------------------------------------------- */
+.rp .rp-count {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  flex-shrink: 0;
+  min-width: 0;
+}
+.rp .rp-count .hint {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--fg-1);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .rp .rp-drugs {
   display: flex;
   flex-wrap: wrap;

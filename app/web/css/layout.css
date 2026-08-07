@@ -107,7 +107,36 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  /* The shell colour, not the panel colour. The rail groups sit ON this as
+     opaque bands (see `.rail-group` below), so the gap between two groups is
+     a strip of shell showing through — which is what turns a 1400 px stack of
+     hairline-separated sections into three things with air between them. */
+  background: var(--bg-0);
 }
+
+/* ======================================================== PRIMACY ========
+   Three columns and a dock, all previously set at exactly the same weight:
+   same head, same title colour, same surface. Nothing said where to look, so
+   the eye started at the top left and read the whole instrument like a page.
+
+   The ranking the product actually has is:
+
+     1  the STAGE          the specimen. It already wins by being --bg-void
+                           and by being the only thing that is not chrome.
+     2  the READ rail      the answer. Full-strength title, a panel boundary
+                           rule instead of a hairline.
+     3  the SETUP rail     the question. Legible, deliberately quieter — you
+                           set it once and then stop looking at it.
+     4  the DOCK           reference: history, comparison, reports. Recessed
+                           onto the shell surface so it reads as a shelf under
+                           the instrument rather than a fourth equal panel.
+
+   All of it is expressed with tokens that already exist — one surface step
+   and one foreground step. No new colour, no new rule weight, no accent
+   spent on hierarchy (the accent is affordance only, tokens.css). */
+.rail-right > .panel-head { border-bottom: 1px solid var(--line-2); }
+.rail-right > .panel-head h2 { color: var(--fg-0); }
+.rail-left  > .panel-head h2 { color: var(--fg-2); }
 
 /* -------------------------------------------------------------- splitters */
 .split {
@@ -274,8 +303,79 @@
      contract the stage toolbar already uses one level up. */
   overflow-x: auto;
 }
-.dock > .panel { min-width: 0; min-height: 0; }
+.dock > .panel { min-width: 0; min-height: 0; background: transparent; }
 .dock-div { background: var(--line-2); }
+/* Tertiary: the dock recedes one surface step onto the shell, and its titles
+   drop to the secondary foreground. Its own heads stay at panel level so the
+   column boundaries survive. */
+.dock { background: var(--bg-0); }
+.dock .panel-head { background: var(--bg-1); }
+.dock .panel-head h2 { color: var(--fg-2); }
+.dock .panel-body { background: var(--bg-0); }
+/* A dock column is 240-320 px holding a seven-column table. `.tbl` is
+   `width: 100%`, so every cell was ellipsing to "xeniu" / "palbo" / "unifo" /
+   "discr" — values that are not merely shortened but actively misleading,
+   since `unifo` and `unifor` are different modes. `.tblwrap` has always been
+   `overflow: auto`; it just never had anything to scroll, because the table
+   dutifully squeezed itself into the column instead. Natural width + the
+   wrapper's own scroll is rule 4.3, which the rest of the shell already
+   follows. */
+.dock .tblwrap > .tbl { min-width: max-content; }
+/* The COMPARISON column is the narrowest in the dock (240 px floor) and holds
+   two tables whose cells are single short words: `xenium_319`, `palbociclib`,
+   `uniform`, `discrete`. Under `white-space: nowrap` they ellipsed to `xeniu`,
+   `palbo`, `unifo`, `discr` — which is worse than shortened, it is WRONG:
+   `unifo` and `unifor` are two different modes and the reader cannot tell
+   which one ran. Horizontal scroll is not the answer for a 240 px column
+   either; its scrollbar ends up at the bottom of a table several hundred
+   pixels below the fold of a 214 px dock.
+   Two-word values in a narrow column should WRAP. The rows get taller, the
+   column scrolls vertically as it already did, and every value is complete and
+   on screen. Scoped to `.panel-body.pad`, which is the comparison column only
+   — the run-history table next door is twelve columns wide and genuinely does
+   need its horizontal scroll. */
+.dock .cmp-fields { overflow: visible; }
+/* One step down the type scale, for the narrowest table in the shell. It is
+   the difference between `palbociclib` on one line and `palbocicl / ib` on
+   two, and this table is field names and enum values — not numbers anyone
+   reads to three significant figures. */
+.dock .cmp-fields > .tbl { min-width: 0; font-size: var(--fs-xs); }
+.dock .cmp-fields .tbl > * > tr > th,
+.dock .cmp-fields .tbl > * > tr > td {
+  white-space: normal;
+  /* `anywhere`, not `break-word`: only `anywhere` reduces the cell's own
+     min-content contribution, and what would not fit was the unbreakable
+     identifiers (`sensitivity_mode`, `palbociclib`, `R_00066`) summing past
+     the column width on their own. It is a safety valve — the tightened cell
+     padding below is what actually buys the room, so in practice the words
+     stay whole. */
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+  min-width: 0;
+  padding-left: var(--sp-2);
+  padding-right: var(--sp-2);
+}
+/* The seven-column metrics table opposite keeps its natural width and its own
+   scroll — folded into 240 px it sets `METRIC` one letter per line. */
+/* It scrolls the same way the run-history table beside it always has. No
+   scrollbar styling here: base.css already declares the app's one scrollbar
+   treatment, and re-declaring it per component is how six copies of a rule end
+   up in three files. (It would not help anyway — this platform serves an
+   overlay bar that occupies no width and paints nothing at rest, whatever the
+   stylesheet asks for.) */
+.dock .cmp-metrics { overflow-x: auto; }
+.dock .cmp-metrics > .tbl { min-width: max-content; }
+
+/* The reports head carries a title and TWO buttons in a 300 px column and was
+   19 px over: the overflow escaped into the dock's own horizontal scroll and
+   clipped `generate report` at the viewport edge. Recovered from the head's
+   own gaps and padding — one step down the same scale — rather than by
+   shortening a label (`refresh reports` is named for its object on purpose:
+   the dock has two `refresh` buttons hitting different endpoints). */
+.dock .panel-head { min-width: 0; overflow: hidden; gap: var(--sp-3); padding: 0 var(--sp-3) 0 var(--sp-4); }
+.dock .panel-head .btn.sm { padding: 0 var(--sp-3); }
+.dock .panel-head h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* ----------------------------------------------------------- status strip */
 .statusbar {
@@ -368,6 +468,11 @@
   letter-spacing: var(--tr-wide);
   text-transform: uppercase;
   color: var(--fg-1);
+  /* Same contract as `.panel-head`: this is one fixed --h-head row and it does
+     not grow for a second line, so anything that runs out of room truncates
+     rather than wrapping on top of the content below it. */
+  white-space: nowrap;
+  overflow: hidden;
 }
 .sect > summary:hover { background: var(--bg-3); }
 .sect > summary::-webkit-details-marker { display: none; }
@@ -389,8 +494,12 @@
   letter-spacing: 0;
   text-transform: none;
   color: var(--fg-3);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.sect-body { padding: var(--sp-4) var(--sp-5) var(--sp-5); }
+.sect-body { padding: var(--sp-5) var(--sp-5) var(--sp-6); }
 
 /* no horizontal body scroll, ever: wide content gets its own container */
 .overflow-x {
@@ -443,7 +552,16 @@
 }
 .rail-nav button:focus-visible { outline-offset: -2px; }
 
-.rail-group { display: block; }
+/* Density without rhythm is a wall. Every section in both rails was packed to
+   the same 1 px hairline, so eleven sections read as one object. A group is an
+   opaque band on the shell surface with a --sp-5 gutter after it: same
+   information, same nothing-hidden rule, but the column now has three
+   landmarks you can find with peripheral vision instead of by reading. */
+.rail-group { display: block; background: var(--bg-1); }
+.rail-group + .rail-group { margin-top: var(--sp-5); }
+/* Scroll runway. Without it the last section ends flush against the bottom of
+   the scroller and reads as cut off rather than as ended. */
+.rail-group:last-child { margin-bottom: var(--sp-8); }
 .rail-group > .rg-head {
   position: sticky;
   top: 0;

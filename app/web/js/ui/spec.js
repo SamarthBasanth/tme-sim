@@ -249,7 +249,7 @@ export function createSpecPanel({ store, onSubmit }) {
         h('div.sect-body', formEl)),
       h('details.sect', { open: true },
         h('summary', 'Source', h('span.hint', 'JSON · two-way sync')),
-        h('div.sect-body', { style: { padding: '0' } }, editorEl, diagList))),
+        h('div.sect-body', { style: { padding: '0' } }, editorEl))),
 
     railGroup('job', 'Commit', 'POST /api/runs',
       h('details.sect', { open: true, id: 'sect-job' },
@@ -268,7 +268,21 @@ export function createSpecPanel({ store, onSubmit }) {
         'what will run')),
     nav.el,
     body,
-    h('div', { style: { borderTop: '1px solid var(--line-2)', background: 'var(--bg-2)' } }, submitRow),
+    // The validator read-out sits WITH the commit control, outside the scroll,
+    // not at the tail of the Source section inside it.
+    //
+    // Inside the scroll it was the last thing in a 1364 px column shown
+    // through an 815 px viewport, so at rest the operator saw one amber box
+    // sawn off mid-sentence by the bottom edge of the rail — text that is cut,
+    // not text that is scrolled, which reads as a rendering bug rather than as
+    // "there is more below". It is also the one thing you are supposed to have
+    // read BEFORE pressing the button directly beneath it, and a control whose
+    // reachability must not depend on scroll position (the reason `submitRow`
+    // is already out here) should not sit above a warning whose visibility
+    // does. It costs nothing on a clean spec: `.diag-list` is empty, and an
+    // empty one has no border and no height.
+    h('div', { style: { borderTop: '1px solid var(--line-2)', background: 'var(--bg-2)' } },
+      diagList, submitRow),
   );
 
   /* --------------------------------------------------------- behaviour -- */
@@ -453,6 +467,23 @@ export function createSpecPanel({ store, onSubmit }) {
 
   function renderDiags(errors, warnings) {
     errLines = new Set();
+    // The diagnostics get their own bounded scroll (css .diag-scroll) rather
+    // than running on to the end of the rail. Four multi-sentence validator
+    // warnings are 475 px of prose at the tail of a 1364 px column in an
+    // 815 px viewport: the last one was sawn in half by the bottom of the
+    // scroller with nothing to say it continued, which reads as broken text
+    // rather than as scrolled text. The count header says how many there are
+    // before you scroll, so bounding the box hides no fact — same contract the
+    // protocol panel's .pdiags already runs under.
+    //
+    // The box also gets an explicit "more below" footer. It would not need one
+    // if a scrollbar were visible, but base.css asks for an always-visible
+    // track and the platform overrides it with an overlay bar that occupies no
+    // width and paints nothing at rest (measured: offsetWidth === clientWidth
+    // on an element with scrollHeight 483 in 116). Without a cue, bounded and
+    // clipped look identical — which is the exact complaint this box exists to
+    // answer, so the cue is drawn rather than delegated.
+    const scroll = h('div.diag-scroll');
     const frag = document.createDocumentFragment();
     const add = (d, kind) => {
       const line = d.line !== undefined ? d.line : lineOfPath(d.path);
@@ -465,7 +496,33 @@ export function createSpecPanel({ store, onSubmit }) {
     };
     for (const e of errors) add(e, 'err');
     for (const w of warnings) add(w, 'warn');
-    fill(diagList, frag);
+    scroll.appendChild(frag);
+    clear(diagList);
+    if (errors.length || warnings.length) {
+      diagList.appendChild(h('div.diag-head',
+        errors.length ? h('span.n-err', `${errors.length} error${errors.length === 1 ? '' : 's'}`) : null,
+        warnings.length ? h('span.n-warn', `${warnings.length} warning${warnings.length === 1 ? '' : 's'}`) : null,
+        h('span.grow'),
+        h('span', 'click one to jump to its line')));
+      diagList.appendChild(scroll);
+
+      const more = h('button.diag-more', {
+        type: 'button', hidden: true,
+        title: 'Scroll the diagnostics. Nothing is hidden — every warning is in the list above.',
+        onclick: () => scroll.scrollBy({ top: scroll.clientHeight - 20, behavior: 'smooth' }),
+      }, h('span.g', '▾'), h('span.t', ''));
+      diagList.appendChild(more);
+
+      const syncMore = () => {
+        const over = scroll.scrollHeight - scroll.clientHeight;
+        const left = over - scroll.scrollTop;
+        more.hidden = over <= 2;
+        more.querySelector('.t').textContent = left > 2 ? 'more below — scroll' : 'end of list';
+        more.classList.toggle('at-end', left <= 2);
+      };
+      scroll.addEventListener('scroll', syncMore, { passive: true });
+      requestAnimationFrame(syncMore);
+    }
 
     // mirror onto the form controls
     for (const [, { control, errEl }] of fieldEls) {

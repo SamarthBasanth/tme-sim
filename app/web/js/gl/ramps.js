@@ -60,12 +60,24 @@ export function sample(name, t) {
   return `rgb(${l[i]},${l[i + 1]},${l[i + 2]})`;
 }
 
-/** A `linear-gradient(...)` string for painting a legend swatch in CSS. */
-export function gradientCss(name, steps = 24) {
+/**
+ * A `linear-gradient(...)` string for painting a legend swatch in CSS.
+ *
+ * `alphaRamp` mirrors the field underlay's alpha handling (FIELD_FS in
+ * shaders.js): when the overlay fades to transparent at the low end of the
+ * window, the swatch must fade too, or the legend is describing an image that
+ * is not the one on screen.
+ */
+export function gradientCss(name, steps = 24, alphaRamp = false) {
+  const l = lut(name);
   const parts = [];
   for (let i = 0; i < steps; i++) {
     const t = i / (steps - 1);
-    parts.push(`${sample(name, t)} ${(t * 100).toFixed(1)}%`);
+    const j = Math.max(0, Math.min(255, Math.round(t * 255))) * 4;
+    const c = alphaRamp
+      ? `rgba(${l[j]},${l[j + 1]},${l[j + 2]},${t.toFixed(3)})`
+      : `rgb(${l[j]},${l[j + 1]},${l[j + 2]})`;
+    parts.push(`${c} ${(t * 100).toFixed(1)}%`);
   }
   return `linear-gradient(90deg, ${parts.join(',')})`;
 }

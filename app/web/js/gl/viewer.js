@@ -48,6 +48,28 @@ const RELAX_MS = 1000 / 90;    // relax LOD below this
 /** Drawing-buffer area budget in device pixels. See Viewer.resize(). */
 export const MAX_DRAW_PX = 4.2e6;
 
+/**
+ * Floor on the drawn cell diameter, in CSS pixels. See Viewer.pointSizePx.
+ *
+ * A cell is ~9 um. Fitting an 8.1 x 5.1 mm Xenium section to an 840 px panel
+ * is ~10 um per CSS pixel, so a to-scale cell is 0.9 CSS px — under one pixel,
+ * and at dpr 2 that is a 1.8 device-px speck with no round-sprite (the circle
+ * discard only engages above 2.5 px). 40,887 of those cover 4.7% of the
+ * drawing buffer: individually visible, collectively not a tissue.
+ *
+ * Below this floor the dots are drawn LARGER THAN LIFE. That is unavoidable —
+ * you cannot draw a sub-pixel object — but it is a real distortion of apparent
+ * density, so it is disclosed rather than hidden: `pointOversize` reports the
+ * factor and the scale bar prints it whenever it exceeds 1.1x.
+ *
+ * 1.75 CSS px is the largest floor that still leaves the cloud sparse at fit:
+ * pi * (1.75 * dpr / 2)^2 * 40,887 is ~18% of an 840x657 dpr-2 buffer, so
+ * overlap stays the exception and the density gradient, the tears and the
+ * section outline all survive as differences in local coverage rather than
+ * flattening into a solid field.
+ */
+export const MIN_POINT_CSS_PX = 1.75;
+
 /* ------------------------------------------------------------------ util */
 
 let probe = null;
@@ -172,6 +194,11 @@ export class Viewer {
     this.fieldVisible = true;
     this.fieldOpacity = 0.55;
     this.fieldGamma = 1;
+    // Alpha of the field underlay tracks the field VALUE rather than being
+    // flat, so a zero concentration paints nothing instead of painting the
+    // ramp's darkest colour across the whole extent. See FIELD_FS in
+    // shaders.js for the full argument and the one case where it can mislead.
+    this.fieldAlphaRamp = true;
     // Window / level, in FIELD UNITS. null = "not set yet"; setField installs
     // the full data range. The ramp is mapped across [c - w/2, c + w/2] and
     // clamped outside, which is what lets an operator pull structure out of a
@@ -602,9 +629,34 @@ export class Viewer {
   /** um per device pixel — used for the scale bar and pick radius. */
   get umPerPx() { return 1 / this.cam.zoom; }
 
+  /** True cell diameter at the current zoom, in CSS px — no floor, no boost. */
+  get trueDiamCssPx() { return this.cellDiamUm * this.cam.zoom; }
+
+  /** Drawn cell diameter in CSS px: the legibility floor, then the operator's
+   *  boost. The boost is applied AFTER the floor so that it stays fully
+   *  authoritative — an operator who drags the size control down still gets
+   *  smaller dots instead of silently hitting the clamp. */
+  get pointSizeCssPx() {
+    return Math.max(MIN_POINT_CSS_PX, this.trueDiamCssPx) * this.sizeBoost;
+  }
+
+  /**
+   * How much larger than life the dots are currently drawn, 1 = to scale.
+   * Covers both causes: the sub-pixel floor, and the operator's size boost.
+   * The scale bar surfaces it; see MIN_POINT_CSS_PX for why the floor exists.
+   */
+  get pointOversize() {
+    const d = this.trueDiamCssPx;
+    return d > 0 ? this.pointSizeCssPx / d : 1;
+  }
+
   get pointSizePx() {
-    const px = this.cellDiamUm * this.cam.zoom * this.sizeBoost * this.dpr;
-    return Math.max(1, Math.min(28, px));
+    // Floor in CSS px, THEN scale to device px. Flooring in device px (as this
+    // used to, via Math.max(1, ...)) makes the on-screen dot size depend on the
+    // display: 1 device px is a full CSS pixel on a 1x panel and half of one on
+    // a retina panel, so the same section looked twice as faint on the better
+    // display. The floor is a legibility floor, so it belongs in CSS px.
+    return Math.max(1, Math.min(28, this.pointSizeCssPx * this.dpr));
   }
 
   /* ----------------------------------------------------------- picking -- */
@@ -725,6 +777,7 @@ export class Viewer {
       gl.uniform2f(u.u_range, winLo, winHi);
       gl.uniform1f(u.u_opacity, this.fieldOpacity);
       gl.uniform1f(u.u_gamma, this.fieldGamma);
+      gl.uniform1f(u.u_alphaRamp, this.fieldAlphaRamp ? 1 : 0);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.fieldTex);
       gl.uniform1i(u.u_field, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.rampTex);
