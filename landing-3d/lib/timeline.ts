@@ -13,12 +13,18 @@ import { clamp, lerp, mapRange, sampleCurve, smoothstep } from "./scrollMath";
 
 export const SECTION_COUNT = 6;
 
+/**
+ * Section ids/labels track lib/copy.ts. They used to track an earlier
+ * product -- "AI Analysis", "Treatment Planning", "Segmentation" -- long after
+ * the copy above them stopped saying any of that, which is how the scene ended
+ * up animating an imaging viewer under drug-transport prose.
+ */
 export const SECTIONS = [
   { id: "hero", label: "Hero", kicker: "01" },
-  { id: "anatomy", label: "Anatomical Context", kicker: "02" },
-  { id: "segmentation", label: "Segmentation", kicker: "03" },
-  { id: "analysis", label: "AI Analysis", kicker: "04" },
-  { id: "planning", label: "Treatment Planning", kicker: "05" },
+  { id: "transport", label: "Transport Physics", kicker: "02" },
+  { id: "mechanism", label: "Delivery or Potency", kicker: "03" },
+  { id: "attribution", label: "Spatial Attribution", kicker: "04" },
+  { id: "limits", label: "Stated Limits", kicker: "05" },
   { id: "cta", label: "Final", kicker: "06" },
 ] as const;
 
@@ -38,10 +44,10 @@ export const sectionLocalProgress = (global: number, index: number): number => {
 
 const SECTION_INDEX: Record<SectionId, number> = {
   hero: 0,
-  anatomy: 1,
-  segmentation: 2,
-  analysis: 3,
-  planning: 4,
+  transport: 1,
+  mechanism: 2,
+  attribution: 3,
+  limits: 4,
   cta: 5,
 };
 
@@ -63,10 +69,10 @@ export interface CameraKeyframe {
 
 export const CAMERA_KEYFRAMES: readonly CameraKeyframe[] = [
   { position: [0, 0.05, 4.4], lookAt: [0, 0, 0], fov: 32 }, // hero
-  { position: [1.7, 0.7, 6.3], lookAt: [0, -0.05, 0], fov: 36 }, // anatomy establishes
-  { position: [-2.4, 0.3, 4.2], lookAt: [0, 0, 0], fov: 33 }, // segmentation
-  { position: [0.35, 1.2, 3.0], lookAt: [0, 0.1, 0], fov: 29 }, // analysis
-  { position: [2.6, 1.0, 3.3], lookAt: [0.15, 0, 0], fov: 31 }, // planning
+  { position: [1.7, 0.7, 6.3], lookAt: [0, -0.05, 0], fov: 36 }, // transport physics establishes
+  { position: [-2.4, 0.3, 4.2], lookAt: [0, 0, 0], fov: 33 }, // delivery or potency
+  { position: [0.35, 1.2, 3.0], lookAt: [0, 0.1, 0], fov: 29 }, // spatial attribution
+  { position: [2.6, 1.0, 3.3], lookAt: [0.15, 0, 0], fov: 31 }, // stated limits
   { position: [-0.7, 0.4, 4.6], lookAt: [0.35, 0, 0], fov: 29 }, // cta enters
   { position: [0, 0.15, 5.3], lookAt: [1.05, 0, 0], fov: 27 }, // cta rests
 ] as const;
@@ -112,10 +118,11 @@ export const heroCopyOpacity = (p: number): number =>
   ]);
 
 // ---------------------------------------------------------------------------
-// Scene 2 — Anatomical context
+// Scene 2 — Transport physics
 // ---------------------------------------------------------------------------
 
-export const anatomyOpacity = (p: number): number =>
+/** Iso-level contour overlay (see FieldContours.tsx). */
+export const fieldContourOpacity = (p: number): number =>
   sampleCurve(p, [
     [1 / 6, 0],
     [2 / 6, 0.34],
@@ -124,7 +131,7 @@ export const anatomyOpacity = (p: number): number =>
     [1, 0.04],
   ]);
 
-export const anatomyLabelOpacity = (p: number): number =>
+export const fieldLabelOpacity = (p: number): number =>
   trapezoid(p, 1 / 6 + 0.02, 2 / 6 - 0.05, 2 / 6 + 0.05, 3 / 6 - 0.02);
 
 function trapezoid(t: number, r0: number, r1: number, f0: number, f1: number) {
@@ -137,7 +144,7 @@ function trapezoid(t: number, r0: number, r1: number, f0: number, f1: number) {
 }
 
 // ---------------------------------------------------------------------------
-// Scene 3 — Segmentation
+// Scene 3 — Delivery or potency
 // ---------------------------------------------------------------------------
 
 /**
@@ -163,22 +170,30 @@ export const separationAmount = (p: number): number =>
     [5 / 6 + (1 / 6) * 0.2, 0],
   ]);
 
-export const segmentationLabelOpacity = (p: number): number =>
+export const regionLabelOpacity = (p: number): number =>
   trapezoid(p, 2 / 6 + 0.03, 3 / 6 - 0.06, 3 / 6 + 0.1, 3 / 6 + 0.2);
 
 // ---------------------------------------------------------------------------
-// Scene 4 — AI analysis
+// Scene 4 — Spatial attribution
 // ---------------------------------------------------------------------------
 
-/** Raw (unsmoothed) local progress through the analysis section, 0..1. */
-export const scanLocalProgress = (p: number): number =>
-  clamp(sectionLocalProgress(p, SECTION_INDEX.analysis));
+/** Raw (unsmoothed) local progress through the attribution section, 0..1. */
+export const frontLocalProgress = (p: number): number =>
+  clamp(sectionLocalProgress(p, SECTION_INDEX.attribution));
 
-/** World-space Y the scan plane sweeps across, top to bottom. */
-export const scanPlaneY = (p: number): number =>
-  lerp(1.35, -1.35, smoothstep(scanLocalProgress(p)));
+/**
+ * 0..1 — how far the drug has penetrated out of the vasculature (see
+ * ConcentrationField.tsx, which turns this into a decay length).
+ *
+ * This used to be `scanPlaneY`, the world-space height of a plane sweeping
+ * top-to-bottom through the model for the "AI Analysis" beat. The sweep is
+ * kept; what advances is now concentration rather than a scanner. It stays a
+ * pure function of scroll, so scrolling back up retracts the front.
+ */
+export const frontAdvance = (p: number): number => smoothstep(frontLocalProgress(p));
 
-export const highlightOpacity = (p: number): number =>
+/** Drives the concentration marker and the point-cloud category highlight. */
+export const exposureHighlight = (p: number): number =>
   sampleCurve(p, [
     [3 / 6 + (1 / 6) * 0.4, 0],
     [3 / 6 + (1 / 6) * 0.62, 1],
@@ -194,40 +209,38 @@ export const metricPanelOpacity = (p: number): number =>
     [4 / 6, 0],
   ]);
 
-export const scanPlaneOpacity = (p: number): number =>
+export const concentrationFieldOpacity = (p: number): number =>
   trapezoid(p, 3 / 6, 3 / 6 + 0.02, 4 / 6 - 0.04, 4 / 6);
 
 // ---------------------------------------------------------------------------
-// Scene 5 — Treatment planning
+// Scene 5 — Stated limits
 // ---------------------------------------------------------------------------
 
-export const trajectoryReveal = (p: number): number =>
-  smoothstep(clamp(sectionLocalProgress(p, SECTION_INDEX.planning)));
+/** Draw-on progress of the fronts leaving the vasculature (DrugFront.tsx). */
+export const drugFrontReveal = (p: number): number =>
+  smoothstep(clamp(sectionLocalProgress(p, SECTION_INDEX.limits)));
 
 /**
- * Independent of the draw-on reveal above: once fully traced, the path
- * recedes again as the final CTA settles, so the closing composition reads
- * as "tumor, reassembled" rather than staying cluttered with planning
- * artifacts (the spec calls for a "smooth, deliberate composition" at the
- * very end, not an abrupt stop).
+ * Independent of the draw-on reveal above: once fully traced, the fronts
+ * recede again as the final CTA settles, so the closing composition reads as
+ * "the section, alone" rather than staying cluttered (the spec calls for a
+ * "smooth, deliberate composition" at the very end, not an abrupt stop).
  */
-export const trajectoryOpacity = (p: number): number =>
+export const drugFrontOpacity = (p: number): number =>
   sampleCurve(p, [
     [5 / 6, 1],
     [5 / 6 + (1 / 6) * 0.5, 0.15],
     [1, 0.15],
   ]);
 
-export const criticalStructureOpacity = (p: number): number =>
+/** Vessel stand-ins (Markers.tsx), revealed late in the scroll. */
+export const vesselOpacity = (p: number): number =>
   sampleCurve(p, [
     [4 / 6, 0],
     [4 / 6 + (1 / 6) * 0.3, 1],
     [5 / 6, 1],
     [1, 0.2],
   ]);
-
-export const planningCopyOpacity = (p: number): number =>
-  trapezoid(p, 4 / 6 + 0.02, 4 / 6 + 0.12, 5 / 6 - 0.08, 5 / 6 - 0.01);
 
 // ---------------------------------------------------------------------------
 // Scene 6 — Final CTA

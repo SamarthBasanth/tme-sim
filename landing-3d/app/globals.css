@@ -1,10 +1,16 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   Tumor Atlas — cinematic scroll experience
-   Palette: black / charcoal / off-white, one cool clinical accent (cyan),
-   one restrained warm accent (amber) reserved for the AI "flagged region"
-   marker only. No gradients-as-decoration, no glassmorphism, no neon.
+   Vivum — cinematic scroll experience
+   Palette: black / charcoal / off-white, one cool accent (cyan) for interface
+   furniture, plus the drug-concentration ramp for anything that depicts a
+   quantity. That ramp is viridis, taken from the product's own table
+   (app/web/js/gl/ramps.js) rather than invented here, so the page and the
+   Studio colour concentration the same way; --conc-high anchors it and
+   components/canvas/shaders/viridis.ts carries the full ramp for WebGL.
+   It replaced an amber accent that was reserved for an "AI flagged region"
+   marker, from a product this is not.
+   No gradients-as-decoration, no glassmorphism, no neon.
    ========================================================================== */
 
 :root {
@@ -16,7 +22,7 @@
   --hairline: rgba(243, 245, 246, 0.14);
   --accent: #7fd1e0;
   --accent-dim: rgba(127, 209, 224, 0.5);
-  --warn: #f2b23a;
+  --conc-high: #d8e219;
 
   /*
    * Swiss neo-grotesque identity face, taken deliberately from the real
@@ -704,4 +710,101 @@ body::after {
   * {
     scroll-behavior: auto !important;
   }
+}
+
+/* --------------------------------------------------------------------- */
+/* Specimen caption — the hero's tissue, presented as data rather than    */
+/* decoration. See components/ui/SpecimenCaption.tsx for why it exists.   */
+/* Deliberately instrument-like: monospace, hairline rules, no card, no   */
+/* radius, no shadow. It should read as a figure caption in a paper.      */
+/* --------------------------------------------------------------------- */
+
+.specimen {
+  margin: 2.6rem 0 0;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--hairline);
+  max-width: 32rem;
+  font-family: var(--font-mono, ui-monospace, "SFMono-Regular", Menlo, monospace);
+  text-align: left;
+}
+
+.specimen__id {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Facts and legend both sit on one baseline grid so the block reads as a
+   single instrument readout rather than three stacked lists. */
+.specimen__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2rem;
+  margin: 0.7rem 0 0;
+}
+
+.specimen__facts div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.specimen__facts dt {
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.specimen__facts dd {
+  margin: 0;
+  font-size: 0.9rem;
+  /* tabular-nums so the counts line up and read as measurements */
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.specimen__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
+  margin: 1.05rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.76rem;
+  color: var(--ink-dim);
+}
+
+.specimen__legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.specimen__swatch {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: none;
+  /* square, not a dot: these are cell-type classes, not points on a chart */
+  border-radius: 0;
+}
+
+.specimen__pct {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+
+.specimen__note {
+  /* overrides .narrative-section p, which is sized for body copy */
+  margin: 1.05rem 0 0;
+  font-size: 0.66rem !important;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  max-width: 30rem;
+}
+
+@media (max-width: 640px) {
+  .specimen__facts { gap: 0.6rem 1.4rem; }
+  .specimen__legend { gap: 0.3rem 0.8rem; }
 }

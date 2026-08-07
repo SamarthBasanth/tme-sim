@@ -16,6 +16,7 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { SECTION_COUNT, metricPanelOpacity, sectionVisual } from "@/lib/timeline";
 import { SECTION_COPY } from "@/lib/copy";
 import { STUDIO_URL } from "@/lib/env";
+import SpecimenCaption from "@/components/ui/SpecimenCaption";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -140,6 +141,10 @@ function Experience() {
             <a className="cta-button" href={STUDIO_URL}>
               Open the Studio
             </a>
+            {/* Turns the tissue behind this text from decoration into data:
+                without a legend the measured cell types read as confetti and
+                "the section is real" lands as an assertion. */}
+            <SpecimenCaption />
           </NarrativeSection>
 
           <NarrativeSection

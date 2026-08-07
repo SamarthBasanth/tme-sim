@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useScrollProgressRef } from "@/components/scroll/ScrollProgressContext";
-import { finalOffsetAmount, highlightOpacity, separationAmount } from "@/lib/timeline";
+import { exposureHighlight, finalOffsetAmount, separationAmount } from "@/lib/timeline";
 import { damp } from "@/lib/scrollMath";
 import {
   createVesselCurves,
@@ -47,12 +47,16 @@ const VESSEL_COLOR = "#6b1f2c";
  * per-point category attribute (core / necrotic / enhancing-rim within the
  * mass cloud) drives colour through `pointCloudShader.ts`, the R3F analogue
  * of the real viewer's category-attribute channel; `uHighlight` nudges the
- * enhancing category brighter while the "AI Analysis" scan plane is active,
- * bridging the point-cloud category concept to that section the same way
+ * enhancing category brighter while the concentration field is up, bridging
+ * the point-cloud category concept to spatial attribution the same way
  * the real product's mechanism-attribution colouring works. Built from
- * three groups — core / edema / margin — because the "Segmentation" scene
- * pulls those apart on scroll; swap this component out (see TumorModel.tsx)
- * once a real scan-derived GLB exists.
+ * three groups — core / edema / margin — because scene 3 pulls those apart
+ * on scroll; swap this component out (see TumorModel.tsx) once a real
+ * measured GLB exists.
+ *
+ * NOTE: `public/models/tumor.glb` now exists, so this is the fallback path
+ * and is not what ships on the page — TumorModel resolves to GLTFTumor and
+ * the real Xenium section.
  */
 export default function ProceduralTumor({
   lowDetail = false,
@@ -167,17 +171,18 @@ export default function ProceduralTumor({
     const p = progressRef.current;
     sepSmoothed.current = damp(sepSmoothed.current, separationAmount(p), 3.2, delta);
     offsetSmoothed.current = damp(offsetSmoothed.current, finalOffsetAmount(p), 3.2, delta);
-    highlightSmoothed.current = damp(highlightSmoothed.current, highlightOpacity(p), 4, delta);
+    highlightSmoothed.current = damp(highlightSmoothed.current, exposureHighlight(p), 4, delta);
 
     const sep = sepSmoothed.current;
     if (coreGroup.current) coreGroup.current.position.set(0, -0.55 * sep, 0);
     if (edemaGroup.current) edemaGroup.current.position.set(0.05 * sep, 0.62 * sep, 0.1 * sep);
     if (marginGroup.current) marginGroup.current.position.set(-0.08 * sep, 0.05 * sep, -0.6 * sep);
 
-    // A gentle glow on the enhancing/margin category while the AI-analysis
-    // scan is active — the same curve that ignites Markers.tsx's amber
-    // marker — so "AI Analysis" reads as flagging a cell category rather
-    // than just sweeping a plane past an inert mass.
+    // A gentle glow on the enhancing/margin category while the concentration
+    // field is up — the same curve that ignites Markers.tsx's concentration
+    // source — so the spatial-attribution section reads as one cell
+    // population getting more exposure than another, rather than as light
+    // passing over an inert mass.
     if (massMaterialRef.current) {
       massMaterialRef.current.uniforms.uHighlight.value = highlightSmoothed.current;
     }

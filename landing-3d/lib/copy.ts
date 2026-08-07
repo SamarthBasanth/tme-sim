@@ -26,7 +26,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "01",
     eyebrow: "Real measured tissue",
     headline: "See Where the Drug Actually Goes.",
-    body: "The section behind this text is real. 40,887 cells from a human glioblastoma, each one where the assay found it, colored by measured cell type. Vivum rebuilds tumor architecture from spatial transcriptomics this way: cells, vasculature, stroma, ECM and oxygen, across 38 sections from 13 patients. Nothing about the shape was invented, including the tears. It reads flat because it is: one 8.1 by 5.1 mm section, with nothing measured along the third axis.",
+    body: "The section behind this text is a real one. Vivum rebuilds tumor architecture from spatial transcriptomics, then runs transport physics on the result to work out where a drug actually reaches.",
     align: "center",
   },
   {

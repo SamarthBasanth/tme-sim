@@ -5,62 +5,58 @@ import { useFrame } from "@react-three/fiber";
 import { Billboard } from "@react-three/drei";
 import * as THREE from "three";
 import { useScrollProgressRef } from "@/components/scroll/ScrollProgressContext";
-import { criticalStructureOpacity, highlightOpacity } from "@/lib/timeline";
+import { exposureHighlight, vesselOpacity } from "@/lib/timeline";
 import { damp } from "@/lib/scrollMath";
+import { ENTRY_POINTS } from "./shaders/viridis";
 
 /**
- * Small emissive marker that "ignites" as the AI-analysis scan plane sweeps
- * past it — a flagged-region indicator during AI Analysis / Treatment
- * Planning, not decoration.
- *
- * Previously a filled sphere with a second ring orbiting it in a fixed
- * horizontal plane (`rotation={[Math.PI / 2, 0, 0]}`): from most camera
- * angles a plane-locked ring around a small sphere reads exactly like a
- * miniature Saturn rather than a clinical marker — flagged (and left
- * unresolved) in the prior visual pass, then independently re-reported.
- * Rebuilt as a camera-facing (`Billboard`, so it never tilts into a
- * Saturn-ring silhouette regardless of viewing angle) crosshair/reticle: a
- * small pulsing dot, a thin ring tight against it, and four short radial
- * tick marks — the standard "flagged point" convention in medical and
- * technical imaging overlays.
+ * Concentration ramp stops used by the WebGL materials in this file, sampled
+ * from the product's own viridis table (app/web/js/gl/ramps.js) at roughly
+ * t = 0.95 / 0.55 / 0.2. Mirrors `--conc-high` in globals.css; three.js cannot
+ * read a CSS custom property, so the anchor value is repeated, not forked.
  */
-export function HighlightMarker({ position }: { position: readonly [number, number, number] }) {
+const CONC_HIGH = "#d8e219";
+const CONC_MID = "#28ae80";
+const CONC_LOW = "#424086";
+
+/**
+ * A point source of drug, sitting on the vasculature it enters from.
+ *
+ * This was an amber crosshair/reticle -- dot, ring and four radial ticks --
+ * the standard "flagged point" convention in imaging overlays, built for an
+ * "AI flagged region" beat this product does not have. Amber carried no
+ * meaning beyond "look here", and the page reserved it site-wide for exactly
+ * that.
+ *
+ * Rebuilt as three concentric bands stepping DOWN the concentration ramp
+ * outward -- bright at the source, mid, then low -- so the marker is a
+ * miniature of the quantity the whole scene is about instead of a flag. The
+ * ticks are gone with the reticle they belonged to. It stays a camera-facing
+ * `Billboard`, which is what keeps a ringed marker from reading as a tilted
+ * Saturn from off-axis (the reason the original stopped being a plain sphere
+ * plus an orbiting ring).
+ */
+export function ConcentrationSource({
+  position,
+}: {
+  position: readonly [number, number, number];
+}) {
   const progressRef = useScrollProgressRef();
-  const dotMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
-  const ringMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
-  const tickMaterialRef = useRef<THREE.LineBasicMaterial>(null);
+  const coreMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
+  const midMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
+  const outerMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
   const billboardRef = useRef<THREE.Group>(null);
   const opacitySmoothed = useRef(0);
 
-  // Four short radial ticks just outside the ring, at 45/135/225/315deg —
-  // a crosshair/reticle silhouette, built once as a single LineSegments
-  // geometry (disconnected pairs) rather than four separate Line elements.
-  const tickGeometry = useMemo(() => {
-    const inner = 0.052;
-    const outer = 0.08;
-    const positions: number[] = [];
-    for (let i = 0; i < 4; i++) {
-      const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
-      const cx = Math.cos(angle);
-      const cy = Math.sin(angle);
-      positions.push(cx * inner, cy * inner, 0, cx * outer, cy * outer, 0);
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    return geometry;
-  }, []);
-
-  useEffect(() => () => tickGeometry.dispose(), [tickGeometry]);
-
   useFrame((state, delta) => {
-    const target = highlightOpacity(progressRef.current);
+    const target = exposureHighlight(progressRef.current);
     opacitySmoothed.current = damp(opacitySmoothed.current, target, 4, delta);
     const o = opacitySmoothed.current;
     const pulse = 1 + Math.sin(state.clock.elapsedTime * 2.4) * 0.08 * o;
 
-    if (dotMaterialRef.current) dotMaterialRef.current.opacity = o;
-    if (ringMaterialRef.current) ringMaterialRef.current.opacity = o * 0.85;
-    if (tickMaterialRef.current) tickMaterialRef.current.opacity = o * 0.7;
+    if (coreMaterialRef.current) coreMaterialRef.current.opacity = o;
+    if (midMaterialRef.current) midMaterialRef.current.opacity = o * 0.7;
+    if (outerMaterialRef.current) outerMaterialRef.current.opacity = o * 0.45;
     if (billboardRef.current) billboardRef.current.scale.setScalar(pulse);
   });
 
@@ -68,64 +64,93 @@ export function HighlightMarker({ position }: { position: readonly [number, numb
     <group position={position}>
       <Billboard ref={billboardRef}>
         <mesh>
-          <circleGeometry args={[0.03, 20]} />
-          <meshBasicMaterial ref={dotMaterialRef} color="#f2b23a" transparent opacity={0} depthWrite={false} />
+          <circleGeometry args={[0.026, 24]} />
+          <meshBasicMaterial
+            ref={coreMaterialRef}
+            color={CONC_HIGH}
+            transparent
+            opacity={0}
+            depthWrite={false}
+          />
         </mesh>
         <mesh>
-          <ringGeometry args={[0.044, 0.05, 32]} />
+          <ringGeometry args={[0.036, 0.048, 40]} />
           <meshBasicMaterial
-            ref={ringMaterialRef}
-            color="#f2b23a"
+            ref={midMaterialRef}
+            color={CONC_MID}
             transparent
             opacity={0}
             depthWrite={false}
             side={THREE.DoubleSide}
           />
         </mesh>
-        <lineSegments geometry={tickGeometry}>
-          <lineBasicMaterial ref={tickMaterialRef} color="#f2b23a" transparent opacity={0} depthWrite={false} />
-        </lineSegments>
+        <mesh>
+          <ringGeometry args={[0.058, 0.074, 40]} />
+          <meshBasicMaterial
+            ref={outerMaterialRef}
+            color={CONC_LOW}
+            transparent
+            opacity={0}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
       </Billboard>
     </group>
   );
 }
 
-/** Faint translucent structures (stand-ins for nearby vessels), revealed late in the scroll. */
-export function CriticalStructures() {
+/**
+ * Faint translucent vessel stand-ins, revealed late in the scroll.
+ *
+ * Kept, and moved onto the tissue. Vasculature is the one piece of scene
+ * furniture that is entirely on-message for a transport product -- it is where
+ * the drug comes from -- but these were laid out for a volumetric placeholder
+ * mass: long curves swinging through +/-0.6 of depth around a section that has
+ * no depth, which rendered as grey scaffolding poles crossing the frame in
+ * front of a flat slide.
+ *
+ * Every control point below is now a measured endothelial density maximum from
+ * the section itself (ENTRY_POINTS), in the section's own plane. The positions
+ * are measured; the connectivity between them -- which point joins which -- is
+ * drawn, not reconstructed, which is why these stay thin and faint and are
+ * called stand-ins.
+ */
+const VESSEL_PATHS: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
+  [ENTRY_POINTS[0], ENTRY_POINTS[1], ENTRY_POINTS[3]],
+  [ENTRY_POINTS[2], ENTRY_POINTS[4], ENTRY_POINTS[5]],
+];
+
+/** Just in front of the section plane (the asset itself is flat at z = 0). */
+const VESSEL_Z = 0.01;
+
+export function VesselNetwork() {
   const progressRef = useScrollProgressRef();
   const groupRef = useRef<THREE.Group>(null);
   const opacitySmoothed = useRef(0);
 
-  const curves = useMemo(
-    () => [
-      new THREE.CatmullRomCurve3([
-        new THREE.Vector3(1.5, 0.9, -0.3),
-        new THREE.Vector3(0.9, 0.5, -0.5),
-        new THREE.Vector3(0.3, -0.1, -0.4),
-        new THREE.Vector3(-0.4, -0.6, -0.3),
-      ]),
-      new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-1.3, -0.7, 0.6),
-        new THREE.Vector3(-0.7, -0.3, 0.5),
-        new THREE.Vector3(-0.1, 0.2, 0.4),
-      ]),
-    ],
+  const geometries = useMemo(
+    () =>
+      VESSEL_PATHS.map((path) => {
+        const curve = new THREE.CatmullRomCurve3(
+          path.map(([x, y]) => new THREE.Vector3(x, y, VESSEL_Z)),
+        );
+        return new THREE.TubeGeometry(curve, 48, 0.007, 6, false);
+      }),
     [],
   );
 
-  const geometries = useMemo(
-    () => curves.map((curve) => new THREE.TubeGeometry(curve, 32, 0.014, 6, false)),
-    [curves],
-  );
+  // Built outside R3F's declarative tree, so they need an explicit dispose.
+  useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
 
   useFrame((_, delta) => {
-    const target = criticalStructureOpacity(progressRef.current);
+    const target = vesselOpacity(progressRef.current);
     opacitySmoothed.current = damp(opacitySmoothed.current, target, 3, delta);
     if (groupRef.current) {
       groupRef.current.children.forEach((child) => {
         const mesh = child as THREE.Mesh;
         const material = mesh.material as THREE.MeshStandardMaterial;
-        material.opacity = opacitySmoothed.current * 0.5;
+        material.opacity = opacitySmoothed.current * 0.55;
       });
     }
   });

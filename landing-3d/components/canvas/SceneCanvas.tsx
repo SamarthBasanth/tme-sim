@@ -7,24 +7,29 @@ import * as THREE from "three";
 import CameraRig from "./CameraRig";
 import SceneLighting from "./SceneLighting";
 import TumorModel from "./TumorModel";
-import AnatomyModel from "./AnatomyModel";
+import FieldContours from "./FieldContours";
 import Particles from "./Particles";
-import ScanPlane from "./ScanPlane";
+import ConcentrationField from "./ConcentrationField";
+import DrugFront from "./DrugFront";
+import TransportOverlay from "./TransportOverlay";
 import Annotation from "./Annotation";
-import { HighlightMarker, CriticalStructures } from "./Markers";
+import { ConcentrationSource, VesselNetwork } from "./Markers";
 import Loader from "./Loader";
+import { ENTRY_POINTS } from "./shaders/viridis";
 import {
-  anatomyLabelOpacity,
-  segmentationLabelOpacity,
+  fieldLabelOpacity,
+  regionLabelOpacity,
 } from "@/lib/timeline";
 
 interface SceneCanvasProps {
   isMobile: boolean;
   /**
-   * "scroll" mounts the full scroll-scrubbed scene (camera path, scan
-   * plane, segmentation, trajectory, annotations). "static" — used under
-   * prefers-reduced-motion — mounts only the tumor + lighting with a fixed
-   * camera and a slow idle rotation, per the spec's simplified fallback.
+   * "scroll" mounts the full scroll-scrubbed scene (camera path,
+   * concentration field, region separation, drug fronts, annotations).
+   * "static" — used under prefers-reduced-motion — mounts only the tissue +
+   * lighting with a fixed camera and a slow idle rotation, per the spec's
+   * simplified fallback. Nothing that animates a physical process is mounted
+   * there: a transport front that cannot advance would be worse than absent.
    */
   mode: "scroll" | "static";
 }
@@ -78,7 +83,7 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
                   label="Tumor core"
                   detail="High interstitial pressure"
                   align="left"
-                  getOpacity={segmentationLabelOpacity}
+                  getOpacity={regionLabelOpacity}
                 />
               )
             }
@@ -93,7 +98,7 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
                   labelOffset={[0.55, 0.2, 0]}
                   label="Diffusion front"
                   detail="Concentration gradient"
-                  getOpacity={segmentationLabelOpacity}
+                  getOpacity={regionLabelOpacity}
                 />
               )
             }
@@ -108,7 +113,7 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
                   label="Perivascular rim"
                   detail="Where drug enters"
                   align="left"
-                  getOpacity={segmentationLabelOpacity}
+                  getOpacity={regionLabelOpacity}
                 />
               )
             }
@@ -117,40 +122,48 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
           {mode === "scroll" && (
             <>
               <CameraRig />
-              <AnatomyModel lowDetail={isMobile}>
+              <Particles count={isMobile ? 320 : 900} />
+              {/* Everything below is positioned in the measured section's own
+                  coordinates, so it all has to travel with the section when
+                  the final scene slides it aside. See TransportOverlay. */}
+              <TransportOverlay>
+              <FieldContours lowDetail={isMobile}>
                 {/*
-                  Nested inside AnatomyModel's own <group> (scale
-                  [1.9,2.3,1.7], continuous rotation.y += delta*0.02) rather
-                  than a sibling with a pre-multiplied world coordinate —
-                  same bug/fix as the core/edema/margin annotations above.
-                  Anchor is a point on the coronal ring itself (level -0.05,
-                  radiusA 0.88, radiusB 0.9 — see RING_SPECS), in the ring's
-                  own local space, before that group's scale/position is
-                  applied (which now happens automatically since this is a
-                  child of the same group the ring <Line> is).
+                  Nested inside FieldContours' own <group> (which sways every
+                  frame) rather than a sibling with a pre-multiplied world
+                  coordinate — same bug/fix as the core/edema/margin
+                  annotations above. Anchor is a point on the outermost
+                  contour itself (level 1.0, so radius 0.88 of the section's
+                  measured half-extent — see CONTOUR_SPECS), in that group's
+                  own local space, at about 35 degrees round the loop — high
+                  enough that the label clears the right-aligned headline in
+                  section 03, which it collided with when anchored at the
+                  contour's widest point.
                 */}
                 <Annotation
-                  anchor={[0.875, 0.09, -0.05]}
-                  labelOffset={[0.32, 0.25, 0]}
-                  label="Tissue context"
-                  detail="Illustrative geometry"
-                  getOpacity={anatomyLabelOpacity}
+                  anchor={[0.757, 0.351, 0]}
+                  labelOffset={[0.42, 0.52, 0]}
+                  label="Pressure contours"
+                  detail="Illustrative, not solved"
+                  getOpacity={fieldLabelOpacity}
                 />
-              </AnatomyModel>
-              <Particles count={isMobile ? 320 : 900} />
-              <ScanPlane />
-              {/* TrajectoryPath is deliberately NOT rendered. It traces a
-                  planned path into the mass during section 05 -- which is now
-                  the "stated limits" section, where the copy says in as many
-                  words that Vivum does not predict patient response and makes
-                  no clinical claim. A needle/trajectory animation playing under
-                  that sentence contradicts it. The component is left in the
-                  repo (components/canvas/TrajectoryPath.tsx) rather than
-                  deleted, in case a future scene pass repurposes the draw-on
-                  effect for something this product actually does -- a drug
-                  front advancing outward from a vessel. Re-import it there. */}
-              <CriticalStructures />
-              <HighlightMarker position={[0.3, 0.25, 0.15]} />
+              </FieldContours>
+                <ConcentrationField />
+                {/* Vessels, then the fronts that leave them, in that order
+                    down the scroll — the two halves of one idea, and the
+                    reason the old TrajectoryPath's draw-on effect was worth
+                    reviving under a different name (see DrugFront.tsx)
+                    rather than deleting. */}
+                <VesselNetwork />
+                <DrugFront />
+                {/* On a measured endothelial density maximum (the first
+                    ENTRY_POINT), lifted just off the section's plane so it is
+                    not co-planar with the vessel stand-in running through the
+                    same point. */}
+                <ConcentrationSource
+                  position={[ENTRY_POINTS[0][0], ENTRY_POINTS[0][1], 0.05]}
+                />
+              </TransportOverlay>
             </>
           )}
 
