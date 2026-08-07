@@ -27,7 +27,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     eyebrow: "Real measured tissue",
     headline: "See Where the Drug Actually Goes.",
     body: "The section behind this text is a real one. Vivum rebuilds tumor architecture from spatial transcriptomics, then runs transport physics on the result to work out where a drug actually reaches.",
-    align: "center",
+    align: "left",
   },
   {
     kicker: "02",

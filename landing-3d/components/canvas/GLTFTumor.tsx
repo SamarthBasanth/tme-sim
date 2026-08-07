@@ -5,7 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { useScrollProgressRef } from "@/components/scroll/ScrollProgressContext";
-import { finalOffsetAmount, separationAmount } from "@/lib/timeline";
+import { sectionOffsetAmount, separationAmount } from "@/lib/timeline";
 import { damp } from "@/lib/scrollMath";
 
 /**
@@ -122,7 +122,7 @@ export default function GLTFTumor({
   useFrame((_, delta) => {
     const p = progressRef.current;
     sepSmoothed.current = damp(sepSmoothed.current, separationAmount(p), 3.2, delta);
-    offsetSmoothed.current = damp(offsetSmoothed.current, finalOffsetAmount(p), 3.2, delta);
+    offsetSmoothed.current = damp(offsetSmoothed.current, sectionOffsetAmount(p), 3.2, delta);
     const sep = sepSmoothed.current;
 
     if (regions.core) regions.core.position.set(0, -0.4 * sep, 0);

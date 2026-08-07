@@ -253,6 +253,38 @@ export const finalOffsetAmount = (p: number): number =>
     [1, 1],
   ]);
 
+/**
+ * HERO composition offset — the section slides RIGHT so the opening copy has
+ * its own ground instead of being set on top of the densest part of the
+ * specimen. Decays to 0 by the end of scene 1, after which the section is
+ * centred and the scroll story proceeds exactly as before.
+ *
+ * Negative sign convention matches `finalOffsetAmount`'s consumer, which
+ * multiplies by a positive constant: this returns a POSITIVE value for a
+ * rightward shift.
+ */
+export const heroOffsetAmount = (p: number): number =>
+  sampleCurve(p, [
+    // 0.78, not 1.0: the section is 2.6 units wide and the frustum is ~2.5
+    // half-widths at z=0, so a full unit of shift pushes its right edge past
+    // the viewport and the crop reads as a bug rather than as a specimen
+    // continuing off-frame. This leaves a margin on the right.
+    [0, 0.78],
+    [1 / 6, 0],
+  ]);
+
+/**
+ * The section's total x offset, in the units its consumers multiply by 1.15.
+ *
+ * Exists so the tissue and everything positioned in ITS coordinates
+ * (TransportOverlay) read ONE function rather than each summing the terms
+ * themselves — that is exactly how the overlays previously drifted out of
+ * lockstep with the model. Add any future offset term here, not at a call
+ * site.
+ */
+export const sectionOffsetAmount = (p: number): number =>
+  finalOffsetAmount(p) + heroOffsetAmount(p);
+
 export const ctaCopyOpacity = (p: number): number =>
   sampleCurve(p, [
     [5 / 6, 0],

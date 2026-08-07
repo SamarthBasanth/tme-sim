@@ -1,6 +1,26 @@
 /**
  * Procedural, GBM-referenced tumor point clouds + vessel curves.
  *
+ * ⚠ FALLBACK ONLY, AND ITS PROVENANCE IS FROM THE WRONG PRODUCT.
+ *
+ * This does NOT render while `public/models/tumor.glb` is present:
+ * `TumorModel` resolves to `GLTFTumor` and the real exported Xenium section
+ * ships instead. It survives as the no-asset fallback path.
+ *
+ * The references below are to MRI segmentation and 3-D-printed SURGICAL
+ * PLANNING literature — the product this page used to describe, before it
+ * was corrected to a drug-transport simulator. They describe how a
+ * glioblastoma reads on contrast-enhanced MRI, which is a genuine and
+ * correctly-cited basis for a *procedural stand-in*, but it is not what
+ * Vivum reconstructs: Vivum builds tissue from spatial transcriptomics,
+ * cell by cell, and never touches an MRI.
+ *
+ * So: the citations are accurate about what they claim, and irrelevant to
+ * the shipped product. If this placeholder is ever restored to the render
+ * path it needs the same retarget the rest of the scene got (see
+ * ConcentrationField / DrugFront / FieldContours), and the BraTS
+ * NCR/ET/ED label convention below should go with it.
+ *
  * Grounded in how glioblastoma actually reads on contrast-enhanced MRI and
  * in gross/3D-printed surgical-planning specimens (BraTS challenge
  * documentation; see PMC11945730 "Advancing Precision: A Comprehensive

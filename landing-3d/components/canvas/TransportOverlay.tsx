@@ -4,7 +4,7 @@ import { useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useScrollProgressRef } from "@/components/scroll/ScrollProgressContext";
-import { finalOffsetAmount } from "@/lib/timeline";
+import { sectionOffsetAmount } from "@/lib/timeline";
 import { damp } from "@/lib/scrollMath";
 
 /**
@@ -16,7 +16,7 @@ import { damp } from "@/lib/scrollMath";
  * all positioned in the measured section's world coordinates, which is the
  * whole reason it registers with the tissue. But the tissue itself is moved
  * aside in the final scene to clear room for the CTA (see TumorModel's
- * children: `position.x = finalOffsetAmount(p) * 1.15`), and anything that
+ * children: `position.x = sectionOffsetAmount(p) * 1.15`), and anything that
  * does not move with it detaches and floats in empty space -- which is
  * exactly what the vessels used to do.
  *
@@ -24,7 +24,7 @@ import { damp } from "@/lib/scrollMath";
  * loaded by GLTFTumor, which takes no scene children, and hanging them off it
  * would also inherit its continuous sway. So the offset is re-derived here
  * from the same pure timeline function with the same damping constant.
- * `finalOffsetAmount` is a function of scroll progress only, so the two stay
+ * `sectionOffsetAmount` is a function of scroll progress only, so the two stay
  * in lockstep frame for frame rather than merely close.
  *
  * Only the translation is mirrored, deliberately. GLTFTumor's shallow sway is
@@ -41,7 +41,7 @@ export default function TransportOverlay({ children }: { children?: ReactNode })
   useFrame((_, delta) => {
     offsetSmoothed.current = damp(
       offsetSmoothed.current,
-      finalOffsetAmount(progressRef.current),
+      sectionOffsetAmount(progressRef.current),
       3.2,
       delta,
     );
