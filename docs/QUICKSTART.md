@@ -164,31 +164,43 @@ stating exactly what quantity is being compared against what.
 
 `--quick` runs only the analytic anchors — closed-form penetration lengths,
 descriptor-derived partition coefficients, literature-table comparisons — which
-need no tissue section and finish in about half a minute. Drop it to run the
-full suite, which reconstructs real sections from `data_cache/` and solves the
+need no tissue section and finish in a few seconds. Drop it to run the full
+suite, which reconstructs real sections from `data_cache/` and solves the
 transport PDE (minutes, and it is the only mode that tests the solver at all).
 
 ```
 NOT TESTABLE analytic doxorubicin   [PMID 16361566]
-                      compares  : analytic penetration length L = sqrt(D_eff/k_eff) vs measured perivascular half-distance
+                      compares  : analytic penetration length L = sqrt(D_eff/k_eff) vs measured
+                                  perivascular half-distance
                       predicted : L = 64.9 um
                       measured  : 40-50 um half-distance (= 58-72 um e-fold, d_half/ln2)
+                      bar       : n/a — this IS the fit
                       NO VERDICT: IN-SAMPLE. alpha is solved in closed form so that L equals this target
                                   exactly; the model reproduces it by construction and could not have
                                   failed. Reporting it as a PASS would be circular.
 
-PASS         analytic mitoxantrone   [PMID 23680920]
-                      compares  : OUT-OF-SAMPLE analytic penetration length, alpha frozen, vs measured
-                                  perivascular half-distance
-                      predicted : L = 70.9 um  (0.98x band mid)
-                      measured  : 25-75 um half-distance (= 36-108 um e-fold)
+PASS         analytic topotecan   [PMID 23680920]
+                      compares  : OUT-OF-SAMPLE analytic penetration length L = sqrt(D_eff/k_eff),
+                                  alpha frozen, vs measured perivascular half-distance
+                      predicted : L = 83.6 um  (1.16x band mid)
+                      measured  : 25-75 um half-distance (= 36-108 um e-fold, d_half/ln2)
+                      bar       : inside the published e-fold band, else within 3x of its midpoint
+                      note      : camptothecin topoisomerase-I inhibitor (chemically DISTINCT from the
+                                  anthracycline fit -- a more independent test)
+                      conditional on: alpha-fit, analytic-only
 
 FAIL         analytic adavosertib   [PMID 39820282]
                       compares  : predicted tissue:plasma partition vs MEASURED human glioma
                                   tissue:plasma AUC ratio
                       predicted : 0.5785  (0.24x measured)
                       measured  : 2.4600 (range 0.7400-4.1800)
+                      bar       : fold error within 3x (module BAND_TIGHT); 10x reported alongside
 ```
+
+At the time of writing `--quick` covers 7 of the 13 registered anchors and ends
+on **PASS 7 / FAIL 4 / NOT TESTABLE 3 / DEFERRED 6**, exiting 1. The full run
+adds the PDE and geometry anchors and ends deeper in the red — see the failure
+list below.
 
 **Four statuses, and the distinction between them is the point.**
 
@@ -199,32 +211,123 @@ FAIL         analytic adavosertib   [PMID 39820282]
 | `NOT TESTABLE` | **no verdict is possible**, for a stated reason — and this is never a soft pass |
 | `DEFERRED` | skipped by `--quick`. Also not a pass: some anchors that are DEFERRED here **FAIL** in the full run, which is why `--quick` prints a banner saying so |
 
-`NOT TESTABLE` is load-bearing and occurs for four genuinely different reasons,
-each printed inline: the number is the *fit* rather than a test of it
-(doxorubicin's penetration anchor is solved for in closed form, so it cannot
-fail); *no measured target exists* (nobody has published a free-drug macrophage
-uptake ratio, so the immune sink's magnitude has nothing to be scored against);
-*required data absent*; or *the model cannot express the measured quantity* (the
-`bbb_penetrance` partition-vs-rate units defect). Conflating any of those with
-`PASS` is exactly the error this project retracts results for.
+`NOT TESTABLE` is load-bearing and occurs for six genuinely different reasons,
+each printed inline:
 
-**Failures are the reason the command exists.** The breast transvascular anchor
-currently fails against measured human microdialysis, the glioma partition
-scorecard fails on two of six drugs, and the reconstructed microvessel density
-misses its measured band — all of that is printed, not buried. `vivum validate`
-**exits non-zero if any anchor fails**, so it drops straight into CI:
+* **the number is the *fit*, not a test of it** — doxorubicin's penetration
+  anchor is solved for in closed form, so the model reproduces it by
+  construction and could not have failed;
+* **no measured target exists** — nobody has published a free-drug macrophage
+  uptake ratio, so the immune sink's magnitude has nothing to be scored
+  against, and the same is true of every breast intercapillary-distance row
+  (GBM has Yoshii & Sugiyama; breast provably does not);
+* **the two sides are not the same quantity** — a measured *compartment*
+  contrast is not the model's tile-to-tile spread;
+* **the prediction is threshold-chosen** — the KDE vascular area fraction lands
+  wherever the chosen threshold puts it, so agreeing with the measurement would
+  be a choice rather than a result;
+* **the model cannot express the measured quantity** — the `bbb_penetrance`
+  partition-vs-rate units defect;
+* **required data absent** — the anchor needs bytes under `data_cache/` that
+  this checkout does not have.
+
+Conflating any of those with `PASS` is exactly the error this project retracts
+results for.
+
+**Failures are the reason the command exists.** The full run currently ends on
+**PASS 13 / FAIL 15 / NOT TESTABLE 13** across 41 rows in under five minutes —
+more failures than passes, and all of it printed rather than buried:
+
+```
+====================================================================================================
+FAILURES (15) -- the model misses these MEASURED values
+====================================================================================================
+
+  FAIL  breast-transvascular / 5-fluorouracil   [PMID 9205062]
+        compares  : mean_tumor_auc / (plasma_mean * total_time) — free interstitial drug AUC at
+                    tumour cells over plasma AUC — vs MEASURED in-vivo microdialysis
+                    interstitial:plasma AUC in primary human breast tumour
+        predicted : 7.7956  (12.78x measured)
+        measured  : 0.61 +/- 0.11 (mean +/- SE, n=10)
+        physics   : transvascular_exchange=False — one-way leak, S = PS*Cp
+        bar       : inside measured mean +/- SE
+
+  FAIL  breast-transvascular / methotrexate   [PMID 9679959]
+        predicted : 0.0571  (0.10x measured)
+        measured  : 0.60 +/- 0.20 (mean +/- SE, n=9)
+        physics   : transvascular_exchange=False — one-way leak, S = PS*Cp
+```
+
+The 15 span every layer: the two breast microdialysis anchors, two of six
+glioma partition drugs, the `bbb_penetrance` rank ordering, the GIST imatinib
+falsification, three of the breast 3-D:2-D kill ratios, all four GBM
+vascular-morphometry anchors, breast microvessel density against Weidner, and
+section cellularity against measured H&E nuclear counts.
+
+`vivum validate` **exits non-zero if any anchor fails**, so it drops straight
+into CI:
 
 ```bash
 vivum validate --quick || echo "an external anchor regressed"
 ```
+
+Note that `--quick` is a *weaker* gate than the full run, not a faster
+equivalent: it scores 11 rows and none of them touch the solver.
+
+#### Every row names the physics it ran under
+
+The breast interstitial:plasma anchor moves by roughly **10x** depending on
+which transvascular delivery law is active — 5-FU lands at 12.78x of measured
+under the shipping one-way leak `S = PS*Cp`, and near 1.33x under the opt-in
+gradient-driven `S = PS*(Cp - C)`. A bare number for that anchor is therefore
+ambiguous by an order of magnitude, so the scorecard prints the law it ran
+under at the top of the run *and* on every row:
+
+```
+PHYSICS   transvascular_exchange=False — one-way leak, S = PS*Cp (source never depends
+          on local tissue concentration)
+          This IS the law the engine ships with (PDEConfig.transvascular_exchange).
+
+FAIL         PDE      5-fluorouracil   [PMID 9205062]
+                      predicted : 7.7956  (12.78x measured)
+                      measured  : 0.61 +/- 0.11 (mean +/- SE, n=10)
+                      physics   : transvascular_exchange=False — one-way leak, S = PS*Cp
+```
+
+The rules behind that line:
+
+* The shipping default is **read from `PDEConfig`**, never hardcoded, so a
+  change to what the engine ships cannot silently desynchronise from what the
+  scorecard claims the default is.
+* Running `--exchange` prints a loud `!! NOT THE SHIPPING DEFAULT` banner and
+  appends the same marker to every affected row, because those numbers are not
+  the ones the shipping engine produces — and each is additionally conditional
+  on the uncalibrated `PS_SCALE_S_INV`.
+* The breast anchor reads the law back **off the config that was actually
+  solved**, not off the flag it was asked for. A mismatch is reported as a
+  `FAIL` provenance row rather than scored.
+* A row whose `scope` is `PDE` and that carries a verdict but declares **no**
+  law is downgraded to `NOT TESTABLE` with `PHYSICS PROVENANCE MISSING`. An
+  unlabelled solver number is not a weaker result, it is an uninterpretable
+  one, and it must not be allowed to pass quietly.
+* Rows that never invoked the solver read `n/a — transport solver never invoked
+  for this row`. That says the question does not arise, **not** that the two
+  laws agreed.
+* `--json` carries the same provenance twice: a top-level `physics` object for
+  the run, and a `physics` string on every row — so two stored scorecards
+  cannot be diffed without the delivery law being visible on both sides.
 
 Three more things worth knowing before you quote a row:
 
 * **Rows carry a `scope`.** `analytic` means the prediction is a closed-form
   expression over molecular descriptors and the transport solver was never
   invoked — such a row scores the molecular layer and *cannot* be cited as
-  evidence about the PDE. The summary line prints how many of the scored rows
-  are in that category. Only the full (non-`--quick`) run produces `PDE` rows.
+  evidence about the PDE. `geometry` means the row scores the reconstructed
+  *tissue* (vessel density, spacing, area fraction, cellularity) with no drug
+  and no solver anywhere in it — a real claim, but about what the transport
+  runs **on**, not about the transport. The summary line prints how many of the
+  scored rows never touch the solver. Only the full (non-`--quick`) run
+  produces `PDE` rows at all.
 * **Rows list the conditionals they inherit**, and every cited conditional is
   printed in full at the bottom. The two with the longest reach are `alpha-fit`
   (everything downstream of the one fitted constant) and `ps-scale` (every
@@ -245,6 +348,7 @@ Useful options:
 vivum validate --list                          # what is checked, and what is not
 vivum validate --quick --json                  # machine-readable, for CI
 vivum validate --only breast-transvascular     # one anchor
+vivum validate --only vascular-morphometry,breast-vascular-morphometry  # several
 vivum validate --only breast-transvascular --exchange   # with the opt-in delivery law
 ```
 

@@ -50,7 +50,7 @@ class TestArgparsePlumbing:
         sub = next(a for a in parser._subparsers._group_actions
                    if hasattr(a, "choices"))
         assert set(sub.choices) == {
-            "reconstruct", "simulate", "compare-drugs", "molecules",
+            "reconstruct", "simulate", "compare-drugs", "validate", "molecules",
             "molecular-run", "acquire", "studio",
         }
 
@@ -59,6 +59,7 @@ class TestArgparsePlumbing:
         ["reconstruct", "--help"],
         ["simulate", "--help"],
         ["compare-drugs", "--help"],
+        ["validate", "--help"],
         ["molecules", "--help"],
         ["molecular-run", "--help"],
         ["acquire", "--help"],

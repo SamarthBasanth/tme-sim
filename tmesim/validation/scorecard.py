@@ -63,8 +63,12 @@ The four statuses, and why NOT TESTABLE is load-bearing
 ANALYTIC anchors do not test the PDE
 ------------------------------------
 Each row carries a ``scope``. ``PDE`` means the transport solver actually ran.
-``analytic`` means the prediction is a closed-form expression over molecular
-descriptors and the solver was never invoked — verified for
+``geometry`` means the row scores the reconstructed TISSUE — vessel density,
+spacing, area fraction, cellularity — with no drug and no solver anywhere in
+it; those anchors constrain what the transport runs ON, which is a real claim
+but a different one. ``analytic`` means the prediction is a closed-form
+expression over molecular descriptors and the solver was never invoked —
+verified for
 ``glioma_regional_pk`` and ``gist_imatinib`` by call-counter instrumentation in
 ``results/transvascular_exchange_revalidation.md`` §6.1, which states the rule
 directly: *"These modules must be reported as UN-TESTABLE, not as unaffected.
@@ -72,6 +76,29 @@ directly: *"These modules must be reported as UN-TESTABLE, not as unaffected.
 different statements and must not be pooled in a coverage count."* An analytic
 row still carries a real PASS/FAIL against its measurement — it just cannot be
 cited as evidence about the solver, and the printed scorecard says so.
+
+Physics provenance
+------------------
+Every row carries a ``physics`` string naming the transvascular delivery law
+the number was produced under, and the suite result carries a ``physics``
+block for the run as a whole. This is not decoration: the breast
+interstitial:plasma anchor differs by roughly **10x** between
+``transvascular_exchange=False`` (one-way leak, ``S = PS*Cp``, what the engine
+ships) and ``True`` (gradient-driven, ``S = PS*(Cp - C)``) — 5-FU lands at
+12.78x of measured under the former and near 1.33x under the latter. A
+scorecard that printed one number without naming the law would be ambiguous by
+an order of magnitude, which is precisely the failure mode this project keeps
+finding in its own results files.
+
+Three rules enforce it:
+
+* the shipping default is READ from ``PDEConfig`` (:func:`repo_default_exchange`)
+  rather than hardcoded, so it cannot desynchronise;
+* the breast runner reads the law back off the config that was actually solved
+  and reports a FAIL provenance row if it differs from the one requested;
+* :func:`_stamp_physics` DOWNGRADES any ``PDE``-scoped row that carries a
+  verdict without declaring a law to ``NOT TESTABLE``. An unlabelled solver
+  number is uninterpretable, not merely imprecise, and must never pass quietly.
 
 Conditionals
 ------------
@@ -211,6 +238,9 @@ class Row:
     reason: str = ""       # REQUIRED when status is NOT TESTABLE / DEFERRED
     conditional: Tuple[str, ...] = ()
     values: Dict = field(default_factory=dict)   # machine-readable numbers
+    #: The physics the number was produced under. NEVER left blank on a row
+    #: whose scope is PDE — see :func:`physics_label`.
+    physics: str = ""
 
     def to_dict(self) -> Dict:
         return {
@@ -227,6 +257,7 @@ class Row:
             "reason": self.reason,
             "conditional": list(self.conditional),
             "values": dict(self.values),
+            "physics": self.physics,
         }
 
 
@@ -244,6 +275,51 @@ class AnchorGroup:
     runner: Callable[[], List[Row]]
     needs: Tuple[str, ...] = ()     # repo-relative paths that must exist
     est: str = ""                   # rough runtime, for --list
+
+
+# --------------------------------------------------------------------------- #
+# Physics provenance
+# --------------------------------------------------------------------------- #
+#: The two transvascular delivery laws, and what each one IS. The breast
+#: interstitial:plasma anchor differs by ~10x between them (5-FU lands at
+#: 12.78x measured under the one-way law and ~1.33x under exchange), so a
+#: scorecard that prints one number without naming the law is ambiguous by an
+#: order of magnitude. That is the same failure this project keeps finding in
+#: its own results files, so every PDE row carries its law explicitly.
+PHYSICS_LAWS: Dict[bool, str] = {
+    False: "transvascular_exchange=False — one-way leak, S = PS*Cp "
+           "(source never depends on local tissue concentration)",
+    True: "transvascular_exchange=True — gradient-driven exchange, "
+          "S = PS*(Cp - C) (opt-in; every number CONDITIONAL on PS_SCALE_S_INV)",
+}
+
+#: Rows whose prediction never went through the solver. Not "unaffected by the
+#: delivery law" — simply not a statement about it at all.
+PHYSICS_NOT_APPLICABLE = "n/a — transport solver never invoked for this row"
+
+
+def repo_default_exchange() -> bool:
+    """The delivery law the engine SHIPS with, read from PDEConfig itself.
+
+    Read rather than hardcoded so that a change to the shipping default cannot
+    silently desynchronise from what this scorecard claims the default is.
+    """
+    from ..core import PDEConfig
+
+    return bool(PDEConfig().transvascular_exchange)
+
+
+def physics_label(exchange: Optional[bool]) -> str:
+    """Human-readable provenance for the physics a row ran under.
+
+    ``None`` means the solver was not invoked at all.
+    """
+    if exchange is None:
+        return PHYSICS_NOT_APPLICABLE
+    law = PHYSICS_LAWS[bool(exchange)]
+    if bool(exchange) != repo_default_exchange():
+        law += "  [NOT THE SHIPPING DEFAULT]"
+    return law
 
 
 def classify(predicted: float, lo: float, hi: float) -> str:
@@ -562,12 +638,17 @@ def _run_immune_sink() -> List[Row]:
         reason="NO MEASURED TARGET EXISTS. The literature supports a DIRECTION "
                "and not a MAGNITUDE, and for free doxorubicin the one direct "
                "measurement is NEGATIVE (a depot, the opposite sign). The "
-               "module's permutation test (structure ratio 2.0025x, p = 0.0476) "
-               "is an INTERNAL label-permutation null on the model's own field, "
-               "not a comparison against any measured number, so it is not an "
-               "external anchor and is not scored here. The sink does not improve "
-               "the measured human-glioma anchor and ships DEFAULT-OFF "
-               "(results/immune_sink_impact.md).",
+               "module's permutation test is an INTERNAL null on the model's "
+               "own field, not a comparison against any measured number, so it "
+               "is not an external anchor and is not scored here whatever its "
+               "value. Do not quote its magnitude from memory: "
+               "results/immune_sink_impact.md carries a CORRECTION NOTICE "
+               "demoting the original label-permutation null (that null "
+               "under-clumps the field it is compared against) and reporting a "
+               "much smaller excess against spatially-aware nulls, part of it "
+               "attributable to a transport gradient with depth into tissue "
+               "rather than to immune biology. The sink does not improve the "
+               "measured human-glioma anchor and ships DEFAULT-OFF.",
         conditional=(),
         values={"n_drugs_with_measured_uptake_ratio": 0, "n_drugs": 3},
     )]
@@ -640,6 +721,30 @@ def _run_breast_transvascular(exchange: bool = False) -> List[Row]:
                           transvascular_exchange=bool(exchange)),
             pd=PDConfig(), seed=0,
         )
+        # Read the delivery law back OFF THE CONFIG THAT WAS ACTUALLY SOLVED,
+        # rather than trusting the flag we passed in. This anchor moves by
+        # ~10x between the two laws, so a silent desync between "what the
+        # scorecard says it ran" and "what ran" would be worth an order of
+        # magnitude — the exact failure this command exists to catch.
+        ran_exchange = bool(cfg.pde.transvascular_exchange)
+        if ran_exchange != bool(exchange):
+            rows.append(Row(
+                group="breast-transvascular", label=name, status=FAIL,
+                scope=SCOPE_PDE,
+                quantity="physics-provenance check: requested delivery law vs "
+                         "the law the solved config actually carried",
+                predicted=f"solved with transvascular_exchange={ran_exchange}",
+                measured=f"requested transvascular_exchange={bool(exchange)}",
+                pmids=(str(pmid),),
+                bar="the solved config must carry the requested delivery law",
+                note="NOT a comparison against measurement — a provenance "
+                     "failure. The anchor differs by ~10x between the two laws, "
+                     "so a number produced under the wrong one is not merely "
+                     "imprecise, it is mislabelled. Refusing to score.",
+                physics=physics_label(ran_exchange),
+            ))
+            continue
+
         res = simulate_response(micro, cfg)
         summ = delivery_metrics.tissue_auc_summary(micro, res)
         plasma_auc = float(res.extras["plasma_mean"]) * bkp.TOTAL_TIME_S
@@ -648,9 +753,9 @@ def _run_breast_transvascular(exchange: bool = False) -> List[Row]:
         lo, hi = mean - se, mean + se
         status = classify(ratio, lo, hi)
         cond = ["alpha-fit", "untreated-section"]
-        law = ("one-way leak S = PS*Cp (repo default)" if not exchange
+        law = ("one-way leak S = PS*Cp (repo default)" if not ran_exchange
                else "gradient-driven exchange S = PS*(Cp - C)")
-        if exchange:
+        if ran_exchange:
             cond += ["ps-scale", "brain-permeability-in-breast"]
         rows.append(Row(
             group="breast-transvascular", label=name, status=status,
@@ -663,22 +768,34 @@ def _run_breast_transvascular(exchange: bool = False) -> List[Row]:
             measured=f"{mean:.2f} +/- {se:.2f} (mean +/- SE, n={n})",
             pmids=(str(pmid),),
             bar="inside measured mean +/- SE",
-            note=f"delivery law: {law}",
+            note=f"delivery law: {law}. This anchor moves by roughly 10x "
+                 f"between the two laws, so the number above is only "
+                 f"interpretable together with the physics line.",
             conditional=tuple(cond),
+            physics=physics_label(ran_exchange),
             values={"ratio": float(ratio), "measured_mean": float(mean),
                     "measured_se": float(se), "n": int(n),
                     "fold_of_measured": float(ratio / mean),
-                    "transvascular_exchange": bool(exchange)},
+                    "transvascular_exchange": ran_exchange,
+                    "repo_default_transvascular_exchange":
+                        repo_default_exchange()},
         ))
     return rows
 
 
 def _kill_rows(group: str, tissue_note: str, tests: Dict, per_drug: Dict,
-               conditional: Sequence[str]) -> List[Row]:
+               conditional: Sequence[str],
+               pmids: Optional[Dict[str, Sequence[str]]] = None) -> List[Row]:
     """Shared renderer for both 3-D:2-D ratio tests (GBM and breast).
 
     ``tests`` is ``kill_calibration.analyse``'s ``A["tests"]`` shape, i.e. the
     output of the frozen ``ratio_test``; nothing is re-scored here.
+
+    ``pmids`` overrides the scope-derived PMID lookup per drug. The breast
+    report builds several of its bands from report-local row tuples that carry
+    no ``scope``, so the GBM path's scope lookup cannot find them; without the
+    override those rows would print "PMID n/a", which for an external-anchor
+    scorecard is not a cosmetic defect.
     """
     rows: List[Row] = []
     for name in sorted(tests):
@@ -702,7 +819,10 @@ def _kill_rows(group: str, tissue_note: str, tests: Dict, per_drug: Dict,
                       f"(implied IC50 fold {t.get('implied_fold', float('nan')):.2f}x)",
             measured=f"ratio band {t['lit_ratio_lo']:.4f}-{t['lit_ratio_hi']:.4f} "
                      f"(measured fold {t['fold_lo']:.2g}-{t['fold_hi']:.2g}x)",
-            pmids=tuple(_bridge_pmids(matched)),
+            pmids=tuple((pmids or {}).get(name) or _bridge_pmids(matched)),
+            # The kill drivers never override PDEConfig, so they run under
+            # whatever the engine ships. Read it rather than assume it.
+            physics=physics_label(repo_default_exchange()),
             bar="predicted ratio inside the literature-derived ratio band "
                 "(kill_calibration.ratio_test)",
             note=note, conditional=tuple(conditional),
@@ -803,8 +923,20 @@ def _run_breast_kill_3d2d() -> List[Row]:
                else " Single-row band (n=1): no spread to test against."),
             {name: t}, res["per_drug"],
             ("alpha-fit", "gdsc-potency", "untreated-section"),
+            pmids={name: _rows_pmids(row.get("specific_bridge"))},
         ))
     return rows
+
+
+def _rows_pmids(bridge: Optional[Dict]) -> Tuple[str, ...]:
+    """PMIDs of the literature rows a ``kill_calibration.literature_bridge``
+    result aggregated, in order and de-duplicated."""
+    out: List[str] = []
+    for r in (bridge or {}).get("rows", ()):
+        p = str(r.get("pmid", "") or "")
+        if p and p not in out:
+            out.append(p)
+    return tuple(out)
 
 
 def _run_vascular_morphometry() -> List[Row]:
@@ -908,6 +1040,286 @@ def _run_vascular_morphometry() -> List[Row]:
                 "area_pct_at_0.2": 100 * float(kde_abs[0.2]),
                 "band": [float(lo), float(hi)]},
     ))
+
+    # 5. The SAME measured CD34+ area fraction, but against the THRESHOLD-FREE
+    #    reconstruction. This is a genuinely scoreable row and row 4 is not, so
+    #    they must not be pooled: vessel_geometry.vascular_area_fraction paints
+    #    a sub-grid vessel footprint from data-derived radii (20 EC/mm, PMID
+    #    38723085; mean degree 1.5, PMID 37582180 — literature inputs that are
+    #    independent of the 2.1% target), with no threshold to pick and no
+    #    hardcoded radius. segmentation_report scores it against its own frozen
+    #    PUBLISHED range, so the bar below is that module's, not this one's.
+    from ..reconstruct.vessel_network import PUBLISHED, segment_vessels
+    from ..reconstruct.vessel_network import segmentation_report
+
+    vessels = segment_vessels(micro.cells, micro.domain)
+    seg = segmentation_report(vessels, micro.domain)
+    af_row = next(r for r in seg["rows"]
+                  if r["key"] == "vascular_area_fraction_pct")
+    slo, shi = af_row["published_range"]
+    rows.append(Row(
+        group="vascular-morphometry",
+        label="vascular area fraction (threshold-free)",
+        status=PASS if af_row["verdict"] == "PASS" else FAIL,
+        scope=SCOPE_GEOMETRY,
+        quantity="grid-independent, data-derived sub-grid vascular area "
+                 "fraction (%) vs MEASURED whole-section CD34+ area fraction "
+                 "in IDH-wildtype GBM",
+        predicted=f"{af_row['reconstructed']:.2f}%  "
+                  f"({af_row['ratio']:.2f}x measured; module verdict "
+                  f"{af_row['verdict']}). Legacy fixed-radius binary field gave "
+                  f"{seg['legacy_binary_area_fraction_pct']:.2f}%",
+        measured=f"{af_row['published']:.1f}% (range {slo:.1f}-{shi:.1f}%, n=30)",
+        pmids=(str(af_row["pmid"]),),
+        bar=f"inside the module's frozen PUBLISHED range "
+            f"{slo:.1f}-{shi:.1f}% (vessel_network.segmentation_report)",
+        note="This row and the KDE row above score the SAME measured number "
+             "against two different reconstructions and must not be pooled: "
+             "this one has no threshold to choose, so it can fail. The vessel "
+             "radii come from literature constants (20 endothelial nuclei per "
+             "mm of vessel, PMID 38723085; mean vessel degree 1.5, PMID "
+             "37582180) that were not tuned to the 2.1% target. "
+             "results/vessel_geometry_fix.md sec. 5 reports 0.99 / 7.14 / "
+             "17.79% across the three available GBM sections, i.e. it does NOT "
+             "replicate across sections. " + str(PUBLISHED[
+                 "vascular_area_fraction_pct"]["source"]),
+        conditional=(),
+        values={"area_pct": float(af_row["reconstructed"]),
+                "ratio_to_measured": float(af_row["ratio"]),
+                "band": [float(slo), float(shi)],
+                "module_verdict": str(af_row["verdict"]),
+                "legacy_binary_area_pct": float(
+                    seg["legacy_binary_area_fraction_pct"])},
+    ))
+    return rows
+
+
+def _run_breast_vascular_morphometry() -> List[Row]:
+    """Reconstructed BREAST vasculature vs measured human invasive-ductal-
+    carcinoma morphometry — the breast twin of :func:`_run_vascular_morphometry`.
+
+    Different tissue, different publications, so this duplicates no GBM row.
+    It is also the group with the largest number of honest NOT TESTABLE rows:
+    ``experiments/vascular_validation_breast.py`` searched for and did not find
+    a breast counterpart to GBM's whole-slide MVD anchor (PMID 27583442) or its
+    directly-measured intercapillary-distance anchor (PMID 3359450), and says so.
+    """
+    from . import vascular_validation as vv
+
+    vvb = _import_experiment("vascular_validation_breast")
+    if not os.path.isdir(_repo_path(vvb.BREAST_SAMPLE)):
+        raise NotTestable(f"requires the real breast Xenium cache at "
+                          f"{vvb.BREAST_SAMPLE} (absent)")
+    res = vv.measure(vvb.reconstruct_breast())
+    prim, het, kde = res["primary"], res["heterogeneity"], res["kde"]
+    rows: List[Row] = []
+
+    # 1. Microvessel density vs Weidner's hotspot counts.
+    mvd = float(prim["mvd_per_mm2"])
+    lo = vvb.w2mm2(vvb.WEIDNER_NOMET_MEAN)
+    hi = vvb.w2mm2(vvb.WEIDNER_MET_MEAN)
+    rows.append(Row(
+        group="breast-vascular-morphometry", label="microvessel density",
+        status=classify(mvd, lo, hi), scope=SCOPE_GEOMETRY,
+        quantity="reconstructed vessel-cluster density (per mm^2, 20 um "
+                 "single-linkage) vs MEASURED factor-VIII hotspot microvessel "
+                 "counts in human invasive ductal breast carcinoma",
+        predicted=f"{mvd:.0f} /mm^2  ({mvd / ((lo + hi) / 2):.2f}x band mid)",
+        measured=f"{lo:.0f}-{hi:.0f} /mm^2 (45-101 vessels per 200x field, "
+                 f"node-negative to node-positive means)",
+        pmids=("1701519",),
+        bar=f"inside {lo:.0f}-{hi:.0f} /mm^2",
+        note="WEAKER EVIDENCE THAN THE GBM EQUIVALENT, twice over. Weidner "
+             "counts the single most vascular HOTSPOT, so the published band is "
+             "already biased high and exceeding it is worse than it looks. And "
+             "the per-field-to-per-mm^2 conversion uses a 0.74 mm^2 field area "
+             "INFERRED from a different paper's microscope (PMID 7539869, "
+             "bladder), not stated in the breast studies themselves.",
+        values={"mvd_per_mm2": mvd, "band": [float(lo), float(hi)],
+                "weidner_field_mm2": float(vvb.WEIDNER_FIELD_MM2)},
+    ))
+
+    # 2. Vascular area fraction vs Haisan's digital CD34 relative endothelial
+    #    area. Same KDE-threshold defect as the GBM row: NOT TESTABLE.
+    #    Keyed by threshold, not by position, so a reordering upstream cannot
+    #    silently retarget this row at a different threshold.
+    kde_abs = {a["threshold"]: a["frac_geom_mask"] for a in kde["absolute"]}
+    area_pct = 100.0 * float(kde_abs[0.3])
+    rows.append(Row(
+        group="breast-vascular-morphometry", label="vascular area fraction",
+        status=NOT_TESTABLE, scope=SCOPE_GEOMETRY,
+        quantity="reconstructed vascular area fraction (%) vs MEASURED "
+                 "whole-slide digital CD34 relative endothelial area in human "
+                 "invasive ductal carcinoma (n=50)",
+        predicted=f"{area_pct:.2f}% (KDE field threshold 0.3)",
+        measured="0.91-4.20% across compartments (stroma 0.91, parenchyma 1.95, "
+                 "invasive front 4.20)",
+        pmids=("24073397",), bar="n/a",
+        reason="THRESHOLD-CHOSEN, NOT A VALIDATION — the same defect as the GBM "
+               "row. The value is set by which KDE field threshold is picked and "
+               "nothing determines that threshold independently, so landing near "
+               "the measured range would be a choice rather than a result. "
+               "results/vascular_validation_breast.md sec. 3.5 gives this row no "
+               "validation weight. Unlike GBM there is also no threshold-free "
+               "breast counterpart registered here.",
+        values={"area_pct_at_0.3": area_pct,
+                "measured_range_pct": [0.91, 4.20]},
+    ))
+
+    # 3. Tile-to-tile heterogeneity. A measured breast number EXISTS but it is
+    #    a within-tumour COMPARTMENT contrast, not the between-tile spread the
+    #    model produces, so the two are not the same quantity.
+    p90p10 = float(het["p90_over_p10"])
+    rows.append(Row(
+        group="breast-vascular-morphometry", label="vascular heterogeneity",
+        status=NOT_TESTABLE, scope=SCOPE_GEOMETRY,
+        quantity="p90/p10 endothelial-density spread across 500 um tiles vs "
+                 "MEASURED CD34 area contrast between pathologist-defined "
+                 "tumour compartments",
+        predicted=f"{p90p10:.1f}x p90/p10 across 500 um tiles",
+        measured="4.61x invasive front vs tumour-associated stroma (a "
+                 "three-compartment contrast, n=50)",
+        pmids=("24073397",), bar="n/a",
+        reason="NOT THE SAME QUANTITY. The measured 4.61x is a contrast between "
+               "three pathologist-defined COMPARTMENTS within a tumour; the "
+               "model's number is an unlabelled tile-to-tile spread. No "
+               "between-case breast CD34 area-fraction range analogous to GBM's "
+               "Sipos 2024 (PMID 38928515) was found despite a dedicated search, "
+               "so there is nothing to score the spread against.",
+        values={"p90_over_p10": p90p10, "measured_compartment_contrast": 4.61},
+    ))
+
+    # 4 & 5. The two anchors GBM has and breast provably does not.
+    rows.append(Row(
+        group="breast-vascular-morphometry",
+        label="intercapillary distance", status=NOT_TESTABLE,
+        scope=SCOPE_GEOMETRY,
+        quantity="median reconstructed vessel-to-nearest-vessel distance (um) "
+                 "vs a measured intercapillary distance in breast IDC",
+        predicted=f"{float(prim['vessel_nn_median']):.1f} um",
+        measured="NONE",
+        pmids=(), bar="n/a",
+        reason="NO MEASURED TARGET EXISTS. A dedicated search found no Voronoi "
+               "or otherwise directly-measured intercapillary-distance study for "
+               "breast IDC. GBM has one (Yoshii & Sugiyama, PMID 3359450); "
+               "breast does not, and reporting the GBM value here would be "
+               "importing a brain measurement into breast tissue.",
+        values={"vessel_nn_median_um": float(prim["vessel_nn_median"])},
+    ))
+    rows.append(Row(
+        group="breast-vascular-morphometry",
+        label="tumour cells >100 um from a vessel", status=NOT_TESTABLE,
+        scope=SCOPE_GEOMETRY,
+        quantity="fraction of reconstructed tumour cells further than 100 um "
+                 "from the nearest vessel vs a measured breast equivalent",
+        predicted=f"{100.0 * float(prim['tumor_to_vessel_frac_gt_100']):.1f}%",
+        measured="NONE",
+        pmids=(), bar="n/a",
+        reason="NO MEASURED TARGET EXISTS. The GBM row derives its band from "
+               "Marien's whole-slide unbiased MVD (PMID 27583442), whose full "
+               "text was retrieved and confirmed to cover colorectal, "
+               "glioblastoma, ovarian and renal carcinoma and explicitly NOT "
+               "breast — the authors themselves flag breast as undone work. No "
+               "follow-up exists.",
+        values={"frac_gt_100_pct":
+                100.0 * float(prim["tumor_to_vessel_frac_gt_100"])},
+    ))
+    return rows
+
+
+def _run_endothelial_cellularity() -> List[Row]:
+    """Reconstructed section CELLULARITY and endothelial fraction vs measured
+    human histology — a different axis from the vessel-geometry anchors above.
+
+    Only section s1 is run (``quick=True`` inside the owning module), because
+    the three sections cost minutes and s1 is the section every other anchor
+    here uses.
+
+    Of the module's comparisons, exactly one is modality-matched enough to
+    score: nuclei per mm^2 measured on 5 um H&E against a 5 um Xenium section.
+    The endothelial-fraction comparison is reported NOT TESTABLE, which is the
+    module's own conclusion — its entire point is that the apparent over-call
+    factorises into definitional terms that carry no endothelial information.
+    """
+    from . import endothelial_density as ED
+
+    if not os.path.isdir(_repo_path("data_cache", "xenium_gbm")):
+        raise NotTestable("requires the real Xenium GBM cache at "
+                          "data_cache/xenium_gbm (absent)")
+    res = ED.run(sections=("s1",), do_regions=False)
+    sec = res["sections"]["s1"]
+    if sec.get("status") != "ok":
+        raise NotTestable(f"section s1 not evaluated: {sec.get('status')}")
+    agg = sec["by_aggregation"][res["production_aggregation"]]
+    rec = agg["reconciliation"]
+
+    obs_cells = float(rec["obs_cells_per_mm2"])
+    _mean, clo, chi = ED.GBM_CELLULARITY["hgg_nuclei_per_mm2"]
+    ctrl = ED.GBM_CELLULARITY["control_nuclei_per_mm2"][0]
+    rows = [Row(
+        group="endothelial-cellularity", label="section cellularity",
+        status=classify(obs_cells, clo, chi), scope=SCOPE_GEOMETRY,
+        quantity="reconstructed cells per mm^2 of tissue on a 5 um Xenium "
+                 "section vs MEASURED nuclei per mm^2 on 5 um H&E sections of "
+                 "human high-grade glioma",
+        predicted=f"{obs_cells:.0f} cells/mm^2  "
+                  f"({obs_cells / float(_mean):.2f}x the measured mean)",
+        measured=f"{float(_mean):.0f} /mm^2 (range {clo:.0f}-{chi:.0f}; "
+                 f"matched non-tumour control {ctrl:.0f} /mm^2)",
+        pmids=(str(ED.GBM_CELLULARITY["pmid"]),),
+        bar=f"inside the measured {clo:.0f}-{chi:.0f} /mm^2 range",
+        note="MODALITY-MATCHED, which is why it is scored: both sides are "
+             "2-D nuclear profiles on a 5 um section, so no volume-to-section "
+             "depth conversion enters. Corroborated to within 5% by an "
+             "independent 37-patient, 561-biopsy series "
+             f"(4557 +/- 3169 /mm^2, PMID "
+             f"{ED.GBM_CELLULARITY_CORROBORATION['pmid']}). Two caveats, both "
+             "of which push the SAME way as the observed miss and neither of "
+             "which excuses it: the measured fields were selected for MAXIMUM "
+             "cellularity in both arms, and Xenium retains only DAPI nuclei "
+             "that segment and receive assigned transcripts, so in-situ "
+             "under-detection relative to H&E nuclear counting is expected. "
+             "The row is scored anyway because the section geometry genuinely "
+             "matches; what it bounds is the reconstruction's cell recall, "
+             "not the transport model.",
+        values={"obs_cells_per_mm2": obs_cells,
+                "measured_mean": float(_mean),
+                "band": [float(clo), float(chi)],
+                "cellularity_ratio_vs_h01": float(rec["cellularity_ratio"])},
+    ), Row(
+        group="endothelial-cellularity", label="endothelial cell fraction",
+        status=NOT_TESTABLE, scope=SCOPE_GEOMETRY,
+        quantity="reconstructed endothelial percentage of all cells vs the "
+                 "MEASURED endothelial fraction of a 1.05 mm^3 volume-EM "
+                 "reconstruction of normal-appearing human temporal cortex",
+        predicted=f"{float(rec['obs_ec_per_mm2']):.0f} endothelial/mm^2; "
+                  f"fraction ratio {float(rec['fraction_ratio']):.2f}x the "
+                  f"reference, of which {1.0 / float(agg['purity']['purity']):.2f}x "
+                  f"is estimated classifier over-call",
+        measured=f"{float(rec['h01']['ec_fraction_pct']):.2f}% of cells "
+                 f"(4,604 endothelial of 57,180, n=1 volume)",
+        pmids=(str(ED.H01["pmid"]), str(ED.CORTEX_STEREOLOGY["pmid"])),
+        bar="n/a",
+        reason="THE TWO SIDES DO NOT COUNT THE SAME THING, and the reference is "
+               "the wrong tissue. One unit of the measurement is a whole cell "
+               "traced in 3-D through 1.05 mm^3; one unit of the model is a 2-D "
+               "polygon on a ~5 um section, so the comparison needs the "
+               "profile-counting relation N_A = N_V*(t+h) and an effective "
+               "sampling depth that is estimated, not measured. The reference "
+               "is also NORMAL temporal cortex, n=1, with no published spread, "
+               "while the section is tumour. endothelial_density.py deliberately "
+               "reports a factorised BUDGET here rather than a verdict, because "
+               f"the raw ratio ({float(rec['apparent_ratio_naive']):.1f}x) is "
+               f"dominated by definitional depth and cellularity terms that "
+               "carry no endothelial information at all.",
+        values={"obs_ec_per_mm2": float(rec["obs_ec_per_mm2"]),
+                "h01_ec_fraction_pct": float(rec["h01"]["ec_fraction_pct"]),
+                "fraction_ratio": float(rec["fraction_ratio"]),
+                "apparent_ratio_naive": float(rec["apparent_ratio_naive"]),
+                "apparent_ratio_depth_corrected": float(
+                    rec["apparent_ratio_depth_corrected"]),
+                "classifier_purity": float(agg["purity"]["purity"])},
+    )]
     return rows
 
 
@@ -1033,7 +1445,29 @@ def build_registry(exchange: bool = False) -> List[AnchorGroup]:
             tissue="GBM", tier=TIER_FULL, scope=SCOPE_GEOMETRY,
             source="tmesim/validation/vascular_validation.py::measure",
             report="results/vascular_validation.md",
-            runner=_run_vascular_morphometry, est="~30 s",
+            runner=_run_vascular_morphometry, est="~1 min",
+            needs=("data_cache/xenium_gbm",),
+        ),
+        AnchorGroup(
+            key="breast-vascular-morphometry",
+            title="Reconstructed breast vasculature vs measured human IDC "
+                  "morphometry",
+            tissue="breast", tier=TIER_FULL, scope=SCOPE_GEOMETRY,
+            source="experiments/vascular_validation_breast.py "
+                   "(drives validation.vascular_validation.measure verbatim)",
+            report="results/vascular_validation_breast.md",
+            runner=_run_breast_vascular_morphometry, est="~20 s",
+            needs=("data_cache/xenium_breast_janesick/rep1",),
+        ),
+        AnchorGroup(
+            key="endothelial-cellularity",
+            title="Section cellularity and endothelial fraction vs measured "
+                  "human histology",
+            tissue="GBM", tier=TIER_FULL, scope=SCOPE_GEOMETRY,
+            source="tmesim/validation/endothelial_density.py::run "
+                   "(section s1 only) -> definitional_reconciliation",
+            report="results/endothelial_density.md",
+            runner=_run_endothelial_cellularity, est="~1-2 min (section s1 only)",
             needs=("data_cache/xenium_gbm",),
         ),
     ]
@@ -1081,6 +1515,68 @@ OUT_OF_SCOPE: Tuple[Tuple[str, str], ...] = (
     ("results/breast_tissue_permeability.md",
      "a falsified FIX to an anchor already registered here "
      "(breast-transvascular), not a separate measurement."),
+    ("results/binding_sink_refuted.md (PMID 18787762 human glioma ECF "
+     "elimination k30, 3.15-14.51 h half-life)",
+     "a genuine model-parameter-vs-measurement falsification, but NO module "
+     "computes it: the document is hand-written with no generator in the repo, "
+     "so there is nothing to run. It is the diagnosis attached to the "
+     "breast-transvascular failure rather than a separate anchor."),
+    ("tmesim/validation/pk_reality.py",
+     "the pre-calibration predecessor of pk_multidrug.run_penetration on the "
+     "SAME drug and the SAME anchor (PMID 16361566); superseded, and "
+     "registering it would double-count."),
+    ("tmesim/validation/pk_anchors.py",
+     "a data compendium and unit converters. It imports nothing from the model "
+     "and runs no simulation, so it produces no prediction to score."),
+    ("tmesim/validation/revalidation.py",
+     "re-runs the glioma / pk / gist / reconstruction entry points under "
+     "current code. Every number in it is already registered or already "
+     "excluded above."),
+    ("tmesim/validation/vessel_network_impact.py",
+     "an A/B ablation of the KDE vs discrete vessel source; it reuses "
+     "values and PMIDs verbatim from results/vascular_validation.md. Its one "
+     "novel number is the threshold-free area fraction, which is registered "
+     "here under vascular-morphometry and attributed to its real owner, "
+     "reconstruct/vessel_network.py::segmentation_report."),
+    ("tmesim/validation/oxygen_benchmark.py",
+     "this IS results/oxygen_demotion.md — within-section marker correlation, "
+     "already excluded above."),
+    ("tmesim/validation/mgmt_spatial.py, classifier_fix.py",
+     "spatial autocorrelation against the assay's own negative-control probes, "
+     "and a bug fix scored on cross-section CONSISTENCY. classifier_fix's own "
+     "report states the volume-EM anchor 'was never optimised against' and is "
+     "not its target."),
+    ("tmesim/validation/cell_state_impact.py",
+     "compares three state-labelling routes to each other. Its Ki-67 and "
+     "Thomlinson-Gray numbers are probe-sensitivity checks on the DATA and a "
+     "model INPUT respectively, not scored model outputs."),
+    ("tmesim/validation/uncertainty.py, ranking_robustness.py, propagation.py, "
+     "delivery_metrics.py",
+     "Monte-Carlo error bars, order-stability under parameter uncertainty, "
+     "flag-propagation instrumentation, and metric self-validation against a "
+     "source null. No external measured number is scored in any of them."),
+    ("tmesim/validation/experiment.py, baselines.py, metrics.py "
+     "(results/stage0_result.json, results/STAGE0_FINDINGS.md)",
+     "the Stage-0 kill-test harness. The only run on disk is a synthetic "
+     "fixture cohort from the archived synthetic era, not real tissue."),
+    ("experiments/cross_tissue.py, real_drug_panel.py, breast_drug_panel.py, "
+     "dose_schedule.py, combination.py, niche_response.py, regimen.py, "
+     "patient_report.py, flagship_markers.py",
+     "forward-prediction drivers on real geometry. Their PMIDs are data "
+     "provenance (Janesick PMID 38114474) or plasma-PK INPUTS (Stupp PMID "
+     "15758009 and ~20 others in regimen.py); no model output is compared to "
+     "any of them."),
+    ("results/gbm_3d_registration.md, results/registration_3d_breast_poc.md",
+     "registration scored by Chamfer/Hausdorff/density correlation against its "
+     "own unregistered baseline. The PMIDs are dataset provenance."),
+    ("results/hypoxia_imputation_model.md, results/oxygen_sensitivity_band.md, "
+     "results/mechanism_attribution.md, results/vessel_promotion.md",
+     "held-out-cell ML imputation within one platform; a parameter sweep plus "
+     "two-solver numerical agreement; a read-out of the kill model's own "
+     "arithmetic; and a default-promotion decision that re-runs an already "
+     "registered check. None introduces a new measurement."),
+    ("results/tumour_physiology_pbpk_literature.md",
+     "explicitly 'reference material, not wired into any model' — a survey."),
 )
 
 
@@ -1089,6 +1585,46 @@ OUT_OF_SCOPE: Tuple[Tuple[str, str], ...] = (
 # --------------------------------------------------------------------------- #
 def _missing(needs: Sequence[str]) -> List[str]:
     return [p for p in needs if not os.path.exists(_repo_path(p))]
+
+
+def _stamp_physics(rows: Sequence[Row]) -> List[Row]:
+    """Give every row a physics-provenance string, and refuse to score a
+    solver number that did not declare one.
+
+    A row whose ``scope`` is ``PDE`` and that carries a PASS/FAIL verdict is a
+    claim about the transport model, and the breast anchor shows those claims
+    move by ~10x depending on which delivery law was active. A row like that
+    with no declared law is therefore not a weaker result, it is an
+    UNINTERPRETABLE one, so it is downgraded to NOT TESTABLE rather than left
+    to pass quietly. Rows that never invoked the solver — analytic, geometry,
+    and any PDE-scoped row that produced no number — are stamped
+    :data:`PHYSICS_NOT_APPLICABLE`, which is a statement that the question does
+    not arise, not that the physics agreed.
+    """
+    out: List[Row] = []
+    for r in rows:
+        if r.physics:
+            out.append(r)
+            continue
+        produced_a_number = r.status in (PASS, FAIL)
+        if r.scope == SCOPE_PDE and produced_a_number:
+            r.status = NOT_TESTABLE
+            r.reason = (
+                "PHYSICS PROVENANCE MISSING. This row ran the transport solver "
+                "and produced a verdict, but did not declare which "
+                "transvascular delivery law it ran under. The breast "
+                "interstitial:plasma anchor moves by roughly 10x between "
+                "transvascular_exchange=False and True, so an undeclared "
+                "number cannot be interpreted at all — it is not a weaker "
+                "result, it is an unlabelled one. Refusing to score it. "
+                + (r.reason or "")
+            ).strip()
+            r.bar = ""
+            r.physics = "UNDECLARED — this is the defect described above"
+        else:
+            r.physics = PHYSICS_NOT_APPLICABLE
+        out.append(r)
+    return out
 
 
 def run_suite(quick: bool = False, only: Optional[Sequence[str]] = None,
@@ -1159,7 +1695,7 @@ def run_suite(quick: bool = False, only: Optional[Sequence[str]] = None,
                     reason=f"ANCHOR CRASHED and therefore produced no verdict: "
                            f"{type(exc).__name__}: {exc}",
                 )]
-        rows.extend(grows)
+        rows.extend(_stamp_physics(grows))
         group_meta.append({
             "key": g.key, "title": g.title, "tissue": g.tissue, "tier": g.tier,
             "scope": g.scope, "source": g.source, "report": g.report,
@@ -1172,9 +1708,23 @@ def run_suite(quick: bool = False, only: Optional[Sequence[str]] = None,
     n_analytic_scored = sum(
         1 for r in rows
         if r.status in (PASS, FAIL) and r.scope != SCOPE_PDE)
+    default_exchange = repo_default_exchange()
     return {
         "mode": "quick" if quick else "full",
         "exchange": bool(exchange),
+        # Physics provenance for the whole run, so a stored JSON scorecard can
+        # never be compared against a later one without the delivery law being
+        # visible on both sides.
+        "physics": {
+            "transvascular_exchange_requested": bool(exchange),
+            "transvascular_exchange_repo_default": default_exchange,
+            "is_shipping_default": bool(exchange) == default_exchange,
+            "law": PHYSICS_LAWS[bool(exchange)],
+            "note": "The breast interstitial:plasma anchor differs by roughly "
+                    "10x between the two laws. Any comparison of two "
+                    "scorecards that does not first check this field is "
+                    "meaningless.",
+        },
         "counts": counts,
         "n_rows": len(rows),
         "n_scored": n_scored,

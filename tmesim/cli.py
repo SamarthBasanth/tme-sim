@@ -467,6 +467,25 @@ def _print_scorecard(result: dict) -> None:
     print("Every row compares a MODEL-PREDICTED number to an INDEPENDENT")
     print("MEASURED number from the cited publication. Rows are never")
     print("suppressed and failures are never softened.")
+
+    # Physics provenance, up front. The breast anchor moves ~10x between the
+    # two delivery laws, so a scorecard that does not say which one it ran is
+    # ambiguous by an order of magnitude.
+    phys = result.get("physics", {})
+    if phys:
+        print()
+        print(f"PHYSICS   {phys['law']}")
+        if phys["is_shipping_default"]:
+            print("          This IS the law the engine ships with "
+                  "(PDEConfig.transvascular_exchange).")
+        else:
+            print("          !! NOT THE SHIPPING DEFAULT. The engine ships "
+                  f"transvascular_exchange="
+                  f"{phys['transvascular_exchange_repo_default']}; this run "
+                  "overrode it.")
+            print("          !! Numbers below are NOT the numbers the shipping "
+                  "engine produces.")
+        print(f"          {phys['note']}")
     if mode == "quick":
         print()
         print("!! QUICK MODE. Only the analytic anchors ran. Anchors needing real")
@@ -494,6 +513,8 @@ def _print_scorecard(result: dict) -> None:
         print(f"{pad}compares  : {r['quantity']}")
         print(f"{pad}predicted : {r['predicted']}")
         print(f"{pad}measured  : {r['measured']}")
+        if r.get("physics"):
+            print(f"{pad}physics   : {r['physics']}")
         if r["bar"]:
             print(f"{pad}bar       : {r['bar']}")
         if r["reason"]:
@@ -516,6 +537,8 @@ def _print_scorecard(result: dict) -> None:
             print(f"        compares  : {r['quantity']}")
             print(f"        predicted : {r['predicted']}")
             print(f"        measured  : {r['measured']}")
+            if r.get("physics"):
+                print(f"        physics   : {r['physics']}")
             print(f"        bar       : {r['bar']}")
             if r["note"]:
                 print(f"        note      : {r['note']}")
@@ -567,15 +590,15 @@ def _print_anchor_list() -> None:
     from tmesim.validation import scorecard as SC
 
     print("\nRegistered external anchors (vivum validate):\n")
-    print(f"{'KEY':22s} {'TIER':6s} {'SCOPE':9s} {'TISSUE':8s} EST")
+    print(f"{'KEY':28s} {'TIER':6s} {'SCOPE':9s} {'TISSUE':8s} EST")
     print(_v_rule("-", 92))
     for g in SC.build_registry():
-        print(f"{g.key:22s} {g.tier:6s} {g.scope:9s} {g.tissue:8s} {g.est}")
-        print(f"{'':22s} {g.title}")
-        print(f"{'':22s} source: {g.source}")
-        print(f"{'':22s} report: {g.report}")
+        print(f"{g.key:28s} {g.tier:6s} {g.scope:9s} {g.tissue:8s} {g.est}")
+        print(f"{'':28s} {g.title}")
+        print(f"{'':28s} source: {g.source}")
+        print(f"{'':28s} report: {g.report}")
         if g.needs:
-            print(f"{'':22s} needs : {', '.join(g.needs)}")
+            print(f"{'':28s} needs : {', '.join(g.needs)}")
     print("\nInventoried and DELIBERATELY NOT registered, with the reason:\n")
     for what, why in SC.OUT_OF_SCOPE:
         print(f"  - {what}")
@@ -607,9 +630,9 @@ def cmd_validate(args: argparse.Namespace) -> int:
         if args.json:
             return
         if args.quick and g.tier != SC.TIER_QUICK:
-            print(f"[validate] {g.key:22s} DEFERRED (--quick)", flush=True)
+            print(f"[validate] {g.key:28s} DEFERRED (--quick)", flush=True)
         else:
-            print(f"[validate] {g.key:22s} running ({g.tier}, {g.est or 'n/a'}) ...",
+            print(f"[validate] {g.key:28s} running ({g.tier}, {g.est or 'n/a'}) ...",
                   flush=True)
 
     try:

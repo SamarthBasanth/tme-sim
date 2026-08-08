@@ -236,9 +236,14 @@ class TestClassification:
         assert SC.run_suite()["exit_code"] == 0
 
     def test_analytic_rows_are_counted_separately_from_pde_rows(self, monkeypatch):
+        # The PDE row must declare its delivery law, or _stamp_physics
+        # downgrades it and it never reaches the scored count at all — see
+        # TestPhysicsProvenance.
+        law = SC.physics_label(SC.repo_default_exchange())
         _install(monkeypatch, [
             _group("an", lambda: [_row("an", SC.PASS, scope=SC.SCOPE_ANALYTIC)]),
-            _group("pd", lambda: [_row("pd", SC.PASS, scope=SC.SCOPE_PDE)]),
+            _group("pd", lambda: [_row("pd", SC.PASS, scope=SC.SCOPE_PDE,
+                                       physics=law)]),
         ])
         res = SC.run_suite()
         assert res["n_scored"] == 2
@@ -374,3 +379,202 @@ class TestRegistryHygiene:
     def test_run_suite_rejects_an_unknown_key(self):
         with pytest.raises(KeyError):
             SC.run_suite(only=["definitely-not-an-anchor"])
+
+    def test_geometry_anchors_are_registered_and_marked_as_such(self):
+        # Rows that score the reconstructed TISSUE rather than the transport
+        # must be distinguishable from rows that score the solver, or the
+        # summary's "n of m scored rows never invoke the PDE" line is wrong.
+        scopes = {g.scope for g in SC.build_registry()}
+        assert SC.SCOPE_GEOMETRY in scopes
+        assert SC.SCOPE_PDE in scopes
+        assert SC.SCOPE_ANALYTIC in scopes
+
+    def test_both_tissues_are_represented(self):
+        tissues = {g.tissue for g in SC.build_registry()}
+        assert {"GBM", "breast"} <= tissues
+
+
+class TestRowHonestyInvariants:
+    """Invariants that keep a row from quietly overstating itself.
+
+    Driven through the synthetic registry so they cost nothing, but they
+    encode the rules the real rows are written to.
+    """
+
+    def test_a_scored_row_must_name_its_bar_and_cite_a_pmid(self, monkeypatch):
+        # A PASS or FAIL with no bar is unfalsifiable, and one with no PMID is
+        # not an EXTERNAL anchor at all.
+        _install(monkeypatch, [
+            _group("a", lambda: [_row("a", SC.PASS, bar="inside 1-2")]),
+            _group("b", lambda: [_row("b", SC.FAIL, bar="inside 1-2")]),
+        ])
+        for r in SC.run_suite()["rows"]:
+            assert r["bar"], f"{r['group']} is scored but names no bar"
+            assert r["pmids"], f"{r['group']} is scored but cites no PMID"
+
+    def test_the_real_registry_obeys_the_same_invariants_where_it_can_run(self):
+        # Only the anchors that need no data at all, so this stays data-free.
+        res = SC.run_suite(only=["ps-scale", "immune-sink"])
+        assert res["rows"]
+        for r in res["rows"]:
+            if r["status"] in (SC.PASS, SC.FAIL):
+                assert r["bar"] and r["pmids"]
+            else:
+                assert r["reason"]
+            assert r["quantity"] and "MEASURED" in r["quantity"].upper()
+
+    def test_deferred_and_not_testable_never_reach_the_pass_count(self,
+                                                                  monkeypatch):
+        def _decline():
+            raise SC.NotTestable("nope")
+
+        _install(monkeypatch, [
+            _group("nt", _decline),
+            _group("df", lambda: [_row("df", SC.PASS)], tier=SC.TIER_FULL),
+            _group("md", lambda: [], needs=("data_cache/absent-7c3e",)),
+        ])
+        res = SC.run_suite(quick=True)
+        assert res["counts"][SC.PASS] == 0
+        assert res["n_scored"] == 0
+        assert res["exit_code"] == 0
+
+    def test_bridge_pmids_are_recovered_from_report_local_row_tuples(self):
+        # The breast kill report builds several bands from row tuples that
+        # carry no ``scope``, so the scope-based lookup finds nothing for them.
+        # A scored row with no PMID is not an EXTERNAL anchor, so this path
+        # must not silently degrade to "n/a".
+        bridge = {"n": 2, "rows": [
+            {"pmid": "29221130", "fold": 3.0},
+            {"pmid": "33431915", "fold": 5.0},
+            {"pmid": "29221130", "fold": 4.0},   # duplicate, must collapse
+            {"fold": 6.0},                        # no pmid, must be skipped
+        ]}
+        assert SC._rows_pmids(bridge) == ("29221130", "33431915")
+        assert SC._rows_pmids(None) == ()
+        assert SC._rows_pmids({"n": 0, "rows": []}) == ()
+
+    def test_conditional_keys_on_real_rows_are_all_defined(self):
+        res = SC.run_suite(only=["ps-scale", "immune-sink"])
+        for key in res["conditionals"]:
+            assert key in SC.CONDITIONALS
+        for r in res["rows"]:
+            for key in r["conditional"]:
+                assert key in SC.CONDITIONALS, f"{r['group']} cites unknown {key}"
+
+
+class TestPhysicsProvenance:
+    """The delivery law must be visible on every row that could depend on it.
+
+    The breast interstitial:plasma anchor moves by ~10x between the one-way
+    leak and gradient-driven exchange, so a scorecard that prints a bare number
+    is ambiguous by an order of magnitude. These tests pin the rule that a
+    solver-derived verdict without a declared law is downgraded rather than
+    allowed to pass.
+    """
+
+    def test_repo_default_is_read_from_pdeconfig_not_hardcoded(self):
+        from tmesim.core import PDEConfig
+
+        assert SC.repo_default_exchange() is bool(
+            PDEConfig().transvascular_exchange)
+
+    def test_physics_label_names_the_law_and_flags_non_default(self):
+        default = SC.repo_default_exchange()
+        assert "transvascular_exchange" in SC.physics_label(default)
+        assert "NOT THE SHIPPING DEFAULT" not in SC.physics_label(default)
+        assert "NOT THE SHIPPING DEFAULT" in SC.physics_label(not default)
+        assert SC.physics_label(None) == SC.PHYSICS_NOT_APPLICABLE
+
+    def test_non_pde_rows_are_stamped_not_applicable(self, monkeypatch):
+        _install(monkeypatch, [
+            _group("an", lambda: [_row("an", SC.PASS, scope=SC.SCOPE_ANALYTIC)]),
+            _group("ge", lambda: [_row("ge", SC.PASS, scope=SC.SCOPE_GEOMETRY)]),
+        ])
+        for r in SC.run_suite()["rows"]:
+            assert r["physics"] == SC.PHYSICS_NOT_APPLICABLE
+
+    def test_a_pde_verdict_without_declared_physics_is_not_a_pass(self,
+                                                                  monkeypatch):
+        # The load-bearing one: a solver number with no declared delivery law
+        # must NOT be reported as passing.
+        _install(monkeypatch, [
+            _group("pde", lambda: [_row("pde", SC.PASS, scope=SC.SCOPE_PDE)]),
+        ])
+        res = SC.run_suite()
+        row = res["rows"][0]
+        assert row["status"] == SC.NOT_TESTABLE
+        assert res["counts"][SC.PASS] == 0
+        assert "PHYSICS PROVENANCE MISSING" in row["reason"]
+        assert row["bar"] == ""
+
+    def test_a_pde_failure_without_declared_physics_is_also_downgraded(
+            self, monkeypatch):
+        _install(monkeypatch, [
+            _group("pde", lambda: [_row("pde", SC.FAIL, scope=SC.SCOPE_PDE)]),
+        ])
+        res = SC.run_suite()
+        assert res["rows"][0]["status"] == SC.NOT_TESTABLE
+        assert res["exit_code"] == 0     # nothing was scored, so nothing failed
+
+    def test_a_pde_row_that_declares_its_physics_keeps_its_verdict(self,
+                                                                   monkeypatch):
+        law = SC.physics_label(SC.repo_default_exchange())
+        _install(monkeypatch, [_group(
+            "pde",
+            lambda: [_row("pde", SC.PASS, scope=SC.SCOPE_PDE, physics=law)])])
+        res = SC.run_suite()
+        assert res["rows"][0]["status"] == SC.PASS
+        assert res["rows"][0]["physics"] == law
+
+    def test_a_verdictless_pde_row_is_not_downgraded_further(self, monkeypatch):
+        # immune-sink is PDE-scoped but produces no number; it must stay
+        # NOT TESTABLE with its own reason, not acquire the provenance one.
+        _install(monkeypatch, [_group(
+            "pde",
+            lambda: [_row("pde", SC.NOT_TESTABLE, scope=SC.SCOPE_PDE,
+                          reason="no measured target exists")])])
+        row = SC.run_suite()["rows"][0]
+        assert row["status"] == SC.NOT_TESTABLE
+        assert row["reason"] == "no measured target exists"
+        assert row["physics"] == SC.PHYSICS_NOT_APPLICABLE
+
+    def test_suite_result_carries_the_run_physics(self, monkeypatch):
+        _install(monkeypatch, [_group("ok", lambda: [_row("ok", SC.PASS)])])
+        default = SC.run_suite()["physics"]
+        assert default["transvascular_exchange_requested"] is False
+        assert default["is_shipping_default"] is (
+            SC.repo_default_exchange() is False)
+        assert default["law"] == SC.PHYSICS_LAWS[False]
+        other = SC.run_suite(exchange=True)["physics"]
+        assert other["transvascular_exchange_requested"] is True
+        assert other["law"] == SC.PHYSICS_LAWS[True]
+
+    def test_cli_prints_the_physics_banner(self, monkeypatch, capsys):
+        _install(monkeypatch, [_group("ok", lambda: [_row("ok", SC.PASS)])])
+        cli.main(["validate"])
+        out = capsys.readouterr().out
+        assert "PHYSICS" in out
+        assert "transvascular_exchange" in out
+
+    def test_cli_shouts_when_the_run_is_not_the_shipping_default(
+            self, monkeypatch, capsys):
+        _install(monkeypatch, [_group("ok", lambda: [_row("ok", SC.PASS)])])
+        cli.main(["validate", "--exchange"])
+        out = capsys.readouterr().out
+        assert "NOT THE SHIPPING DEFAULT" in out
+
+    def test_json_carries_physics_on_the_run_and_on_every_row(self, monkeypatch,
+                                                              capsys):
+        _install(monkeypatch, [_group("ok", lambda: [_row("ok", SC.PASS)])])
+        cli.main(["validate", "--json"])
+        payload = json.loads(capsys.readouterr().out)
+        assert "physics" in payload
+        assert payload["physics"]["law"]
+        for r in payload["rows"]:
+            assert r["physics"], f"{r['group']} carries no physics provenance"
+
+    def test_real_data_free_anchors_all_declare_physics(self):
+        # ps-scale and immune-sink need no data_cache, so this exercises the
+        # stamping on REAL registry rows rather than synthetic ones.
+        for r in SC.run_suite(only=["ps-scale", "immune-sink"])["rows"]:
+            assert r["physics"], f"{r['group']} carries no physics provenance"
