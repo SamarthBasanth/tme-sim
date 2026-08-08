@@ -462,9 +462,15 @@ body::after {
 /* Metric overlay                                                         */
 /* --------------------------------------------------------------------- */
 
-.metric-overlay {
+/*
+ * The two instrument panels share one chrome deliberately: they are the same
+ * device appearing twice, one beat apart, and identical framing is what makes
+ * them read that way rather than as two unrelated cards. They sit on opposite
+ * sides because each is placed opposite its section's copy.
+ */
+.metric-overlay,
+.attribution {
   position: absolute;
-  right: clamp(1.25rem, 4vw, 3.5rem);
   bottom: clamp(1.5rem, 6vh, 4rem);
   z-index: 12;
   width: min(19rem, 84vw);
@@ -474,6 +480,119 @@ body::after {
   background: var(--bg-panel);
   backdrop-filter: blur(14px);
   will-change: opacity, transform;
+}
+
+.metric-overlay {
+  right: clamp(1.25rem, 4vw, 3.5rem);
+}
+
+/* Section 03 sets its copy right, so its readout goes left. */
+.attribution {
+  left: clamp(1.25rem, 4vw, 3.5rem);
+  width: min(21rem, 84vw);
+}
+
+.attribution__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 0.9rem;
+}
+
+.attribution__tag {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+/* Segment widths come straight from the values. The resistance sliver is
+   meant to be nearly invisible -- that it is 0.3% and not 30% is the finding,
+   so it is not given a minimum width to make it "readable". */
+.attribution__bar {
+  display: flex;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--hairline);
+}
+
+.attribution__seg {
+  display: block;
+  height: 100%;
+}
+
+/* Three distinct hues, none of them the concentration ramp -- these are
+   categories, not a quantity, and must not read as one. */
+.attribution__seg--delivery {
+  background: #7fd1e0;
+}
+.attribution__seg--dose {
+  background: #d8b23a;
+}
+.attribution__seg--resistance {
+  background: #e0685c;
+}
+
+.attribution__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.95rem 0 0;
+}
+
+.attribution__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.attribution__row dt {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+}
+
+.attribution__swatch {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex: none;
+  transform: translateY(-1px);
+}
+
+.attribution__sub {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+
+.attribution__row dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.86rem;
+  color: var(--ink);
+}
+
+.attribution__footnote {
+  margin: 0.9rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: var(--ink-faint);
+  font-style: italic;
 }
 
 .metric-overlay__header {
@@ -841,7 +960,8 @@ body::after {
   margin-top: 0.5rem;
 }
 
-.reduced-motion-section__metric .metric-overlay {
+.reduced-motion-section__metric .metric-overlay,
+.reduced-motion-section__metric .attribution {
   position: static;
   width: 100%;
   max-width: 22rem;
@@ -858,7 +978,10 @@ body::after {
     max-width: 100%;
   }
 
-  .metric-overlay {
+  /* Both panels go full-bleed on narrow screens; at this width there is no
+     "opposite side" left to place them on. */
+  .metric-overlay,
+  .attribution {
     right: 1rem;
     left: 1rem;
     bottom: 1.25rem;

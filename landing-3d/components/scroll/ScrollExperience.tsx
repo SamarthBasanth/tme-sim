@@ -7,13 +7,19 @@ import type Lenis from "lenis";
 import SceneCanvas from "@/components/canvas/SceneCanvas";
 import NarrativeSection from "@/components/ui/NarrativeSection";
 import MetricOverlay from "@/components/ui/MetricOverlay";
+import AttributionOverlay from "@/components/ui/AttributionOverlay";
 import ProgressRail from "@/components/ui/ProgressRail";
 import ReducedMotionExperience from "./ReducedMotionExperience";
 import { ScrollProgressProvider, useScrollProgressRef } from "./ScrollProgressContext";
 import { useLenis } from "@/hooks/useLenis";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
-import { SECTION_COUNT, metricPanelOpacity, sectionVisual } from "@/lib/timeline";
+import {
+  SECTION_COUNT,
+  attributionPanelOpacity,
+  metricPanelOpacity,
+  sectionVisual,
+} from "@/lib/timeline";
 import { SECTION_COPY } from "@/lib/copy";
 import { STUDIO_URL } from "@/lib/env";
 import SpecimenCaption from "@/components/ui/SpecimenCaption";
@@ -38,6 +44,7 @@ function Experience() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const sectionElRefs = useRef<Array<HTMLDivElement | null>>([]);
   const metricElRef = useRef<HTMLDivElement>(null);
+  const attributionElRef = useRef<HTMLDivElement>(null);
   const railFillRef = useRef<HTMLDivElement>(null);
   const lenisRef = useRef<Lenis | null>(null);
 
@@ -88,11 +95,17 @@ function Experience() {
             el.style.pointerEvents = opacity > 0.4 ? "auto" : "none";
           });
 
-          if (metricElRef.current) {
-            const o = metricPanelOpacity(p);
-            metricElRef.current.style.opacity = String(o);
-            metricElRef.current.style.transform = `translate3d(0, ${(1 - o) * 14}px, 0)`;
-            metricElRef.current.style.pointerEvents = o > 0.4 ? "auto" : "none";
+          // Both instrument panels are driven the same way and with the same
+          // easing, so they read as one recurring device appearing twice
+          // rather than two unrelated cards.
+          for (const [el, opacity] of [
+            [metricElRef.current, metricPanelOpacity(p)],
+            [attributionElRef.current, attributionPanelOpacity(p)],
+          ] as const) {
+            if (!el) continue;
+            el.style.opacity = String(opacity);
+            el.style.transform = `translate3d(0, ${(1 - opacity) * 14}px, 0)`;
+            el.style.pointerEvents = opacity > 0.4 ? "auto" : "none";
           }
 
           if (railFillRef.current) {
@@ -207,6 +220,10 @@ function Experience() {
           </NarrativeSection>
         </div>
 
+        {/* Section 03's copy is set on the right, so its readout sits left —
+            mirroring the metric panel one beat later, which sits right
+            opposite left-set copy. */}
+        <AttributionOverlay ref={attributionElRef} />
         <MetricOverlay ref={metricElRef} />
         <ProgressRail fillRef={railFillRef} labels={SECTION_COPY.map((s) => s.eyebrow)} />
       </div>

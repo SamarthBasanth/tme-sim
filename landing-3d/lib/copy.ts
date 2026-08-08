@@ -58,7 +58,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "03",
     eyebrow: "Delivery or potency",
     headline: "Which one killed the compound?",
-    body: "A compound compiles from its own structure: descriptors to Stokes-Einstein diffusivity to hindered transport through crowded ECM, with potency from measured GDSC2 screens. Each run then decomposes survival cell by cell. One returns delivery 0.172, dose 0.825, resistance 0.003. A molecule that never arrives and a molecule that arrives too weak need different fixes.",
+    body: "A compound compiles from its own structure: descriptors to Stokes-Einstein diffusivity to hindered transport through crowded ECM, with potency from measured GDSC2 screens. Each run then decomposes survival cell by cell — not how many lived, but why each one did. A molecule that never arrives and a molecule that arrives too weak look identical in a survival curve and need opposite fixes.",
     align: "right",
   },
   {

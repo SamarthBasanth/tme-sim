@@ -209,6 +209,20 @@ export const metricPanelOpacity = (p: number): number =>
     [4 / 6, 0],
   ]);
 
+/**
+ * Section 03's mechanism-attribution readout. Same shape as the metric panel
+ * one beat later, shifted to the 2/6..3/6 window, so the two instrument
+ * panels enter and leave on an identical rhythm rather than each having its
+ * own hand-tuned timing.
+ */
+export const attributionPanelOpacity = (p: number): number =>
+  sampleCurve(p, [
+    [2 / 6, 0],
+    [2 / 6 + (1 / 6) * 0.22, 1],
+    [3 / 6 - (1 / 6) * 0.18, 1],
+    [3 / 6, 0],
+  ]);
+
 export const concentrationFieldOpacity = (p: number): number =>
   trapezoid(p, 3 / 6, 3 / 6 + 0.02, 4 / 6 - 0.04, 4 / 6);
 

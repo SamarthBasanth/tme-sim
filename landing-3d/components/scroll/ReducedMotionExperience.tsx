@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import SceneCanvas from "@/components/canvas/SceneCanvas";
 import MetricOverlay from "@/components/ui/MetricOverlay";
+import AttributionOverlay from "@/components/ui/AttributionOverlay";
 import { SECTION_COPY } from "@/lib/copy";
 import { STUDIO_URL } from "@/lib/env";
 
@@ -64,6 +65,11 @@ export default function ReducedMotionExperience({ isMobile }: { isMobile: boolea
           <h2>{section.headline}</h2>
           <p>{section.body}</p>
           {i === 2 && (
+            <div className="reduced-motion-section__metric">
+              <AttributionOverlay initiallyHidden={false} />
+            </div>
+          )}
+          {i === 3 && (
             <div className="reduced-motion-section__metric">
               <MetricOverlay initiallyHidden={false} />
             </div>
