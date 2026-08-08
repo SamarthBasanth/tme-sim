@@ -103,6 +103,9 @@ __all__ = [
     "Exemption",
     "ALT_SOLVERS",
     "DECLARATIONS",
+    "WIRING_POINTS",
+    "WiringPoint",
+    "wiring_points",
     "EXEMPTIONS",
     "sweep_repo",
     "undeclared_direct_callers",
@@ -928,6 +931,72 @@ EXEMPTIONS: Tuple[Exemption, ...] = (
         ),
     ),
 )
+
+
+@dataclass(frozen=True)
+class WiringPoint:
+    """A file that deliberately PASSES ``exchange_k`` into the solver."""
+
+    path: str
+    #: True only for the shipped runtime path. See :data:`WIRING_POINTS`.
+    production: bool
+    reason: str
+
+    def __post_init__(self) -> None:
+        if len(self.reason.strip()) < 25:
+            raise ValueError(f"{self.path}: a WiringPoint needs a written reason")
+
+
+#: Every file that hands ``exchange_k`` to the solver, and why.
+#:
+#: The invariant this table protects is unchanged and still strict: there is
+#: EXACTLY ONE production wiring point. A second one would mean two places
+#: decide whether the gradient-driven delivery law is active, which is how a
+#: flag ends up silently on in one path and off in another -- the whole failure
+#: mode this module exists to catch.
+#:
+#: What the table adds is a second, non-production category. A validation
+#: experiment that measures an INERT path has no choice but to inject
+#: ``exchange_k`` by hand: setting ``PDEConfig(transvascular_exchange=True)``
+#: on such a path is a silent no-op, so an experiment that did the obvious
+#: thing would produce a clean, confident, meaningless "nothing changed"
+#: result. Those scripts are doing exactly the right thing and must not be
+#: driven to do the wrong thing by a guard.
+#:
+#: They are enumerated individually rather than exempted by directory. A rule
+#: like "anything under experiments/ may wire it up" would let an undeclared
+#: no-op creep back in precisely where it is least likely to be noticed, and
+#: the point of this module is that every such path is written down.
+WIRING_POINTS: Tuple[WiringPoint, ...] = (
+    WiringPoint(
+        path="tmesim/sim/engine.py",
+        production=True,
+        reason=(
+            "The shipped runtime path, and the only place that translates "
+            "PDEConfig.transvascular_exchange into an exchange_k argument. "
+            "Everything a user runs reaches the solver through here."
+        ),
+    ),
+    WiringPoint(
+        path="experiments/vessel_profile_arms.py",
+        production=False,
+        reason=(
+            "Re-measures results/vessel_profile.md under both delivery laws. "
+            "Its subject is declared INERT, so the PDEConfig flag alone would "
+            "be a silent no-op and the experiment would report a false "
+            "'no change'. It injects exchange_k deliberately, and asserts the "
+            "two arms' fields are not bit-identical before drawing any "
+            "conclusion."
+        ),
+    ),
+)
+
+
+def wiring_points(production_only: bool = False) -> frozenset:
+    """Paths permitted to pass ``exchange_k``; the production one if asked."""
+    return frozenset(
+        w.path for w in WIRING_POINTS if w.production or not production_only
+    )
 
 
 def declaration_for(path: str, symbol: Optional[str] = None) -> Declaration:

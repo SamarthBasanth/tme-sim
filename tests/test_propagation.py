@@ -46,6 +46,7 @@ from tmesim.sim.engine import simulate_response
 from tmesim.validation.propagation import (
     DECLARATIONS,
     EXEMPTIONS,
+    WIRING_POINTS,
     Category,
     Declaration,
     check_flag_propagation,
@@ -55,6 +56,7 @@ from tmesim.validation.propagation import (
     scan_call_sites,
     sweep_repo,
     undeclared_direct_callers,
+    wiring_points,
 )
 
 REPO = Path(__file__).resolve().parents[1]
@@ -424,15 +426,50 @@ def test_no_undeclared_direct_solver_callers():
     )
 
 
-def test_engine_is_the_only_place_that_wires_the_flag_up():
-    """If a second wiring point ever appears, the mental model behind this whole
-    guard has changed and every verdict above needs revisiting."""
-    wired = {
+def _wired_paths():
+    return {
         path
         for path, cs in sweep_repo(REPO).items()
         if cs.direct_calls_with_exchange_k
     }
-    assert wired == {"tmesim/sim/engine.py"}, wired
+
+
+def test_engine_is_the_only_place_that_wires_the_flag_up():
+    """The original invariant, unchanged and still strict.
+
+    If a SECOND PRODUCTION wiring point ever appears, the mental model behind
+    this whole guard has changed and every verdict above needs revisiting --
+    two places deciding whether the delivery law is active is how a flag ends
+    up on in one path and off in another.
+    """
+    production = wiring_points(production_only=True)
+    assert production == {"tmesim/sim/engine.py"}, production
+    assert _wired_paths() >= production, "the production wiring point vanished"
+
+
+def test_every_wiring_point_is_declared():
+    """Validation experiments that measure an INERT path have to inject
+    ``exchange_k`` by hand -- the flag alone would be a silent no-op there, so
+    doing the obvious thing would yield a confident, meaningless "no change".
+    They are legitimate, but each one is written down individually rather than
+    exempted by directory, because a blanket rule would let an undeclared
+    no-op back in exactly where nobody would look for it.
+    """
+    undeclared = _wired_paths() - wiring_points()
+    assert not undeclared, (
+        "these files pass exchange_k to the solver but are not in "
+        "tmesim.validation.propagation.WIRING_POINTS:\n  "
+        + "\n  ".join(sorted(undeclared))
+        + "\n\nAdd a WiringPoint (production=False for an experiment) with a "
+        "written reason. Do NOT exempt experiments/ wholesale."
+    )
+
+
+def test_declared_wiring_points_still_exist():
+    """A stale entry is a hole: it would silently permit a future file at that
+    path to wire the flag up with nobody re-reading the reason."""
+    missing = {w.path for w in WIRING_POINTS} - _wired_paths()
+    assert not missing, f"declared wiring points that no longer wire anything: {missing}"
 
 
 def test_no_unaccounted_reimplemented_solver():
