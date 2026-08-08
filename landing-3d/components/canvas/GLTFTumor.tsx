@@ -78,9 +78,43 @@ export default function GLTFTumor({
         mat.size = POINT_SIZE_UNITS;
         mat.sizeAttenuation = true;
         mat.transparent = true;
-        mat.opacity = 0.95;
+        /*
+         * ADDITIVE, and this is the difference between the section reading as
+         * tissue and reading as noise.
+         *
+         * Under normal blending each point simply paints over whatever is
+         * behind it, so 40,887 overlapping cells average out to one flat
+         * wash -- and since 58.2% of them are tumour red, that wash was a
+         * muddy maroon in which none of the structure was visible. Additive
+         * accumulates instead: where cells are dense the luminance sums and
+         * the region brightens, where they are sparse it stays near the
+         * ground. Density becomes something you can see.
+         *
+         * That is an honest encoding, not a cosmetic glow. Local density is
+         * measured data -- it is the same quantity the reconstruction meshes
+         * onto its grid -- so brightness here is carrying real information
+         * rather than asserting any. It is also how the fluorescence imaging
+         * this section came from actually looks, which is the register the
+         * page is claiming to be in.
+         *
+         * The HUES are untouched. They remain exactly the CELLTYPE_COLORS
+         * that `tmesim.viz.explainer` uses for every figure in results/, so
+         * the page and the papers still agree and the SpecimenCaption swatches
+         * remain the key. Only accumulation changed.
+         */
+        mat.blending = THREE.AdditiveBlending;
+        /*
+         * Per-point alpha has to drop a long way under additive or the dense
+         * interior clips to white and destroys exactly the structure this was
+         * meant to reveal -- the vessel tracks and the tears go first,
+         * because they read as EDGES against dense tissue. At 0.55 the
+         * densest region sits just below clipping, so the full range from
+         * section outline to core stays inside the ramp.
+         */
+        mat.opacity = 0.55;
         // Real cells overlap in projection; without this the far side of the
         // section punches holes through the near side as points sort badly.
+        // Additive is order-independent, so this is now doubly correct.
         mat.depthWrite = false;
         mat.needsUpdate = true;
       }

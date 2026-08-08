@@ -25,21 +25,28 @@
   --conc-high: #d8e219;
 
   /*
-   * Swiss neo-grotesque identity face, taken deliberately from the real
-   * tmesim Studio product (app/web/css/tokens.css) rather than invented
-   * fresh: Helvetica Neue / Neue Haas Grotesk Text lineage, system-
-   * available, no Google Fonts network dependency. This is the lineage of
-   * instrument and wayfinding lettering — it reads as clinical/instrument
-   * rather than product-marketing, which is the same reason the Studio
-   * itself avoids Inter (large x-height, loose default tracking) and any
-   * geometric/humanist face with personality. Every numeral and data value
-   * still goes through the monospace stack below.
+   * IBM Plex, self-hosted via next/font/google (see app/layout.tsx for the
+   * full rationale and for why the "no network dependency" constraint that
+   * previously pinned this to system Helvetica does not apply to that API).
+   *
+   * Three roles, one superfamily. --font-display is CONDENSED: the width
+   * contrast against the regular body face is what carries hierarchy here,
+   * not size alone. Every measured quantity, label and caption goes through
+   * --font-mono, which is the rule this page already had and is worth
+   * keeping strictly — a number set in the text face reads as a claim, a
+   * number set in mono reads as a reading.
+   *
+   * The system stacks are retained as fallbacks so a font failure degrades
+   * to the previous design rather than to Times.
    */
   --font-sans:
-    "Helvetica Neue", "Neue Haas Grotesk Text", "Nimbus Sans", Arimo,
+    var(--font-plex-sans), "Helvetica Neue", "Nimbus Sans", Arimo,
     "Liberation Sans", Arial, sans-serif;
+  --font-display:
+    var(--font-plex-condensed), var(--font-plex-sans), "Helvetica Neue",
+    "Nimbus Sans", Arial, sans-serif;
   --font-mono:
-    "SF Mono", "IBM Plex Mono", "Roboto Mono", "DejaVu Sans Mono", Menlo,
+    var(--font-plex-mono), "SF Mono", "Roboto Mono", "DejaVu Sans Mono", Menlo,
     Consolas, "Courier New", monospace;
 }
 
@@ -121,10 +128,18 @@ body::after {
   height: 200%;
 }
 
+/*
+ * The mark runs on the DISPLAY face, not the mono, which is what separates
+ * it from the section eyebrows -- those are mono at almost exactly this size,
+ * so as long as the mark was also mono the brand had no more presence than a
+ * label. The rule the page now follows throughout: display is the voice,
+ * mono is data and labels, sans is prose. Tracking stays wide so it reads as
+ * a nameplate rather than a word.
+ */
 .site-header__mark {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.34em;
   font-weight: 600;
   color: var(--ink);
 }
@@ -178,6 +193,65 @@ body::after {
   justify-content: center;
   padding: 0 clamp(1.5rem, 6vw, 6rem);
   will-change: opacity, transform, filter;
+}
+
+/*
+ * DIRECTIONAL EDGE SCRIM — the one that actually does the work.
+ *
+ * The local scrim below hugs the text block, which was enough when the
+ * tissue rendered as a dim flat wash. It is not enough now: switching the
+ * point cloud to additive blending made the section genuinely bright, and
+ * the right-aligned sections (03, 05) had their copy sitting straight on top
+ * of a field of lit cells with essentially no contrast guarantee.
+ *
+ * So the scrim is a linear falloff from the edge the text is set against,
+ * not a box behind the words. That is the difference between something that
+ * reads as a panel dropped on the artwork and something that reads as the
+ * specimen being lit from one side — and it is why this is anchored to the
+ * SECTION rather than to the text block. Text stays over the plateau end of
+ * the ramp; the tissue emerges out of the falloff toward the far edge.
+ *
+ * Sits on the section, so it inherits the same opacity/blur the scroll
+ * timeline drives per frame and cannot desynchronise from its own copy.
+ */
+.narrative-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+}
+
+.narrative-section--left::before {
+  background: linear-gradient(
+    to right,
+    rgba(4, 5, 7, 0.93) 0%,
+    rgba(4, 5, 7, 0.9) 26%,
+    rgba(4, 5, 7, 0.62) 46%,
+    rgba(4, 5, 7, 0) 66%
+  );
+}
+
+.narrative-section--right::before {
+  background: linear-gradient(
+    to left,
+    rgba(4, 5, 7, 0.93) 0%,
+    rgba(4, 5, 7, 0.9) 26%,
+    rgba(4, 5, 7, 0.62) 46%,
+    rgba(4, 5, 7, 0) 66%
+  );
+}
+
+/* Centered sections have no edge to fall off from, so they keep a radial
+   falloff — widened well past the text so it does not read as a disc. */
+.narrative-section--center::before {
+  background: radial-gradient(
+    ellipse 78% 72% at center,
+    rgba(4, 5, 7, 0.93) 0%,
+    rgba(4, 5, 7, 0.88) 40%,
+    rgba(4, 5, 7, 0.5) 68%,
+    rgba(4, 5, 7, 0) 100%
+  );
 }
 
 .narrative-section__body {
@@ -255,36 +329,61 @@ body::after {
   margin: 0 auto;
 }
 
+/*
+ * The eyebrow was set in --accent-dim (0.5 alpha) and effectively vanished
+ * against the ground -- it is the only running indication of where you are
+ * in a six-part scroll, so it has to survive being read. Raised to 0.78 and
+ * up a step in size; still clearly subordinate to the headline.
+ */
 .narrative-section__kicker {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--accent-dim);
+  color: rgba(127, 209, 224, 0.78);
+}
+
+/*
+ * Headings run on the CONDENSED face at weight 600. Condensed lets the
+ * display size go up without the line count going up with it, which is what
+ * keeps a three-line headline from crowding the tissue behind it. Tracking
+ * is near-neutral rather than the tight negative the old neo-grotesque
+ * needed -- Plex Condensed is already narrow, and pulling it tighter closes
+ * the counters and turns a headline into a grey block.
+ */
+.narrative-section h1,
+.narrative-section h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0;
+  text-wrap: balance;
 }
 
 .narrative-section h1 {
-  font-size: clamp(2.1rem, 6vw, 4.6rem);
-  line-height: 1.04;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 0;
+  font-size: clamp(2.4rem, 6.6vw, 5.2rem);
+  line-height: 1.02;
+  letter-spacing: -0.005em;
 }
 
 .narrative-section h2 {
-  font-size: clamp(1.7rem, 4.2vw, 3.1rem);
-  line-height: 1.08;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  margin: 0;
+  font-size: clamp(1.9rem, 4.6vw, 3.5rem);
+  line-height: 1.06;
+  letter-spacing: -0.004em;
 }
 
+/*
+ * 0.62 alpha was too faint for running text on this ground -- it read as
+ * disabled rather than secondary, and these paragraphs carry the argument.
+ * Kept below full --ink so the headline still leads.
+ */
 .narrative-section p {
-  font-size: clamp(0.95rem, 1.4vw, 1.1rem);
-  line-height: 1.55;
-  color: var(--ink-dim);
+  font-size: clamp(0.98rem, 1.4vw, 1.12rem);
+  line-height: 1.62;
+  color: rgba(243, 245, 246, 0.76);
   margin: 0;
-  max-width: 32rem;
+  max-width: 34rem;
+  text-wrap: pretty;
 }
 
 .narrative-section--hero .narrative-section__body {
