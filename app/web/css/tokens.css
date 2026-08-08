@@ -46,11 +46,28 @@
 
 :root {
   /* --- type ------------------------------------------------------------- */
+  /*
+   * IBM Plex, self-hosted by css/fonts.css (which is linked from index.html
+   * and deliberately NOT imported here -- this file is inlined verbatim into
+   * every generated report, and that document must reference nothing off its
+   * own page).
+   *
+   * --font-mono already named "IBM Plex Mono" and it never loaded, so the
+   * Studio actually rendered SF Mono on macOS, Consolas on Windows, DejaVu on
+   * Linux. Those faces have different digit advance widths, which meant the
+   * tabular alignment in the metrics rail and the run history was
+   * machine-dependent -- a real defect in a tool that is mostly columns of
+   * numbers, not a preference.
+   *
+   * The old system stacks stay as fallbacks, so a checkout with no font files
+   * (or a report, which has no @font-face) degrades to exactly the previous
+   * rendering rather than to Times.
+   */
   --font-ui:
-    "Helvetica Neue", "Neue Haas Grotesk Text", "Nimbus Sans", Arimo,
-    "Liberation Sans", Arial, sans-serif;
+    "IBM Plex Sans", "Helvetica Neue", "Neue Haas Grotesk Text", "Nimbus Sans",
+    Arimo, "Liberation Sans", Arial, sans-serif;
   --font-mono:
-    "SF Mono", "IBM Plex Mono", "Roboto Mono", "DejaVu Sans Mono", Menlo,
+    "IBM Plex Mono", "SF Mono", "Roboto Mono", "DejaVu Sans Mono", Menlo,
     Consolas, "Courier New", monospace;
 
   --fs-micro: 9.5px;   /* provenance chips, unit suffixes */

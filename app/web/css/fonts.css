@@ -1,0 +1,54 @@
+/* ==========================================================================
+   Self-hosted IBM Plex — the Studio's only external-resource stylesheet.
+
+   WHY THIS IS A SEPARATE FILE AND NOT PART OF tokens.css.
+   `app/server/report.py::_tokens_css()` inlines tokens.css VERBATIM into every
+   generated report, and that document's contract is explicit: "Nothing in this
+   stylesheet references anything off this page - no stylesheet import, no
+   resource reference, no webfont, no image, no script." An @font-face with a
+   relative src would put a dangling URL into every emailed report. So the
+   faces live here, linked only from index.html, and tokens.css stays a pure
+   token file. Reports keep resolving --font-ui/--font-mono through the system
+   fallbacks, exactly as they do today.
+
+   WHY SELF-HOST AT ALL. tokens.css named "IBM Plex Mono" in --font-mono and
+   never loaded it, so the Studio fell through to SF Mono on macOS, Consolas on
+   Windows, DejaVu on Linux. For a tool whose entire readout is columns of
+   numbers that is not a cosmetic difference: digit advance width varies
+   between those faces, so tabular alignment in the metrics rail and the run
+   history was machine-dependent. Now every machine renders the same columns.
+
+   PROVENANCE. These are the Latin subsets Google serves, obtained from the
+   build that next/font already performed for landing-3d rather than fetched
+   separately, so the two surfaces are byte-identical typography. IBM Plex is
+   SIL Open Font License 1.1 (c) 2017 IBM Corp -- redistribution in a product
+   is permitted, and the OFL requires the licence travel with the files, hence
+   fonts/LICENSE.txt.
+
+   Plex Sans ships as ONE variable file covering the whole weight axis; Mono is
+   static, so it needs a face per weight. 64 KB total, no network at runtime.
+   ========================================================================== */
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 100 700; /* variable axis - one file covers every weight used */
+  font-display: swap;
+  src: url("../fonts/plex-sans-var.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/plex-mono-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/plex-mono-500.woff2") format("woff2");
+}
