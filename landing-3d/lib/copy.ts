@@ -8,9 +8,27 @@
  * patient outcome prediction, any diagnostic / treatment-planning /
  * surgical use, AI or machine learning of any kind, "digital twin", or
  * personalised medicine for an individual patient. Absolute kill fraction
- * is not a defensible output; relative ranking on the same tissue and
- * spatial delivery attribution are. Every number that appears below must
- * be traceable to a real run or a real dataset count.
+ * is not a defensible output. Every number that appears below must be
+ * traceable to a real run or a real dataset count.
+ *
+ * Two guardrails narrowed by measurement, both of which read as weaker than
+ * the obvious marketing line and must not drift back to it:
+ *
+ * 1. RANKING IS NOT UNCONDITIONALLY INVARIANT. It is invariant to
+ *    common-mode perturbations (cell-state route, oxygen route, alpha,
+ *    grid) and NOT to drug-specific transport parameters — correcting the
+ *    transvascular delivery law changes the top-1 GBM pick. Say the narrow
+ *    version; the broad one was tested and is false.
+ *    See results/transvascular_exchange_revalidation.md.
+ * 2. THE SPATIAL SPREAD MUST CARRY ITS HONEST NULL. The 2.0x is real and
+ *    reproducible, but a well-mixed model's 1.0 is not the comparator that
+ *    bounds it: a null that preserves the macrophages' own clustering
+ *    returns ~1.7, so the part attributable to where these macrophages
+ *    actually are is ~1.13-1.20x. Quote both numbers or neither. Do NOT
+ *    cite monotonicity across quintiles as corroboration — every control
+ *    reproduces it, so it carries no information. The statistic is invalid
+ *    on spot data, where immune positions are synthesised rather than
+ *    measured. See results/immune_sink_impact.md.
  */
 
 export interface SectionCopy {
@@ -47,14 +65,14 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "04",
     eyebrow: "Spatial attribution",
     headline: "The mean is not the finding. The spread is.",
-    body: "In one section, tumor cells in the macrophage-densest quintile hold about 0.43 of drug exposure. In the sparsest, about 0.86. That is a 2.0x spread inside a single tumor, and it falls monotonically across every quintile between them. A well-mixed compartmental model returns exactly 1.0 there, by construction. Geometry produces quantities a compartment cannot express.",
+    body: "In one section, tumor cells in the macrophage-densest quintile hold about 0.43 of drug exposure. In the sparsest, about 0.86 — a 2.0x spread inside a single tumor, where a well-mixed compartmental model returns exactly 1.0 by construction. That comparison flatters us, so here is the other one: relocate the same macrophages at random, keeping their real clustering, and it still returns about 1.7. Most of the spread is what clustering does at all. What these particular macrophages add is about 1.15x — smaller, and measured. A compartment expresses neither.",
     align: "left",
   },
   {
     kicker: "05",
     eyebrow: "Stated limits",
     headline: "Every run ships its own caveats.",
-    body: "Ranking compounds on the same tissue is far more robust than any absolute number, and it is the output to trust. It is not unconditionally invariant, and we can tell you exactly where it breaks: correcting the transvascular delivery law re-weights the panel by permeability and changes the top pick on glioblastoma. That is written up, not buried. Absolute kill fraction is not defensible at all, and every run says so in its own caveats panel. Vivum does not predict patient response, and its null results are published.",
+    body: "Ranking compounds on the same tissue is far more robust than any absolute number, and it is the output to trust. It is not unconditionally invariant, and we can tell you exactly where it breaks: correcting the transvascular delivery law re-weights the panel by permeability and changes the top pick on glioblastoma. That is written up, not buried. The spatial spread needs single-cell resolved tissue — on spot data the immune positions are synthesized rather than measured, so we do not report it there. Absolute kill fraction is not defensible at all, and every run says so in its own caveats panel. Vivum does not predict patient response, and its null results are published.",
     align: "right",
   },
   {

@@ -61,7 +61,7 @@ vivum --help
 
 ```
 usage: vivum [-h] [--seed SEED]
-             {reconstruct,simulate,compare-drugs,molecules,molecular-run,acquire,studio}
+             {reconstruct,simulate,compare-drugs,validate,molecules,molecular-run,acquire,studio}
              ...
 ```
 
@@ -151,7 +151,110 @@ paired measured drug response to check it against. See
 README's "Five corrections" section for what is and is not defensible to
 quote.
 
-### 2c. Launch Studio (the interactive web UI)
+### 2c. Ask how the model currently scores against reality
+
+```bash
+vivum validate --quick
+```
+
+This runs the **external-anchor suite**: every place in this repository where a
+model-produced number is scored against an *independent measured* number from
+the published literature. One row per comparison, each citing its PMID and
+stating exactly what quantity is being compared against what.
+
+`--quick` runs only the analytic anchors — closed-form penetration lengths,
+descriptor-derived partition coefficients, literature-table comparisons — which
+need no tissue section and finish in about half a minute. Drop it to run the
+full suite, which reconstructs real sections from `data_cache/` and solves the
+transport PDE (minutes, and it is the only mode that tests the solver at all).
+
+```
+NOT TESTABLE analytic doxorubicin   [PMID 16361566]
+                      compares  : analytic penetration length L = sqrt(D_eff/k_eff) vs measured perivascular half-distance
+                      predicted : L = 64.9 um
+                      measured  : 40-50 um half-distance (= 58-72 um e-fold, d_half/ln2)
+                      NO VERDICT: IN-SAMPLE. alpha is solved in closed form so that L equals this target
+                                  exactly; the model reproduces it by construction and could not have
+                                  failed. Reporting it as a PASS would be circular.
+
+PASS         analytic mitoxantrone   [PMID 23680920]
+                      compares  : OUT-OF-SAMPLE analytic penetration length, alpha frozen, vs measured
+                                  perivascular half-distance
+                      predicted : L = 70.9 um  (0.98x band mid)
+                      measured  : 25-75 um half-distance (= 36-108 um e-fold)
+
+FAIL         analytic adavosertib   [PMID 39820282]
+                      compares  : predicted tissue:plasma partition vs MEASURED human glioma
+                                  tissue:plasma AUC ratio
+                      predicted : 0.5785  (0.24x measured)
+                      measured  : 2.4600 (range 0.7400-4.1800)
+```
+
+**Four statuses, and the distinction between them is the point.**
+
+| status | meaning |
+|---|---|
+| `PASS` | the model ran and landed inside the band the owning module declares (the bar is named on every row — different modules declare different bars) |
+| `FAIL` | the model ran and missed. Reported three times over: in the row, again in a dedicated `FAILURES` block with full detail, and in the summary |
+| `NOT TESTABLE` | **no verdict is possible**, for a stated reason — and this is never a soft pass |
+| `DEFERRED` | skipped by `--quick`. Also not a pass: some anchors that are DEFERRED here **FAIL** in the full run, which is why `--quick` prints a banner saying so |
+
+`NOT TESTABLE` is load-bearing and occurs for four genuinely different reasons,
+each printed inline: the number is the *fit* rather than a test of it
+(doxorubicin's penetration anchor is solved for in closed form, so it cannot
+fail); *no measured target exists* (nobody has published a free-drug macrophage
+uptake ratio, so the immune sink's magnitude has nothing to be scored against);
+*required data absent*; or *the model cannot express the measured quantity* (the
+`bbb_penetrance` partition-vs-rate units defect). Conflating any of those with
+`PASS` is exactly the error this project retracts results for.
+
+**Failures are the reason the command exists.** The breast transvascular anchor
+currently fails against measured human microdialysis, the glioma partition
+scorecard fails on two of six drugs, and the reconstructed microvessel density
+misses its measured band — all of that is printed, not buried. `vivum validate`
+**exits non-zero if any anchor fails**, so it drops straight into CI:
+
+```bash
+vivum validate --quick || echo "an external anchor regressed"
+```
+
+Three more things worth knowing before you quote a row:
+
+* **Rows carry a `scope`.** `analytic` means the prediction is a closed-form
+  expression over molecular descriptors and the transport solver was never
+  invoked — such a row scores the molecular layer and *cannot* be cited as
+  evidence about the PDE. The summary line prints how many of the scored rows
+  are in that category. Only the full (non-`--quick`) run produces `PDE` rows.
+* **Rows list the conditionals they inherit**, and every cited conditional is
+  printed in full at the bottom. The two with the longest reach are `alpha-fit`
+  (everything downstream of the one fitted constant) and `ps-scale` (every
+  transvascular-exchange number is conditional on
+  `tmesim/treatment/drugs.py::PS_SCALE_S_INV = 1.0`, an implicit and underived
+  dimensionless-to-rate conversion — see
+  [`results/transvascular_exchange_revalidation.md`](../results/transvascular_exchange_revalidation.md)
+  §6.2).
+* **The omissions are auditable too.** `vivum validate --list` prints the
+  registry *and* the validations that were inventoried and deliberately left
+  out, with the reason for each (ablations that would double-count the same six
+  measurements; real-vs-real corroboration with no model in the loop; the
+  `vessel_profile` anchor that `alpha` was itself fitted to).
+
+Useful options:
+
+```bash
+vivum validate --list                          # what is checked, and what is not
+vivum validate --quick --json                  # machine-readable, for CI
+vivum validate --only breast-transvascular     # one anchor
+vivum validate --only breast-transvascular --exchange   # with the opt-in delivery law
+```
+
+`--json` emits the whole scorecard — every row's predicted/measured values,
+PMIDs, bar, status, reason and raw numbers — as a single parseable document
+with no log lines around it. The registry itself lives in
+`tmesim/validation/scorecard.py`; adding an anchor is one entry there and needs
+no CLI change.
+
+### 2d. Launch Studio (the interactive web UI)
 
 Needs the `app` extra installed (`pip install -e '.[app]'` above):
 
@@ -172,7 +275,7 @@ use a different port; `vivum studio --help` for the full option list. This is
 a thin delegate to the existing `python -m app.server` entry point — nothing
 about the server itself changed.
 
-### 2d. TPL — a small scripting language for defining and sweeping experiments
+### 2e. TPL — a small scripting language for defining and sweeping experiments
 
 Studio's **"protocol"** tab (top nav) is a real code editor, not just a form:
 syntax highlighting, line-numbered diagnostics, `Cmd+Enter` to plan+run,
@@ -337,6 +440,7 @@ micro = reconstruct_real(
 
 | Question | File |
 |---|---|
+| How does the model score against measured reality, right now? | `vivum validate` (§2c), then [`results/SESSION_AUDIT.md`](../results/SESSION_AUDIT.md) |
 | What is the current state, honestly? | [`results/SESSION_AUDIT.md`](../results/SESSION_AUDIT.md) |
 | How do I regenerate every published result from scratch? | [`docs/REPRODUCE.md`](REPRODUCE.md) |
 | Where did every byte of data come from? | [`docs/DATA_INVENTORY.md`](DATA_INVENTORY.md) |

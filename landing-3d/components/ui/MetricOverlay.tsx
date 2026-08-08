@@ -23,9 +23,21 @@ interface MetricOverlayProps {
  * The panel's scroll window (metricPanelOpacity, 3/6 -> 4/6) puts it under
  * section 04, so it shows that section's number and nothing else: relative
  * drug exposure retained by tumor cells in the macrophage-densest vs the
- * sparsest quintile of one real section, and the spread between them. The
- * spread is the point, because a well-mixed compartmental model returns
- * exactly 1.0 there by construction.
+ * sparsest quintile of one real section, and the spread between them.
+ *
+ * The spread is only meaningful against its nulls, so BOTH are shown as
+ * rows rather than prose. A well-mixed compartment returns 1.0 by
+ * construction — fair, but it is not what bounds the claim. A null that
+ * randomly relocates the same macrophages while preserving their real
+ * degree of clustering returns ~1.7, which means the part attributable to
+ * where these macrophages actually are is ~1.13-1.20x, not 2.0x. Showing
+ * 2.0 against 1.0 alone overstates the finding by roughly ten-fold.
+ *
+ * Do NOT re-add "monotone across all five quintiles" as corroboration. It
+ * was there and it was removed on measurement: every control reproduces the
+ * monotone fall (label permutation 0.7031->0.5002, uniform-in-tissue
+ * 0.6942->0.5780), so it discriminates nothing. Details and the Visium
+ * invalidity result: results/immune_sink_impact.md.
  *
  * These are illustrative interface content in the sense that a product
  * screenshot is: real values from one run, labeled "sample run", never to
@@ -61,13 +73,29 @@ const MetricOverlay = forwardRef<HTMLDivElement, MetricOverlayProps>(function Me
             <span className="metric-overlay__word">~0.86</span>
           </dd>
         </div>
-        <div className="metric-overlay__row">
+        <div className="metric-overlay__row metric-overlay__row--total">
           <dt>Spread</dt>
           <dd>2.0x</dd>
         </div>
       </dl>
+      {/* The two reference points sit IN the readout rather than in the
+          footnote, because the spread means nothing without them and a
+          footnote is where a number goes to be skipped. 1.0 is what a
+          well-mixed compartment returns by construction; ~1.7 is what a null
+          that preserves the macrophages' own clustering returns, and it is
+          the one that actually bounds the claim. */}
+      <dl className="metric-overlay__refs">
+        <div>
+          <dt>Well-mixed model</dt>
+          <dd>1.0x</dd>
+        </div>
+        <div>
+          <dt>Clustering-matched null</dt>
+          <dd>~1.7x</dd>
+        </div>
+      </dl>
       <p className="metric-overlay__footnote">
-        One run, one tissue section, monotone across all five quintiles. A well-mixed model returns 1.0x here.
+        One run, one section, single-cell resolved. Not measurable on spot data.
       </p>
     </div>
   );

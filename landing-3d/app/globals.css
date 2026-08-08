@@ -415,6 +415,51 @@ body::after {
   border-radius: inherit;
 }
 
+/* The headline spread is the conclusion of the two bars above it, so it gets
+   a rule to sit under rather than being a third identical row. */
+.metric-overlay__row--total {
+  margin-top: 0.15rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.metric-overlay__row--total dd {
+  color: var(--ink);
+}
+
+/* The two nulls that bound the spread. Subordinate to it in size and colour
+   -- they are the reference, not the reading -- but deliberately still IN
+   the readout, because 2.0x against 1.0x alone overstates the finding by
+   about ten-fold. See the component docstring. */
+.metric-overlay__refs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0.6rem 0 0;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--hairline);
+}
+
+.metric-overlay__refs > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.metric-overlay__refs dt {
+  font-size: 0.68rem;
+  color: var(--ink-faint);
+}
+
+.metric-overlay__refs dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
+  color: var(--ink-dim);
+}
+
 .metric-overlay__footnote {
   margin: 0.85rem 0 0;
   font-size: 0.68rem;

@@ -35,6 +35,13 @@ Subcommands
 ``molecular-run``
     Compile a library molecule to DrugParams (Stokes-Einstein -> Brownian
     hindrance -> BBB/binding) and simulate it on a REAL reconstructed patient.
+``validate``
+    Run the EXTERNAL-ANCHOR suite and print a scorecard: every place this model
+    is scored against an independent MEASURED number from the literature, with
+    a PMID and a PASS / FAIL / NOT TESTABLE verdict per row. ``--quick`` runs
+    only the analytic anchors (seconds, no ``data_cache/``); the full run needs
+    real tissue and takes minutes. **Exits non-zero if any anchor FAILS**, so it
+    is usable as a CI gate. See :mod:`tmesim.validation.scorecard`.
 ``acquire``
     Best-effort live download of open glioblastoma datasets into a cache dir.
 ``studio``
@@ -425,6 +432,201 @@ def cmd_studio(args: argparse.Namespace) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# validate — the external-anchor scorecard
+# --------------------------------------------------------------------------- #
+#: Column widths for the scorecard table. Kept here (not in the scorecard
+#: module) because they are presentation, not science.
+_V_STATUS_W = 12
+_V_SCOPE_W = 8
+_V_ANCHOR_W = 34
+
+
+def _v_rule(char: str = "-", width: int = 100) -> str:
+    return char * width
+
+
+def _print_scorecard(result: dict) -> None:
+    """Render :func:`tmesim.validation.scorecard.run_suite`'s result.
+
+    Deliberately prints failures THREE times — in the table, again in a
+    dedicated FAILURES block with the full quantity/PMID/conditionals, and once
+    more in the summary line. A scorecard that made the model look good by
+    omission would be worse than no scorecard at all.
+    """
+    from tmesim.validation import scorecard as SC
+
+    rows = result["rows"]
+    mode = result["mode"]
+
+    print()
+    print(_v_rule("="))
+    print("VIVUM EXTERNAL-ANCHOR SCORECARD"
+          f"    mode={mode}    "
+          f"{result['seconds']:.1f}s")
+    print(_v_rule("="))
+    print("Every row compares a MODEL-PREDICTED number to an INDEPENDENT")
+    print("MEASURED number from the cited publication. Rows are never")
+    print("suppressed and failures are never softened.")
+    if mode == "quick":
+        print()
+        print("!! QUICK MODE. Only the analytic anchors ran. Anchors needing real")
+        print("!! tissue are DEFERRED below -- DEFERRED IS NOT A PASS, and some of")
+        print("!! them FAIL in the full run. A green --quick is not a green suite.")
+    print()
+
+    # One block per row rather than a fixed-width table: every field here
+    # (the compared quantity, the band, the reason a row has no verdict) is a
+    # sentence, and truncating any of them to fit a column is how a scorecard
+    # starts lying by abbreviation.
+    pad = " " * (_V_STATUS_W + _V_SCOPE_W + 2)
+    last_group = None
+    for r in rows:
+        if r["group"] != last_group:
+            last_group = r["group"]
+            grp = next((g for g in result["groups"] if g["key"] == last_group), {})
+            print(_v_rule("-"))
+            print(f"[{last_group}]  {grp.get('title', '')}")
+            print(f"    source: {grp.get('source', '')}")
+            print(f"    report: {grp.get('report', '')}")
+        pm = ", ".join(r["pmids"]) or "n/a"
+        print(f"\n{r['status']:{_V_STATUS_W}s} {r['scope']:{_V_SCOPE_W}s} "
+              f"{r['label']}   [PMID {pm}]")
+        print(f"{pad}compares  : {r['quantity']}")
+        print(f"{pad}predicted : {r['predicted']}")
+        print(f"{pad}measured  : {r['measured']}")
+        if r["bar"]:
+            print(f"{pad}bar       : {r['bar']}")
+        if r["reason"]:
+            print(f"{pad}NO VERDICT: {r['reason']}")
+        if r["note"]:
+            print(f"{pad}note      : {r['note']}")
+        if r["conditional"]:
+            print(f"{pad}conditional on: {', '.join(r['conditional'])}")
+
+    # --- failures, repeated in full ---------------------------------------- #
+    fails = [r for r in rows if r["status"] == SC.FAIL]
+    print()
+    print(_v_rule("="))
+    if fails:
+        print(f"FAILURES ({len(fails)}) -- the model misses these MEASURED values")
+        print(_v_rule("="))
+        for r in fails:
+            print(f"\n  FAIL  {r['group']} / {r['label']}   [PMID "
+                  f"{', '.join(r['pmids']) or 'n/a'}]")
+            print(f"        compares  : {r['quantity']}")
+            print(f"        predicted : {r['predicted']}")
+            print(f"        measured  : {r['measured']}")
+            print(f"        bar       : {r['bar']}")
+            if r["note"]:
+                print(f"        note      : {r['note']}")
+    else:
+        print("FAILURES: none among the rows that carried a verdict.")
+        print(_v_rule("="))
+
+    # --- everything without a verdict -------------------------------------- #
+    nt = [r for r in rows if r["status"] in (SC.NOT_TESTABLE, SC.DEFERRED)]
+    if nt:
+        print()
+        print(_v_rule("="))
+        print(f"NO VERDICT ({len(nt)}) -- NOT a pass. Each row states why.")
+        print(_v_rule("="))
+        for r in nt:
+            print(f"  {r['status']:12s} {r['group']}/{r['label']}: {r['reason']}")
+
+    # --- conditionals ------------------------------------------------------ #
+    if result["conditionals"]:
+        print()
+        print(_v_rule("="))
+        print("CONDITIONALS cited by the rows above")
+        print(_v_rule("="))
+        for key, text in sorted(result["conditionals"].items()):
+            print(f"  [{key}] {text}")
+
+    # --- summary ----------------------------------------------------------- #
+    c = result["counts"]
+    print()
+    print(_v_rule("="))
+    print(f"SUMMARY   PASS {c[SC.PASS]}   FAIL {c[SC.FAIL]}   "
+          f"NOT TESTABLE {c[SC.NOT_TESTABLE]}   DEFERRED {c[SC.DEFERRED]}   "
+          f"(of {result['n_rows']} rows)")
+    if result["n_scored"]:
+        print(f"          {result['n_scored_not_pde']} of the "
+              f"{result['n_scored']} scored rows never invoke the transport PDE. "
+              f"They cannot be cited as evidence about the solver.")
+    if c[SC.FAIL]:
+        print(f"VERDICT   {c[SC.FAIL]} anchor(s) FAIL against measured data. "
+              f"Exiting 1.")
+    else:
+        print("VERDICT   no scored anchor fails. Read the NO VERDICT block "
+              "before calling this validated.")
+    print(_v_rule("="))
+
+
+def _print_anchor_list() -> None:
+    """``--list``: the registry and the deliberate omissions, no computation."""
+    from tmesim.validation import scorecard as SC
+
+    print("\nRegistered external anchors (vivum validate):\n")
+    print(f"{'KEY':22s} {'TIER':6s} {'SCOPE':9s} {'TISSUE':8s} EST")
+    print(_v_rule("-", 92))
+    for g in SC.build_registry():
+        print(f"{g.key:22s} {g.tier:6s} {g.scope:9s} {g.tissue:8s} {g.est}")
+        print(f"{'':22s} {g.title}")
+        print(f"{'':22s} source: {g.source}")
+        print(f"{'':22s} report: {g.report}")
+        if g.needs:
+            print(f"{'':22s} needs : {', '.join(g.needs)}")
+    print("\nInventoried and DELIBERATELY NOT registered, with the reason:\n")
+    for what, why in SC.OUT_OF_SCOPE:
+        print(f"  - {what}")
+        print(f"      {why}")
+    print()
+
+
+def cmd_validate(args: argparse.Namespace) -> int:
+    """Run the external-anchor suite and print the scorecard.
+
+    Thin orchestration only: every comparison is computed by the validation
+    module that already owns it (see ``tmesim/validation/scorecard.py``'s
+    registry), and every verdict is that module's own declared bar. Nothing
+    under ``results/`` is written.
+
+    Returns 1 if any anchor FAILS, so this is usable in CI.
+    """
+    import json
+
+    from tmesim.validation import scorecard as SC
+
+    if args.list_anchors:
+        _print_anchor_list()
+        return 0
+
+    only = [k.strip() for k in args.only.split(",")] if args.only else None
+
+    def _progress(g) -> None:
+        if args.json:
+            return
+        if args.quick and g.tier != SC.TIER_QUICK:
+            print(f"[validate] {g.key:22s} DEFERRED (--quick)", flush=True)
+        else:
+            print(f"[validate] {g.key:22s} running ({g.tier}, {g.est or 'n/a'}) ...",
+                  flush=True)
+
+    try:
+        result = SC.run_suite(quick=args.quick, only=only,
+                              exchange=args.exchange, on_progress=_progress)
+    except KeyError as exc:
+        print(f"[validate] {exc}")
+        return 2
+
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=False, default=str))
+    else:
+        _print_scorecard(result)
+    return int(result["exit_code"])
+
+
+# --------------------------------------------------------------------------- #
 # acquire
 # --------------------------------------------------------------------------- #
 def cmd_acquire(args: argparse.Namespace) -> int:
@@ -643,8 +845,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(
         dest="command",
-        metavar="{reconstruct,simulate,compare-drugs,molecules,molecular-run,"
-                 "acquire,studio}")
+        metavar="{reconstruct,simulate,compare-drugs,validate,molecules,"
+                 "molecular-run,acquire,studio}")
     sub.required = True
 
     # reconstruct
@@ -698,6 +900,43 @@ def build_parser() -> argparse.ArgumentParser:
                        help="path to write the comparison table as CSV "
                             "(default: print only, do not save)")
     p_cmp.set_defaults(func=cmd_compare_drugs)
+
+    # validate
+    p_val = sub.add_parser(
+        "validate",
+        help="score the model against every INDEPENDENT MEASURED literature "
+             "anchor and print a PASS/FAIL/NOT-TESTABLE scorecard",
+        description="Run the external-anchor suite: every place this model is "
+                    "scored against an independent MEASURED number, each row "
+                    "citing its PMID and stating exactly what quantity is being "
+                    "compared. Failures are reported prominently and the "
+                    "command EXITS NON-ZERO if any anchor fails, so it is "
+                    "usable as a CI gate. NOT TESTABLE is a distinct status "
+                    "from PASS and is never pooled with it.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p_val.add_argument("--quick", action="store_true",
+                       help="run only the analytic / literature-table anchors "
+                            "(seconds, no data_cache/ tissue needed). Anchors "
+                            "that need real tissue are reported DEFERRED, which "
+                            "is NOT a pass")
+    p_val.add_argument("--json", action="store_true",
+                       help="emit the scorecard as JSON on stdout instead of "
+                            "the human-readable table")
+    p_val.add_argument("--only", default=None,
+                       help="comma-separated anchor keys to run "
+                            "(see --list for the registry)")
+    p_val.add_argument("--list", dest="list_anchors", action="store_true",
+                       help="list the registered anchors and the validations "
+                            "deliberately left out (with reasons), then exit; "
+                            "runs nothing")
+    p_val.add_argument("--exchange", action="store_true",
+                       help="run the breast transvascular anchor with the "
+                            "opt-in gradient-driven delivery law "
+                            "(PDEConfig.transvascular_exchange) instead of the "
+                            "shipping one-way leak. Every number produced this "
+                            "way is conditional on the uncalibrated "
+                            "PS_SCALE_S_INV -- see the CONDITIONALS block")
+    p_val.set_defaults(func=cmd_validate)
 
     # studio
     p_studio = sub.add_parser(
