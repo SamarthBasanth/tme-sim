@@ -7,7 +7,12 @@ Runs the whole assessment of ``molecular/immune_sink.py`` and writes
   §2  the measured immune field on all three real sections
   §3  the literature anchor converted through each section's own field
   §4  the sweep: mean tumour AUC, coverage at 1x IC50, predicted kill, RANKING
-  §5  THE SPATIAL QUESTION — is the reduction structured, with a permutation null
+  §5  THE SPATIAL QUESTION — is the reduction structured, and by HOW MUCH once
+      the nulls are honest: the measured well-mixed floors, the depth-into-tissue
+      confound, the CV of the sink field, a clumpiness-matched permutation and a
+      block shuffle as the primary comparators (the original label permutation
+      is kept but DEMOTED to a floor check), and a hard refusal to compute any
+      of it on spot data, where no immune cell was ever localised
   §6  the measured human-glioma partition scorecard, re-scored
 
 Nothing outside ``tmesim/molecular/immune_sink.py`` and this file was created or
@@ -66,6 +71,7 @@ from ..physics.diffusion import simulate_drug_transport
 from ..physics.oxygen import solve_oxygen
 from ..physics.pressure import solve_ifp
 from ..reconstruct.real_pipeline import reconstruct_real
+from ..reconstruct.real_visium import _CELLS_PER_SPOT as _VISIUM_CELLS_PER_SPOT
 from ..sim.engine import plasma_profile_safe, simulate_response
 from ..treatment.drugs import delivery_source
 from .calibration import calibrate_alpha
@@ -625,6 +631,645 @@ def spatial_structure(strength: float = SPATIAL_STRENGTH,
 
 
 # --------------------------------------------------------------------------- #
+# §5 (corrected) — THE HONEST NULLS
+#
+# The label permutation above is kept and still computed, but it is DEMOTED to a
+# floor check: it destroys the immune compartment's clumping entirely, and
+# clumping is the very quantity the structure ratio measures, so it produces a
+# sink field far less variable than the observed one and loses a variance-driven
+# contest almost regardless of whether any spatial biology exists. The CV of the
+# sink field is emitted for the observed data and for every null so that this is
+# visible rather than asserted.
+#
+# The two PRIMARY comparators keep every immune cell on a real MEASURED cell
+# position, and differ from the label permutation only in that they are allowed
+# to be as clumped as the data:
+#
+#   * clumpiness-matched permutation — the immune label moves in clumps of
+#     CLUMP_SIZE mutually-nearest measured cells rather than one cell at a time;
+#   * BLOCK_UM block shuffle — the per-block immune COUNTS are permuted across
+#     blocks, so the observed block-scale count heterogeneity is inherited and
+#     only its placement is randomised.
+#
+# The jitter reshuffle is a NEGATIVE CONTROL, not a null: it is the operation
+# ``reconstruct/real_visium.py::_place_cells`` performs by construction, applied
+# to the Xenium section. It is the control that entirely reproduces the statistic
+# on spot data, so its COLLAPSE here is what separates the two platforms.
+# --------------------------------------------------------------------------- #
+
+#: Cells per clump in the clumpiness-matched permutation.
+CLUMP_SIZE = 5
+
+#: Block edge for the block shuffle (um).
+BLOCK_UM = 400.0
+
+#: The Visium synthesis, read off ``reconstruct/real_visium.py``: 12 pseudo-cells
+#: per ~100 um spot, all at the spot centroid with uniform-in-disc jitter of at
+#: most ``min(27.5, 0.45 * dx)`` um. The jitter reshuffle control applies exactly
+#: that operation to the measured Xenium positions.
+SPOT_PITCH_UM = 100.0
+SPOT_JITTER_UM = 27.5
+
+#: Clump sizes for the CV-vs-structure-ratio sweep (one draw each).
+CLUMP_SWEEP_SIZES: Tuple[int, ...] = (1, 5, 20, 50)
+
+#: Random shifts used for the torus-null FEASIBILITY diagnostic. The torus null
+#: is never scored — the diagnostic exists to show why.
+N_TORUS_PROBE = 20
+
+#: The null families, in report order. ``jitter_reshuffle`` is a control.
+NULL_FAMILIES: Tuple[str, ...] = (
+    "clumpiness_matched", "block_shuffle", "label_permutation",
+    "jitter_reshuffle", "spot_emulation",
+)
+
+_PRIMARY_NULLS: Tuple[str, ...] = ("clumpiness_matched", "block_shuffle")
+
+NULL_SEEDS: Dict[str, int] = {
+    "label_permutation": PERM_SEED,
+    "clumpiness_matched": PERM_SEED + 1,
+    "block_shuffle": PERM_SEED + 2,
+    "jitter_reshuffle": PERM_SEED + 3,
+    "spot_emulation": PERM_SEED + 4,
+}
+
+NULL_LABELS: Dict[str, str] = {
+    "clumpiness_matched": "clumpiness-matched permutation",
+    "block_shuffle": f"{BLOCK_UM:.0f} um block shuffle",
+    "label_permutation": "label permutation (as originally published)",
+    "jitter_reshuffle": "jitter reshuffle (re-draw the Visium jitter only)",
+    "spot_emulation": "spot emulation (the whole Visium synthesis)",
+}
+
+
+class SpotDataError(RuntimeError):
+    """Raised when a single-cell-only statistic is asked for on spot data."""
+
+
+#: Reconstruction sources that DO measure individual cell positions.
+_SINGLE_CELL_SOURCES = frozenset({"xenium", "real_xenium", "cosmx", "merfish"})
+#: Reconstruction sources that synthesise pseudo-cells from spot deconvolution.
+_SPOT_SOURCES = frozenset({"visium", "real_visium", "spot"})
+
+
+def reconstruction_provenance(micro: Microenvironment) -> Dict:
+    """Where the cell POSITIONS in ``micro`` came from, from its own metadata.
+
+    This reads ``metadata['real_pipeline']['source']`` (set by
+    ``reconstruct/real_pipeline.py`` for every reconstruction it returns) and the
+    spot-level fingerprints the Visium reconstructor leaves behind
+    (``metadata['source'] == 'real_visium'``, ``metadata['n_spots']``). It never
+    looks at the sample PATH, so a section moved or renamed on disk cannot fool
+    it.
+    """
+    md = dict(micro.metadata or {})
+    rp = md.get("real_pipeline") or {}
+    source = str(rp.get("source") or md.get("source") or "unknown").strip().lower()
+    n_spots = md.get("n_spots")
+    spot_based = bool(source in _SPOT_SOURCES or n_spots is not None)
+    single_cell = bool(source in _SINGLE_CELL_SOURCES and not spot_based)
+    if spot_based:
+        reason = (
+            f"reconstruction source {source!r}"
+            + (f" with {int(n_spots)} spots" if n_spots is not None else "")
+            + " — cell positions are SYNTHESISED: "
+            f"reconstruct/real_visium.py::_place_cells puts a fixed number of "
+            f"pseudo-cells at each spot centroid with uniform-in-disc jitter of "
+            f"at most {SPOT_JITTER_UM:g} um, apportioned by deconvolved "
+            f"fractions. No individual immune cell was ever localised."
+        )
+    elif single_cell:
+        reason = f"reconstruction source {source!r} — measured single-cell centroids"
+    else:
+        reason = (
+            f"reconstruction source {source!r} is not a recognised single-cell "
+            f"platform; positional provenance cannot be established"
+        )
+    return {
+        "source": source, "n_spots": (int(n_spots) if n_spots is not None else None),
+        "spot_based": spot_based, "single_cell": single_cell, "reason": reason,
+    }
+
+
+def require_measured_cell_positions(
+        micro: Microenvironment,
+        what: str = "the immune-density structure ratio") -> Dict:
+    """Refuse to compute ``what`` unless the immune POSITIONS were measured.
+
+    The structure ratio asks whether tumour cells near MEASURED macrophages lose
+    more drug. On a spot platform there are no measured macrophage positions to
+    be near: everything below the ~100 um spot pitch is a random draw, and the
+    sink field is a 25 um-bandwidth KDE of those draws, so every plausible null
+    is comparing a field to itself. The statistic is not weak there, it is
+    undefined, so it is refused rather than degraded.
+    """
+    prov = reconstruction_provenance(micro)
+    if not prov["single_cell"]:
+        raise SpotDataError(
+            f"{what} is INVALID on this reconstruction and will not be "
+            f"computed: {prov['reason']}. See results/immune_sink_impact.md "
+            f"§5.6. Pass allow_invalid=True only to DEMONSTRATE the invalidity; "
+            f"the result is then stamped INVALID and must never be quoted."
+        )
+    return prov
+
+
+def _field_cv(field: np.ndarray, tissue: np.ndarray) -> float:
+    """Coefficient of variation of a field over the tissue mask."""
+    v = np.asarray(field, dtype=np.float64)[np.asarray(tissue, dtype=bool)]
+    m = float(v.mean())
+    return float(v.std() / m) if m > 0 else float("nan")
+
+
+def _spatial_context(strength: float = SPATIAL_STRENGTH,
+                     drug_name: str = "doxorubicin",
+                     dx_um: float = DX_PERM,
+                     sample: str = FLAGSHIP_SECTION,
+                     allow_invalid: bool = False,
+                     verbose: bool = True,
+                     micro: Optional[Microenvironment] = None,
+                     drug: Optional[DrugParams] = None,
+                     pde: Optional[PDEConfig] = None) -> Dict:
+    """Everything every null shares: the section, the prologue, and 2 solves.
+
+    Built ONCE and reused by every null family and every diagnostic, so the only
+    thing that differs between the observed value and any null is `k_sink`.
+
+    ``micro`` / ``drug`` / ``pde`` are injection points for the tests, which run
+    the identical code on a small synthetic section; leaving them at ``None``
+    gives the flagship path exactly as §5 runs it.
+    """
+    if micro is None:
+        micro = _reconstruct(sample, dx_um)
+    prov = reconstruction_provenance(micro)
+    if not allow_invalid:
+        require_measured_cell_positions(micro)
+    if drug is None:
+        alpha = calibrate_alpha()
+        drug, _mol = compile_real_drug(drug_name, alpha)
+    dp = drug
+    cfg = SimConfig(drug=dp, pde=(pde if pde is not None
+                                  else PDEConfig(**_PDE)), seed=0)
+    work, labeled, velocity = _prologue(micro, cfg)
+    source = _source_for(work, dp, cfg)
+    vel = velocity if cfg.pde.convection else None
+
+    cells = micro.cells
+    ct = np.asarray(cells.cell_type)
+    tumor = ct == int(CellType.TUMOR)
+    immune = ct == int(CellType.IMMUNE)
+    x = np.asarray(cells.x, dtype=np.float64)
+    y = np.asarray(cells.y, dtype=np.float64)
+    col, row = micro.domain.to_index(x, y)
+    tissue = np.asarray(micro.domain.tissue_mask, dtype=bool)
+
+    t0 = time.time()
+    base = transport_with_immune_sink(work, dp, source, cfg.pde, velocity=vel,
+                                      sink_rate=None)
+    auc_base = np.asarray(base.auc)[row, col][tumor]
+    phi = immune_area_fraction(micro)
+    k_max = k_max_from_strength(dp, strength)
+    sink = immune_sink_rate(micro, k_max, phi=phi)
+    obs_tr = transport_with_immune_sink(work, dp, source, cfg.pde, velocity=vel,
+                                        sink_rate=sink)
+    auc_obs = np.asarray(obs_tr.auc)[row, col][tumor]
+    if verbose:
+        print(f"    context: 2 solves in {time.time() - t0:.0f}s", flush=True)
+
+    # depth into tissue — the confound §5.1a measures, computed once
+    from scipy.ndimage import distance_transform_edt
+    edge_um = distance_transform_edt(tissue) * float(micro.domain.dx)
+
+    observed = _structure_stats(auc_base, auc_obs, phi[row, col][tumor])
+    observed["sink_cv"] = _field_cv(sink, tissue)
+    observed["phi_mean_tissue"] = float(phi[tissue].mean())
+
+    return {
+        "micro": micro, "work": work, "cfg": cfg, "drug": dp, "source": source,
+        "vel": vel, "tissue": tissue, "row": row, "col": col, "x": x, "y": y,
+        "tumor": tumor, "immune": immune, "n_cells": int(ct.size),
+        "n_immune": int(immune.sum()), "n_tumor": int(tumor.sum()),
+        "phi": phi, "sink": sink, "k_max": float(k_max),
+        "auc_base": auc_base, "auc_obs": auc_obs,
+        "edge_um": edge_um, "edge_at_tumor": edge_um[row, col][tumor],
+        "phi_at_tumor": phi[row, col][tumor],
+        "observed": observed, "provenance": prov,
+        "strength": float(strength), "drug_name": drug_name,
+        "dx_um": float(dx_um), "sample": sample,
+    }
+
+
+def _stats_for_sink(ctx: Dict, sink_field: np.ndarray,
+                    bin_by: Optional[np.ndarray] = None) -> Dict:
+    """One transport re-solve, and the structure statistics that come out of it.
+
+    ``bin_by`` is the per-tumour-cell variable the quintiles are formed on and
+    defaults to the sink field's OWN local immune density — i.e. every null is
+    scored on exactly the statistic the observed value was scored on.
+    """
+    tr = transport_with_immune_sink(ctx["work"], ctx["drug"], ctx["source"],
+                                    ctx["cfg"].pde, velocity=ctx["vel"],
+                                    sink_rate=sink_field)
+    auc = np.asarray(tr.auc)[ctx["row"], ctx["col"]][ctx["tumor"]]
+    if bin_by is None:
+        bin_by = sink_field[ctx["row"], ctx["col"]][ctx["tumor"]]
+    st = _structure_stats(ctx["auc_base"], auc, np.asarray(bin_by))
+    st["sink_cv"] = _field_cv(sink_field, ctx["tissue"])
+    st["sink_mean_tissue"] = float(sink_field[ctx["tissue"]].mean())
+    return st
+
+
+def _stats_for_positions(ctx: Dict, px: np.ndarray, py: np.ndarray) -> Dict:
+    """The null's own immune positions -> its own phi -> its own sink -> stats."""
+    phi_p = immune_area_fraction(ctx["micro"], positions=(px, py))
+    sink_p = immune_sink_rate(ctx["micro"], ctx["k_max"], phi=phi_p)
+    st = _stats_for_sink(ctx, sink_p, bin_by=phi_p[ctx["row"], ctx["col"]][ctx["tumor"]])
+    st["n_placed"] = int(np.asarray(px).size)
+    st["phi_mean_tissue"] = float(phi_p[ctx["tissue"]].mean())
+    st["corr_phi_edge"] = float(np.corrcoef(
+        phi_p[ctx["row"], ctx["col"]][ctx["tumor"]], ctx["edge_at_tumor"])[0, 1])
+    return st
+
+
+# --- the position generators ------------------------------------------------ #
+def _draw_label_permutation(ctx: Dict, rng) -> Tuple[np.ndarray, np.ndarray]:
+    """The ORIGINAL null: the immune label moves one cell at a time."""
+    pick = rng.choice(ctx["n_cells"], size=ctx["n_immune"], replace=False)
+    return ctx["x"][pick], ctx["y"][pick]
+
+
+def _draw_clumpiness_matched(ctx: Dict, rng,
+                             clump_size: int = CLUMP_SIZE
+                             ) -> Tuple[np.ndarray, np.ndarray]:
+    """The immune label moves in CLUMPS of mutually-nearest measured cells.
+
+    A seed cell is drawn at random and its ``clump_size`` nearest MEASURED
+    neighbours (of any type) take the immune label together, until the observed
+    immune count is reached. Every immune cell therefore still sits on a real
+    measured cell position and the total count is exactly preserved — the only
+    thing that changes relative to the label permutation is that the null is
+    allowed to be as clumped as the data.
+    """
+    tree = ctx["_tree_all"]
+    pts = ctx["_pts_all"]
+    n_cells, n_immune = ctx["n_cells"], ctx["n_immune"]
+    taken = np.zeros(n_cells, dtype=bool)
+    picked: List[int] = []
+    k = max(int(clump_size), 1)
+    while len(picked) < n_immune:
+        need = n_immune - len(picked)
+        n_seed = max(1, int(np.ceil(need / k)))
+        seeds = rng.choice(n_cells, size=min(n_seed, n_cells), replace=False)
+        _d, nbr = tree.query(pts[seeds], k=k)
+        nbr = np.atleast_2d(nbr)
+        for j in nbr.reshape(-1):
+            if not taken[j]:
+                taken[j] = True
+                picked.append(int(j))
+                if len(picked) >= n_immune:
+                    break
+    idx = np.asarray(picked[:n_immune], dtype=int)
+    return ctx["x"][idx], ctx["y"][idx]
+
+
+def _draw_block_shuffle(ctx: Dict, rng, block_um: float = BLOCK_UM
+                        ) -> Tuple[np.ndarray, np.ndarray]:
+    """Permute the per-block immune COUNTS across ``block_um`` blocks.
+
+    The observed section is tiled into ``block_um`` squares. Each block's
+    observed immune count is reassigned to a randomly chosen OTHER block, which
+    then draws that many of its own measured cells to carry the immune label.
+    The block-scale count heterogeneity of the real section is therefore
+    inherited exactly (only relocated), every immune cell stays on a measured
+    cell position, and the total count is preserved up to block capacity — any
+    shortfall is topped up among blocks with spare capacity, and the realised
+    count is reported.
+    """
+    x, y = ctx["x"], ctx["y"]
+    bx = np.floor(x / float(block_um)).astype(np.int64)
+    by = np.floor(y / float(block_um)).astype(np.int64)
+    key = bx * 1000003 + by
+    uniq, inv = np.unique(key, return_inverse=True)
+    n_blocks = int(uniq.size)
+    members = [np.flatnonzero(inv == b) for b in range(n_blocks)]
+    imm = ctx["immune"]
+    counts = np.array([int(imm[m].sum()) for m in members], dtype=int)
+    cap = np.array([int(m.size) for m in members], dtype=int)
+
+    order = rng.permutation(n_blocks)
+    want = counts[order]                       # block b receives block order[b]'s count
+    take = np.minimum(want, cap)
+    picked: List[np.ndarray] = []
+    for b in range(n_blocks):
+        if take[b] <= 0:
+            continue
+        picked.append(rng.choice(members[b], size=int(take[b]), replace=False))
+    chosen = np.concatenate(picked) if picked else np.zeros(0, dtype=int)
+
+    deficit = int(ctx["n_immune"] - chosen.size)
+    if deficit > 0:                            # top up where there is room
+        free = np.ones(ctx["n_cells"], dtype=bool)
+        free[chosen] = False
+        spare = np.flatnonzero(free)
+        extra = rng.choice(spare, size=min(deficit, spare.size), replace=False)
+        chosen = np.concatenate([chosen, extra])
+    return x[chosen], y[chosen]
+
+
+def _draw_jitter_reshuffle(ctx: Dict, rng, jitter_um: float = SPOT_JITTER_UM
+                           ) -> Tuple[np.ndarray, np.ndarray]:
+    """Re-draw the synthetic JITTER, and nothing else.
+
+    Every measured immune cell is displaced by a uniform-in-disc offset of at
+    most ``jitter_um`` — the exact amplitude ``real_visium.py::_place_cells``
+    applies (``jitter_um = min(27.5, 0.45 dx)``). Nothing about which
+    neighbourhood a macrophage is in changes; only positional detail AT THE
+    VISIUM JITTER SCALE is re-randomised.
+
+    On a spot reconstruction this control is a no-op by construction — the
+    positions WERE a centroid plus this jitter — so it reproduces the observed
+    statistic there and leaves nothing. That is why its behaviour here is
+    decisive: if the Xenium number were the same artefact, this would reproduce
+    it here too.
+    """
+    x = ctx["x"][ctx["immune"]]
+    y = ctx["y"][ctx["immune"]]
+    ang = rng.uniform(0.0, 2.0 * np.pi, size=x.size)
+    rad = float(jitter_um) * np.sqrt(rng.uniform(0.0, 1.0, size=x.size))
+    w, h = ctx["micro"].domain.extent_um
+    return (np.clip(x + rad * np.cos(ang), 0.0, w),
+            np.clip(y + rad * np.sin(ang), 0.0, h))
+
+
+def _draw_spot_emulation(ctx: Dict, rng, pitch_um: float = SPOT_PITCH_UM,
+                         jitter_um: float = SPOT_JITTER_UM
+                         ) -> Tuple[np.ndarray, np.ndarray]:
+    """The whole Visium synthesis, applied to the measured Xenium immune cells.
+
+    Every measured immune cell is snapped to the centroid of its ``pitch_um``
+    lattice cell and re-placed with uniform-in-disc jitter of at most
+    ``jitter_um`` — literally what ``real_visium.py::_place_cells`` does. The
+    per-spot immune COUNT is preserved exactly; everything finer is destroyed and
+    redrawn. This answers "what would this section's statistic be if it had been
+    measured at spot resolution", and it is reported as a CONTROL rather than a
+    null because snapping to a lattice CONCENTRATES the point pattern and
+    therefore biases the sink-field CV upward, in the same mechanical way the
+    torus shift does.
+    """
+    x = ctx["x"][ctx["immune"]]
+    y = ctx["y"][ctx["immune"]]
+    cx = (np.floor(x / float(pitch_um)) + 0.5) * float(pitch_um)
+    cy = (np.floor(y / float(pitch_um)) + 0.5) * float(pitch_um)
+    ang = rng.uniform(0.0, 2.0 * np.pi, size=x.size)
+    rad = float(jitter_um) * np.sqrt(rng.uniform(0.0, 1.0, size=x.size))
+    w, h = ctx["micro"].domain.extent_um
+    return (np.clip(cx + rad * np.cos(ang), 0.0, w),
+            np.clip(cy + rad * np.sin(ang), 0.0, h))
+
+
+def _draw_uniform_in_tissue(ctx: Dict, rng) -> Tuple[np.ndarray, np.ndarray]:
+    """Scatter the same number of immune cells uniformly INSIDE the tissue mask.
+
+    Contains no measured immune structure whatsoever, which is what makes it the
+    right control for the monotonicity question (§5.4).
+    """
+    tissue = ctx["tissue"]
+    dx = float(ctx["micro"].domain.dx)
+    rr, cc = np.nonzero(tissue)
+    pick = rng.choice(rr.size, size=ctx["n_immune"], replace=True)
+    px = (cc[pick] + rng.uniform(0.0, 1.0, size=pick.size)) * dx
+    py = (rr[pick] + rng.uniform(0.0, 1.0, size=pick.size)) * dx
+    return px, py
+
+
+_DRAWERS = {
+    "label_permutation": _draw_label_permutation,
+    "clumpiness_matched": _draw_clumpiness_matched,
+    "block_shuffle": _draw_block_shuffle,
+    "jitter_reshuffle": _draw_jitter_reshuffle,
+    "spot_emulation": _draw_spot_emulation,
+}
+
+
+def _ensure_tree(ctx: Dict) -> None:
+    if "_tree_all" not in ctx:
+        from scipy.spatial import cKDTree
+        pts = np.column_stack([ctx["x"], ctx["y"]])
+        ctx["_pts_all"] = pts
+        ctx["_tree_all"] = cKDTree(pts)
+
+
+def null_family(ctx: Dict, family: str, n_draws: int = N_PERM,
+                seed: Optional[int] = None, verbose: bool = True) -> Dict:
+    """Run one null family: ``n_draws`` full transport re-solves.
+
+    Emits, per draw and in the summary, the CV of the sink field — the diagnostic
+    that shows WHICH nulls are being asked a fair question and which are not.
+    """
+    if family not in _DRAWERS:
+        raise ValueError(f"unknown null family {family!r}; "
+                         f"expected one of {sorted(_DRAWERS)}")
+    _ensure_tree(ctx)
+    rng = np.random.default_rng(NULL_SEEDS[family] if seed is None else seed)
+    draw = _DRAWERS[family]
+    obs = ctx["observed"]
+    rows: List[Dict] = []
+    for i in range(int(n_draws)):
+        t0 = time.time()
+        px, py = draw(ctx, rng)
+        st = _stats_for_positions(ctx, px, py)
+        st["draw"] = i
+        rows.append(st)
+        if verbose:
+            print(f"    [{family}] {i + 1}/{n_draws} {time.time() - t0:.0f}s "
+                  f"SR={st['structure_ratio']:.4f} CV={st['sink_cv']:.3f} "
+                  f"n={st['n_placed']}", flush=True)
+
+    def _arr(k: str) -> np.ndarray:
+        return np.array([r[k] for r in rows], dtype=np.float64)
+
+    sr, sp_, cv = _arr("structure_ratio"), _arr("a_p90_over_p10"), _arr("sink_cv")
+    am = _arr("a_mean")
+    quint = np.array([[b["attenuation_mean"] for b in r["bins"]] for r in rows],
+                     dtype=np.float64)
+    qmean = quint.mean(axis=0) if quint.size else np.full(N_BINS, np.nan)
+    return {
+        "family": family, "label": NULL_LABELS[family], "n_draws": int(n_draws),
+        "seed": int(NULL_SEEDS[family] if seed is None else seed),
+        "is_primary": family in _PRIMARY_NULLS,
+        "sr_mean": float(sr.mean()), "sr_min": float(sr.min()),
+        "sr_max": float(sr.max()), "sr_std": float(sr.std()),
+        "spread_mean": float(sp_.mean()), "spread_min": float(sp_.min()),
+        "spread_max": float(sp_.max()),
+        "cv_mean": float(cv.mean()), "cv_min": float(cv.min()),
+        "cv_max": float(cv.max()),
+        "a_mean_mean": float(am.mean()),
+        "n_placed_mean": float(np.mean([r["n_placed"] for r in rows])),
+        "corr_phi_edge_mean": float(np.mean([r["corr_phi_edge"] for r in rows])),
+        "quintile_attenuation_mean": [float(v) for v in qmean],
+        "monotone": bool(np.all(np.diff(qmean) < 0.0)),
+        # one-sided permutation p-values; at n draws the FLOOR is 1/(1+n)
+        "p_structure_ratio": float((1.0 + np.sum(sr >= obs["structure_ratio"]))
+                                   / (1.0 + sr.size)),
+        "p_spread": float((1.0 + np.sum(sp_ >= obs["a_p90_over_p10"]))
+                          / (1.0 + sp_.size)),
+        "p_floor": float(1.0 / (1.0 + sr.size)),
+        "excess_over_null": float(obs["structure_ratio"] / sr.mean())
+        if sr.mean() > 0 else float("nan"),
+        "draws": rows,
+    }
+
+
+def spatial_diagnostics(ctx: Dict, verbose: bool = True) -> Dict:
+    """The floors, the depth confound, the CV sweep and the torus feasibility.
+
+    Costs 2 + ``len(CLUMP_SWEEP_SIZES)`` transport re-solves. Nothing here is a
+    scored null; every entry exists to stop a statistic being quoted against an
+    ASSUMED floor of 1.0.
+    """
+    _ensure_tree(ctx)
+    tissue, phi = ctx["tissue"], ctx["phi"]
+    obs = ctx["observed"]
+
+    # --- floor 1: a genuinely WELL-MIXED sink of the same tissue-mean magnitude
+    t0 = time.time()
+    uniform = np.zeros_like(phi)
+    uniform[tissue] = float(ctx["sink"][tissue].mean())
+    uni = _stats_for_sink(ctx, uniform, bin_by=ctx["phi_at_tumor"])
+    if verbose:
+        print(f"    [floor] uniform sink {time.time() - t0:.0f}s "
+              f"SR={uni['structure_ratio']:.4f} "
+              f"p90/p10={uni['a_p90_over_p10']:.4f}", flush=True)
+
+    # --- the depth-into-tissue confound, with NO immune input at all ----------
+    from scipy.stats import spearmanr
+    edge = ctx["edge_at_tumor"]
+    edge_stats = _structure_stats(ctx["auc_base"], ctx["auc_obs"], edge)
+    corr_pearson = float(np.corrcoef(ctx["phi_at_tumor"], edge)[0, 1])
+    corr_spearman = float(spearmanr(ctx["phi_at_tumor"], edge).statistic)
+
+    # within-edge-stratum immune structure ratio
+    q = np.quantile(edge, np.linspace(0.0, 1.0, N_BINS + 1))
+    q[0] -= 1e-12
+    strat_idx = np.clip(np.searchsorted(q, edge, side="left") - 1, 0, N_BINS - 1)
+    strata = []
+    for s in range(N_BINS):
+        m = strat_idx == s
+        if m.sum() < 5 * N_BINS:
+            strata.append(float("nan"))
+            continue
+        st = _structure_stats(ctx["auc_base"][m], ctx["auc_obs"][m],
+                              ctx["phi_at_tumor"][m])
+        strata.append(float(st["structure_ratio"]))
+
+    # --- the monotonicity control: uniform-in-tissue scatter ------------------
+    t0 = time.time()
+    rng = np.random.default_rng(PERM_SEED + 11)
+    ux, uy = _draw_uniform_in_tissue(ctx, rng)
+    scatter = _stats_for_positions(ctx, ux, uy)
+    if verbose:
+        print(f"    [control] uniform-in-tissue scatter {time.time() - t0:.0f}s "
+              f"SR={scatter['structure_ratio']:.4f} "
+              f"CV={scatter['sink_cv']:.3f}", flush=True)
+
+    # --- CV sweep: the structure ratio very largely TRACKS sink-field CV ------
+    sweep_rows: List[Dict] = []
+    for k in CLUMP_SWEEP_SIZES:
+        t0 = time.time()
+        r = np.random.default_rng(PERM_SEED + 100 + int(k))
+        px, py = _draw_clumpiness_matched(ctx, r, clump_size=int(k))
+        st = _stats_for_positions(ctx, px, py)
+        sweep_rows.append({"clump_size": int(k), "sink_cv": st["sink_cv"],
+                           "structure_ratio": st["structure_ratio"]})
+        if verbose:
+            print(f"    [cv-sweep] clump={k} {time.time() - t0:.0f}s "
+                  f"CV={st['sink_cv']:.3f} SR={st['structure_ratio']:.4f}",
+                  flush=True)
+
+    # --- torus FEASIBILITY (never scored) ------------------------------------
+    r = np.random.default_rng(PERM_SEED + 7)
+    w, h = ctx["micro"].domain.extent_um
+    xi = ctx["x"][ctx["immune"]]
+    yi = ctx["y"][ctx["immune"]]
+    inside, phi_ratio, cv_ratio = [], [], []
+    for _ in range(N_TORUS_PROBE):
+        sx, sy = r.uniform(0.0, w), r.uniform(0.0, h)
+        tx, ty = np.mod(xi + sx, w), np.mod(yi + sy, h)
+        c, rw = ctx["micro"].domain.to_index(tx, ty)
+        keep = tissue[rw, c]
+        inside.append(float(keep.mean()))
+        phi_t = immune_area_fraction(ctx["micro"],
+                                     positions=(tx[keep], ty[keep]))
+        phi_ratio.append(float(phi_t[tissue].mean() / phi[tissue].mean()))
+        cv_ratio.append(_field_cv(phi_t, tissue) / obs["sink_cv"])
+
+    # --- the tissue's own density envelope (why depth carries a gradient) -----
+    rim_um = max(IMMUNE_KERNEL_BANDWIDTH_UM, float(ctx["micro"].domain.dx))
+    rim = ctx["edge_um"][tissue] <= rim_um
+    from scipy.ndimage import gaussian_filter
+    counts = ctx["micro"].domain.zeros()
+    np.add.at(counts, (ctx["row"], ctx["col"]), 1.0)
+    dens = gaussian_filter(counts, sigma=max(IMMUNE_KERNEL_BANDWIDTH_UM
+                                             / float(ctx["micro"].domain.dx), 1e-6),
+                           mode="constant")
+    rim_mean = float(dens[tissue][rim].mean()) if rim.any() else float("nan")
+    core_mean = float(dens[tissue][~rim].mean()) if (~rim).any() else float("nan")
+
+    return {
+        "uniform_sink_floor": uni,
+        "edge_distance": {
+            "stats": edge_stats,
+            "corr_phi_edge_pearson": corr_pearson,
+            "corr_phi_edge_spearman": corr_spearman,
+            "within_stratum_sr": strata,
+            "density_rim_mean": rim_mean, "density_core_mean": core_mean,
+            "density_envelope_ratio": (core_mean / rim_mean
+                                       if rim_mean > 0 else float("nan")),
+            "rim_um": float(rim_um),
+        },
+        "uniform_in_tissue_scatter": scatter,
+        "cv_sweep": sweep_rows,
+        "torus": {
+            "n_probe": N_TORUS_PROBE,
+            "fraction_in_tissue_mean": float(np.mean(inside)),
+            "fraction_in_tissue_min": float(np.min(inside)),
+            "fraction_in_tissue_max": float(np.max(inside)),
+            "phi_mean_ratio": float(np.mean(phi_ratio)),
+            "cv_ratio": float(np.mean(cv_ratio)),
+        },
+    }
+
+
+def honest_spatial_summary(ctx_meta: Dict, families: Dict[str, Dict],
+                           diag: Dict) -> Dict:
+    """Fold the families and the diagnostics into the numbers §5 leads with."""
+    obs = ctx_meta["observed"]
+    primary = [families[f] for f in _PRIMARY_NULLS if f in families]
+    excess = [p["excess_over_null"] for p in primary]
+    return {
+        "observed_structure_ratio": float(obs["structure_ratio"]),
+        "observed_spread": float(obs["a_p90_over_p10"]),
+        "observed_sink_cv": float(obs["sink_cv"]),
+        "honest_excess_min": float(min(excess)) if excess else float("nan"),
+        "honest_excess_max": float(max(excess)) if excess else float("nan"),
+        "primary_families": list(_PRIMARY_NULLS),
+        "well_mixed_sr_floor": float(diag["uniform_sink_floor"]["structure_ratio"]),
+        "well_mixed_spread_floor": float(diag["uniform_sink_floor"]["a_p90_over_p10"]),
+        "spread_excess_over_floor": float(
+            obs["a_p90_over_p10"] / diag["uniform_sink_floor"]["a_p90_over_p10"]),
+        "edge_only_structure_ratio": float(
+            diag["edge_distance"]["stats"]["structure_ratio"]),
+        # the floor is 1/(1+draws) at the number of draws ACTUALLY run
+        "p_floor": float(max(p["p_floor"] for p in primary))
+        if primary else float("nan"),
+        "p_primary_max": float(max(p["p_structure_ratio"] for p in primary))
+        if primary else float("nan"),
+        "above_all_primary_null_draws": bool(all(
+            obs["structure_ratio"] > p["sr_max"] for p in primary)),
+    }
+
+
+# --------------------------------------------------------------------------- #
 # §6 — the measured human-glioma partition scorecard
 # --------------------------------------------------------------------------- #
 def glioma_scorecard(mean_phi: float,
@@ -715,7 +1360,23 @@ def _f(x: float, n: int = 4) -> str:
 
 def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
                  sc: Dict, spf: Optional[Dict] = None,
+                 hc: Optional[Dict] = None,
+                 families: Optional[Dict[str, Dict]] = None,
+                 diag: Optional[Dict] = None,
+                 hon: Optional[Dict] = None,
                  path: str = REPORT_MD) -> str:
+    if not (hc and families and diag and hon):
+        raise ValueError(
+            "write_report requires the honest-null results (hc, families, "
+            "diag, hon). Refusing to regenerate results/immune_sink_impact.md "
+            "from the label-permutation null alone: that is exactly the claim "
+            "the §5 correction removed, and a report that silently reverts to "
+            "it is worse than no report. Run tmesim.validation."
+            "immune_sink_impact.run(), which computes them."
+        )
+    fams: Dict[str, Dict] = families
+    dg: Dict = diag
+
     A: List[str] = []
     a = A.append
 
@@ -733,14 +1394,80 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
       "spatial structure is the whole result")
     a("")
     p_sr = float(sp["p_structure_ratio"])
-    beats_null = p_sr <= 0.05
+    beats_null = bool(hon["above_all_primary_null_draws"])
+    _lab, _clump, _block = (fams["label_permutation"],
+                            fams["clumpiness_matched"], fams["block_shuffle"])
+    _floor = dg["uniform_sink_floor"]
+    _edge = dg["edge_distance"]
+    ex_lo, ex_hi = hon["honest_excess_min"], hon["honest_excess_max"]
+    p_floor = hon["p_floor"]
     null_clause = (
-        f"and it beats a label-permutation null at p = {_f(p_sr, 4)}"
+        f"the observed value still sits above their entire ranges "
+        f"(p = {_f(p_floor, 4)}, the {_lab['n_draws']}-draw floor)"
         if beats_null else
-        f"but it does NOT beat a label-permutation null (p = {_f(p_sr, 4)}), "
-        f"i.e. the structure is a property of where the CELLS are and not "
-        f"specifically of where the MACROPHAGES are"
+        f"the observed value does NOT clear their ranges, so at "
+        f"{_lab['n_draws']} draws the measured macrophage positions are not "
+        f"distinguishable from an equally-clumped rearrangement of them"
     )
+
+    # ---- the CORRECTION NOTICE, emitted by the generator that computes it ----
+    a("> ## CORRECTION NOTICE — the headline spatial number is smaller than this "
+      "report originally claimed")
+    a(">")
+    a(f"> An audit of §5 found that the "
+      f"{_f(obs['structure_ratio'], 4)}x structure ratio was being quoted "
+      f"against a null that is too weak to be informative, and that a large part "
+      f"of the spread is a transport gradient with depth into tissue rather than "
+      f"immune biology. **The honest excess attributable to where the "
+      f"macrophages actually sit is ~{_f(ex_lo, 2)}-{_f(ex_hi, 2)}x, not "
+      f"{_f(obs['structure_ratio'], 1)}x.** "
+      + ("The effect is still there and it still clears an honest null — but "
+         "the excess over that null is "
+         f"{_f(ex_lo - 1.0, 2)}-{_f(ex_hi - 1.0, 2)}, against the "
+         f"{_f(obs['structure_ratio'] - 1.0, 1)} excess that "
+         f"\"{_f(obs['structure_ratio'], 1)}x versus a well-mixed 1.0\" "
+         f"advertised."
+         if beats_null else
+         "The effect does not clear an honest null at all."))
+    a(">")
+    a("> The nulls, the floors, the depth confound and the CV diagnostic below "
+      "are all computed by "
+      "`tmesim/validation/immune_sink_impact.py`, so re-running the command in "
+      "§9 reproduces this correction rather than reverting it. What changed, in "
+      "one place:")
+    a(">")
+    a("> | claim as originally published | corrected |")
+    a("> |---|---|")
+    a(f"> | structure ratio {_f(obs['structure_ratio'], 4)}x \"against a "
+      f"well-mixed model's exactly 1.0\" | observed "
+      f"{_f(obs['structure_ratio'], 4)}x is real and reproduces to the digit. "
+      f"But the defensible comparator is a **spatially-aware** null, not a "
+      f"well-mixed one: clumpiness-matched permutation "
+      f"**{_f(_clump['sr_mean'], 4)}**, {BLOCK_UM:.0f} um block shuffle "
+      f"**{_f(_block['sr_mean'], 4)}**. **Excess = "
+      f"{_f(_clump['excess_over_null'], 3)}x and "
+      f"{_f(_block['excess_over_null'], 3)}x.** |")
+    a(f"> | the label-permutation null (mean {_f(_lab['sr_mean'], 4)}) is the "
+      f"evidence | that null under-clumps the sink field it is being compared "
+      f"against — CV **{_f(_lab['cv_mean'], 2)}** vs the observed "
+      f"**{_f(hon['observed_sink_cv'], 3)}** — so it loses almost "
+      f"automatically. It is **demoted** to a floor check (§5.3). |")
+    a(f"> | the quintile gradient is an immune effect | binning the same tumour "
+      f"cells by **distance to tissue edge alone**, with no reference to immune "
+      f"density at all, already gives SR "
+      f"**{_f(_edge['stats']['structure_ratio'], 4)}** (§5.1a). |")
+    a("> | monotonicity across all five quintiles is corroboration | **every** "
+      "control is monotone, including uniform-in-tissue scatter. Monotonicity "
+      "is not evidence (§5.4). |")
+    a(f"> | p90/p10 spread {_f(obs['a_p90_over_p10'], 4)}x against a well-mixed "
+      f"1.0 | the well-mixed floor for that statistic is "
+      f"**{_f(_floor['a_p90_over_p10'], 4)}**, not 1.0 (§5.1). |")
+    a("> | (not previously stated) | **the statistic is INVALID on Visium/spot "
+      "data**; the generator now REFUSES to compute it there (§5.6). |")
+    a(">")
+    a("> Nothing in §1-§4 or §6 changes. Those sections were not implicated by "
+      "the audit.")
+    a("")
     imm_lo = min(r["immune_pct"] for r in fields)
     imm_hi = max(r["immune_pct"] for r in fields)
     a("**Verdict up front.** The immune compartment was pharmacologically inert: "
@@ -750,14 +1477,20 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
       "MEASURED immune-cell area fraction — and the honest findings are three. "
       "**(i) The literature supports a DIRECTION and not a MAGNITUDE**, and for "
       "free doxorubicin the one direct measurement is NEGATIVE, so the magnitude "
-      "is swept and never fitted. **(ii) The reduction is spatially "
-      "structured rather than uniform** — tumour cells in the macrophage-densest "
-      f"quintile keep {_f(obs['bins'][-1]['attenuation_mean'], 4)} of their "
+      "is swept and never fitted. **(ii) The reduction is spatially structured "
+      "rather than uniform, but the structure attributable to immune geometry is "
+      f"~{_f(ex_lo, 2)}-{_f(ex_hi, 2)}x, not the "
+      f"{_f(obs['structure_ratio'], 1)}x this report previously led with.** The "
+      f"raw quintile contrast is {_f(obs['structure_ratio'], 4)}x (densest "
+      f"quintile keeps {_f(obs['bins'][-1]['attenuation_mean'], 4)} of its "
       f"exposure against {_f(obs['bins'][0]['attenuation_mean'], 4)} in the "
-      f"sparsest, a **{_f(obs['structure_ratio'], 4)}x** contrast that a "
-      f"well-mixed model gives as exactly 1.0000, {null_clause}. "
-      "**(iii) It does not improve the measured human-glioma anchor**, so it "
-      "ships DEFAULT-OFF.")
+      f"sparsest), but most of that is reproduced by nulls that keep the "
+      f"macrophages' clumpiness ({_f(_clump['sr_mean'], 4)} and "
+      f"{_f(_block['sr_mean'], 4)}) and by a depth-into-tissue gradient with no "
+      f"immune content at all ({_f(_edge['stats']['structure_ratio'], 4)}); "
+      f"against honest spatially-aware nulls {null_clause}, which is what "
+      "remains defensible. **(iii) It does not improve the measured "
+      "human-glioma anchor**, so it ships DEFAULT-OFF.")
     a("")
     a("| question | answer |")
     a("|---|---|")
@@ -773,9 +1506,17 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
       f"{_f(doxmax['kill_fraction'])} |")
     a(f"| **cross-drug RANKING across the whole sweep** | "
       f"**{'INVARIANT' if sw['ranking_invariant'] else 'CHANGES'}** |")
-    a(f"| spatial structure ratio (sparsest / densest immune quintile) | "
-      f"**{_f(obs['structure_ratio'], 4)}x**, permutation p = "
-      f"{_f(sp['p_structure_ratio'], 4)} |")
+    a(f"| spatial structure ratio, raw (sparsest / densest immune quintile) | "
+      f"{_f(obs['structure_ratio'], 4)}x |")
+    _p_prim = hon["p_primary_max"]
+    a(f"| **same ratio, excess over an honest spatially-aware null** | "
+      f"**{_f(ex_lo, 2)}-{_f(ex_hi, 2)}x**, p = {_f(_p_prim, 4)}"
+      + (f" (= the {_lab['n_draws']}-permutation floor)"
+         if abs(_p_prim - p_floor) < 1e-12 else "") + " |")
+    a(f"| same ratio from tissue-EDGE DISTANCE alone, no immune input | "
+      f"{_f(_edge['stats']['structure_ratio'], 4)}x — see §5.1a |")
+    a(f"| validity on Visium / spot transcriptomics | **INVALID — refused by "
+      f"the generator (§5.6)** |")
     a(f"| human glioma scorecard, GM abs fold error | "
       f"{_f(sc['baseline']['gm_abs'], 3)}x -> "
       f"{_f(sc['best_modality_aware']['gm_abs'], 3)}x at best swept S "
@@ -1100,31 +1841,70 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
     a("")
 
     # ---------------- §5 -----------------------------------------------------
+    lab = fams["label_permutation"]
+    clump = fams["clumpiness_matched"]
+    block = fams["block_shuffle"]
+    jit = fams.get("jitter_reshuffle")
+    spot_em = fams.get("spot_emulation")
+    floor = dg["uniform_sink_floor"]
+    edge = dg["edge_distance"]
+    scat = dg["uniform_in_tissue_scatter"]
+    ex_lo, ex_hi = hon["honest_excess_min"], hon["honest_excess_max"]
+    p_floor = hon["p_floor"]
+
     a("## 5. THE SPATIAL QUESTION — is the reduction structured, or just smaller?")
     a("")
-    a("This is the section the whole module exists for. **A uniform reduction is "
-      "pharmacologically boring: a compartmental model reproduces it exactly by "
-      "lowering one rate constant.** The question is whether tumour cells sitting "
-      "in macrophage-dense neighbourhoods are measurably worse off than tumour "
-      "cells that are not — because that is a statement only a spatial model can "
-      "make.")
+    a("This is the section the whole module exists for, and it is the section "
+      "the audit corrected. **A uniform reduction is pharmacologically boring: "
+      "a compartmental model reproduces it exactly by lowering one rate "
+      "constant.** The question is whether tumour cells sitting in "
+      "macrophage-dense neighbourhoods are measurably worse off than tumour "
+      "cells that are not — because that is a statement only a spatial model "
+      "can make.")
+    a("")
+    a(f"**Read the answer first, then the working.** The raw quintile contrast "
+      f"is {_f(obs['structure_ratio'], 4)}x and reproduces to the digit. But "
+      f"three things have to be subtracted from it before it means what this "
+      f"report originally claimed it meant: a depth-into-tissue transport "
+      f"gradient that carries {_f(edge['stats']['structure_ratio'], 4)}x on its "
+      f"own with no immune input (§5.1a), a null that under-clumps the sink "
+      f"field and therefore loses without contest (§5.3), and a monotonicity "
+      f"argument that every control also satisfies (§5.4). What survives all "
+      f"three is an excess of **{_f(ex_lo, 2)}-{_f(ex_hi, 2)}x** over honest "
+      f"spatially-aware nulls"
+      + (f", above their entire ranges at p = {_f(p_floor, 4)} (the "
+         f"{lab['n_draws']}-draw floor)."
+         if hon["above_all_primary_null_draws"] else
+         f" — and it does NOT clear their entire ranges, so the effect is not "
+         f"separable from them at {lab['n_draws']} draws."))
     a("")
     a(f"**Configuration.** `{sp['drug']}` at S = {sp['strength']:g} (the sweep "
-      f"point nearest the Miller anchor), flagship section, dx = "
-      f"{sp['dx_um']:.0f} um, {sp['n_tumor']:,} tumour cells and "
-      f"{sp['n_immune']:,} immune cells. The statistic is the per-tumour-cell "
-      f"**attenuation** `a_i = AUC_sink,i / AUC_base,i`, from the SAME "
-      f"prologue, source field and velocity field — the only difference between "
-      f"the two solves is `k_sink`.")
+      f"point nearest the Miller anchor), flagship section `{FLAGSHIP_SECTION}`, "
+      f"dx = {sp['dx_um']:.0f} um, transvascular exchange off, "
+      f"{sp['n_tumor']:,} tumour cells and {sp['n_immune']:,} immune cells. The "
+      f"statistic is the per-tumour-cell **attenuation** "
+      f"`a_i = AUC_sink,i / AUC_base,i`, from the SAME prologue, source field "
+      f"and velocity field — the only difference between the two solves is "
+      f"`k_sink`.")
+    a("")
+    a(f"The observed statistic is computed twice by two independent code paths "
+      f"in this file (`spatial_structure` for §5.5's mesh check and "
+      f"`_spatial_context` for the nulls below); they agree to "
+      f"{_f(abs(hc['observed']['structure_ratio'] - obs['structure_ratio']), 6)} "
+      f"absolute"
+      + (", which is the internal consistency check on everything that follows."
+         if abs(hc['observed']['structure_ratio'] - obs['structure_ratio']) < 1e-6
+         else " — which is NOT agreement to round-off, and until that is "
+              "explained no §5 number should be quoted."))
     a("")
     if spf is not None and abs(spf["dx_um"] - sp["dx_um"]) > 1e-9:
-        a(f"**A declared cost decision, and it is priced.** Every permutation is "
-          f"a full transport re-solve, so the null runs at dx = "
+        a(f"**A declared cost decision, and it is priced.** Every null draw is a "
+          f"full transport re-solve, so the nulls run at dx = "
           f"{sp['dx_um']:.0f} um rather than the flagship "
           f"{spf['dx_um']:.0f} um (~2.8x fewer unknowns). Because this project "
           f"treats mesh-dependence as a first-class failure mode, the SAME "
           f"observed statistic is also computed at the flagship spacing and "
-          f"both are reported in §5.4 — so the reader can see directly whether "
+          f"both are reported in §5.5 — so the reader can see directly whether "
           f"the structure is a property of the tissue or of the grid.")
         a("")
     a("### 5.1 Tumour-cell exposure binned by LOCAL IMMUNE DENSITY")
@@ -1138,12 +1918,117 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
           f"{_f(b['auc_sink_mean'], 1)} | **{_f(b['attenuation_mean'], 4)}** |")
     a("")
     a(f"**Structure ratio** (mean attenuation in the sparsest quintile / mean "
-      f"attenuation in the densest) = **{_f(obs['structure_ratio'], 4)}x**. A "
-      f"well-mixed sink of any magnitude gives exactly **1.0000**. The bin-free "
-      f"version — the p90/p10 spread of the per-cell attenuation — is "
-      f"**{_f(obs['a_p90_over_p10'], 4)}x**, over a full range of "
-      f"{_f(obs['a_min'], 4)} to {_f(obs['a_max'], 4)}, against a section-mean "
-      f"attenuation of {_f(obs['a_mean'], 4)}.")
+      f"attenuation in the densest) = **{_f(obs['structure_ratio'], 4)}x**. This "
+      f"number is correct and reproduces to the digit; what it is compared "
+      f"against is where this report previously went wrong. Read §5.1a, §5.3 "
+      f"and §5.4 before quoting it.")
+    a("")
+    a("**The two floors, MEASURED rather than asserted.** The claim \"a "
+      "well-mixed model gives exactly 1.0\" is not assumed here: a genuinely "
+      "uniform sink field of the same tissue-mean magnitude is built, re-solved, "
+      "and binned identically.")
+    a("")
+    a("| statistic | observed | well-mixed floor, MEASURED | what the excess "
+      "over the floor actually is |")
+    a("|---|---|---|---|")
+    a(f"| structure ratio (sparsest/densest quintile) | "
+      f"**{_f(obs['structure_ratio'], 4)}** | "
+      f"**{_f(floor['structure_ratio'], 4)}** | "
+      + ("the analytic 1.0000 is a FAIR comparator for this binned statistic — "
+         "the measured floor sits slightly below it, so quoting 1.0 is if "
+         "anything mildly conservative"
+         if floor["structure_ratio"] <= 1.0 else
+         f"the measured floor is ABOVE 1.0, so the analytic 1.0 OVERSTATES the "
+         f"excess; read {_f(obs['structure_ratio'], 4)} against "
+         f"{_f(floor['structure_ratio'], 4)}")
+      + " |")
+    a(f"| per-cell attenuation spread (p90/p10) | "
+      f"**{_f(obs['a_p90_over_p10'], 4)}** | "
+      f"**{_f(floor['a_p90_over_p10'], 4)}** | "
+      f"**the analytic 1.0 is NOT the right floor here.** "
+      f"{_f(obs['a_p90_over_p10'], 4)} must be read against "
+      f"{_f(floor['a_p90_over_p10'], 4)}, i.e. an excess of "
+      f"{_f(hon['spread_excess_over_floor'], 3)}x |")
+    a("")
+    a(f"The p90/p10 figure of {_f(obs['a_p90_over_p10'], 4)}x (over a full range "
+      f"of {_f(obs['a_min'], 4)} to {_f(obs['a_max'], 4)}, against a "
+      f"section-mean attenuation of {_f(obs['a_mean'], 4)}) was previously "
+      f"quoted as though its floor were 1.0. **It is "
+      f"{_f(floor['a_p90_over_p10'], 4)}.** Any external use of the p90/p10 "
+      f"number must carry that floor with it.")
+    a("")
+    a("The well-mixed floor is the easy comparator, and it is not the "
+      "informative one. A uniform sink is not a serious rival hypothesis — the "
+      "serious rivals are \"the macrophages are clumped, but not clumped *where "
+      "the data says*\" (§5.3) and \"this is depth into tissue, not immune "
+      "density\" (§5.1a).")
+    a("")
+    a("#### 5.1a A large part of the spread is DEPTH INTO TISSUE, not immune biology")
+    a("")
+    a("This is the largest single correction in this report and it was not "
+      "tested in the original version.")
+    a("")
+    a(f"Take the same {sp['n_tumor']:,} tumour cells, the same two solves, and "
+      f"bin them by **distance to the tissue edge alone** — no reference to "
+      f"immune density anywhere in the binning:")
+    a("")
+    a("| binning variable | sparsest/shallowest bin | densest/deepest bin | "
+      "**structure ratio** |")
+    a("|---|---|---|---|")
+    a(f"| local immune density `phi_imm` (table above) | "
+      f"{_f(obs['bins'][0]['attenuation_mean'], 4)} | "
+      f"{_f(obs['bins'][-1]['attenuation_mean'], 4)} | "
+      f"**{_f(obs['structure_ratio'], 4)}** |")
+    a(f"| **distance to tissue edge, no immune input at all** | "
+      f"**{_f(edge['stats']['bins'][0]['attenuation_mean'], 4)}** | "
+      f"**{_f(edge['stats']['bins'][-1]['attenuation_mean'], 4)}** | "
+      f"**{_f(edge['stats']['structure_ratio'], 4)}** |")
+    a("")
+    a(f"So a variable containing **zero immune information** already reaches "
+      f"{_f(edge['stats']['structure_ratio'], 4)} of the headline "
+      f"{_f(obs['structure_ratio'], 4)} — "
+      f"{100.0 * edge['stats']['structure_ratio'] / obs['structure_ratio']:.0f}% "
+      f"of the ratio. The two binning variables are correlated: "
+      f"**corr(phi_imm, edge-distance) = "
+      f"{_f(edge['corr_phi_edge_pearson'], 3)}** (Spearman "
+      f"{_f(edge['corr_phi_edge_spearman'], 3)}).")
+    a("")
+    a(f"**The depth gradient comes from the measured tissue, not from the "
+      f"kernel.** The segmented cell-density envelope rises "
+      f"**{_f(edge['density_envelope_ratio'], 1)}x** from the outer "
+      f"{edge['rim_um']:.0f} um band into the interior. Cells deep in the "
+      f"section are simply in denser tissue, which carries both more macrophages "
+      f"and different transport. The uniform-in-tissue scatter control (§5.4) "
+      f"passes the identical KDE and reaches only "
+      f"{_f(scat['structure_ratio'], 4)}, so the KDE is not manufacturing the "
+      f"gradient by itself.")
+    a("")
+    a(f"**And the published label-permutation null cannot remove this confound, "
+      f"because it PRESERVES it.** Permuting the immune label among measured "
+      f"cell positions keeps every immune cell on a real cell, so it inherits "
+      f"the same density envelope: the permuted fields carry "
+      f"corr(phi_imm, edge-distance) = "
+      f"**{_f(lab['corr_phi_edge_mean'], 3)}** against the observed "
+      f"{_f(edge['corr_phi_edge_pearson'], 3)}. The null reproduces the depth "
+      f"gradient it should be controlling for.")
+    a("")
+    a("**How much survives after stratifying it out.** Splitting the tumour "
+      "cells into five edge-distance strata and computing the immune-density "
+      "structure ratio *within* each:")
+    a("")
+    a("| edge-distance stratum | " + " | ".join(
+        f"{i + 1}{' (shallowest)' if i == 0 else ' (deepest)' if i == N_BINS - 1 else ''}"
+        for i in range(N_BINS)) + " |")
+    a("|---|" + "---|" * N_BINS)
+    a("| within-stratum structure ratio | " + " | ".join(
+        f"**{_f(v, 2)}**" for v in edge["within_stratum_sr"]) + " |")
+    a("")
+    _strat = [v for v in edge["within_stratum_sr"] if np.isfinite(v)]
+    a(f"An immune-density contrast persists at every depth, so the effect is not "
+      f"purely depth. But it is {_f(min(_strat), 2)}-{_f(max(_strat), 2)}x "
+      f"within strata rather than {_f(obs['structure_ratio'], 4)}x overall, and "
+      f"it is not monotone in depth — which is what one expects when two "
+      f"partly-collinear variables are being separated on a single section.")
     a("")
     a("### 5.2 Exposure deficit versus DISTANCE to the nearest macrophage")
     a("")
@@ -1163,93 +2048,284 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
       "and must not be read as such.** The kernel bandwidth was CHOSEN as "
       f"{IMMUNE_KERNEL_BANDWIDTH_UM:.0f} um from that same measurement (§2.1), "
       "so the model was told what length scale to have and the fact that it has "
-      "it is arithmetic, not evidence. What the table does show that is not "
-      "circular is the SHAPE: the deficit is monotone over every bin, it does "
-      "not saturate until well beyond the bandwidth (because drug also diffuses "
-      "in from further away, which is exactly the non-local effect an AUC "
-      "rescale could not have produced), and the worst-off cells are a small "
-      "minority — "
+      "it is arithmetic, not evidence.")
+    a("")
+    a("**Nor is the monotonicity of this column evidence of anything** — §5.4 "
+      "shows every control reproduces monotonicity, including controls with no "
+      "measured immune structure in them at all. The original version of this "
+      "report leaned on that monotonicity; it should not have.")
+    a("")
+    a("What the table does show that is not circular is that the deficit does "
+      "not saturate until well beyond the bandwidth (drug also diffuses in from "
+      "further away, which is exactly the non-local effect an AUC rescale could "
+      "not have produced), and that the worst-off cells are a small minority — "
       f"{sp['distance_bins'][0]['n']:,} of {sp['n_tumor']:,} tumour cells lie "
       "within 10 um of a macrophage. Note also that the sink-OFF AUC column "
-      "falls monotonically with distance too: cells near macrophages are in "
-      "denser, better-perfused tissue and started with MORE drug, so the "
-      "attenuation column is the right comparison and the raw exposure column "
-      "would point the other way.")
+      "falls with distance too: cells near macrophages are in denser, "
+      "better-perfused tissue and started with MORE drug, so the attenuation "
+      "column is the right comparison and the raw exposure column would point "
+      "the other way. That same tissue-density envelope is the confound "
+      "quantified in §5.1a.")
     a("")
-    a("### 5.3 The permutation null")
+    a("### 5.3 The nulls — the published one was too weak, and here are the honest ones")
     a("")
-    a("**The null, stated before its result.** The observed structure is compared "
-      "against re-solves in which the IMMUNE LABEL is permuted among the "
-      "measured cells: the same NUMBER of immune cells, drawn from the same "
-      "measured cell POSITIONS, but with the immune compartment's own spatial "
-      "clustering destroyed. The tissue outline, the cell layout, the vessel "
-      "geometry, the ECM field and the total sink magnitude are all held fixed, "
-      "so the only thing that varies is whether the macrophages sit where the "
-      "data says they sit. A null that scattered points uniformly through the "
-      "tissue would also destroy the tissue's own density structure and would be "
-      "rejected for the wrong reason.")
+    a("**What was wrong.** The original version of this report tested the "
+      "observed structure against ONE null: permuting the IMMUNE LABEL among "
+      "the measured cell positions. That null does hold the tissue outline, the "
+      "cell layout, the vessel geometry, the ECM field and the total sink "
+      "magnitude fixed — but it destroys the immune compartment's clumping "
+      "entirely, and clumping is the very quantity the structure ratio "
+      "measures.")
     a("")
-    a(f"{sp['n_perm']} permutations, seed {sp['seed']}; each one is a full "
-      f"transport re-solve.")
+    a(f"**Measured, not argued.** The sink field the label-permutation null "
+      f"produces has coefficient of variation **{_f(lab['cv_mean'], 3)}** "
+      f"(range {_f(lab['cv_min'], 3)}-{_f(lab['cv_max'], 3)}). The observed sink "
+      f"field has CV **{_f(hon['observed_sink_cv'], 3)}**. A null whose field is "
+      f"{100.0 * (1.0 - lab['cv_mean'] / hon['observed_sink_cv']):.0f}% less "
+      f"variable than the observed field will lose a variance-driven contest "
+      f"almost regardless of whether any real spatial biology exists — it is not "
+      f"being asked a fair question.")
     a("")
-    a("| statistic | observed | null mean | null range | one-sided p |")
-    a("|---|---|---|---|---|")
-    a(f"| structure ratio (sparsest/densest quintile) | "
-      f"**{_f(obs['structure_ratio'], 4)}** | "
-      f"{_f(sp['null_structure_ratio_mean'], 4)} | "
-      f"{_f(sp['null_structure_ratio_min'], 4)}-"
-      f"{_f(sp['null_structure_ratio_max'], 4)} | "
-      f"**{_f(sp['p_structure_ratio'], 4)}** |")
-    a(f"| per-cell attenuation spread (p90/p10) | "
-      f"**{_f(obs['a_p90_over_p10'], 4)}** | {_f(sp['null_spread_mean'], 4)} | "
-      f"up to {_f(sp['null_spread_max'], 4)} | **{_f(sp['p_spread'], 4)}** |")
-    a(f"| mean attenuation (a magnitude, NOT a structure statistic) | "
-      f"{_f(obs['a_mean'], 4)} | {_f(sp['null_a_mean_mean'], 4)} | -- | -- |")
+    a("And the dependence is direct rather than incidental. Sweeping the clump "
+      "size of the permutation, holding the immune COUNT and therefore the total "
+      "sink magnitude fixed:")
     a("")
-    a("**Read the last row as the control.** The MEAN attenuation is a magnitude, "
-      "not a structure statistic: the same number of macrophages removes roughly "
-      "the same total amount of drug wherever they sit. What the permutation is "
-      "asked about is the SPREAD and the density contrast — i.e. not how much "
-      "drug is lost, but **which tumour cells lose it**. A compartmental model "
-      "gets the first quantity right by construction and cannot express the "
-      "second at all.")
+    a("| clump size (cells) | " + " | ".join(
+        f"{r['clump_size']}" for r in dg["cv_sweep"]) + " |")
+    a("|---|" + "---|" * len(dg["cv_sweep"]))
+    a("| sink-field CV | " + " | ".join(
+        f"{_f(r['sink_cv'], 2)}" for r in dg["cv_sweep"]) + " |")
+    a("| resulting structure ratio | " + " | ".join(
+        f"**{_f(r['structure_ratio'], 2)}**" for r in dg["cv_sweep"]) + " |")
     a("")
-    if beats_null:
-        a(f"**The measured immune geometry is doing work.** The observed "
-          f"structure ratio of {_f(obs['structure_ratio'], 4)} sits above the "
-          f"entire null range "
-          f"({_f(sp['null_structure_ratio_min'], 4)}-"
-          f"{_f(sp['null_structure_ratio_max'], 4)}), p = {_f(p_sr, 4)}: putting "
-          f"the same number of macrophages at other measured cell positions "
-          f"produces a measurably WEAKER exposure gradient than putting them "
-          f"where the data says they are. The clustering is not an artefact of "
-          f"the tissue being denser in some places than others.")
+    a(f"**The structure ratio very largely tracks sink-field heterogeneity.** "
+      f"Any null that does not match the observed CV of "
+      f"{_f(hon['observed_sink_cv'], 3)} is measuring CV, not geometry.")
+    a("")
+    a("#### The primary comparators")
+    a("")
+    a("Two nulls fix this. Both keep **every immune cell on a real measured cell "
+      "position** — nothing is scattered into empty space, and nothing leaves "
+      "the tissue mask:")
+    a("")
+    a(f"- **clumpiness-matched permutation** — the immune label moves in clumps "
+      f"of {CLUMP_SIZE} mutually-nearest MEASURED cells instead of one cell at a "
+      f"time, so the CV asymmetry above is largely removed "
+      f"({_f(clump['cv_mean'], 3)} against the observed "
+      f"{_f(hon['observed_sink_cv'], 3)}) and only the *location* of the clumps "
+      f"varies.")
+    a(f"- **{BLOCK_UM:.0f} um block shuffle** — the section is tiled into "
+      f"{BLOCK_UM:.0f} um blocks and each block's observed immune COUNT is "
+      f"reassigned to another block, which draws that many of its own measured "
+      f"cells. The block-scale count heterogeneity of the real section is "
+      f"inherited exactly and only relocated.")
+    a("")
+    a(f"{lab['n_draws']} draws each, each one a full transport re-solve.")
+    a("")
+    a("| null | rank | null mean SR | null range | sink-field CV | observed | "
+      "one-sided p | **observed / null mean** |")
+    a("|---|---|---|---|---|---|---|---|")
+    _order = [("clumpiness_matched", "**PRIMARY**"),
+              ("block_shuffle", "**PRIMARY**"),
+              ("label_permutation", "DEMOTED — floor check only"),
+              ("jitter_reshuffle", "control, see below"),
+              ("spot_emulation", "control, see below")]
+    for key, rank in _order:
+        f_ = fams.get(key)
+        if f_ is None:
+            continue
+        star = "**" if f_["is_primary"] else ""
+        a(f"| {star}{f_['label']}{star} | {rank} | {star}{_f(f_['sr_mean'], 4)}{star} | "
+          f"{_f(f_['sr_min'], 4)}-{_f(f_['sr_max'], 4)} | "
+          f"{_f(f_['cv_mean'], 3)} | {_f(obs['structure_ratio'], 4)} | "
+          f"{_f(f_['p_structure_ratio'], 4)} | "
+          f"{star}{_f(f_['excess_over_null'], 3)}x{star} |")
+    a(f"| torus shift | **UNUSABLE on this mask** — see below | -- | -- | "
+      f"{_f(dg['torus']['cv_ratio'] * hon['observed_sink_cv'], 3)} | "
+      f"{_f(obs['structure_ratio'], 4)} | -- | -- |")
+    a("")
+    a(f"**The honest number is the last column: "
+      f"{_f(obs['structure_ratio'], 4)} / {_f(clump['sr_mean'], 4)} = "
+      f"{_f(clump['excess_over_null'], 3)}x and "
+      f"{_f(obs['structure_ratio'], 4)} / {_f(block['sr_mean'], 4)} = "
+      f"{_f(block['excess_over_null'], 3)}x.** That — an excess of roughly "
+      f"{_f(ex_lo, 2)} to {_f(ex_hi, 2)}x — is what is attributable to where the "
+      f"macrophages actually are, once a null is allowed to be as clumped as the "
+      f"data. It is not {_f(obs['structure_ratio'], 1)}x. This report previously "
+      f"said {_f(obs['structure_ratio'], 1)}x, and that was quoting a raw ratio "
+      f"against a floor of 1.0 as though the floor were the alternative "
+      f"hypothesis.")
+    a("")
+    if hon["above_all_primary_null_draws"]:
+        a(f"**What still holds, and it is not nothing.** The observed "
+          f"{_f(obs['structure_ratio'], 4)} sits **above the entire range of "
+          f"both primary nulls** ({_f(clump['sr_min'], 4)}-"
+          f"{_f(clump['sr_max'], 4)} and {_f(block['sr_min'], 4)}-"
+          f"{_f(block['sr_max'], 4)}), at p = {_f(p_floor, 4)}. A "
+          f"clumpiness-matched null and a block-shuffle null both fail to reach "
+          f"the observed value in {lab['n_draws']} out of {lab['n_draws']} "
+          f"draws. Putting the same number of equally-clumped macrophages "
+          f"*somewhere else* on real measured cell positions produces a "
+          f"measurably weaker exposure gradient than putting them where the data "
+          f"says they are. A {_f(ex_lo, 2)}-{_f(ex_hi, 2)}x effect that survives "
+          f"an honest null is worth more than a "
+          f"{_f(obs['structure_ratio'], 1)}x effect resting on a weak one.")
     else:
-        a(f"**Honest negative on the null, and it is a specific one.** The "
-          f"observed structure ratio of {_f(obs['structure_ratio'], 4)} is NOT "
-          f"outside the null range "
-          f"({_f(sp['null_structure_ratio_min'], 4)}-"
-          f"{_f(sp['null_structure_ratio_max'], 4)}), p = {_f(p_sr, 4)}. The "
-          f"reduction IS spatially structured — the contrast against a "
-          f"well-mixed model's exact 1.0000 is real and is what the "
-          f"microenvironment model adds — but the structure is not specific to "
-          f"the MACROPHAGES: relabelling the same number of immune cells onto "
-          f"other measured cell positions reproduces a comparable gradient, "
-          f"because the dominant signal is where the TISSUE is dense, not where "
-          f"the CD163+ cells are. This is a deliberately conservative null (it "
-          f"holds the tissue outline and cell layout fixed), and it says the "
-          f"claim this analysis can support is 'exposure is structured by local "
-          f"cellularity', not 'exposure is structured by macrophages "
-          f"specifically'.")
+        a(f"**And it does not clear the honest nulls.** The observed "
+          f"{_f(obs['structure_ratio'], 4)} does NOT sit above the entire range "
+          f"of both primary nulls ({_f(clump['sr_min'], 4)}-"
+          f"{_f(clump['sr_max'], 4)} and {_f(block['sr_min'], 4)}-"
+          f"{_f(block['sr_max'], 4)}). Once a null is allowed to be as clumped "
+          f"as the data, the measured immune POSITIONS are not distinguishable "
+          f"from an equally-clumped rearrangement of them at "
+          f"{lab['n_draws']} draws. Nothing here should be quoted as a "
+          f"macrophage-geometry effect.")
     a("")
-    a(f"The floor on the p-value at {sp['n_perm']} permutations is "
-      f"{1.0 / (1 + sp['n_perm']):.4f}, so a reported "
-      f"{_f(sp['p_structure_ratio'], 4)} is at that floor rather than a "
-      f"resolved small number; the effect size (the null range) is the more "
-      f"informative column.")
+    a("#### The platform controls — what happens if the positional detail goes away")
+    a("")
+    def _control_verdict(f_: Dict, what: str, scale: str) -> str:
+        """Read a control by how close it lands to the observed value."""
+        r = f_["sr_mean"] / obs["structure_ratio"]
+        if r >= 0.95:
+            return (f"it **reproduces the observed value** "
+                    f"({_f(f_['sr_mean'], 4)} against "
+                    f"{_f(obs['structure_ratio'], 4)}, "
+                    f"{_f(r, 3)}x). {what[0].upper() + what[1:]} therefore "
+                    f"carries essentially none of "
+                    f"the statistic: the structure ratio is built from immune "
+                    f"density at scales COARSER than {scale}, not from it. This "
+                    f"control does not discriminate, and nothing is rested on "
+                    f"it.")
+        if r >= 0.8:
+            return (f"it lands close to but below the observed value "
+                    f"({_f(f_['sr_mean'], 4)} against "
+                    f"{_f(obs['structure_ratio'], 4)}, {_f(r, 3)}x), so {what} "
+                    f"carries a minority of the statistic.")
+        return (f"it **collapses** ({_f(f_['sr_mean'], 4)} against "
+                f"{_f(obs['structure_ratio'], 4)}, {_f(r, 3)}x), so the "
+                f"statistic genuinely depends on {what}.")
+
+    if jit is not None:
+        a(f"**Jitter reshuffle — re-draw the Visium jitter and nothing else.** "
+          f"Every measured immune cell is displaced by a uniform-in-disc offset "
+          f"of at most {SPOT_JITTER_UM:g} um, the exact amplitude "
+          f"`reconstruct/real_visium.py::_place_cells` applies "
+          f"(`jitter_um = min(27.5, 0.45 * dx_um)`). Nothing about which "
+          f"neighbourhood a macrophage is in changes. On a SPOT reconstruction "
+          f"this control is a no-op by construction — the positions were "
+          f"generated that way. Here, {lab['n_draws']} draws give "
+          f"**{_f(jit['sr_mean'], 4)}** (range {_f(jit['sr_min'], 4)}-"
+          f"{_f(jit['sr_max'], 4)}, CV {_f(jit['cv_mean'], 3)} against the "
+          f"observed {_f(hon['observed_sink_cv'], 3)}): "
+          + _control_verdict(jit, "positional detail below the jitter amplitude",
+                             f"~{SPOT_JITTER_UM:g} um"))
+        a("")
+    if spot_em is not None:
+        a(f"**Spot emulation — the whole Visium synthesis.** Snapping every "
+          f"measured immune cell to its {SPOT_PITCH_UM:.0f} um lattice centroid "
+          f"and re-jittering it (literally what `_place_cells` does, keeping the "
+          f"per-spot immune COUNT and destroying everything finer) gives "
+          f"**{_f(spot_em['sr_mean'], 4)}** at CV {_f(spot_em['cv_mean'], 3)}: "
+          + _control_verdict(spot_em,
+                             f"positional detail below the "
+                             f"{SPOT_PITCH_UM:.0f} um spot pitch",
+                             f"the {SPOT_PITCH_UM:.0f} um spot pitch"))
+        a("")
+    if jit is not None and jit["sr_mean"] >= 0.95 * obs["structure_ratio"]:
+        a("**This does NOT reproduce a claim the §5 audit made, and the audit's "
+          "version should be dropped rather than repeated.** The audit reported "
+          "a jitter reshuffle at 1.4188 on this section and read its collapse as "
+          "the decisive evidence separating Xenium from Visium. Re-implemented "
+          "here — displace every measured immune cell by at most "
+          f"{SPOT_JITTER_UM:g} um, change nothing else — the control returns "
+          f"{_f(jit['sr_mean'], 4)}, i.e. the observed value, and the full spot "
+          f"synthesis returns {_f(spot_em['sr_mean'], 4)} if run as well. Either "
+          f"the audit's control was a different operation or its number does not "
+          f"reproduce; either way **this report does not rest the Xenium result "
+          f"on a jitter control**, and no downstream document should. What the "
+          f"Xenium result rests on is the two primary nulls in the table above, "
+          f"which do not involve the platform question at all. The scope limit "
+          f"in §5.6 rests on PROVENANCE — spot platforms never localise an "
+          f"immune cell — and not on this control.")
+        a("")
+    a("#### Two methodological notes that must travel with these numbers")
+    a("")
+    a(f"1. **Torus / Moran-style nulls are unusable on this tissue mask and "
+      f"nothing rests on them.** Circularly shifting the immune point pattern "
+      f"lands only **{100.0 * dg['torus']['fraction_in_tissue_mean']:.1f}%** of "
+      f"shifted cells back inside tissue (over {dg['torus']['n_probe']} random "
+      f"shifts; range {100.0 * dg['torus']['fraction_in_tissue_min']:.1f}-"
+      f"{100.0 * dg['torus']['fraction_in_tissue_max']:.1f}%). The surviving "
+      f"field has mean `phi_imm` at "
+      f"**{_f(dg['torus']['phi_mean_ratio'], 2)}x** the observed and CV inflated "
+      f"to **{_f(dg['torus']['cv_ratio'], 2)}x** the observed — i.e. the shift "
+      f"simultaneously weakens and sharpens the sink, which biases the structure "
+      f"ratio upward for entirely mechanical reasons. **This is measured here as "
+      f"a FEASIBILITY diagnostic and the torus null is never scored.** The "
+      f"clumpiness-matched permutation and the block shuffle are the defensible "
+      f"nulls, precisely because both keep every immune cell on a real measured "
+      f"position inside the mask.")
+    a(f"2. **p = {_f(p_floor, 4)} is the {lab['n_draws']}-draw floor** "
+      f"(1/{lab['n_draws'] + 1}). It appears in every row above for that reason "
+      f"and **must never be quoted as a resolved p-value**. It means only \"not "
+      f"exceeded in {lab['n_draws']} draws\". The informative columns are the "
+      f"null range and the observed/null ratio.")
+    a("")
+    a(f"**One control that is not about structure at all.** Mean attenuation is "
+      f"a magnitude, not a structure statistic: observed "
+      f"{_f(obs['a_mean'], 4)} against a label-permutation mean of "
+      f"{_f(lab['a_mean_mean'], 4)} and a clumpiness-matched mean of "
+      f"{_f(clump['a_mean_mean'], 4)}. The same number of macrophages removes "
+      f"roughly the same total amount of drug wherever they sit. A compartmental "
+      f"model gets that quantity right by construction; what it cannot express "
+      f"is **which** tumour cells lose the drug. That distinction is still the "
+      f"point of the module — it is the *size* of the spatial term that has been "
+      f"corrected, not its existence.")
+    a("")
+    a("### 5.4 Monotonicity across the quintiles is NOT evidence, and was "
+      "previously treated as though it were")
+    a("")
+    a(f"The original report pointed to the attenuation falling smoothly across "
+      f"all five immune quintiles "
+      f"({_f(obs['bins'][0]['attenuation_mean'], 4)} -> "
+      f"{_f(obs['bins'][-1]['attenuation_mean'], 4)}) as corroboration. It is "
+      f"not. Every control tested is also monotone across all five quintiles:")
+    a("")
+    a("| field | quintile 1 | quintile 5 | monotone across all 5? | ratio |")
+    a("|---|---|---|---|---|")
+    _obs_mono = all(obs["bins"][i]["attenuation_mean"]
+                    > obs["bins"][i + 1]["attenuation_mean"]
+                    for i in range(N_BINS - 1))
+    a(f"| **observed** | {_f(obs['bins'][0]['attenuation_mean'], 4)} | "
+      f"{_f(obs['bins'][-1]['attenuation_mean'], 4)} | "
+      f"{'yes' if _obs_mono else 'no'} | {_f(obs['structure_ratio'], 4)} |")
+    for key in ("label_permutation", "clumpiness_matched", "block_shuffle",
+                "jitter_reshuffle", "spot_emulation"):
+        f_ = fams.get(key)
+        if f_ is None:
+            continue
+        q = f_["quintile_attenuation_mean"]
+        a(f"| {f_['label']} | {_f(q[0], 4)} | {_f(q[-1], 4)} | "
+          f"**{'yes' if f_['monotone'] else 'no'}** | {_f(f_['sr_mean'], 2)} |")
+    _scat_mono = all(scat["bins"][i]["attenuation_mean"]
+                     > scat["bins"][i + 1]["attenuation_mean"]
+                     for i in range(N_BINS - 1))
+    a(f"| uniform-in-tissue scatter | "
+      f"{_f(scat['bins'][0]['attenuation_mean'], 4)} | "
+      f"{_f(scat['bins'][-1]['attenuation_mean'], 4)} | "
+      f"**{'yes' if _scat_mono else 'no'}** | "
+      f"{_f(scat['structure_ratio'], 2)} |")
+    a("")
+    a("Uniform-in-tissue scatter contains **no measured immune structure "
+      "whatsoever** and is still monotone. Monotonicity is a generic consequence "
+      "of binning a smooth field by its own local value — it would be surprising "
+      "only in its absence. **Only the RATIO carries information, and only "
+      "against a null that matches the observed field's clumpiness (§5.3).** Any "
+      "downstream document quoting \"monotone across all five quintiles\" as "
+      "support should drop that phrasing.")
     a("")
     if spf is not None:
-        a("### 5.4 Is the structure a property of the tissue, or of the mesh?")
+        a("### 5.5 Is the structure a property of the tissue, or of the mesh?")
         a("")
         a("`results/state_validation.md` and `results/cell_state_impact.md` both "
           "turn on the same question, so it is asked here rather than assumed. "
@@ -1261,7 +2337,7 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
         a("|---|---|---|---|")
         for tag in (spf, sp):
             o = tag["observed"]
-            tail = " (flagship)" if abs(tag["dx_um"] - DX_FLAGSHIP) < 1e-9 else " (null runs here)"
+            tail = " (flagship)" if abs(tag["dx_um"] - DX_FLAGSHIP) < 1e-9 else " (nulls run here)"
             a(f"| {tag['dx_um']:.0f}{tail} | **{_f(o['structure_ratio'], 4)}** | "
               f"{_f(o['a_p90_over_p10'], 4)} | {_f(o['a_mean'], 4)} |")
         sr_a, sr_b = (sp["observed"]["structure_ratio"],
@@ -1275,9 +2351,86 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
              if swing < 1.2 else
              "That is NOT small, so the structure statistic carries a mesh "
              "dependence and its LEVEL should not be quoted without the dx it "
-             "was computed at. The qualitative direction (densest quintile "
-             "worse off) is reproduced at both spacings; the magnitude is not."))
+             "was computed at.")
+          + " Note that mesh-stability is a necessary check, not a sufficient "
+            "one: a discretisation-stable number can still be a depth artefact "
+            "(§5.1a) or be quoted against the wrong null (§5.3), and here it "
+            "was both.")
         a("")
+    a("### 5.6 SCOPE LIMIT — this statistic is INVALID on Visium / spot "
+      "transcriptomics, and the generator now REFUSES to compute it there")
+    a("")
+    a("This is a hard limit, not a caution. **The structure ratio computed on "
+      "Visium or any other spot-based platform is meaningless, because the "
+      "platform does not measure immune-cell positions at all.**")
+    a("")
+    a(f"**The mechanism, read off the reconstruction code.** "
+      f"`tmesim/reconstruct/real_visium.py::_place_cells` builds the cell "
+      f"population from a deconvolved spot table by synthesising a fixed "
+      f"**{_VISIUM_CELLS_PER_SPOT} pseudo-cells per ~{SPOT_PITCH_UM:.0f} um "
+      f"spot** (`_CELLS_PER_SPOT = {_VISIUM_CELLS_PER_SPOT}`), apportioned "
+      f"across types by the deconvolved fractions, and placing all of them **at "
+      f"the spot centroid with uniform-in-disc jitter of at most "
+      f"{SPOT_JITTER_UM:g} um** (`jitter_um = min(27.5, 0.45 * dx_um)`). There "
+      f"is no measured position for any individual immune cell anywhere in that "
+      f"pipeline. The only spatial information present is the per-spot immune "
+      f"FRACTION on a {SPOT_PITCH_UM:.0f} um lattice; everything finer is drawn "
+      f"from a random number generator.")
+    a("")
+    a(f"**Why every plausible null is therefore a no-op.** The sink field is a "
+      f"{IMMUNE_KERNEL_BANDWIDTH_UM:.0f} um-bandwidth KDE. Sub-spot jitter of "
+      f"<={SPOT_JITTER_UM:g} um is at or below that bandwidth, so re-drawing it "
+      f"— or reshuffling labels within a spot — changes the KDE almost not at "
+      f"all. Any control that preserves the per-spot immune count is, by "
+      f"construction, comparing a field to itself.")
+    a("")
+    a("**The refusal is in the code, not in this prose.** "
+      "`validation/immune_sink_impact.py::require_measured_cell_positions` "
+      "raises `SpotDataError` for any reconstruction whose own metadata says "
+      "the positions were synthesised from spots "
+      "(`metadata['real_pipeline']['source']`, `metadata['n_spots']`); the "
+      "shared context builder every null family runs through calls it first, so "
+      "no null can bypass it, and an unstamped reconstruction of unknown "
+      "provenance is refused too. It reads the reconstruction's metadata rather "
+      "than the sample PATH, so a renamed section cannot get past it. "
+      "`tests/test_immune_sink_nulls.py` pins the refusal.")
+    a("")
+    if spot_em is not None:
+        _r = spot_em["sr_mean"] / obs["structure_ratio"]
+        a(f"**And the cost of ignoring the limit is measured here rather than "
+          f"asserted.** Passing the measured single-cell immune positions "
+          f"through the identical spot synthesis (§5.3, spot emulation) returns "
+          f"**{_f(spot_em['sr_mean'], 4)}** against the observed "
+          f"{_f(obs['structure_ratio'], 4)} — {_f(_r, 3)}x. "
+          + ("**A spot-resolution field reproduces essentially the entire "
+             "claimed effect.** Read that as a warning and not as a "
+             "reassurance: it means the structure ratio is carried by immune "
+             "density at the spot scale and coarser, so on a platform where "
+             "the per-spot immune content is a DECONVOLUTION ESTIMATE rather "
+             "than a count of localised cells, the statistic will report "
+             "whatever the deconvolution wrote — at full apparent strength, "
+             "and with no null available on that platform able to tell the two "
+             "apart, because every control that preserves per-spot counts is a "
+             "no-op there."
+             if _r >= 0.95 else
+             "The spot pipeline does not reproduce the measured section's "
+             "value, which is consistent with the statistic needing positional "
+             "detail a spot platform does not have.")
+          + " Any use of a Visium-derived structure ratio in a deck, a landing "
+            "page or a customer-facing claim is unsupported.")
+        a("")
+    a("**This does not retract the single-cell result, and it does not rest on "
+      "a platform control either.** What that result rests on is the two "
+      "primary nulls of §5.3, which never leave the measured section: an "
+      "equally-clumped rearrangement of the same macrophages onto other "
+      "measured positions "
+      + ("does not reach the observed value in any draw"
+         if hon["above_all_primary_null_draws"] else
+         "reaches the observed value in at least one draw")
+      + ". The scope limit here is about PROVENANCE — a spot platform never "
+        "localises an immune cell, so there is nothing on it for such a null "
+        "to rearrange — and the generator enforces it by refusing to run.")
+    a("")
 
     # ---------------- §6 -----------------------------------------------------
     a("## 6. Does it improve the measured human-glioma anchor? NO.")
@@ -1375,25 +2528,40 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
       "errors point both ways. This is the same outcome the efflux, uptake and "
       "ion-trapping runs reached, and the same conclusion follows.")
     if beats_null:
-        a(f"3. **But the spatial result is real and is worth keeping.** The "
-          f"reduction is structured — {_f(obs['structure_ratio'], 4)}x between "
-          f"the sparsest and densest immune quintile against a well-mixed "
-          f"model's exact 1.0000 — and it survives a permutation null that "
-          f"holds the tissue, the cell layout and the total sink magnitude "
-          f"fixed (p = {_f(p_sr, 4)}). That is a clean demonstration of what a "
-          "microenvironment model adds over a compartmental one, and it holds "
-          "at every strength because the geometry, not the magnitude, produces "
-          "it.")
+        a(f"3. **The spatial result is real but is SMALLER than this report "
+          f"originally claimed, and must be quoted at its corrected size.** The "
+          f"raw quintile contrast is {_f(obs['structure_ratio'], 4)}x, but the "
+          f"defensible statement is: **an excess of "
+          f"{_f(ex_lo, 2)}-{_f(ex_hi, 2)}x over spatially-aware nulls that "
+          f"match the observed clumpiness (§5.3), above the entire range of "
+          f"both in {_lab['n_draws']} draws.** Most of the raw "
+          f"{_f(obs['structure_ratio'], 4)} is accounted for by things that are "
+          f"not immune geometry: depth into tissue alone reaches "
+          f"{_f(_edge['stats']['structure_ratio'], 4)}x with no immune input "
+          f"whatsoever (§5.1a), and simply matching the observed clumpiness "
+          f"reaches {_f(_clump['sr_mean'], 4)}x (§5.3). The correct external "
+          f"phrasing is *\"tumour cells in macrophage-dense neighbourhoods lose "
+          f"measurably more drug than an equally-clumped random arrangement of "
+          f"the same macrophages would predict, by "
+          f"~{_f(ex_lo, 2)}-{_f(ex_hi, 2)}x\"* — not *\"a "
+          f"{_f(obs['structure_ratio'], 1)}x spread that a compartmental model "
+          f"gives as 1.0\"*. It remains a genuine demonstration that geometry "
+          f"carries information a compartmental model cannot express; it is not "
+          f"a {_f(obs['structure_ratio'], 1)}x demonstration. **And it is "
+          f"single-cell-only: on spot data the statistic is invalid and the "
+          f"generator refuses to compute it (§5.6).**")
     else:
         a(f"3. **The reduction is structured, but the structure is not "
-          f"MACROPHAGE-specific.** The {_f(obs['structure_ratio'], 4)}x contrast "
-          f"between the sparsest and densest immune quintile is real and is "
-          f"exactly 1.0000 in a well-mixed model, so the spatial capability is "
-          f"demonstrated. But relabelling the same number of immune cells onto "
-          f"other measured cell positions reproduces it "
-          f"(p = {_f(p_sr, 4)}), so what the analysis actually establishes is "
-          f"that exposure is structured by local CELLULARITY. Quoting it as a "
-          f"macrophage effect would over-claim, and this report does not.")
+          f"MACROPHAGE-specific once the null is allowed to be as clumped as "
+          f"the data.** The raw {_f(obs['structure_ratio'], 4)}x contrast is "
+          f"real, but the clumpiness-matched permutation reaches "
+          f"{_f(_clump['sr_mean'], 4)} and the block shuffle "
+          f"{_f(_block['sr_mean'], 4)} without using the measured macrophage "
+          f"positions at all, and depth into tissue alone reaches "
+          f"{_f(_edge['stats']['structure_ratio'], 4)}. What the analysis "
+          f"establishes is that exposure is structured by local CELLULARITY and "
+          f"by depth. Quoting it as a macrophage effect would over-claim, and "
+          f"this report does not.")
     a("4. **The ranking is safe either way.** "
       f"{'The cross-drug ranking is invariant across the entire swept range' if sw['ranking_invariant'] else 'The ranking moves within the swept range'}, "
       "so no comparative conclusion in `results/` is at risk from this term "
@@ -1444,9 +2612,33 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
     a("6. **Three sections, three patients, three panels, and no outcome label "
       "anywhere.** Nothing here says which strength is right, because nothing "
       "here can be scored against a measured drug response.")
-    a("7. **The scorecard test rests on assumption A1** (tissue:plasma partition "
-      "= effective penetrance) and on a quasi-steady-state reading of it. Both "
-      "are the scorecard's own standing assumptions, inherited unchanged.")
+    a(f"7. **The spatial structure ratio is partly confounded with depth into "
+      f"tissue, and one section cannot fully separate them.** §5.1a measures "
+      f"corr(phi_imm, edge-distance) = "
+      f"{_f(_edge['corr_phi_edge_pearson'], 3)} on a cell-density envelope that "
+      f"rises {_f(_edge['density_envelope_ratio'], 1)}x from the tissue rim "
+      f"inward. Stratifying gives "
+      f"{_f(min(v for v in _edge['within_stratum_sr'] if np.isfinite(v)), 2)}-"
+      f"{_f(max(v for v in _edge['within_stratum_sr'] if np.isfinite(v)), 2)}x "
+      f"within strata, but with {sp['n_tumor']:,} tumour cells on ONE section "
+      f"there is no way to decide how much of the residual is immune geometry "
+      f"and how much is residual collinearity. A second single-cell section "
+      f"with a different immune-versus-depth arrangement is the cheapest test "
+      f"that would resolve it, and it has not been run.")
+    a(f"8. **Everything in §5 is one section, one drug, one strength.** The "
+      f"corrected {_f(ex_lo, 2)}-{_f(ex_hi, 2)}x is a single measurement with a "
+      f"p-value pinned at its {_lab['n_draws']}-draw floor "
+      f"({_f(p_floor, 4)}). It is not an interval and no confidence should be "
+      f"attached to the second decimal place.")
+    a("9. **The statistic does not transfer to spot platforms** (§5.6), so the "
+      "module's flagship spatial claim is available only where single-cell "
+      "centroids are measured. That restricts it to Xenium/CosMx-class data and "
+      "excludes the Visium sections in `data_cache/`; the generator raises "
+      "rather than reporting a number there.")
+    a("10. **The scorecard test rests on assumption A1** (tissue:plasma "
+      "partition = effective penetrance) and on a quasi-steady-state reading of "
+      "it. Both are the scorecard's own standing assumptions, inherited "
+      "unchanged.")
     a("")
     a("## 9. Reproduction")
     a("")
@@ -1454,24 +2646,37 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
     a("./.venv/bin/python -m tmesim.validation.immune_sink_impact")
     a("```")
     a("")
+    _n_null_solves = sum(f_["n_draws"] for f_ in fams.values())
     a(f"Deterministic — the engine's seeded generator (`seed = 0`) and the "
-      f"permutation null's own seed ({sp['seed']}) are the only randomness. "
-      f"Runtime is dominated by transport solves: "
+      f"nulls' own seeds ({', '.join(str(v) for v in sorted(set(NULL_SEEDS.values())))}) "
+      f"are the only randomness. Runtime is dominated by transport solves: "
       f"{len(DRUGS) * (len(SEQUESTRATION_SWEEP) + 1)} on the {sw['grid']} "
       f"flagship grid (§4, including the three engine reference runs)"
-      + (f", {sp['n_perm'] + 2} at dx = {sp['dx_um']:.0f} um (§5.3) and 2 more "
-         f"at dx = {spf['dx_um']:.0f} um (§5.4)" if spf is not None else "")
+      + (f", {sp['n_perm'] + 2} for the demoted label-permutation null and "
+         f"{_n_null_solves + len(CLUMP_SWEEP_SIZES) + 4} more at dx = "
+         f"{sp['dx_um']:.0f} um for the honest nulls, the floors and the CV "
+         f"sweep (§5.1-§5.4), and 2 at dx = {spf['dx_um']:.0f} um (§5.5)"
+         if spf is not None else "")
       + ". Each stage is cached to `results/immune_sink_impact_cache.pkl` as it "
       "completes, so an interrupted run resumes rather than restarting; delete "
-      "that file to force a full recompute.")
+      "that file to force a full recompute. **Every §5 number above — the "
+      "nulls, the CV diagnostic, the measured floors, the edge-distance "
+      "confound, the monotonicity controls and the platform controls — is "
+      "produced by this command.** `write_report` refuses to write this file at "
+      "all if the honest nulls are missing, so the corrected claim cannot be "
+      "silently reverted by a regeneration.")
     a("")
     a("**Files added by this work:**")
     a("")
     a("* `tmesim/molecular/immune_sink.py` — new; the field, the swept magnitude, "
       "the literature table and the re-solve")
-    a("* `tmesim/validation/immune_sink_impact.py` — new; this analysis")
+    a("* `tmesim/validation/immune_sink_impact.py` — new; this analysis, "
+      "including the honest nulls of §5.3 and the spot-data refusal of §5.6")
     a("* `tests/test_immune_sink.py` — new; pins the bit-identity and the "
       "non-vacuity")
+    a("* `tests/test_immune_sink_nulls.py` — new; pins that the primary nulls "
+      "exceed the label permutation, that the CV diagnostic is emitted, and "
+      "that the spot-data guard fires")
     a("* `results/immune_sink_impact.md` — this report")
     a("")
     a("*Generated by `tmesim/validation/immune_sink_impact.py`. Additive only: "
@@ -1512,42 +2717,87 @@ def run(write_md: bool = True, use_cache: bool = True,
             pickle.dump(out, fh)
         return val
 
-    print("[1/6] identity check ...", flush=True)
+    print("[1/8] identity check ...", flush=True)
     ident = _stage("identity", identity_check)
     print(f"      {ident['n_bit_identical']}/{ident['n_comparisons']} "
           f"bit-identical, all={ident['all_bit_identical']}", flush=True)
 
-    print("[2/6] immune fields on three real sections ...", flush=True)
+    print("[2/8] immune fields on three real sections ...", flush=True)
     fields = _stage("fields", immune_fields)
     for r in fields:
         print(f"      {r['section']:<16} immune {r['immune_pct']:.2f}%  "
               f"mean phi {r['phi_mean']:.4f}", flush=True)
 
-    print("[3/6] sweep on the flagship section ...", flush=True)
+    print("[3/8] sweep on the flagship section ...", flush=True)
     sw = _stage("sweep", sweep)
 
-    print(f"[4/6] spatial structure + permutation null (dx={DX_PERM:.0f}) ...",
+    print(f"[4/8] spatial structure + permutation null (dx={DX_PERM:.0f}) ...",
           flush=True)
     sp = _stage("spatial",
                 lambda: spatial_structure(dx_um=DX_PERM, n_perm=n_perm))
     print(f"      structure ratio {sp['observed']['structure_ratio']:.4f} "
           f"p={sp['p_structure_ratio']:.4f}", flush=True)
 
-    print(f"[5/6] mesh cross-check of the same statistic at the flagship "
+    print(f"[5/8] mesh cross-check of the same statistic at the flagship "
           f"dx={DX_FLAGSHIP:.0f} ...", flush=True)
     spf = _stage("spatial_flagship",
                  lambda: spatial_structure(dx_um=DX_FLAGSHIP, n_perm=0))
     print(f"      structure ratio {spf['observed']['structure_ratio']:.4f}",
           flush=True)
 
-    print("[6/6] glioma scorecard ...", flush=True)
+    # --- the honest nulls: built on ONE shared context, cached per family -----
+    _ctx: List[Dict] = []
+
+    def ctx() -> Dict:
+        if not _ctx:
+            print("      building the shared spatial context "
+                  f"(dx={DX_PERM:.0f}) ...", flush=True)
+            _ctx.append(_spatial_context(dx_um=DX_PERM))
+        return _ctx[0]
+
+    print(f"[6/8] honest-null diagnostics: floors, depth confound, CV sweep ...",
+          flush=True)
+    diag = _stage("honest_diag", lambda: spatial_diagnostics(ctx()))
+    print(f"      well-mixed SR floor "
+          f"{diag['uniform_sink_floor']['structure_ratio']:.4f}, "
+          f"edge-only SR "
+          f"{diag['edge_distance']['stats']['structure_ratio']:.4f}", flush=True)
+
+    print(f"[7/8] the null families ({N_PERM} re-solves each) ...", flush=True)
+    families: Dict[str, Dict] = {}
+    for fam in NULL_FAMILIES:
+        families[fam] = _stage(f"null_{fam}",
+                               lambda f=fam: null_family(ctx(), f, n_draws=n_perm))
+        print(f"      {fam:<20} mean SR {families[fam]['sr_mean']:.4f} "
+              f"[{families[fam]['sr_min']:.4f}-{families[fam]['sr_max']:.4f}] "
+              f"CV {families[fam]['cv_mean']:.3f} "
+              f"excess {families[fam]['excess_over_null']:.3f}x", flush=True)
+
+    hc = _stage("honest_ctx", lambda: {
+        "observed": ctx()["observed"],
+        "provenance": ctx()["provenance"],
+        "n_tumor": ctx()["n_tumor"], "n_immune": ctx()["n_immune"],
+        "n_cells": ctx()["n_cells"], "dx_um": ctx()["dx_um"],
+        "strength": ctx()["strength"], "drug_name": ctx()["drug_name"],
+        "sample": ctx()["sample"],
+        "corr_phi_edge_observed": float(np.corrcoef(
+            ctx()["phi_at_tumor"], ctx()["edge_at_tumor"])[0, 1]),
+    })
+    hon = honest_spatial_summary(hc, families, diag)
+    out["honest_summary"] = hon
+    print(f"      honest excess {hon['honest_excess_min']:.3f}-"
+          f"{hon['honest_excess_max']:.3f}x over the primary nulls", flush=True)
+    _ctx.clear()
+
+    print("[8/8] glioma scorecard ...", flush=True)
     sc = _stage("scorecard", lambda: glioma_scorecard(sw["mean_phi"]))
     print(f"      baseline {sc['baseline']['gm_abs']:.3f}x -> best "
           f"{sc['best_modality_aware']['gm_abs']:.3f}x "
           f"(improves={sc['improves']})", flush=True)
 
     if write_md:
-        out["report_path"] = write_report(ident, fields, sw, sp, sc, spf)
+        out["report_path"] = write_report(ident, fields, sw, sp, sc, spf,
+                                          hc, families, diag, hon)
         print(f"wrote {out['report_path']}", flush=True)
     print(f"total {time.time() - t0:.0f}s", flush=True)
     return out
