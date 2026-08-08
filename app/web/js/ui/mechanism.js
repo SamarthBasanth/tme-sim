@@ -1,14 +1,16 @@
-// ui/mechanism.js — the two stage overlays this feature adds:
+// ui/mechanism.js — the two pieces this feature adds:
 //
-//   1. the MECHANISM LEGEND: every attribution category with its count and its
-//      share, the delivery / dose / resistance / chance roll-up as one stacked
-//      bar, and the bit-exact reconciliation against the engine's own
+//   1. the MECHANISM BREAKDOWN: every attribution category with its count and
+//      its share, the delivery / dose / resistance / chance roll-up as one
+//      stacked bar, and the bit-exact reconciliation against the engine's own
 //      kill_fraction. Rows toggle their category in the viewer.
 //   2. the TIME-LAPSE SCRUBBER: play / pause / step / seek over the captured
 //      drug-concentration frames.
 //
-// Both are new files and both are additive: they are appended to #canvas-wrap
-// alongside the existing overlays and never touch them.
+// (1) used to be a floating card parked in the stage's top-right corner. It is
+// now DOCKED into the READ rail — see the note above createMechanismLegend.
+// (2) is still a stage overlay: it is a transport control for the picture, and
+// it has to be under the picture it scrubs.
 //
 // Design rule being honoured (API_CONTRACT.md): every category carries a
 // visible label AND a number. The categorical palette clears its CVD target on
@@ -19,18 +21,35 @@ import { h, fill } from '../util/dom.js';
 import { num, int, pct, NULL_GLYPH } from '../util/fmt.js';
 import { MECH, MECH_META, LIMITER_LABEL, dominantReason } from '../mechanism.js';
 
-/* ====================================================== legend ========= */
+/* ==================================================== breakdown ======== */
 
-// docs/UI_ARCHITECTURE.md 2.3 records the legend's 300px width as a deliberate
-// cost, permanent for as long as the run carries attribution, and names the
-// one fix that does not compromise that reasoning: "a collapse control on the
-// card, not a mode coupling". This is that control. It defaults to expanded
-// (the finding stays visible with no action required, exactly as decided),
-// persists the operator's choice, and even collapsed keeps the headline
-// number in the title row — collapsing hides the row-by-row breakdown, not
-// the finding itself.
-const COLLAPSE_KEY = 'tmesim.mechleg.collapsed';
-
+// WHY THIS IS NO LONGER A STAGE OVERLAY
+// -------------------------------------
+// docs/UI_ARCHITECTURE.md 2.3 booked the legend's 300px as a permanent cost
+// against the specimen and named the escape hatch as "a collapse control on
+// the card, not a mode coupling". Both alternatives were wrong in the same
+// way: they treated a 300x380 px card sitting ON TOP of the tissue as a width
+// problem. It is not. The stage is the product's primary output and the card
+// OCCLUDED the top-right quarter of it in every colour mode, including the two
+// modes it is not the key for.
+//
+// A mode coupling was rejected because "tying it to mech mode would hide a
+// result behind a display setting" — and that reasoning is still right, which
+// is exactly why the answer is not to hide it but to MOVE it. The panel is
+// read once per run (what was killed, and what limited the survivors) and then
+// used episodically (toggling a category to isolate it spatially). Once-per-
+// run reference numbers belong in the READ rail — that rail's whole job is
+// "what does the run say" — and specifically in RESULT, immediately under
+// METRICS, because this breakdown IS the decomposition of the `Kill fraction`
+// metric printed two lines above it and reconciles with it bit-exactly.
+//
+// There is precedent for the interactive half too: `type` colouring has no
+// stage key either. Its per-channel visibility toggles live in the rail under
+// VIEW > Channels. Mechanism now matches it.
+//
+// Nothing is hidden by this: the rail section is `open` by default, RESULT is
+// the group the rail opens on, and selecting the `mech` colour source scrolls
+// the rail to it (main.js). What the stage gets back is a quarter of itself.
 export function createMechanismLegend(viewer, { onToggle } = {}) {
   const title = h('div.m-title');
   const headline = h('span.m-headline');
@@ -39,38 +58,26 @@ export function createMechanismLegend(viewer, { onToggle } = {}) {
   const note = h('div.m-note');
   const body = h('div.m-body', rows, bar, note);
 
-  let collapsed = false;
-  try { collapsed = localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { /* private mode */ }
-
-  const collapseBtn = h('button.m-collapse', {
-    type: 'button',
-    'aria-label': 'Collapse the mechanism breakdown',
-    'aria-expanded': String(!collapsed),
-    title: 'Collapse the row breakdown to reclaim stage width. The headline stays visible either way.',
-    onclick: () => {
-      collapsed = !collapsed;
-      try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch { /* private mode */ }
-      card.classList.toggle('collapsed', collapsed);
-      collapseBtn.setAttribute('aria-expanded', String(!collapsed));
-      // The label names the action the button performs NEXT, same convention
-      // as the theme toggle — otherwise a screen reader announces "collapse"
-      // forever, including while already collapsed.
-      collapseBtn.setAttribute('aria-label',
-        collapsed ? 'Expand the mechanism breakdown' : 'Collapse the mechanism breakdown');
-      collapseBtn.textContent = collapsed ? '▸' : '▾';
-    },
-  }, collapsed ? '▸' : '▾');
-
-  const card = h('div.ov.ov-mech.ov-card.mechleg.hidden.interactive',
-    { role: 'figure', 'aria-label': 'Mechanism attribution legend' },
+  const card = h('div.mechleg.mechleg-docked',
+    { role: 'figure', 'aria-label': 'Mechanism attribution breakdown' },
     title, body);
-  card.classList.toggle('collapsed', collapsed);
 
   let agg = null;
 
   function render() {
-    if (!agg) { card.classList.add('hidden'); return; }
-    card.classList.remove('hidden');
+    if (!agg) {
+      // An empty state, not a disappearance. A reconstruction-only run has
+      // nothing to attribute and the section says so where the numbers would
+      // be — a section that silently vanishes reads as a bug.
+      fill(title);
+      fill(rows, h('div.m-empty',
+        'This run carries no per-cell attribution. Submit a run with '
+        + 'attribute_mechanism (the default) to get one.'));
+      fill(bar);
+      bar.style.display = 'none';
+      fill(note);
+      return;
+    }
 
     const counts = agg.counts || {};
     const nTumor = agg.n_tumor || 0;
@@ -78,13 +85,14 @@ export function createMechanismLegend(viewer, { onToggle } = {}) {
 
     headline.textContent = `${pct(killed / (nTumor || 1), 1)}% killed`;
 
+    // No 'mechanism' word here any more: the section's own <summary> says it
+    // one line above, and a card that repeats its container's title is how a
+    // rail ends up with two headings per section.
     fill(title,
-      h('span', 'mechanism'),
       headline,
       h('span.grow'),
       h('span.mono', { style: { color: 'var(--fg-2)' } },
-        `${int(nTumor)} tumour cells`),
-      collapseBtn);
+        `${int(nTumor)} tumour cells`));
 
     /* --- one row per category ---------------------------------------- */
     const order = [
@@ -188,7 +196,6 @@ export function createMechanismLegend(viewer, { onToggle } = {}) {
     set(aggregate) { agg = aggregate; render(); },
     refresh: render,
     get aggregate() { return agg; },
-    setHidden(on) { card.classList.toggle('hidden', !!on || !agg); },
   };
 }
 
@@ -196,6 +203,49 @@ export function createMechanismLegend(viewer, { onToggle } = {}) {
 
 /** Frames per second when the time-lapse is playing. */
 const PLAY_FPS = 8;
+
+/**
+ * Pick the frame the series should OPEN on.
+ *
+ * The series starts at t=0, which by construction is empty — no drug has
+ * entered the tissue yet. Opening there is defensible arithmetic and terrible
+ * evidence: the first thing a visitor sees on a view sold as "where does the
+ * drug go" is a frame with no drug in it, and the panel underneath has to
+ * apologise for it in orange.
+ *
+ * So open on the frame that carries the MOST DRUG — argmax of the mean over
+ * the sampled grid. Two reasons for that statistic rather than "the last
+ * frame":
+ *
+ *   - with a static plasma source the concentration climbs to a quasi-steady
+ *     state and never clears, so the mean is monotone and the argmax IS the
+ *     last frame: maximum penetration, which is the honest headline;
+ *   - with time_resolved=true the drug enters AND clears, so the last frame is
+ *     empty for the same reason the first one is. The argmax lands on peak
+ *     exposure instead, and the same rule keeps working.
+ *
+ * `frame.max` alone would not do: it peaks the moment the vessel-adjacent
+ * voxel saturates, which can be long before the drug has gone anywhere.
+ *
+ * Ties resolve to the LATEST frame, so a perfectly flat series still opens on
+ * the end of the window rather than at t=0.
+ *
+ * Returning 0 is a legitimate answer (a series that never carries any drug),
+ * and then nothing has been misrepresented: t=0 is genuinely what there is.
+ */
+export function openingFrameIndex(series) {
+  if (!series || !series.n_frames) return 0;
+  let best = 0, bestMean = -Infinity;
+  for (let k = 0; k < series.frames.length; k++) {
+    const v = series.frames[k].values;
+    if (!v || !v.length) continue;
+    let s = 0;
+    for (let j = 0; j < v.length; j++) s += v[j];
+    const mean = s / v.length;
+    if (mean >= bestMean) { bestMean = mean; best = k; }
+  }
+  return bestMean > 0 ? best : 0;
+}
 
 export function createTimelapseScrubber({ onFrame }) {
   // Glyph-only buttons: the character itself is not a usable accessible name
@@ -205,7 +255,10 @@ export function createTimelapseScrubber({ onFrame }) {
   // action the button performs, per docs/UI_ARCHITECTURE.md section 5 ("a
   // toggle states the state it produces").
   const btnPlay = h('button.btn.ghost.sm.s-btn', { title: 'Play / pause (space)', 'aria-label': 'Play' }, '▶');
-  const btnStop = h('button.btn.ghost.sm.s-btn', { title: 'Back to first frame', 'aria-label': 'Back to first frame' }, '⏮');
+  const btnStop = h('button.btn.ghost.sm.s-btn', {
+    title: 'Jump to the first frame — t = 0, before any drug has entered the tissue',
+    'aria-label': 'Back to first frame, t = 0',
+  }, '⏮');
   const range = h('input', {
     type: 'range', min: '0', max: '0', step: '1', value: '0',
     'aria-label': 'Time-lapse frame',
@@ -224,9 +277,18 @@ export function createTimelapseScrubber({ onFrame }) {
     if (!series) return;
     const f = series.frames[i];
     read.textContent = '';
-    read.appendChild(h('span', `t ${fmtTime(f.time_s)}`));
+    // The series no longer opens at t=0, so the clock is the single most
+    // load-bearing character on this control: a viewer who thinks the frame in
+    // front of them is t=0 misreads the penetration by the whole window. It is
+    // therefore set apart — its own type size, its own colour, `t =` spelled
+    // out — rather than being one more grey token in a run-on line.
+    read.appendChild(h('span.s-t', `t = ${fmtTime(f.time_s)}`));
     read.appendChild(h('span.unit', ` · frame ${i + 1}/${series.n_frames}`));
     read.appendChild(h('span.unit', ` · max ${num(f.max, 3)} uM`));
+    // t=0 is a legitimate place to stand, and it is empty by construction.
+    // Say which of the two it is rather than letting a blank field read as a
+    // broken overlay.
+    if (f.max <= 0) read.appendChild(h('span.s-zero', ' · no drug yet'));
     range.value = String(i);
     if (onFrame) onFrame(f, i, series);
   }
@@ -280,6 +342,7 @@ export function createTimelapseScrubber({ onFrame }) {
       if (!series || !series.n_frames) { card.classList.add('hidden'); return; }
       card.classList.remove('hidden');
       range.max = String(series.n_frames - 1);
+      i = openingFrameIndex(series);
       const bits = [
         `${series.n_frames} frames`,
         `every ${fmtTime(info.realised_interval_s || series.interval_s)}`,
@@ -288,6 +351,16 @@ export function createTimelapseScrubber({ onFrame }) {
         `drug concentration (uM), ${info.grid ? info.grid.join('x') : '?'} grid`,
       ];
       fill(meta, h('span', bits.join(' · ')));
+      // State the default out loud, next to the control that set it. The
+      // series is showing a chosen frame, not its beginning, and the operator
+      // is told so in words before they read a number off the picture.
+      if (i > 0) {
+        meta.appendChild(h('span.s-open',
+          ` — opened at t = ${fmtTime(series.frames[i].time_s)} `
+          + `(frame ${i + 1}/${series.n_frames}), the frame carrying the most `
+          + 'drug. It is NOT the start of the window: press ⏮ for t = 0, '
+          + 'before dosing.'));
+      }
       if (info.plateau_note) {
         meta.appendChild(h('span.warn', ' — static plasma source: the drug is ' +
           'seen to enter and spread toward a quasi-steady state, but never to ' +
@@ -301,7 +374,12 @@ export function createTimelapseScrubber({ onFrame }) {
   };
 }
 
-function fmtTime(s) {
+/**
+ * The one clock format for time-lapse instants. Exported because the stage's
+ * field legend now prints the same value (main.js) and the two must not be
+ * able to disagree about what time the picture is.
+ */
+export function fmtTime(s) {
   if (!Number.isFinite(s)) return NULL_GLYPH;
   if (s < 90) return `${num(s, 0)} s`;
   if (s < 5400) return `${num(s / 60, 1)} min`;

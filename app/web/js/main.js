@@ -10,7 +10,7 @@ import { createHistoryPanel } from './ui/history.js';
 import { createReportsPanel } from './ui/reports.js';
 import { createProjectsPanel } from './ui/projects.js';
 import { createOverlays } from './ui/overlays.js';
-import { createMechanismLegend, createTimelapseScrubber } from './ui/mechanism.js';
+import { createMechanismLegend, createTimelapseScrubber, fmtTime as fmtClock } from './ui/mechanism.js';
 import { createWindowLevel } from './ui/wl.js';
 import { createTools, TOOLS } from './ui/tools.js';
 import { makeSplitter } from './ui/splitter.js';
@@ -104,13 +104,18 @@ async function boot() {
     for (const n of overlays.nodes) $('#canvas-wrap').appendChild(n);
     overlays.setEmpty(true);
 
-    // Mechanism legend + time-lapse scrubber. Both are appended alongside the
-    // existing overlays and never modify them.
+    // The mechanism breakdown is built here (it needs the viewer, whose label
+    // visibility its rows drive) but MOUNTED in the READ rail, below —
+    // `mechanismEl` on createInspectPanel, the same seam windowLevelEl and the
+    // three tool panels already use. It used to be appended to #canvas-wrap as
+    // a floating card and it occluded the stage's top-right quarter in every
+    // colour mode; see js/ui/mechanism.js for the full argument.
     mechLegend = createMechanismLegend(viewer, {
       onToggle: () => { viewer.dirty = true; },
     });
+    // The scrubber stays on the stage: it is a transport control for the
+    // picture, so it has to be under the picture it scrubs.
     scrubber = createTimelapseScrubber({ onFrame: onTimelapseFrame });
-    $('#canvas-wrap').appendChild(mechLegend.node);
     $('#canvas-wrap').appendChild(scrubber.node);
 
     wl = createWindowLevel({ viewer, onChange: onWindowChange });
@@ -139,6 +144,7 @@ async function boot() {
     profileEl: tools ? tools.profileEl : null,
     regionEl: tools ? tools.regionEl : null,
     distanceEl: tools ? tools.distanceEl : null,
+    mechanismEl: mechLegend ? mechLegend.node : null,
   });
   history = createHistoryPanel({ onOpen: openRun, onRefresh: refreshRuns });
   // Additive: the reports panel mounts as a third dock column and brings its
@@ -369,6 +375,13 @@ function setColourMode(m) {
   }
   viewer.setColorMode(m);
   syncColourControl();
+  // Selecting `mech` promotes the breakdown from "the run's finding" to "the
+  // key for what is on screen right now". It lives in the rail rather than on
+  // the stage, so bring it to the operator instead of making them hunt for the
+  // legend of the picture they are looking at.
+  if (m === COLOR_MODE.LABEL && inspect && inspect.revealMechanism) {
+    inspect.revealMechanism();
+  }
 }
 
 /** Cycle 'colour by' through the modes this run can actually offer. */
@@ -840,6 +853,7 @@ async function loadTimelapse(id, run) {
   if (!scrubber) return;
   scrubber.clear();
   timelapseField = false;
+  if (overlays) overlays.setFieldFrame(null);
   store.set({ timelapse: null });
   const info = (run && run.timelapse) || null;
   if (info && info.available === false) return;   // the run says there is none
@@ -888,6 +902,14 @@ function onTimelapseFrame(frame, i, series) {
     if (overlays) overlays.updateLegend('drug_concentration', viewer.field);
     syncColourControl();
   }
+  // Stamp the stage legend with the instant it is labelling. The series opens
+  // on the frame carrying the most drug, not on t=0, so the key to these
+  // pixels has to name the time — otherwise the picture is a penetration
+  // claim with no clock on it.
+  if (overlays) {
+    overlays.setFieldFrame(
+      `t = ${fmtClock(frame.time_s)} · frame ${i + 1}/${series.n_frames}`);
+  }
   const el = $('#sb-msg');
   if (el) {
     el.textContent = `time-lapse frame ${i + 1}/${series.n_frames} · `
@@ -929,6 +951,9 @@ async function selectField(name) {
   // The operator asked for a served overlay: hand the field texture back and
   // stop the time-lapse rather than letting the two fight over it.
   if (timelapseField) { timelapseField = false; if (scrubber) scrubber.pause(); }
+  // A served field is not an instant of anything — drop the time stamp with
+  // the frame it belonged to, rather than leaving it to label the next field.
+  if (overlays) overlays.setFieldFrame(null);
   store.set({ fieldName: name || null });
   if (!viewer) return;
   if (!name) {

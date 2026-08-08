@@ -1,10 +1,10 @@
 // inspect.js — the READ rail. Everything that interprets the active run, and
 // nothing that changes what will be run (that is the SETUP rail, ui/spec.js).
 //
-// The eleven sections are organised into three named groups with a sticky
+// The twelve sections are organised into three named groups with a sticky
 // header each and a navigator at the top of the rail:
 //
-//   RESULT   metrics, caveats, provenance, reconstruction report
+//   RESULT   metrics, mechanism, caveats, provenance, reconstruction report
 //   VIEW     channels, field overlay, window/level, render
 //   MEASURE  line profile, regions, distance
 //
@@ -145,7 +145,7 @@ function caveatNode(text, n, extra) {
 }
 
 export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
-  windowLevelEl, profileEl, regionEl, distanceEl }) {
+  windowLevelEl, profileEl, regionEl, distanceEl, mechanismEl }) {
   /* ------------------------------------------------------- channels ---- */
   const chanList = h('div');
   const chanRows = [];
@@ -511,12 +511,24 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   const na = (what) => h('div.dim', { style: { padding: 'var(--sp-4) var(--sp-5)' } },
     `${what} is unavailable without WebGL2.`);
 
+  const mechSect = h('details.sect', { open: true, id: 'sect-mech' },
+    h('summary', 'Mechanism', h('span.hint', 'reconciles with kill_fraction')),
+    h('div.sect-body', mechanismEl || na('Mechanism')));
+
   const railBody = h('div.rail-body',
     /* ---- RESULT: what did the run find, and how much of it is measured -- */
     railGroup('result', 'Result', 'RunResult',
       h('details.sect', { open: true },
         h('summary', 'Metrics', h('span.hint', 'provenance on every value')),
         h('div.sect-body', errorEl, metricsEl)),
+
+      // Was a floating card over the stage's top-right quarter. It lives here
+      // now, DIRECTLY under Metrics, because it is the decomposition of the
+      // `Kill fraction` value printed immediately above it and reconciles with
+      // it bit-exactly — the two belong on the same screen, in that order, and
+      // neither belongs on top of the tissue. js/ui/mechanism.js carries the
+      // full argument.
+      mechSect,
 
       h('details.sect', { open: true },
         h('summary', 'Caveats', tallyEl, h('span.hint', 'not collapsible for a reason')),
@@ -646,6 +658,33 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       });
     },
     get rampName() { return rampSel.value; },
+    /**
+     * Bring the mechanism breakdown into view.
+     *
+     * Called when the operator selects the `mech` colour source: that turns the
+     * breakdown into the KEY for what is on the stage, and a key you have to
+     * go looking for is not one. Opens the section if the operator closed it,
+     * then scrolls the rail body — scrollTop arithmetic on bounding rects, not
+     * scrollIntoView, for the reason spelled out in ui/rail.js: the nearest
+     * scrollable ancestor is the shell, and the shell must never scroll.
+     */
+    revealMechanism() {
+      if (!mechSect.open) mechSect.open = true;
+      if (!railBody.isConnected || !railBody.clientHeight) return;
+      // Land the section's own SUMMARY below the group's sticky header, not
+      // under it. railNav gets away with a bare alignment because the thing it
+      // scrolls to IS the sticky header; a section inside the group has one
+      // sitting on top of it, and without this offset "Mechanism · reconciles
+      // with kill_fraction" was scrolled underneath RESULT and the panel
+      // appeared to have lost its title.
+      const head = mechSect.closest('.rail-group')
+        ? mechSect.closest('.rail-group').querySelector('.rg-head')
+        : null;
+      railBody.scrollTop += mechSect.getBoundingClientRect().top
+        - railBody.getBoundingClientRect().top
+        - (head ? head.getBoundingClientRect().height : 0);
+      nav.sync();
+    },
     benchOut,
   };
 }

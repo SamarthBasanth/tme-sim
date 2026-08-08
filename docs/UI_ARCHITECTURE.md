@@ -124,7 +124,7 @@ to overlap each other:
 | Slot | Overlay | Shown when |
 |---|---|---|
 | top-left | hover / pinned cell read-out | always |
-| top-right | mechanism legend | the run carries mechanism attribution |
+| top-right | *(free)* | — |
 | bottom-left | scale bar | geometry loaded |
 | bottom-right | field legend | a field overlay is selected |
 | bottom band, above the corners | time-lapse scrubber | a time-lapse is loaded |
@@ -134,28 +134,60 @@ to overlap each other:
 The empty state is the only overlay allowed to cover the others, because when
 it is showing there is nothing underneath it to cover.
 
-Two notes on the mechanism legend, which is the largest overlay at 300 px wide:
+The scrubber's clearance above the two bottom corners is **measured**, not a
+constant: `ui/overlays.js` publishes `--ov-bottom` from the taller of the scale
+bar and the field legend. The constant it replaced went stale the moment the
+legend grew a line.
 
-- It stays up whenever the run has attribution, **not** only while the colour
-  source is `mech`. That is deliberate and it was left as it was: the legend is
-  the run's finding — the delivery/dose/resistance/chance split and the
-  bit-exact reconciliation against `kill_fraction` — not merely a key for the
-  current colouring. Tying it to `mech` mode would hide a result behind a
-  display setting.
-- It therefore costs specimen area permanently. The honest trade is stated here
-  rather than hidden: if this becomes a complaint, the fix is a collapse control
-  on the card, not a mode coupling.
+**The time-lapse does not open on its first frame.** Frame 1 is `t = 0`, which
+is empty by construction — no drug has entered the tissue yet — so a stage sold
+as *see where the drug goes* opened on a picture with no drug in it. It now
+opens on the frame carrying the most drug (argmax of the mean over the sampled
+grid; see `openingFrameIndex` in `js/ui/mechanism.js`), which is the last frame
+for a static plasma source and the peak-exposure frame for a clearing one. The
+rule has one obligation attached, and it is not negotiable: **the picture must
+never be mistaken for `t = 0`.** Three independent disclosures carry the clock —
+the scrubber read-out promotes `t =` to accent at `--fs-md`; the scrubber's
+metadata line states the default in words and names the control that returns to
+`t = 0`; and the field legend, which is the key to those pixels, prints
+`t = … · frame n/N` under its title. The status bar prints it a fourth time.
+
+**The mechanism legend used to hold the top-right slot, and no longer does.**
+It was the largest overlay at 300 px wide and ~380 px tall, and this document
+booked that as a permanent cost against the specimen, offering "a collapse
+control on the card, not a mode coupling" as the escape hatch if it ever became
+a complaint. It became one, and both of those options were answers to the wrong
+question: the problem was never the card's width, it was that a card sat **on
+top of** the product's primary output — occluding roughly the top-right quarter
+of the tissue, in every colour mode, including the two it is not the key for.
+
+The rejection of a mode coupling still stands ("tying it to `mech` mode would
+hide a result behind a display setting"), which is exactly why the fix is not
+to hide the panel but to **move** it: it is now a section of the READ rail,
+under RESULT, immediately below `Metrics` (§2.4). Nothing about it is
+conditional and nothing about it is collapsed by default. See `js/ui/mechanism.js`
+for the full argument; the short version is that the breakdown is read once per
+run and then used episodically, that once-per-run reference numbers are what
+the READ rail is *for*, and that the breakdown belongs beside the `Kill fraction`
+metric it decomposes and reconciles with bit-exactly.
+
+The interactive half of the panel — rows that toggle a category's visibility in
+the viewer — moves with it, and has precedent: `type` colouring has no stage key
+either, and its per-channel toggles live in the rail under VIEW > Channels.
+Selecting the `mech` colour source scrolls the rail to the section, because in
+that mode the breakdown is also the key to what is on screen.
 
 ### 2.4 READ — the right rail
 
 Answers *what does the run say, and how am I looking at it*. This rail carried
 ten flat, unlabelled sections and 2350 px of content in a 1000 px column. It
-now carries the same ten sections plus one that was missing, organised into
+now carries the same ten sections, plus one that was missing and one that came
+in off the stage (`Mechanism`, §2.3), organised into
 **three named groups** with a **sticky group navigator** at the top of the rail.
 
 | Group | Sections | Question |
 |---|---|---|
-| **RESULT** | Metrics · Caveats · Provenance · Reconstruction report | what did the run find, and how much of it is measured |
+| **RESULT** | Metrics · Mechanism · Caveats · Provenance · Reconstruction report | what did the run find, and how much of it is measured |
 | **VIEW** | Channels · Field overlay · Window / level · Render | how is the picture being drawn |
 | **MEASURE** | Line profile · Regions · Distance | what did I measure on it |
 

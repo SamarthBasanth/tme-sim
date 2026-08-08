@@ -47,13 +47,21 @@ export function createOverlays(viewer) {
 
   /* ---------------------------------------------------------- legend --- */
   const legTitle = h('div.l-title');
+  const legFrame = h('div.l-t.hidden');
   const legRamp = h('div.l-ramp');
   const legTicks = h('div.l-ticks');
   const legNote = h('div.l-note');
   const legend = h('div.ov.ov-legend.ov-card.legend.hidden', { role: 'figure', 'aria-label': 'Field legend' },
-    legTitle, legRamp, legTicks, legNote);
+    legTitle, legFrame, legRamp, legTicks, legNote);
 
   let legendField = null, legendName = null;
+  // Set only while the field texture is holding a TIME-LAPSE frame. The series
+  // no longer opens at t=0 (see openingFrameIndex in ui/mechanism.js), so the
+  // pixels on the stage are one chosen instant out of twenty-four and the key
+  // that explains those pixels has to say which one. Without it the only
+  // statement of the time is on the scrubber, which is a control — a reader
+  // taking a number off the ramp has no reason to look at it.
+  let frameLabel = null;
 
   // The legend labels the WINDOW, not the payload range, because the window is
   // what the colours on screen actually mean. When the two differ the legend
@@ -66,6 +74,13 @@ export function createOverlays(viewer) {
     const meta = fieldMeta(legendName);
     legend.classList.remove('hidden');
     fill(legTitle, h('span', meta.label), h('span.unit', meta.unit));
+    legFrame.textContent = frameLabel || '';
+    legFrame.classList.toggle('hidden', !frameLabel);
+    legFrame.title = frameLabel
+      ? 'These pixels are ONE instant of the time-lapse, not the whole window. '
+        + 'The series opens on the frame carrying the most drug, not on t = 0. '
+        + 'Scrub with the control below the stage.'
+      : '';
     legRamp.style.backgroundImage = gradientCss(viewer.rampName, 24, viewer.fieldAlphaRamp);
 
     const [lo, hi] = viewer.windowRange();
@@ -103,6 +118,17 @@ export function createOverlays(viewer) {
 
   /** Re-label the legend after the window moved, without refetching anything. */
   function refreshWindow() { if (legendName) updateLegend(legendName, legendField); }
+
+  /**
+   * Stamp the legend with the instant these pixels are, or clear it.
+   * @param {string|null} label e.g. "t = 6.00 h · 24/24"
+   */
+  function setFieldFrame(label) {
+    const next = label || null;
+    if (next === frameLabel) return;
+    frameLabel = next;
+    if (legendName) updateLegend(legendName, legendField);
+  }
 
   /* --------------------------------------------------------- read-out -- */
   const roBody = h('div');
@@ -161,6 +187,26 @@ export function createOverlays(viewer) {
     readout.style.borderColor = pinned ? 'var(--accent)' : '';
   }
 
+  /* -------------------------------------------------- bottom band ------ */
+  // The time-lapse scrubber has to clear whichever bottom-corner card is
+  // tallest. That clearance used to be a constant in mechanism.css, and the
+  // constant went stale the moment the field legend grew its timestamp line.
+  // Measure it instead: a ResizeObserver fires only when one of the two cards
+  // actually changes height, so this costs nothing per frame.
+  function syncBottomBand() {
+    const host = legend.parentElement;
+    if (!host) return;
+    const tall = Math.max(
+      scalebar.classList.contains('hidden') ? 0 : scalebar.offsetHeight,
+      legend.classList.contains('hidden') ? 0 : legend.offsetHeight);
+    host.style.setProperty('--ov-bottom', tall + 'px');
+  }
+  if (typeof ResizeObserver === 'function') {
+    const ro = new ResizeObserver(syncBottomBand);
+    ro.observe(scalebar);
+    ro.observe(legend);
+  }
+
   /* ------------------------------------------------------ empty state -- */
   // NOT `.interactive`: the notice spans the full width of the top strip at
   // z-index 3 and contains nothing clickable, so pointer-events:auto only
@@ -178,7 +224,7 @@ export function createOverlays(viewer) {
 
   return {
     nodes: [empty, scalebar, legend, readout],
-    updateScalebar, updateLegend, updateReadout, refreshWindow,
+    updateScalebar, updateLegend, updateReadout, refreshWindow, setFieldFrame,
     setEmpty(on) { empty.classList.toggle('hidden', !on); },
     refreshRamp() {
       legRamp.style.backgroundImage = gradientCss(viewer.rampName, 24, viewer.fieldAlphaRamp);

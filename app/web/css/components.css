@@ -769,6 +769,18 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   margin-bottom: var(--sp-2);
 }
 .legend .l-title .unit { text-transform: none; letter-spacing: 0; margin: 0; }
+/* Which INSTANT these pixels are. Present only while the field texture holds a
+   time-lapse frame; the series opens on the frame carrying the most drug
+   rather than on t = 0, so the key to the image has to name the time or the
+   image is a claim about the wrong moment. Accent, mono, tabular — it is a
+   value, and it must not read as part of the field's title. */
+.legend .l-t {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  margin: -2px 0 var(--sp-2);
+}
 .legend .l-ramp {
   height: 9px;
   width: 100%;

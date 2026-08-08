@@ -33,10 +33,14 @@
    is exactly how eight stylesheets stop agreeing with each other.
    ============================================================================ */
 
-/* --------------------------------------------------------- legend card --- */
-.ov-mech { right: var(--stage-inset); top: var(--stage-inset); max-width: 300px; }
-
-.mechleg { padding: var(--sp-3) var(--sp-4); min-width: 250px; }
+/* ------------------------------------------------- docked breakdown --- */
+/* This was `.ov-mech`, a floating card pinned to the stage's top-right corner
+   at max-width 300px. It is now a section of the READ rail (RESULT group,
+   directly under Metrics) — see the long note in js/ui/mechanism.js for why.
+   It therefore carries NO positioning, no surface of its own and no border of
+   its own: `.sect-body` already supplies all three, and a card inside a panel
+   inside a rail is three nested surfaces to say one thing. */
+.mechleg { min-width: 0; }
 .mechleg .m-title {
   display: flex; align-items: baseline; gap: var(--sp-3);
   font-size: var(--fs-micro);
@@ -46,6 +50,9 @@
   margin-bottom: var(--sp-2);
 }
 .mechleg .m-title .grow { flex: 1; }
+/* The empty state has no headline to put here; an empty flex row would still
+   spend its margin-bottom. */
+.mechleg .m-title:empty { display: none; }
 .mechleg .m-headline {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -54,28 +61,15 @@
   color: var(--fg-0);
 }
 
-/* Collapse control (docs/UI_ARCHITECTURE.md 2.3): the row breakdown hides,
-   the headline kill number and the card itself do not — collapsing reclaims
-   stage width without pretending the run has no attribution. */
-.mechleg .m-collapse {
-  appearance: none;
-  pointer-events: auto;
-  background: transparent;
-  border: 1px solid var(--line-1);
-  color: var(--fg-2);
-  width: 16px; height: 16px;
-  line-height: 14px;
-  padding: 0;
-  font-size: var(--fs-micro);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.mechleg .m-collapse:hover { background: var(--bg-3); color: var(--fg-0); }
+/* The section's own <summary> is the collapse control now, so the card no
+   longer ships one of its own — two disclosure affordances one line apart is
+   worse than none. */
 
-.mechleg.collapsed { min-width: 0; width: max-content; }
-.mechleg.collapsed .m-title { margin-bottom: 0; }
-.mechleg.collapsed .m-body { display: none; }
-.ov-mech.collapsed { max-width: none; }
+.mechleg .m-empty {
+  font-size: var(--fs-micro);
+  color: var(--fg-2);
+  line-height: 1.45;
+}
 
 .mechleg .m-rows { display: grid; gap: 0; }
 .mechleg .m-row {
@@ -125,11 +119,16 @@
 
 /* ------------------------------------------------------------ scrubber --- */
 /* Sits ABOVE the two bottom-corner cards (scale bar, field legend) rather
-   than beside them: --stage-inset gutter, plus the tallest bottom card. */
+   than beside them: --stage-inset gutter, plus the tallest bottom card.
+   `--ov-bottom` is MEASURED from those two cards by ui/overlays.js. It used to
+   be a 72px constant, and the constant went stale the moment the field legend
+   grew a timestamp line — which it grows exactly when a time-lapse is loaded,
+   i.e. exactly when this control is on screen. The fallback keeps the band
+   sane for the one frame before the first measurement. */
 .ov-timelapse {
   left: var(--stage-inset);
   right: var(--stage-inset);
-  bottom: calc(var(--stage-inset) + 72px);
+  bottom: calc(var(--stage-inset) + var(--ov-bottom, 88px) + var(--sp-3));
   pointer-events: none;
 }
 
@@ -161,6 +160,17 @@
   white-space: nowrap;
 }
 .scrub .s-read .unit { color: var(--fg-2); }
+/* The clock, promoted. The series opens on the frame carrying the most drug
+   rather than on t=0, so the one thing that must not be skimmed is which
+   instant is on screen. Accent + one size up + tabular figures; no box, no
+   badge — the surrounding line is already quiet enough for weight alone to
+   carry it. */
+.scrub .s-read .s-t {
+  font-size: var(--fs-md);
+  color: var(--accent);
+  font-weight: 600;
+}
+.scrub .s-read .s-zero { color: var(--warn); }
 .scrub .s-meta {
   grid-column: 1 / -1;
   font-size: var(--fs-micro);
@@ -168,3 +178,4 @@
   line-height: 1.4;
 }
 .scrub .s-meta .warn { color: var(--warn); }
+.scrub .s-meta .s-open { color: var(--fg-1); }
