@@ -311,13 +311,41 @@ body::after {
   text-align: left;
 }
 
+/*
+ * Right sections position the BLOCK right but set the TEXT left.
+ *
+ * They used to be right-aligned throughout, which is fine for a headline and
+ * a readability failure for a paragraph -- section 05 runs to eleven lines,
+ * and with a ragged left edge the eye has to hunt for the start of every one
+ * of them. Since these paragraphs carry the limitations, which is the copy
+ * this product most needs people to actually read, that trade is the wrong
+ * way round.
+ *
+ * So the composition is unchanged (the block still sits opposite the tissue,
+ * which is what the alignment was for) while headline and body now share one
+ * straight left edge.
+ */
 .narrative-section--right {
   align-items: flex-end;
 }
 .narrative-section--right .narrative-section__body {
-  align-items: flex-end;
-  text-align: right;
+  align-items: flex-start;
+  text-align: left;
   margin-left: auto;
+}
+
+/*
+ * The eyebrow is a SIBLING of the text block, not a child, so the section's
+ * `align-items: flex-end` pins it to the right margin while the block's own
+ * left edge sits one max-width inward -- leaving the eyebrow aligned to
+ * nothing once the copy switched to left-set. Giving it the block's width
+ * constraint puts all three on the same edge.
+ */
+.narrative-section--right .narrative-section__kicker {
+  width: 100%;
+  max-width: 34rem;
+  margin-left: auto;
+  text-align: left;
 }
 
 .narrative-section--center {
