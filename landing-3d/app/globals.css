@@ -222,13 +222,25 @@ body::after {
   pointer-events: none;
 }
 
+/*
+ * The falloff reaches 0 at 56%, not 66%. The first version protected text as
+ * far as two thirds of the viewport, but the copy column ends around 41% --
+ * so the last quarter of the ramp was dimming the tissue to protect nothing,
+ * and it showed worst in section 02, where the camera has pulled the section
+ * left into that dead zone and the artwork read as a smudge.
+ *
+ * Full strength is held slightly LONGER (to 30%) and then dropped faster, so
+ * the copy is better covered than before while the tissue is released about
+ * ten percent of the viewport earlier. Protect the text, then get out of the
+ * way.
+ */
 .narrative-section--left::before {
   background: linear-gradient(
     to right,
     rgba(4, 5, 7, 0.93) 0%,
-    rgba(4, 5, 7, 0.9) 26%,
-    rgba(4, 5, 7, 0.62) 46%,
-    rgba(4, 5, 7, 0) 66%
+    rgba(4, 5, 7, 0.91) 30%,
+    rgba(4, 5, 7, 0.55) 44%,
+    rgba(4, 5, 7, 0) 56%
   );
 }
 
@@ -236,9 +248,9 @@ body::after {
   background: linear-gradient(
     to left,
     rgba(4, 5, 7, 0.93) 0%,
-    rgba(4, 5, 7, 0.9) 26%,
-    rgba(4, 5, 7, 0.62) 46%,
-    rgba(4, 5, 7, 0) 66%
+    rgba(4, 5, 7, 0.91) 30%,
+    rgba(4, 5, 7, 0.55) 44%,
+    rgba(4, 5, 7, 0) 56%
   );
 }
 
