@@ -94,8 +94,16 @@ const MetricOverlay = forwardRef<HTMLDivElement, MetricOverlayProps>(function Me
           <dd>~1.7x</dd>
         </div>
       </dl>
+      {/* "Not measurable on spot data" was imprecise and is now known to be
+          wrong in the literal sense: a spot-resolution field reproduces
+          essentially the whole effect (1.98 against the observed 2.00). What
+          spot data cannot do is LOCALISE an immune cell — its per-spot immune
+          content is a deconvolution estimate — so the number can be computed
+          there but not attributed to where the macrophages are, which is the
+          entire claim. The distinction is the honest one. */}
       <p className="metric-overlay__footnote">
-        One run, one section, single-cell resolved. Not measurable on spot data.
+        One run, one section. Needs measured cell positions; spot platforms
+        estimate them.
       </p>
     </div>
   );
