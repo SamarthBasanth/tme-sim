@@ -1323,6 +1323,162 @@ def _run_endothelial_cellularity() -> List[Row]:
     return rows
 
 
+def _run_heldout_patient_geometry() -> List[Row]:
+    """The SAME published human-GBM anchors, on the section nothing was fitted to.
+
+    Every other GBM row in this registry is scored on ``data_cache/xenium_gbm``
+    -- the section the marker gate, the 30 um tissue-mask radius, the 20 um
+    vessel linking distance and the 7.5 um vessel radius were all chosen while
+    looking at. This group scores the identical published values on
+    ``data_cache/xenium_gbm_io``: a DIFFERENT patient on a DIFFERENT 480-gene
+    panel (the two panels share 60 genes), reconstructed by the same frozen
+    production path with no constant refitted. It is the only out-of-sample
+    TISSUE in the registry, and it is structurally the same move as
+    ``breast-vascular-morphometry`` -- same anchors, different specimen.
+
+    Only the GEOMETRY half of ``heldout_patient.py`` is registered, and that is
+    a deliberate, load-bearing restriction. The module's other half runs ten
+    transport-PDE solves, but those solves are scored against **no measured
+    number at all** -- they compare the two sections with each other. Nothing in
+    this group invokes the transport PDE, and the group must not be cited as
+    evidence about the solver. See :data:`OUT_OF_SCOPE` for the parts left out.
+
+    Runtime is ~3-5 min and is dominated by loading and reconstructing 816,769
+    cells, NOT by any solve. The whole module was previously left unregistered
+    on a runtime estimate that belonged to the drug panel.
+    """
+    from ..reconstruct.vessel_network import (
+        LINK_DISTANCE_UM, VESSEL_RADIUS_UM, segment_vessels, segmentation_report)
+    from . import heldout_patient as HP
+
+    spec = next(s for s in HP.SECTIONS if not s["dev"])
+    sample = str(spec["sample"])
+    if not os.path.isdir(_repo_path(sample)):
+        raise NotTestable(f"requires the held-out Xenium GBM cache at {sample} "
+                          "(absent)")
+    micro = HP.reconstruct_section(sample, HP.DX_UM)
+    vessels = segment_vessels(micro.cells, micro.domain,
+                              link_distance_um=LINK_DISTANCE_UM)
+    seg = segmentation_report(vessels, micro.domain, radius_um=VESSEL_RADIUS_UM)
+    by_key = {r["key"]: r for r in seg["rows"]}
+    comp = HP.composition_block(micro, HP._retry(
+        HP.load_singlecell_spatial, path=sample, dense=False))
+
+    #: Both scored rows use segmentation_report's OWN frozen PUBLISHED bands and
+    #: PMIDs, exactly as the section-1 threshold-free area-fraction row above
+    #: does, so the bar is the owning module's and not this one's.
+    held_out = ("HELD OUT: this section was never inspected while any "
+                "reconstruction constant was chosen. The 20 um linking distance "
+                "and the vessel radius model are section-1 / literature values, "
+                "used here unchanged and NOT refitted.")
+    cohort = ("The published value is a population cohort mean, which is "
+              "context for a single patient rather than a target; "
+              "vessel_network.segmentation_report says so on every row it "
+              "emits, and that caveat travels with these two.")
+
+    rows: List[Row] = []
+
+    af = by_key["vascular_area_fraction_pct"]
+    alo, ahi = af["published_range"]
+    rows.append(Row(
+        group="heldout-patient-geometry",
+        label="vascular area fraction (held-out section)",
+        status=classify(float(af["reconstructed"]), alo, ahi),
+        scope=SCOPE_GEOMETRY,
+        quantity="reconstructed threshold-free sub-grid vascular area fraction "
+                 "(%) on the HELD-OUT section vs MEASURED whole-section CD34+ "
+                 "area fraction in IDH-wildtype human GBM",
+        predicted=f"{float(af['reconstructed']):.2f}%  "
+                  f"({float(af['ratio']):.2f}x the measured mean)",
+        measured=f"{float(af['published']):.2f}% (range {alo:.1f}-{ahi:.1f}%, "
+                 f"n=30)",
+        pmids=(str(af["pmid"]),),
+        bar=f"inside vessel_network.PUBLISHED range {alo:.1f}-{ahi:.1f}%",
+        note=(held_out + " THE LOAD-BEARING ROW: it is the only anchor here "
+              "that tests the vascular FIELD rather than the point pattern, and "
+              "it has no threshold to pick. Section 1 lands at 1.25% (0.59x, "
+              "LOW); this section lands high, so the two sections miss the same "
+              "published value in OPPOSITE directions -- which is why "
+              "results/sweep/vascular_area_fraction_generalization_"
+              "2026-07-30T03-18-42Z.md could find no section-invariant radius "
+              "model that fixes both. " + cohort),
+        values={"area_fraction_pct": float(af["reconstructed"]),
+                "band": [float(alo), float(ahi)],
+                "ratio_vs_published": float(af["ratio"]),
+                "section": sample},
+    ))
+
+    mv = by_key["mvd_per_mm2"]
+    mlo, mhi = mv["published_range"]
+    rows.append(Row(
+        group="heldout-patient-geometry",
+        label="microvessel density (held-out section)",
+        status=classify(float(mv["reconstructed"]), mlo, mhi),
+        scope=SCOPE_GEOMETRY,
+        quantity="reconstructed vessel-cluster density (per mm^2, 20 um "
+                 "single-linkage) on the HELD-OUT section vs MEASURED "
+                 "whole-slide CD31 microvessel density in human GBM",
+        predicted=f"{float(mv['reconstructed']):.0f} /mm^2  "
+                  f"({float(mv['ratio']):.2f}x the measured mean)",
+        measured=f"{float(mv['published']):.0f} /mm^2 (range {mlo:.0f}-"
+                 f"{mhi:.0f}, n=20 patients)",
+        pmids=(str(mv["pmid"]),),
+        bar=f"inside vessel_network.PUBLISHED range {mlo:.0f}-{mhi:.0f} /mm^2",
+        note=(held_out + " This is NOT a held-out failure on its own: section 1 "
+              "misses the same band in the same direction (111 /mm^2), so the "
+              "two sections AGREE with each other while both disagree with the "
+              "literature. That points at the segmentation over-splitting "
+              "endothelial cells into vessel objects, not at the held-out "
+              "patient. " + cohort),
+        values={"mvd_per_mm2": float(mv["reconstructed"]),
+                "band": [float(mlo), float(mhi)],
+                "ratio_vs_published": float(mv["ratio"]),
+                "n_vessels": int(vessels["n_vessels"]),
+                "n_endothelial_cells": int(vessels["n_endothelial_cells"]),
+                "section": sample},
+    ))
+
+    rows.append(Row(
+        group="heldout-patient-geometry",
+        label="endothelial cell fraction (held-out section)",
+        status=NOT_TESTABLE, scope=SCOPE_GEOMETRY,
+        quantity="reconstructed endothelial percentage of all cells on the "
+                 "HELD-OUT section vs the MEASURED endothelial fraction of a "
+                 "1.05 mm^3 volume-EM reconstruction of normal-appearing human "
+                 "temporal cortex",
+        predicted=f"{float(comp['endothelial_pct']):.2f}% of cells "
+                  f"({float(comp['endothelial_fold_vs_volume_em']):.2f}x the "
+                  f"reference)",
+        measured="8.05% of cells (4,604 endothelial of 57,180, n=1 volume)",
+        pmids=("38723085",), bar="n/a",
+        reason="NOT TESTABLE FOR TWO INDEPENDENT REASONS, and heldout_patient.py "
+               "scores it PASS against a 1.5x tolerance anyway -- which is why "
+               "it is carried here explicitly rather than left to that report. "
+               "(1) SAME DEFECT AS THE SECTION-1 ROW: endothelial-cellularity "
+               "above already reports this exact comparison NOT TESTABLE, "
+               "because one unit of the measurement is a whole cell traced in "
+               "3-D through 1.05 mm^3 and one unit of the model is a 2-D polygon "
+               "on a ~5 um section, and the reference is normal cortex, n=1. "
+               "Nothing about a second section repairs that. (2) IT IS NOT "
+               "BLIND: results/classifier_fix.md sec. 0 selected the production "
+               "typing rule (matched_null_z) on a cross-SECTION consistency "
+               "criterion computed WITH this section in it, and that selection "
+               "is what moved this number from 4.18% (0.52x -- outside the 1.5x "
+               "tolerance) to its present value. The rule was not optimised "
+               "against the 8.0% anchor, but it was optimised toward agreement "
+               "with a section that is anchored near it, so the resulting "
+               "agreement is not out-of-sample evidence.",
+        values={"endothelial_pct": float(comp["endothelial_pct"]),
+                "fold_vs_volume_em": float(
+                    comp["endothelial_fold_vs_volume_em"]),
+                "endothelial_per_mm2": float(comp["endothelial_per_mm2"]),
+                "cell_density_per_mm2": float(comp["cell_density_per_mm2"]),
+                "pre_fix_endothelial_pct": 4.18,
+                "section": sample},
+    ))
+    return rows
+
+
 # --------------------------------------------------------------------------- #
 # The registry
 # --------------------------------------------------------------------------- #
@@ -1470,6 +1626,22 @@ def build_registry(exchange: bool = False) -> List[AnchorGroup]:
             runner=_run_endothelial_cellularity, est="~1-2 min (section s1 only)",
             needs=("data_cache/xenium_gbm",),
         ),
+        AnchorGroup(
+            key="heldout-patient-geometry",
+            title="HELD-OUT second GBM patient: reconstructed geometry vs the "
+                  "same measured human GBM histology",
+            tissue="GBM", tier=TIER_FULL, scope=SCOPE_GEOMETRY,
+            source="tmesim/validation/heldout_patient.py::reconstruct_section + "
+                   "vascular_block / composition_block, section 2 "
+                   "(data_cache/xenium_gbm_io) -- GEOMETRY ONLY, the module's "
+                   "10 PDE solves are NOT registered",
+            report="results/heldout_patient.md, "
+                   "results/heldout_patient_validation.md",
+            runner=_run_heldout_patient_geometry,
+            est="~2-3 min (measured 126 s on a loaded machine: load + "
+                "reconstruct 816,769 cells + vessel segmentation; NO PDE solve)",
+            needs=("data_cache/xenium_gbm_io",),
+        ),
     ]
 
 
@@ -1505,9 +1677,22 @@ OUT_OF_SCOPE: Tuple[Tuple[str, str], ...] = (
      "structurally capped: 89.9% of measured variance is within-slice "
      "ROI-to-ROI and the ROI table carries no X/Y coordinates, so a "
      "slice-resolved prediction cannot reach it. Not scoreable pass/fail."),
-    ("tmesim/validation/heldout_patient.py (PMIDs 38723085, 36611806, 27583442)",
-     "a real held-out external-anchor test, but ~18 min and 10 PDE solves — too "
-     "slow for a suite meant to be run routinely. Run it directly."),
+    ("tmesim/validation/heldout_patient.py -- the DRUG PANEL and HYPOXIA halves "
+     "(its geometry half IS now registered, as heldout-patient-geometry)",
+     "SUPERSEDES an earlier note that said this module was omitted on runtime "
+     "grounds only. That was wrong twice over. The geometry half costs ~4 min "
+     "and no PDE solve, so runtime never justified hiding it, and it is now "
+     "registered. The two halves that stay out are out on substance: (a) the "
+     "five-drug panel runs 10 transport-PDE solves but is scored against NO "
+     "measured number -- it compares the two sections with EACH OTHER, so it "
+     "yields no external anchor, and it is downstream of alpha besides; (b) the "
+     "VEGFA/HIF1A hypoxia check is model-vs-marker WITHIN one section, the same "
+     "category state_validation.py is excluded under, and it is a re-derivation "
+     "on the very section that finding was made on, so it is not out-of-sample. "
+     "Worth running directly anyway: computing that comparison arithmetically "
+     "is what shows results/state_validation.md sec. 1.2 has its inequality "
+     "backwards (|-0.1523| > |-0.1204|, so the solved field OUT-predicts the "
+     "distance baseline it is said to lose to)."),
     ("results/oxygen_calibration_breast.md / oxygen_calibration_landscape.md",
      "the mmHg <-> dimensionless-O mapping was never derived for these tissues "
      "(REFERENCE_PO2_MMHG = 35.0 is a normal-human-BRAIN anchor), so nothing is "

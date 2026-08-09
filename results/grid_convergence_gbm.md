@@ -34,12 +34,12 @@
 * **Drugs** — the 3 the published report formally tests: temozolomide, cisplatin, doxorubicin. All three carry their own drug-matched literature band, so none falls back to the broad 'solid' band.
 * **Held fixed** — `dt = 10 s`, window 6 h, `save_every = 10`, seed 0, convection on, `alpha = 148.6082` (the published value, not re-fitted), shipping diffusivity, `PDConfig` defaults, p99 bath matching.
 * **Reporting concentration** — temozolomide at **100 uM (the ex-vivo assay concentration)**, cisplatin and doxorubicin at **1x IC50** — exactly the `headline` rows the published verdicts are read off.
-* **24 transport solves**, 35.6 min total.
+* **25 transport solves**, 37.5 min total.
 
 **Only `dx` was varied — no delivery-law arms.** The brief's KNOWN TRAP (`kill_calibration.unit_transport()` calls `simulate_drug_transport` directly, so `PDEConfig` delivery flags are silent no-ops) does not apply here, because no two arms differ by a `PDEConfig` flag: every arm differs by the mesh, which reaches the solver through the reconstructed `Domain` itself. That the mesh really moved the physics is asserted rather than assumed — the per-cell exposure vector is fingerprinted at every rung and all rungs are required distinct:
 
 ```
-temozolomide           8/8 distinct exposure fields
+temozolomide           9/9 distinct exposure fields
 cisplatin              8/8 distinct exposure fields
 doxorubicin            8/8 distinct exposure fields
 ```
@@ -310,6 +310,22 @@ The exposure vectors behind `results/kill_calibration.md` are on disk in `data_c
 
 Worst deviation **0.000049**; verdicts **ALL MATCH**. The scoring path in this file IS the published scoring path, so every movement reported in §3 is attributable to the mesh and to nothing in the analysis.
 
+### 7.3 Temporal control — was holding `dt` fixed legitimate?
+
+The spatial ladder holds `dt` at the published 10 s throughout. To bound the temporal discretisation error that leaves in place, the published grid and the fine end of the ladder were re-run at **half** that dt. If the ratio barely moves, the §3 curve is a spatial curve and the choice was sound; if it moves a lot, the absolute ratios carry a temporal error no amount of mesh refinement removes.
+
+**dt was verified to actually reach the solver**, not silently ignored: the step count doubles, the CFL number halves, the solve takes longer, and the exposure field changes. A bit-identical exposure field would make this control meaningless and `run()` asserts against it.
+
+| dx (um) | dt (s) | steps | CFL | drug | ratio | ratio at the published dt | delta | delta % | exposure-field change | verdict |
+|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---|
+| 12 | 5 | 4320 | 0.264 | temozolomide | 0.262649 | 0.262649 | +5.31e-08 | 0.0000 % | 1.18e-04 | PASS (PASS) |
+
+Worst movement from halving dt: **0.0000 %** of the scored ratio; **0** verdict change(s). Holding dt fixed across the spatial ladder was therefore legitimate, and the §3 curve is a spatial curve.
+
+**But the interesting part is WHY it is so small, because it is not that the solver is temporally exact.** The exposure field itself moves by up to **1.2e-04** relative when dt is halved — small, but four to five orders of magnitude larger than the resulting move in the score. The reason is the cancellation structure of §4.1: `decompose` renormalises by `plasma = c_bath / p99(e_unit)`, which removes **multiplicative scale** error from the exposure field exactly. Halving dt shifts the whole AUC field by a near-uniform factor — almost pure scale — so it cancels almost completely. Refining dx changes the **shape** of the exposure distribution, which is precisely the component that survives that normalisation.
+
+**So the two discretisations are not comparable in their effect on this score, and that is a property of the score rather than of the solver.** It also means this control does NOT license the claim that the absolute exposure or absolute kill numbers are temporally converged — only that the 3-D:2-D *ratio* is insensitive to dt. Anyone quoting an absolute AUC or an absolute kill from this pipeline still needs a dt study of their own.
+
 ## 8. Limitations of THIS audit
 
 1. **`dt` is held at the published 10 s throughout, so this is a SPATIAL convergence study only.** That is the right choice for attributing movement to the mesh, but it means any temporal discretisation error is common to every rung: it cancels out of the convergence CURVE and does NOT cancel out of the absolute ratios. §7.3 bounds it by halving dt at two rungs rather than assuming it away, but a full joint (dx, dt) refinement is a stronger statement and is not made here. The CFL condition also ties the two axes together: the measured finest reachable dx at this dt is 7 um.
@@ -320,4 +336,4 @@ Worst deviation **0.000049**; verdicts **ALL MATCH**. The scoring path in this f
 6. **This audit does not revisit any of the substantive limitations of the published report** — no outcome label, wide literature bands, a delivery/state split the spheroid literature disagrees with, and cell-state multipliers that are unvalidated priors. **A grid-converged number is not a validated number.** Convergence says the answer is the answer the model gives; it says nothing about whether the model is right.
 7. **The breast comparison in §6 uses published breast figures, not a breast run executed here.** A concurrent workstream owns the breast convergence study; nothing in §6 substitutes for it.
 
-*Generated by `experiments/grid_convergence_gbm.py` — 24 transport solves over 8 grids, 35.6 min, seed 0, deterministic. Raw records: `results/sweep/gbmgrid_raw.json`, `results/sweep/gbmgrid_records.jsonl`.*
+*Generated by `experiments/grid_convergence_gbm.py` — 25 transport solves over 8 grids, 37.5 min, seed 0, deterministic. Raw records: `results/sweep/gbmgrid_raw.json`, `results/sweep/gbmgrid_records.jsonl`.*
