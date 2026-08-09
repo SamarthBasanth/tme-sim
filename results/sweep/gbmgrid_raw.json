@@ -1,0 +1,294 @@
+{
+ "alpha": 148.60815765445545,
+ "dt_s": 10.0,
+ "window_s": 21600.0,
+ "save_every": 10,
+ "seed": 0,
+ "published_dx_um": 12.0,
+ "dx_ladder": [
+  12.0
+ ],
+ "drugs": [
+  "temozolomide",
+  "cisplatin",
+  "doxorubicin"
+ ],
+ "drug_static": {
+  "temozolomide": {
+   "ic50_uM": 606.0466722391783,
+   "hill": 1.2,
+   "bbb_penetrance": 0.12537158358322562,
+   "diffusivity_um2_s": 277.9851085523925,
+   "binding_per_s": 0.0029611457433713555,
+   "clearance_per_s": 5.793886770322136e-05,
+   "L_um": 264.53303812072556
+  },
+  "cisplatin": {
+   "ic50_uM": 24.550285905059777,
+   "hill": 1.2,
+   "bbb_penetrance": 0.8576798963736021,
+   "diffusivity_um2_s": 236.18442715353106,
+   "binding_per_s": 0.008710359202449943,
+   "clearance_per_s": 7.59974390611852e-05,
+   "L_um": 142.93151989079706
+  },
+  "doxorubicin": {
+   "ic50_uM": 0.5,
+   "hill": 1.2,
+   "bbb_penetrance": 0.020567870235594195,
+   "diffusivity_um2_s": 184.74861430191334,
+   "binding_per_s": 0.03325045168543613,
+   "clearance_per_s": 6.30800204946529e-05,
+   "L_um": 64.92127684000336
+  }
+ },
+ "bands": {
+  "temozolomide": {
+   "band": {
+    "ratio_hi": 0.4622133669344504,
+    "ratio_lo": 0.15898511609865443,
+    "ratio_central": 0.28945993922317925,
+    "fold_lo": 2.0,
+    "fold_hi": 5.0,
+    "fold_central": 3.0
+   },
+   "scope": "drug:temozolomide",
+   "band_is_drug_matched": true,
+   "n_lit_rows": 6,
+   "c_bath_uM": 100.0
+  },
+  "cisplatin": {
+   "band": {
+    "ratio_hi": 1.5003511388489135,
+    "ratio_lo": 0.20864163423872006,
+    "ratio_central": 0.2532078809167949,
+    "fold_lo": 0.4,
+    "fold_hi": 6.0,
+    "fold_central": 5.0
+   },
+   "scope": "drug:cisplatin",
+   "band_is_drug_matched": true,
+   "n_lit_rows": 5,
+   "c_bath_uM": 24.550285905059777
+  },
+  "doxorubicin": {
+   "band": {
+    "ratio_hi": 1.0,
+    "ratio_lo": 0.05746191856610602,
+    "ratio_central": 0.4221909633999182,
+    "fold_lo": 1.0,
+    "fold_hi": 18.8,
+    "fold_central": 3.0
+   },
+   "scope": "drug:doxorubicin",
+   "band_is_drug_matched": true,
+   "n_lit_rows": 5,
+   "c_bath_uM": 0.5
+  }
+ },
+ "grids": {
+  "12": {
+   "dx_um": 12.0,
+   "grid": [
+    424,
+    675
+   ],
+   "n_cells": 40887,
+   "n_tumor": 23812,
+   "state_viable_frac": 0.10041155719805141,
+   "state_quiescent_frac": 0.8995884428019486,
+   "state_hypoxic_frac": 0.0,
+   "max_speed_um_s": 0.6336488624409844,
+   "cfl": 0.5280407187008204,
+   "prologue_s": 8.159679889678955
+  }
+ },
+ "records": [
+  {
+   "drug": "temozolomide",
+   "c_bath_uM": 100.0,
+   "c_bath_label": "100 uM (ex-vivo assay)",
+   "f_penetration": 0.46783514742473475,
+   "f_state": 0.5502057785990258,
+   "f_sensitivity": 1.0,
+   "f_product": 0.2574056015448162,
+   "interaction": 1.0203709789941304,
+   "ratio_exact": 0.2626492056468571,
+   "implied_ic50_fold": 3.260836175720401,
+   "kill_3d_model": 0.0271058803457657,
+   "kill_2d_model": 0.10320183637718933,
+   "plasma_required_uM": 44.17353462906821,
+   "E_median_over_bath": 0.47821350269974033,
+   "kill_nominal_plasma": 0.018127810327315384,
+   "e_unit_mean": 1.1403222463992084,
+   "e_unit_median": 1.082579211094088,
+   "e_unit_p99": 2.263798920319938,
+   "e_unit_p01": 0.5114023391106866,
+   "e_unit_max": 3.0386654410749676,
+   "verdict": "PASS",
+   "verdict_direction": "inside",
+   "band_used_lo": 0.15898511609865443,
+   "band_used_hi": 0.4622133669344504,
+   "band_is_drug_matched": true,
+   "dx_um": 12.0,
+   "grid": [
+    424,
+    675
+   ],
+   "n_cells": 40887,
+   "n_tumor": 23812,
+   "state_viable_frac": 0.10041155719805141,
+   "state_quiescent_frac": 0.8995884428019486,
+   "state_hypoxic_frac": 0.0,
+   "max_speed_um_s": 0.6336488624409844,
+   "cfl": 0.5280407187008204,
+   "prologue_s": 8.159679889678955,
+   "ic50_uM": 606.0466722391783,
+   "hill": 1.2,
+   "bbb_penetrance": 0.12537158358322562,
+   "diffusivity_um2_s": 277.9851085523925,
+   "binding_per_s": 0.0029611457433713555,
+   "clearance_per_s": 5.793886770322136e-05,
+   "L_um": 264.53303812072556,
+   "solve_s": 93.89717388153076,
+   "penetration_index": 0.510699173086199,
+   "plasma_mean_uM": 31.09499320754238,
+   "_e_unit_sum": 27153.353331257953,
+   "_e_unit_first": 1.6782387956095082
+  },
+  {
+   "drug": "cisplatin",
+   "c_bath_uM": 24.550285905059777,
+   "c_bath_label": "1xIC50",
+   "f_penetration": 0.49795474312473176,
+   "f_state": 0.5502057785990258,
+   "f_sensitivity": 1.0,
+   "f_product": 0.2739775771480209,
+   "interaction": 1.0187619471238951,
+   "ratio_exact": 0.27911792996360496,
+   "implied_ic50_fold": 4.553054111179313,
+   "kill_3d_model": 0.13955896498180248,
+   "kill_2d_model": 0.5,
+   "plasma_required_uM": 3.719804095298335,
+   "E_median_over_bath": 0.38011912932375563,
+   "kill_nominal_plasma": 0.4381842545635497,
+   "e_unit_mean": 2.71219876091473,
+   "e_unit_median": 2.5087432197507025,
+   "e_unit_p99": 6.599886788686058,
+   "e_unit_p01": 1.0497160795411162,
+   "e_unit_max": 11.331057053501072,
+   "verdict": "PASS",
+   "verdict_direction": "inside",
+   "band_used_lo": 0.20864163423872006,
+   "band_used_hi": 1.5003511388489135,
+   "band_is_drug_matched": true,
+   "dx_um": 12.0,
+   "grid": [
+    424,
+    675
+   ],
+   "n_cells": 40887,
+   "n_tumor": 23812,
+   "state_viable_frac": 0.10041155719805141,
+   "state_quiescent_frac": 0.8995884428019486,
+   "state_hypoxic_frac": 0.0,
+   "max_speed_um_s": 0.6336488624409844,
+   "cfl": 0.5280407187008204,
+   "prologue_s": 8.159679889678955,
+   "ic50_uM": 24.550285905059777,
+   "hill": 1.2,
+   "bbb_penetrance": 0.8576798963736021,
+   "diffusivity_um2_s": 236.18442715353106,
+   "binding_per_s": 0.008710359202449943,
+   "clearance_per_s": 7.59974390611852e-05,
+   "L_um": 142.93151989079706,
+   "solve_s": 115.26805400848389,
+   "penetration_index": 0.428330237044244,
+   "plasma_mean_uM": 31.09499320754238,
+   "_e_unit_sum": 64582.87689490155,
+   "_e_unit_first": 3.818126377708825
+  },
+  {
+   "drug": "doxorubicin",
+   "c_bath_uM": 0.5,
+   "c_bath_label": "1xIC50",
+   "f_penetration": 0.36882540737261743,
+   "f_state": 0.5502057785990258,
+   "f_sensitivity": 1.0,
+   "f_product": 0.20292987043055383,
+   "interaction": 1.0233874119904696,
+   "ratio_exact": 0.2076758749154858,
+   "implied_ic50_fold": 6.025948533555849,
+   "kill_3d_model": 0.1038379374577429,
+   "kill_2d_model": 0.5,
+   "plasma_required_uM": 8.87493491172547,
+   "E_median_over_bath": 0.2627573249267222,
+   "kill_nominal_plasma": 0.2647139565251604,
+   "e_unit_mean": 0.017128149000390062,
+   "e_unit_median": 0.01480333813939131,
+   "e_unit_p99": 0.056338441348950656,
+   "e_unit_p01": 0.0034436929033907766,
+   "e_unit_max": 0.13255418526650425,
+   "verdict": "PASS",
+   "verdict_direction": "inside",
+   "band_used_lo": 0.05746191856610602,
+   "band_used_hi": 1.0,
+   "band_is_drug_matched": true,
+   "dx_um": 12.0,
+   "grid": [
+    424,
+    675
+   ],
+   "n_cells": 40887,
+   "n_tumor": 23812,
+   "state_viable_frac": 0.10041155719805141,
+   "state_quiescent_frac": 0.8995884428019486,
+   "state_hypoxic_frac": 0.0,
+   "max_speed_um_s": 0.6336488624409844,
+   "cfl": 0.5280407187008204,
+   "prologue_s": 8.159679889678955,
+   "ic50_uM": 0.5,
+   "hill": 1.2,
+   "bbb_penetrance": 0.020567870235594195,
+   "diffusivity_um2_s": 184.74861430191334,
+   "binding_per_s": 0.03325045168543613,
+   "clearance_per_s": 6.30800204946529e-05,
+   "L_um": 64.92127684000336,
+   "solve_s": 130.21639800071716,
+   "penetration_index": 0.3043820656874998,
+   "plasma_mean_uM": 31.09499320754238,
+   "_e_unit_sum": 407.85548399728816,
+   "_e_unit_first": 0.023403643382240505
+  }
+ ],
+ "field_distinctness": {
+  "temozolomide": {
+   "n_points": 1,
+   "n_distinct": 1
+  },
+  "cisplatin": {
+   "n_points": 1,
+   "n_distinct": 1
+  },
+  "doxorubicin": {
+   "n_points": 1,
+   "n_distinct": 1
+  }
+ },
+ "published_ratio": {
+  "temozolomide": 0.2626,
+  "cisplatin": 0.2791,
+  "doxorubicin": 0.2077
+ },
+ "published_verdict": {
+  "temozolomide": "PASS",
+  "cisplatin": "PASS",
+  "doxorubicin": "PASS"
+ },
+ "published_f_penetration": {
+  "temozolomide": 0.4678,
+  "cisplatin": 0.498,
+  "doxorubicin": 0.3688
+ },
+ "elapsed_s": 350.44284415245056
+}
