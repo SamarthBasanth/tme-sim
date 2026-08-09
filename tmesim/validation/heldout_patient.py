@@ -20,7 +20,7 @@ This module runs it, end to end, and reports EVERY quantity side by side:
 2. **Vascular morphometry** — :func:`reconstruct.vessel_network.segment_vessels`:
    MVD, intervessel spacing, tumour-to-vessel distance, and the load-bearing
    **vascular area fraction** against the measured **2.1 ± 0.3%** whole-section
-   CD34 value (Angelucci C et al., *Cells* 2022;12(1):11, PMID 36611806). Section
+   CD34 value (Tamma R et al., *Cells* 2022;12(1):11, PMID 36611806). Section
    1 gave 2.50%.
 3. **Simulation** — the five-drug panel at dx = 12 µm in **uniform** sensitivity
    mode (the only fair cross-drug mode), reporting ``therapeutic_coverage`` @1x

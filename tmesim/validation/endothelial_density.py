@@ -293,14 +293,14 @@ GBM_CELLULARITY_CORROBORATION: Dict[str, object] = {
     "viable_tumor_cells_per_mm2": (4557.0, 3169.0),
 }
 
-#: Annese T et al., Cells 2022;12(1):11. PMID 36611806, doi:10.3390/cells12010011.
+#: Tamma R et al., Cells 2022;12(1):11. PMID 36611806, doi:10.3390/cells12010011.
 #: CD34+ vascular AREA fraction, 4-um sections, GBM core vs peritumoral tissue —
 #: the measured vascular ENRICHMENT factor of glioblastoma. An area fraction, NOT
 #: a cell fraction.
 GBM_VASCULAR_AREA: Dict[str, object] = {
     "pmid": "36611806",
     "doi": "10.3390/cells12010011",
-    "source": "Annese T et al., Cells 2022;12(1):11",
+    "source": "Tamma R et al., Cells 2022;12(1):11",
     "gbm_cd34_area_pct": (2.1, 0.3),
     "peritumoral_cd34_area_pct": (0.58, 0.09),
 }

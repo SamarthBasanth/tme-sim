@@ -2,6 +2,28 @@
 
 Two independent falsification tests against MEASURED markers in real GBM tissue, on two different open 10x Xenium sections.
 
+> ## CORRECTION (§1.2) — this document had its central inequality backwards
+>
+> **What §1.2 previously said.** That a one-line distance-to-vessel baseline **out-predicted** the solved oxygen field:
+>
+> > *"**`dist_endothelial` (-0.1204) beats the PDE (-0.1523) by -21%.**"*
+> > *"**`vascular_kde` (-0.1111) also beats the PDE.** … the diffusion step *destroys* predictive information rather than adding it."*
+> > *"**The PDE is the redundant variable in that pair.**"*
+>
+> The one-sentence summary, the headline table's "Killer detail" row, §1.3's closing paragraph, §1.5's closing line, and consequences 1–2 of §1.6 all repeated that reading.
+>
+> **Why it was wrong.** Every predictor in the §1.2 table is sign-aligned to oxygen, so — as **that table's own header states** — a correct predictor gives a NEGATIVE ρ, and the *stronger* predictor is the one with the larger **|ρ|**. |-0.1523| > |-0.1204|. **The solved field out-predicts the distance baseline**, by 1.27×. The "-21%" figure is itself the tell: 0.1204 / 0.1523 = 0.79, i.e. the baseline is **79% as strong** — weaker, not better. The nested partials say the same thing (simulated O₂ retains **0.1227** with distance held fixed; distance retains only **0.0792** with simulated O₂ held fixed), and so does the depth-partialled column (-0.1619 vs -0.1185).
+>
+> **How it went undetected, and how it was caught.** The inverted sentences are hand-written narrative in the report generator (`tmesim/validation/state_validation.py`, the `dist_endothelial … beats the PDE` template). Everything in this repository that decides the same question **arithmetically** always disagreed with them:
+>
+> * `state_validation.verdict_test1()` — the mechanical verdict for this very test — tests `abs(sim) > abs(best) * (1 + BASELINE_MARGIN)` and returns **SUPPORTED**, with the reason string *"the solved field beats every trivial baseline"*. That is why **§1.6 below has always contradicted §1.2 above it.**
+> * `tmesim/validation/heldout_patient.py` re-derives the comparison on the same section and adjudicates with `abs(dist_rho) > abs(pde_rho)`. It returns **REFUTED** on the §1.2 claim — *"the solved field now wins"*. Written up in `results/heldout_patient_validation.md` §3.4.
+> * `tmesim/validation/scorecard.py` records the same arithmetic finding in its exclusion notes.
+>
+> **What replaces it.** §1.2 is not deleted, because the comparison it ran is the right comparison and its numbers were always correct — only the ordering was misread. The corrected reading is below: the PDE is the **best** of four weak predictors, not the worst. The load-bearing caveat is now a different and narrower one — ρ ≈ 0.15 is weak however it is ordered, this is a **within-section** re-derivation and not out-of-sample, and the composite is carried by a single gene (VEGFA).
+>
+> **This correction is document-only.** The generator still emits the inverted prose, so re-running `python -m tmesim.validation.state_validation` will reproduce it until `state_validation.py` is fixed. That file is not owned by this correction pass. **The claim also propagated** — see the note at the end of §1.6.
+
 | | Test 1 — simulated oxygen field | Test 2 — cell-state labelling |
 |---|---|---|
 | **Verdict** | **SUPPORTED** | **UNDERPOWERED** |
@@ -9,9 +31,10 @@ Two independent falsification tests against MEASURED markers in real GBM tissue,
 | Cells | 816,769 (480-gene panel) | 40,887 (23,812 tumour; 319-gene panel) |
 | Measured against | VEGFA + HIF1A (hypoxia response) | MKI67 + TOP2A (proliferation) |
 | Headline statistic | Spearman ρ = -0.1523 (p = 0.00050) | MKI67+ in VIABLE nan% (0/0) |
-| Killer detail | a **one-line distance-to-vessel baseline scores -0.1204**, i.e. 0.79× the solved field | the test could only have detected a **≥inf× rate ratio** |
+| Baseline contrast *(corrected)* | a one-line distance-to-vessel baseline scores **-0.1204**, i.e. **0.79× the solved field — weaker, not better** | the test could only have detected a **≥inf× rate ratio** |
+| Killer detail *(corrected)* | not the baseline. It is that ρ ≈ 0.15 is **weak**, this is a **within-section** re-derivation, and the composite is carried by **one gene** (VEGFA -0.2004; HIF1A +0.0140, null) | the test could only have detected a **≥inf× rate ratio** |
 
-**In one sentence each.** The simulated oxygen field *is* significantly anti-correlated with measured hypoxia response, but it is out-predicted by a physics-free distance-to-nearest-vessel baseline computed from its own inputs — so the reaction–diffusion solve is not what carries the signal. And the proliferation test on the 319-gene section is dropout-limited to the point where it cannot distinguish a correct cell-state model from noise; that is a power failure, not a vindication and not a refutation.
+**In one sentence each** *(corrected — see the CORRECTION block above; this sentence previously asserted the opposite)*. The simulated oxygen field *is* significantly anti-correlated with measured hypoxia response, and it **out-predicts** every physics-free baseline built from its own inputs — including the distance-to-nearest-vessel transform (-0.1204) and its own undiffused source term (-0.1111) — but it wins a contest between four weak predictors on the one section that measures the marker, so the result is real and small rather than decisive. And the proliferation test on the 319-gene section is dropout-limited to the point where it cannot distinguish a correct cell-state model from noise; that is a power failure, not a vindication and not a refutation.
 
 > **The two sections are DIFFERENT PATIENTS.** Test 1 and Test 2 are two experiments, not two views of one tumour. Nothing here transfers from one to the other.
 
@@ -105,11 +128,15 @@ Permutation p-values (label shuffling, 2,000 draws on a seeded random subsample 
 | dist_endothelial | -0.1254 | 0.00050 |
 | vascular_kde | -0.1174 | 0.00050 |
 
-**The answer to (a) is yes — and it does not matter.** The simulated field is genuinely, significantly anti-correlated with measured hypoxia response (ρ = -0.1523, p = 0.00050, floor of the estimator). But so is every trivial baseline built from the same inputs, and two of them do it BETTER:
+**The answer to (a) is yes, and the PDE wins the comparison — but it is a contest between weak predictors.** *(This paragraph and the three bullets below are the CORRECTED text. The superseded version asserted that two baselines beat the PDE; see the CORRECTION block at the top of this document for what it said and why it was backwards.)*
 
-* **`dist_endothelial` (-0.1204) beats the PDE (-0.1523) by -21%.** One `cKDTree` query — the distance from each cell to the nearest endothelial cell — predicts measured VEGFA/HIF1A better than the reaction–diffusion solve does.
-* **`vascular_kde` (-0.1111) also beats the PDE.** That is the solver's OWN SOURCE TERM, sampled before it is diffused. The solve takes a field correlating at -0.1111 and returns one correlating at -0.1523: the diffusion step *destroys* predictive information rather than adding it.
+The simulated field is genuinely, significantly anti-correlated with measured hypoxia response (ρ = -0.1523, p = 0.00050, floor of the estimator). Every trivial baseline built from the same inputs is anti-correlated too, but the solved field is the **strongest** of the four — reading the table by |ρ|, as its own sign convention requires:
+
+* **The PDE (-0.1523) beats `dist_endothelial` (-0.1204) by 1.27×.** One `cKDTree` query — the distance from each cell to the nearest endothelial cell — recovers 79% of the solved field's association with measured VEGFA/HIF1A. That a physics-free one-liner gets **most** of the way there is the honest caveat; it does not get all the way there, and it does not win.
+* **`vascular_kde` (-0.1111) is the weakest vessel-derived predictor of the three.** That is the solver's OWN SOURCE TERM, sampled before it is diffused. The solve takes a field correlating at -0.1111 and returns one correlating at -0.1523: **the diffusion step ADDS predictive information** (1.37× on |ρ|) rather than destroying it. This is the single most direct evidence in the document that the reaction–diffusion step is doing work.
 * **`local_cell_density` (-0.0192) is near zero**, which is the sanity floor — not every spatial variable correlates with the marker, so the effects above are real signal, not autocorrelation artefacts.
+
+**How large is "wins", honestly.** 1.27× on a ρ of 0.15 is a small margin on a weak association, measured on one section, with no confidence interval attached to the *difference* between two correlated predictors (the permutation test above tests each ρ against zero, not the predictors against each other). The defensible statement is **"the solve is not redundant with the geometry it is built from"**, not "the solve is accurate".
 
 **Nested test — does the PDE add anything beyond the raw geometry?**
 
@@ -119,7 +146,7 @@ Permutation p-values (label shuffling, 2,000 draws on a seeded random subsample 
 | hypoxia score vs **−distance-to-vessel**, simulated O₂ held fixed | -0.0792 |
 | simulated O₂ vs −distance-to-vessel (how nested the two predictors are) | +0.3006 |
 
-Distance-to-vessel retains 0.0792 of explanatory power after the simulated field is conditioned out; the simulated field retains only 0.1227 after distance is conditioned out. **The PDE is the redundant variable in that pair.**
+*(Corrected reading — this paragraph previously concluded the opposite.)* The simulated field retains **0.1227** of explanatory power after distance-to-vessel is conditioned out; distance-to-vessel retains only **0.0792** after the simulated field is conditioned out. The two are substantially nested (ρ = +0.3006), as they must be — the PDE's source cells *are* the distance transform's targets — but **distance-to-vessel is the redundant variable in that pair, not the PDE.** The nested test therefore agrees with the marginal comparison above, which is what makes the corrected ordering hard to argue with: two independent framings of the question return the same winner.
 
 **Depth control.** The simulated field correlates with total transcript count — a purely technical variable — at ρ = +0.0572. Partialling log-depth out of the table above changes nothing material (simulated O₂ goes -0.1523 → -0.1619; distance goes -0.1204 → -0.1185), so the ordering is not a depth artefact.
 
@@ -149,7 +176,7 @@ Depth-stratified control (labels permuted **within** total-transcript deciles, s
 
 **The answer to (b) is yes for VEGFA, no for HIF1A.** Model-HYPOXIC cells carry substantially more measured VEGFA than model-VIABLE cells (d = +0.971, Cliff's δ = +0.609, p = 0.02799), and the effect survives depth stratification. For HIF1A the same contrast is only d = +0.400, and the tumour-only version is not significant at all (p = 0.70715).
 
-**Two things blunt this result.** First, the VIABLE group holds only 37 of 816,769 cells (0.005%), so "HYPOXIC vs VIABLE" is a comparison against a sliver. The better-balanced HYPOXIC-vs-QUIESCENT contrast is far weaker (VEGFA d = +0.402, HIF1A d = -0.040). Second — and decisively — §1.2 already showed the same separation is obtained, more strongly, by thresholding distance-to-vessel. A large Cohen's d here is evidence that the *bands* sit somewhere sensible in space, not that the PDE computed them.
+**Two things blunt this result.** First, the VIABLE group holds only 37 of 816,769 cells (0.005%), so "HYPOXIC vs VIABLE" is a comparison against a sliver. The better-balanced HYPOXIC-vs-QUIESCENT contrast is far weaker (VEGFA d = +0.402, HIF1A d = -0.040). Second, §1.2 shows that most of this separation — 79% of the association, by |ρ| — is recoverable by thresholding distance-to-vessel alone, so a large Cohen's d here is mostly evidence that the *bands* sit somewhere sensible in space. *(Corrected: this passage previously read "the same separation is obtained, more strongly, by thresholding distance-to-vessel … not that the PDE computed them", which inherited the inverted §1.2 inequality. The PDE separates them somewhat better than the distance threshold does; the point that survives is that the margin is small.)*
 
 ### 1.4 (c) Field-vs-field agreement on the grid
 
@@ -173,7 +200,7 @@ Agreement is ~2.4× stronger at the field level (ρ ≈ -0.312 vs -0.152 per cel
 | 20 | 543×574 | 0.2190 | 33.38% / 66.59% / 0.02% | -0.1536 | -0.1204 |
 | 12 | 905×956 | 0.2210 | 30.90% / 69.09% / 0.00% | -0.1523 | -0.1204 |
 
-This is the *good* news about the numerics and the *bad* news about the model. With the geometric tissue mask and the areal oxygen sink both in place, the field is genuinely grid-converged: mean O₂ moves by 0.2% and the correlation by <0.0002 over a 2.5× range of dx. So the disagreement with measured biology is **not** a resolution problem — refining the mesh cannot rescue it. The model has converged onto an answer that a distance transform beats.
+This is good news about the numerics and neutral news about the model. With the geometric tissue mask and the areal oxygen sink both in place, the field is genuinely grid-converged *for this statistic*: mean O₂ moves by 0.2% and the correlation by <0.0002 over a 2.5× range of dx. Note also that the PDE's margin over the distance baseline is **stable across the whole ladder** — the baseline sits at -0.1204 at every dx while the solved field sits at -0.1523 to -0.1536 — so the corrected ordering in §1.2 is not a single-resolution artefact. What the flatness *does* establish is the ceiling: refining the mesh will not raise ρ above ≈0.153, so **the remaining gap to the measured marker is a model or measurement limitation, not a resolution one.** *(Corrected: this paragraph previously closed "The model has converged onto an answer that a distance transform beats.")*
 
 ### 1.6 Verdict — Test 1
 
@@ -184,11 +211,28 @@ This is the *good* news about the numerics and the *bad* news about the model. W
 
 **Consequences, stated plainly.**
 
-1. **The oxygen field is not falsified — it is out-competed.** Its sign is right, its significance is overwhelming, and VEGFA being its rank-1 anti-correlate out of 480 genes is a genuine hit. But the reaction–diffusion solve is not what produces that hit: its own undiffused source term and a plain distance transform both do better. Whatever the PDE is adding, it is not predictive accuracy about hypoxia.
-2. **Hypoxia-driven resistance in the kill model is therefore not supported *as physics*.** The `PDConfig.hypoxia_resistance` multiplier is applied to cells selected by a field that a one-line geometric heuristic selects better. Any kill number that leans on the *spatial pattern* of hypoxia is, at best, an expensive re-derivation of "far from a vessel".
+1. **The oxygen field is not falsified, and it is not out-competed either.** *(Corrected — this item previously read "it is out-competed … its own undiffused source term and a plain distance transform both do better".)* Its sign is right, its significance is overwhelming, VEGFA being its rank-1 anti-correlate out of 480 genes is a genuine hit, and it is the strongest of the four predictors tested (|ρ| 0.1523 vs 0.1204 vs 0.1111 vs 0.0192). The reaction–diffusion step measurably **improves** on its own undiffused source term, 0.1111 → 0.1523. What remains true is that the association is **weak in absolute terms** and that a physics-free distance transform recovers 79% of it, so the PDE's marginal value over trivial geometry is real but modest.
+2. **Hypoxia-driven resistance in the kill model is supported only as *ordering*, not as *magnitude*.** *(Corrected — this item previously concluded the multiplier is "applied to cells selected by a field that a one-line geometric heuristic selects better", which does not follow from the data.)* `PDConfig.hypoxia_resistance` is applied to cells selected by the best available predictor of measured hypoxia response on this section — but "best" here means ρ ≈ 0.15, and §1.5 shows refining the mesh cannot improve it. So the *spatial pattern* of hypoxia is defensible as a weak, correctly-signed ordering; **any kill number that treats the hypoxic/non-hypoxic assignment as accurate per-cell is over-reading it**, and consequence 5 (the absolute level is uncalibrated) binds regardless.
 3. **Hypoxia should be derived from measured markers where they exist.** On a section that measures VEGFA, the defensible per-cell hypoxia covariate is the measured VEGFA level, not the simulated oxygen — and where no such marker is on the panel (the 319-gene section: no VEGFA, no CA9, no ADM, no NDRG1, no SLC2A1), the honest statement is that hypoxia is **unmeasured**, not that it has been simulated.
 4. **Drop HIF1A from any hypoxia score.** Its mRNA is null against the field (rank 327/480) for a known mechanistic reason, and including it dilutes the composite from ρ ≈ -0.200 (VEGFA alone) to -0.152.
-5. **The absolute oxygen level remains uncalibrated.** Nothing here tests it. `OxygenConfig.consumption` has never been fitted to a measured oxygen tension, and on this section the model calls 30.9% of all cells HYPOXIC while on the 319-gene section under the shipping mask it calls 0.0% hypoxic (§2.2). Those two numbers cannot both be right.
+5. **The absolute oxygen level remains uncalibrated.** Nothing here tests it. `OxygenConfig.consumption` has never been fitted to a measured oxygen tension, and on this section the model calls 30.9% of all cells HYPOXIC while on the 319-gene section under the shipping mask it calls 0.0% hypoxic (§2.2). Those two numbers cannot both be right. **This, not the baseline comparison, is the strongest negative result in this document.**
+
+### 1.7 Where the superseded §1.2 claim propagated
+
+The inverted "a distance transform out-predicts the PDE" reading was load-bearing well beyond this file, and **the corrections below are NOT applied** — they are recorded here so the trail is visible. Each of these asserts or is premised on the superseded inequality:
+
+| location | what it says | status |
+|---|---|---|
+| `tmesim/validation/state_validation.py` | generates the inverted §1.2 prose; re-running this module reproduces it | **not corrected** — generator not owned by this pass |
+| `results/oxygen_demotion.md` §1 | opens *"`results/state_validation.md` §1.2 found the reaction-diffusion oxygen solve **falsified as value-add**"* — the whole demotion rests on it | **not corrected** |
+| `tmesim/physics/oxygen_proxy.py` | a distance-based proxy module whose stated premise is that it *"out-predicts the solve on the one section where we can measure"* | **not corrected** |
+| `tmesim/reconstruct/real_pipeline.py`, `tmesim/reconstruct/cell_state.py` | carry the "out-predicted by a distance transform" caveat in docstrings and in an emitted caveat string | **not corrected** |
+| `tmesim/validation/oxygen_benchmark.py` | emits "falsified as value-add — out-predicted against measured hypoxia markers" | **not corrected** |
+| `docs/architecture.md`, `docs/VERIFICATION_METHODOLOGY.md` | repeat the claim as settled | **not corrected** |
+| Studio caveat panel (`app/`, e.g. `app/reports/rep_0000*/report.html`) | *"oxygen (pde): FALSIFIED AS VALUE-ADD … out-predicted … (rho -0.1503 vs -0.1132)"* — note |-0.1503| > |-0.1132|, so **this instance is backwards by its own quoted numbers too** | **not corrected** — front end owned elsewhere |
+| `results/heldout_patient.md` §6.1 | describes the hypoxia rows as *"confirmations of a negative result"* | **not corrected** |
+
+Already correct and needing no change: `results/heldout_patient_validation.md` §3.4 (which independently caught this), `tmesim/validation/scorecard.py`, and this document's own §1.6 verdict — all three decide the question arithmetically.
 
 ## 2. TEST 2 — cell-state model vs measured proliferation
 
@@ -302,7 +346,7 @@ The measured MKI67+ rate inside the model's VIABLE band is ~0.44–0.46% at five
 ## 3. Caveats — what could make these conclusions wrong
 
 1. **The two sections are different patients.** Test 1 runs on `data_cache/xenium_gbm_io` (816,769 cells, IO panel); Test 2 on `data_cache/xenium_gbm` (40,887 cells, brain panel). They are different tumours with different vascular architectures and different panels. Nothing here is a paired observation, and the two verdicts do not reinforce each other.
-2. **VEGFA and HIF1A are hypoxia-RESPONSE genes, not an oxygen tension.** They are the transcriptional output of a pathway with its own kinetics and its own non-hypoxic inducers. A simulated field could be a perfectly good oxygen tension and still correlate weakly with them. What the trivial-baseline control establishes is narrower and safer: *whatever* VEGFA is reporting, a distance transform predicts it better than the PDE does — and that comparison is internal, so it is immune to this caveat.
+2. **VEGFA and HIF1A are hypoxia-RESPONSE genes, not an oxygen tension.** They are the transcriptional output of a pathway with its own kinetics and its own non-hypoxic inducers. A simulated field could be a perfectly good oxygen tension and still correlate weakly with them. What the trivial-baseline control establishes is narrower and safer: *whatever* VEGFA is reporting, the PDE predicts it better than a distance transform does — and that comparison is internal, so it is immune to this caveat. *(Corrected: this sentence previously had the two predictors the other way round.)*
 3. **Targeted-panel dropout.** A zero is "no probe fired", not "no transcript". This is fatal for Test 2 (MKI67 at 0.55%) and merely limiting for Test 1 (VEGFA at 63.4%, which is why Test 1 is powered and Test 2 is not).
 4. **Typing circularity.** `FLT1` and `PLVAP` are IO-panel ENDOTHELIAL markers, so they help build the oxygen source; the positive tail of the 480-gene ranking is partly the model correlating with its own inputs. `MKI67` is one of the four brain-panel TUMOR markers, so an MKI67-high cell is marginally more likely to be typed TUMOR — that inflates the MKI67+ rate *uniformly across states*, so it cannot manufacture a between-state contrast, but it does inflate the marginal rate slightly.
 5. **`SLC1A3`/`S100B`/`PTN` (the IO STROMAL class) are expressed by malignant astrocyte-like glioma cells too**, so the IO section's STROMAL compartment is not clean. The brain panel's `AQP4`/`GJA1` have the same ambiguity, so the two sections are consistently rather than differently wrong here.
