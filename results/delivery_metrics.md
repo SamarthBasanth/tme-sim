@@ -6,7 +6,9 @@
 
 **Figure:** `results/delivery_metrics.png`
 
-**Geometry:** the REAL open 10x Xenium GBM section — 40,887 measured cells (tumor 23,812), reconstructed by `reconstruct.real_pipeline.reconstruct_real('xenium', dx_um=…)`; real endothelial-KDE vascular field, real matrix-transcript ECM, physics-solved oxygen. **Drugs:** the 5-drug panel of [`results/real_drug_panel.md`](real_drug_panel.md), each compiled through the identical pipeline (`calibrate_alpha()` → α = 148.6, fit ONCE on doxorubicin → `calibrated_drugparams` → `apply_barrier_to_drugparams`). **Engine:** advection on, dt = 10 s, 6 h window, seed 0 — unchanged from the flagship run. Production resolution **dx = 12 µm**, grid (424, 675) (dx = 10 µm violates the advection CFL condition at dt = 10 s and is therefore not on the ladder).
+**Geometry:** the REAL open 10x Xenium GBM section — 40,887 measured cells (tumor 23,812), reconstructed by `reconstruct.real_pipeline.reconstruct_real('xenium', dx_um=…)`; real endothelial-KDE vascular field, real matrix-transcript ECM, physics-solved oxygen. **Drugs:** the 5-drug panel of [`results/real_drug_panel.md`](real_drug_panel.md), each compiled through the identical pipeline (`calibrate_alpha()` → α = 148.6, fit ONCE on doxorubicin → `calibrated_drugparams` → `apply_barrier_to_drugparams`). **Engine:** advection on, dt = 10 s, 6 h window, seed 0 — unchanged from the flagship run. Production resolution **dx = 12 µm**, grid (424, 675).
+
+> **CORRECTION (measured).** This line previously read "dx = 10 µm violates the advection CFL condition at dt = 10 s and is therefore not on the ladder", and that sentence was the stated reason no ladder in this project ever went below 12 µm. It is false. Measured at dt = 10 s, dx = 10 µm runs at **CFL 0.663** on this GBM section and **0.816** on the breast section — both feasible. The true floor is **dx = 7 µm** on GBM (CFL 0.955) and **dx = 8 µm** on breast (0.809); dx = 6 µm is refused on both. The claim most likely predates the tissue-mask switch from `occupancy` to `geometric`, which changed the velocity field. Full ladders: `results/grid_convergence_gbm.md`, `results/grid_convergence_breast.md`.
 
 ---
 

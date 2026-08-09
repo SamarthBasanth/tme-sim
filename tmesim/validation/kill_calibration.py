@@ -101,8 +101,28 @@ RUN_CACHE = os.path.join(_ROOT, "data_cache", "kill_calibration_runs.json")
 # --------------------------------------------------------------------------- #
 DRUGS: Tuple[str, ...] = ("temozolomide", "cisplatin", "doxorubicin")
 
-#: Converged grid (results/numerical_rigor.md section 2). dx = 10 um violates the
-#: upwind advection CFL condition at dt = 10 s.
+#: The published grid. NOT converged, and the CFL claim that used to sit here
+#: was false -- see results/grid_convergence_gbm.md and
+#: results/grid_convergence_breast.md, which measured both.
+#:
+#: This comment previously read "dx = 10 um violates the upwind advection CFL
+#: condition at dt = 10 s", and that was the stated reason nobody ever looked
+#: below 12 um. Measured at dt = 10 s: dx = 10 runs at CFL 0.663 on the GBM
+#: section and 0.816 on breast -- both comfortably feasible. The true floor is
+#: dx = 7 um on GBM (CFL 0.955) and dx = 8 um on breast (0.809), with dx = 6
+#: refused on both. The claim most likely predates the tissue-mask switch from
+#: ``occupancy`` to ``geometric``, which changed the velocity field.
+#:
+#: What the ladders actually found at this dx: the breast panel is monotone in
+#: dx and NOT converged here (docetaxel carries -3.4 % against its Richardson
+#: limit and its verdict flips at dx >= 16), while the GBM panel is
+#: NON-monotone, oscillating 6.6-7.4 % below dx = 18 with no extractable order
+#: of accuracy. GBM's 3/3 PASS holds because its bands are wide, not because
+#: the numerics are clean.
+#:
+#: Left at 12.0 deliberately: every published number in results/ was computed
+#: here, so changing it silently would invalidate them all. Any change must be
+#: a deliberate regeneration, not a constant edit.
 DX_UM = 12.0
 DT_S = 10.0
 WINDOW_S = 3600.0 * 6

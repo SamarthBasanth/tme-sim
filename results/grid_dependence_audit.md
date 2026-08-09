@@ -224,7 +224,24 @@ studies should be prepared to reconcile:**
 buried:** `results/delivery_metrics.md` §"Geometry" states that **`dx = 10 µm` violates
 the advection CFL condition at `dt = 10 s`** and is therefore excluded from that ladder.
 Refining below 12 µm at the production `dt` is not simply expensive — it is unstable
-unless `dt` is reduced with it. `tests/test_app_server.py:366-379` enforces the same
+unless `dt` is reduced with it.
+
+> **THIS PARAGRAPH WAS WRONG, and the ladders it warned measured it.** The claim it
+> relays is false. At `dt = 10 s`, `dx = 10 µm` runs at **CFL 0.663** on the GBM section
+> and **0.816** on breast — both feasible, neither unstable. The true floor is **dx = 7 µm**
+> on GBM (CFL 0.955) and **dx = 8 µm** on breast (0.809), with dx = 6 µm refused on both.
+> The original claim most likely predates the tissue-mask switch from `occupancy` to
+> `geometric`, which changed the velocity field.
+>
+> The audit's own framing was right in the way that mattered — this was buried, it was
+> load-bearing, and it needed surfacing — but the thing surfaced was a stale claim rather
+> than a hard constraint, and it had been serving as **the stated reason nobody in this
+> project ever ran a grid finer than 12 µm**. It is left standing above, struck through by
+> this note, because deleting it would hide that a false numerical claim silently bounded
+> every convergence study this repo never ran.
+>
+> Measured in `results/grid_convergence_gbm.md` §CFL and `results/grid_convergence_breast.md`
+> §0, independently, on two different sections. `tests/test_app_server.py:366-379` enforces the same
 condition in the spec validator.
 
 ---
