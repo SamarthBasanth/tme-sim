@@ -989,6 +989,37 @@ WIRING_POINTS: Tuple[WiringPoint, ...] = (
             "conclusion."
         ),
     ),
+    WiringPoint(
+        path="experiments/dose_schedule_arms.py",
+        production=False,
+        reason=(
+            "Re-measures results/dose_schedule.md under both delivery laws. "
+            "Its subject, experiments/dose_schedule.py, is the module the "
+            "silent no-op was first MEASURED on and is declared INERT above, "
+            "so the PDEConfig flag alone would change nothing there. This "
+            "script injects exchange_coefficient(work, drug) as exchange_k at "
+            "a single call site, asserts per solve that exchange_k crossed the "
+            "boundary on every call in the ON arm and none in the OFF arm, "
+            "requires the two arms' AUC fields to differ bit-wise, and "
+            "additionally reconciles the injection against the PRODUCTION "
+            "wiring by re-running sim.engine.simulate_response with "
+            "transvascular_exchange=True."
+        ),
+    ),
+    WiringPoint(
+        path="experiments/boundary_layer_resolution.py",
+        production=False,
+        reason=(
+            "Measures the discretisation error of the perivascular boundary "
+            "layer delta = sqrt(D_eff/(PS + clearance + binding)) against dx. "
+            "PS is the exchange term, so delta only EXISTS under the corrected "
+            "law -- the experiment cannot pose its own question without "
+            "exchange_k, and on its controlled slab there is no PDEConfig "
+            "path to route through. It injects at a single call site and its "
+            "stage-0 trap check asserts the ON and OFF fields differ before "
+            "any error law is fitted."
+        ),
+    ),
 )
 
 
