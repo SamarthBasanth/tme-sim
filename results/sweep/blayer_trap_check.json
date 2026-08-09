@@ -1,0 +1,36 @@
+{
+  "wiring_points_all": [
+    "experiments/vessel_profile_arms.py",
+    "tmesim/sim/engine.py"
+  ],
+  "wiring_points_production": [
+    "tmesim/sim/engine.py"
+  ],
+  "kill_calibration_declared": {
+    "category": "INERT",
+    "reason": "Calls simulate_drug_transport directly (kill_calibration.py:681) with no exchange_k. The calibration constant it fits is therefore an exchange-OFF constant whatever the config says."
+  },
+  "experiments/kill_calibration_breast.py": {
+    "direct_solver_calls": [],
+    "direct_calls_with_exchange_k": [],
+    "bare_direct_calls": [],
+    "engine_calls": [
+      364
+    ],
+    "static_prediction": "PROPAGATED"
+  },
+  "tmesim/validation/kill_calibration.py": {
+    "direct_solver_calls": [
+      681
+    ],
+    "direct_calls_with_exchange_k": [],
+    "bare_direct_calls": [
+      681
+    ],
+    "engine_calls": [
+      899
+    ],
+    "static_prediction": "INERT"
+  },
+  "conclusion": "kill_calibration.unit_transport is the transport call behind BOTH the GBM and breast 3-D:2-D panels and it passes no exchange_k, so the shipped verdicts are exchange-OFF and `delta` is not an active length scale on that path."
+}

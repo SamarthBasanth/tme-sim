@@ -1,0 +1,155 @@
+{
+  "panels": [
+    {
+      "tissue": "gbm",
+      "law": "exchange ON",
+      "n": 6,
+      "comparison": "dx12 vs 8 um",
+      "spearman_movement_vs_delta": -0.7714285714285715,
+      "spearman_movement_vs_L": -0.37142857142857144,
+      "spearman_movement_vs_bbb": 0.37142857142857144,
+      "rows": [
+        {
+          "drug": "ribociclib",
+          "delta_median_um": 15.128274756412596,
+          "L_median_um": 69.66268819232583,
+          "bbb_penetrance": 0.7995183083447064,
+          "ratio_dx12": 0.2609,
+          "ratio_r8": 0.2677,
+          "abs_rel_movement": 0.02606362591031036,
+          "signed_rel_movement": 0.02606362591031036
+        },
+        {
+          "drug": "lomustine",
+          "delta_median_um": 15.738896711345978,
+          "L_median_um": 112.87609470669389,
+          "bbb_penetrance": 0.9732974962235796,
+          "ratio_dx12": 0.4584,
+          "ratio_r8": 0.4671,
+          "abs_rel_movement": 0.018979057591623126,
+          "signed_rel_movement": 0.018979057591623126
+        },
+        {
+          "drug": "procarbazine",
+          "delta_median_um": 16.66081292260046,
+          "L_median_um": 112.49335916036549,
+          "bbb_penetrance": 0.8848562120299905,
+          "ratio_dx12": 0.4374,
+          "ratio_r8": 0.4453,
+          "abs_rel_movement": 0.018061271147690815,
+          "signed_rel_movement": 0.018061271147690815
+        },
+        {
+          "drug": "carmustine",
+          "delta_median_um": 16.236601401499815,
+          "L_median_um": 156.7710228592826,
+          "bbb_penetrance": 0.9551190730480774,
+          "ratio_dx12": 0.6041,
+          "ratio_r8": 0.6123,
+          "abs_rel_movement": 0.013573911604039042,
+          "signed_rel_movement": 0.013573911604039042
+        },
+        {
+          "drug": "cisplatin",
+          "delta_median_um": 16.083095163725464,
+          "L_median_um": 160.60210003673402,
+          "bbb_penetrance": 0.8576798963736021,
+          "ratio_dx12": 0.6184,
+          "ratio_r8": 0.6266,
+          "abs_rel_movement": 0.013260025873221372,
+          "signed_rel_movement": 0.013260025873221372
+        },
+        {
+          "drug": "doxorubicin",
+          "delta_median_um": 57.04150555099121,
+          "L_median_um": 72.94747446565182,
+          "bbb_penetrance": 0.020567870235594195,
+          "ratio_dx12": 0.0165,
+          "ratio_r8": 0.0165,
+          "abs_rel_movement": 0.0,
+          "signed_rel_movement": 0.0
+        }
+      ]
+    },
+    {
+      "tissue": "breast",
+      "law": "exchange OFF",
+      "n": 6,
+      "comparison": "dx12 vs 24 um",
+      "spearman_movement_vs_delta": 0.47058823529411764,
+      "spearman_movement_vs_L": -0.9411764705882353,
+      "spearman_movement_vs_bbb": -1.0,
+      "rows": [
+        {
+          "drug": "docetaxel",
+          "delta_median_um": 27.803222159010172,
+          "L_median_um": 30.108657418102446,
+          "bbb_penetrance": 0.01900170082738329,
+          "ratio_dx12": 0.1484,
+          "ratio_r24": 0.12,
+          "abs_rel_movement": 0.19137466307277634,
+          "signed_rel_movement": -0.19137466307277634
+        },
+        {
+          "drug": "paclitaxel",
+          "delta_median_um": 28.23879388935776,
+          "L_median_um": 30.71991229301998,
+          "bbb_penetrance": 0.0191146610720123,
+          "ratio_dx12": 0.1503,
+          "ratio_r24": 0.1223,
+          "abs_rel_movement": 0.18629407850964727,
+          "signed_rel_movement": -0.18629407850964727
+        },
+        {
+          "drug": "doxorubicin",
+          "delta_median_um": 53.40691954086977,
+          "L_median_um": 69.27363905412598,
+          "bbb_penetrance": 0.020567870235594195,
+          "ratio_dx12": 0.2301,
+          "ratio_r24": 0.2191,
+          "abs_rel_movement": 0.047805302042590224,
+          "signed_rel_movement": -0.047805302042590224
+        },
+        {
+          "drug": "epirubicin",
+          "delta_median_um": 53.40691954086977,
+          "L_median_um": 69.27363905412598,
+          "bbb_penetrance": 0.020567870235594195,
+          "ratio_dx12": 0.2301,
+          "ratio_r24": 0.2191,
+          "abs_rel_movement": 0.047805302042590224,
+          "signed_rel_movement": -0.047805302042590224
+        },
+        {
+          "drug": "5-fluorouracil",
+          "delta_median_um": 20.54311408140777,
+          "L_median_um": 223.9658950794225,
+          "bbb_penetrance": 0.63269194223888,
+          "ratio_dx12": 0.3379,
+          "ratio_r24": 0.3317,
+          "abs_rel_movement": 0.01834862385321096,
+          "signed_rel_movement": -0.01834862385321096
+        },
+        {
+          "drug": "cisplatin",
+          "delta_median_um": 15.05830817542844,
+          "L_median_um": 152.51373664098426,
+          "bbb_penetrance": 0.8576798963736021,
+          "ratio_dx12": 0.3085,
+          "ratio_r24": 0.3048,
+          "abs_rel_movement": 0.01199351701782814,
+          "signed_rel_movement": -0.01199351701782814
+        }
+      ]
+    }
+  ],
+  "error_law_fit": {
+    "n_points": 54,
+    "log_C": -6.552371362633455,
+    "C": 0.001426728293467925,
+    "p_dx": 1.9387584935468856,
+    "q_delta": -1.1446916264639386,
+    "r2": 0.9949508038042821,
+    "form": "|rel_err_mean| = C * dx_um^p * delta_um^q  (exchange ON, interface aligned, L_out = 64.92 um fixed)"
+  }
+}

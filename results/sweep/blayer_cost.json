@@ -1,0 +1,123 @@
+{
+  "tissue": "breast",
+  "drug": "docetaxel",
+  "alpha": 148.60815765445545,
+  "window_s": 21600.0,
+  "points": [
+    {
+      "dx_um": 24.0,
+      "dt_s": 10.0,
+      "grid": [
+        230,
+        315
+      ],
+      "n_grid_cells": 72450,
+      "n_tissue_cells": 67030,
+      "n_steps": 2160,
+      "max_interstitial_speed_um_s": 0.6274331741772881,
+      "cfl_dt_max_s": 38.251085514357165,
+      "cfl_ok_at_this_dt": true,
+      "cfl_ok_at_dt10": true,
+      "t_reconstruct_s": 8.283015012741089,
+      "t_prologue_s": 1.3395109176635742,
+      "t_one_solve_s": 43.98676013946533,
+      "peak_solve_mem_MiB": 21.027884483337402,
+      "mean_auc": 157.57594204463993,
+      "penetration_index": 0.1626331421989977,
+      "solve_cost_vs_dx12": 0.23255539345168488,
+      "mem_vs_dx12": 0.25165302791663813
+    },
+    {
+      "dx_um": 16.0,
+      "dt_s": 10.0,
+      "grid": [
+        344,
+        472
+      ],
+      "n_grid_cells": 162368,
+      "n_tissue_cells": 150860,
+      "n_steps": 2160,
+      "max_interstitial_speed_um_s": 0.5344059598700638,
+      "cfl_dt_max_s": 29.939785858470334,
+      "cfl_ok_at_this_dt": true,
+      "cfl_ok_at_dt10": true,
+      "t_reconstruct_s": 11.303504705429077,
+      "t_prologue_s": 4.403447151184082,
+      "t_one_solve_s": 107.74730396270752,
+      "peak_solve_mem_MiB": 47.152347564697266,
+      "mean_auc": 155.21202795644422,
+      "penetration_index": 0.19014326338331797,
+      "solve_cost_vs_dx12": 0.5696536091078044,
+      "mem_vs_dx12": 0.564299801410669
+    },
+    {
+      "dx_um": 12.0,
+      "dt_s": 10.0,
+      "grid": [
+        458,
+        628
+      ],
+      "n_grid_cells": 287624,
+      "n_tissue_cells": 267838,
+      "n_steps": 2160,
+      "max_interstitial_speed_um_s": 0.5943436743305659,
+      "cfl_dt_max_s": 20.190338550361627,
+      "cfl_ok_at_this_dt": true,
+      "cfl_ok_at_dt10": true,
+      "t_reconstruct_s": 11.919149160385132,
+      "t_prologue_s": 8.065875053405762,
+      "t_one_solve_s": 189.14530205726624,
+      "peak_solve_mem_MiB": 83.55903625488281,
+      "mean_auc": 155.96566266086458,
+      "penetration_index": 0.201241843222828,
+      "solve_cost_vs_dx12": 1.0,
+      "mem_vs_dx12": 1.0
+    },
+    {
+      "dx_um": 8.0,
+      "dt_s": 5.0,
+      "grid": [
+        686,
+        942
+      ],
+      "n_grid_cells": 646212,
+      "n_tissue_cells": 602236,
+      "n_steps": 4320,
+      "max_interstitial_speed_um_s": 0.6472943787167377,
+      "cfl_dt_max_s": 12.35913714538973,
+      "cfl_ok_at_this_dt": true,
+      "cfl_ok_at_dt10": true,
+      "t_reconstruct_s": 29.67048692703247,
+      "t_prologue_s": 30.214849948883057,
+      "t_one_solve_s": 1002.9114491939545,
+      "peak_solve_mem_MiB": 187.8083667755127,
+      "mean_auc": 155.65907347793433,
+      "penetration_index": 0.20458350486079904,
+      "solve_cost_vs_dx12": 5.3023333822497465,
+      "mem_vs_dx12": 2.2476128877627883
+    },
+    {
+      "dx_um": 6.0,
+      "dt_s": 3.0,
+      "grid": [
+        914,
+        1255
+      ],
+      "n_grid_cells": 1147070,
+      "n_tissue_cells": 1069421,
+      "n_steps": 7200,
+      "max_interstitial_speed_um_s": 0.941903307375547,
+      "cfl_dt_max_s": 6.3700806155124114,
+      "cfl_ok_at_this_dt": true,
+      "cfl_ok_at_dt10": false,
+      "t_reconstruct_s": 47.936299085617065,
+      "t_prologue_s": 62.099472999572754,
+      "t_one_solve_s": 29909.588257074356,
+      "peak_solve_mem_MiB": 333.439959526062,
+      "mean_auc": 156.26489823944056,
+      "penetration_index": 0.20558836070540817,
+      "solve_cost_vs_dx12": 158.13022016279757,
+      "mem_vs_dx12": 3.990471581181949
+    }
+  ]
+}

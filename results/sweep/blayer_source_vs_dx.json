@@ -1,0 +1,160 @@
+{
+  "vessel_radius_um": 7.5,
+  "disc_area_um2": 176.71458676442586,
+  "sections": {
+    "gbm": [
+      {
+        "dx_um": 8.0,
+        "grid": [
+          635,
+          1012
+        ],
+        "n_tissue_cells": 435924,
+        "tissue_area_um2": 27899136.0,
+        "n_source_cells": 11669,
+        "source_area_um2": 746816.0,
+        "source_area_fraction": 0.026768427524063828,
+        "source_integral_um2": 746816.0,
+        "seconds": 15.261858224868774,
+        "source_integral_rel_to_dx12": 0.9975422624008891
+      },
+      {
+        "dx_um": 12.0,
+        "grid": [
+          424,
+          675
+        ],
+        "n_tissue_cells": 193752,
+        "tissue_area_um2": 27900288.0,
+        "n_source_cells": 5199,
+        "source_area_um2": 748656.0,
+        "source_area_fraction": 0.02683327139848879,
+        "source_integral_um2": 748656.0,
+        "seconds": 5.778581857681274,
+        "source_integral_rel_to_dx12": 1.0
+      },
+      {
+        "dx_um": 16.0,
+        "grid": [
+          318,
+          507
+        ],
+        "n_tissue_cells": 108973,
+        "tissue_area_um2": 27897088.0,
+        "n_source_cells": 2913,
+        "source_area_um2": 745728.0,
+        "source_area_fraction": 0.02673139217971424,
+        "source_integral_um2": 745728.0,
+        "seconds": 3.2953710556030273,
+        "source_integral_rel_to_dx12": 0.9960889914727191
+      },
+      {
+        "dx_um": 24.0,
+        "grid": [
+          213,
+          338
+        ],
+        "n_tissue_cells": 48445,
+        "tissue_area_um2": 27904320.0,
+        "n_source_cells": 1300,
+        "source_area_um2": 748800.0,
+        "source_area_fraction": 0.026834554649602643,
+        "source_integral_um2": 748800.0,
+        "seconds": 2.01094388961792,
+        "source_integral_rel_to_dx12": 1.0001923446816696
+      },
+      {
+        "dx_um": 30.0,
+        "grid": [
+          170,
+          271
+        ],
+        "n_tissue_cells": 30976,
+        "tissue_area_um2": 27878400.0,
+        "n_source_cells": 793,
+        "source_area_um2": 713700.0,
+        "source_area_fraction": 0.02560046487603306,
+        "source_integral_um2": 713700.0,
+        "seconds": 1.7717609405517578,
+        "source_integral_rel_to_dx12": 0.9533083285247163
+      }
+    ],
+    "breast": [
+      {
+        "dx_um": 8.0,
+        "grid": [
+          686,
+          942
+        ],
+        "n_tissue_cells": 602236,
+        "tissue_area_um2": 38543104.0,
+        "n_source_cells": 34086,
+        "source_area_um2": 2181504.0,
+        "source_area_fraction": 0.05659907411712352,
+        "source_integral_um2": 2181504.0,
+        "seconds": 19.56501007080078,
+        "source_integral_rel_to_dx12": 0.9972571478726439
+      },
+      {
+        "dx_um": 12.0,
+        "grid": [
+          458,
+          628
+        ],
+        "n_tissue_cells": 267838,
+        "tissue_area_um2": 38568672.0,
+        "n_source_cells": 15191,
+        "source_area_um2": 2187504.0,
+        "source_area_fraction": 0.056717120050179586,
+        "source_integral_um2": 2187504.0,
+        "seconds": 10.982644081115723,
+        "source_integral_rel_to_dx12": 1.0
+      },
+      {
+        "dx_um": 16.0,
+        "grid": [
+          344,
+          472
+        ],
+        "n_tissue_cells": 150860,
+        "tissue_area_um2": 38620160.0,
+        "n_source_cells": 8515,
+        "source_area_um2": 2179840.0,
+        "source_area_fraction": 0.05644305979053427,
+        "source_integral_um2": 2179840.0,
+        "seconds": 7.970237970352173,
+        "source_integral_rel_to_dx12": 0.9964964635493238
+      },
+      {
+        "dx_um": 24.0,
+        "grid": [
+          230,
+          315
+        ],
+        "n_tissue_cells": 67030,
+        "tissue_area_um2": 38609280.0,
+        "n_source_cells": 3841,
+        "source_area_um2": 2212416.0,
+        "source_area_fraction": 0.05730270028345517,
+        "source_integral_um2": 2212416.0,
+        "seconds": 6.497171878814697,
+        "source_integral_rel_to_dx12": 1.0113883220327826
+      },
+      {
+        "dx_um": 30.0,
+        "grid": [
+          184,
+          252
+        ],
+        "n_tissue_cells": 42862,
+        "tissue_area_um2": 38575800.0,
+        "n_source_cells": 2486,
+        "source_area_um2": 2237400.0,
+        "source_area_fraction": 0.058000093322756754,
+        "source_integral_um2": 2237400.0,
+        "seconds": 6.461776256561279,
+        "source_integral_rel_to_dx12": 1.0228095582910934
+      }
+    ]
+  }
+}
