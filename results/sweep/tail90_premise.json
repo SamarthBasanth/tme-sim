@@ -1,0 +1,407 @@
+{
+  "per_cell_exposure_vectors_on_disk": [
+    {
+      "file": "data_cache/kill_calibration_breast_runs.json",
+      "key": "doxorubicin|12.0|10.0|21600.0|10|ic50=0.5",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_breast_runs.json",
+      "key": "paclitaxel|12.0|10.0|21600.0|10|ic50=0.0685849",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_breast_runs.json",
+      "key": "cyclophosphamide|12.0|10.0|21600.0|10|ic50=166.647",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_breast_runs.json",
+      "key": "tamoxifen|12.0|10.0|21600.0|10|ic50=44.7238",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_breast_runs.json",
+      "key": "docetaxel|12.0|10.0|21600.0|10|ic50=0.0566993",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_breast_runs.json",
+      "key": "epirubicin|12.0|10.0|21600.0|10|ic50=0.841191",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_breast_runs.json",
+      "key": "5-fluorouracil|12.0|10.0|21600.0|10|ic50=201.18",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_breast_runs.json",
+      "key": "vinorelbine|12.0|10.0|21600.0|10|ic50=0.0871266",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_breast_runs.json",
+      "key": "cisplatin|12.0|10.0|21600.0|10|ic50=82.4157",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_breast_runs.json",
+      "key": "palbociclib|12.0|10.0|21600.0|10|ic50=59.9791",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_runs.json",
+      "key": "temozolomide|12.0|10.0|21600.0|10",
+      "n_cells": 23812,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_runs.json",
+      "key": "cisplatin|12.0|10.0|21600.0|10",
+      "n_cells": 23812,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "data_cache/kill_calibration_runs.json",
+      "key": "doxorubicin|12.0|10.0|21600.0|10",
+      "n_cells": 23812,
+      "dx_um": 12.0,
+      "dx_source": "cache key"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "frozen/doxorubicin",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "frozen/paclitaxel",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "frozen/docetaxel",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "frozen/epirubicin",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "frozen/5-fluorouracil",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "frozen/cisplatin",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "recal/doxorubicin",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "recal/paclitaxel",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "recal/docetaxel",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "recal/epirubicin",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "recal/5-fluorouracil",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "key": "recal/cisplatin",
+      "n_cells": 89785,
+      "dx_um": 12.0,
+      "dx_source": "file name / documented dx = 12 arm"
+    }
+  ],
+  "ladder_record_files": [
+    {
+      "file": "results/sweep/gbmgrid_records.jsonl",
+      "tissue": "gbm",
+      "n_records": 30,
+      "n_spatial_rungs": 24,
+      "drugs": [
+        "cisplatin",
+        "doxorubicin",
+        "temozolomide"
+      ],
+      "dx_ladder": [
+        7.0,
+        8.0,
+        10.0,
+        12.0,
+        16.0,
+        18.0,
+        24.0,
+        30.0
+      ],
+      "has_per_cell_e_unit": false,
+      "exposure_statistics_carried": [
+        "e_unit_max",
+        "e_unit_mean",
+        "e_unit_median",
+        "e_unit_p01",
+        "e_unit_p99"
+      ],
+      "fields_it_carries_instead": [
+        "_e_unit_first",
+        "_e_unit_sum"
+      ]
+    },
+    {
+      "file": "results/sweep/gridconv_records.jsonl",
+      "tissue": "breast",
+      "n_records": 42,
+      "n_spatial_rungs": 42,
+      "drugs": [
+        "5-fluorouracil",
+        "cisplatin",
+        "docetaxel",
+        "doxorubicin",
+        "epirubicin",
+        "paclitaxel"
+      ],
+      "dx_ladder": [
+        8.0,
+        10.0,
+        12.0,
+        16.0,
+        18.0,
+        24.0,
+        30.0
+      ],
+      "has_per_cell_e_unit": false,
+      "exposure_statistics_carried": [
+        "e_unit_max",
+        "e_unit_mean",
+        "e_unit_median",
+        "e_unit_p01",
+        "e_unit_p99"
+      ],
+      "fields_it_carries_instead": [
+        "_e_unit_first",
+        "_e_unit_sum"
+      ]
+    }
+  ],
+  "searched": [
+    {
+      "file": "data_cache/kill_calibration_breast_runs.json",
+      "bytes": 18574269
+    },
+    {
+      "file": "data_cache/kill_calibration_runs.json",
+      "bytes": 1452508
+    },
+    {
+      "file": "data_cache/mgmt_scalar_runs.json",
+      "bytes": 8253
+    },
+    {
+      "file": "data_cache/mgmt_spatial_runs.json",
+      "bytes": 1218
+    },
+    {
+      "file": "data_cache/tcga_gbm_clinical.json",
+      "bytes": 65686
+    },
+    {
+      "file": "results/sweep/blayer_analysis.json",
+      "bytes": 5254
+    },
+    {
+      "file": "results/sweep/blayer_controlled.json",
+      "bytes": 240942
+    },
+    {
+      "file": "results/sweep/blayer_cost.json",
+      "bytes": 3588
+    },
+    {
+      "file": "results/sweep/blayer_lengthscales.json",
+      "bytes": 40880
+    },
+    {
+      "file": "results/sweep/blayer_source_vs_dx.json",
+      "bytes": 4413
+    },
+    {
+      "file": "results/sweep/blayer_trap_check.json",
+      "bytes": 1151
+    },
+    {
+      "file": "results/sweep/cellexcl_sweep_dx12.json",
+      "bytes": 40079
+    },
+    {
+      "file": "results/sweep/cellular_exclusion_blast.json",
+      "bytes": 4957
+    },
+    {
+      "file": "results/sweep/cellular_exclusion_chain.json",
+      "bytes": 697
+    },
+    {
+      "file": "results/sweep/cellular_exclusion_mcl.json",
+      "bytes": 1417
+    },
+    {
+      "file": "results/sweep/dtissue_confirm_dx12.json",
+      "bytes": 40044
+    },
+    {
+      "file": "results/sweep/dtissue_refcheck_dx12.json",
+      "bytes": 6907
+    },
+    {
+      "file": "results/sweep/dtissue_sweep_dx24.json",
+      "bytes": 174792
+    },
+    {
+      "file": "results/sweep/gbmgrid_cfl_probe.json",
+      "bytes": 2152
+    },
+    {
+      "file": "results/sweep/gbmgrid_raw.json",
+      "bytes": 57274
+    },
+    {
+      "file": "results/sweep/gridconv_breast.json",
+      "bytes": 75887
+    },
+    {
+      "file": "results/sweep/ifp_validation.json",
+      "bytes": 61709
+    },
+    {
+      "file": "results/sweep/oxygen_sensitivity_band_raw.json",
+      "bytes": 7012
+    },
+    {
+      "file": "results/sweep/p99_algebra.json",
+      "bytes": 53108
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.json",
+      "bytes": 39531
+    },
+    {
+      "file": "results/sweep/p99_gridslab.json",
+      "bytes": 651967
+    },
+    {
+      "file": "results/sweep/p99_perivascular.json",
+      "bytes": 8817
+    },
+    {
+      "file": "results/sweep/p99_stability.json",
+      "bytes": 61599
+    },
+    {
+      "file": "results/sweep/p99_transfer.json",
+      "bytes": 3612
+    },
+    {
+      "file": "results/sweep/p99_verdicts.json",
+      "bytes": 63597
+    },
+    {
+      "file": "results/sweep/cellexcl_records_dx12.jsonl",
+      "bytes": 47265
+    },
+    {
+      "file": "results/sweep/dtissue_confirm_dx12.jsonl",
+      "bytes": 31828
+    },
+    {
+      "file": "results/sweep/dtissue_records_dx24.jsonl",
+      "bytes": 153888
+    },
+    {
+      "file": "results/sweep/gbmgrid_records.jsonl",
+      "bytes": 46507
+    },
+    {
+      "file": "results/sweep/gridconv_records.jsonl",
+      "bytes": 61406
+    },
+    {
+      "file": "results/sweep/p99_dtissue_dx12.jsonl",
+      "bytes": 22456562
+    }
+  ],
+  "distinct_dx_with_per_cell_fields": [
+    12.0
+  ],
+  "n_per_cell_vectors": 25,
+  "verdict": {
+    "ladder_per_cell_fields_exist": false,
+    "only_dx_with_per_cell_fields": [
+      12.0
+    ],
+    "can_rescore_ladders_under_tail90_without_solving": false,
+    "why": "grid_convergence_gbm.run_ladder() builds e_unit_by_key in memory (line 477/560) and returns it (line 615) but never writes it; the JSONL rung records carry only mean / median / p01 / p99 / max plus a sum+first fingerprint. grid_convergence_breast.py is the same. A tail mean is not recoverable from those five order statistics, so tail90 cannot be evaluated at any rung except dx = 12 um without re-running the transport solves."
+  }
+}

@@ -1,0 +1,300 @@
+{
+  "panels": [
+    {
+      "tissue": "gbm",
+      "drugs": [
+        {
+          "tissue": "gbm",
+          "drug": "cisplatin",
+          "band_lo": 0.20864163423872006,
+          "band_hi": 1.5003511388489135,
+          "published_ratio_dx12": 0.27911792996360496,
+          "published_verdict": "PASS",
+          "verdicts_p99_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "verdicts_perfect_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "n_pass_p99": 8,
+          "n_pass_perfect": 8,
+          "n_rungs": 8,
+          "ratio_tail90_dx12": 0.34783791882006104,
+          "verdict_tail90_dx12": "PASS"
+        },
+        {
+          "tissue": "gbm",
+          "drug": "doxorubicin",
+          "band_lo": 0.05746191856610602,
+          "band_hi": 1.0,
+          "published_ratio_dx12": 0.2076758749154858,
+          "published_verdict": "PASS",
+          "verdicts_p99_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "verdicts_perfect_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "n_pass_p99": 8,
+          "n_pass_perfect": 8,
+          "n_rungs": 8,
+          "ratio_tail90_dx12": 0.27548766346586495,
+          "verdict_tail90_dx12": "PASS"
+        },
+        {
+          "tissue": "gbm",
+          "drug": "temozolomide",
+          "band_lo": 0.15898511609865443,
+          "band_hi": 0.4622133669344504,
+          "published_ratio_dx12": 0.2626492056468571,
+          "published_verdict": "PASS",
+          "verdicts_p99_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "verdicts_perfect_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "n_pass_p99": 8,
+          "n_pass_perfect": 8,
+          "n_rungs": 8,
+          "ratio_tail90_dx12": 0.3278702454121089,
+          "verdict_tail90_dx12": "PASS"
+        }
+      ]
+    },
+    {
+      "tissue": "breast",
+      "drugs": [
+        {
+          "tissue": "breast",
+          "drug": "5-fluorouracil",
+          "band_lo": 0.04115959040159892,
+          "band_hi": 1.5003511388489135,
+          "published_ratio_dx12": 0.3378821161474709,
+          "published_verdict": "PASS",
+          "verdicts_p99_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "verdicts_perfect_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "n_pass_p99": 7,
+          "n_pass_perfect": 7,
+          "n_rungs": 7,
+          "ratio_tail90_dx12": 0.3619754285727185,
+          "verdict_tail90_dx12": "PASS"
+        },
+        {
+          "tissue": "breast",
+          "drug": "cisplatin",
+          "band_lo": 0.20864163423872,
+          "band_hi": 1.5003511388489135,
+          "published_ratio_dx12": 0.3084627482484707,
+          "published_verdict": "PASS",
+          "verdicts_p99_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "verdicts_perfect_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "n_pass_p99": 7,
+          "n_pass_perfect": 7,
+          "n_rungs": 7,
+          "ratio_tail90_dx12": 0.3413568706032781,
+          "verdict_tail90_dx12": "PASS"
+        },
+        {
+          "tissue": "breast",
+          "drug": "docetaxel",
+          "band_lo": 0.015191651385247596,
+          "band_hi": 0.1462692215159669,
+          "published_ratio_dx12": 0.14842965466495936,
+          "published_verdict": "FAIL",
+          "verdicts_p99_every_rung": [
+            "FAIL",
+            "FAIL",
+            "FAIL",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "verdicts_perfect_every_rung": [
+            "FAIL",
+            "FAIL",
+            "FAIL",
+            "FAIL",
+            "FAIL",
+            "FAIL",
+            "FAIL"
+          ],
+          "n_pass_p99": 4,
+          "n_pass_perfect": 0,
+          "n_rungs": 7,
+          "ratio_tail90_dx12": 0.19776443076609473,
+          "verdict_tail90_dx12": "FAIL"
+        },
+        {
+          "tissue": "breast",
+          "drug": "doxorubicin",
+          "band_lo": 0.05746191856610602,
+          "band_hi": 1.0,
+          "published_ratio_dx12": 0.23013330629020515,
+          "published_verdict": "PASS",
+          "verdicts_p99_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "verdicts_perfect_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "n_pass_p99": 7,
+          "n_pass_perfect": 7,
+          "n_rungs": 7,
+          "ratio_tail90_dx12": 0.27944660286431117,
+          "verdict_tail90_dx12": "PASS"
+        },
+        {
+          "tissue": "breast",
+          "drug": "epirubicin",
+          "band_lo": 0.01100669697548635,
+          "band_hi": 1.0,
+          "published_ratio_dx12": 0.23013330629020515,
+          "published_verdict": "PASS",
+          "verdicts_p99_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "verdicts_perfect_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "n_pass_p99": 7,
+          "n_pass_perfect": 7,
+          "n_rungs": 7,
+          "ratio_tail90_dx12": 0.27944660286431117,
+          "verdict_tail90_dx12": "PASS"
+        },
+        {
+          "tissue": "breast",
+          "drug": "paclitaxel",
+          "band_lo": 0.04115959040159893,
+          "band_hi": 1.5003511388489135,
+          "published_ratio_dx12": 0.15028661822296227,
+          "published_verdict": "PASS",
+          "verdicts_p99_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "verdicts_perfect_every_rung": [
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS",
+            "PASS"
+          ],
+          "n_pass_p99": 7,
+          "n_pass_perfect": 7,
+          "n_rungs": 7,
+          "ratio_tail90_dx12": 0.19974455063771815,
+          "verdict_tail90_dx12": "PASS"
+        }
+      ]
+    }
+  ],
+  "note": "Verdicts are the frozen-band test applied to each ladder. The counterfactual ladder is an IDEALISATION (a normaliser with exactly zero grid error); its verdicts are reported to show what is and is not at stake, NOT as a proposed replacement for the published numbers."
+}
