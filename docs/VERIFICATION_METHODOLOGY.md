@@ -33,11 +33,31 @@ test cannot express.
 | 8 | Unfair cross-drug comparison: TMZ advantaged because its determinant is *unmeasured* | measurement-coverage confound | asking what differs between arms besides the thing under test |
 | 9 | `bbb_penetrance` arithmetic mean cannot express a veto | aggregation-form error | external validation outlier (66×) traced to source |
 | 10 | `membrane_permeability` returned 4.2e7 µm/s for imatinib (42 m/s) | missing physical ceiling | plausibility check on units |
-| 11 | Oxygen PDE **falsified as value-add** — beaten by a kd-tree query | trivial-baseline failure | baseline comparison (pattern 2) |
+| 11 | ~~Oxygen PDE **falsified as value-add** — beaten by a kd-tree query~~ **WITHDRAWN — this "defect" was itself a defect** | *misread inequality* | see below |
 
-Two of the eleven were not repairs but retirements: `penetration_index` (#2) was withdrawn as a
-delivery metric, and the oxygen reaction–diffusion solve (#11) was shown to be out-predicted by a
-one-line distance transform computed from its own inputs.
+**#11 is retracted, and is now the most instructive entry in the table.** The oxygen solve was never
+out-predicted. Every predictor in the comparison is sign-aligned to oxygen, so the stronger one is
+the one with the larger |ρ|, and the solve's |-0.1523| exceeds the kd-tree baseline's |-0.1204| —
+**the solve wins by 1.26×**. The claim survived because a *directional statement was written in
+prose* while the corresponding *decision procedure was computed in code*, and nothing required the
+two to agree: `state_validation.verdict_test1()` compares `abs(sim) > abs(best)` and returned
+**SUPPORTED** throughout, in the same generated document whose §1.2 asserted the opposite.
+`heldout_patient.py` independently returns **REFUTED** on the demotion claim. A component was
+deprecated anyway. Full record: `results/oxygen_demotion.md`.
+
+The corrected reading is deliberately modest: the PDE is **the best of four weak predictors**, on
+one section, within-sample, at ρ ≈ 0.15, with the composite carried by VEGFA alone. That is not
+"the oxygen solve is validated" — inverting an overclaim into the opposite overclaim would be the
+same error with its sign flipped.
+
+**The transferable pattern this actually demonstrates** is not "trivial-baseline failure" but
+**prose/arithmetic divergence**: any hand-written sentence that states a direction a machine could
+have derived is an unchecked assertion, and will eventually disagree with the code beside it. The
+repair is structural — `state_validation._ordering()` now derives every ordering claim from the
+numbers, so regeneration cannot reinstate the inversion.
+
+One of the eleven was a retirement rather than a repair: `penetration_index` (#2) was withdrawn as a
+delivery metric. #11 was a retirement that has since been **reversed**.
 
 **The generalisable claim.** Nine of these eleven are invisible to unit tests by construction,
 because a unit test asserts that a function returns what the author believes it should return. The
@@ -1071,8 +1091,13 @@ that one weighting scheme finds a trend."
   spatial drug distribution with measured treatment response in the same tumour. The response axis of
   this model is not validatable with open data, and no amount of methodology changes that.
 - Verifying a component does not validate it. Mass conserved to 4e-14, unconditionally stable,
-  dt-converged and grid-converged — all true of the oxygen solve, and all compatible with being
-  out-predicted by a kd-tree query.
+  dt-converged and grid-converged — all true of the oxygen solve, and all compatible with predicting
+  the measured marker only weakly (ρ ≈ 0.15, within-section). It out-predicts a kd-tree query, but
+  winning a contest between weak predictors is not validation either.
+- **It cannot catch a claim the arithmetic never made.** Defect #11 was a hand-written sentence that
+  inverted a comparison the code beside it computed correctly. No invariance check, convergence
+  study or baseline comparison could have found it, because none of them were wrong — the prose was.
+  The only defence is to stop writing directional claims by hand and derive them.
 
 ### 12e. The net position
 

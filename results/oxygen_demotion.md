@@ -1,191 +1,405 @@
-# Demoting the oxygen PDE: the benchmark, the cost, and the downstream effect
+# The oxygen demotion was wrong: a component deprecated on an inverted inequality
 
-`results/state_validation.md` §1.2 found the reaction-diffusion oxygen solve **falsified as value-add** — out-predicted against measured hypoxia markers by a one-line distance transform built from its own source cells, and by its own undiffused source. This report acts on that. It benchmarks every oxygen route the codebase can build, prices them, measures whether the choice changes a drug prediction at all, and makes a recommendation.
+> **STATUS: WITHDRAWN AND REPLACED BY THIS CORRECTION RECORD.**
+>
+> This document used to argue for demoting the reaction-diffusion oxygen solve in
+> favour of a distance-to-vessel surrogate. **Its central premise was an inverted
+> inequality.** The solved field out-predicts the distance baseline; it does not
+> lose to it. The demotion should never have happened.
+>
+> The document is **not deleted**. It is kept, retitled, and rewritten as the
+> record of the mistake, because this is the most instructive failure in the
+> project: *a component was deprecated on a misread inequality while every
+> mechanical check in the same repository disagreed with the prose.*
 
-**The PDE has not been deleted.** It is still the default (`reconstruct_real(oxygen_mode='pde')`, bit-identical to the pre-option pipeline). What has changed is that there is now an honest alternative, it is labelled a SURROGATE, and the default's own falsification travels with it in `reconstruction_report()['oxygen']['caveat']`.
+---
 
-## Headline
+## 1. What was claimed
 
-| | |
-|---|---|
-| **Best predictor of measured VEGFA** | `vessel_distance_exact` at rho = -0.1647 (p = 0.00050) |
-| **The PDE** | rho = -0.1479 (p = 0.00050), rank 5 of 7 |
-| **Cost ratio** | the PDE is 11x to 31x slower than the surrogate |
-| **Downstream effect on predicted kill** | at most 0.0262 absolute across three drugs |
-| **Downstream effect on therapeutic coverage** | 0 — coverage is oxygen-invariant *by construction* |
-| **Recommendation** | keep `'pde'` as the default; use `oxygen_mode='vessel_distance'` for any NEW hypoxia claim. See §5. |
+The opening sentence of the superseded version, verbatim:
 
-> **The two sections are DIFFERENT PATIENTS.** The benchmark runs on the 480-gene IO section (816,769 cells); the downstream drug arm runs on the 319-gene brain section (40,887 cells), because that is the section every flagship drug result in `results/` was computed on. Nothing transfers between them.
+> `results/state_validation.md` §1.2 found the reaction-diffusion oxygen solve
+> **falsified as value-add** — out-predicted against measured hypoxia markers by a
+> one-line distance transform built from its own source cells, and by its own
+> undiffused source. This report acts on that.
 
-## 1. Benchmark — every oxygen route against measured VEGFA
+Its headline table, verbatim:
 
-**Section.** `data_cache/xenium_gbm_io` — 816,769 cells, 480-gene IO panel, dx = 12 um, grid 905x956.  
-**Target.** Depth-normalised VEGFA (detected in 63.36% of cells). HIF1A (54.93%) is reported only inside the historical composite column — `state_validation.md` §1.1 showed it ranks 249/480 at rho = +0.0085 and dilutes the signal, for the mechanistic reason that oxygen sensing acts on the HIF-1alpha PROTEIN, not its mRNA (Ivan et al., Science 2001;292(5516):464-468, PMID 11292862, doi:10.1126/science.1059817; Jaakkola et al., Science 2001;292(5516):468-472, PMID 11292861, doi:10.1126/science.1059796).
+> | **Best predictor of measured VEGFA** | `vessel_distance_exact` at rho = -0.1647 (p = 0.00050) |
+> | **The PDE** | rho = -0.1479 (p = 0.00050), rank 5 of 7 |
 
-Every predictor is **sign-aligned to oxygen** (larger = better perfused), so a correct predictor gives a NEGATIVE rho. All rho are on the full 816,769 cells; permutation p uses a fixed seeded subsample of 50,000 cells with 2,000 draws (the kernel is O(n x draws); subsampling the null can only make a p more conservative).
+Its recommendation, verbatim:
 
-| rank | route | rho vs VEGFA | permutation p | rho vs VEGFA+HIF1A composite | rho with log-depth removed | what it is |
-|---|---|---|---|---|---|---|
-| 1 | **vessel_distance_exact** | **-0.1647** | 0.00050 | -0.1503 | -0.1663 | identical rho to raw distance-to-vessel: the map is monotone |
-| 2 | **dist_endothelial** | **-0.1647** | 0.00050 | -0.1503 | -0.1663 | one cKDTree query on the PDE's own source cells; no physics |
-| 3 | **vessel_distance** | **-0.1636** | 0.00050 | -0.1489 | -0.1651 | one cKDTree query per grid cell; no solve. This is what oxygen_mode='vessel_distance' installs |
-| 4 | **vessel_network** | **-0.1521** | 0.00050 | -0.1366 | -0.1535 | more physical vessel definition; discards singleton endothelium |
-| 5 | **pde** | **-0.1479** | 0.00050 | -0.1132 | -0.1548 | sparse steady-state solve; the current shipping default |
-| 6 | **vascular_kde** | **-0.1456** | 0.00050 | -0.1270 | -0.1476 | the solver's own input field, undiffused |
-| 7 | **local_cell_density** | **-0.0031** | 0.59770 | -0.0192 | -0.0093 | pure local crowding; ignores vessels entirely |
-| — | ~~markers~~ (CIRCULAR) | -0.6346 | 0.00050 | -0.4556 | -0.6411 | CIRCULAR against this target — the only HYPOXIA_MARKER_GENES member on this panel IS VEGFA, so this correlates VEGFA with a smoothed copy of itself. Reported as a CEILING, not a competitor |
+> **The surrogate is better and cheaper on the one section where we can measure**
+> — rho -0.1647 vs -0.1479, at 31x less compute at dx = 12 um. **There is no
+> accuracy argument for the solve.**
 
-**Reading the table.**
+And the source claim it rested on, from `results/state_validation.md` §1.2 as it
+then read, verbatim:
 
-* **The vessel-distance surrogate wins.** `vessel_distance_exact` at rho = -0.1647 against the PDE's -0.1479 — a 1.11x larger effect, from a kd-tree query instead of a sparse linear solve. Ranks 1 and 2 are the SAME predictor written two ways: `vessel_distance_exact` is `exp(-d/L)` and `dist_endothelial` is `-d`, and a monotone map cannot change a Spearman rho. They are both listed only to make that identity visible rather than claimed.
-* **Meshing costs almost nothing here.** The grid-sampled surrogate (-0.1636) and the exact per-cell surrogate (-0.1647) differ by 0.0012, so binning the distance to a 12 um mesh is not what separates the routes.
-* **The 'more physical' vessel definition is WORSE.** Measuring distance to a SEGMENTED vessel object rather than to any endothelial cell scores -0.1521 against -0.1636. Segmentation discards 4,003 of 34,179 endothelial cells as singletons, and on this section those discarded cells were carrying signal. It is offered as an option and is NOT the default — the plainer definition is the one that was benchmarked and the one that wins.
-* **The mapping cannot be tuned to win.** `exp(-d/L)` is strictly monotone in distance, so **every** monotone map of distance gives the identical Spearman rho. The constant `L` sets where the HYPOXIC/QUIESCENT/VIABLE band edges fall and nothing else. This is why it is anchored to published morphometry rather than fitted — fitting it would be unfalsifiable decoration.
-* **The marker route is a CEILING, not a competitor.** rho = -0.6346. The only `HYPOXIA_MARKER_GENES` member on this panel is VEGFA (absent: CA9, ADM, NDRG1, SLC2A1, LDHA, PGK1, ANGPTL4), so this correlates VEGFA with a kernel-smoothed copy of itself. It measures how much of the per-cell marker signal survives 40 um smoothing — i.e. an upper bound on what ANY spatial field could score here — and it must never be quoted as a validated predictor.
+> **`dist_endothelial` (-0.1204) beats the PDE (-0.1523) by -21%.**
 
-### 1.1 Calibration of the surrogate mapping
+On that basis a module was written — `tmesim/physics/oxygen_proxy.py` — whose
+own docstring stated its purpose as supplying a proxy
 
-| quantity | value | provenance |
+> whose only defence is that it out-predicts the solve on the one section where
+> we can measure.
+
+## 2. Why it was wrong
+
+**Every predictor in the §1.2 table is sign-aligned to oxygen.**
+`state_validation.trivial_baselines` explicitly negates the distance
+(`"values": -dist_endo`) and negates the cell count, and documents why:
+
+> Each baseline is returned with the SIGN CONVENTION ALIGNED TO OXYGEN — i.e.
+> larger means "more oxygenated" — so its Spearman rho against a hypoxia score is
+> directly comparable to the simulated field's, no mental sign-flipping.
+
+So a correct predictor gives a **negative** rho, and the **stronger** predictor is
+the one with the **larger |rho|**. The §1.2 table's own header says exactly this.
+
+**|-0.1523| > |-0.1204|.** The solved field is the stronger predictor.
+
+The "-21%" figure in the superseded sentence was itself the tell:
+0.1204 / 0.1523 = **0.79**, i.e. the baseline is **79% as strong as** the solved
+field. That is a statement that the baseline is *weaker*. It was read as though a
+negative percentage meant the PDE came out below the baseline.
+
+### 2.1 Every arithmetic path in the repository always disagreed
+
+This is the part worth internalising. The misreading was never anywhere except in
+hand-written English. Four independent mechanical checks, all present in the repo
+at the time, all disagreed with it:
+
+| check | what it computes | what it returns |
 |---|---|---|
-| hypoxia onset distance | 150 um | Thomlinson & Gray, Br J Cancer 1955;9(4):539-549 (PMID 13304213, doi:10.1038/bjc.1955.55) — tumour cords viable to ~100-180 um from stroma, necrotic beyond |
-| hypoxia threshold | 0.20 | `OxygenConfig.hypoxia_threshold`, unchanged |
-| derived length scale L | 93.20 um | `L = onset / ln(1/threshold)`, so a cell at the published onset distance lands exactly on the existing hypoxia threshold — no new tuning knob |
-| VIABLE within | 85.4 um | `L * ln(1/(2*threshold))`, the QUIESCENT/VIABLE edge |
-| the PDE's OWN length scale | 310 um | `sqrt(D / (consumption * rho_tum))` at the mean tumour areal density |
+| `state_validation.verdict_test1()` | `beats = abs(sim) > abs(best) * (1.0 + BASELINE_MARGIN)`, `BASELINE_MARGIN = 0.05` | **SUPPORTED**, reason string *"the solved field beats every trivial baseline"* |
+| `validation/heldout_patient.py` | `abs(dist_rho) > abs(pde_rho)` → `"CONFIRMED" if ... else "REFUTED"` | **REFUTED** on the demotion claim, *"the solved field now wins"* |
+| nested partials (§1.2) | partial Spearman both ways | simulated O2 retains **0.1227**; distance retains only **0.0792** |
+| depth-partialled column (§1.2) | log-depth removed | **-0.1619** vs **-0.1185** — same ordering |
 
-**The last row is a finding, not a footnote.** The solved field's own effective diffusion length is ~310 um, 2.1x the measured oxygen-diffusion distance. `OxygenConfig.consumption` has never been fitted to an oxygen tension, and at its current value the solve low-pass-filters its own source at a length scale the tissue does not have. That is a mechanism for §1.2's observation that the diffusion step DESTROYS predictive information: it is not adding physics, it is blurring. Independent support that vessel distance is the right axis in the first place: Helmlinger et al., Nat Med 1997;3(2):177-182 (PMID 9018236, doi:10.1038/nm0297-177) measured interstitial pO2 profiles BETWEEN ADJACENT VESSELS at <=10 um resolution in vivo — and, honestly, also found heterogeneous profile shapes and hypoxic well-perfused vessels, which is the ceiling on what geometry alone can know.
+`verdict_test1` sits in **§1.6 of the very same generated document** whose §1.2
+asserted the opposite. The document contradicted itself, in one file, from one
+run, for as long as both sections existed. Nobody read down.
 
-### 1.2 Nested test on the VEGFA-only target
+**The transferable lesson.** The defect was not in the measurement, the data, or
+the statistics — all four numbers were correct throughout, and remain correct
+today. It was that a *directional claim was written in prose* while the
+corresponding *decision procedure was computed in code*, and the two were never
+required to agree. A number rendered into a sentence by hand is an unchecked
+assertion. See §7 for the fix.
 
-| partial Spearman | rho |
-|---|---|
-| VEGFA vs **simulated O2**, distance-to-vessel held fixed | -0.0983 |
-| VEGFA vs **-distance-to-vessel**, simulated O2 held fixed | -0.1224 |
-| simulated O2 vs -distance-to-vessel (how nested the pair is) | 0.3459 |
+## 3. What the arithmetic actually says
 
-Distance keeps more explanatory power after the PDE is conditioned out than the PDE keeps after distance is conditioned out. **The PDE is the redundant member of the pair**, reproducing §1.2's conclusion on the cleaner VEGFA-only target.
+Re-derived from primitives at dx = 12 um on the IO section (816,769 cells,
+480-gene panel), deliberately **not** by calling the reporting layer, so a bug in
+the reporting layer could not hide in this check. Target: the measured hypoxia
+score (mean z of depth-normalised VEGFA and HIF1A). All predictors sign-aligned to
+oxygen.
 
-## 2. Runtime — a sparse solve against a kd-tree query
-
-Best of 3 on the same reconstructed microenvironment (`data_cache/xenium_gbm_io`), so the shared reconstruction cost is excluded. The surrogate's timing INCLUDES building the kd-tree.
-
-| dx (um) | grid | unknowns | PDE solve (s) | vessel-distance (s) | speed-up |
-|---|---|---|---|---|---|
-| 30 | 363x383 | 139,029 | 1.441 | 0.1275 | **11x** |
-| 20 | 543x574 | 311,682 | 4.394 | 0.2571 | **17x** |
-| 12 | 905x956 | 865,180 | 20.428 | 0.6556 | **31x** |
-
-The gap widens with refinement, as it must: the sparse direct solve's cost grows superlinearly in the number of unknowns while the kd-tree query grows as `O(n_grid log n_vessels)`. At the production dx = 12 um the solve is the single most expensive step in a reconstruction and the surrogate is 31x cheaper.
-
-## 3. Downstream — does the oxygen route change a drug prediction?
-
-**Section.** `data_cache/xenium_gbm` — 40,887 cells, 319-gene brain panel, dx = 12 um, grid 424x675, geometric tissue mask (the shipping default). Perivascular-sink alpha = 148.61, calibrated once on doxorubicin as in every flagship run.
-
-**How arm B is computed.** `sim.engine.simulate_response` re-solves the PDE internally and `sim/engine.py` is not modified here, so arm B re-bands the cells with the surrogate via the unmodified `cells.agents.update_cell_states` and re-runs the unmodified `cells.pkpd.apply_drug_kill` on **the engine's own transport result**, with the engine's own seeded generator. This is valid because nothing in `physics.pressure`, `physics.diffusion` or `treatment.drugs` reads `fields.oxygen` — oxygen reaches the kill through exactly one channel, the state banding. That is not assumed: arm A is recomputed through the same path and **must reproduce the engine's `kill_fraction` bit-for-bit or the run aborts**. It did, for all three drugs.
-
-Mean oxygen over tissue: PDE 0.5755, surrogate 0.6170. The two fields agree spatially at Spearman rho = 0.2433 over the grid.
-
-### 3.1 Tumour-cell state occupancy under each route
-
-| route | HYPOXIC | QUIESCENT | VIABLE |
+| predictor | rho vs hypoxia score | rho vs VEGFA | rho with log-depth removed |
 |---|---|---|---|
-| `oxygen_mode='pde'` | 0.00% | 5.08% | 94.92% |
-| `oxygen_mode='vessel_distance'` | 0.46% | 10.19% | 89.35% |
+| **SIMULATED O2 (the PDE)** | **-0.1523** | **-0.2004** | **-0.1619** |
+| dist_endothelial | -0.1204 | -0.1237 | -0.1185 |
+| vascular_kde (the solver's own undiffused source) | -0.1111 | -0.1017 | -0.1119 |
+| local_cell_density (sanity floor) | -0.0192 | -0.0031 | -0.0336 |
 
-The banding is identical for every drug (it is set before any drug is applied), so one row each suffices. The resistance multipliers this feeds are `hypoxia_resistance = 0.35` and `quiescent_resistance = 0.5`.
+* **The PDE beats the distance baseline by 1.26x** on |rho| (0.1523279 / 0.1204202
+  = 1.26497). *(`state_validation.md` §1.2 rounds this to "1.27x"; 1.26497 rounds
+  to 1.26. The direction is not in doubt; only the second decimal place.)*
+* **The diffusion step ADDS information rather than destroying it.** The solve
+  takes a source field correlating at 0.1111 and returns one correlating at
+  0.1523 — a 1.37x gain on |rho|. The superseded document's claim that "the
+  diffusion step DESTROYS predictive information" was the same inversion applied
+  to a second pair of numbers.
+* **Nested partials agree.** Simulated O2 retains 0.1227 with distance held fixed;
+  distance retains only 0.0792 with simulated O2 held fixed (the two are nested at
+  rho = +0.3006). Distance-to-vessel is the redundant member of the pair, not the
+  PDE.
 
-**Note the PDE's HYPOXIC band is EMPTY on this section under the shipping `geometric` tissue mask** — a point `results/state_validation.md` §2.2 already made. So `PDConfig.hypoxia_resistance` currently has no cells to act on at all in the flagship configuration, and the entire pde-vs-surrogate difference below runs through the QUIESCENT band. Any statement anywhere in `results/` about hypoxia-driven resistance on this section is, under this mask, describing an empty set.
+### 3.1 A second, independent defect: this document's own table was stale
 
-### 3.2 Predicted kill and therapeutic coverage
+The numbers in §1 of the superseded version (**-0.1647** for the surrogate,
+**-0.1479** for the PDE) do not merely have their ordering reversed. **They no
+longer reproduce at all.** Two commits landed *after* this document was written
+and changed the very inputs it compared:
 
-| drug | IC50 (uM) | kill (pde) | kill (vd) | delta kill | delta % | cov@1xIC50 (pde) | cov@1xIC50 (vd) | median E/IC50 (pde) | median E/IC50 (vd) |
-|---|---|---|---|---|---|---|---|---|---|
-| temozolomide | 606 | 0.1151 | 0.1113 | -0.0039 | -3.4% | 0.0000 | 0.0000 | 0.177 | 0.177 |
-| cisplatin | 24.6 | 0.9125 | 0.8862 | -0.0262 | -2.9% | 0.9986 | 0.9986 | 10.06 | 10.06 |
-| doxorubicin | 0.5 | 0.7531 | 0.7371 | -0.0160 | -2.1% | 0.9692 | 0.9692 | 3.003 | 3.003 |
+* `4ad221f` — *"Classifier arity fix: endothelial spread 2.91x -> 1.49x across
+  three real sections"*. This changed which cells are `CellType.ENDOTHELIAL`.
+* `ceb96c0` — *"Discrete vessels PROMOTED to default"*. This changed the vascular
+  source the PDE solves against.
 
-`median E/IC50` is carried alongside coverage because coverage@1xIC50 is degenerate at one end or the other for these drugs on this section (temozolomide 0.0000 — no tumour cell reaches its IC50; cisplatin and doxorubicin near-saturated above 0.96), so an identical pair of coverage numbers could be read as a saturation artefact. The median potency margin is un-saturated, spans two orders of magnitude across the panel, and is *also* identical to every digit across the two arms.
+`dist_endothelial` is built from the endothelial cell set; the PDE is solved from
+the vascular source. Both moved. Re-running the same comparison under current code
+at the same dx, on the same section, against the same target:
 
-**Therapeutic coverage does not move at all, and that is structural.** `delivery_metrics.therapeutic_coverage` is a pure function of the per-cell AUC and the drug's IC50, and the AUC field has no oxygen dependence anywhere in the pipeline. So **no oxygen model of any kind — the PDE, the surrogate, a perfect measurement — can change a delivery metric in this codebase.** Every coverage number already published is therefore immune to this whole question, which is the most useful thing in this report for anyone auditing `results/delivery_metrics.md`, `results/dose_schedule.md` or `results/vessel_network_impact.md`.
+| route | rho vs VEGFA (as published here) | rho vs VEGFA (current code) | rho vs composite (current code) |
+|---|---|---|---|
+| **pde** | -0.1479 | **-0.2004** | **-0.1523** |
+| vessel_network | -0.1521 | -0.1470 | -0.1343 |
+| vessel_distance_exact | -0.1647 | -0.1237 | -0.1204 |
+| dist_endothelial | -0.1647 | -0.1237 | -0.1204 |
+| vessel_distance (grid-sampled) | -0.1636 | -0.1220 | -0.1183 |
+| vascular_kde | -0.1456 | -0.1017 | -0.1111 |
+| local_cell_density | -0.0031 | **-0.0031** | -0.0192 |
 
-**Predicted kill moves a little, and always downwards**: -0.0262 to -0.0039 absolute, i.e. 3.4% relative at worst. The direction is not a coincidence — the surrogate bands more tumour into the resistant QUIESCENT band than the PDE does (§3.1), and every resistant cell carries a 0.5x kill multiplier.
+**Read the last row.** `local_cell_density` is the only predictor here that
+depends on neither the endothelial typing nor the solve — it is a count of cells
+within a radius. It is **unchanged to four decimal places**. Every row that
+touches endothelial typing or the vascular source moved. That is a clean internal
+control confirming the cause of the drift rather than assuming it.
 
-**The cross-drug ranking is unchanged**: cisplatin > doxorubicin > temozolomide under the PDE, cisplatin > doxorubicin > temozolomide under the surrogate — identical. That is the expected structure: the resistance multipliers are shared across drugs, so they largely cancel out of a comparison and do not cancel out of a level.
+The endothelial cell count is the direct evidence: this document reported
+*"Segmentation discards 4,003 of **34,179** endothelial cells as singletons"*.
+Current code finds **57,733** endothelial cells on the same section (and
+segmentation keeps 44,612 points in 7,754 vessels of >= 2 cells, out of 20,875
+objects, at a 20 um link distance).
 
-**So: how load-bearing is the oxygen field?** *Weakly.* A 2-3% relative shift in absolute kill is far smaller than the acknowledged uncertainty in those levels — `results/state_validation.md` §2.2 shows the VIABLE fraction on this section swings 165x across two tissue-mask conventions and three grid spacings, all of which are bookkeeping choices. The oxygen ROUTE is a second-order knob next to the tissue-mask convention. It is not zero, though, so absolute kill fractions must be reported with the oxygen mode attached, which is why `reconstruction_report()['oxygen']['mode']` now exists.
+So on this document's **own** primary target, VEGFA alone, under current code the
+PDE leads the best surrogate by **1.62x** (0.2004 / 0.1237), and the nested test
+on that target agrees: PDE retains **-0.1725** with distance held fixed, distance
+retains **-0.0679** with the PDE held fixed.
 
-### 3.3 What this does NOT show
+Two further claims of the superseded §1 also invert under current code, and are
+withdrawn:
 
-Neither section carries a paired drug-response outcome label, so nothing here says which arm's kill is *right*. The comparison is internal: it measures how much the answer depends on a modelling choice, which is a sensitivity, not a validation.
+* *"The 'more physical' vessel definition is WORSE"* (-0.1521 vs -0.1636). It is
+  now **better**: `vessel_network` -0.1470 vs `vessel_distance` -0.1220.
+* *"The vessel-distance surrogate wins ... a 1.11x larger effect."* It loses.
 
-## 4. What was wired, and what did not change
+The identity the document asserted between `vessel_distance_exact` and
+`dist_endothelial` **does** hold, and is confirmed exactly (both -0.12366370788383857):
+`exp(-d/L)` and `-d` are both strictly monotone in `d`, and a monotone map cannot
+change a Spearman rho.
 
-| | |
-|---|---|
-| new module | `tmesim/physics/oxygen_proxy.py` — `oxygen_from_vessel_distance`, `vessel_distance_um`, `hypoxia_from_markers`, `diffusion_length_um`, `pde_diffusion_length_um` |
-| new option | `reconstruct_real(..., oxygen_mode=...)` with `'pde'` / `'vessel_distance'` / `'markers'`, plus `oxygen_kwargs=None` |
-| default | **`'pde'`, unchanged and BIT-IDENTICAL** — asserted by `tests/test_oxygen_proxy.py` |
-| recorded in | `reconstruction_report()['oxygen']` -> `mode`, `source`, `is_surrogate`, `caveat`, `detail` (and a flat `['oxygen_mode']`) |
-| NOT touched | `tmesim/core`, `tmesim/sim/engine.py`, `tmesim/physics/oxygen.py` |
+## 4. The honest limits of the reversal — read this before quoting anything above
 
-`oxygen_mode='markers'` **raises** on the 319-gene brain panel rather than degrading silently, because that panel carries no VEGFA, CA9, ADM, NDRG1 or SLC2A1: on that section hypoxia is UNMEASURED, and the honest interface says so. `hypoxia_from_markers` returns `None` with the same reason when called directly.
+**The solved field winning does NOT mean the oxygen solve is validated.** A
+correction that becomes an overclaim in the opposite direction is the same error
+with its sign flipped. Specifically:
 
-A caller who passes `oxygen_mode='vessel_distance'` straight into `sim.engine.simulate_response` will NOT get a surrogate-driven kill — the engine re-solves the PDE internally. That is documented in `reconstruct_real`'s docstring, and the supported route is the re-banding path §3 uses.
+1. **rho ~ 0.15 is WEAK.** It explains a couple of percent of the rank variance in
+   the marker. It cannot carry a claim about any individual cell, and it is not
+   evidence that the absolute oxygen level is right — nothing here tests that.
+   `OxygenConfig.consumption` has still never been fitted to a measured oxygen
+   tension.
+2. **This is a WITHIN-SECTION comparison, not out-of-sample.** Every number in §3
+   comes from one section of one patient. It is a re-derivation on the data the
+   claim was made from, not a held-out test.
+3. **The composite is carried by VEGFA alone.** HIF1A contributes rho = **+0.0140**
+   against the simulated field — the wrong sign and indistinguishable from zero.
+   The "VEGFA + HIF1A hypoxia score" is, in practice, VEGFA.
+4. **VEGFA is a hypoxia-RESPONSE gene, not an oxygen tension**, with its own
+   kinetics and its own non-hypoxic inducers. The comparison is internal: it
+   establishes that the solve is not redundant with the geometry it is built from,
+   not that the solve is accurate about pO2.
+5. **The margin is small and has no confidence interval.** 1.26x on a rho of 0.15,
+   with the permutation test measuring each rho against zero rather than the
+   predictors against each other.
+6. **The circularity is inherited by both routes.** `FLT1` and `PLVAP` are IO-panel
+   endothelial markers, so the cells defining "distance to a vessel" are themselves
+   typed from the panel. This cannot explain the *gap* between the routes, but
+   neither route's absolute rho is free of it.
 
-## 5. RECOMMENDATION
+**The defensible conclusion is: "the PDE is the best of four weak predictors, on
+one section, within-sample."** It is not "the oxygen solve is validated". If in
+doubt, understate it.
 
-**Keep `'pde'` as the shipping default. Use `oxygen_mode='vessel_distance'` for every NEW hypoxia claim, and stop making per-cell hypoxia claims from the solved field.**
+### 4.1 The one criticism of the PDE that SURVIVES
 
-The reasoning, in order of weight:
+The reversal kills the *accuracy* case against the solve. It leaves the
+*calibration* case fully intact, and that case is still open.
 
-1. **The surrogate is better and cheaper on the one section where we can measure** — rho -0.1647 vs -0.1479, at 31x less compute at dx = 12 um. There is no accuracy argument for the solve.
-2. **But the drug outputs barely notice, and flipping the default would invalidate the provenance of everything already published.** §3 shows therapeutic coverage is EXACTLY invariant and kill moves by at most 0.0262 absolute (3.4% relative) with the cross-drug ranking unchanged. The measurable gain on the drug side is therefore close to nil, while the cost is re-deriving every kill number in `results/` (§5.1) and breaking the correspondence between those documents and the code. Silent improvement is still silent change.
-   The honest asymmetry: the surrogate is unambiguously better as a *hypoxia predictor* (§1) and only marginally different as a *drug-kill input* (§3). So the recommendation splits along exactly that line — flip it for hypoxia claims, leave it for the kill pipeline until that pipeline is being re-run for some other reason anyway.
-3. **The measured route is the right long-run answer and is not available yet.** `hypoxia_from_markers` is the only route here that is a measurement, but the flagship drug section's panel does not carry a hypoxia-response gene, and on the IO section that does, benchmarking it is circular. A panel or platform carrying CA9/ADM/NDRG1/SLC2A1 alongside a drug-relevant readout would settle this properly.
+The PDE's own effective diffusion length is `sqrt(D / (consumption * rho_tum))`
+(`oxygen_proxy.pde_diffusion_length_um`), which at the default `OxygenConfig` and
+the measured tumour density is **~310 um on the IO section and ~800 um on the
+brain section** — 2-5x the published oxygen-diffusion distance of ~150 um
+(Thomlinson & Gray, Br J Cancer 1955;9(4):539-549, PMID 13304213,
+doi:10.1038/bjc.1955.55).
 
-### 5.1 If the default WERE flipped, this is the re-run list
+*(Those two length scales are the module's own reported figures and were **not**
+re-derived in this pass. They depend on the measured tumour areal density, which
+the `4ad221f` reclassification may also have moved, so they should be re-measured
+before being quoted as current. The argument does not depend on their exact
+values — only on the length scale being materially larger than the published one,
+which a factor of 2-5 comfortably allows.)*
 
-Everything whose numbers depend on the per-cell state banding — i.e. on `PDConfig.hypoxia_resistance` / `quiescent_resistance` having cells to act on. Coverage-only and AUC-only results are immune (§3.2) and would not need re-running:
+A rank correlation cannot see this. Spearman rho is invariant under any monotone
+rescaling, so the solve can win §3 comfortably and still have its diffusion length
+wrong by a factor of 2-5. **Both are true at once.** What the reversal removes is
+only the inference that this mis-scaling was *destroying predictive information* —
+it demonstrably is not (0.1111 -> 0.1523).
 
-| artefact | why | immune? |
-|---|---|---|
-| `results/dose_schedule.md` | its kill ceilings are ~89% the quiescent multiplier | **no — re-run** |
-| `results/state_validation.md` | Test 1 IS this comparison | **no — re-run** |
-| `results/report.md`, `results/patient_report_*.md` | quote absolute kill | **no — re-run** |
-| `results/ranking_robustness.md`, `results/uncertainty.md` | resample kill | **no — re-run** |
-| `results/delivery_metrics.md` | AUC + coverage only | yes |
-| `results/vessel_network_impact.md` | coverage + penetration length | mostly — only its `hypoxia` block moves |
-| `results/numerical_rigor.md` | would need the surrogate's own dx sweep | **no — re-run** |
+Resolving it requires a measured oxygen tension — phosphorescence-quenching pO2 or
+pimonidazole IHC on a serial section — not another rank statistic.
 
-### 5.2 What would change our mind
+## 5. Verdict on `tmesim/physics/oxygen_proxy.py`
 
-* A section with a **measured oxygen tension** (phosphorescence-quenching pO2, or pimonidazole IHC on a serial section). Every route here is uncalibrated in absolute level; a tension would adjudicate levels, not just orderings, and could rehabilitate the PDE by fitting `consumption`.
-* A panel carrying **several** hypoxia-response genes, so the marker route can be benchmarked non-circularly by leave-one-gene-out.
-* Evidence that the solve matters somewhere the distance transform cannot reach — e.g. a geometry with a supply-limited vessel where the (1-O) saturation term does real work. Nothing in the two cached sections exercises that.
+**KEEP, with the rationale corrected, and DEMOTE the recommendation that callers
+switch to it.**
 
-## 6. Caveats — what could make this wrong
+Being born of a false premise is not by itself disqualifying — the question is
+whether the module has an independent justification. It has three, none of which
+depend on the withdrawn claim:
 
-1. **VEGFA is a hypoxia-RESPONSE gene, not an oxygen tension.** It is the transcriptional output of a pathway with its own kinetics and its own non-hypoxic inducers (Fischer et al., Brain Pathol 2005;15(4):297-310, PMID 16389942, doi:10.1111/j.1750-3639.2005.tb00115.x). A field could be a perfectly good oxygen tension and still score poorly here. What the comparison establishes is narrower and immune to this: *whatever* VEGFA is reporting, a distance transform predicts it better than the solve does, and that is an internal comparison on identical inputs.
-2. **The two sections are different patients**, with different vascular architectures and different panels. The benchmark (§1) and the downstream effect (§3) are two experiments, not two views of one tumour.
-3. **Circularity in the vessel term.** `FLT1` and `PLVAP` are IO-panel ENDOTHELIAL markers, so the cells that define 'distance to a vessel' are themselves typed from the panel. Both the PDE and the surrogate inherit this equally, so it cannot explain the gap between them — but neither route's absolute rho is free of it.
-4. **Targeted-panel dropout.** A zero is 'no probe fired', not 'no transcript'. VEGFA fires in 63.4% of cells, which is enough to power this test and not enough to make any single cell's value trustworthy.
-5. **No absolute calibration anywhere.** `OxygenConfig.consumption` has never been fitted to a measured oxygen tension, and the surrogate's `L` is anchored to published morphometry, not to a tension. Demoting the PDE does not calibrate anything.
-6. **The surrogate has no supply saturation and no sink.** It cannot represent a vessel that is itself hypoxic, or tissue whose consumption varies. Helmlinger et al. measured exactly those effects in vivo. The claim is only that on these data the extra physics costs accuracy rather than buying it.
+1. **A baseline you keep is how a claim stays falsifiable.** The entire force of
+   §1.2's SUPPORTED verdict is that the solve was made to beat a physics-free
+   alternative built from its own inputs. That alternative must exist and be
+   runnable, or the verdict is unfalsifiable decoration. Deleting the surrogate
+   would *weaken* the corrected conclusion, not strengthen it. This is the
+   strongest argument for keeping it, and it is the opposite of the argument that
+   created it.
+2. **Cost — the one claim the reversal leaves untouched.** The surrogate is a
+   `cKDTree` build plus one nearest-neighbour query against a sparse direct solve
+   on 865,180 unknowns at dx = 12 um. This was never an accuracy argument, so the
+   inversion does not touch it. Measured this pass at dx = 12 um: vessel-distance
+   grid **1.497 s**, at exact cell coordinates **1.051 s**, vessel-network variant
+   **11.876 s**. *(The PDE solve was not timed in isolation in this pass; the
+   superseded §2 runtime table — 11x to 31x — is pre-fix and should be re-measured
+   before being quoted. The structural argument that a kd-tree query is
+   asymptotically cheaper than a sparse solve stands on its own.)*
+3. **`hypoxia_from_markers` is a MEASUREMENT and was never contingent on any of
+   this.** It reads hypoxia off measured transcripts with no physics, and returns
+   `None` with an explicit reason where the panel cannot measure it (the 319-gene
+   brain panel carries no VEGFA, CA9, ADM, NDRG1 or SLC2A1, so on that section
+   hypoxia is UNMEASURED and the interface says so). It is wired into the Studio's
+   validation path. This is the most defensible thing in the module.
 
-## 7. Reproduction
+A fourth item outlived its motivation: `pde_diffusion_length_um` produced the
+calibration finding in §4.1, which is real, independent of the rank comparison,
+and still unresolved.
 
-```bash
-python -m tmesim.validation.oxygen_benchmark
+**What must change, and has:**
+
+* The module docstring's title and premise are rewritten. It previously opened
+  *"Oxygen SURROGATES that are not a solved oxygen tension — and are better at
+  it"* and is now *"Cheap oxygen BASELINES, and the one route that is a
+  measurement"*, carrying an explicit withdrawal warning at the top.
+* Every in-module claim that the surrogate out-predicts the solve is replaced with
+  the measured relation: it scores **0.79x** the solved field's |rho| — cheaper
+  **and weaker**.
+* The superseded recommendation *"use `oxygen_mode='vessel_distance'` for any NEW
+  hypoxia claim"* is **withdrawn**. `'pde'` remains the default, and it is now the
+  default on the evidence rather than in spite of it. `'vessel_distance'` is
+  demoted to an explicitly-weaker cost-constrained option.
+
+**What is NOT recommended:** deleting the module, or flipping the default. The
+default never moved (`oxygen_mode='pde'`, bit-identical, asserted by
+`tests/test_oxygen_proxy.py`), and that is the one piece of luck in this episode:
+**no flagship result in `results/` was ever computed through the surrogate.** The
+only surrogate-driven numbers anywhere were the sensitivity arm in the superseded
+§3 of this document, which was explicitly a comparison and never fed anything
+downstream. The damage was to the documentation and to the stated rationale of a
+module — not to any published prediction.
+
+## 6. What survives from the superseded document
+
+Not everything in it was downstream of the inversion. These findings stand and are
+worth keeping:
+
+* **Therapeutic coverage is oxygen-invariant *by construction*.**
+  `delivery_metrics.therapeutic_coverage` is a pure function of per-cell AUC and
+  IC50, and the AUC field has no oxygen dependence anywhere in the pipeline. **No
+  oxygen model of any kind — PDE, surrogate, or a perfect measurement — can change
+  a delivery metric in this codebase.** Every coverage number in
+  `results/delivery_metrics.md`, `results/dose_schedule.md` and
+  `results/vessel_network_impact.md` is immune to this entire question. This is a
+  structural argument and does not depend on any rho.
+* **The oxygen route is a second-order knob** next to the tissue-mask convention,
+  which swings the VIABLE fraction far harder.
+* **`oxygen_mode='markers'` raising on a panel that cannot measure hypoxia** is the
+  right interface behaviour and should be kept.
+* **The `exp(-d/L)` mapping cannot be tuned to win**, because every strictly
+  monotone map of distance has the identical Spearman rho. `L` sets band edges and
+  nothing else, which is why it is anchored to published morphometry rather than
+  fitted.
+
+**What must be re-measured before it is quoted again:** the §2 runtime table and
+the entire §3 downstream drug arm (state occupancies, kill deltas of -0.0039 /
+-0.0262 / -0.0160) were computed pre-`4ad221f` and pre-`ceb96c0`. They are not
+re-derived here. Their *qualitative* conclusion — that the oxygen route barely
+moves predicted kill and cannot move coverage at all — is structural and survives;
+their digits are stale.
+
+## 7. The generator fix — so this cannot regenerate back to the defect
+
+`results/state_validation.md` is a **generated** document. Correcting the markdown
+without correcting `tmesim/validation/state_validation.py` would mean the next
+regeneration silently reinstates the inversion — and a corrected document that
+reverts on regeneration is *worse* than an uncorrected one, because it looks
+reviewed.
+
+The generator emitted the direction as hard-coded English:
+
+```python
+A(f"* **`dist_endothelial` ({de:+.4f}) beats the PDE ({so:+.4f}) by "
+  f"{100*(abs(de)/abs(so)-1):.0f}%.** ...")
 ```
 
-Deterministic (the only randomness is the seeded permutation / subsampling, `PERM_SEED = 0`, and the engine's `seed = 0`). Runtime ~10 min, dominated by the 816,769-cell reconstructions and the three transport solves.
+That sentence asserts an ordering **unconditionally**, whatever the numbers do.
+Meanwhile `verdict_test1` in the same module computed `abs(sim) > abs(best)`.
 
-**Files added or changed by this work:**
+**The fix is structural, not textual.** Every ordering claim is now derived from
+the numbers through a new helper, `state_validation._ordering()`, which returns
+the direction, the ratio, and the verb phrases. No sentence in the module states
+an ordering the data did not produce. If the ordering ever legitimately flips, the
+prose flips with it.
 
-* `tmesim/physics/oxygen_proxy.py` — new; the surrogate and the marker route
-* `tmesim/validation/oxygen_benchmark.py` — new; this analysis
-* `tmesim/reconstruct/real_pipeline.py` — additive `oxygen_mode` / `oxygen_kwargs` keyword, default `'pde'` and bit-identical; the oxygen provenance block in `reconstruction_report`
-* `tests/test_oxygen_proxy.py` — new
-* `results/oxygen_demotion.md` — this report
+The generator also now **emits the correction record itself** (the `CORRECTION
+(§1.2)` block), so the trail of the mistake is reproduced by regeneration rather
+than being a hand-added note that the next run deletes.
 
-**Data provenance.** Both sections are open 10x Genomics Xenium datasets, CC BY 4.0, no login or DUA: the Human Brain Cancer (GBM) FFPE IO-panel section (v2.0.0, 480 targets) and the Human Brain Glioblastoma section (v1.3.0, 319 targets).
+**Verified, not assumed.** `write_report` was re-run against the independently
+re-derived dx = 12 numbers and the output checked mechanically:
+
+* With the real measured numbers: all nine superseded sentences are **absent**
+  (*"is out-predicted by a physics-free distance-to-nearest-vessel baseline"*,
+  *"beats the PDE"*, *"also beats the PDE"*,
+  *"the diffusion step \*destroys\* predictive information"*,
+  *"**The PDE is the redundant variable in that pair.**"*, *"The oxygen field is
+  not falsified — it is out-competed"*, *"The model has converged onto an answer
+  that a distance transform beats"*, *"and it does not matter"*, and the §1.3
+  thresholding sentence), and the corrected text plus the `CORRECTION (§1.2)`
+  block are **present**.
+* With the two rho values artificially **swapped**, the prose flips back to the
+  "out-competed" wording and the correction block disappears — confirming the text
+  is following the arithmetic in both directions rather than being hard-coded the
+  other way.
+
+## 8. Sites that still carry the superseded claim
+
+Every quote below was read from the file itself, not inherited from another
+document's summary. Rows marked CORRECTED were fixed in this pass; the rest are
+listed so they can be routed, not so they can be forgotten.
+
+| site | what it says now | what it should say |
+|---|---|---|
+| `tmesim/reconstruct/real_pipeline.py` L106-108, **L234-235**, L821 | L234: `"FALSIFIED AS VALUE-ADD (results/state_validation.md §1.2, results/oxygen_demotion.md): out-predicted against measured "...` — this string travels into every `reconstruction_report()['oxygen']['caveat']` and thence into the Studio. L821: *"retained as the default despite being falsified as value-add"* | the solve out-predicts every trivial baseline (1.26x on \|rho\|) but at weak absolute rho, within-section. `'pde'` is the default **on** the evidence, not despite it |
+| `tmesim/reconstruct/cell_state.py` L25 | *"`results/oxygen_demotion.md` §1 — the oxygen PDE is out-predicted as a ..."* | cite the corrected §3 ordering of this document |
+| `tmesim/validation/oxygen_benchmark.py` **L707**, **L784** | L707 emits *"**falsified as value-add** — out-predicted against measured hypoxia markers "*. L784 hard-codes *"**The vessel-distance surrogate wins.**"* and then interpolates `winner = ranked[0]`. Its ranking (`sorted(..., key=lambda r: r["rho_vegfa"])`) is in fact **correct** while every rho is negative — most-negative first is largest-\|rho\| first — so under current numbers `ranked[0]` is now the **PDE**, and the sentence would emit *"The vessel-distance surrogate wins. `pde` at rho = -0.2004 against the PDE's -0.2004 — a 1.00x larger effect"* | give the prose the same `_ordering()` treatment applied to `state_validation.py`, and make the ranking robust to a positive rho by sorting on `abs()`. **Highest-priority remaining site**: it regenerates *this* document, so running it as-is overwrites this correction with the defect |
+| ~~`docs/architecture.md`~~ | **no action needed.** Searched for `kd-tree`, `value-add`, `out-predict`, `redundant`, `demot` — **no instance of the claim survives in this file** | — |
+| ~~`docs/VERIFICATION_METHODOLOGY.md` L36, L39-40, L1075~~ | **CORRECTED IN THIS PASS.** Defect #11 was listed as a successful falsification (*"Oxygen PDE falsified as value-add — beaten by a kd-tree query"*) | now marked **WITHDRAWN**, with the retraction and the reframing of the transferable pattern as *prose/arithmetic divergence* rather than trivial-baseline failure |
+| `results/heldout_patient.md` (~L344) | **mostly already correct** — L238 reads *"a one-line `cKDTree` query ... scores -0.1204 — 0.79× the solved field ... so the solve does add predictive information here"*, and L336 says *"loses to the PDE"*. But L344 still concludes *"the hypoxia rows confirm that the reaction-diffusion solve is out-predicted by a distance transform"* | L344 alone contradicts L238 and L336 of its own document, and must be flipped. This file is the closest to correct of any site, because its generator adjudicates with `abs()` |
+| `app/reports/rep_00001,3,4/report.html` | *"oxygen (pde): FALSIFIED AS VALUE-ADD ... (rho -0.1503 vs -0.1132)"* | **backwards by its own quoted numbers**: \|-0.1503\| > \|-0.1132\| |
+| `tests/test_oxygen_proxy.py:257` | asserts `"FALSIFIED AS VALUE-ADD" in rep["oxygen"]["caveat"]` | pins the defective string in place; must be updated together with `real_pipeline.py` |
+
+**Note the last two rows.** The Studio caveat is internally inconsistent by its
+own quoted numbers, and a test actively pins the defective wording so that fixing
+the caveat string will fail the suite until both are changed together. That is how
+a wrong claim becomes load-bearing.
+
+## 9. Reproduction
+
+The correction in §3 was re-derived from primitives (loader -> `reconstruct_real`
+-> `cKDTree` -> `spearman_full`) without calling the reporting layer, at
+dx = 12 um on `data_cache/xenium_gbm_io`, 816,769 cells. The §3.1 refresh
+additionally exercised `oxygen_proxy.oxygen_from_vessel_distance` and
+`vessel_distance_um` under current code.
+
+`tmesim/validation/oxygen_benchmark.py` has **not** been re-run to regenerate this
+document, because its prose generator still hard-codes the superseded ordering
+(§8). Running it as-is would overwrite this correction with the defect. It needs
+the `_ordering()` treatment first.
+
+**Data provenance.** 10x Genomics Xenium Human Brain Cancer (GBM) FFPE IO-panel
+section, v2.0.0, 480 targets. CC BY 4.0, no login or DUA.

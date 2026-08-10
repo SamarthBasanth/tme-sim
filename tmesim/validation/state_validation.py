@@ -1699,11 +1699,18 @@ def make_figure(results: Dict, out_path: Optional[str] = None) -> str:
              f"TEST 2 (cell states vs measured MKI67/TOP2A, {t2['n_tumor']:,} tumour "
              f"cells): {v2['verdict']}",
              fontsize=10, color=INK_PRIMARY, ha="left")
+    _fo = _ordering(preds["simulated_o2"]["rho_score"],
+                    preds["dist_endothelial"]["rho_score"])
     fig.text(0.055, 0.905,
-             "The PDE is out-predicted by a one-line distance-to-vessel baseline; "
-             "HIF1A is null; and the proliferation test cannot distinguish a correct "
-             "state model from noise. Two different patients — the tests are "
-             "independent, not corroborating.",
+             ("The PDE out-predicts a one-line distance-to-vessel baseline "
+              f"({_fo['ratio']:.2f}× on |ρ|) but only at |ρ| ≈ "
+              f"{_fo['abs_sim']:.2f}, within-section; "
+              if _fo["sim_wins"] else
+              "The PDE is out-predicted by a one-line distance-to-vessel "
+              "baseline; ")
+             + "HIF1A is null; and the proliferation test cannot distinguish a "
+             "correct state model from noise. Two different patients — the tests "
+             "are independent, not corroborating.",
              fontsize=8.5, color=INK_SECONDARY, ha="left")
 
     out_path = out_path or os.path.join(_results_dir(), "state_validation.png")
@@ -1721,12 +1728,72 @@ def _pmid(entry: Dict[str, object]) -> str:
             f"doi:{entry['doi']})")
 
 
+def _ordering(sim: float, base: float) -> Dict[str, object]:
+    """Derive the simulated-vs-baseline comparison FROM THE NUMBERS.
+
+    Every predictor in Test 1 is sign-aligned to oxygen — :func:`trivial_baselines`
+    negates the distance and the cell count explicitly — so both a correct solved
+    field and a correct baseline score NEGATIVE, and the stronger predictor is
+    simply the one with the larger ``|rho|``. The comparison is therefore
+    ``abs(sim)`` against ``abs(base)``, never ``sim`` against ``base``.
+
+    WHY THIS FUNCTION EXISTS. The prose in this report used to hard-code the
+    direction of that comparison in English while :func:`verdict_test1` computed
+    it with ``abs()``. When the measured ordering was the reverse of the
+    hard-coded sentence, the generator kept emitting the sentence — so
+    ``results/state_validation.md`` §1.2 asserted that a distance baseline beat
+    the solved field (-0.1204 vs -0.1523) while §1.6 of the same document, from
+    the same run, returned SUPPORTED with the reason "the solved field beats
+    every trivial baseline". The document contradicted itself for as long as both
+    sections existed, and a whole component (``results/oxygen_demotion.md``,
+    ``physics/oxygen_proxy.py``) was deprecated on the strength of the English
+    rather than the arithmetic.
+
+    Deriving the wording here is what makes that unrepeatable: there is now no
+    sentence in this module that states an ordering the numbers did not produce,
+    so a regeneration reproduces whatever the data say — including a flip back —
+    instead of reverting to a remembered conclusion.
+    """
+    a_sim, a_base = abs(float(sim)), abs(float(base))
+    sim_wins = a_sim > a_base
+    strong, weak = (a_sim, a_base) if sim_wins else (a_base, a_sim)
+    return {
+        "sim_wins": bool(sim_wins),
+        "abs_sim": a_sim,
+        "abs_base": a_base,
+        # How many times stronger the WINNER is than the loser.
+        "ratio": (strong / weak) if weak else float("inf"),
+        # What fraction of the winner the loser recovers.
+        "recovers": (weak / strong) if strong else float("nan"),
+        # The baseline expressed as a multiple of the solved field. < 1 means the
+        # baseline is weaker. This is the number the superseded prose reported as
+        # a percentage CHANGE ("-21%"), which is why it read as though the
+        # baseline had gained rather than lost.
+        "base_over_sim": (a_base / a_sim) if a_sim else float("inf"),
+        "winner": "the solved field" if sim_wins else "the baseline",
+        # Verb phrases, so no call site has to re-decide the direction.
+        "verb_vs_baseline": "beats" if sim_wins else "is beaten by",
+        "strongest_or_weakest": "strongest" if sim_wins else "weakest",
+    }
+
+
 def write_report(results: Dict, out_path: Optional[str] = None) -> str:
-    """Write ``results/state_validation.md``. Returns the written path."""
+    """Write ``results/state_validation.md``. Returns the written path.
+
+    Every sentence that states an ORDERING between the solved field and a
+    baseline is derived through :func:`_ordering` rather than written out, for
+    the reason given in that function's docstring.
+    """
     t1, t2 = results["test1"], results["test2"]
     v1, v2 = results["verdict1"], results["verdict2"]
     guard = results["guard"]
     preds = t1["sweep"][DX_CONVERGED]["predictors"]
+    # The three Test-1 numbers every ordering claim below is derived from.
+    so = preds["simulated_o2"]["rho_score"]
+    de = preds["dist_endothelial"]["rho_score"]
+    vk = preds["vascular_kde"]["rho_score"]
+    ordv = _ordering(so, de)       # solved field vs the distance baseline
+    ordk = _ordering(so, vk)       # solved field vs its own undiffused source
     L: List[str] = []
     A = L.append
 
@@ -1737,6 +1804,57 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
     A("Two independent falsification tests against MEASURED markers in real GBM "
       "tissue, on two different open 10x Xenium sections.")
     A("")
+    # The correction record. Emitted, not hand-written, so a regeneration cannot
+    # quietly drop it -- this project keeps a visible trail of its own mistakes.
+    # It only appears while the solved field is the winner, i.e. exactly when a
+    # reader would otherwise have no way of knowing the document once said the
+    # opposite.
+    if ordv["sim_wins"]:
+        A("> ## CORRECTION (§1.2) — this document once had its central "
+          "inequality backwards")
+        A(">")
+        A("> **What §1.2 previously said.** That a one-line distance-to-vessel "
+          "baseline **out-predicted** the solved oxygen field, quoting the two "
+          "numbers below in that order and describing the gap as \"-21%\". The "
+          "one-sentence summary, the headline table, §1.3, §1.5 and consequences "
+          "1–2 of §1.6 all repeated that reading.")
+        A(">")
+        A("> **Why it was wrong.** Every predictor in the §1.2 table is "
+          "sign-aligned to oxygen — `trivial_baselines` negates the distance — "
+          "so, as that table's own header states, a correct predictor gives a "
+          f"NEGATIVE ρ and the STRONGER predictor is the one with the larger "
+          f"|ρ|. |{so:+.4f}| > |{de:+.4f}|: **the solved field out-predicts the "
+          f"distance baseline**, by {ordv['ratio']:.2f}×. The \"-21%\" was itself "
+          f"the tell — {ordv['base_over_sim']:.2f} means the baseline is "
+          f"{100*ordv['base_over_sim']:.0f}% as strong, i.e. **weaker**, not "
+          "better.")
+        A(">")
+        A("> **Every mechanical check in this repo always disagreed with the "
+          "prose.** `verdict_test1()` compares `abs(sim) > abs(best)` and has "
+          "always returned **SUPPORTED** here, with the reason string \"the "
+          "solved field beats every trivial baseline\" — which is why §1.6 "
+          "contradicted §1.2 above it for as long as both existed. "
+          "`validation/heldout_patient.py` adjudicates the same comparison "
+          "arithmetically and returns **REFUTED** on the demotion claim. The "
+          "nested partials and the depth-partialled column agree.")
+        A(">")
+        A("> **What it cost.** A component was deprecated on the misread: "
+          "`results/oxygen_demotion.md` and `tmesim/physics/oxygen_proxy.py` were "
+          "both written on the inverted premise. That document is now the record "
+          "of the correction rather than of the demotion.")
+        A(">")
+        A("> **The fix that makes this unrepeatable.** Every ordering claim in "
+          "this report is now DERIVED from the numbers via "
+          "`state_validation._ordering()` instead of written in English, so "
+          "re-running this module reproduces whatever the data say — including a "
+          "flip back — rather than reverting to a remembered conclusion.")
+        A(">")
+        A("> **What does NOT follow.** The solved field winning does not make it "
+          f"good. |ρ| ≈ {ordv['abs_sim']:.2f} is WEAK, this is a within-section "
+          "re-derivation and not out-of-sample, and the composite is carried by "
+          "VEGFA alone. The correct conclusion is **\"the PDE is the best of four "
+          "weak predictors\"**, not \"the oxygen solve is validated\".")
+        A("")
     A("| | Test 1 — simulated oxygen field | Test 2 — cell-state labelling |")
     A("|---|---|---|")
     A(f"| **Verdict** | **{v1['verdict']}** | **{v2['verdict']}** |")
@@ -1751,18 +1869,29 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
       f"{100*t2['contrasts']['MKI67']['rates']['VIABLE']['rate']:.2f}% "
       f"({t2['contrasts']['MKI67']['rates']['VIABLE']['k']}/"
       f"{t2['contrasts']['MKI67']['rates']['VIABLE']['n']}) |")
-    A(f"| Killer detail | a **one-line distance-to-vessel baseline scores "
-      f"{preds['dist_endothelial']['rho_score']:+.4f}**, i.e. "
-      f"{abs(preds['dist_endothelial']['rho_score']/preds['simulated_o2']['rho_score']):.2f}× "
-      f"the solved field | the test could only have detected a "
+    A(f"| Baseline contrast | a one-line distance-to-vessel baseline scores "
+      f"**{de:+.4f}**, i.e. **{ordv['base_over_sim']:.2f}× "
+      f"the solved field — "
+      f"{'weaker' if ordv['sim_wins'] else 'STRONGER'}, reading by |ρ| as this "
+      f"table's own sign convention requires** | the test could only have "
+      f"detected a "
       f"**≥{t2['contrasts']['MKI67']['viable_vs_rest']['power']['rate_ratio']:.1f}× "
       "rate ratio** |")
     A("")
     A("**In one sentence each.** The simulated oxygen field *is* significantly "
-      "anti-correlated with measured hypoxia response, but it is out-predicted by "
-      "a physics-free distance-to-nearest-vessel baseline computed from its own "
-      "inputs — so the reaction–diffusion solve is not what carries the signal. "
-      "And the proliferation test on the 319-gene section is dropout-limited to "
+      "anti-correlated with measured hypoxia response, and it "
+      + ("**out-predicts** every physics-free baseline built from its own inputs "
+         if ordv["sim_wins"] and ordk["sim_wins"] else
+         "is **out-predicted** by at least one physics-free baseline built from "
+         "its own inputs ")
+      + f"— including the distance-to-nearest-vessel transform ({de:+.4f}) and "
+      f"its own undiffused source term ({vk:+.4f}) — but "
+      + ("it wins a contest between four weak predictors on the one section that "
+         "measures the marker, so the result is real and small rather than "
+         "decisive. "
+         if ordv["sim_wins"] else
+         "the reaction–diffusion solve is therefore not what carries the signal. ")
+      + "And the proliferation test on the 319-gene section is dropout-limited to "
       "the point where it cannot distinguish a correct cell-state model from "
       "noise; that is a power failure, not a vindication and not a refutation.")
     A("")
@@ -1939,28 +2068,61 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
     for key, pv in t1["perm"].items():
         A(f"| {key} | {pv['rho']:+.4f} | {pv['p_value']:.5f} |")
     A("")
-    A(f"**The answer to (a) is yes — and it does not matter.** The simulated field "
-      f"is genuinely, significantly anti-correlated with measured hypoxia response "
-      f"(ρ = {preds['simulated_o2']['rho_score']:+.4f}, "
+    A("**The answer to (a) is yes, and "
+      + ("the PDE wins the comparison — but it is a contest between weak "
+         "predictors.**" if ordv["sim_wins"] else
+         "a trivial baseline does it better.**")
+      + f" The simulated field is genuinely, significantly anti-correlated with "
+      f"measured hypoxia response (ρ = {so:+.4f}, "
       f"p = {t1['perm']['simulated_o2']['p_value']:.5f}, floor of the estimator). "
-      "But so is every trivial baseline built from the same inputs, and two of "
-      "them do it BETTER:")
+      "Every trivial baseline built from the same inputs is anti-correlated too, "
+      f"but the solved field is the **{ordv['strongest_or_weakest']}** of the "
+      "four — reading the table by |ρ|, as its own sign convention requires:")
     A("")
-    de = preds["dist_endothelial"]["rho_score"]
-    vk = preds["vascular_kde"]["rho_score"]
-    so = preds["simulated_o2"]["rho_score"]
-    A(f"* **`dist_endothelial` ({de:+.4f}) beats the PDE ({so:+.4f}) by "
-      f"{100*(abs(de)/abs(so)-1):.0f}%.** One `cKDTree` query — the distance from "
-      "each cell to the nearest endothelial cell — predicts measured VEGFA/HIF1A "
-      "better than the reaction–diffusion solve does.")
-    A(f"* **`vascular_kde` ({vk:+.4f}) also beats the PDE.** That is the solver's "
-      "OWN SOURCE TERM, sampled before it is diffused. The solve takes a field "
-      f"correlating at {vk:+.4f} and returns one correlating at {so:+.4f}: the "
-      "diffusion step *destroys* predictive information rather than adding it.")
+    A(f"* **The PDE ({so:+.4f}) {ordv['verb_vs_baseline']} `dist_endothelial` "
+      f"({de:+.4f}) by {ordv['ratio']:.2f}×.** One `cKDTree` query — the distance "
+      "from each cell to the nearest endothelial cell — recovers "
+      f"{100*ordv['recovers']:.0f}% of "
+      + ("the solved field's association with measured VEGFA/HIF1A. That a "
+         "physics-free one-liner gets **most** of the way there is the honest "
+         "caveat; it does not get all the way there, and it does not win."
+         if ordv["sim_wins"] else
+         "the association and costs nothing, so the reaction–diffusion solve is "
+         "not what is carrying the signal."))
+    A(f"* **`vascular_kde` ({vk:+.4f}) is the "
+      f"{'weakest' if ordk['sim_wins'] else 'stronger'} vessel-derived "
+      "predictor of the pair.** That is the solver's OWN SOURCE TERM, sampled "
+      f"before it is diffused. The solve takes a field correlating at {vk:+.4f} "
+      f"and returns one correlating at {so:+.4f}: **the diffusion step "
+      + ("ADDS predictive information** "
+         f"({ordk['ratio']:.2f}× on |ρ|) rather than destroying it. This is the "
+         "single most direct evidence in the document that the reaction–diffusion "
+         "step is doing work."
+         if ordk["sim_wins"] else
+         "*destroys* predictive information** rather than adding it."))
     A(f"* **`local_cell_density` ({preds['local_cell_density']['rho_score']:+.4f}) "
       "is near zero**, which is the sanity floor — not every spatial variable "
       "correlates with the marker, so the effects above are real signal, not "
       "autocorrelation artefacts.")
+    A("")
+    # The honesty clamp on the winning direction. A correction must not become an
+    # overclaim with the sign flipped, so the size of the win is stated next to it.
+    A(f"**How large is \"{'wins' if ordv['sim_wins'] else 'loses'}\", honestly.** "
+      f"{ordv['ratio']:.2f}× on a ρ of {ordv['abs_sim']:.2f} is a small margin on "
+      "a weak association, measured on ONE section, WITHIN-section rather than "
+      "out-of-sample, with no confidence interval attached to the *difference* "
+      "between two correlated predictors (the permutation test above tests each ρ "
+      "against zero, not the predictors against each other). The composite is "
+      f"carried by VEGFA alone (ρ = {preds['simulated_o2']['rho_VEGFA']:+.4f}) "
+      f"while HIF1A contributes ρ = {preds['simulated_o2']['rho_HIF1A']:+.4f}. "
+      + ("The defensible statement is **\"the solve is not redundant with the "
+         "geometry it is built from\"** and **\"the PDE is the best of four weak "
+         "predictors\"** — NOT \"the oxygen solve is validated\"."
+         if ordv["sim_wins"] else
+         "The defensible statement is **\"a trivial baseline is at least as good "
+         "as the solve here\"** — NOT \"the oxygen solve is falsified\", which "
+         "would require it to fail against the marker, not merely to be matched "
+         "by cheaper geometry."))
     A("")
     nested = t1["sweep"][DX_CONVERGED]["nested"]
     A("**Nested test — does the PDE add anything beyond the raw geometry?**")
@@ -1974,11 +2136,31 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
     A(f"| simulated O₂ vs −distance-to-vessel (how nested the two predictors are) | "
       f"{nested['simo2_vs_dist']:+.4f} |")
     A("")
-    A("Distance-to-vessel retains "
-      f"{abs(nested['score_vs_dist_given_simo2']):.4f} of explanatory power after "
-      "the simulated field is conditioned out; the simulated field retains only "
-      f"{abs(nested['score_vs_simo2_given_dist']):.4f} after distance is "
-      "conditioned out. **The PDE is the redundant variable in that pair.**")
+    # Derived, not asserted: whichever partial is larger in absolute value names
+    # the variable that survives conditioning, and the other one is the redundant
+    # member. Hard-coding this sentence is what put the two halves of this
+    # document into contradiction in the first place.
+    n_sim = abs(nested["score_vs_simo2_given_dist"])
+    n_dist = abs(nested["score_vs_dist_given_simo2"])
+    ord_n = _ordering(n_sim, n_dist)
+    A(("The simulated field retains "
+       f"**{n_sim:.4f}** of explanatory power after distance-to-vessel is "
+       "conditioned out; distance-to-vessel retains only "
+       f"**{n_dist:.4f}** after the simulated field is conditioned out."
+       if ord_n["sim_wins"] else
+       "Distance-to-vessel retains "
+       f"**{n_dist:.4f}** of explanatory power after the simulated field is "
+       "conditioned out; the simulated field retains only "
+       f"**{n_sim:.4f}** after distance is conditioned out.")
+      + " The two are substantially nested "
+      f"(ρ = {nested['simo2_vs_dist']:+.4f}), as they must be — the PDE's source "
+      "cells *are* the distance transform's targets — but "
+      + ("**distance-to-vessel is the redundant variable in that pair, not the "
+         "PDE.**" if ord_n["sim_wins"] else
+         "**the PDE is the redundant variable in that pair.**")
+      + " The nested test therefore "
+      + ("agrees with" if ord_n["sim_wins"] == ordv["sim_wins"] else "DISAGREES with")
+      + " the marginal comparison above.")
     A("")
     A(f"**Depth control.** The simulated field correlates with total transcript "
       f"count — a purely technical variable — at ρ = {t1['o2_vs_depth_rho']:+.4f}. "
@@ -2036,10 +2218,18 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
       f"(VEGFA d = {t1['enrichment']['VEGFA']['hypoxic_vs_quiescent']['cohens_d']:+.3f}, "
       f"HIF1A d = "
       f"{t1['enrichment']['HIF1A']['hypoxic_vs_quiescent']['cohens_d']:+.3f}). "
-      "Second — and decisively — §1.2 already showed the same separation is "
-      "obtained, more strongly, by thresholding distance-to-vessel. A large "
-      "Cohen's d here is evidence that the *bands* sit somewhere sensible in "
-      "space, not that the PDE computed them.")
+      "Second, §1.2 shows that "
+      + (f"{100*ordv['recovers']:.0f}% of this association, by |ρ|, is "
+         "recoverable by thresholding distance-to-vessel alone, so a large "
+         "Cohen's d here is mostly evidence that the *bands* sit somewhere "
+         "sensible in space. The PDE separates them somewhat better than the "
+         "distance threshold does; the point that survives is that the margin "
+         "is small."
+         if ordv["sim_wins"] else
+         "the same separation is obtained, more strongly, by thresholding "
+         "distance-to-vessel. A large Cohen's d here is evidence that the "
+         "*bands* sit somewhere sensible in space, not that the PDE computed "
+         "them."))
     A("")
 
     # ---- 1.4 (c) spatial / field-level
@@ -2084,13 +2274,20 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
           + f" | {s['predictors']['simulated_o2']['rho_score']:+.4f} | "
           f"{s['predictors']['dist_endothelial']['rho_score']:+.4f} |")
     A("")
-    A("This is the *good* news about the numerics and the *bad* news about the "
-      "model. With the geometric tissue mask and the areal oxygen sink both in "
-      "place, the field is genuinely grid-converged: mean O₂ moves by 0.2% and "
-      "the correlation by <0.0002 over a 2.5× range of dx. So the disagreement "
-      "with measured biology is **not** a resolution problem — refining the mesh "
-      "cannot rescue it. The model has converged onto an answer that a "
-      "distance transform beats.")
+    A("This is good news about the numerics and neutral news about the model. "
+      "With the geometric tissue mask and the areal oxygen sink both in place, "
+      "the field is genuinely grid-converged *for this statistic*: mean O₂ moves "
+      "by 0.2% and the correlation by <0.0002 over a 2.5× range of dx. "
+      + ("Note also that the PDE's margin over the distance baseline is **stable "
+         "across the whole ladder**, so the ordering in §1.2 is not a "
+         "single-resolution artefact. What the flatness *does* establish is the "
+         f"ceiling: refining the mesh will not raise |ρ| above ≈{ordv['abs_sim']:.3f}, "
+         "so **the remaining gap to the measured marker is a model or measurement "
+         "limitation, not a resolution one.**"
+         if ordv["sim_wins"] else
+         "So the disagreement with measured biology is **not** a resolution "
+         "problem — refining the mesh cannot rescue it. The model has converged "
+         "onto an answer that a distance transform beats."))
     A("")
 
     # ---- 1.6 verdict
@@ -2103,17 +2300,41 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
     A("")
     A("**Consequences, stated plainly.**")
     A("")
-    A("1. **The oxygen field is not falsified — it is out-competed.** Its sign is "
-      "right, its significance is overwhelming, and VEGFA being its rank-1 "
-      "anti-correlate out of 480 genes is a genuine hit. But the reaction–"
-      "diffusion solve is not what produces that hit: its own undiffused source "
-      "term and a plain distance transform both do better. Whatever the PDE is "
-      "adding, it is not predictive accuracy about hypoxia.")
-    A("2. **Hypoxia-driven resistance in the kill model is therefore not "
-      "supported *as physics*.** The `PDConfig.hypoxia_resistance` multiplier is "
-      "applied to cells selected by a field that a one-line geometric heuristic "
-      "selects better. Any kill number that leans on the *spatial pattern* of "
-      "hypoxia is, at best, an expensive re-derivation of \"far from a vessel\".")
+    if ordv["sim_wins"]:
+        A("1. **The oxygen field is not falsified, and it is not out-competed "
+          "either.** Its sign is right, its significance is overwhelming, VEGFA "
+          "being its rank-1 anti-correlate out of 480 genes is a genuine hit, "
+          "and it is the strongest of the four predictors tested "
+          f"(|ρ| {abs(so):.4f} vs {abs(de):.4f} vs {abs(vk):.4f} vs "
+          f"{abs(preds['local_cell_density']['rho_score']):.4f}). The reaction–"
+          "diffusion step measurably **improves** on its own undiffused source "
+          f"term, {abs(vk):.4f} → {abs(so):.4f}. What remains true is that the "
+          "association is **weak in absolute terms**, that this is a "
+          "**within-section** test rather than an out-of-sample one, that the "
+          "composite is carried by VEGFA alone, and that a physics-free distance "
+          f"transform recovers {100*ordv['recovers']:.0f}% of it — so the PDE's "
+          "marginal value over trivial geometry is real but modest.")
+        A("2. **Hypoxia-driven resistance in the kill model is not *validated* by "
+          "this, only left standing.** The `PDConfig.hypoxia_resistance` "
+          "multiplier is applied to cells selected by a field that beats the "
+          "trivial alternatives on this section — which is the weakest form of "
+          "support that still counts as support. It is not evidence that the "
+          "absolute hypoxic fraction is right (see consequence 5), and a "
+          f"|ρ| of {abs(so):.2f} cannot carry a per-cell claim about any "
+          "individual cell.")
+    else:
+        A("1. **The oxygen field is not falsified — it is out-competed.** Its "
+          "sign is right, its significance is overwhelming, and VEGFA being its "
+          "rank-1 anti-correlate out of 480 genes is a genuine hit. But the "
+          "reaction–diffusion solve is not what produces that hit: a plain "
+          "distance transform does better. Whatever the PDE is adding, it is not "
+          "predictive accuracy about hypoxia.")
+        A("2. **Hypoxia-driven resistance in the kill model is therefore not "
+          "supported *as physics*.** The `PDConfig.hypoxia_resistance` multiplier "
+          "is applied to cells selected by a field that a one-line geometric "
+          "heuristic selects better. Any kill number that leans on the *spatial "
+          "pattern* of hypoxia is, at best, an expensive re-derivation of "
+          "\"far from a vessel\".")
     A("3. **Hypoxia should be derived from measured markers where they exist.** On "
       "a section that measures VEGFA, the defensible per-cell hypoxia covariate is "
       "the measured VEGFA level, not the simulated oxygen — and where no such "

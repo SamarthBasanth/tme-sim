@@ -1,31 +1,52 @@
-"""Oxygen SURROGATES that are not a solved oxygen tension — and are better at it.
+"""Cheap oxygen BASELINES, and the one route that is a measurement.
 
-WHY THIS MODULE EXISTS
-----------------------
-``results/state_validation.md`` §1.2 falsified the reaction-diffusion oxygen solve
-**as value-add** against measured hypoxia markers in 816,769 real cells (10x Xenium
-Human Brain Cancer GBM FFPE, IO panel). Sign-aligned to oxygen, per-cell Spearman
-rho against the measured VEGFA/HIF1A hypoxia score:
+.. warning::
 
-    distance to nearest ENDOTHELIAL cell   -0.1503   <- one cKDTree query
-    the PDE's own UNDIFFUSED source (KDE)  -0.1270   <- the solver's input
-    the SOLVED oxygen field (the PDE)      -0.1132   <- the sparse linear solve
-    local cell density                     -0.0192   <- the sanity floor
+   **THIS MODULE WAS BUILT ON AN INVERTED INEQUALITY, AND ITS ORIGINAL PREMISE IS
+   WITHDRAWN.** It was written to replace the reaction-diffusion oxygen solve on
+   the grounds that a distance transform out-predicted it. That was a misreading
+   of ``results/state_validation.md`` §1.2: every predictor there is sign-aligned
+   to oxygen, so the stronger predictor is the one with the larger ``|rho|``, and
+   the solved field's ``|-0.1523|`` is LARGER than the distance baseline's
+   ``|-0.1204|``. **The solve wins, by 1.26x.** The full account is in
+   ``results/oxygen_demotion.md``, which is now the record of the correction.
 
-Two facts, not one. (1) A distance transform beats the solve by 33%. (2) The solve
-is WORSE than its own input: diffusing the source destroys predictive information
-rather than adding it. The nested partials say the same thing — conditioning on
-distance leaves the PDE only -0.066, conditioning on the PDE leaves distance
--0.119, so the PDE is the redundant member of the pair. And it is grid-converged
-(-0.1132 at dx = 30 / 20 / 12 um), so refinement cannot rescue it.
+   The module is KEPT, for the reasons below — but as a cheap BASELINE and a
+   measurement route, never as a better predictor than the solve.
 
-This module therefore supplies the two HONEST alternatives:
+WHY THIS MODULE STILL EXISTS
+----------------------------
+Three justifications, none of which depend on the withdrawn claim:
+
+1. **A baseline you keep is how a claim stays falsifiable.** The whole force of
+   §1.2's SUPPORTED verdict is that the solve was made to beat a physics-free
+   alternative built from its own inputs. That alternative has to exist, and be
+   runnable, or the verdict is unfalsifiable. :func:`oxygen_from_vessel_distance`
+   is that alternative.
+2. **Cost.** The surrogate is one ``cKDTree`` build plus one nearest-neighbour
+   query; the PDE is a sparse direct solve on ``ny*nx`` unknowns (905 x 956 =
+   865,180 at the production dx = 12 um). The measured gap is 1-2 orders of
+   magnitude. That argument survives the reversal untouched — it was never an
+   accuracy argument. What changes is the trade: the surrogate is cheaper AND
+   weaker, so it is for cost-constrained or no-solve settings, not for new
+   hypoxia claims.
+3. **:func:`hypoxia_from_markers` is a MEASUREMENT and is independent of all of
+   this.** It reads hypoxia off measured transcripts with no physics, and returns
+   ``None`` with an explicit reason where the panel cannot measure it. Its value
+   was never contingent on the solve being bad.
+
+A fourth thing in here outlived the claim that motivated it:
+:func:`pde_diffusion_length_um` is a DIAGNOSTIC of the solve, and the defect it
+found is real and still open — see "THE ONE CRITICISM THAT SURVIVES" below.
 
 ``oxygen_from_vessel_distance``
     A monotone map from "distance to the nearest perfused vessel" to a
     dimensionless [0, 1] **oxygen surrogate**. It is NOT a solved oxygen tension
-    and this module never claims it is; it is a geometric proxy whose only defence
-    is that it out-predicts the solve on the one section where we can measure.
+    and this module never claims it is. It is a geometric proxy that is far
+    cheaper than the solve and, on the one section where we can measure, scores
+    0.79x the solved field's ``|rho|`` — i.e. it recovers most of the signal for
+    almost none of the cost, which is the honest reason to keep it and not a
+    reason to prefer it.
 
 ``hypoxia_from_markers``
     Hypoxia read DIRECTLY off measured hypoxia-response transcripts, with no
@@ -37,11 +58,15 @@ This module therefore supplies the two HONEST alternatives:
 
 WHAT IS AND IS NOT CLAIMED
 --------------------------
+* **The surrogate is WEAKER than the solve as a predictor.** On the IO section,
+  against the measured VEGFA/HIF1A score, ``|rho|`` is 0.1204 for the surrogate
+  against 0.1523 for the PDE, and on the VEGFA-only target 0.1237 against 0.2004.
+  Nothing in this module should be read as claiming otherwise.
 * The surrogate is **relative and dimensionless**, exactly like the PDE's output.
   Neither is a pO2 in mmHg. ``OxygenConfig.consumption`` has never been fitted to a
   measured oxygen tension (``physics.oxygen`` docstring), so the absolute level of
-  the solved field is uncalibrated too. Demoting the PDE does not calibrate
-  anything; it only stops paying for a solve that loses to a kd-tree.
+  the solved field is uncalibrated too. Using the surrogate does not calibrate
+  anything either; it only avoids paying for a solve.
 * The surrogate is **monotone in distance by construction**. That has a sharp
   consequence for the benchmark: *every* strictly-monotone map of distance has the
   SAME Spearman rho. The mapping's shape and its length scale therefore cannot be
@@ -79,17 +104,7 @@ published anchor rather than fitted:
   so a cell 150 um from the nearest vessel lands exactly on the existing hypoxia
   threshold, 2x that threshold (the QUIESCENT/VIABLE edge) falls at 85.9 um, and
   the surrogate needs no new tuning knob anywhere downstream.
-* Diagnostic, not calibration — and it does NOT agree: the PDE's own effective
-  diffusion length is ``sqrt(D / (consumption * rho_tum))``
-  (:func:`pde_diffusion_length_um`). At the default ``OxygenConfig`` and the real
-  sections' measured tumour density that is ~310 um on the IO section and ~800 um
-  on the brain section, i.e. **2-5x the published oxygen-diffusion distance**.
-  The uncalibrated ``OxygenConfig.consumption``
-  therefore makes the solved field far smoother than tissue oxygen is measured to
-  be, which is a mechanistic account of §1.2's finding that the diffusion step
-  DESTROYS predictive information: it low-pass-filters the source at a length scale
-  the tissue does not have. The surrogate does not inherit that error, but neither
-  does it fix the underlying problem — ``consumption`` is still unfitted.
+* Diagnostic, not calibration — and it does NOT agree. See the next section.
 * Independent support that the vessel-distance axis is the physically right one:
   Helmlinger et al., Nat Med 1997;3(2):177-182 (PMID 9018236,
   doi:10.1038/nm0297-177) measured interstitial pO2 profiles BETWEEN ADJACENT
@@ -102,12 +117,38 @@ published anchor rather than fitted:
 separately so a caller can apply any other monotone map without touching the rank
 statistics.
 
+THE ONE CRITICISM THAT SURVIVES
+-------------------------------
+The reversal above kills the ACCURACY case against the PDE. It does not touch the
+CALIBRATION case, which was always a separate argument and is still open.
+
+The PDE's own effective diffusion length is ``sqrt(D / (consumption * rho_tum))``
+(:func:`pde_diffusion_length_um`). At the default ``OxygenConfig`` and the real
+sections' measured tumour density that is ~310 um on the IO section and ~800 um on
+the brain section — **2-5x the published oxygen-diffusion distance** of ~150 um
+(Thomlinson & Gray 1955). ``OxygenConfig.consumption`` has never been fitted to a
+measured oxygen tension, and at its current value the solve low-pass-filters its
+own source at a length scale the tissue does not have.
+
+This is a statement about the solved field's ABSOLUTE level and spatial scale, and
+a rank correlation cannot see it: Spearman rho is invariant to any monotone
+rescaling, so the PDE can win §1.2 comfortably and still have its diffusion length
+wrong by a factor of 2-5. Both things are true at once. What the reversal removes
+is the inference that this mis-scaling was destroying predictive information —
+the solve out-predicts its own undiffused source (0.1111 -> 0.1523 on ``|rho|``),
+so the diffusion step is adding signal, not removing it, even at the wrong length
+scale.
+
+Resolving it needs a measured oxygen tension (phosphorescence-quenching pO2 or
+pimonidazole IHC on a serial section), not another rank statistic.
+
 COST
 ----
 The PDE is a sparse direct solve on ny*nx unknowns (905 x 956 = 865,180 at the
 production dx = 12 um). The surrogate is one ``cKDTree`` build over the
 endothelial cells plus one nearest-neighbour query per grid point. See
-``results/oxygen_demotion.md`` for the measured wall-clock comparison.
+``results/oxygen_demotion.md`` for the measured wall-clock comparison. This is the
+one argument for the surrogate that the reversal leaves fully intact.
 
 WHAT IS NOT TOUCHED
 -------------------
@@ -180,8 +221,11 @@ OXYGEN_MODES: Tuple[str, ...] = ("pde", "vessel_distance", "markers")
 #:
 #: ``'endothelial'``
 #:     Every measured ``CellType.ENDOTHELIAL`` cell is a vessel point. This is the
-#:     exact predictor that scored -0.1503 in ``results/state_validation.md``, so
-#:     it is the DEFAULT: it is the one that was actually benchmarked.
+#:     exact predictor that scores -0.1204 as ``dist_endothelial`` in
+#:     ``results/state_validation.md`` §1.2, so it is the DEFAULT: it is the one
+#:     that was actually benchmarked. (A monotone map cannot change a Spearman
+#:     rho, so ``exp(-d/L)`` and ``-d`` score identically — verified to 15
+#:     significant figures in ``results/oxygen_demotion.md`` §1.)
 #: ``'vessel_network'``
 #:     Endothelial cells first clustered into DISCRETE vessel objects by
 #:     :func:`reconstruct.vessel_network.segment_vessels`, keeping only objects
@@ -431,9 +475,12 @@ def oxygen_from_vessel_distance(
     """Oxygen SURROGATE field (ny, nx) in [0, 1] from distance to the nearest vessel.
 
     **This is not a solved oxygen tension and must never be labelled one.** It is a
-    dimensionless, monotone, published-distance-calibrated proxy that out-predicts
-    the reaction-diffusion solve against measured hypoxia markers by 33%
-    (``results/state_validation.md`` §1.2; ``results/oxygen_demotion.md``).
+    dimensionless, monotone, published-distance-calibrated proxy. Against measured
+    hypoxia markers it scores 0.79x the reaction-diffusion solve's ``|rho|``
+    (-0.1204 against -0.1523; ``results/state_validation.md`` §1.2) — i.e. it is
+    CHEAPER AND WEAKER, not better. An earlier version of this docstring claimed
+    it out-predicted the solve by 33%; that was an inverted reading of the sign
+    convention and is withdrawn (``results/oxygen_demotion.md``).
 
     The map is ``O(d) = exp(-d / L)``, clipped to [0, 1], where ``d`` is the
     distance from each grid-cell centre to the nearest vessel point and ``L`` comes
