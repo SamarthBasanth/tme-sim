@@ -16,6 +16,7 @@ import Annotation from "./Annotation";
 import { ConcentrationSource, VesselNetwork } from "./Markers";
 import Loader from "./Loader";
 import { ENTRY_POINTS } from "./shaders/viridis";
+import { IFP_LEVEL_RANGE_LABEL } from "@/lib/ifpContours";
 import {
   fieldLabelOpacity,
   regionLabelOpacity,
@@ -132,19 +133,60 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
                   Nested inside FieldContours' own <group> (which sways every
                   frame) rather than a sibling with a pre-multiplied world
                   coordinate — same bug/fix as the core/edema/margin
-                  annotations above. Anchor is a point on the outermost
-                  contour itself (level 1.0, so radius 0.88 of the section's
-                  measured half-extent — see CONTOUR_SPECS), in that group's
-                  own local space, at about 35 degrees round the loop — high
-                  enough that the label clears the right-aligned headline in
-                  section 03, which it collided with when anchored at the
-                  contour's widest point.
+                  annotations above. Anchor is a real vertex of the SECOND
+                  drawn iso-level (0.36 mmHg) in that group's own local space:
+                  its upper-right shoulder, which is the outermost point of the
+                  contour set that is still legible. Anchoring on the true
+                  outermost level (0.22 mmHg) was tried first and read as the
+                  old bug — that level sits at viridis 0.30, dark by
+                  construction, so at the opacity the timeline gives section
+                  02's centre the reticle appeared to float in empty space
+                  next to a line nobody could see. The contour set sits in the
+                  LOWER-LEFT of the section because that is where this tissue's
+                  vasculature is densest, so the anchor moved there with it —
+                  the previous one was on the right, where the procedural rings
+                  used to be.
+
+                  The label leads RIGHT, across the section, deliberately:
+                  section 02's copy is left-aligned, and the solved lobe is on
+                  the same side, so a leftward label would sit under the
+                  headline.
+
+                  detail= names the quantity, the ONE display transformation
+                  applied to it (a 250 um local mean of the solved field —
+                  see lib/ifpContours.ts) and the mmHg range the viridis ramp
+                  spans, so the contours can never be read as the drug
+                  concentration ConcentrationField paints with the same ramp.
+                  It replaces "Illustrative, not solved", which was true of
+                  the noise-walk ellipses it labelled and is not true of these.
+
+                  The label is `white-space: nowrap` and about 250px wide at
+                  its full length, which is two thirds of a 390px viewport and
+                  ran off the right edge there. Below the 820px breakpoint it
+                  therefore drops the level range and is re-placed. What it
+                  keeps is the load-bearing half: that the
+                  field is SOLVED and that what is drawn is a 250 um mean of
+                  it. The numeric range is the part a narrow screen can afford
+                  to lose — the ramp is still monotone without it, and the
+                  quantity is still named.
+
+                  The mobile x offset is not a smaller version of the desktop
+                  one, it is LARGER relative to the label's travel: over the
+                  window this callout is visible the projected label sweeps
+                  about 140px leftward at 390px wide (the section rotates and
+                  slides under it), which took it off the left edge while it
+                  was still at 38% opacity. The offset is set from the left
+                  extreme of that sweep, not from its resting position.
                 */}
                 <Annotation
-                  anchor={[0.757, 0.351, 0]}
-                  labelOffset={[0.42, 0.52, 0]}
-                  label="Pressure contours"
-                  detail="Illustrative, not solved"
+                  anchor={[-0.831, -0.33, 0]}
+                  labelOffset={isMobile ? [0.48, 0.5, 0] : [0.78, 0.58, 0]}
+                  label="Interstitial pressure"
+                  detail={
+                    isMobile
+                      ? "Solved · 250 µm mean"
+                      : `Solved · 250 µm mean · ${IFP_LEVEL_RANGE_LABEL}`
+                  }
                   getOpacity={fieldLabelOpacity}
                 />
               </FieldContours>
