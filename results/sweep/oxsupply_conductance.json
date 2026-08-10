@@ -1,0 +1,113 @@
+{
+  "krogh_formula_self_test": {
+    "secomb_reported_K_tiss": 0.997,
+    "formula_value": 0.9971361996361467,
+    "relative_error": 0.000136609464540371
+  },
+  "K_TO2_cap_cm3O2_per_100cm3_min_mmHg": 1.213,
+  "K_TO2_tiss_cm3O2_per_100cm3_min_mmHg": 0.997,
+  "secomb_reference": {
+    "rc_um": 2.0,
+    "rt_um": 25.0,
+    "Ncap_per_mm2": 509.3,
+    "HT": 0.281,
+    "D_um2_s": 2410.0,
+    "alpha_cm3O2_per_cm3_mmHg": 3.89e-05,
+    "CMRO2_cm3O2_per_100cm3_min": 6.0
+  },
+  "reference_po2_mmhg": 35.0,
+  "vessel_radius_um": 7.5,
+  "secomb_capillary_volume_fraction": {
+    "from_krogh_radii": 0.0064,
+    "from_length_density": 0.0064000525538931265
+  },
+  "K_TO2_cap_cm3O2_per_cm3_s_mmHg": 0.00020216666666666666,
+  "G_transvascular_s^-1_by_alpha": {
+    "alpha=3.00e-05": 6.738888888888888,
+    "alpha=3.30e-05": 6.126262626262625,
+    "alpha=3.89e-05": 5.197086546700943
+  },
+  "supply_from_secomb_own_geometry_s^-1": {
+    "alpha=3.00e-05": 1052.9513888888887,
+    "alpha=3.30e-05": 957.2285353535351,
+    "alpha=3.89e-05": 812.0447729220223
+  },
+  "sections": {
+    "gbm": {
+      "vessel_area_fraction_of_tissue": 0.02683327139848879,
+      "mean_rho_tum_per_144um2": 0.12289937652256493,
+      "supply_implied_s^-1": {
+        "alpha=3.00e-05": 251.13929601846507,
+        "alpha=3.30e-05": 228.3084509258773,
+        "alpha=3.89e-05": 193.68069101681112
+      },
+      "K_cap_of_shipped_supply": {
+        "alpha=3.00e-05": 0.00024149944258639912,
+        "alpha=3.30e-05": 0.00026564938684503904,
+        "alpha=3.89e-05": 0.0003131442772203642
+      },
+      "krogh_equivalent": {
+        "rc_um": 7.5,
+        "rt_um": 45.78513001411805,
+        "delta_rc_over_rt": 0.1638086426245233,
+        "K_tiss_theory": {
+          "alpha=3.00e-05": 0.2996017981446864,
+          "alpha=3.30e-05": 0.3295619779591551,
+          "alpha=3.89e-05": 0.38848366492761005
+        }
+      },
+      "supply_from_radius_scaling_s^-1": {
+        "alpha=3.00e-05": 280.787037037037,
+        "alpha=3.30e-05": 255.2609427609427,
+        "alpha=3.89e-05": 216.54527277920593
+      },
+      "dirichlet_limit": {
+        "mean_o2_tissue": 0.9942284572467444,
+        "mean_o2_tumour": 0.9931876957688196,
+        "o2_at_vessel_pixels": 0.9999990902179104,
+        "drop_tissue_diffusive_mmhg": 0.20197215399081314,
+        "implied_CMRO2_cm3O2_per_100cm3_min": 0.016917813793170096,
+        "K_tiss_model_cm3O2_per_100cm3_min_mmHg": 0.08376310030312208,
+        "K_tiss_model_over_secomb": 0.0840151457403431
+      }
+    },
+    "breast": {
+      "vessel_area_fraction_of_tissue": 0.056717120050179586,
+      "mean_rho_tum_per_144um2": 0.33522129048155974,
+      "supply_implied_s^-1": {
+        "alpha=3.00e-05": 118.81578054257272,
+        "alpha=3.30e-05": 108.01434594779337,
+        "alpha=3.89e-05": 91.63170735931058
+      },
+      "K_cap_of_shipped_supply": {
+        "alpha=3.00e-05": 0.0005104540804516163,
+        "alpha=3.30e-05": 0.000561499488496778,
+        "alpha=3.89e-05": 0.0006618887909855957
+      },
+      "krogh_equivalent": {
+        "rc_um": 7.5,
+        "rt_um": 31.492285371455466,
+        "delta_rc_over_rt": 0.23815356400898052,
+        "K_tiss_theory": {
+          "alpha=3.00e-05": 0.8720370149225105,
+          "alpha=3.30e-05": 0.9592407164147616,
+          "alpha=3.89e-05": 1.1307413293495219
+        }
+      },
+      "supply_from_radius_scaling_s^-1": {
+        "alpha=3.00e-05": 280.787037037037,
+        "alpha=3.30e-05": 255.2609427609427,
+        "alpha=3.89e-05": 216.54527277920593
+      },
+      "dirichlet_limit": {
+        "mean_o2_tissue": 0.9897770872289813,
+        "mean_o2_tumour": 0.9764488943316558,
+        "o2_at_vessel_pixels": 0.9999988457578305,
+        "drop_tissue_diffusive_mmhg": 0.3577615485097224,
+        "implied_CMRO2_cm3O2_per_100cm3_min": 0.04536744714077499,
+        "K_tiss_model_cm3O2_per_100cm3_min_mmHg": 0.12680917591551094,
+        "K_tiss_model_over_secomb": 0.1271907481599909
+      }
+    }
+  }
+}

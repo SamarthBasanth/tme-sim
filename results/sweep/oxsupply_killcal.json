@@ -1,0 +1,84 @@
+{
+  "arms": {
+    "derived_supply_only": {
+      "supply": 194.0,
+      "consumption": 0.02,
+      "rows": {},
+      "state_breakdown": null,
+      "verdicts": {
+        ".tests.temozolomide.predicted_ratio": 0.46783514742473475,
+        ".tests.temozolomide.lit_ratio_lo": 0.15898511609865443,
+        ".tests.temozolomide.lit_ratio_hi": 0.4622133669344504,
+        ".tests.temozolomide.verdict": "FAIL",
+        ".tests.cisplatin.predicted_ratio": 0.49795474312473176,
+        ".tests.cisplatin.lit_ratio_lo": 0.20864163423872006,
+        ".tests.cisplatin.lit_ratio_hi": 1.5003511388489135,
+        ".tests.cisplatin.verdict": "PASS",
+        ".tests.doxorubicin.predicted_ratio": 0.36882540737261743,
+        ".tests.doxorubicin.lit_ratio_lo": 0.05746191856610602,
+        ".tests.doxorubicin.lit_ratio_hi": 1.0,
+        ".tests.doxorubicin.verdict": "PASS",
+        ".state_dep[0].f_state": 1.0,
+        ".state_dep[1].f_state": 0.875,
+        ".state_dep[2].f_state": 0.75,
+        ".state_dep[3].f_state": 0.625,
+        ".state_dep[4].f_state": 0.5
+      },
+      "wall_s": 47.69100999832153
+    },
+    "joint_cmro2_lo": {
+      "supply": 194.0,
+      "consumption": 10.0,
+      "rows": {},
+      "state_breakdown": null,
+      "verdicts": {
+        ".tests.temozolomide.predicted_ratio": 0.33218017516751636,
+        ".tests.temozolomide.lit_ratio_lo": 0.15898511609865443,
+        ".tests.temozolomide.lit_ratio_hi": 0.4622133669344504,
+        ".tests.temozolomide.verdict": "PASS",
+        ".tests.cisplatin.predicted_ratio": 0.2769047050525909,
+        ".tests.cisplatin.lit_ratio_lo": 0.20864163423872006,
+        ".tests.cisplatin.lit_ratio_hi": 1.5003511388489135,
+        ".tests.cisplatin.verdict": "PASS",
+        ".tests.doxorubicin.predicted_ratio": 0.2210848425317094,
+        ".tests.doxorubicin.lit_ratio_lo": 0.05746191856610602,
+        ".tests.doxorubicin.lit_ratio_hi": 1.0,
+        ".tests.doxorubicin.verdict": "PASS",
+        ".state_dep[0].f_state": 1.0,
+        ".state_dep[1].f_state": 0.875,
+        ".state_dep[2].f_state": 0.7863052242566773,
+        ".state_dep[3].f_state": 0.75,
+        ".state_dep[4].f_state": 0.625,
+        ".state_dep[5].f_state": 0.5
+      },
+      "wall_s": 47.99907207489014
+    },
+    "joint_cmro2_hi": {
+      "supply": 194.0,
+      "consumption": 20.0,
+      "rows": {},
+      "state_breakdown": null,
+      "verdicts": {
+        ".tests.temozolomide.predicted_ratio": 0.3423979788819221,
+        ".tests.temozolomide.lit_ratio_lo": 0.15898511609865443,
+        ".tests.temozolomide.lit_ratio_hi": 0.4622133669344504,
+        ".tests.temozolomide.verdict": "PASS",
+        ".tests.cisplatin.predicted_ratio": 0.21643638848384644,
+        ".tests.cisplatin.lit_ratio_lo": 0.20864163423872006,
+        ".tests.cisplatin.lit_ratio_hi": 1.5003511388489135,
+        ".tests.cisplatin.verdict": "PASS",
+        ".tests.doxorubicin.predicted_ratio": 0.16994109287665082,
+        ".tests.doxorubicin.lit_ratio_lo": 0.05746191856610602,
+        ".tests.doxorubicin.lit_ratio_hi": 1.0,
+        ".tests.doxorubicin.verdict": "PASS",
+        ".state_dep[0].f_state": 1.0,
+        ".state_dep[1].f_state": 0.8767008231143961,
+        ".state_dep[2].f_state": 0.875,
+        ".state_dep[3].f_state": 0.75,
+        ".state_dep[4].f_state": 0.625,
+        ".state_dep[5].f_state": 0.5
+      },
+      "wall_s": 48.6348659992218
+    }
+  }
+}

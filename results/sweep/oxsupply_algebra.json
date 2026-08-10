@@ -1,0 +1,204 @@
+{
+  "shipped": {
+    "supply_s^-1": 0.05,
+    "consumption_s^-1": 0.02,
+    "diffusivity_um2_s": 2000.0,
+    "vessel_radius_um": 7.5
+  },
+  "competing_rates_s^-1": {
+    "D_over_R2": 35.55555555555556,
+    "D_over_dx2_dx8": 31.25,
+    "D_over_dx2_dx12": 13.88888888888889,
+    "D_over_dx2_dx30": 2.2222222222222223,
+    "sink_rho1": 0.02,
+    "sink_rho8": 0.16
+  },
+  "lengths_um": {
+    "source_equilibration_length_shipped": 200.0,
+    "sink_diffusion_length_rho1": 316.22776601683796,
+    "sink_diffusion_length_rho8": 111.80339887498948,
+    "vessel_radius": 7.5
+  },
+  "damkohler_shipped": {
+    "supply_over_D_over_R2": 0.00140625,
+    "supply_over_D_over_dx2_dx12": 0.0036
+  },
+  "wall_only_estimate": {
+    "t_0.2um": {
+      "P_um_s": 10000.0,
+      "supply_s^-1": 2666.6666666666665
+    },
+    "t_0.5um": {
+      "P_um_s": 4000.0,
+      "supply_s^-1": 1066.6666666666667
+    },
+    "t_1.0um": {
+      "P_um_s": 2000.0,
+      "supply_s^-1": 533.3333333333334
+    },
+    "t_2.0um": {
+      "P_um_s": 1000.0,
+      "supply_s^-1": 266.6666666666667
+    }
+  },
+  "krogh_cylinder": {
+    "rho_tum=1": {
+      "sink_Q_s^-1": 0.02,
+      "dirichlet_reference_mean_tissue_o2": 0.9760068196020502,
+      "dirichlet_reference_wall_o2": 0.99996541245288,
+      "sweep": [
+        {
+          "supply": 0.05,
+          "o2_at_vessel_axis": 0.03940005935042856,
+          "o2_at_vessel_wall": 0.03906164321061235,
+          "mean_tissue_o2": 0.03812574883609821,
+          "fraction_of_dirichlet_mean": 0.039062994305350575,
+          "relative_error_vs_dirichlet": 0.9609370056946495
+        },
+        {
+          "supply": 0.5,
+          "o2_at_vessel_axis": 0.29118600887480534,
+          "o2_at_vessel_wall": 0.2886869010570509,
+          "mean_tissue_o2": 0.2817701299111164,
+          "fraction_of_dirichlet_mean": 0.2886968863865145,
+          "relative_error_vs_dirichlet": 0.7113031136134855
+        },
+        {
+          "supply": 5.0,
+          "o2_at_vessel_axis": 0.8066919266651611,
+          "o2_at_vessel_wall": 0.7998221434646662,
+          "mean_tissue_o2": 0.7806588675723813,
+          "fraction_of_dirichlet_mean": 0.7998498083145377,
+          "relative_error_vs_dirichlet": 0.20015019168546236
+        },
+        {
+          "supply": 35.56,
+          "o2_at_vessel_axis": 0.9705451817917012,
+          "o2_at_vessel_wall": 0.9626905724208885,
+          "mean_tissue_o2": 0.9396250631915783,
+          "fraction_of_dirichlet_mean": 0.9627238706945656,
+          "relative_error_vs_dirichlet": 0.037276129305434405
+        },
+        {
+          "supply": 100.0,
+          "o2_at_vessel_axis": 0.9913263678732575,
+          "o2_at_vessel_wall": 0.9840511419095558,
+          "mean_tissue_o2": 0.9604738457857184,
+          "fraction_of_dirichlet_mean": 0.9840851790127193,
+          "relative_error_vs_dirichlet": 0.01591482098728069
+        },
+        {
+          "supply": 356.0,
+          "o2_at_vessel_axis": 0.9988156283104688,
+          "o2_at_vessel_wall": 0.9933732543446043,
+          "mean_tissue_o2": 0.9695726058131272,
+          "fraction_of_dirichlet_mean": 0.9934076139021791,
+          "relative_error_vs_dirichlet": 0.006592386097820903
+        },
+        {
+          "supply": 1000.0,
+          "o2_at_vessel_axis": 0.9998990200995028,
+          "o2_at_vessel_wall": 0.996372386797242,
+          "mean_tissue_o2": 0.9724998807979701,
+          "fraction_of_dirichlet_mean": 0.9964068501022257,
+          "relative_error_vs_dirichlet": 0.0035931498977742117
+        },
+        {
+          "supply": 10000.0,
+          "o2_at_vessel_axis": 0.9999999994360521,
+          "o2_at_vessel_wall": 0.9989202901410728,
+          "mean_tissue_o2": 0.9749867378650414,
+          "fraction_of_dirichlet_mean": 0.9989548415886841,
+          "relative_error_vs_dirichlet": 0.0010451584113158742
+        },
+        {
+          "supply": 100000.0,
+          "o2_at_vessel_axis": 1.0,
+          "o2_at_vessel_wall": 0.9996531460194238,
+          "mean_tissue_o2": 0.975702034903907,
+          "fraction_of_dirichlet_mean": 0.9996877227781384,
+          "relative_error_vs_dirichlet": 0.000312277221861506
+        }
+      ]
+    },
+    "rho_tum=8": {
+      "sink_Q_s^-1": 0.16,
+      "dirichlet_reference_mean_tissue_o2": 0.8367780699466354,
+      "dirichlet_reference_wall_o2": 0.9997627713075551,
+      "sweep": [
+        {
+          "supply": 0.05,
+          "o2_at_vessel_axis": 0.006240619317106065,
+          "o2_at_vessel_wall": 0.005890521217650984,
+          "mean_tissue_o2": 0.004930228566961993,
+          "fraction_of_dirichlet_mean": 0.00589191894964027,
+          "relative_error_vs_dirichlet": 0.9941080810503597
+        },
+        {
+          "supply": 0.5,
+          "o2_at_vessel_axis": 0.059173033651945116,
+          "o2_at_vessel_wall": 0.055855903833546716,
+          "mean_tissue_o2": 0.046750085866596576,
+          "fraction_of_dirichlet_mean": 0.055869157600626426,
+          "relative_error_vs_dirichlet": 0.9441308423993736
+        },
+        {
+          "supply": 5.0,
+          "o2_at_vessel_axis": 0.3897467249331097,
+          "o2_at_vessel_wall": 0.36805954124220985,
+          "mean_tissue_o2": 0.3080572325506085,
+          "fraction_of_dirichlet_mean": 0.3681468762323737,
+          "relative_error_vs_dirichlet": 0.6318531237676263
+        },
+        {
+          "supply": 35.56,
+          "o2_at_vessel_axis": 0.8341878272545906,
+          "o2_at_vessel_wall": 0.7899712975647136,
+          "mean_tissue_o2": 0.6611875103332151,
+          "fraction_of_dirichlet_mean": 0.7901587458851325,
+          "relative_error_vs_dirichlet": 0.2098412541148675
+        },
+        {
+          "supply": 100.0,
+          "o2_at_vessel_axis": 0.9455832864947583,
+          "o2_at_vessel_wall": 0.8999399065413934,
+          "mean_tissue_o2": 0.7532286655144032,
+          "fraction_of_dirichlet_mean": 0.9001534487662176,
+          "relative_error_vs_dirichlet": 0.09984655123378235
+        },
+        {
+          "supply": 356.0,
+          "o2_at_vessel_axis": 0.9921787284047705,
+          "o2_at_vessel_wall": 0.9562387568299413,
+          "mean_tissue_o2": 0.8003494871843622,
+          "fraction_of_dirichlet_mean": 0.9564656578958906,
+          "relative_error_vs_dirichlet": 0.043534342104109426
+        },
+        {
+          "supply": 1000.0,
+          "o2_at_vessel_axis": 0.9993216798133295,
+          "o2_at_vessel_wall": 0.975631950123182,
+          "mean_tissue_o2": 0.8165811366496077,
+          "fraction_of_dirichlet_mean": 0.9758634529005813,
+          "relative_error_vs_dirichlet": 0.024136547099418714
+        },
+        {
+          "supply": 10000.0,
+          "o2_at_vessel_axis": 0.9999999961550952,
+          "o2_at_vessel_wall": 0.992639568327715,
+          "mean_tissue_o2": 0.8308161155497283,
+          "fraction_of_dirichlet_mean": 0.9928751067803591,
+          "relative_error_vs_dirichlet": 0.007124893219640987
+        },
+        {
+          "supply": 100000.0,
+          "o2_at_vessel_axis": 1.0,
+          "o2_at_vessel_wall": 0.9976253462709818,
+          "mean_tissue_o2": 0.8349890951316585,
+          "fraction_of_dirichlet_mean": 0.9978620677581919,
+          "relative_error_vs_dirichlet": 0.0021379322418080965
+        }
+      ]
+    }
+  }
+}
