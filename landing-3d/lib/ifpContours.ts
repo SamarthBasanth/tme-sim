@@ -25,9 +25,24 @@
  * is stated on the page: the contoured quantity is the solved field's LOCAL
  * MEAN over a 250 um window (`coarseGrainUm`). That is forced by resolution,
  * not by taste. With a discrete vessel source the field's screening length is
- * of order 60 um, so the raw solution is thousands of per-vessel haloes, each
- * well under one screen pixel when 8.1 mm of tissue is fitted into ~2.6 scene
- * units — drawn literally it is speckle, not a field. Because it is a mean,
+ * about 7 um — measured, median 7.081 um, and derivable by hand from the
+ * shipped coefficients as sqrt(1.2/0.03) = 6.3 um outside the tumour. (This
+ * comment previously said "of order 60 um", which is wrong by ~8.5x and is
+ * almost certainly `_TUMOR_SIGMA * dx` at production resolution rather than a
+ * screening length at all; the exported metadata carried the same error and is
+ * corrected in ifp_contours.json.) So the raw solution is thousands of
+ * per-vessel haloes, each far under one screen pixel when 8.1 mm of tissue is
+ * fitted into ~2.6 scene units — drawn literally it is speckle, not a field.
+ *
+ * The smaller number makes the coarse-graining MORE necessary, not less, and
+ * it carries a consequence the page must not overstate: the screening length
+ * is below every grid spacing the engine runs at (L < dx at 99.8 % of nodes),
+ * so the solved field correlates r = 0.90 with the pointwise algebraic limit.
+ * It is a real solve, and at production dx it is closer to a pointwise map of
+ * the vascular-density field than a resolved transport solve. See
+ * results/ifp_validation.md.
+ *
+ * Because it is a mean,
  * the level values here (~0.2-0.65 mmHg) are far below the raw field's peak
  * (`rawMaxMmHg`, ~12.9 mmHg); the page must never quote one as the other.
  *
