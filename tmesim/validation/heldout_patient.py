@@ -27,9 +27,14 @@ This module runs it, end to end, and reports EVERY quantity side by side:
    IC50, mean tumour AUC and ``kill_fraction``, and asking whether the ordering
    **cisplatin > doxorubicin > lomustine > methotrexate > temozolomide** holds.
 4. **The hypoxia check on its home turf** — the IO panel MEASURES VEGFA and HIF1A,
-   so ``results/state_validation.md``'s central claim (the simulated oxygen field
-   is beaten by a one-line distance-to-nearest-endothelial-cell baseline) is
-   re-derived here independently, on the same section it was found on.
+   so ``results/state_validation.md``'s central claim about the simulated oxygen
+   field is re-derived here independently, on the same section it was found on.
+   That claim was once written as "the field is beaten by a one-line
+   distance-to-nearest-endothelial-cell baseline"; this module has always
+   adjudicated it arithmetically, comparing ``abs()`` against ``abs()``, and has
+   always returned **REFUTED** on it. The prose was the thing that was wrong
+   (``results/oxygen_demotion.md``), and every ordering sentence in
+   :func:`write_report` is now derived rather than written.
 5. **An honest comparison table** with an explicit per-claim verdict.
 
 Both sections are driven through the SAME frozen production path
@@ -1823,10 +1828,36 @@ def write_report(res: Dict, path: str = _OUT_MD,
     A("")
     A("### 6.1 Replicates / confirmed")
     A("")
-    A("Two of these are confirmations of a *negative* result — the hypoxia rows "
-      "confirm that the reaction-diffusion solve is out-predicted by a distance "
-      "transform. 'Confirmed' means the prior finding reproduced, not that the "
-      "model performed well.")
+    # DERIVED, never asserted. This sentence used to hard-code "the hypoxia rows
+    # confirm that the reaction-diffusion solve is out-predicted by a distance
+    # transform" while the adjudication 80 lines up in verdicts() computed the
+    # same comparison with abs() and returned REFUTED -- so the generated
+    # document contradicted itself, in the same direction as the inverted
+    # inequality recorded in results/oxygen_demotion.md. Every predictor here is
+    # sign-aligned to oxygen, so the stronger one has the larger |rho|.
+    if h2 is not None:
+        _pde_rho = float(h2["predictors"]["simulated_o2"]["rho_score"])
+        _dist_rho = float(h2["predictors"]["dist_endothelial"]["rho_score"])
+        if abs(_pde_rho) > abs(_dist_rho):
+            A("Read the hypoxia rows carefully: they **refute** a prior negative "
+              f"result rather than confirming one. The solved field ({_pde_rho:+.4f}) "
+              f"out-predicts the distance transform ({_dist_rho:+.4f}) by "
+              f"{abs(_pde_rho) / abs(_dist_rho):.2f}x on |ρ| — §4.1 above returns "
+              "REFUTED on the demotion claim for exactly this reason. "
+              "'Confirmed' below means the prior finding reproduced, not that the "
+              "model performed well, and that caution applies to the hypoxia rows "
+              f"in the reversed direction too: |ρ| ≈ {abs(_pde_rho):.2f} is weak, "
+              "within-section, and carried by VEGFA alone. Best of several weak "
+              "predictors is not a validated oxygen field.")
+        else:
+            A("Two of these are confirmations of a *negative* result — the "
+              f"hypoxia rows confirm that the reaction-diffusion solve "
+              f"({_pde_rho:+.4f}) is out-predicted by a distance transform "
+              f"({_dist_rho:+.4f}). 'Confirmed' means the prior finding "
+              "reproduced, not that the model performed well.")
+    else:
+        A("'Confirmed' means the prior finding reproduced, not that the model "
+          "performed well.")
     A("")
     for v in vd:
         if v["status"] in ("REPLICATES", "CONFIRMED", "HOLDS"):

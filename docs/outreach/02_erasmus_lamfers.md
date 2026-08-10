@@ -74,9 +74,17 @@ contradicts the Results text) rather than silently resolving it. The write-up is
 clinically validated, it is not a device, and nothing in it should inform a treatment decision.
 An adversarial audit of my own work found **eleven distinct defects**, several of them mutually
 cancelling and invisible to a passing test suite; every headline number I had published before
-that audit was wrong in at least one way. Two components were **falsified and retracted** — the
-oxygen PDE, which is beaten by plain distance-to-nearest-vessel, and a penetration metric that
-turned out to be definitionally unable to discriminate between drugs. What survives is the
+that audit was wrong in at least one way. One component was **falsified and retracted**: a
+penetration metric that turned out to be definitionally unable to discriminate between drugs. A
+second retraction has since been **withdrawn in its turn** — I had demoted my own oxygen PDE for
+losing to plain distance-to-nearest-vessel, and that comparison was an inverted inequality. The
+predictors are sign-aligned to oxygen, so |−0.1523| > |−0.1204| means the solve out-predicts the
+baseline, by 1.26×. I mention it because it is the most instructive failure in the project: a
+component was deprecated on a misread inequality while every mechanical check in the same
+repository disagreed with the prose. The corrected reading stays modest — at ρ ≈ 0.15,
+within-section, it is the best of four weak predictors rather than a validated oxygen field, and
+its diffusion length remains 2–5× the published value because the consumption term has never been
+fitted to a measured tension. What survives is the
 delivery axis: scored against 125 human glioma tissue samples across 42 patients plus 27
 PMID-anchored regional PK measurements, the model predicts tumour:plasma partition to about a
 **2× geometric-mean fold error**, with 6/6 drugs inside 10×, and reproduces the measured

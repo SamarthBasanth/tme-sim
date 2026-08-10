@@ -22,11 +22,17 @@ cannot carry an absolute number:
   vessel source, ``results/cell_state_impact.md`` §2.2 gets 0.00%-10.04% — the
   VIABLE band itself goes empty, so the swing is unbounded. The conclusion does
   not depend on which source is in force.)
-* ``results/oxygen_demotion.md`` §1 — the oxygen PDE is out-predicted as a
-  hypoxia predictor by a one-line distance-to-nearest-vessel transform, and its
-  own effective diffusion length (310-801 um) is 2-5x the measured oxygen
-  diffusion distance (~150 um) because ``OxygenConfig.consumption`` has never
-  been fitted to a measured oxygen tension.
+* ``results/oxygen_demotion.md`` §1 — the oxygen PDE's own effective diffusion
+  length (310-801 um) is 2-5x the measured oxygen diffusion distance (~150 um)
+  because ``OxygenConfig.consumption`` has never been fitted to a measured oxygen
+  tension. (This bullet also used to say the PDE was out-predicted as a hypoxia
+  predictor by a one-line distance-to-nearest-vessel transform. **That was an
+  inverted inequality and is withdrawn** — the solve scores rho -0.1523 against
+  the baseline's -0.1204, and wins. The length-scale criticism above is
+  INDEPENDENT of that and survives it: a Spearman rho is invariant to monotone
+  rescaling, so the solve can win the correlation and still have the wrong length
+  scale. The banding this module does depends on the length scale, not on the
+  rank correlation, so nothing here changes.)
 
 So the state label — the single largest term in every absolute kill number this
 project reports — is currently a bookkeeping choice. This module supplies the

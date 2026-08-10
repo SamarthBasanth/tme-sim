@@ -8,9 +8,13 @@ labelling is not a measurement: the tumour VIABLE fraction runs **0.60% to 98.19
 (165x)** across two tissue-mask conventions and three grid spacings, and under the
 shipping ``geometric`` mask the HYPOXIC band is EMPTY so ``hypoxia_resistance``
 acts on no cells. ``results/oxygen_demotion.md`` §1 showed the field the bands come
-from is out-predicted by a distance transform, with an effective length 2-5x the
-measured oxygen-diffusion distance because ``OxygenConfig.consumption`` is
-uncalibrated.
+from has an effective length 2-5x the measured oxygen-diffusion distance because
+``OxygenConfig.consumption`` is uncalibrated. (That document also once said the
+field was out-predicted by a distance transform; **that was an inverted inequality
+and is withdrawn** — the solve wins, -0.1523 to -0.1204. The length-scale
+criticism is independent and survives, because a Spearman rho is invariant to
+monotone rescaling. The band edges depend on the length scale, so this module's
+argument is untouched either way.)
 
 This module is the follow-through. It does four things and writes
 ``results/cell_state_impact.md``:
@@ -752,8 +756,11 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
     A("`results/dose_schedule.md` derives ~89% of the temozolomide kill ceiling "
       "from the QUIESCENT band alone; `results/state_validation.md` shows that "
       "band is set by a tissue-mask convention and a mesh, not by tissue; "
-      "`results/oxygen_demotion.md` shows the field it is banded from is beaten by "
-      "a distance transform. So the largest single term in every absolute kill "
+      "`results/oxygen_demotion.md` shows the field it is banded from has an "
+      "effective diffusion length 2-5x the measured ~150 um because "
+      "`OxygenConfig.consumption` is unfitted, so its BAND EDGES are uncalibrated "
+      "even though it out-predicts every trivial baseline on rank correlation. "
+      "So the largest single term in every absolute kill "
       "number this project reports is a bookkeeping choice. This report replaces "
       "it where the data allows, refuses where it does not, and measures what the "
       "difference is worth.")

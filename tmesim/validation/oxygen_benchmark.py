@@ -1,10 +1,33 @@
-"""DEMOTING THE OXYGEN PDE — every available oxygen route, scored on the same data.
+"""BENCHMARKING THE OXYGEN ROUTES — every available route, scored on the same data.
 
-``results/state_validation.md`` §1.2 falsified the reaction-diffusion oxygen solve
-**as value-add**: against the measured hypoxia score in 816,769 real cells it
-scores rho = -0.1132, while a single ``cKDTree`` query on its own source cells
-scores -0.1503 and its own undiffused source scores -0.1270. This module is the
-follow-through. It does four things and writes ``results/oxygen_demotion.md``:
+**THIS MODULE ONCE ASSERTED THE OPPOSITE OF WHAT ITS OWN NUMBERS SAY.** It was
+written to follow through on a claim in ``results/state_validation.md`` §1.2 that
+the reaction-diffusion oxygen solve was "falsified as value-add" — out-predicted
+by a one-line distance transform built from its own source cells. That claim was
+an INVERTED INEQUALITY. Every predictor here is sign-aligned to oxygen, so a
+correct predictor scores a NEGATIVE rho and the stronger predictor is the one with
+the larger ``|rho|``; on the 816,769-cell IO section the solved field scores
+rho = -0.1523 against the measured hypoxia composite while the distance baseline
+scores -0.1204, i.e. |-0.1523| > |-0.1204| and **the solve wins, by 1.27x**.
+``results/oxygen_demotion.md`` is now the record of that correction rather than of
+the demotion.
+
+The structural consequence for THIS file: every sentence in :func:`write_report`
+that states an ORDERING is now derived from the numbers through
+:func:`state_validation._ordering` instead of written out in English. The previous
+version hard-coded "The vessel-distance surrogate wins" and then interpolated
+``ranked[0]`` beside it, so a regeneration under the corrected numbers would have
+emitted a sentence contradicting its own interpolated values. Nothing here now
+states a direction the arithmetic did not produce.
+
+What the correction does NOT license is the opposite overclaim. |rho| ~ 0.15-0.20
+is WEAK, it is within-section rather than out-of-sample, the composite is carried
+by VEGFA alone, and §1.1's finding that the solve's effective diffusion length is
+several times the published oxygen-diffusion distance SURVIVES intact — Spearman
+rho is invariant to any monotone rescaling, so the solve can win this ranking and
+still have its length scale wrong. Both are true at once.
+
+It does four things and writes a benchmark report:
 
 1. **Benchmark.** Every oxygen/hypoxia route this codebase can build — the PDE, the
    vessel-distance surrogate (two vessel definitions), the marker-derived field,
@@ -47,7 +70,8 @@ CAVEATS THAT DO NOT GO AWAY
   a transcriptional programme with its own kinetics and its own non-hypoxic
   inducers. Every rho here is "predicts measured VEGFA", not "predicts pO2". What
   the comparison DOES establish is internal and immune to this: whatever VEGFA is
-  reporting, a distance transform predicts it better than the solve does.
+  reporting, these routes are ranked against it on identical inputs. Which route
+  wins that ranking is read off the numbers, never asserted here.
 * **The two sections are DIFFERENT PATIENTS.** The benchmark runs on the 480-gene
   IO section (816,769 cells); the downstream drug arm runs on the 319-gene brain
   section (40,887 cells) because that is the section every flagship drug result in
@@ -64,13 +88,21 @@ CAVEATS THAT DO NOT GO AWAY
   calibrates a level.
 
 Run:    ./.venv/bin/python -m tmesim.validation.oxygen_benchmark
-Writes: results/oxygen_demotion.md
+Writes: results/oxygen_benchmark.md
+
+   NOT ``results/oxygen_demotion.md`` any more. That path now holds the
+   hand-written record of the inverted-inequality correction, which no generator
+   can reproduce and which regenerating this module used to destroy.
+   :func:`write_report` additionally REFUSES to overwrite any file marked
+   ``STATUS: WITHDRAWN``, so pointing it back at that path fails loudly instead of
+   silently reverting a correction.
 
 Units: distance um, oxygen dimensionless [0,1], AUC uM*s, coverage/kill fractions.
 """
 from __future__ import annotations
 
 import os
+import re
 import time
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -106,6 +138,7 @@ from .state_validation import (
     IO_SAMPLE,
     N_PERM_IO,
     PERM_SEED,
+    _ordering,
     spearman_full,
     subsample_index,
     trivial_baselines,
@@ -341,8 +374,18 @@ def benchmark_predictors(
         print(f"  {name:24s} rho(VEGFA) = {rho_v:+.4f}   p = {perm['p_value']:.5f}")
 
     # Competitors only: circular routes cannot be ranked against the others.
+    #
+    # Sorted by DESCENDING |rho|, which is what "stronger predictor" means under
+    # this table's sign convention. While every rho is negative — as it is on this
+    # section for every route — that is exactly the same ordering as sorting
+    # ascending on the signed rho, which is how this line used to read; the
+    # ordering was never the defect. The abs() is here so that a route which came
+    # out ANTI-aligned (positive rho, i.e. predicting hypoxia where it predicts
+    # oxygen) would be ranked on the strength of its association rather than
+    # silently sent to the bottom of the table.
     ranked = sorted(
-        [r for r in rows if r["family"] != "circular"], key=lambda r: r["rho_vegfa"]
+        [r for r in rows if r["family"] != "circular"],
+        key=lambda r: -abs(r["rho_vegfa"]),
     )
     for i, r in enumerate(ranked, 1):
         r["rank"] = i
@@ -681,17 +724,75 @@ def _fmt(v, nd: int = 4) -> str:
     return f"{f:.{nd}f}"
 
 
+def _refuse_to_clobber_a_withdrawal(out_path: str) -> None:
+    """Abort rather than overwrite a document marked ``STATUS: WITHDRAWN``.
+
+    This module used to regenerate ``results/oxygen_demotion.md``. That path now
+    holds the hand-written record of the inverted-inequality correction — a
+    document a generator cannot reproduce — so a routine re-run of this module
+    would have DELETED the correction and re-emitted the claim it corrects. The
+    check is on the file's own content rather than on its name, so it protects
+    any withdrawn artefact this generator is ever pointed at.
+    """
+    if not os.path.exists(out_path):
+        return
+    with open(out_path) as fh:
+        head = fh.read(4096)
+    # Anchored to the start of a line, allowing a blockquote marker and bold
+    # emphasis, because that is how such a banner is actually written:
+    #
+    #     > **STATUS: WITHDRAWN AND REPLACED BY THIS CORRECTION RECORD.**
+    #
+    # A bare substring test would be wrong in both directions: this generator's
+    # own correction block DISCUSSES the marker in running prose, so a substring
+    # test made the generator refuse to overwrite its own previous output and
+    # therefore non-idempotent -- which is a real bug, caught by running the
+    # regeneration twice.
+    banner = re.compile(r"^[>\s]*\**\s*STATUS:\s*WITHDRAWN", re.MULTILINE)
+    if banner.search(head):
+        raise RuntimeError(
+            f"refusing to overwrite {out_path}: its header marks it WITHDRAWN, "
+            "so it is a correction record rather than generator output. Write "
+            "the benchmark somewhere else."
+        )
+
+
 def write_report(results: Dict, out_path: Optional[str] = None) -> str:
-    """Write ``results/oxygen_demotion.md``."""
+    """Write ``results/oxygen_benchmark.md``. Returns the written path.
+
+    EVERY SENTENCE THAT STATES AN ORDERING between the solved field and a
+    competitor is derived through :func:`state_validation._ordering` rather than
+    written out in English, for the reason given in that function's docstring and
+    recorded in ``results/oxygen_demotion.md``: the previous version of this
+    function hard-coded *"The vessel-distance surrogate wins"* and then
+    interpolated ``ranked[0]`` next to it, so once the underlying inequality was
+    read correctly a regeneration would have emitted a sentence contradicting its
+    own numbers. There is now no such sentence to emit.
+    """
     b = results["benchmark"]
     rt = results["runtime"]
     dn = results["downstream"]
-    out_path = out_path or os.path.join(_results_dir(), "oxygen_demotion.md")
+    out_path = out_path or os.path.join(_results_dir(), "oxygen_benchmark.md")
+    _refuse_to_clobber_a_withdrawal(out_path)
 
     winner = b["ranked"][0]
     pde_row = next(r for r in b["rows"] if r["name"] == "pde")
     vd_row = next(r for r in b["rows"] if r["name"] == "vessel_distance")
     vde_row = next(r for r in b["rows"] if r["name"] == "vessel_distance_exact")
+
+    # ---- THE ORDERING, DERIVED ---------------------------------------------
+    # The strongest route that is NOT the PDE, i.e. the thing the PDE is on trial
+    # against. Ranked by |rho| under this table's sign convention.
+    rivals = [r for r in b["ranked"] if r["name"] != "pde"]
+    best_rival = max(rivals, key=lambda r: abs(r["rho_vegfa"])) if rivals else pde_row
+    ordv = _ordering(pde_row["rho_vegfa"], best_rival["rho_vegfa"])
+    kde_row = next((r for r in b["rows"] if r["name"] == "vascular_kde"), None)
+    # The solve against its OWN undiffused source term: does diffusing add or
+    # destroy predictive information? Also derived, never asserted.
+    ordk = (_ordering(pde_row["rho_vegfa"], kde_row["rho_vegfa"])
+            if kde_row is not None else None)
+    pde_wins = bool(ordv["sim_wins"])
+
     kill_deltas = [abs(r["delta_kill"]) for r in dn["rows"].values()]
     cov_deltas = [abs(r["delta_coverage_1x"]) for r in dn["rows"].values()]
     max_kill_delta = max(kill_deltas) if kill_deltas else 0.0
@@ -701,20 +802,62 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
 
     L = []
     A = L.append
-    A("# Demoting the oxygen PDE: the benchmark, the cost, and the downstream effect")
+    A("# The oxygen routes benchmarked: which predicts measured hypoxia, what it "
+      "costs, and whether it changes a drug number")
     A("")
-    A("`results/state_validation.md` §1.2 found the reaction-diffusion oxygen solve "
-      "**falsified as value-add** — out-predicted against measured hypoxia markers "
-      "by a one-line distance transform built from its own source cells, and by "
-      "its own undiffused source. This report acts on that. It benchmarks every "
-      "oxygen route the codebase can build, prices them, measures whether the "
-      "choice changes a drug prediction at all, and makes a recommendation.")
+    A("Every oxygen route this codebase can build, scored against the same measured "
+      "VEGFA signal on the same cells, then priced, then tested for whether the "
+      "choice moves a drug prediction at all.")
     A("")
-    A("**The PDE has not been deleted.** It is still the default "
-      "(`reconstruct_real(oxygen_mode='pde')`, bit-identical to the pre-option "
-      "pipeline). What has changed is that there is now an honest alternative, it "
-      "is labelled a SURROGATE, and the default's own falsification travels with "
-      "it in `reconstruction_report()['oxygen']['caveat']`.")
+    if pde_wins:
+        # Emitted, not hand-written, so a regeneration cannot quietly drop it. It
+        # appears only while the solve is the winner -- i.e. exactly when a reader
+        # would otherwise have no way of knowing this document once said the
+        # opposite, and was the stated basis for deprecating a component.
+        A("> ## CORRECTION — this report was originally written on an inverted "
+          "inequality")
+        A(">")
+        A("> **What it used to say.** That `results/state_validation.md` §1.2 had "
+          "found the reaction-diffusion solve *\"falsified as value-add\"*, "
+          "out-predicted by a one-line distance transform built from its own "
+          "source cells; that *\"the vessel-distance surrogate wins\"*; and that "
+          "*\"there is no accuracy argument for the solve\"*. This module and "
+          "`tmesim/physics/oxygen_proxy.py` were both written to act on that.")
+        A(">")
+        A("> **Why it was wrong.** Every predictor in the §1 table is sign-aligned "
+          "to oxygen — `state_validation.trivial_baselines` literally returns "
+          "`-dist_endo` — so, as that table's own header states, a correct "
+          f"predictor gives a NEGATIVE rho and the STRONGER predictor is the one "
+          f"with the larger |rho|. On this run "
+          f"|{_fmt(pde_row['rho_vegfa'])}| > |{_fmt(best_rival['rho_vegfa'])}|: "
+          f"**the solved field out-predicts `{best_rival['name']}`**, by "
+          f"{ordv['ratio']:.2f}x. The inequality was read on the signed number "
+          "instead of on its magnitude.")
+        A(">")
+        A("> **The fix that makes this unrepeatable.** Every ordering claim below "
+          "is now DERIVED from the numbers via `state_validation._ordering()` "
+          "rather than written in English, so re-running this module reproduces "
+          "whatever the data say — including a flip back — instead of reverting "
+          "to a remembered conclusion. `write_report` also refuses to overwrite "
+          "any document whose header marks it as withdrawn, which is what stops "
+          "a re-run from deleting `results/oxygen_demotion.md`.")
+        A(">")
+        A("> **What does NOT follow.** The solve winning does not make it good. "
+          f"|rho| ~ {ordv['abs_sim']:.2f} is WEAK; this is a within-section "
+          "comparison, not out-of-sample; and the VEGFA+HIF1A composite is carried "
+          "by VEGFA alone. The correct reading is **\"the PDE is the best of "
+          "several weak predictors\"**, never \"the oxygen solve is validated\". "
+          "§1.1's separate finding — that the solve's effective diffusion length "
+          "is several times the published oxygen-diffusion distance because "
+          "`OxygenConfig.consumption` is unfitted — **survives this correction "
+          "unchanged**, because a Spearman rho is invariant to monotone rescaling: "
+          "a field can win this ranking and still have the wrong length scale.")
+        A("")
+    A("**The default is unchanged.** `reconstruct_real(oxygen_mode='pde')` is still "
+      "the shipping route and is bit-identical to the pre-option pipeline. What "
+      "this work added is an explicit alternative, labelled a SURROGATE, with the "
+      "route's provenance travelling in "
+      "`reconstruction_report()['oxygen']`.")
     A("")
 
     # --- headline ---
@@ -733,8 +876,11 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
       f"{max_kill_delta:.4f} absolute across three drugs |")
     A(f"| **Downstream effect on therapeutic coverage** | {max_cov_delta:.3g} — "
       "coverage is oxygen-invariant *by construction* |")
-    A(f"| **Recommendation** | keep `'pde'` as the default; use "
-      "`oxygen_mode='vessel_distance'` for any NEW hypoxia claim. See §5. |")
+    A("| **Recommendation** | "
+      + ("keep `'pde'` as the default — it is the default ON the evidence, not "
+         "despite it. See §5. |" if pde_wins else
+         "keep `'pde'` as the default; use `oxygen_mode='vessel_distance'` for "
+         "any NEW hypoxia claim. See §5. |"))
     A("")
     A("> **The two sections are DIFFERENT PATIENTS.** The benchmark runs on the "
       f"480-gene IO section ({b['n_cells']:,} cells); the downstream drug arm runs "
@@ -781,14 +927,42 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
     A("")
     A("**Reading the table.**")
     A("")
-    A(f"* **The vessel-distance surrogate wins.** `{winner['name']}` at rho = "
-      f"{_fmt(winner['rho_vegfa'])} against the PDE's {_fmt(pde_row['rho_vegfa'])} — "
-      f"a {abs(winner['rho_vegfa'] / pde_row['rho_vegfa']):.2f}x larger effect, from "
-      "a kd-tree query instead of a sparse linear solve. Ranks 1 and 2 are the SAME "
-      "predictor written two ways: `vessel_distance_exact` is `exp(-d/L)` and "
-      "`dist_endothelial` is `-d`, and a monotone map cannot change a Spearman rho. "
-      "They are both listed only to make that identity visible rather than "
-      "claimed.")
+    # THE ORDERING SENTENCE. Derived end to end -- winner, direction, ratio and
+    # the "what does not follow" rider all come out of _ordering() and out of
+    # ranked[0], so this bullet cannot state an ordering the run did not produce.
+    # It is the sentence that used to hard-code "The vessel-distance surrogate
+    # wins" while interpolating ranked[0] beside it.
+    A(f"* **{'The solved field wins' if pde_wins else 'The PDE is out-predicted'}.** "
+      f"Rank 1 is `{winner['name']}` at rho = {_fmt(winner['rho_vegfa'])}. The PDE "
+      f"is at {_fmt(pde_row['rho_vegfa'])}; the strongest route that is NOT the "
+      f"PDE, `{best_rival['name']}`, is at {_fmt(best_rival['rho_vegfa'])}. Read "
+      "by |rho|, as this table's sign convention requires, the solved field "
+      f"{ordv['verb_vs_baseline']} it by {ordv['ratio']:.2f}x — and the "
+      f"{'loser' if pde_wins else 'solve'} recovers "
+      f"{100 * ordv['recovers']:.0f}% of the "
+      f"{'winner' if pde_wins else 'baseline'}'s association. "
+      + ("That a one-line kd-tree query gets MOST of the way there is the honest "
+         "caveat; it does not get all of the way, and it does not win. "
+         if pde_wins else
+         "A kd-tree query out-predicting a sparse linear solve on the solve's own "
+         "inputs is the finding. ")
+      + "The two surrogate rows are the SAME predictor written twice — "
+      "`vessel_distance_exact` is `exp(-d/L)` and `dist_endothelial` is `-d`, and "
+      "a monotone map cannot change a Spearman rho — and are both listed only to "
+      "make that identity visible rather than claimed.")
+    if ordk is not None:
+        # The solve against its own undiffused source: adds or destroys?
+        A(f"* **The diffusion step "
+          f"{'ADDS predictive information' if ordk['sim_wins'] else 'DESTROYS predictive information'}.** "
+          f"`vascular_kde` is the solver's OWN SOURCE TERM sampled before it is "
+          f"diffused, at rho = {_fmt(kde_row['rho_vegfa'])}. The solve takes that "
+          f"field and returns one at {_fmt(pde_row['rho_vegfa'])} — "
+          f"{ordk['ratio']:.2f}x on |rho| in favour of "
+          f"{'the solved field' if ordk['sim_wins'] else 'the undiffused source'}. "
+          + ("This is the most direct evidence in the document that the "
+             "reaction-diffusion step is doing work rather than blurring."
+             if ordk["sim_wins"] else
+             "The solve is destroying information its own input already had."))
     A(f"* **Meshing costs almost nothing here.** The grid-sampled surrogate "
       f"({_fmt(vd_row['rho_vegfa'])}) and the exact per-cell surrogate "
       f"({_fmt(vde_row['rho_vegfa'])}) differ by "
@@ -796,16 +970,30 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
       f"distance to a {b['dx_um']:g} um mesh is not what separates the routes.")
     vn_row = next((r for r in b["rows"] if r["name"] == "vessel_network"), None)
     if vn_row is not None:
-        better = "better" if vn_row["rho_vegfa"] < vd_row["rho_vegfa"] else "WORSE"
-        A(f"* **The 'more physical' vessel definition is {better}.** Measuring "
-          f"distance to a SEGMENTED vessel object rather than to any endothelial "
-          f"cell scores {_fmt(vn_row['rho_vegfa'])} against "
-          f"{_fmt(vd_row['rho_vegfa'])}. Segmentation discards "
-          f"{b['surrogate_info']['n_points'] - b['vessel_network_info']['n_points']:,} "
-          f"of {b['surrogate_info']['n_points']:,} endothelial cells as singletons, "
-          "and on this section those discarded cells were carrying signal. It is "
-          "offered as an option and is NOT the default — the plainer definition is "
-          "the one that was benchmarked and the one that wins.")
+        # Derived both ways: which vessel definition scores better, and what the
+        # discarded singletons were therefore carrying. The trailing clause used
+        # to hard-code "the plainer definition ... is the one that wins", which
+        # contradicts the leading clause whenever the segmented one scores higher.
+        vn_better = abs(vn_row["rho_vegfa"]) > abs(vd_row["rho_vegfa"])
+        n_dropped = (b["surrogate_info"]["n_points"]
+                     - b["vessel_network_info"]["n_points"])
+        A(f"* **The 'more physical' vessel definition is "
+          f"{'better' if vn_better else 'WORSE'}.** Measuring distance to a "
+          f"SEGMENTED vessel object rather than to any endothelial cell scores "
+          f"{_fmt(vn_row['rho_vegfa'])} against {_fmt(vd_row['rho_vegfa'])}. "
+          f"Segmentation discards {n_dropped:,} of "
+          f"{b['surrogate_info']['n_points']:,} endothelial cells as singletons, "
+          + ("so on this section those discarded cells were carrying NOISE, not "
+             "signal. It is still NOT the default: the plainer definition is the "
+             "one every other number in this report was benchmarked on, and "
+             "switching it is a separate change with its own re-run list."
+             if vn_better else
+             "and on this section those discarded cells were carrying signal. It "
+             "is offered as an option and is NOT the default — the plainer "
+             "definition is the one that was benchmarked and the one that "
+             "scores higher.")
+          + " Either way this is a comparison between two SURROGATES, neither of "
+          f"which is the rank-1 route here (`{winner['name']}`).")
     A("* **The mapping cannot be tuned to win.** `exp(-d/L)` is strictly monotone in "
       "distance, so **every** monotone map of distance gives the identical Spearman "
       "rho. The constant `L` sets where the HYPOXIC/QUIESCENT/VIABLE band edges "
@@ -841,14 +1029,21 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
       f"{b['pde_length_scale']['L_mean_um']:.0f} um | "
       "`sqrt(D / (consumption * rho_tum))` at the mean tumour areal density |")
     A("")
-    A(f"**The last row is a finding, not a footnote.** The solved field's own "
-      f"effective diffusion length is ~{b['pde_length_scale']['L_mean_um']:.0f} um, "
+    A(f"**The last row is a finding, not a footnote, and it SURVIVES the "
+      f"correction above.** The solved field's own effective diffusion length is "
+      f"~{b['pde_length_scale']['L_mean_um']:.0f} um, "
       f"{b['pde_length_scale']['L_mean_um'] / b['hypoxia_onset_um']:.1f}x the "
       "measured oxygen-diffusion distance. `OxygenConfig.consumption` has never "
       "been fitted to an oxygen tension, and at its current value the solve "
-      "low-pass-filters its own source at a length scale the tissue does not have. "
-      "That is a mechanism for §1.2's observation that the diffusion step DESTROYS "
-      "predictive information: it is not adding physics, it is blurring. "
+      "low-pass-filters its own source at a length scale the tissue does not "
+      "have. **This criticism is independent of who wins §1**, and it is important "
+      "not to let the ranking result erase it: a Spearman rho is invariant to any "
+      "monotone rescaling of the field, so the solve can top the correlation table "
+      "and still place its hypoxic band edge at the wrong distance from a vessel. "
+      "Ranking is not calibration. The one thing that has changed is the "
+      "INTERPRETATION: this over-long length scale can no longer be offered as the "
+      "mechanism by which diffusion destroys predictive information, because on "
+      "these data it does not destroy it. "
       "Independent support that vessel distance is the right axis in the first "
       "place: Helmlinger et al., Nat Med 1997;3(2):177-182 (PMID 9018236, "
       "doi:10.1038/nm0297-177) measured interstitial pO2 profiles BETWEEN ADJACENT "
@@ -867,10 +1062,21 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
     A(f"| simulated O2 vs -distance-to-vessel (how nested the pair is) | "
       f"{_fmt(b['nested']['pde_vs_distance'])} |")
     A("")
-    A("Distance keeps more explanatory power after the PDE is conditioned out than "
-      "the PDE keeps after distance is conditioned out. **The PDE is the redundant "
-      "member of the pair**, reproducing §1.2's conclusion on the cleaner "
-      "VEGFA-only target.")
+    # Derived, not asserted: which member of the nested pair retains more.
+    _np_pde = abs(float(b["nested"]["vegfa_vs_pde_given_distance"]))
+    _np_dist = abs(float(b["nested"]["vegfa_vs_distance_given_pde"]))
+    if _np_pde > _np_dist:
+        A(f"The PDE keeps more explanatory power after distance is conditioned out "
+          f"(|{_np_pde:.4f}|) than distance keeps after the PDE is conditioned out "
+          f"(|{_np_dist:.4f}|). **Distance is the redundant member of the pair** on "
+          "the cleaner VEGFA-only target — the same direction as the corrected §1.2 "
+          "of `results/state_validation.md`. Both partials are small in absolute "
+          "terms; this orders two weak predictors, it does not validate either.")
+    else:
+        A(f"Distance keeps more explanatory power after the PDE is conditioned out "
+          f"(|{_np_dist:.4f}|) than the PDE keeps after distance is conditioned out "
+          f"(|{_np_pde:.4f}|). **The PDE is the redundant member of the pair** on "
+          "the cleaner VEGFA-only target.")
     A("")
 
     # --- 2 runtime ---
@@ -989,13 +1195,20 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
         order_b = sorted(
             dn["rows"], key=lambda k: -dn["rows"][k]["vessel_distance"]["kill_fraction"]
         )
-        A(f"**Predicted kill moves a little, and always downwards**: "
-          f"{min(r['delta_kill'] for r in dn['rows'].values()):+.4f} to "
-          f"{max(r['delta_kill'] for r in dn['rows'].values()):+.4f} absolute, i.e. "
-          f"{max_rel:.1f}% relative at worst. The direction is not a coincidence — "
-          "the surrogate bands more tumour into the resistant QUIESCENT band than "
-          "the PDE does (§3.1), and every resistant cell carries a "
-          f"{dn['pd']['quiescent_resistance']}x kill multiplier.")
+        _dk = [r["delta_kill"] for r in dn["rows"].values()]
+        _dir = ("and always downwards" if all(d < 0 for d in _dk) else
+                "and always upwards" if all(d > 0 for d in _dk) else
+                "in both directions")
+        _size = ("a little" if max_kill_delta < 0.05 else
+                 "substantially" if max_kill_delta < 0.20 else "a great deal")
+        A(f"**Predicted kill moves {_size}, {_dir}**: "
+          f"{min(_dk):+.4f} to {max(_dk):+.4f} absolute, i.e. "
+          f"{max_rel:.1f}% relative at worst."
+          + (" The direction is not a coincidence — the surrogate bands more "
+             "tumour into the resistant QUIESCENT band than the PDE does (§3.1), "
+             f"and every resistant cell carries a "
+             f"{dn['pd']['quiescent_resistance']}x kill multiplier."
+             if all(d < 0 for d in _dk) else ""))
         A("")
         A(f"**The cross-drug ranking is unchanged**: "
           f"{' > '.join(order_a)} under the PDE, {' > '.join(order_b)} under the "
@@ -1004,14 +1217,30 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
           "across drugs, so they largely cancel out of a comparison and do not "
           "cancel out of a level.")
         A("")
-        A("**So: how load-bearing is the oxygen field?** *Weakly.* A 2-3% relative "
-          "shift in absolute kill is far smaller than the acknowledged uncertainty "
-          "in those levels — `results/state_validation.md` §2.2 shows the VIABLE "
-          "fraction on this section swings 165x across two tissue-mask conventions "
-          "and three grid spacings, all of which are bookkeeping choices. The "
-          "oxygen ROUTE is a second-order knob next to the tissue-mask convention. "
-          "It is not zero, though, so absolute kill fractions must be reported with "
-          "the oxygen mode attached, which is why "
+        # The verdict on load-bearing-ness is read off the measured shift, not
+        # asserted. It used to read "*Weakly.* A 2-3% relative shift ...", which
+        # is false whenever the shift is not 2-3%.
+        A("**So: how load-bearing is the oxygen field?** "
+          + (f"*Weakly.* A {max_rel:.0f}% relative shift in absolute kill is far "
+             "smaller than the acknowledged uncertainty in those levels — "
+             "`results/state_validation.md` §2.2 shows the VIABLE fraction on this "
+             "section swings 165x across two tissue-mask conventions and three "
+             "grid spacings, all of which are bookkeeping choices. The oxygen "
+             "ROUTE is a second-order knob next to the tissue-mask convention."
+             if max_kill_delta < 0.05 else
+             f"*Heavily, for the LEVEL.* A {max_rel:.0f}% relative shift in "
+             f"absolute kill ({max_kill_delta:.4f} absolute) is larger than most "
+             "of the effects this project reports, and no measurement on either "
+             "section can say which arm is right (§3.3). Absolute kill from this "
+             "section is therefore not a number, it is an interval whose width "
+             "includes the oxygen route — alongside the tissue-mask convention "
+             "and the mesh, which `results/state_validation.md` §2.2 shows swing "
+             "the VIABLE fraction by 165x on their own. What is NOT sensitive is "
+             "the cross-drug RANKING, which is unchanged above, and therapeutic "
+             "coverage, which is invariant by construction. That split — ranking "
+             "defensible, level not — is the finding.")
+          + " Either way it is not zero, so absolute kill fractions must be "
+          "reported with the oxygen mode attached, which is why "
           "`reconstruction_report()['oxygen']['mode']` now exists.")
     A("")
     A("### 3.3 What this does NOT show")
@@ -1055,30 +1284,73 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
     # --- 5 recommendation ---
     A("## 5. RECOMMENDATION")
     A("")
-    A("**Keep `'pde'` as the shipping default. Use `oxygen_mode='vessel_distance'` "
-      "for every NEW hypoxia claim, and stop making per-cell hypoxia claims from "
-      "the solved field.**")
+    if pde_wins:
+        A("**Keep `'pde'` as the shipping default — on the evidence, not despite "
+          "it. Keep the surrogate as a cheap, explicitly-labelled option, and keep "
+          "every per-cell hypoxia claim weak, because every route here is weak.**")
+    else:
+        A("**Keep `'pde'` as the shipping default. Use "
+          "`oxygen_mode='vessel_distance'` for every NEW hypoxia claim, and stop "
+          "making per-cell hypoxia claims from the solved field.**")
     A("")
     A("The reasoning, in order of weight:")
     A("")
-    A("1. **The surrogate is better and cheaper on the one section where we can "
-      f"measure** — rho {_fmt(winner['rho_vegfa'])} vs {_fmt(pde_row['rho_vegfa'])}, "
-      f"at {rt[-1]['speedup']:.0f}x less compute at dx = 12 um. There is no "
-      "accuracy argument for the solve.")
-    A("2. **But the drug outputs barely notice, and flipping the default would "
-      "invalidate the provenance of everything already published.** §3 shows "
-      "therapeutic coverage is EXACTLY invariant and kill moves by at most "
-      f"{max_kill_delta:.4f} absolute "
-      f"({max(abs(r['delta_kill_pct']) for r in dn['rows'].values()):.1f}% "
-      "relative) with the cross-drug ranking unchanged. The measurable gain on the "
-      "drug side is therefore close to nil, while the cost is re-deriving every "
-      "kill number in `results/` (§5.1) and breaking the correspondence between "
-      "those documents and the code. Silent improvement is still silent change.")
-    A("   The honest asymmetry: the surrogate is unambiguously better as a "
-      "*hypoxia predictor* (§1) and only marginally different as a *drug-kill "
-      "input* (§3). So the recommendation splits along exactly that line — flip it "
-      "for hypoxia claims, leave it for the kill pipeline until that pipeline is "
-      "being re-run for some other reason anyway.")
+    if pde_wins:
+        A(f"1. **The solve is the more accurate route on the one section where we "
+          f"can measure, and the more expensive one** — rho "
+          f"{_fmt(pde_row['rho_vegfa'])} against `{best_rival['name']}`'s "
+          f"{_fmt(best_rival['rho_vegfa'])} ({ordv['ratio']:.2f}x on |rho|), for "
+          f"{rt[-1]['speedup']:.0f}x more compute at dx = 12 um. The accuracy "
+          "argument now runs FOR the solve, which is the reverse of what this "
+          "section said before the inequality was checked. It is a small accuracy "
+          f"argument: |rho| ~ {ordv['abs_sim']:.2f} means the winner and the loser "
+          "are both weak, and a physics-free one-liner recovering "
+          f"{100 * ordv['recovers']:.0f}% of a sparse solve is still the most "
+          "sobering number in this report.")
+    else:
+        A("1. **The surrogate is better and cheaper on the one section where we can "
+          f"measure** — rho {_fmt(winner['rho_vegfa'])} vs "
+          f"{_fmt(pde_row['rho_vegfa'])}, at {rt[-1]['speedup']:.0f}x less compute "
+          "at dx = 12 um. There is no accuracy argument for the solve.")
+    # Whether the drug side "barely notices" is a MEASURED question, so it is
+    # read off max_kill_delta rather than asserted. This sentence used to say
+    # "the drug outputs barely notice" unconditionally, directly beside the
+    # interpolated delta that contradicts it whenever the delta is large.
+    _max_rel = max(abs(r["delta_kill_pct"]) for r in dn["rows"].values())
+    _barely = max_kill_delta < 0.01
+    A(("2. **Either way the drug outputs barely notice, and flipping the default "
+       "would invalidate the provenance of everything already published.**"
+       if _barely else
+       "2. **The drug outputs, by contrast, move a lot — which is an argument "
+       "AGAINST flipping the default, not for it.**")
+      + " §3 shows therapeutic coverage is EXACTLY invariant and kill moves by at "
+      f"most {max_kill_delta:.4f} absolute ({_max_rel:.1f}% relative) with the "
+      "cross-drug ranking unchanged. "
+      + ("The measurable gain on the drug side is therefore close to nil, while "
+         "the cost is re-deriving every kill number in `results/` (§5.1) and "
+         "breaking the correspondence between those documents and the code."
+         if _barely else
+         "A shift of that size is not a refinement, it is a different answer: "
+         "flipping the oxygen route would move every absolute kill number in "
+         "`results/` (§5.1) by more than most of the effects those documents "
+         "report, with no measurement able to say which arm is right (§3.3). "
+         "That the CROSS-DRUG RANKING survives it unchanged is the reason the "
+         "ranking, not the level, is this project's defensible output.")
+      + " Silent improvement is still silent change.")
+    if pde_wins:
+        A("   The honest asymmetry: the solve is the better *hypoxia predictor* "
+          f"(§1, by {ordv['ratio']:.2f}x on a weak |rho|) and barely distinguishable "
+          "as a *drug-kill input* (§3). So the surrogate stays available and stays "
+          "labelled, and is the right choice when compute matters more than "
+          f"{100 * (1 - ordv['recovers']):.0f}% of a weak association — but it is "
+          "not the accuracy choice, and this report must not be cited as though it "
+          "were.")
+    else:
+        A("   The honest asymmetry: the surrogate is unambiguously better as a "
+          "*hypoxia predictor* (§1) and only marginally different as a *drug-kill "
+          "input* (§3). So the recommendation splits along exactly that line — flip "
+          "it for hypoxia claims, leave it for the kill pipeline until that "
+          "pipeline is being re-run for some other reason anyway.")
     A("3. **The measured route is the right long-run answer and is not available "
       "yet.** `hypoxia_from_markers` is the only route here that is a measurement, "
       "but the flagship drug section's panel does not carry a hypoxia-response "
@@ -1132,8 +1404,9 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
       "16389942, doi:10.1111/j.1750-3639.2005.tb00115.x). A field could be a "
       "perfectly good oxygen tension and still score poorly here. What the "
       "comparison establishes is narrower and immune to this: *whatever* VEGFA is "
-      "reporting, a distance transform predicts it better than the solve does, and "
-      "that is an internal comparison on identical inputs.")
+      "reporting, these routes are ranked against it on identical inputs, and on "
+      f"this run `{winner['name']}` came first. It is an internal ordering of weak "
+      "predictors, not a measurement of oxygen.")
     A("2. **The two sections are different patients**, with different vascular "
       "architectures and different panels. The benchmark (§1) and the downstream "
       "effect (§3) are two experiments, not two views of one tumour.")
@@ -1146,15 +1419,22 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
       f"transcript'. VEGFA fires in {b['vegfa_detection'] * 100:.1f}% of cells, "
       "which is enough to power this test and not enough to make any single cell's "
       "value trustworthy.")
-    A("5. **No absolute calibration anywhere.** `OxygenConfig.consumption` has "
-      "never been fitted to a measured oxygen tension, and the surrogate's `L` is "
-      "anchored to published morphometry, not to a tension. Demoting the PDE does "
-      "not calibrate anything.")
+    A("5. **No absolute calibration anywhere, and this is the criticism that "
+      "outlives the ranking.** `OxygenConfig.consumption` has never been fitted to "
+      "a measured oxygen tension, and the surrogate's `L` is anchored to published "
+      "morphometry, not to a tension. Nothing in §1 calibrates a level: Spearman "
+      "rho is invariant to monotone rescaling, so winning or losing this benchmark "
+      "says nothing at all about whether either field's hypoxic band edge sits at "
+      "the right distance from a vessel. See §1.1.")
     A("6. **The surrogate has no supply saturation and no sink.** It cannot "
       "represent a vessel that is itself hypoxic, or tissue whose consumption "
-      "varies. Helmlinger et al. measured exactly those effects in vivo. The claim "
-      "is only that on these data the extra physics costs accuracy rather than "
-      "buying it.")
+      "varies. Helmlinger et al. measured exactly those effects in vivo. "
+      + ("On these data the extra physics buys a small amount of rank accuracy "
+         f"({ordv['ratio']:.2f}x on a weak |rho|) at a large compute cost; it is "
+         "not established that it buys a better oxygen FIELD."
+         if pde_wins else
+         "The claim is only that on these data the extra physics costs accuracy "
+         "rather than buying it."))
     A("")
 
     A("## 7. Reproduction")
@@ -1176,7 +1456,10 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
       "`oxygen_kwargs` keyword, default `'pde'` and bit-identical; the oxygen "
       "provenance block in `reconstruction_report`")
     A("* `tests/test_oxygen_proxy.py` — new")
-    A("* `results/oxygen_demotion.md` — this report")
+    A("* `results/oxygen_benchmark.md` — this report. It used to be written to "
+      "`results/oxygen_demotion.md`; that path now holds the hand-written record "
+      "of the inverted-inequality correction, and `write_report` refuses to "
+      "overwrite it.")
     A("")
     A("**Data provenance.** Both sections are open 10x Genomics Xenium datasets, "
       "CC BY 4.0, no login or DUA: the Human Brain Cancer (GBM) FFPE IO-panel "

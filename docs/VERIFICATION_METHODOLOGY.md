@@ -148,21 +148,47 @@ directly, mass-conservative, grid-converged, deterministic, all verified. It was
 measured hypoxia-response transcripts (VEGFA, HIF1A) in 816,769 cells of a real GBM section, against
 three baselines built from **the solver's own inputs**:
 
+> **CORRECTED.** This subsection previously ran the numbers below with the rows **assigned to the
+> wrong predictors** — it gave the PDE −0.1132 and `dist_endothelial` −0.1503 — and concluded the
+> solve lost. Both the assignment and the conclusion were wrong; see entry 11 above. The table now
+> carries the re-derived values. The chapter's *pattern* is unchanged and is still mandatory: you
+> must run the cheap baseline. What changed is that this case is an example of the baseline being
+> **run and beaten**, not of the model losing to it.
+
 | predictor | what it is | Spearman ρ vs measured hypoxia score |
 |---|---|---:|
-| **simulated O₂ (the PDE)** | the reaction–diffusion solve under test | **−0.1132** |
-| `vascular_kde` | the solver's own source term, *before* it is diffused | **−0.1270** |
-| `dist_endothelial` | one `cKDTree` query to the nearest endothelial cell; no physics | **−0.1503** |
+| **simulated O₂ (the PDE)** | the reaction–diffusion solve under test | **−0.1523** |
+| `dist_endothelial` | one `cKDTree` query to the nearest endothelial cell; no physics | **−0.1204** |
+| `vascular_kde` | the solver's own source term, *before* it is diffused | **−0.1111** |
 | `local_cell_density` | pure local crowding; ignores vessels entirely | −0.0192 |
 
-All three non-trivial predictors are significant at the permutation floor (p = 0.00050). The PDE
-loses to the kd-tree query by **33%**, and it loses to its own undiffused input. Partialling out
-distance-to-vessel leaves the PDE with ρ = −0.0660; partialling out the PDE leaves distance with
-ρ = −0.1192. **The PDE is the redundant variable in the pair.**
+All three non-trivial predictors are significant at the permutation floor (p = 0.00050). Every
+predictor is **sign-aligned to oxygen**, so a correct one scores NEGATIVE and the stronger one is
+the one with the larger **|ρ|**. Read that way: the PDE beats the kd-tree query by **1.26×**, and it
+beats its own undiffused input by **1.37×** — the diffusion step *adds* predictive information
+rather than destroying it. Partialling out distance-to-vessel leaves the PDE with ρ = −0.1227;
+partialling out the PDE leaves distance with ρ = −0.0792. **Distance is the redundant variable in
+the pair.**
 
-The failure is not a resolution problem. Refining the mesh over a 2.5× range of Δx moves the
-correlation by **less than 0.0002** — the field has converged onto an answer that a distance
-transform beats.
+**This is a narrow win, and the chapter would be dishonest to sell it as more.** |ρ| ≈ 0.15 is weak;
+the comparison is within-section, not out-of-sample; the composite is carried by VEGFA alone
+(HIF1A contributes +0.0140); and a physics-free one-liner still recovers **79%** of a sparse linear
+solve's association with the marker. The defensible sentence is *"the PDE is the best of four weak
+predictors"*. Inverting an overclaim into the opposite overclaim would be the same error with its
+sign flipped.
+
+**And one criticism of the solve survives untouched.** Its effective diffusion length is 2–5× the
+published ~150 µm oxygen-diffusion distance, because `OxygenConfig.consumption` has never been
+fitted to a measured oxygen tension. A Spearman ρ is **invariant to any monotone rescaling of the
+field**, so the solve can top this table *and* place its hypoxic band edge at the wrong distance
+from a vessel. Ranking is not calibration; a rank-correlation baseline test cannot see a length
+scale at all. Both facts are true simultaneously, and a reader who takes only the first has
+mislearned the chapter.
+
+None of this is a resolution effect. Refining the mesh over a 2.5× range of Δx moves the correlation
+by **less than 0.0002**, and the baseline sits at −0.1204 at every Δx — so the ordering is not a
+single-resolution artefact, and refining further will not raise ρ above ≈0.153 either. The remaining
+gap to the measured marker is a model or measurement limitation, not a mesh one.
 
 `local_cell_density` at −0.0192 is the control that makes the comparison meaningful: it establishes
 that not every spatial variable correlates with the marker, so the other three numbers are signal
@@ -180,20 +206,36 @@ simulator at all. The simulator's prediction correlates with that covariate at S
 
 1. **The baseline must use the same inputs as the model.** A baseline the model can beat because it
    is fed worse data proves nothing. `dist_endothelial` is computed from *the PDE's own source
-   cells*. That is what makes losing to it decisive.
+   cells*. That is what makes the comparison decisive in **either** direction — and what makes it
+   sobering that the one-liner still recovers 79% of the solve.
 2. **Include the model's own input as a baseline.** "Does the transformation add information, or
    destroy it?" is a distinct and often more damaging question than "does the model beat nothing?".
-   Here the diffusion step took a field correlating at −0.1270 and returned one correlating at
-   −0.1132.
-3. **Statistical significance is not a baseline.** The PDE's p-value was at the estimator's floor.
+   Here the diffusion step took a field correlating at −0.1111 and returned one correlating at
+   −0.1523, so it adds. Had the arrow pointed the other way it would have been the single most
+   damaging number in the project — which is exactly why the test is worth running, and why the
+   direction must be *computed* rather than written down.
+3. **A rank-correlation baseline test cannot see a calibration error.** Spearman ρ is invariant to
+   monotone rescaling, so winning this table says nothing about whether the field's absolute levels
+   or band edges are right. The PDE wins here *and* has a diffusion length 2–5× the published value.
+   Do not let one result retire the other.
+4. **Statistical significance is not a baseline.** The PDE's p-value was at the estimator's floor.
    Significance measures distance from zero; a baseline measures distance from *the cheap
    alternative*, which is the only comparison that licenses complexity.
-4. **Include a null-spatial or null-mechanism control** (here `local_cell_density`) so a passing
+5. **Include a null-spatial or null-mechanism control** (here `local_cell_density`) so a passing
    baseline comparison cannot be attributed to a generic property of the data.
-5. **Losing to a baseline does not falsify the mechanism** — it falsifies the *value-add of computing
-   it this way*. The honest verdict recorded here was "PARTIALLY SUPPORTED: not falsified, out-
-   competed", and the consequence drawn was to derive hypoxia from measured markers where they exist
-   rather than to delete the solver.
+6. **Beating a baseline does not validate the mechanism, and losing to one does not falsify it** —
+   the comparison licenses (or withdraws) the *value-add of computing it this way*, nothing more.
+   The verdict recorded here is **SUPPORTED, narrowly**: the solve beats every trivial baseline
+   built from its own inputs, at a weak absolute ρ, within-section. The consequence drawn is to keep
+   the solver as the default **on** that evidence, keep the cheap surrogate available and labelled,
+   and still prefer hypoxia derived from measured markers wherever a panel carries them — because
+   the strongest of four weak predictors is not a measurement.
+7. **Write the verdict where the arithmetic can reach it.** Item 6's verdict flipped once already,
+   from "out-competed" to "SUPPORTED", without a single number changing — only the reading of them.
+   Any hand-written sentence stating a direction a machine could have derived is an unchecked
+   assertion. The repair applied across this repository was structural: `state_validation._ordering()`
+   now derives every ordering claim from the numbers, and the report generators call it instead of
+   asserting, so regeneration cannot reinstate a superseded conclusion.
 
 **The concrete check.** For every model component, name the cheapest predictor of the same target
 that can be computed from the same inputs in one line, and score both. Write the baseline *before*

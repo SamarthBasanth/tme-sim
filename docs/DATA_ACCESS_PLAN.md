@@ -23,7 +23,7 @@ State this, unchanged, in every approach. It is the reason anyone would say yes.
 | **What is built** | A patient-specific GBM microenvironment reconstruction (10x Xenium 319-gene and 480-gene panels, 4 Visium sections) feeding a mechanistic reaction–diffusion transport solver and a Hill/PD kill layer. All inputs measured; the synthetic-data era is deleted from the package. |
 | **What was found by attacking it** | **11 distinct defects**, several mutually cancelling and invisible to a green 55-test suite (`results/SESSION_AUDIT.md`). Every headline number published before the audit was wrong in at least one way. |
 | **What is externally validated** | **Delivery/partition, in human glioma**: scored against 125 tissue samples across 42 patients plus 27 PMID-anchored regional PK measurements. **~2× geometric-mean fold error**, 6/6 drugs within 10×, cross-drug penetrant-vs-excluded separation 3.65× predicted against 4.66× measured. Vascular area fraction 2.50% predicted vs 2.1 ± 0.3% measured (untuned). Reconstruction cross-platform Pearson 0.997. |
-| **What was falsified** | The **oxygen PDE** as a value-add — beaten by plain distance-to-nearest-vessel (ρ −0.150 vs −0.113) and by its own undiffused source. The **`penetration_index`** metric — definitionally unable to discriminate drugs; retired. Both retractions are published in the repo. |
+| **What was falsified** | The **`penetration_index`** metric — definitionally unable to discriminate drugs; retired. A second entry once sat here: the **oxygen PDE** "as a value-add, beaten by plain distance-to-nearest-vessel (ρ −0.150 vs −0.113)". **That entry is WITHDRAWN — it was an inverted inequality**, backwards by its own quoted numbers, since every predictor is sign-aligned to oxygen and \|−0.150\| > \|−0.113\|. Re-derived on 816,769 cells the solve scores ρ −0.1523 against the baseline's −0.1204 and **wins by 1.26×**. The retraction of the retraction is published in the repo (`results/oxygen_demotion.md`). What survives: ρ ≈ 0.15 is weak and within-section, so the solve is the best of four weak predictors, not a validated field — and `OxygenConfig.consumption` is still unfitted, so its diffusion length is 2–5× the published ~150 µm, which a rank correlation cannot detect. |
 | **What is NOT validated** | **Response.** The delivery→kill link has never been tested in space, because no open dataset pairs a measured spatial drug distribution with a measured treatment response in the same tumour. Not one, anywhere. |
 | **Stage** | Research prototype. Not clinically validated, not a device, no regulatory pathway, no patient has been or will be treated on its output. |
 
@@ -608,9 +608,11 @@ data already on disk or freely downloadable.
 5. **Finish the two interrupted internal validations** — cell state vs measured MKI67, and
    simulated oxygen vs measured VEGFA/HIF1A. There is a partial result on the table (VEGFA is
    the single most anti-correlated gene of all 480 against simulated oxygen; HIF1A is exactly
-   null) and it needs completing before either is claimed. Note this bears directly on the
-   falsified oxygen PDE (defect #11): if hypoxia is better taken from measured markers, that
-   should be implemented, not just observed.
+   null) and it needs completing before either is claimed. Note this bears directly on
+   defect #11, which has since been **withdrawn** as an inverted inequality — the solve
+   out-predicts its baselines rather than losing to them — but the underlying question is
+   unchanged: if hypoxia is better taken from measured markers than from any solved or
+   geometric field, that should be implemented, not just observed.
 6. **Pre-register the predictions.** Before any collaboration data arrives, commit — file,
    timestamp, git hash — to the predicted cisplatin/doxorubicin ordering, the predicted
    per-region exposure ratios, and the predicted MGMT effect size. This costs nothing, takes an

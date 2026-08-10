@@ -250,11 +250,44 @@ def test_default_reconstruction_metadata_is_unchanged(real_micro):
 
 
 def test_report_records_the_oxygen_mode(real_micro):
+    """The Studio-facing caveat is PINNED, in the corrected direction.
+
+    This assertion used to pin ``"FALSIFIED AS VALUE-ADD"``. That claim was an
+    inverted inequality — it was backwards by its own quoted numbers, since
+    |-0.1503| > |-0.1132| under a sign convention where every predictor is
+    aligned to oxygen (``results/oxygen_demotion.md``). The pin is deliberately
+    kept rather than deleted: this string travels into every Studio report, and
+    the test exists so that it cannot drift silently in EITHER direction.
+
+    It pins three things at once, because the correction is only honest if all
+    three travel together:
+
+    1. the corrected ordering (the solve out-predicts its baselines),
+    2. the limit on it (weak, within-section, VEGFA-carried), so the reversal
+       cannot quietly become an overclaim with its sign flipped, and
+    3. the criticism that SURVIVES the reversal — ``consumption`` is unfitted, so
+       the length scale is wrong regardless of who wins a rank correlation.
+
+    The negative assertion is the important one: the withdrawn claim must never
+    reappear as a live assertion, only as the quoted history it now is.
+    """
     rep = reconstruction_report(real_micro)
     assert rep["oxygen_mode"] == "pde"
     assert rep["oxygen"]["mode"] == "pde"
     assert rep["oxygen"]["is_surrogate"] is False
-    assert "FALSIFIED AS VALUE-ADD" in rep["oxygen"]["caveat"]
+
+    caveat = rep["oxygen"]["caveat"]
+    # 1. the corrected ordering, with the numbers it rests on.
+    assert "WEAK BUT BEST-IN-CLASS" in caveat
+    assert "out-predicting" in caveat
+    assert "-0.1523" in caveat and "-0.1204" in caveat
+    # 2. the limit — the reversal must not read as a validation.
+    assert "weak" in caveat and "not a validated oxygen field" in caveat
+    # 3. the surviving criticism.
+    assert "unfitted" in caveat and "invariant to monotone rescaling" in caveat
+    # The withdrawn claim survives only as history, never as an assertion.
+    assert "declared the solve FALSIFIED AS VALUE-ADD" in caveat
+    assert not caveat.startswith("FALSIFIED AS VALUE-ADD")
     # The historical keys are all still there.
     for key in ("mean_oxygen", "mean_vascular_density", "mean_ecm_density",
                 "celltype_fractions", "sensitivity"):

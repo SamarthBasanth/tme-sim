@@ -103,16 +103,21 @@ _DEFAULT_VISIUM_SAMPLE = "10x_parent_gbm"
 #:
 #: ``'pde'`` (DEFAULT, unchanged)
 #:     ``physics.solve_oxygen`` — the steady-state reaction-diffusion solve driven
-#:     by the real vascular KDE. **Falsified as value-add**
-#:     (``results/state_validation.md`` §1.2, ``results/oxygen_demotion.md``): it
-#:     is out-predicted by a distance transform built from its own source cells,
-#:     and by its own undiffused source. Kept as the default only because flipping
-#:     it silently would invalidate every published number in ``results/``.
+#:     by the real vascular KDE. **The strongest of the routes benchmarked, and
+#:     still weak** (``results/state_validation.md`` §1.2,
+#:     ``results/oxygen_demotion.md``): rho -0.1523 against measured hypoxia
+#:     markers, out-predicting a distance transform on its own source cells
+#:     (-0.1204) and its own undiffused source (-0.1111). It is the default ON
+#:     that evidence — an earlier version of this note said it had been falsified
+#:     as value-add, which was an inverted inequality. What does NOT follow: |rho|
+#:     ~ 0.15 is weak and within-section, and ``OxygenConfig.consumption`` is
+#:     still unfitted, so the field's absolute level and diffusion length remain
+#:     uncalibrated.
 #: ``'vessel_distance'``
 #:     :func:`physics.oxygen_proxy.oxygen_from_vessel_distance` — a monotone
-#:     SURROGATE from distance to the nearest endothelial cell. Better against
-#:     measured markers, ~10^2-10^3x cheaper, and honestly labelled as not being a
-#:     solved oxygen tension.
+#:     SURROGATE from distance to the nearest endothelial cell. ~10^2-10^3x
+#:     cheaper, recovers ~79% of the solve's association with measured markers,
+#:     and honestly labelled as not being a solved oxygen tension.
 #: ``'markers'``
 #:     :func:`physics.oxygen_proxy.hypoxia_from_markers` — hypoxia read directly
 #:     off MEASURED hypoxia-response transcripts. Only available where the panel
@@ -230,13 +235,32 @@ def _install_oxygen(
             "oxygen_mode": "pde",
             "oxygen_source": "physics.solve_oxygen driven by the real vascular field",
             "oxygen_is_surrogate": False,
+            # This string travels into every reconstruction_report()['oxygen']
+            # ['caveat'] and thence into the Studio, so it is the single most
+            # widely-read sentence this module emits. It previously read
+            # "FALSIFIED AS VALUE-ADD ... out-predicted ... (rho -0.1503 vs
+            # -0.1132)", which was BACKWARDS BY ITS OWN QUOTED NUMBERS:
+            # |-0.1503| > |-0.1132| under a sign convention where every
+            # predictor is aligned to oxygen. See results/oxygen_demotion.md.
+            # It must stay weak in the corrected direction too -- "best of
+            # several weak predictors", never "validated".
             "oxygen_caveat": (
-                "FALSIFIED AS VALUE-ADD (results/state_validation.md §1.2, "
-                "results/oxygen_demotion.md): out-predicted against measured "
-                "hypoxia markers by a distance transform on its own source cells "
-                "(rho -0.1503 vs -0.1132) and by its own undiffused source "
-                "(-0.1270). Retained as the default so no published number moves "
-                "silently, NOT because it is the best available route."
+                "WEAK BUT BEST-IN-CLASS (results/state_validation.md §1.2, "
+                "results/oxygen_demotion.md): against measured hypoxia markers on "
+                "816,769 cells the solve scores rho -0.1523, out-predicting a "
+                "distance transform on its own source cells (-0.1204) and its own "
+                "undiffused source term (-0.1111). The default is 'pde' ON that "
+                "evidence, not despite it. Read the magnitude, though: |rho| ~ "
+                "0.15 is a weak, within-section association carried by VEGFA "
+                "alone (HIF1A contributes +0.0140), so this is the best of "
+                "several weak predictors and not a validated oxygen field. "
+                "SEPARATELY AND STILL TRUE: OxygenConfig.consumption is unfitted, "
+                "so the solve's effective diffusion length is several times the "
+                "published ~150 um -- a Spearman rho cannot detect that, because "
+                "it is invariant to monotone rescaling. Absolute levels and band "
+                "edges remain uncalibrated. An earlier version of this caveat "
+                "declared the solve FALSIFIED AS VALUE-ADD; that claim was an "
+                "inverted inequality and has been withdrawn."
             ),
             "oxygen_detail": None,
         }
@@ -818,10 +842,12 @@ def reconstruct_real(
         ``tests/test_oxygen_proxy.py::test_default_oxygen_mode_is_bit_identical``),
         so no existing result in ``results/`` moves.
 
-        ``'pde'`` is retained as the default despite being falsified as value-add
-        (``results/oxygen_demotion.md``) because flipping it would silently
-        invalidate every number that has already been published against it. The
-        recommendation and the re-run list are in that report.
+        ``'pde'`` is retained as the default because it out-predicts every
+        trivial baseline built from its own inputs (``results/oxygen_demotion.md``
+        — which records the correction of the opposite, inverted claim), and
+        because flipping it would silently invalidate every number already
+        published against it. Both reasons hold; the first is the one that
+        changed.
     oxygen_kwargs : dict, optional
         Extra keyword arguments forwarded to the chosen route
         (:func:`physics.oxygen_proxy.oxygen_from_vessel_distance` or

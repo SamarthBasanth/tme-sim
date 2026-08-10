@@ -234,10 +234,33 @@ class TestLimits:
         assert "UPPER BOUND" in lim["body"]
         assert "MGMT" in lim["body"]
 
-    def test_the_oxygen_pde_is_declared_falsified(self, limits):
+    def test_the_oxygen_field_is_declared_weak_in_the_corrected_direction(self, limits):
+        """The oxygen limit is PINNED, in the corrected direction.
+
+        This assertion used to require ``"FALSIFIED"`` in the title. That claim
+        was an inverted inequality — the solve out-predicts the baselines it was
+        said to lose to (results/oxygen_demotion.md). The limit is kept and still
+        pinned, because a reversal that turns into an overclaim in the opposite
+        direction is the same error with its sign flipped: what must reach the
+        reader is that the winner is WEAK, and that the unfitted-``consumption``
+        criticism survives the reversal untouched.
+        """
         lim = next(x for x in limits if x["id"] == "oxygen_pde_falsified")
-        assert "FALSIFIED" in lim["title"]
         assert "oxygen_demotion.md" in lim["source"]
+        assert "WEAK" in lim["title"]
+        body = lim["body"]
+        # The corrected ordering, with the numbers it rests on.
+        assert "out-predicting" in body
+        assert "-0.1523" in body and "-0.1204" in body
+        # The limit on it — this must never read as a validation.
+        assert "best of several weak predictors" in body
+        assert "never 'the oxygen solve is validated'" in body
+        # The criticism that survives the reversal.
+        assert "never been fitted" in body
+        assert "invariant to monotone rescaling" in body
+        # The withdrawn claim survives as history only, never as an assertion.
+        assert "has been withdrawn" in body
+        assert "FALSIFIED" not in lim["title"]
 
     def test_no_outcome_label_anywhere(self, limits):
         lim = next(x for x in limits if x["id"] == "no_outcome_label")

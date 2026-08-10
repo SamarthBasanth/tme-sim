@@ -288,7 +288,7 @@ Every `RunResult.provenance` carries, mandatorily:
   `sensitivity_determinant_gene`, and the `mgmt_*` block when an MGMT value was
   supplied — including `mgmt_applied:false` **with a reason** when the drug is
   not MGMT-calibrated;
-* `caveats[]` — the oxygen route's own falsification note, the upper-bound
+* `caveats[]` — the oxygen route's own weakness/calibration note, the upper-bound
   warning, the grid-convergence status at this `dx`, the Stage-0 PK
   simplification, and the absence of any outcome label;
 * the solver settings the frozen `RunSpec` cannot carry — `pde_dt_s`,
@@ -467,8 +467,11 @@ ranking-is-the-output rule (`results/cell_state_impact.md` §3.2/§5, kill movin
 absolute kill at all (the 319-gene panel carries no hypoxia gene and calls
 proliferation in 1.42% of tumour cells against a published 19-40%), the interval
 absolute kill is defensible as (TMZ 0.0048-0.1442, 30x —
-`results/kill_calibration.md` §5.1), the uniform-mode upper bound, the oxygen
-PDE's falsification (`results/oxygen_demotion.md`), and the absence of any
+`results/kill_calibration.md` §5.1), the uniform-mode upper bound, the weakness
+of the oxygen field (`results/oxygen_demotion.md` — it out-predicts every trivial
+baseline, at ρ ≈ 0.15, which makes it the best of several weak predictors and not
+a validated field; an earlier version of this line called it a *falsification*,
+which was an inverted inequality and is withdrawn), and the absence of any
 outcome label anywhere in this repository. An item that does not apply to a
 section is still returned, saying why — a caveat that disappears cannot be
 audited.

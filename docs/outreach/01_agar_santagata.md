@@ -80,10 +80,17 @@ dataset in the world that can test its central claim, and yours is the only one 
 **Where the model stands, plainly.** It is a research prototype. It is not clinically validated
 and nothing in it should inform a treatment decision. An adversarial audit of my own work found
 eleven distinct defects, several mutually cancelling and invisible to a green test suite; every
-headline number I published before that audit was wrong in at least one way. Two components
-were falsified outright and retracted — an oxygen PDE that is beaten by plain
-distance-to-nearest-vessel, and a penetration metric that could not discriminate between drugs
-by construction. What survives is the delivery axis, and it is scored: against 125 human glioma
+headline number I published before that audit was wrong in at least one way. One component was
+falsified outright and retracted: a penetration metric that could not discriminate between drugs
+by construction. A second retraction has since been **retracted in its turn** — I had demoted my
+own oxygen PDE for losing to plain distance-to-nearest-vessel, and that was an inverted
+inequality: the predictors are sign-aligned, so |−0.1523| > |−0.1204| means the solve *wins*, by
+1.26×. I record it because it is the most instructive failure in the project — a component was
+deprecated on a misread inequality while every mechanical check in the same repository disagreed
+with the prose — and because the corrected reading is still modest: at ρ ≈ 0.15, within-section,
+the solve is the best of four weak predictors, not a validated oxygen field, and its diffusion
+length is still 2–5× the published value because its consumption term has never been fitted.
+What survives is the delivery axis, and it is scored: against 125 human glioma
 tissue samples across 42 patients plus 27 PMID-anchored regional PK measurements, predicted
 tumour:plasma partition lands within about a **2× geometric-mean fold error**, 6/6 drugs inside
 10×, with the BBB-penetrant vs BBB-excluded separation reproduced from molecular structure alone

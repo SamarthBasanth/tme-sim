@@ -222,24 +222,42 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
 
     # 6 -------------------------------------------------------------------- #
     oxy_mode = spec.get("oxygen_mode") or "pde"
+    # This limit previously read "The oxygen PDE is FALSIFIED as value-add",
+    # asserting the solve was beaten by a distance transform. That was an
+    # INVERTED INEQUALITY -- every predictor in the source table is sign-aligned
+    # to oxygen, so the stronger one is the one with the larger |rho|, and the
+    # solve has the larger |rho|. See results/oxygen_demotion.md, which is now
+    # the record of the correction. The limit is NOT deleted: the honest reading
+    # is still a warning, because the winning association is weak.
     limits.append({
         "id": "oxygen_pde_falsified",
         "severity": "warn",
         "applies": True,
-        "title": "The oxygen PDE is FALSIFIED as value-add",
+        "title": "The oxygen field is WEAK — the best of several weak predictors",
         "source": "results/oxygen_demotion.md; results/state_validation.md §1.2",
         "body": (
-            "Against measured VEGFA the reaction-diffusion oxygen solve ranks 5 "
-            "of 7 (rho = -0.1479) and is beaten by a one-line distance "
-            "transform built from its own source cells (rho = -0.1647), while "
-            "costing 11x to 31x more. It is retained as the default only "
-            "because it is bit-identical to the pre-option pipeline; it is not "
-            "retained because it predicts better. This report ran "
-            f"oxygen_mode='{oxy_mode}'. Its downstream effect on predicted kill "
-            "is at most 0.0262 absolute across three drugs, and therapeutic "
-            "coverage is oxygen-invariant by construction — so the oxygen field "
-            "is not what the ranking rests on, and no hypoxia claim should rest "
-            "on it either."
+            "Against measured hypoxia markers in 816,769 real cells the "
+            "reaction-diffusion oxygen solve scores rho = -0.1523, "
+            "out-predicting a one-line distance transform built from its own "
+            "source cells (-0.1204) and its own undiffused source term "
+            "(-0.1111). It is the default ON that evidence. But read the "
+            "magnitude, not just the ordering: |rho| ~ 0.15 is a WEAK "
+            "association, measured within one section rather than out of "
+            "sample, and carried by VEGFA alone (HIF1A contributes +0.0140). "
+            "The defensible statement is 'the best of several weak predictors', "
+            "never 'the oxygen solve is validated'. Separately and still true: "
+            "OxygenConfig.consumption has never been fitted to a measured "
+            "oxygen tension, so the solve's effective diffusion length is "
+            "several times the published ~150 um oxygen-diffusion distance — a "
+            "rank correlation cannot detect that, being invariant to monotone "
+            "rescaling, so absolute oxygen levels and band edges remain "
+            f"uncalibrated. This report ran oxygen_mode='{oxy_mode}'. The "
+            "oxygen route's downstream effect on predicted kill is small and "
+            "therapeutic coverage is oxygen-invariant by construction — so the "
+            "ranking does not rest on the oxygen field, and no absolute hypoxia "
+            "claim should rest on it either. AN EARLIER VERSION OF THIS LIMIT "
+            "DECLARED THE SOLVE FALSIFIED AS VALUE-ADD; that claim was "
+            "backwards by its own quoted numbers and has been withdrawn."
         ),
     })
 

@@ -341,7 +341,7 @@ State occupancy over all cells at this configuration: **VIABLE** 0.00%, **HYPOXI
 
 ### 6.1 Replicates / confirmed
 
-Two of these are confirmations of a *negative* result — the hypoxia rows confirm that the reaction-diffusion solve is out-predicted by a distance transform. 'Confirmed' means the prior finding reproduced, not that the model performed well.
+*(Corrected. This paragraph previously read "the hypoxia rows confirm that the reaction-diffusion solve is out-predicted by a distance transform" — which contradicted §4.1 and §5 of this same document, both of which already had it the right way round: §4.1 returns **REFUTED** on exactly that claim, and §5 annotates the distance baseline "loses to the PDE".)* The hypoxia rows here **refute** a prior negative result rather than confirming one: the solve out-predicts the distance transform (-0.1523 vs -0.1204). 'Confirmed' below means the prior finding reproduced, not that the model performed well — and that caution still applies to the hypoxia rows in the reversed direction, since |ρ| ≈ 0.15 is weak, within-section, and carried by VEGFA alone (HIF1A +0.0140). The solve being the best of these predictors does not make it a validated oxygen field.
 
 * **ENDOTHELIAL fraction matches human volume-EM 8.0% (PMID 38723085)** — 7.07% is 1.13x from 8.0% (inside the declared 1.5x tolerance); section 1 was 10.50% (1.31x)
 * **The ordering is NOT simply the IC50 ordering read back out** — potency alone would rank doxorubicin > methotrexate > cisplatin > lomustine > temozolomide; the simulation ranks cisplatin > doxorubicin > lomustine > temozolomide > methotrexate. rho(kill, 1/IC50) = +0.20, rho(kill, AUC/IC50) = +0.90
