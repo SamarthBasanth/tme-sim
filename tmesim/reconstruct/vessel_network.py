@@ -163,6 +163,30 @@ PUBLISHED: Dict[str, Dict] = {
                 "unbiased systematic-uniform-random sampling",
         "source": "Marien KM et al., PLoS One 2016;11(9):e0161496",
         "pmid": "27583442", "doi": "10.1371/journal.pone.0161496",
+        "measures": (
+            "count of CD31-stained vessel OBJECTS per mm^2 of tissue, under an "
+            "explicit connectivity rule quoted verbatim from the source's "
+            "Methods: 'every CD31-positive object, no matter how small, should "
+            "be counted, except suspected CD31-positive monocytes, macrophages "
+            "and tumor cells. Furthermore, if CD31-positive objects were "
+            "connected, they were considered a single object, while absence of "
+            "staining defined two or more separate objects.'"),
+        "commensurable_with_model": False,
+        "caveat": (
+            "The measurement's connectivity is CONTINUITY OF STAIN along the "
+            "vessel wall; this module's is PROXIMITY OF NUCLEI at "
+            "LINK_DISTANCE_UM = 20 um. Those cannot agree, and the direction of "
+            "the disagreement is fixed by this package's own measured constant: "
+            "vessel_geometry.EC_AXIAL_PITCH_UM = 50 um is the spacing of "
+            "consecutive endothelial nuclei along one vessel (PMID 38723085). "
+            "Linking at 20 um is provably below it, so consecutive nuclei on a "
+            "SINGLE stained vessel are split into separate objects and MVD is "
+            "over-counted BY CONSTRUCTION, in the same direction on every "
+            "section. The source also excludes CD31+ monocytes, macrophages and "
+            "tumour cells, which the marker-gated typing does not do, and notes "
+            "independently that 'one vessel can appear as separate shapes in "
+            "the two-dimensional section'. See "
+            "results/vascular_segmentation_audit.md."),
     },
     "intervessel_spacing_um": {
         "value": 124.0, "range": (102.6, 169.0),
@@ -180,10 +204,64 @@ PUBLISHED: Dict[str, Dict] = {
     },
     "vascular_area_fraction_pct": {
         "value": 2.1, "sd": 0.3, "range": (1.8, 2.4),
-        "what": "CD34+ vascular area fraction, human IDH-wt GBM (n=30), "
-                "whole-field positive-pixel count",
-        "source": "Angelucci C et al., Cells 2022;12(1):11",
+        "what": "CD34+ STAIN-POSITIVITY percentage, human IDH-wt GBM (n=30), "
+                "Aperio Positive Pixel Count over 10 selected 40x fields in the "
+                "TUMOUR CENTRE of 4 um sections",
+        "source": "Tamma R, Ingravallo G, Annese T, d'Amati A, Lorusso L, "
+                  "Ribatti D, Cells 2022;12(1):11",
         "pmid": "36611806", "doi": "10.3390/cells12010011",
+        # --- provenance verified against the source's own Methods -----------
+        "measures": (
+            "fraction of image PIXELS scoring positive for CD34 immunostain. "
+            "The source defines it verbatim as 'the number of positively "
+            "stained pixels on the total pixels in the image'."),
+        "commensurable_with_model": False,
+        "caveat": (
+            "NOT the same physical quantity as this module's vascular area "
+            "fraction. The model paints the geometric cross-section of a vessel "
+            "PROFILE (lumen + wall); CD34 stains only the endothelium, so the "
+            "lumen contributes no positive pixels. The measurement is therefore "
+            "a lower bound on vessel-profile area fraction, by an unquantified "
+            "factor that grows with vessel caliber. Two further mismatches: it "
+            "is 10 operator-selected 40x fields in the tumour centre, not a "
+            "whole section or an unbiased sample; and the reported +/-0.3 is a "
+            "STANDARD ERROR (the source's Statistical Analysis states 'means "
+            "+/- SE', n=30), so the 1.8-2.4 band below is a +/-1 SE band on the "
+            "cohort MEAN, not a cohort range. The implied cohort SD is "
+            "0.3*sqrt(30) = 1.64, i.e. a +/-1 SD range of roughly 0.5-3.7. The "
+            "band is left UNCHANGED here on purpose: widening it would convert "
+            "the development section's 1.25% from a miss into a pass, which is "
+            "a scoring decision for a human reviewer, not a silent edit. See "
+            "results/vascular_segmentation_audit.md. Use "
+            "'vessel_areal_fraction_pct' below for the commensurable comparison."),
+        "dispersion_is": "standard error of the mean (n=30), NOT a cohort SD",
+    },
+    # The COMMENSURABLE areal-fraction anchor, from the SAME paper this module
+    # already cites for MVD. Its stereological point-count rule counts a grid
+    # point as vascular when it falls on "an endothelial cell OR a vessel lumen"
+    # -- i.e. the whole vessel profile, which is exactly what
+    # vessel_geometry.vascular_area_fraction paints. Reported alongside the CD34
+    # stain-positivity entry above rather than replacing it, so that no existing
+    # verdict moves and the two can be compared.
+    "vessel_areal_fraction_pct": {
+        "value": 4.70, "sd": 2.38, "range": (2.32, 7.08),
+        "what": "microvessel AREAL FRACTION A_A, human GBM (n=20), CD31 "
+                "whole-slide, systematic-uniform-random sampling, stereological "
+                "point counting (grid point counts when it falls on an "
+                "endothelial cell OR a vessel lumen)",
+        "source": "Marien KM et al., PLoS One 2016;11(9):e0161496",
+        "pmid": "27583442", "doi": "10.1371/journal.pone.0161496",
+        "measures": (
+            "areal fraction of VESSEL PROFILES (lumen included) per unit tissue "
+            "area, by unbiased point counting. Same specimens, same sampling "
+            "design and same denominator convention as the MVD anchor above."),
+        "commensurable_with_model": True,
+        "caveat": (
+            "Cohort mean +/- 1 SD over 20 GBM patients; population context, not "
+            "a target. The source itself reports this parameter as the LESS "
+            "robust of its two: inter-ROI ICC for A_A in GBM was 0.6 against "
+            "1.0 for the profile count, because point counting samples only a "
+            "small area. Range shown is mean +/- 1 SD."),
     },
     "vessel_diameter_um": {
         "value": 15.0, "range": (15.0, 37.4),
@@ -651,12 +729,23 @@ def segmentation_report(vessels: Dict, domain: Domain,
             "reference_kind": "population cohort mean — context, not a target",
             "pmid": pub["pmid"], "doi": pub["doi"],
             "source": pub["source"],
+            # Is the model computing the SAME physical quantity the source
+            # measured? Where this is False the ratio above is not an error
+            # measurement and must not be read as one. ``None`` means the
+            # question has not been adjudicated for that row.
+            "measures": pub.get("measures"),
+            "commensurable": pub.get("commensurable_with_model"),
+            "caveat": pub.get("caveat"),
         })
 
     _row("mvd_per_mm2", vessels["mvd_per_mm2"], "vessels/mm^2")
     _row("intervessel_spacing_um", vessels["spacing_from_mvd_um"], "um")
     _row("median_tumor_to_vessel_um", vessels["tumor_to_vessel"]["median"], "um")
     _row("vascular_area_fraction_pct", area_frac_pct, "% of tissue area")
+    # The SAME reconstructed number scored against the commensurable anchor.
+    # Both rows are emitted so the size of the modality correction is always
+    # visible next to the historical comparison; neither replaces the other.
+    _row("vessel_areal_fraction_pct", area_frac_pct, "% of tissue area")
 
     # Poisson (complete-spatial-randomness) expectation AT THE RECONSTRUCTION'S OWN
     # density — the test that ``vascular_validation.md`` shows the KDE fails. Real
