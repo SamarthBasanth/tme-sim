@@ -1,0 +1,171 @@
+{
+  "sample": "data_cache/xenium_gbm",
+  "dx_um": 12.0,
+  "pd_multipliers": {
+    "HYPOXIC": 0.35,
+    "QUIESCENT": 0.5,
+    "VIABLE": 1.0
+  },
+  "quiescent_band": [
+    0.2,
+    0.4
+  ],
+  "sweep": {
+    "x0.5": {
+      "band_fractions": {
+        "HYPOXIC": 0.2675961699983202,
+        "QUIESCENT": 0.7324038300016799,
+        "VIABLE": 0.0
+      },
+      "f_state": 0.459860574500252,
+      "mean_oxygen_tissue": 0.2148973545496174,
+      "mean_oxygen_all": 0.2161401663624142,
+      "mean_oxygen_tumour": 0.21263238864150544,
+      "mean_vascular_tissue": 0.013416635699244395,
+      "source_multiplier": 0.5
+    },
+    "x0.75": {
+      "band_fractions": {
+        "HYPOXIC": 0.0,
+        "QUIESCENT": 1.0,
+        "VIABLE": 0.0
+      },
+      "f_state": 0.5,
+      "mean_oxygen_tissue": 0.29026665807985846,
+      "mean_oxygen_all": 0.29185865613474365,
+      "mean_oxygen_tumour": 0.2873356967866605,
+      "mean_vascular_tissue": 0.020124953548866592,
+      "source_multiplier": 0.75
+    },
+    "x1": {
+      "band_fractions": {
+        "HYPOXIC": 0.0,
+        "QUIESCENT": 0.8995884428019486,
+        "VIABLE": 0.10041155719805141
+      },
+      "f_state": 0.5502057785990258,
+      "mean_oxygen_tissue": 0.35204854974974675,
+      "mean_oxygen_all": 0.3538863602825404,
+      "mean_oxygen_tumour": 0.34862776586515865,
+      "mean_vascular_tissue": 0.02683327139848879,
+      "source_multiplier": 1.0
+    },
+    "x1.25": {
+      "band_fractions": {
+        "HYPOXIC": 0.0,
+        "QUIESCENT": 0.8995884428019486,
+        "VIABLE": 0.10041155719805141
+      },
+      "f_state": 0.5502057785990258,
+      "mean_oxygen_tissue": 0.35204854974974675,
+      "mean_oxygen_all": 0.3538863602825404,
+      "mean_oxygen_tumour": 0.34862776586515865,
+      "mean_vascular_tissue": 0.03354158924811099,
+      "source_multiplier": 1.25
+    },
+    "x1.5": {
+      "band_fractions": {
+        "HYPOXIC": 0.0,
+        "QUIESCENT": 0.8995884428019486,
+        "VIABLE": 0.10041155719805141
+      },
+      "f_state": 0.5502057785990258,
+      "mean_oxygen_tissue": 0.35204854974974675,
+      "mean_oxygen_all": 0.3538863602825404,
+      "mean_oxygen_tumour": 0.34862776586515865,
+      "mean_vascular_tissue": 0.040249907097733184,
+      "source_multiplier": 1.5
+    },
+    "x2": {
+      "band_fractions": {
+        "HYPOXIC": 0.0,
+        "QUIESCENT": 0.8995884428019486,
+        "VIABLE": 0.10041155719805141
+      },
+      "f_state": 0.5502057785990258,
+      "mean_oxygen_tissue": 0.35204854974974675,
+      "mean_oxygen_all": 0.3538863602825404,
+      "mean_oxygen_tumour": 0.34862776586515865,
+      "mean_vascular_tissue": 0.05366654279697758,
+      "source_multiplier": 2.0
+    },
+    "x2.78": {
+      "band_fractions": {
+        "HYPOXIC": 0.0,
+        "QUIESCENT": 0.8995884428019486,
+        "VIABLE": 0.10041155719805141
+      },
+      "f_state": 0.5502057785990258,
+      "mean_oxygen_tissue": 0.35204854974974675,
+      "mean_oxygen_all": 0.3538863602825404,
+      "mean_oxygen_tumour": 0.34862776586515865,
+      "mean_vascular_tissue": 0.0745964944877988,
+      "source_multiplier": 2.78
+    },
+    "x3": {
+      "band_fractions": {
+        "HYPOXIC": 0.0,
+        "QUIESCENT": 0.8995884428019486,
+        "VIABLE": 0.10041155719805141
+      },
+      "f_state": 0.5502057785990258,
+      "mean_oxygen_tissue": 0.35204854974974675,
+      "mean_oxygen_all": 0.3538863602825404,
+      "mean_oxygen_tumour": 0.34862776586515865,
+      "mean_vascular_tissue": 0.08049981419546637,
+      "source_multiplier": 3.0
+    },
+    "x4": {
+      "band_fractions": {
+        "HYPOXIC": 0.0,
+        "QUIESCENT": 0.8995884428019486,
+        "VIABLE": 0.10041155719805141
+      },
+      "f_state": 0.5502057785990258,
+      "mean_oxygen_tissue": 0.35204854974974675,
+      "mean_oxygen_all": 0.3538863602825404,
+      "mean_oxygen_tumour": 0.34862776586515865,
+      "mean_vascular_tissue": 0.10733308559395516,
+      "source_multiplier": 4.0
+    },
+    "x6": {
+      "band_fractions": {
+        "HYPOXIC": 0.0,
+        "QUIESCENT": 0.8995884428019486,
+        "VIABLE": 0.10041155719805141
+      },
+      "f_state": 0.5502057785990258,
+      "mean_oxygen_tissue": 0.35204854974974675,
+      "mean_oxygen_all": 0.3538863602825404,
+      "mean_oxygen_tumour": 0.34862776586515865,
+      "mean_vascular_tissue": 0.16099962839093274,
+      "source_multiplier": 6.0
+    }
+  },
+  "reference": {
+    "discrete": {
+      "band_fractions": {
+        "HYPOXIC": 0.0,
+        "QUIESCENT": 0.8995884428019486,
+        "VIABLE": 0.10041155719805141
+      },
+      "f_state": 0.5502057785990258,
+      "mean_oxygen_tissue": 0.35204854974974675,
+      "mean_oxygen_all": 0.3538863602825404,
+      "mean_oxygen_tumour": 0.34862776586515865,
+      "mean_vascular_tissue": 0.02683327139848879
+    },
+    "kde": {
+      "band_fractions": {
+        "HYPOXIC": 0.0,
+        "QUIESCENT": 0.0,
+        "VIABLE": 1.0
+      },
+      "f_state": 1.0,
+      "mean_oxygen_tissue": 0.598283690759461,
+      "mean_oxygen_all": 0.6002046137399711,
+      "mean_oxygen_tumour": 0.5944548208836133,
+      "mean_vascular_tissue": 0.074652368516946
+    }
+  }
+}

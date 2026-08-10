@@ -1,0 +1,327 @@
+{
+  "alpha": 148.60815765445545,
+  "dx_um": 12.0,
+  "sample": "data_cache/xenium_gbm",
+  "vascular": {
+    "kde": {
+      "mean_tissue": 0.074652368516946,
+      "total_tissue": 14464.04570489532,
+      "nonzero_frac_tissue": 0.997796151781659,
+      "sha": "6859268c1fba258f"
+    },
+    "discrete": {
+      "mean_tissue": 0.02683327139848879,
+      "total_tissue": 5199.0,
+      "nonzero_frac_tissue": 0.02683327139848879,
+      "sha": "1a30cb3950c0c6ee"
+    },
+    "discrete_dosematched": {
+      "mean_tissue": 0.074652368516946,
+      "total_tissue": 14464.045704895321,
+      "nonzero_frac_tissue": 0.02683327139848879,
+      "sha": "c4baaa1e4d6a8be1"
+    }
+  },
+  "surrogate_sha_by_arm": {
+    "kde": "b43d0262b1f23cfe",
+    "discrete": "b43d0262b1f23cfe",
+    "discrete_dosematched": "b43d0262b1f23cfe"
+  },
+  "surrogate_identical_everywhere": true,
+  "mean_oxygen": {
+    "kde": 0.6002046137399711,
+    "discrete": 0.3538863602825404,
+    "discrete_dosematched": 0.3538863602825404
+  },
+  "mean_oxygen_surrogate": 0.4574456334468773,
+  "cells": {
+    "kde|temozolomide": {
+      "engine_kill": 0.10322526457248449,
+      "kills": {
+        "kde": 0.10322526457248449,
+        "discrete": 0.05707206450529145,
+        "discrete_dosematched": 0.05707206450529145,
+        "surrogate": 0.10024357466823453
+      },
+      "bands": {
+        "kde": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "discrete": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "discrete_dosematched": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "surrogate": {
+          "HYPOXIC": 0.0025617335797077103,
+          "QUIESCENT": 0.08667898538551991,
+          "VIABLE": 0.9107592810347724
+        }
+      },
+      "delta_kill_surrogate_minus_native_pde": -0.0029816899042499623
+    },
+    "kde|cisplatin": {
+      "engine_kill": 0.9288593986225433,
+      "kills": {
+        "kde": 0.9288593986225433,
+        "discrete": 0.5104989081135562,
+        "discrete_dosematched": 0.5104989081135562,
+        "surrogate": 0.8887955652612128
+      },
+      "bands": {
+        "kde": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "discrete": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "discrete_dosematched": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "surrogate": {
+          "HYPOXIC": 0.0025617335797077103,
+          "QUIESCENT": 0.08667898538551991,
+          "VIABLE": 0.9107592810347724
+        }
+      },
+      "delta_kill_surrogate_minus_native_pde": -0.04006383336133046
+    },
+    "kde|doxorubicin": {
+      "engine_kill": 0.7465563581387535,
+      "kills": {
+        "kde": 0.7465563581387535,
+        "discrete": 0.41126322862422304,
+        "discrete_dosematched": 0.41126322862422304,
+        "surrogate": 0.7206030572820427
+      },
+      "bands": {
+        "kde": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "discrete": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "discrete_dosematched": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "surrogate": {
+          "HYPOXIC": 0.0025617335797077103,
+          "QUIESCENT": 0.08667898538551991,
+          "VIABLE": 0.9107592810347724
+        }
+      },
+      "delta_kill_surrogate_minus_native_pde": -0.02595330085671088
+    },
+    "discrete|temozolomide": {
+      "engine_kill": 0.01835209138249627,
+      "kills": {
+        "kde": 0.03246262388711574,
+        "discrete": 0.01835209138249627,
+        "discrete_dosematched": 0.01835209138249627,
+        "surrogate": 0.03145472870821431
+      },
+      "bands": {
+        "kde": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "discrete": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "discrete_dosematched": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "surrogate": {
+          "HYPOXIC": 0.0025617335797077103,
+          "QUIESCENT": 0.08667898538551991,
+          "VIABLE": 0.9107592810347724
+        }
+      },
+      "delta_kill_surrogate_minus_native_pde": 0.013102637325718036
+    },
+    "discrete|cisplatin": {
+      "engine_kill": 0.4361666386695784,
+      "kills": {
+        "kde": 0.7932974970603057,
+        "discrete": 0.4361666386695784,
+        "discrete_dosematched": 0.4361666386695784,
+        "surrogate": 0.7613808163950949
+      },
+      "bands": {
+        "kde": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "discrete": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "discrete_dosematched": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "surrogate": {
+          "HYPOXIC": 0.0025617335797077103,
+          "QUIESCENT": 0.08667898538551991,
+          "VIABLE": 0.9107592810347724
+        }
+      },
+      "delta_kill_surrogate_minus_native_pde": 0.32521417772551653
+    },
+    "discrete|doxorubicin": {
+      "engine_kill": 0.2594910129346548,
+      "kills": {
+        "kde": 0.47203090878548626,
+        "discrete": 0.2594910129346548,
+        "discrete_dosematched": 0.2594910129346548,
+        "surrogate": 0.45926423651940196
+      },
+      "bands": {
+        "kde": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "discrete": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "discrete_dosematched": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "surrogate": {
+          "HYPOXIC": 0.0025617335797077103,
+          "QUIESCENT": 0.08667898538551991,
+          "VIABLE": 0.9107592810347724
+        }
+      },
+      "delta_kill_surrogate_minus_native_pde": 0.19977322358474714
+    },
+    "discrete_dosematched|temozolomide": {
+      "engine_kill": 0.056904081975474585,
+      "kills": {
+        "kde": 0.10234335629094571,
+        "discrete": 0.056904081975474585,
+        "discrete_dosematched": 0.056904081975474585,
+        "surrogate": 0.09936166638669575
+      },
+      "bands": {
+        "kde": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "discrete": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "discrete_dosematched": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "surrogate": {
+          "HYPOXIC": 0.0025617335797077103,
+          "QUIESCENT": 0.08667898538551991,
+          "VIABLE": 0.9107592810347724
+        }
+      },
+      "delta_kill_surrogate_minus_native_pde": 0.04245758441122116
+    },
+    "discrete_dosematched|cisplatin": {
+      "engine_kill": 0.5101629430539224,
+      "kills": {
+        "kde": 0.9283974466655468,
+        "discrete": 0.5101629430539224,
+        "discrete_dosematched": 0.5101629430539224,
+        "surrogate": 0.8885435914664874
+      },
+      "bands": {
+        "kde": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "discrete": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "discrete_dosematched": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "surrogate": {
+          "HYPOXIC": 0.0025617335797077103,
+          "QUIESCENT": 0.08667898538551991,
+          "VIABLE": 0.9107592810347724
+        }
+      },
+      "delta_kill_surrogate_minus_native_pde": 0.378380648412565
+    },
+    "discrete_dosematched|doxorubicin": {
+      "engine_kill": 0.40370401478246265,
+      "kills": {
+        "kde": 0.7341256509323031,
+        "discrete": 0.40370401478246265,
+        "discrete_dosematched": 0.40370401478246265,
+        "surrogate": 0.7101461448009407
+      },
+      "bands": {
+        "kde": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "discrete": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "discrete_dosematched": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "surrogate": {
+          "HYPOXIC": 0.0025617335797077103,
+          "QUIESCENT": 0.08667898538551991,
+          "VIABLE": 0.9107592810347724
+        }
+      },
+      "delta_kill_surrogate_minus_native_pde": 0.3064421300184781
+    }
+  }
+}

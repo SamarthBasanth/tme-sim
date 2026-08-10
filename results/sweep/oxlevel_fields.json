@@ -1,0 +1,149 @@
+{
+  "sample": "data_cache/xenium_gbm",
+  "dx_um": 12.0,
+  "arms": {
+    "discrete": {
+      "vascular_source": "DISCRETE segmented vessels from REAL ENDOTHELIAL cell positions",
+      "mean_oxygen_reported": 0.35204854974974675,
+      "mean_vascular_density_reported": 0.02683327139848879,
+      "vascular": {
+        "all": {
+          "mean": 0.018165618448637316,
+          "min": 0.0,
+          "max": 1.0,
+          "nonzero_fraction": 0.018165618448637316,
+          "median": 0.0,
+          "sum": 5199.0
+        },
+        "tissue": {
+          "mean": 0.02683327139848879,
+          "min": 0.0,
+          "max": 1.0,
+          "nonzero_fraction": 0.02683327139848879,
+          "median": 0.0,
+          "sum": 5199.0
+        }
+      },
+      "oxygen_pde": {
+        "all": {
+          "mean": 0.3538863602825404,
+          "min": 0.2853010120243143,
+          "max": 0.4295696245297673,
+          "nonzero_fraction": 1.0,
+          "median": 0.35036210505233456,
+          "sum": 101282.27631286306
+        },
+        "tissue": {
+          "mean": 0.35204854974974675,
+          "min": 0.2853010120243143,
+          "max": 0.4295696245297673,
+          "nonzero_fraction": 1.0,
+          "median": 0.3479898227245416,
+          "sum": 68210.11061111293
+        }
+      },
+      "oxygen_surrogate": {
+        "all": {
+          "mean": 0.4574456334468773,
+          "min": 7.950360157061675e-12,
+          "max": 0.9995030725889263,
+          "nonzero_fraction": 1.0,
+          "median": 0.5237149275358657,
+          "sum": 130920.94029249628
+        },
+        "tissue": {
+          "mean": 0.6216393252588699,
+          "min": 0.00020985419517454107,
+          "max": 0.9995030725889263,
+          "nonzero_fraction": 1.0,
+          "median": 0.6230782016956664,
+          "sum": 120443.86254755656
+        }
+      },
+      "surrogate_sha": "b43d0262b1f23cfe",
+      "vascular_sha": "1a30cb3950c0c6ee",
+      "oxygen_pde_sha": "2fb1bae6cc4a7f36",
+      "surrogate_L_um": 93.20024018394177,
+      "surrogate_n_endothelial_cells": 4295,
+      "surrogate_point_source": "endothelial",
+      "grid": [
+        424,
+        675
+      ],
+      "n_cells": 40887
+    },
+    "kde": {
+      "vascular_source": "DISCRETE segmented vessels from REAL ENDOTHELIAL cell positions",
+      "mean_oxygen_reported": 0.598283690759461,
+      "mean_vascular_density_reported": 0.074652368516946,
+      "vascular": {
+        "all": {
+          "mean": 0.05053824495071739,
+          "min": 0.0,
+          "max": 1.0,
+          "nonzero_fraction": 0.6754891684136967,
+          "median": 0.029049806978936787,
+          "sum": 14464.045704895318
+        },
+        "tissue": {
+          "mean": 0.074652368516946,
+          "min": 0.0,
+          "max": 1.0,
+          "nonzero_fraction": 0.997796151781659,
+          "median": 0.05666396255825103,
+          "sum": 14464.04570489532
+        }
+      },
+      "oxygen_pde": {
+        "all": {
+          "mean": 0.6002046137399711,
+          "min": 0.514810807492788,
+          "max": 0.697849253636139,
+          "nonzero_fraction": 1.0,
+          "median": 0.5969926760832754,
+          "sum": 171778.56045237975
+        },
+        "tissue": {
+          "mean": 0.598283690759461,
+          "min": 0.514810807492788,
+          "max": 0.697849253636139,
+          "nonzero_fraction": 1.0,
+          "median": 0.5941032888571633,
+          "sum": 115918.66165202709
+        }
+      },
+      "oxygen_surrogate": {
+        "all": {
+          "mean": 0.4574456334468773,
+          "min": 7.950360157061675e-12,
+          "max": 0.9995030725889263,
+          "nonzero_fraction": 1.0,
+          "median": 0.5237149275358657,
+          "sum": 130920.94029249628
+        },
+        "tissue": {
+          "mean": 0.6216393252588699,
+          "min": 0.00020985419517454107,
+          "max": 0.9995030725889263,
+          "nonzero_fraction": 1.0,
+          "median": 0.6230782016956664,
+          "sum": 120443.86254755656
+        }
+      },
+      "surrogate_sha": "b43d0262b1f23cfe",
+      "vascular_sha": "6859268c1fba258f",
+      "oxygen_pde_sha": "071eb7e3c9c617d2",
+      "surrogate_L_um": 93.20024018394177,
+      "surrogate_n_endothelial_cells": 4295,
+      "surrogate_point_source": "endothelial",
+      "grid": [
+        424,
+        675
+      ],
+      "n_cells": 40887
+    }
+  },
+  "surrogate_is_vascular_mode_invariant": true,
+  "pde_field_changed": true,
+  "vascular_field_changed": true
+}

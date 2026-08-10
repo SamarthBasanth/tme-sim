@@ -1,0 +1,257 @@
+{
+  "sample": "data_cache/xenium_gbm",
+  "ladder": {
+    "dx30_discrete": {
+      "dx_um": 30.0,
+      "vascular_mode": "discrete",
+      "grid": [
+        170,
+        271
+      ],
+      "mean_oxygen_pde": 0.33994170999009055,
+      "mean_oxygen_surrogate": 0.45492376353265324,
+      "mean_vascular": 0.017212936835250707,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.9917688560389719,
+        "viable_frac": 0.008231143961028054
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.002603729212161935,
+        "quiescent_frac": 0.08453720813035444,
+        "viable_frac": 0.9128590626574836
+      }
+    },
+    "dx30_kde": {
+      "dx_um": 30.0,
+      "vascular_mode": "kde",
+      "grid": [
+        170,
+        271
+      ],
+      "mean_oxygen_pde": 0.6056198929177026,
+      "mean_oxygen_surrogate": 0.45492376353265324,
+      "mean_vascular": 0.05138146046230593,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.0,
+        "viable_frac": 1.0
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.002603729212161935,
+        "quiescent_frac": 0.08453720813035444,
+        "viable_frac": 0.9128590626574836
+      }
+    },
+    "dx20_discrete": {
+      "dx_um": 20.0,
+      "vascular_mode": "discrete",
+      "grid": [
+        255,
+        406
+      ],
+      "mean_oxygen_pde": 0.34886809941839286,
+      "mean_oxygen_surrogate": 0.4554606047735782,
+      "mean_vascular": 0.0178402395440935,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.9196203594826138,
+        "viable_frac": 0.08037964051738619
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.0023937510498908115,
+        "quiescent_frac": 0.08495716445489669,
+        "viable_frac": 0.9126490844952125
+      }
+    },
+    "dx20_kde": {
+      "dx_um": 20.0,
+      "vascular_mode": "kde",
+      "grid": [
+        255,
+        406
+      ],
+      "mean_oxygen_pde": 0.5985208822206391,
+      "mean_oxygen_surrogate": 0.4554606047735782,
+      "mean_vascular": 0.049911853711406426,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.0,
+        "viable_frac": 1.0
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.0023937510498908115,
+        "quiescent_frac": 0.08495716445489669,
+        "viable_frac": 0.9126490844952125
+      }
+    },
+    "dx16_discrete": {
+      "dx_um": 16.0,
+      "vascular_mode": "discrete",
+      "grid": [
+        318,
+        507
+      ],
+      "mean_oxygen_pde": 0.3528419796506145,
+      "mean_oxygen_surrogate": 0.45688084298142545,
+      "mean_vascular": 0.018067805440809794,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.9333529312951453,
+        "viable_frac": 0.06664706870485469
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.0025197379472534855,
+        "quiescent_frac": 0.08655299848815723,
+        "viable_frac": 0.9109272635645893
+      }
+    },
+    "dx16_kde": {
+      "dx_um": 16.0,
+      "vascular_mode": "kde",
+      "grid": [
+        318,
+        507
+      ],
+      "mean_oxygen_pde": 0.6026709452563379,
+      "mean_oxygen_surrogate": 0.45688084298142545,
+      "mean_vascular": 0.05096079936099871,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.0,
+        "viable_frac": 1.0
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.0025197379472534855,
+        "quiescent_frac": 0.08655299848815723,
+        "viable_frac": 0.9109272635645893
+      }
+    },
+    "dx12_discrete": {
+      "dx_um": 12.0,
+      "vascular_mode": "discrete",
+      "grid": [
+        424,
+        675
+      ],
+      "mean_oxygen_pde": 0.3538863602825404,
+      "mean_oxygen_surrogate": 0.4574456334468773,
+      "mean_vascular": 0.018165618448637316,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.8995884428019486,
+        "viable_frac": 0.10041155719805141
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.0025617335797077103,
+        "quiescent_frac": 0.08667898538551991,
+        "viable_frac": 0.9107592810347724
+      }
+    },
+    "dx12_kde": {
+      "dx_um": 12.0,
+      "vascular_mode": "kde",
+      "grid": [
+        424,
+        675
+      ],
+      "mean_oxygen_pde": 0.6002046137399711,
+      "mean_oxygen_surrogate": 0.4574456334468773,
+      "mean_vascular": 0.05053824495071739,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.0,
+        "viable_frac": 1.0
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.0025617335797077103,
+        "quiescent_frac": 0.08667898538551991,
+        "viable_frac": 0.9107592810347724
+      }
+    },
+    "dx10_discrete": {
+      "dx_um": 10.0,
+      "vascular_mode": "discrete",
+      "grid": [
+        508,
+        810
+      ],
+      "mean_oxygen_pde": 0.35189265671102515,
+      "mean_oxygen_surrogate": 0.4581318746247703,
+      "mean_vascular": 0.017964421114027414,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.9390223416764657,
+        "viable_frac": 0.06097765832353435
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.0023517554174365867,
+        "quiescent_frac": 0.08722492860742483,
+        "viable_frac": 0.9104233159751386
+      }
+    },
+    "dx10_kde": {
+      "dx_um": 10.0,
+      "vascular_mode": "kde",
+      "grid": [
+        508,
+        810
+      ],
+      "mean_oxygen_pde": 0.5983776211365787,
+      "mean_oxygen_surrogate": 0.4581318746247703,
+      "mean_vascular": 0.05021146566665237,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.0,
+        "viable_frac": 1.0
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.0023517554174365867,
+        "quiescent_frac": 0.08722492860742483,
+        "viable_frac": 0.9104233159751386
+      }
+    },
+    "dx8_discrete": {
+      "dx_um": 8.0,
+      "vascular_mode": "discrete",
+      "grid": [
+        635,
+        1012
+      ],
+      "mean_oxygen_pde": 0.3536013928737012,
+      "mean_oxygen_surrogate": 0.4583234241786978,
+      "mean_vascular": 0.01815847623790109,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.9023601545439275,
+        "viable_frac": 0.09763984545607257
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.0024357466823450363,
+        "quiescent_frac": 0.08613304216361499,
+        "viable_frac": 0.91143121115404
+      }
+    },
+    "dx8_kde": {
+      "dx_um": 8.0,
+      "vascular_mode": "kde",
+      "grid": [
+        635,
+        1012
+      ],
+      "mean_oxygen_pde": 0.5987768627682919,
+      "mean_oxygen_surrogate": 0.4583234241786978,
+      "mean_vascular": 0.05034272111177398,
+      "bands_pde": {
+        "hypoxic_frac": 0.0,
+        "quiescent_frac": 0.0,
+        "viable_frac": 1.0
+      },
+      "bands_surrogate": {
+        "hypoxic_frac": 0.0024357466823450363,
+        "quiescent_frac": 0.08613304216361499,
+        "viable_frac": 0.91143121115404
+      }
+    }
+  }
+}

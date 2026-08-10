@@ -1,0 +1,677 @@
+{
+  "sample": "data_cache/xenium_gbm",
+  "dx_um": 12.0,
+  "arms": {
+    "discrete": {
+      "sample": "data_cache/xenium_gbm",
+      "dx_um": 12.0,
+      "alpha": 148.60815765445545,
+      "n_cells": 40887,
+      "grid": [
+        424,
+        675
+      ],
+      "report_pde": {
+        "patient_id": "xenium-gbm-real",
+        "source": "xenium",
+        "n_cells": 40887,
+        "n_tumor": 23812,
+        "grid": [
+          424,
+          675
+        ],
+        "dx_um": 12.0,
+        "extent_um": [
+          8100.0,
+          5088.0
+        ],
+        "celltype_counts": {
+          "TUMOR": 23812,
+          "STROMAL": 4815,
+          "IMMUNE": 7965,
+          "ENDOTHELIAL": 4295,
+          "NECROTIC": 0
+        },
+        "celltype_fractions": {
+          "TUMOR": 0.5823855993347519,
+          "STROMAL": 0.11776359233986353,
+          "IMMUNE": 0.19480519480519481,
+          "ENDOTHELIAL": 0.10504561352018979,
+          "NECROTIC": 0.0
+        },
+        "mean_vascular_density": 0.02683327139848879,
+        "mean_ecm_density": 0.07594908632830119,
+        "mean_oxygen": 0.35204854974974675,
+        "oxygen": {
+          "mode": "pde",
+          "source": "physics.solve_oxygen driven by the real vascular field",
+          "is_surrogate": false,
+          "caveat": "WEAK BUT BEST-IN-CLASS (results/state_validation.md \u00a71.2, results/oxygen_demotion.md): against measured hypoxia markers on 816,769 cells the solve scores rho -0.1523, out-predicting a distance transform on its own source cells (-0.1204) and its own undiffused source term (-0.1111). The default is 'pde' ON that evidence, not despite it. Read the magnitude, though: |rho| ~ 0.15 is a weak, within-section association carried by VEGFA alone (HIF1A contributes +0.0140), so this is the best of several weak predictors and not a validated oxygen field. SEPARATELY AND STILL TRUE: OxygenConfig.consumption is unfitted, so the solve's effective diffusion length is several times the published ~150 um -- a Spearman rho cannot detect that, because it is invariant to monotone rescaling. Absolute levels and band edges remain uncalibrated. An earlier version of this caveat declared the solve FALSIFIED AS VALUE-ADD; that claim was an inverted inequality and has been withdrawn.",
+          "detail": null
+        },
+        "oxygen_mode": "pde",
+        "cell_state": {
+          "mode": "oxygen",
+          "source": "cells.agents.update_cell_states bands the SIMULATED oxygen field (applied by sim.engine.simulate_response, not here)",
+          "is_measured": false,
+          "caveat": "NOT A MEASUREMENT (results/state_validation.md \u00a72.2, results/cell_state_impact.md \u00a72.2): the tumour VIABLE fraction this produces swings across two tissue-mask conventions and three grid spacings, both of which are bookkeeping choices rather than measurements \u2014 0.60%-98.19% (165x) as measured under the KDE-era vascular source, and 0.00%-10.04% (the band goes EMPTY, so the ratio is unbounded) re-measured on the same grid under the current discrete vessel source. The HYPOXIC band is also empty on that section, so PDConfig.hypoxia_resistance acts on no cells. Retained as the default so no published number moves silently, NOT because it is the best available route.",
+          "detail": null,
+          "unmeasured_states": null,
+          "fractions_tumor": null
+        },
+        "state_mode": "oxygen",
+        "ecm_markers_used": [
+          "COL1A2",
+          "COL12A1",
+          "COL25A1",
+          "POSTN",
+          "VCAN",
+          "DCN",
+          "FBLN1",
+          "LAMA2",
+          "THBS1",
+          "SPON1",
+          "TGFBI"
+        ],
+        "tissue_mask_mode": "geometric",
+        "tissue_disc_radius_um": 30.0,
+        "tissue_coverage_fraction": 0.6769811320754717,
+        "sensitivity": {
+          "mode": null,
+          "upper_bound": true,
+          "comparability": "COMPARABLE across drugs \u2014 the reconstruction default is uniform 1.0 for every drug, so sensitivity cancels out of any ranking (and every absolute kill is an equal no-resistance upper bound).",
+          "model": "uniform 1.0 (drug-agnostic reconstruction default)",
+          "determinant_gene": null,
+          "kind": "none (uniform 1.0)",
+          "rationale": "no per-cell intrinsic-resistance information is asserted; kill is pure delivery + potency physics",
+          "marker_detection_rate": null,
+          "mgmt_applied": false,
+          "mgmt_scalar": null,
+          "mgmt_input": null,
+          "mgmt_model": null,
+          "mgmt_scalar_ci95": null,
+          "mgmt_calibration_n": null,
+          "mgmt_resolution": null,
+          "mgmt_note": null,
+          "is_uniform": true,
+          "mean_all_cells": 1.0,
+          "std_all_cells": 0.0,
+          "mean_tumor": 1.0,
+          "std_tumor": 0.0,
+          "min": 1.0,
+          "max": 1.0,
+          "caveat": "ABSOLUTE kill_fraction is CONDITIONAL on this sensitivity assumption. It is deterministic and documented, but it is NOT a measured drug response -- this section has no outcome label."
+        }
+      },
+      "report_vessel_distance": {
+        "patient_id": "xenium-gbm-real",
+        "source": "xenium",
+        "n_cells": 40887,
+        "n_tumor": 23812,
+        "grid": [
+          424,
+          675
+        ],
+        "dx_um": 12.0,
+        "extent_um": [
+          8100.0,
+          5088.0
+        ],
+        "celltype_counts": {
+          "TUMOR": 23812,
+          "STROMAL": 4815,
+          "IMMUNE": 7965,
+          "ENDOTHELIAL": 4295,
+          "NECROTIC": 0
+        },
+        "celltype_fractions": {
+          "TUMOR": 0.5823855993347519,
+          "STROMAL": 0.11776359233986353,
+          "IMMUNE": 0.19480519480519481,
+          "ENDOTHELIAL": 0.10504561352018979,
+          "NECROTIC": 0.0
+        },
+        "mean_vascular_density": 0.02683327139848879,
+        "mean_ecm_density": 0.07594908632830119,
+        "mean_oxygen": 0.6216393252588699,
+        "oxygen": {
+          "mode": "vessel_distance",
+          "source": "SURROGATE: exp(-d/L) in distance to the nearest endothelial vessel point (L = 93.20 um)",
+          "is_surrogate": true,
+          "caveat": "NOT a solved oxygen tension. A monotone geometric proxy, calibrated to the Thomlinson & Gray 1955 oxygen-diffusion distance (PMID 13304213) so its hypoxia band edge sits at 150 um from a vessel. Its ABSOLUTE level is uncalibrated \u2014 as is the PDE's.",
+          "detail": {
+            "source": "endothelial",
+            "what": "every measured CellType.ENDOTHELIAL cell centroid",
+            "n_points": 4295,
+            "n_endothelial_cells": 4295,
+            "n_vessels": null,
+            "link_distance_um": null,
+            "min_cells_per_vessel": null,
+            "at": "grid",
+            "median_distance_um": 60.28263990193476,
+            "kind": "SURROGATE (geometric proxy), NOT a solved oxygen tension",
+            "mapping": "O(d) = exp(-d / L), clipped to [0, 1]",
+            "diffusion_length_um": 93.20024018394177,
+            "hypoxia_onset_um": 150.0,
+            "hypoxia_threshold": 0.2,
+            "hypoxic_beyond_um": 150.0,
+            "viable_within_um": 85.39851628899105,
+            "calibration": "L = hypoxia_onset_um / ln(1/hypoxia_threshold); hypoxia_onset_um is the Thomlinson & Gray 1955 oxygen-diffusion distance (PMID 13304213), NOT a fit to the marker data. Any strictly monotone map of distance gives an identical Spearman rho, so this constant sets the band edges and nothing else.",
+            "mean_over_tissue": 0.6216393252588699,
+            "frac_below_threshold_over_tissue": 0.004768983029852595
+          }
+        },
+        "oxygen_mode": "vessel_distance",
+        "cell_state": {
+          "mode": "oxygen",
+          "source": "cells.agents.update_cell_states bands the SIMULATED oxygen field (applied by sim.engine.simulate_response, not here)",
+          "is_measured": false,
+          "caveat": "NOT A MEASUREMENT (results/state_validation.md \u00a72.2, results/cell_state_impact.md \u00a72.2): the tumour VIABLE fraction this produces swings across two tissue-mask conventions and three grid spacings, both of which are bookkeeping choices rather than measurements \u2014 0.60%-98.19% (165x) as measured under the KDE-era vascular source, and 0.00%-10.04% (the band goes EMPTY, so the ratio is unbounded) re-measured on the same grid under the current discrete vessel source. The HYPOXIC band is also empty on that section, so PDConfig.hypoxia_resistance acts on no cells. Retained as the default so no published number moves silently, NOT because it is the best available route.",
+          "detail": null,
+          "unmeasured_states": null,
+          "fractions_tumor": null
+        },
+        "state_mode": "oxygen",
+        "ecm_markers_used": [
+          "COL1A2",
+          "COL12A1",
+          "COL25A1",
+          "POSTN",
+          "VCAN",
+          "DCN",
+          "FBLN1",
+          "LAMA2",
+          "THBS1",
+          "SPON1",
+          "TGFBI"
+        ],
+        "tissue_mask_mode": "geometric",
+        "tissue_disc_radius_um": 30.0,
+        "tissue_coverage_fraction": 0.6769811320754717,
+        "sensitivity": {
+          "mode": null,
+          "upper_bound": true,
+          "comparability": "COMPARABLE across drugs \u2014 the reconstruction default is uniform 1.0 for every drug, so sensitivity cancels out of any ranking (and every absolute kill is an equal no-resistance upper bound).",
+          "model": "uniform 1.0 (drug-agnostic reconstruction default)",
+          "determinant_gene": null,
+          "kind": "none (uniform 1.0)",
+          "rationale": "no per-cell intrinsic-resistance information is asserted; kill is pure delivery + potency physics",
+          "marker_detection_rate": null,
+          "mgmt_applied": false,
+          "mgmt_scalar": null,
+          "mgmt_input": null,
+          "mgmt_model": null,
+          "mgmt_scalar_ci95": null,
+          "mgmt_calibration_n": null,
+          "mgmt_resolution": null,
+          "mgmt_note": null,
+          "is_uniform": true,
+          "mean_all_cells": 1.0,
+          "std_all_cells": 0.0,
+          "mean_tumor": 1.0,
+          "std_tumor": 0.0,
+          "min": 1.0,
+          "max": 1.0,
+          "caveat": "ABSOLUTE kill_fraction is CONDITIONAL on this sensitivity assumption. It is deterministic and documented, but it is NOT a measured drug response -- this section has no outcome label."
+        }
+      },
+      "mean_oxygen_pde": 0.35204854974974675,
+      "mean_oxygen_vessel_distance": 0.6216393252588699,
+      "field_spearman": -0.03801918974115099,
+      "pd": {
+        "hypoxia_resistance": 0.35,
+        "quiescent_resistance": 0.5
+      },
+      "rows": {
+        "temozolomide": {
+          "drug": "temozolomide",
+          "ic50_uM": 606.0466722391783,
+          "mw": 194.154,
+          "pde": {
+            "kill_fraction": 0.01835209138249627,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0,
+              "QUIESCENT": 0.8995884428019486,
+              "VIABLE": 0.10041155719805141
+            },
+            "coverage_1x": 0.0,
+            "coverage_0.5x": 0.0,
+            "coverage_2x": 0.0,
+            "median_E_over_ic50": 0.055544885827392684,
+            "hypoxic_over_normoxic_exposure": NaN
+          },
+          "vessel_distance": {
+            "kill_fraction": 0.03145472870821431,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0025617335797077103,
+              "QUIESCENT": 0.08667898538551991,
+              "VIABLE": 0.9107592810347724
+            },
+            "coverage_1x": 0.0,
+            "coverage_0.5x": 0.0,
+            "coverage_2x": 0.0,
+            "median_E_over_ic50": 0.055544885827392684,
+            "hypoxic_over_normoxic_exposure": 0.26004349499263035
+          },
+          "runtime_s": 38.072731256484985,
+          "delta_kill": 0.013102637325718036,
+          "delta_kill_pct": 71.3958810068643,
+          "delta_coverage_1x": 0.0
+        },
+        "cisplatin": {
+          "drug": "cisplatin",
+          "ic50_uM": 24.550285905059777,
+          "mw": 298.03,
+          "pde": {
+            "kill_fraction": 0.4361666386695784,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0,
+              "QUIESCENT": 0.8995884428019486,
+              "VIABLE": 0.10041155719805141
+            },
+            "coverage_1x": 0.9954644716949437,
+            "coverage_0.5x": 0.9985721484965564,
+            "coverage_2x": 0.913866957836385,
+            "median_E_over_ic50": 3.1775333973418305,
+            "hypoxic_over_normoxic_exposure": NaN
+          },
+          "vessel_distance": {
+            "kill_fraction": 0.7613808163950949,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0025617335797077103,
+              "QUIESCENT": 0.08667898538551991,
+              "VIABLE": 0.9107592810347724
+            },
+            "coverage_1x": 0.9954644716949437,
+            "coverage_0.5x": 0.9985721484965564,
+            "coverage_2x": 0.913866957836385,
+            "median_E_over_ic50": 3.1775333973418305,
+            "hypoxic_over_normoxic_exposure": 0.16668773713189333
+          },
+          "runtime_s": 37.04707193374634,
+          "delta_kill": 0.32521417772551653,
+          "delta_kill_pct": 74.56191026381667,
+          "delta_coverage_1x": 0.0
+        },
+        "doxorubicin": {
+          "drug": "doxorubicin",
+          "ic50_uM": 0.5,
+          "mw": 543.525,
+          "pde": {
+            "kill_fraction": 0.2594910129346548,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0,
+              "QUIESCENT": 0.8995884428019486,
+              "VIABLE": 0.10041155719805141
+            },
+            "coverage_1x": 0.43734251637829663,
+            "coverage_0.5x": 0.8577607928775407,
+            "coverage_2x": 0.0710566101125483,
+            "median_E_over_ic50": 0.9206193977866491,
+            "hypoxic_over_normoxic_exposure": NaN
+          },
+          "vessel_distance": {
+            "kill_fraction": 0.45926423651940196,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0025617335797077103,
+              "QUIESCENT": 0.08667898538551991,
+              "VIABLE": 0.9107592810347724
+            },
+            "coverage_1x": 0.43734251637829663,
+            "coverage_0.5x": 0.8577607928775407,
+            "coverage_2x": 0.0710566101125483,
+            "median_E_over_ic50": 0.9206193977866491,
+            "hypoxic_over_normoxic_exposure": 0.05128266999734553
+          },
+          "runtime_s": 37.12808084487915,
+          "delta_kill": 0.19977322358474714,
+          "delta_kill_pct": 76.98656740572906,
+          "delta_coverage_1x": 0.0
+        }
+      },
+      "wall_s": 116.52710294723511,
+      "max_abs_delta_kill": 0.32521417772551653,
+      "abs_delta_kill_by_drug": {
+        "temozolomide": 0.013102637325718036,
+        "cisplatin": 0.32521417772551653,
+        "doxorubicin": 0.19977322358474714
+      }
+    },
+    "kde": {
+      "sample": "data_cache/xenium_gbm",
+      "dx_um": 12.0,
+      "alpha": 148.60815765445545,
+      "n_cells": 40887,
+      "grid": [
+        424,
+        675
+      ],
+      "report_pde": {
+        "patient_id": "xenium-gbm-real",
+        "source": "xenium",
+        "n_cells": 40887,
+        "n_tumor": 23812,
+        "grid": [
+          424,
+          675
+        ],
+        "dx_um": 12.0,
+        "extent_um": [
+          8100.0,
+          5088.0
+        ],
+        "celltype_counts": {
+          "TUMOR": 23812,
+          "STROMAL": 4815,
+          "IMMUNE": 7965,
+          "ENDOTHELIAL": 4295,
+          "NECROTIC": 0
+        },
+        "celltype_fractions": {
+          "TUMOR": 0.5823855993347519,
+          "STROMAL": 0.11776359233986353,
+          "IMMUNE": 0.19480519480519481,
+          "ENDOTHELIAL": 0.10504561352018979,
+          "NECROTIC": 0.0
+        },
+        "mean_vascular_density": 0.074652368516946,
+        "mean_ecm_density": 0.07594908632830119,
+        "mean_oxygen": 0.598283690759461,
+        "oxygen": {
+          "mode": "pde",
+          "source": "physics.solve_oxygen driven by the real vascular field",
+          "is_surrogate": false,
+          "caveat": "WEAK BUT BEST-IN-CLASS (results/state_validation.md \u00a71.2, results/oxygen_demotion.md): against measured hypoxia markers on 816,769 cells the solve scores rho -0.1523, out-predicting a distance transform on its own source cells (-0.1204) and its own undiffused source term (-0.1111). The default is 'pde' ON that evidence, not despite it. Read the magnitude, though: |rho| ~ 0.15 is a weak, within-section association carried by VEGFA alone (HIF1A contributes +0.0140), so this is the best of several weak predictors and not a validated oxygen field. SEPARATELY AND STILL TRUE: OxygenConfig.consumption is unfitted, so the solve's effective diffusion length is several times the published ~150 um -- a Spearman rho cannot detect that, because it is invariant to monotone rescaling. Absolute levels and band edges remain uncalibrated. An earlier version of this caveat declared the solve FALSIFIED AS VALUE-ADD; that claim was an inverted inequality and has been withdrawn.",
+          "detail": null
+        },
+        "oxygen_mode": "pde",
+        "cell_state": {
+          "mode": "oxygen",
+          "source": "cells.agents.update_cell_states bands the SIMULATED oxygen field (applied by sim.engine.simulate_response, not here)",
+          "is_measured": false,
+          "caveat": "NOT A MEASUREMENT (results/state_validation.md \u00a72.2, results/cell_state_impact.md \u00a72.2): the tumour VIABLE fraction this produces swings across two tissue-mask conventions and three grid spacings, both of which are bookkeeping choices rather than measurements \u2014 0.60%-98.19% (165x) as measured under the KDE-era vascular source, and 0.00%-10.04% (the band goes EMPTY, so the ratio is unbounded) re-measured on the same grid under the current discrete vessel source. The HYPOXIC band is also empty on that section, so PDConfig.hypoxia_resistance acts on no cells. Retained as the default so no published number moves silently, NOT because it is the best available route.",
+          "detail": null,
+          "unmeasured_states": null,
+          "fractions_tumor": null
+        },
+        "state_mode": "oxygen",
+        "ecm_markers_used": [
+          "COL1A2",
+          "COL12A1",
+          "COL25A1",
+          "POSTN",
+          "VCAN",
+          "DCN",
+          "FBLN1",
+          "LAMA2",
+          "THBS1",
+          "SPON1",
+          "TGFBI"
+        ],
+        "tissue_mask_mode": "geometric",
+        "tissue_disc_radius_um": 30.0,
+        "tissue_coverage_fraction": 0.6769811320754717,
+        "sensitivity": {
+          "mode": null,
+          "upper_bound": true,
+          "comparability": "COMPARABLE across drugs \u2014 the reconstruction default is uniform 1.0 for every drug, so sensitivity cancels out of any ranking (and every absolute kill is an equal no-resistance upper bound).",
+          "model": "uniform 1.0 (drug-agnostic reconstruction default)",
+          "determinant_gene": null,
+          "kind": "none (uniform 1.0)",
+          "rationale": "no per-cell intrinsic-resistance information is asserted; kill is pure delivery + potency physics",
+          "marker_detection_rate": null,
+          "mgmt_applied": false,
+          "mgmt_scalar": null,
+          "mgmt_input": null,
+          "mgmt_model": null,
+          "mgmt_scalar_ci95": null,
+          "mgmt_calibration_n": null,
+          "mgmt_resolution": null,
+          "mgmt_note": null,
+          "is_uniform": true,
+          "mean_all_cells": 1.0,
+          "std_all_cells": 0.0,
+          "mean_tumor": 1.0,
+          "std_tumor": 0.0,
+          "min": 1.0,
+          "max": 1.0,
+          "caveat": "ABSOLUTE kill_fraction is CONDITIONAL on this sensitivity assumption. It is deterministic and documented, but it is NOT a measured drug response -- this section has no outcome label."
+        }
+      },
+      "report_vessel_distance": {
+        "patient_id": "xenium-gbm-real",
+        "source": "xenium",
+        "n_cells": 40887,
+        "n_tumor": 23812,
+        "grid": [
+          424,
+          675
+        ],
+        "dx_um": 12.0,
+        "extent_um": [
+          8100.0,
+          5088.0
+        ],
+        "celltype_counts": {
+          "TUMOR": 23812,
+          "STROMAL": 4815,
+          "IMMUNE": 7965,
+          "ENDOTHELIAL": 4295,
+          "NECROTIC": 0
+        },
+        "celltype_fractions": {
+          "TUMOR": 0.5823855993347519,
+          "STROMAL": 0.11776359233986353,
+          "IMMUNE": 0.19480519480519481,
+          "ENDOTHELIAL": 0.10504561352018979,
+          "NECROTIC": 0.0
+        },
+        "mean_vascular_density": 0.074652368516946,
+        "mean_ecm_density": 0.07594908632830119,
+        "mean_oxygen": 0.6216393252588699,
+        "oxygen": {
+          "mode": "vessel_distance",
+          "source": "SURROGATE: exp(-d/L) in distance to the nearest endothelial vessel point (L = 93.20 um)",
+          "is_surrogate": true,
+          "caveat": "NOT a solved oxygen tension. A monotone geometric proxy, calibrated to the Thomlinson & Gray 1955 oxygen-diffusion distance (PMID 13304213) so its hypoxia band edge sits at 150 um from a vessel. Its ABSOLUTE level is uncalibrated \u2014 as is the PDE's.",
+          "detail": {
+            "source": "endothelial",
+            "what": "every measured CellType.ENDOTHELIAL cell centroid",
+            "n_points": 4295,
+            "n_endothelial_cells": 4295,
+            "n_vessels": null,
+            "link_distance_um": null,
+            "min_cells_per_vessel": null,
+            "at": "grid",
+            "median_distance_um": 60.28263990193476,
+            "kind": "SURROGATE (geometric proxy), NOT a solved oxygen tension",
+            "mapping": "O(d) = exp(-d / L), clipped to [0, 1]",
+            "diffusion_length_um": 93.20024018394177,
+            "hypoxia_onset_um": 150.0,
+            "hypoxia_threshold": 0.2,
+            "hypoxic_beyond_um": 150.0,
+            "viable_within_um": 85.39851628899105,
+            "calibration": "L = hypoxia_onset_um / ln(1/hypoxia_threshold); hypoxia_onset_um is the Thomlinson & Gray 1955 oxygen-diffusion distance (PMID 13304213), NOT a fit to the marker data. Any strictly monotone map of distance gives an identical Spearman rho, so this constant sets the band edges and nothing else.",
+            "mean_over_tissue": 0.6216393252588699,
+            "frac_below_threshold_over_tissue": 0.004768983029852595
+          }
+        },
+        "oxygen_mode": "vessel_distance",
+        "cell_state": {
+          "mode": "oxygen",
+          "source": "cells.agents.update_cell_states bands the SIMULATED oxygen field (applied by sim.engine.simulate_response, not here)",
+          "is_measured": false,
+          "caveat": "NOT A MEASUREMENT (results/state_validation.md \u00a72.2, results/cell_state_impact.md \u00a72.2): the tumour VIABLE fraction this produces swings across two tissue-mask conventions and three grid spacings, both of which are bookkeeping choices rather than measurements \u2014 0.60%-98.19% (165x) as measured under the KDE-era vascular source, and 0.00%-10.04% (the band goes EMPTY, so the ratio is unbounded) re-measured on the same grid under the current discrete vessel source. The HYPOXIC band is also empty on that section, so PDConfig.hypoxia_resistance acts on no cells. Retained as the default so no published number moves silently, NOT because it is the best available route.",
+          "detail": null,
+          "unmeasured_states": null,
+          "fractions_tumor": null
+        },
+        "state_mode": "oxygen",
+        "ecm_markers_used": [
+          "COL1A2",
+          "COL12A1",
+          "COL25A1",
+          "POSTN",
+          "VCAN",
+          "DCN",
+          "FBLN1",
+          "LAMA2",
+          "THBS1",
+          "SPON1",
+          "TGFBI"
+        ],
+        "tissue_mask_mode": "geometric",
+        "tissue_disc_radius_um": 30.0,
+        "tissue_coverage_fraction": 0.6769811320754717,
+        "sensitivity": {
+          "mode": null,
+          "upper_bound": true,
+          "comparability": "COMPARABLE across drugs \u2014 the reconstruction default is uniform 1.0 for every drug, so sensitivity cancels out of any ranking (and every absolute kill is an equal no-resistance upper bound).",
+          "model": "uniform 1.0 (drug-agnostic reconstruction default)",
+          "determinant_gene": null,
+          "kind": "none (uniform 1.0)",
+          "rationale": "no per-cell intrinsic-resistance information is asserted; kill is pure delivery + potency physics",
+          "marker_detection_rate": null,
+          "mgmt_applied": false,
+          "mgmt_scalar": null,
+          "mgmt_input": null,
+          "mgmt_model": null,
+          "mgmt_scalar_ci95": null,
+          "mgmt_calibration_n": null,
+          "mgmt_resolution": null,
+          "mgmt_note": null,
+          "is_uniform": true,
+          "mean_all_cells": 1.0,
+          "std_all_cells": 0.0,
+          "mean_tumor": 1.0,
+          "std_tumor": 0.0,
+          "min": 1.0,
+          "max": 1.0,
+          "caveat": "ABSOLUTE kill_fraction is CONDITIONAL on this sensitivity assumption. It is deterministic and documented, but it is NOT a measured drug response -- this section has no outcome label."
+        }
+      },
+      "mean_oxygen_pde": 0.598283690759461,
+      "mean_oxygen_vessel_distance": 0.6216393252588699,
+      "field_spearman": -0.005386803909131873,
+      "pd": {
+        "hypoxia_resistance": 0.35,
+        "quiescent_resistance": 0.5
+      },
+      "rows": {
+        "temozolomide": {
+          "drug": "temozolomide",
+          "ic50_uM": 606.0466722391783,
+          "mw": 194.154,
+          "pde": {
+            "kill_fraction": 0.10322526457248449,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0,
+              "QUIESCENT": 0.0,
+              "VIABLE": 1.0
+            },
+            "coverage_1x": 0.0,
+            "coverage_0.5x": 0.0,
+            "coverage_2x": 0.0,
+            "median_E_over_ic50": 0.15550752539185597,
+            "hypoxic_over_normoxic_exposure": NaN
+          },
+          "vessel_distance": {
+            "kill_fraction": 0.10024357466823453,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0025617335797077103,
+              "QUIESCENT": 0.08667898538551991,
+              "VIABLE": 0.9107592810347724
+            },
+            "coverage_1x": 0.0,
+            "coverage_0.5x": 0.0,
+            "coverage_2x": 0.0,
+            "median_E_over_ic50": 0.15550752539185597,
+            "hypoxic_over_normoxic_exposure": 0.26509273498418917
+          },
+          "runtime_s": 38.73728799819946,
+          "delta_kill": -0.0029816899042499623,
+          "delta_kill_pct": -2.8885272579332826,
+          "delta_coverage_1x": 0.0
+        },
+        "cisplatin": {
+          "drug": "cisplatin",
+          "ic50_uM": 24.550285905059777,
+          "mw": 298.03,
+          "pde": {
+            "kill_fraction": 0.9288593986225433,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0,
+              "QUIESCENT": 0.0,
+              "VIABLE": 1.0
+            },
+            "coverage_1x": 0.998698135393919,
+            "coverage_0.5x": 0.9987821266588275,
+            "coverage_2x": 0.997774231479926,
+            "median_E_over_ic50": 8.878225866359788,
+            "hypoxic_over_normoxic_exposure": NaN
+          },
+          "vessel_distance": {
+            "kill_fraction": 0.8887955652612128,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0025617335797077103,
+              "QUIESCENT": 0.08667898538551991,
+              "VIABLE": 0.9107592810347724
+            },
+            "coverage_1x": 0.998698135393919,
+            "coverage_0.5x": 0.9987821266588275,
+            "coverage_2x": 0.997774231479926,
+            "median_E_over_ic50": 8.878225866359788,
+            "hypoxic_over_normoxic_exposure": 0.17500281416281674
+          },
+          "runtime_s": 38.09120416641235,
+          "delta_kill": -0.04006383336133046,
+          "delta_kill_pct": -4.313229044217383,
+          "delta_coverage_1x": 0.0
+        },
+        "doxorubicin": {
+          "drug": "doxorubicin",
+          "ic50_uM": 0.5,
+          "mw": 543.525,
+          "pde": {
+            "kill_fraction": 0.7465563581387535,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0,
+              "QUIESCENT": 0.0,
+              "VIABLE": 1.0
+            },
+            "coverage_1x": 0.9691752057785991,
+            "coverage_0.5x": 0.9957164454896691,
+            "coverage_2x": 0.7188812363514194,
+            "median_E_over_ic50": 2.668625952589199,
+            "hypoxic_over_normoxic_exposure": NaN
+          },
+          "vessel_distance": {
+            "kill_fraction": 0.7206030572820427,
+            "tumor_state_fractions": {
+              "HYPOXIC": 0.0025617335797077103,
+              "QUIESCENT": 0.08667898538551991,
+              "VIABLE": 0.9107592810347724
+            },
+            "coverage_1x": 0.9691752057785991,
+            "coverage_0.5x": 0.9957164454896691,
+            "coverage_2x": 0.7188812363514194,
+            "median_E_over_ic50": 2.668625952589199,
+            "hypoxic_over_normoxic_exposure": 0.06226387644841003
+          },
+          "runtime_s": 37.458568811416626,
+          "delta_kill": -0.02595330085671088,
+          "delta_kill_pct": -3.4764020925915484,
+          "delta_coverage_1x": 0.0
+        }
+      },
+      "wall_s": 118.03147315979004,
+      "max_abs_delta_kill": 0.04006383336133046,
+      "abs_delta_kill_by_drug": {
+        "temozolomide": 0.0029816899042499623,
+        "cisplatin": 0.04006383336133046,
+        "doxorubicin": 0.02595330085671088
+      }
+    }
+  },
+  "ratio_discrete_over_kde": 8.117400419287204
+}

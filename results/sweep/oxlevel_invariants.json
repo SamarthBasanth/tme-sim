@@ -1,0 +1,194 @@
+{
+  "alpha": 148.60815765445545,
+  "arms": {
+    "discrete": {
+      "rows": {
+        "temozolomide": {
+          "kill_pde": 0.01835209138249627,
+          "kill_surrogate": 0.03145472870821431,
+          "delta_kill": 0.013102637325718036,
+          "coverage_1x_pde": 0.0,
+          "coverage_1x_surrogate": 0.0,
+          "coverage_1x_exact_equal": true,
+          "coverage_0.5x_exact_equal": true,
+          "coverage_2x_exact_equal": true,
+          "median_E_over_ic50_exact_equal": true,
+          "exposure_sha": "5a21e76f0f679b3a",
+          "exposure_mean": 498775.1690615983,
+          "ic50_uM": 606.0466722391783,
+          "states_pde": {
+            "HYPOXIC": 0.0,
+            "QUIESCENT": 0.8995884428019486,
+            "VIABLE": 0.10041155719805141
+          },
+          "states_surrogate": {
+            "HYPOXIC": 0.0025617335797077103,
+            "QUIESCENT": 0.08667898538551991,
+            "VIABLE": 0.9107592810347724
+          }
+        },
+        "cisplatin": {
+          "kill_pde": 0.4361666386695784,
+          "kill_surrogate": 0.7613808163950949,
+          "delta_kill": 0.32521417772551653,
+          "coverage_1x_pde": 0.9954644716949437,
+          "coverage_1x_surrogate": 0.9954644716949437,
+          "coverage_1x_exact_equal": true,
+          "coverage_0.5x_exact_equal": true,
+          "coverage_2x_exact_equal": true,
+          "median_E_over_ic50_exact_equal": true,
+          "exposure_sha": "4b6fe5505cda5f1e",
+          "exposure_mean": 1184446.1942569807,
+          "ic50_uM": 24.550285905059777,
+          "states_pde": {
+            "HYPOXIC": 0.0,
+            "QUIESCENT": 0.8995884428019486,
+            "VIABLE": 0.10041155719805141
+          },
+          "states_surrogate": {
+            "HYPOXIC": 0.0025617335797077103,
+            "QUIESCENT": 0.08667898538551991,
+            "VIABLE": 0.9107592810347724
+          }
+        },
+        "doxorubicin": {
+          "kill_pde": 0.2594910129346548,
+          "kill_surrogate": 0.45926423651940196,
+          "delta_kill": 0.19977322358474714,
+          "coverage_1x_pde": 0.43734251637829663,
+          "coverage_1x_surrogate": 0.43734251637829663,
+          "coverage_1x_exact_equal": true,
+          "coverage_0.5x_exact_equal": true,
+          "coverage_2x_exact_equal": true,
+          "median_E_over_ic50_exact_equal": true,
+          "exposure_sha": "4f4ca9b95d26e47c",
+          "exposure_mean": 7520.702419992766,
+          "ic50_uM": 0.5,
+          "states_pde": {
+            "HYPOXIC": 0.0,
+            "QUIESCENT": 0.8995884428019486,
+            "VIABLE": 0.10041155719805141
+          },
+          "states_surrogate": {
+            "HYPOXIC": 0.0025617335797077103,
+            "QUIESCENT": 0.08667898538551991,
+            "VIABLE": 0.9107592810347724
+          }
+        }
+      },
+      "rank_by_kill_pde": [
+        "cisplatin",
+        "doxorubicin",
+        "temozolomide"
+      ],
+      "rank_by_kill_surrogate": [
+        "cisplatin",
+        "doxorubicin",
+        "temozolomide"
+      ],
+      "rank_by_coverage": [
+        "cisplatin",
+        "doxorubicin",
+        "temozolomide"
+      ],
+      "ranking_preserved_across_oxygen_route": true,
+      "all_coverage_exactly_invariant": true,
+      "max_abs_delta_kill": 0.32521417772551653
+    },
+    "kde": {
+      "rows": {
+        "temozolomide": {
+          "kill_pde": 0.10322526457248449,
+          "kill_surrogate": 0.10024357466823453,
+          "delta_kill": -0.0029816899042499623,
+          "coverage_1x_pde": 0.0,
+          "coverage_1x_surrogate": 0.0,
+          "coverage_1x_exact_equal": true,
+          "coverage_0.5x_exact_equal": true,
+          "coverage_2x_exact_equal": true,
+          "median_E_over_ic50_exact_equal": true,
+          "exposure_sha": "80cf31733f55c119",
+          "exposure_mean": 1387633.552947461,
+          "ic50_uM": 606.0466722391783,
+          "states_pde": {
+            "HYPOXIC": 0.0,
+            "QUIESCENT": 0.0,
+            "VIABLE": 1.0
+          },
+          "states_surrogate": {
+            "HYPOXIC": 0.0025617335797077103,
+            "QUIESCENT": 0.08667898538551991,
+            "VIABLE": 0.9107592810347724
+          }
+        },
+        "cisplatin": {
+          "kill_pde": 0.9288593986225433,
+          "kill_surrogate": 0.8887955652612128,
+          "delta_kill": -0.04006383336133046,
+          "coverage_1x_pde": 0.998698135393919,
+          "coverage_1x_surrogate": 0.998698135393919,
+          "coverage_1x_exact_equal": true,
+          "coverage_0.5x_exact_equal": true,
+          "coverage_2x_exact_equal": true,
+          "median_E_over_ic50_exact_equal": true,
+          "exposure_sha": "7d5a0966ce445576",
+          "exposure_mean": 3295226.752976012,
+          "ic50_uM": 24.550285905059777,
+          "states_pde": {
+            "HYPOXIC": 0.0,
+            "QUIESCENT": 0.0,
+            "VIABLE": 1.0
+          },
+          "states_surrogate": {
+            "HYPOXIC": 0.0025617335797077103,
+            "QUIESCENT": 0.08667898538551991,
+            "VIABLE": 0.9107592810347724
+          }
+        },
+        "doxorubicin": {
+          "kill_pde": 0.7465563581387535,
+          "kill_surrogate": 0.7206030572820427,
+          "delta_kill": -0.02595330085671088,
+          "coverage_1x_pde": 0.9691752057785991,
+          "coverage_1x_surrogate": 0.9691752057785991,
+          "coverage_1x_exact_equal": true,
+          "coverage_0.5x_exact_equal": true,
+          "coverage_2x_exact_equal": true,
+          "median_E_over_ic50_exact_equal": true,
+          "exposure_sha": "b4991cc085233569",
+          "exposure_mean": 20923.21283625546,
+          "ic50_uM": 0.5,
+          "states_pde": {
+            "HYPOXIC": 0.0,
+            "QUIESCENT": 0.0,
+            "VIABLE": 1.0
+          },
+          "states_surrogate": {
+            "HYPOXIC": 0.0025617335797077103,
+            "QUIESCENT": 0.08667898538551991,
+            "VIABLE": 0.9107592810347724
+          }
+        }
+      },
+      "rank_by_kill_pde": [
+        "cisplatin",
+        "doxorubicin",
+        "temozolomide"
+      ],
+      "rank_by_kill_surrogate": [
+        "cisplatin",
+        "doxorubicin",
+        "temozolomide"
+      ],
+      "rank_by_coverage": [
+        "cisplatin",
+        "doxorubicin",
+        "temozolomide"
+      ],
+      "ranking_preserved_across_oxygen_route": true,
+      "all_coverage_exactly_invariant": true,
+      "max_abs_delta_kill": 0.04006383336133046
+    }
+  },
+  "ranking_same_across_vascular_modes": true
+}
