@@ -1,0 +1,295 @@
+{
+ "dx_um": 12.0,
+ "links": [
+  10.0,
+  20.0,
+  50.0,
+  80.0
+ ],
+ "sections": {
+  "s1_dev": {
+   "sample": "data_cache/xenium_gbm",
+   "grid": [
+    424,
+    675
+   ],
+   "safe_vs_shipping_segmentation": {
+    "labels_identical": true,
+    "counts_identical": true,
+    "extent_max_abs_diff_um": 0.0,
+    "xy_identical": true
+   },
+   "production_hash": "1a30cb3950c0c6ee",
+   "rows": [
+    {
+     "link_um": 10.0,
+     "n_vessels": 4149,
+     "n_endothelial": 4295,
+     "hash_default": "1a30cb3950c0c6ee",
+     "hash_per_vessel_cells": "c68dad4d6a3c33b6",
+     "hash_subgrid": "1e8c7c55dba20384",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 5199.0,
+     "sum_per_vessel_cells": 1111.0000000000002,
+     "sum_subgrid": 987.2240277777778
+    },
+    {
+     "link_um": 20.0,
+     "n_vessels": 3091,
+     "n_endothelial": 4295,
+     "hash_default": "1a30cb3950c0c6ee",
+     "hash_per_vessel_cells": "66ab10f0a04a269a",
+     "hash_subgrid": "1f5f9ed3f0986b4a",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 5199.0,
+     "sum_per_vessel_cells": 578.1304347826087,
+     "sum_subgrid": 2412.0829166666667
+    },
+    {
+     "link_um": 50.0,
+     "n_vessels": 1765,
+     "n_endothelial": 4295,
+     "hash_default": "1a30cb3950c0c6ee",
+     "hash_per_vessel_cells": "7e20e0ed9883ce9b",
+     "hash_subgrid": "3f4d1f374abe0c79",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 5199.0,
+     "sum_per_vessel_cells": 553.0365853658537,
+     "sum_subgrid": 5808.527795138891
+    },
+    {
+     "link_um": 80.0,
+     "n_vessels": 825,
+     "n_endothelial": 4295,
+     "hash_default": "1a30cb3950c0c6ee",
+     "hash_per_vessel_cells": "1d1c8a3a381d4700",
+     "hash_subgrid": "4474c2a1f1e07d2d",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 5199.0,
+     "sum_per_vessel_cells": 754.3441558441557,
+     "sum_subgrid": 7864.802552083333
+    }
+   ],
+   "default_invariant": true,
+   "labels_invariant": false,
+   "subgrid_invariant": false
+  },
+  "s2_heldout": {
+   "sample": "data_cache/xenium_gbm_io",
+   "grid": [
+    905,
+    956
+   ],
+   "safe_vs_shipping_segmentation": {
+    "labels_identical": true,
+    "counts_identical": true,
+    "extent_max_abs_diff_um": 0.0,
+    "xy_identical": true
+   },
+   "production_hash": "73cb3fb2ff01ab8c",
+   "rows": [
+    {
+     "link_um": 10.0,
+     "n_vessels": 43154,
+     "n_endothelial": 57733,
+     "hash_default": "73cb3fb2ff01ab8c",
+     "hash_per_vessel_cells": "dfdc808391b0a896",
+     "hash_subgrid": "34015d88b867804b",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 62372.0,
+     "sum_per_vessel_cells": 4848.0,
+     "sum_subgrid": 23907.029288194448
+    },
+    {
+     "link_um": 20.0,
+     "n_vessels": 20875,
+     "n_endothelial": 57733,
+     "hash_default": "73cb3fb2ff01ab8c",
+     "hash_per_vessel_cells": "a646e85e2910ba97",
+     "hash_subgrid": "432d2e7c69cbfe71",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 62372.0,
+     "sum_per_vessel_cells": 4023.1090909090913,
+     "sum_subgrid": 68252.58135416669
+    },
+    {
+     "link_um": 50.0,
+     "n_vessels": 3337,
+     "n_endothelial": 57733,
+     "hash_default": "73cb3fb2ff01ab8c",
+     "hash_per_vessel_cells": "0a6a252c30c1b93c",
+     "hash_subgrid": "b965d1fcd0c4f12e",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 62372.0,
+     "sum_per_vessel_cells": 16032.061262688068,
+     "sum_subgrid": 106935.49607638882
+    },
+    {
+     "link_um": 80.0,
+     "n_vessels": 285,
+     "n_endothelial": 57733,
+     "hash_default": "73cb3fb2ff01ab8c",
+     "hash_per_vessel_cells": "28dccaf33ab1682d",
+     "hash_subgrid": "9887212c2f28f0f7",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 62372.0,
+     "sum_per_vessel_cells": 58574.848739341054,
+     "sum_subgrid": 109642.02388888884
+    }
+   ],
+   "default_invariant": true,
+   "labels_invariant": false,
+   "subgrid_invariant": false
+  },
+  "s3_gse324268": {
+   "sample": "data_cache/gse324268_xenium",
+   "grid": [
+    1196,
+    880
+   ],
+   "safe_vs_shipping_segmentation": {
+    "labels_identical": true,
+    "counts_identical": true,
+    "extent_max_abs_diff_um": 0.0,
+    "xy_identical": true
+   },
+   "production_hash": "03d6c55449c25c38",
+   "rows": [
+    {
+     "link_um": 10.0,
+     "n_vessels": 62637,
+     "n_endothelial": 74515,
+     "hash_default": "03d6c55449c25c38",
+     "hash_per_vessel_cells": "41b0e735653e79bc",
+     "hash_subgrid": "ac88360f885c810d",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 83940.0,
+     "sum_per_vessel_cells": 4356.222222222222,
+     "sum_subgrid": 23275.205763888884
+    },
+    {
+     "link_um": 20.0,
+     "n_vessels": 31551,
+     "n_endothelial": 74515,
+     "hash_default": "03d6c55449c25c38",
+     "hash_per_vessel_cells": "f21a05f2c4915292",
+     "hash_subgrid": "d374076172f89177",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 83940.0,
+     "sum_per_vessel_cells": 2229.6642984014215,
+     "sum_subgrid": 74784.34944444445
+    },
+    {
+     "link_um": 50.0,
+     "n_vessels": 2347,
+     "n_endothelial": 74515,
+     "hash_default": "03d6c55449c25c38",
+     "hash_per_vessel_cells": "fab3cfb438a38b1e",
+     "hash_subgrid": "459c6d1472970ab5",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 83940.0,
+     "sum_per_vessel_cells": 56525.02238209432,
+     "sum_subgrid": 141375.47013888884
+    },
+    {
+     "link_um": 80.0,
+     "n_vessels": 73,
+     "n_endothelial": 74515,
+     "hash_default": "03d6c55449c25c38",
+     "hash_per_vessel_cells": "50b1600a197ed88c",
+     "hash_subgrid": "8f65dfe32469ff28",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 83940.0,
+     "sum_per_vessel_cells": 83664.0359354804,
+     "sum_subgrid": 144703.1521527778
+    }
+   ],
+   "default_invariant": true,
+   "labels_invariant": false,
+   "subgrid_invariant": false
+  },
+  "breast": {
+   "sample": "data_cache/xenium_breast_janesick/rep1",
+   "grid": [
+    458,
+    628
+   ],
+   "safe_vs_shipping_segmentation": {
+    "labels_identical": true,
+    "counts_identical": true,
+    "extent_max_abs_diff_um": 0.0,
+    "xy_identical": true
+   },
+   "production_hash": "cb58d8d06d636f91",
+   "rows": [
+    {
+     "link_um": 10.0,
+     "n_vessels": 11125,
+     "n_endothelial": 13677,
+     "hash_default": "cb58d8d06d636f91",
+     "hash_per_vessel_cells": "44011a02ba62ec69",
+     "hash_subgrid": "121dad751bdc5879",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 15191.0,
+     "sum_per_vessel_cells": 744.5294117647059,
+     "sum_subgrid": 5187.142673611111
+    },
+    {
+     "link_um": 20.0,
+     "n_vessels": 5756,
+     "n_endothelial": 13677,
+     "hash_default": "cb58d8d06d636f91",
+     "hash_per_vessel_cells": "b98d0ac4c221f7c8",
+     "hash_subgrid": "f1a1cb4ad50b27a9",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 15191.0,
+     "sum_per_vessel_cells": 1577.3239436619717,
+     "sum_subgrid": 14390.039513888885
+    },
+    {
+     "link_um": 50.0,
+     "n_vessels": 1626,
+     "n_endothelial": 13677,
+     "hash_default": "cb58d8d06d636f91",
+     "hash_per_vessel_cells": "357ad6f1dd0c33ce",
+     "hash_subgrid": "2af9e25ebecbd071",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 15191.0,
+     "sum_per_vessel_cells": 3257.0909090909095,
+     "sum_subgrid": 24969.23206597222
+    },
+    {
+     "link_um": 80.0,
+     "n_vessels": 438,
+     "n_endothelial": 13677,
+     "hash_default": "cb58d8d06d636f91",
+     "hash_per_vessel_cells": "894b0081bb421981",
+     "hash_subgrid": "425968113c636898",
+     "identical_to_production": true,
+     "max_abs_diff_vs_production": 0.0,
+     "sum_default": 15191.0,
+     "sum_per_vessel_cells": 8554.073438379291,
+     "sum_subgrid": 25661.07689236111
+    }
+   ],
+   "default_invariant": true,
+   "labels_invariant": false,
+   "subgrid_invariant": false
+  }
+ }
+}

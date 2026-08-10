@@ -1,0 +1,11 @@
+{
+ "alpha_published": 148.60815765445545,
+ "alpha_recomputed": 148.60815765445545,
+ "D_eff_um2_s": 140.40894686945413,
+ "k_passive_per_s": 6.30800204946529e-05,
+ "uptake_proxy_per_s": 0.00022374580379867353,
+ "target_efold_um": 64.92127684000336,
+ "L_analytic_um": 64.92127684000336,
+ "inputs_depend_on_vascular_density": false,
+ "alpha_refit_minus_published": 0.0
+}

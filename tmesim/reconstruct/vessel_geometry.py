@@ -44,6 +44,50 @@ endothelial-cell densities differ by 2.7× (143 vs 382 EC/mm²) — and the repo
 area fractions differed by exactly that ratio (2.50 % vs 5.79 %). A vessel
 profile lined by ``k`` endothelial cells is **one** vessel, not ``k`` of them.
 
+Scope — "Wrong #2" is an argument about an AREAL FRACTION, and it does NOT
+transfer to the delivery source
+---------------------------------------------------------------------------
+Measured in ``results/delivery_source_geometry.md``; recorded here because the
+gap between the corrected geometry and the field that actually delivers drug
+looks like an oversight and is not one.
+
+The engine's delivery term is ``vascular_density * bbb_penetrance * plasma``, a
+**transvascular flux**, whose geometric weight is the vessel **WALL** area per
+unit tissue (``S/V``). This module paints a vessel **CROSS-SECTION** area. Those
+are different powers of the radius, and with this module's own ``r = r1 * k``
+they are different powers of ``k``::
+
+    wall area          ~  2 pi r L      ~  k        (what a flux BC wants)
+    cross-section area ~  pi r^2 + 2rL  ~  k^2      (what this module paints)
+
+Endothelial-cell COUNT is a direct wall-area proxy in both regimes, from the two
+measured human constants below: axially, one cell lines
+:data:`EC_AXIAL_PITCH_UM` = 50 um of wall (PMID 38723085); circumferentially,
+``2 pi r = k w`` makes the perimeter proportional to ``k``. So a source that
+deposits a CONSTANT per endothelial cell implements the wall-area law, and the
+legacy binary field in ``vessel_network`` does exactly that.
+
+Measured consequence of routing the delivery source through :func:`vessel_geometry`
+instead: the source deposited per endothelial cell stops being constant and
+spans **8.06x / 8.40x / 8.27x / 8.43x** across ``k`` on the four cached real
+sections (30.4 um^2/EC at ``k = 1``, ~250 um^2/EC at ``k >= 5``). On the module's
+own fidelity score, :func:`vascular_heterogeneity`, the legacy field scores
+0.94-1.01 against a target of 1.0 and the sub-grid field 1.45-2.26 — i.e. the
+``r ∝ k`` over-dispersion documented below reappears as sharpened architecture.
+The 7.5 um radius of the legacy field is arbitrary, but it is a **gauge**
+constant that ``PS`` absorbs exactly (``results/transvascular_exchange_revalidation.md``
+section 5); the ``k^2`` scaling is not, because it re-weights vessels relative to
+one another inside one section.
+
+**So the two representations answer two different questions.** A stereological
+areal fraction counts each vessel profile once (Marien's rule: a grid point is
+vascular when it falls on "an endothelial cell or a vessel lumen"), which is what
+:func:`vascular_area_fraction` computes and what "Wrong #2" correctly fixes. A
+leak source is a wall-area quantity, and for it the per-endothelial-cell painting
+is the RIGHT law with an arbitrary constant. The default of
+``discrete_vascular_field`` is therefore left at ``geometry='binary'``
+deliberately, not by omission.
+
 What this module does
 ---------------------
 1. :func:`vessel_geometry` — a per-vessel-object radius and footprint from the

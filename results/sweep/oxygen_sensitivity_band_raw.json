@@ -1,0 +1,252 @@
+{
+  "consumption_sweep": [
+    {
+      "sink_form": "linear",
+      "consumption": 0.0002,
+      "K": null,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.9815302357780216,
+      "mean_o2_tissue": 0.9816999222514369,
+      "solve_time_s": 1.4665858745574951
+    },
+    {
+      "sink_form": "linear",
+      "consumption": 0.0005,
+      "K": null,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.9550789736776998,
+      "mean_o2_tissue": 0.9554857144439678,
+      "solve_time_s": 1.4926140308380127
+    },
+    {
+      "sink_form": "linear",
+      "consumption": 0.001,
+      "K": null,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.914045563180785,
+      "mean_o2_tissue": 0.9148057823754502,
+      "solve_time_s": 1.458061933517456
+    },
+    {
+      "sink_form": "linear",
+      "consumption": 0.002,
+      "K": null,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.8417779451658204,
+      "mean_o2_tissue": 0.8431166702843013,
+      "solve_time_s": 1.4919447898864746
+    },
+    {
+      "sink_form": "linear",
+      "consumption": 0.005,
+      "K": null,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.6806478840029879,
+      "mean_o2_tissue": 0.6830554274476934,
+      "solve_time_s": 1.4831218719482422
+    },
+    {
+      "sink_form": "linear",
+      "consumption": 0.01,
+      "K": null,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.5163732434764164,
+      "mean_o2_tissue": 0.5195097713877941,
+      "solve_time_s": 1.5127339363098145
+    },
+    {
+      "sink_form": "linear",
+      "consumption": 0.02,
+      "K": null,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.34862776586515865,
+      "mean_o2_tissue": 0.35204854974974675,
+      "solve_time_s": 1.495312213897705
+    },
+    {
+      "sink_form": "linear",
+      "consumption": 0.05,
+      "K": null,
+      "hypoxic_fraction": 0.8134134050058794,
+      "mean_o2_tumor": 0.17690157672449447,
+      "mean_o2_tissue": 0.17994222873541224,
+      "solve_time_s": 1.5207939147949219
+    },
+    {
+      "sink_form": "linear",
+      "consumption": 0.1,
+      "K": null,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.09728273006640947,
+      "mean_o2_tissue": 0.09974435719080489,
+      "solve_time_s": 1.5405972003936768
+    },
+    {
+      "sink_form": "linear",
+      "consumption": 0.24,
+      "K": null,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.04309743665323442,
+      "mean_o2_tissue": 0.04482909231515834,
+      "solve_time_s": 1.5616028308868408
+    },
+    {
+      "sink_form": "linear",
+      "consumption": 0.5,
+      "K": null,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.021201200361912094,
+      "mean_o2_tissue": 0.02246546901841732,
+      "solve_time_s": 1.5871617794036865
+    },
+    {
+      "sink_form": "michaelis_menten",
+      "consumption": 0.0002,
+      "K": 0.02857142857142857,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.9817124092525944,
+      "mean_o2_tissue": 0.9818820460233347,
+      "solve_time_s": 4.8552069664001465
+    },
+    {
+      "sink_form": "michaelis_menten",
+      "consumption": 0.0005,
+      "K": 0.02857142857142857,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.9543184164464424,
+      "mean_o2_tissue": 0.9547419676052458,
+      "solve_time_s": 10.904887914657593
+    },
+    {
+      "sink_form": "michaelis_menten",
+      "consumption": 0.001,
+      "K": 0.02857142857142857,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.908771016547356,
+      "mean_o2_tissue": 0.909616129607591,
+      "solve_time_s": 11.61852216720581
+    },
+    {
+      "sink_form": "michaelis_menten",
+      "consumption": 0.002,
+      "K": 0.02857142857142857,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.8181634496206343,
+      "mean_o2_tissue": 0.8198439903744174,
+      "solve_time_s": 27.92009711265564
+    },
+    {
+      "sink_form": "michaelis_menten",
+      "consumption": 0.005,
+      "K": 0.02857142857142857,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.5528430760538604,
+      "mean_o2_tissue": 0.5569072049997155,
+      "solve_time_s": 6.0468339920043945
+    },
+    {
+      "sink_form": "michaelis_menten",
+      "consumption": 0.01,
+      "K": 0.02857142857142857,
+      "hypoxic_fraction": 0.663866957836385,
+      "mean_o2_tumor": 0.19126603019629293,
+      "mean_o2_tissue": 0.19707255107242994,
+      "solve_time_s": 12.717986106872559
+    },
+    {
+      "sink_form": "michaelis_menten",
+      "consumption": 0.02,
+      "K": 0.02857142857142857,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.034694473921513286,
+      "mean_o2_tissue": 0.03682876141253793,
+      "solve_time_s": 12.431712865829468
+    },
+    {
+      "sink_form": "michaelis_menten",
+      "consumption": 0.05,
+      "K": 0.02857142857142857,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.008303773139664598,
+      "mean_o2_tissue": 0.009266046765501898,
+      "solve_time_s": 10.304152965545654
+    },
+    {
+      "sink_form": "michaelis_menten",
+      "consumption": 0.1,
+      "K": 0.02857142857142857,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.0036178903875227924,
+      "mean_o2_tissue": 0.004322329352361394,
+      "solve_time_s": 8.99263882637024
+    },
+    {
+      "sink_form": "michaelis_menten",
+      "consumption": 0.24,
+      "K": 0.02857142857142857,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.0013953578649236265,
+      "mean_o2_tissue": 0.0019428870149781421,
+      "solve_time_s": 9.284390926361084
+    },
+    {
+      "sink_form": "michaelis_menten",
+      "consumption": 0.5,
+      "K": 0.02857142857142857,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.0006490155513452001,
+      "mean_o2_tissue": 0.0011234575862002908,
+      "solve_time_s": 8.767388105392456
+    }
+  ],
+  "k_sweep": [
+    {
+      "K": 0.01,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.0143618725164169,
+      "mean_o2_tissue": 0.015826019820356925,
+      "solve_time_s": 13.427748680114746
+    },
+    {
+      "K": 0.025,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.030983577118738618,
+      "mean_o2_tissue": 0.033015262011020806,
+      "solve_time_s": 12.070895195007324
+    },
+    {
+      "K": 0.05,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.05556243766823447,
+      "mean_o2_tissue": 0.05817079276086309,
+      "solve_time_s": 12.286364316940308
+    },
+    {
+      "K": 0.1,
+      "hypoxic_fraction": 1.0,
+      "mean_o2_tumor": 0.09768394048645195,
+      "mean_o2_tissue": 0.10091646602905165,
+      "solve_time_s": 12.693681001663208
+    },
+    {
+      "K": 0.25,
+      "hypoxic_fraction": 0.6941458088358811,
+      "mean_o2_tumor": 0.1929586755199344,
+      "mean_o2_tissue": 0.1968244585475432,
+      "solve_time_s": 11.575438737869263
+    },
+    {
+      "K": 0.5,
+      "hypoxic_fraction": 0.0,
+      "mean_o2_tumor": 0.3003808693443711,
+      "mean_o2_tissue": 0.30436428841047075,
+      "solve_time_s": 9.547612190246582
+    }
+  ],
+  "n_tumor": 23812,
+  "n_cells": 40887,
+  "grid": [
+    424,
+    675
+  ]
+}

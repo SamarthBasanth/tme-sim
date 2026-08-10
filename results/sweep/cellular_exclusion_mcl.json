@@ -1,0 +1,48 @@
+{
+ "phi": {
+  "phi_cell": 0.7891592791653802,
+  "n_cells": 167780,
+  "sum_cell_area_um2": 32494789.538125005,
+  "by_mask": {
+   "bounding box": 0.7891592791653802,
+   "50 um occupancy mask": 0.8499814161162701,
+   "100 um occupancy mask": 0.7826298058315271,
+   "200 um occupancy mask": 0.7635053932830124
+  }
+ },
+ "mcl": {
+  "before_hindrance": 0.563958961855513,
+  "before_fold": 1.7731786665998603,
+  "before_D_um2s": 287.32155645469413,
+  "free_D_um2s": 509.47245435973105,
+  "arms": [
+   {
+    "arm": "A. pipeline + cell term, repo ECM defaults",
+    "phi_cell": 0.7891592791653802,
+    "ecm_leg": 0.563958961855513,
+    "cell_leg_maxwell": 0.15118585905765206,
+    "hindrance": 0.08526262012138736,
+    "fold": 11.728469035742886,
+    "D_eff_um2s": 43.43895633838461,
+    "hindrance_bruggeman": 0.05459831513750211,
+    "fold_bruggeman": 18.3155835025599,
+    "D_eff_bruggeman_um2s": 27.816337617009257
+   },
+   {
+    "arm": "B. cell term ALONE (MCL: packed cells, no stroma)",
+    "phi_cell": 0.7891592791653802,
+    "ecm_leg": 1.0,
+    "cell_leg_maxwell": 0.15118585905765206,
+    "hindrance": 0.15118585905765206,
+    "fold": 6.614375221552088,
+    "D_eff_um2s": 77.02503067858636,
+    "hindrance_bruggeman": 0.09681256763411496,
+    "fold_bruggeman": 10.329237457881641,
+    "D_eff_bruggeman_um2s": 49.323336445420004
+   }
+  ],
+  "measured_fold": 12.0,
+  "measured_D_lo": 74.0,
+  "measured_D_hi": 130.0
+ }
+}

@@ -1,0 +1,25 @@
+{
+ "chain": {
+  "mw": 543.525,
+  "radius_nm": 0.5386,
+  "free_D_um2s": 351.31464825325685,
+  "bd_hindrance": 0.6803574592188634,
+  "mesh_hindrance": 0.772943555845583,
+  "drugparams_diffusivity_um2s": 184.74861430191334,
+  "ecm_tortuosity_factor": 0.76,
+  "d_tissue_um2s": 140.40894686945413,
+  "d_tissue_cm2s": 1.4040894686945413e-06,
+  "d_tissue_over_d_free": 0.3996672144687678
+ },
+ "phi": {
+  "phi_cell": 0.7891592791653802,
+  "n_cells": 167780,
+  "sum_cell_area_um2": 32494789.538125005,
+  "by_mask": {
+   "bounding box": 0.7891592791653802,
+   "50 um occupancy mask": 0.8499814161162701,
+   "100 um occupancy mask": 0.7826298058315271,
+   "200 um occupancy mask": 0.7635053932830124
+  }
+ }
+}
