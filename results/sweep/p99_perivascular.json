@@ -1,0 +1,244 @@
+{
+  "spheroid_shell_fractions": [
+    {
+      "spheroid_radius_um": 50.0,
+      "cell_diameter_um": 10.0,
+      "outer_shell_volume_fraction": 0.4879999999999999
+    },
+    {
+      "spheroid_radius_um": 50.0,
+      "cell_diameter_um": 15.0,
+      "outer_shell_volume_fraction": 0.657
+    },
+    {
+      "spheroid_radius_um": 50.0,
+      "cell_diameter_um": 20.0,
+      "outer_shell_volume_fraction": 0.784
+    },
+    {
+      "spheroid_radius_um": 100.0,
+      "cell_diameter_um": 10.0,
+      "outer_shell_volume_fraction": 0.2709999999999999
+    },
+    {
+      "spheroid_radius_um": 100.0,
+      "cell_diameter_um": 15.0,
+      "outer_shell_volume_fraction": 0.3858750000000001
+    },
+    {
+      "spheroid_radius_um": 100.0,
+      "cell_diameter_um": 20.0,
+      "outer_shell_volume_fraction": 0.4879999999999999
+    },
+    {
+      "spheroid_radius_um": 150.0,
+      "cell_diameter_um": 10.0,
+      "outer_shell_volume_fraction": 0.1869629629629629
+    },
+    {
+      "spheroid_radius_um": 150.0,
+      "cell_diameter_um": 15.0,
+      "outer_shell_volume_fraction": 0.2709999999999999
+    },
+    {
+      "spheroid_radius_um": 150.0,
+      "cell_diameter_um": 20.0,
+      "outer_shell_volume_fraction": 0.3490370370370369
+    },
+    {
+      "spheroid_radius_um": 250.0,
+      "cell_diameter_um": 10.0,
+      "outer_shell_volume_fraction": 0.11526400000000014
+    },
+    {
+      "spheroid_radius_um": 250.0,
+      "cell_diameter_um": 15.0,
+      "outer_shell_volume_fraction": 0.16941600000000012
+    },
+    {
+      "spheroid_radius_um": 250.0,
+      "cell_diameter_um": 20.0,
+      "outer_shell_volume_fraction": 0.22131199999999995
+    }
+  ],
+  "panels": [
+    {
+      "tissue": "gbm",
+      "drugs": [
+        {
+          "drug": "temozolomide",
+          "perivascular_mean_exposure": 1.5826898209911897,
+          "its_percentile_on_the_full_distribution": 90.0974298672938,
+          "pct_of_p50": 50.0,
+          "pct_of_p90": 89.99664034940366,
+          "pct_of_p95": 94.99832017470183,
+          "pct_of_p99": 98.99630438434403,
+          "pct_of_p99.9": 99.89921048210985,
+          "pct_of_max": 99.99580043675458,
+          "pct_of_mean": 59.10885267932136,
+          "pct_of_rms": 64.64387703678818,
+          "pct_of_L4": 74.99160087350916,
+          "pct_of_sauter": 69.70855031076768,
+          "pct_of_tail99": 99.52544935326726,
+          "pct_of_tail95": 97.7952292961532,
+          "pct_of_tail90": 96.35057953972786
+        },
+        {
+          "drug": "cisplatin",
+          "perivascular_mean_exposure": 4.654497915604522,
+          "its_percentile_on_the_full_distribution": 95.20409877372754,
+          "pct_of_p50": 50.0,
+          "pct_of_p90": 89.99664034940366,
+          "pct_of_p95": 94.99832017470183,
+          "pct_of_p99": 98.99630438434403,
+          "pct_of_p99.9": 99.89501091886443,
+          "pct_of_max": 99.99580043675458,
+          "pct_of_mean": 59.386023853519234,
+          "pct_of_rms": 66.97463463799764,
+          "pct_of_L4": 81.78649420460272,
+          "pct_of_sauter": 73.90811355619016,
+          "pct_of_tail99": 99.54644716949437,
+          "pct_of_tail95": 98.31597513858559,
+          "pct_of_tail90": 96.62775071392575
+        },
+        {
+          "drug": "doxorubicin",
+          "perivascular_mean_exposure": 0.046613433345156406,
+          "its_percentile_on_the_full_distribution": 98.10179741306904,
+          "pct_of_p50": 50.0,
+          "pct_of_p90": 89.99664034940366,
+          "pct_of_p95": 94.99832017470183,
+          "pct_of_p99": 98.99630438434403,
+          "pct_of_p99.9": 99.89921048210985,
+          "pct_of_max": 99.99580043675458,
+          "pct_of_mean": 61.040651772215696,
+          "pct_of_rms": 72.61884763984546,
+          "pct_of_L4": 91.29850495548463,
+          "pct_of_sauter": 82.41642869141609,
+          "pct_of_tail99": 99.60104149168487,
+          "pct_of_tail95": 98.47135897866622,
+          "pct_of_tail90": 96.95111708382328
+        }
+      ],
+      "n_tumor": 23812,
+      "n_tumor_in_perfused_voxel": 190,
+      "perfused_tumour_cell_fraction": 0.007979170166302705
+    },
+    {
+      "tissue": "breast",
+      "drugs": [
+        {
+          "drug": "doxorubicin",
+          "perivascular_mean_exposure": 0.07449592101153929,
+          "its_percentile_on_the_full_distribution": 91.82491507490114,
+          "pct_of_p50": 49.99832934231776,
+          "pct_of_p90": 89.99944311410592,
+          "pct_of_p95": 94.99916467115888,
+          "pct_of_p99": 98.99983293423178,
+          "pct_of_p99.9": 99.89864676727738,
+          "pct_of_max": 99.99888622821183,
+          "pct_of_mean": 53.4944589853539,
+          "pct_of_rms": 63.79016539511054,
+          "pct_of_L4": 79.08225204655565,
+          "pct_of_sauter": 74.27855432421897,
+          "pct_of_tail99": 99.60572478699115,
+          "pct_of_tail95": 98.11883944979674,
+          "pct_of_tail90": 96.3613075680793
+        },
+        {
+          "drug": "paclitaxel",
+          "perivascular_mean_exposure": 0.02740287501289298,
+          "its_percentile_on_the_full_distribution": 96.94046889792281,
+          "pct_of_p50": 49.999443114105915,
+          "pct_of_p90": 89.99944311410592,
+          "pct_of_p95": 94.99916467115888,
+          "pct_of_p99": 98.99871916244362,
+          "pct_of_p99.9": 99.89976053906554,
+          "pct_of_max": 99.99888622821183,
+          "pct_of_mean": 60.394275213008854,
+          "pct_of_rms": 73.83861446789552,
+          "pct_of_L4": 88.24079746060032,
+          "pct_of_sauter": 85.06209277718996,
+          "pct_of_tail99": 99.6124074177201,
+          "pct_of_tail95": 98.12329453694937,
+          "pct_of_tail90": 96.36910397059643
+        },
+        {
+          "drug": "docetaxel",
+          "perivascular_mean_exposure": 0.025730398099455345,
+          "its_percentile_on_the_full_distribution": 97.00284011805981,
+          "pct_of_p50": 49.999443114105915,
+          "pct_of_p90": 89.99944311410592,
+          "pct_of_p95": 94.99916467115888,
+          "pct_of_p99": 98.99983293423178,
+          "pct_of_p99.9": 99.89976053906554,
+          "pct_of_max": 99.99888622821183,
+          "pct_of_mean": 60.6136882552765,
+          "pct_of_rms": 74.07139277162109,
+          "pct_of_L4": 88.40118059809545,
+          "pct_of_sauter": 85.28150581945759,
+          "pct_of_tail99": 99.61463496129643,
+          "pct_of_tail95": 98.12886339589019,
+          "pct_of_tail90": 96.37467282953722
+        },
+        {
+          "drug": "epirubicin",
+          "perivascular_mean_exposure": 0.07449592101153929,
+          "its_percentile_on_the_full_distribution": 91.82491507490114,
+          "pct_of_p50": 49.99832934231776,
+          "pct_of_p90": 89.99944311410592,
+          "pct_of_p95": 94.99916467115888,
+          "pct_of_p99": 98.99983293423178,
+          "pct_of_p99.9": 99.89864676727738,
+          "pct_of_max": 99.99888622821183,
+          "pct_of_mean": 53.4944589853539,
+          "pct_of_rms": 63.79016539511054,
+          "pct_of_L4": 79.08225204655565,
+          "pct_of_sauter": 74.27855432421897,
+          "pct_of_tail99": 99.60572478699115,
+          "pct_of_tail95": 98.11883944979674,
+          "pct_of_tail90": 96.3613075680793
+        },
+        {
+          "drug": "5-fluorouracil",
+          "perivascular_mean_exposure": 9.248675868289846,
+          "its_percentile_on_the_full_distribution": 67.91891741382192,
+          "pct_of_p50": 49.99832934231776,
+          "pct_of_p90": 89.99832934231776,
+          "pct_of_p95": 94.99916467115888,
+          "pct_of_p99": 98.99983293423178,
+          "pct_of_p99.9": 99.89976053906554,
+          "pct_of_max": 99.99888622821183,
+          "pct_of_mean": 50.010580831987525,
+          "pct_of_rms": 53.92660243916022,
+          "pct_of_L4": 62.96820181544801,
+          "pct_of_sauter": 59.46984462883555,
+          "pct_of_tail99": 99.68146126858606,
+          "pct_of_tail95": 97.86712702567245,
+          "pct_of_tail90": 95.96814612685861
+        },
+        {
+          "drug": "cisplatin",
+          "perivascular_mean_exposure": 8.731807023564198,
+          "its_percentile_on_the_full_distribution": 77.69894748566018,
+          "pct_of_p50": 49.999443114105915,
+          "pct_of_p90": 89.99944311410592,
+          "pct_of_p95": 94.99916467115888,
+          "pct_of_p99": 98.99983293423178,
+          "pct_of_p99.9": 99.89976053906554,
+          "pct_of_max": 99.99888622821183,
+          "pct_of_mean": 50.03842512669154,
+          "pct_of_rms": 56.20092443058417,
+          "pct_of_L4": 67.78303725566631,
+          "pct_of_sauter": 63.78236899259342,
+          "pct_of_tail99": 99.59235952553321,
+          "pct_of_tail95": 98.01080358634516,
+          "pct_of_tail90": 96.0394275213009
+        }
+      ],
+      "n_tumor": 89785,
+      "n_tumor_in_perfused_voxel": 2752,
+      "perfused_tumour_cell_fraction": 0.030650999610179874
+    }
+  ]
+}

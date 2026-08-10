@@ -1,0 +1,1095 @@
+{
+  "scale_factors": [
+    1e-06,
+    0.001,
+    0.1,
+    0.5,
+    2.0,
+    10.0,
+    1000.0,
+    1000000.0
+  ],
+  "panels": [
+    {
+      "tissue": "gbm",
+      "drugs": [
+        {
+          "drug": "temozolomide",
+          "c_bath_uM": 100.0,
+          "shipped_ratio": 0.2626492056468571,
+          "conventions": {
+            "p50": {
+              "ref_unit": 1.082579211094088,
+              "ratio_exact": 0.5909731625299404,
+              "f_penetration": 1.0538405519143514,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.0021790021647971614,
+              "rel_change_under_2pct_iid_multiplicative": 0.0006288904173359366
+            },
+            "p90": {
+              "ref_unit": 1.5801014315454989,
+              "ratio_exact": 0.39281725906284554,
+              "f_penetration": 0.7000018008937103,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.005875822277776166,
+              "rel_change_under_2pct_iid_multiplicative": 0.00039957198938411764
+            },
+            "p95": {
+              "ref_unit": 1.7414066581239933,
+              "ratio_exact": 0.35272293347883493,
+              "f_penetration": 0.6284674982849777,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.008040891818151263,
+              "rel_change_under_2pct_iid_multiplicative": 0.002970890747219568
+            },
+            "p99": {
+              "ref_unit": 2.263798920319938,
+              "ratio_exact": 0.2626492056468571,
+              "f_penetration": 0.46783514742473475,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.014008169610460586,
+              "rel_change_under_2pct_iid_multiplicative": 0.0008359204192558423
+            },
+            "p99.9": {
+              "ref_unit": 2.8271077911510503,
+              "ratio_exact": 0.20378151074052872,
+              "f_penetration": 0.36290753432973466,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.01915613051321352,
+              "rel_change_under_2pct_iid_multiplicative": 0.004746659974804945
+            },
+            "max": {
+              "ref_unit": 3.0386654410749676,
+              "ratio_exact": 0.1875383705802326,
+              "f_penetration": 0.3339626355494146,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.020839119647431348,
+              "rel_change_under_2pct_iid_multiplicative": 0.0025657069490016005
+            },
+            "mean": {
+              "ref_unit": 1.1403222463992084,
+              "ratio_exact": 0.559341747368454,
+              "f_penetration": 0.9973239096691401,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.00021284748059069436,
+              "rel_change_under_2pct_iid_multiplicative": 7.795127051624107e-05
+            },
+            "rms": {
+              "ref_unit": 1.1891954553739905,
+              "ratio_exact": 0.5348856876568984,
+              "f_penetration": 0.9536365098307787,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.0016182967848789032,
+              "rel_change_under_2pct_iid_multiplicative": 0.0003401451005209388
+            },
+            "L4": {
+              "ref_unit": 1.3011199019677113,
+              "ratio_exact": 0.4856191821972964,
+              "f_penetration": 0.8656519628134968,
+              "worst_rel_change_under_pure_scale": 3.3306690738754696e-16,
+              "rel_change_under_2pct_shape_warp": 0.005787970010083354,
+              "rel_change_under_2pct_iid_multiplicative": 0.0007738561952567169
+            },
+            "sauter": {
+              "ref_unit": 1.240163327118911,
+              "ratio_exact": 0.5113751121088728,
+              "f_penetration": 0.9116453371538082,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.0034666285025666266,
+              "rel_change_under_2pct_iid_multiplicative": 0.00047070292063988717
+            },
+            "tail99": {
+              "ref_unit": 2.5130735804635247,
+              "ratio_exact": 0.23320617185675463,
+              "f_penetration": 0.4153497082286216,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.016492752295042656,
+              "rel_change_under_2pct_iid_multiplicative": 0.004890901724470154
+            },
+            "tail95": {
+              "ref_unit": 2.0736914139829006,
+              "ratio_exact": 0.29004559425727966,
+              "f_penetration": 0.5166817284529115,
+              "worst_rel_change_under_pure_scale": 5.551115123125783e-16,
+              "rel_change_under_2pct_shape_warp": 0.012189782121933335,
+              "rel_change_under_2pct_iid_multiplicative": 0.0018437815821532588
+            },
+            "tail90": {
+              "ref_unit": 1.8592906483791782,
+              "ratio_exact": 0.3278702454121089,
+              "f_penetration": 0.5841366216765725,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.009776892300987328,
+              "rel_change_under_2pct_iid_multiplicative": 0.0015863182241603324
+            },
+            "fixed": {
+              "ref_unit": 2.263798920319938,
+              "ratio_exact": 0.2626492056468571,
+              "f_penetration": 0.46783514742473475,
+              "worst_rel_change_under_pure_scale": 19.273575245701736,
+              "rel_change_under_2pct_shape_warp": 0.0004906789671252909,
+              "rel_change_under_2pct_iid_multiplicative": 0.00046356844058181856
+            }
+          }
+        },
+        {
+          "drug": "cisplatin",
+          "c_bath_uM": 24.550285905059777,
+          "shipped_ratio": 0.27911792996360496,
+          "conventions": {
+            "p50": {
+              "ref_unit": 2.5087432197507025,
+              "ratio_exact": 0.559398526125076,
+              "f_penetration": 1.004107939648861,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.00031676141272996006,
+              "rel_change_under_2pct_iid_multiplicative": 0.0001261864907091681
+            },
+            "p90": {
+              "ref_unit": 4.00906038432219,
+              "ratio_exact": 0.41428845323432967,
+              "f_penetration": 0.7412635851299167,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.005750411166622449,
+              "rel_change_under_2pct_iid_multiplicative": 0.0006293401109888075
+            },
+            "p95": {
+              "ref_unit": 4.603542458817507,
+              "ratio_exact": 0.3740820958350941,
+              "f_penetration": 0.6687388077951734,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.008020856633728646,
+              "rel_change_under_2pct_iid_multiplicative": 0.001401865407463343
+            },
+            "p99": {
+              "ref_unit": 6.599886788686058,
+              "ratio_exact": 0.27911792996360496,
+              "f_penetration": 0.49795474312473176,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.01481954895645099,
+              "rel_change_under_2pct_iid_multiplicative": 0.005253983595468248
+            },
+            "p99.9": {
+              "ref_unit": 10.071373561021218,
+              "ratio_exact": 0.18947286202061311,
+              "f_penetration": 0.33738812636781307,
+              "worst_rel_change_under_pure_scale": 3.3306690738754696e-16,
+              "rel_change_under_2pct_shape_warp": 0.024049593897412902,
+              "rel_change_under_2pct_iid_multiplicative": 0.008767805162851916
+            },
+            "max": {
+              "ref_unit": 11.331057053501072,
+              "ratio_exact": 0.16885470960970106,
+              "f_penetration": 0.3005459758553436,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.0267895599092296,
+              "rel_change_under_2pct_iid_multiplicative": 0.015842043422214513
+            },
+            "mean": {
+              "ref_unit": 2.71219876091473,
+              "ratio_exact": 0.5348071037689225,
+              "f_penetration": 0.9594429692546618,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.0013841178953478694,
+              "rel_change_under_2pct_iid_multiplicative": 0.00012892663096686352
+            },
+            "rms": {
+              "ref_unit": 2.9245229038825715,
+              "ratio_exact": 0.5110916235907604,
+              "f_penetration": 0.9164161232527416,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.003356841051143755,
+              "rel_change_under_2pct_iid_multiplicative": 5.1238770682249246e-05
+            },
+            "L4": {
+              "ref_unit": 3.4843082609330316,
+              "ratio_exact": 0.4566630299377412,
+              "f_penetration": 0.8178408812036053,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.008878338323619173,
+              "rel_change_under_2pct_iid_multiplicative": 0.0005215418447420683
+            },
+            "sauter": {
+              "ref_unit": 3.15346881599827,
+              "ratio_exact": 0.48751522939620806,
+              "f_penetration": 0.8736873590752515,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.005482535235091124,
+              "rel_change_under_2pct_iid_multiplicative": 0.00020304009703109305
+            },
+            "tail99": {
+              "ref_unit": 8.060881715564772,
+              "ratio_exact": 0.2336241229404176,
+              "f_penetration": 0.41639096745406234,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.01923683006550292,
+              "rel_change_under_2pct_iid_multiplicative": 0.0014412115242187218
+            },
+            "tail95": {
+              "ref_unit": 5.852833946533406,
+              "ratio_exact": 0.30902579616990883,
+              "f_penetration": 0.5516638814685373,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.01280444867235786,
+              "rel_change_under_2pct_iid_multiplicative": 0.0013181019631078872
+            },
+            "tail90": {
+              "ref_unit": 5.057111159655879,
+              "ratio_exact": 0.34783791882006104,
+              "f_penetration": 0.6214692754849059,
+              "worst_rel_change_under_pure_scale": 3.3306690738754696e-16,
+              "rel_change_under_2pct_shape_warp": 0.010091657487484862,
+              "rel_change_under_2pct_iid_multiplicative": 0.000390928714779637
+            },
+            "fixed": {
+              "ref_unit": 6.599886788686058,
+              "ratio_exact": 0.27911792996360496,
+              "f_penetration": 0.49795474312473176,
+              "worst_rel_change_under_pure_scale": 2.9376455027177752,
+              "rel_change_under_2pct_shape_warp": 0.0008293514299231308,
+              "rel_change_under_2pct_iid_multiplicative": 8.899639033366213e-05
+            }
+          }
+        },
+        {
+          "drug": "doxorubicin",
+          "c_bath_uM": 0.5,
+          "shipped_ratio": 0.2076758749154858,
+          "conventions": {
+            "p50": {
+              "ref_unit": 0.01480333813939131,
+              "ratio_exact": 0.5541961012921905,
+              "f_penetration": 0.9927497284304891,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.0001771202014115847,
+              "rel_change_under_2pct_iid_multiplicative": 7.149107318027426e-05
+            },
+            "p90": {
+              "ref_unit": 0.02899506500348807,
+              "ratio_exact": 0.3601865914794267,
+              "f_penetration": 0.6421335778337321,
+              "worst_rel_change_under_pure_scale": 3.3306690738754696e-16,
+              "rel_change_under_2pct_shape_warp": 0.008066146014095832,
+              "rel_change_under_2pct_iid_multiplicative": 0.0012642037393855166
+            },
+            "p95": {
+              "ref_unit": 0.035417296803640995,
+              "ratio_exact": 0.3088791562626185,
+              "f_penetration": 0.5499623719619191,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.011355727320615183,
+              "rel_change_under_2pct_iid_multiplicative": 0.00016156581151816063
+            },
+            "p99": {
+              "ref_unit": 0.056338441348950656,
+              "ratio_exact": 0.2076758749154858,
+              "f_penetration": 0.36882540737261743,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.020195250542610066,
+              "rel_change_under_2pct_iid_multiplicative": 0.0007497661447870563
+            },
+            "p99.9": {
+              "ref_unit": 0.11308749113447654,
+              "ratio_exact": 0.104886377908707,
+              "f_penetration": 0.18577085806334642,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.035595747324837834,
+              "rel_change_under_2pct_iid_multiplicative": 0.006917621930774276
+            },
+            "max": {
+              "ref_unit": 0.13255418526650425,
+              "ratio_exact": 0.08875211211744424,
+              "f_penetration": 0.1571248787064518,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.039303122020300285,
+              "rel_change_under_2pct_iid_multiplicative": 0.015212712475010104
+            },
+            "mean": {
+              "ref_unit": 0.017128149000390062,
+              "ratio_exact": 0.5105554647172119,
+              "f_penetration": 0.9135900331401632,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.003173919446621154,
+              "rel_change_under_2pct_iid_multiplicative": 4.435999748730879e-05
+            },
+            "rms": {
+              "ref_unit": 0.020336471824912324,
+              "ratio_exact": 0.45978999460260533,
+              "f_penetration": 0.8217215252932678,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.00787129935749975,
+              "rel_change_under_2pct_iid_multiplicative": 0.0003818355512735794
+            },
+            "L4": {
+              "ref_unit": 0.030358097045989747,
+              "ratio_exact": 0.3480440514157385,
+              "f_penetration": 0.6202994755966121,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.021062899692222747,
+              "rel_change_under_2pct_iid_multiplicative": 0.0009707594196451952
+            },
+            "sauter": {
+              "ref_unit": 0.02414575482009378,
+              "ratio_exact": 0.4104343313370607,
+              "f_penetration": 0.7326230986202997,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.013267754926988062,
+              "rel_change_under_2pct_iid_multiplicative": 0.0003220845697350372
+            },
+            "tail99": {
+              "ref_unit": 0.07906724181071424,
+              "ratio_exact": 0.15065267097982288,
+              "f_penetration": 0.267157824150678,
+              "worst_rel_change_under_pure_scale": 3.3306690738754696e-16,
+              "rel_change_under_2pct_shape_warp": 0.028029756137807116,
+              "rel_change_under_2pct_iid_multiplicative": 0.0017673882716627842
+            },
+            "tail95": {
+              "ref_unit": 0.049700790127365314,
+              "ratio_exact": 0.23238585279384624,
+              "f_penetration": 0.41296996636765415,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.01862113363632334,
+              "rel_change_under_2pct_iid_multiplicative": 0.000633693356604681
+            },
+            "tail90": {
+              "ref_unit": 0.04075909114711761,
+              "ratio_exact": 0.27548766346586495,
+              "f_penetration": 0.49009887989238626,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.014839678393072875,
+              "rel_change_under_2pct_iid_multiplicative": 0.0008969819115858257
+            },
+            "fixed": {
+              "ref_unit": 0.056338441348950656,
+              "ratio_exact": 0.2076758749154858,
+              "f_penetration": 0.36882540737261743,
+              "worst_rel_change_under_pure_scale": 4.292224037151095,
+              "rel_change_under_2pct_shape_warp": 0.0017422335199783756,
+              "rel_change_under_2pct_iid_multiplicative": 7.425174487085684e-05
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tissue": "breast",
+      "drugs": [
+        {
+          "drug": "doxorubicin",
+          "c_bath_uM": 0.5,
+          "shipped_ratio": 0.23013330629020515,
+          "conventions": {
+            "p50": {
+              "ref_unit": 0.03951348732273718,
+              "ratio_exact": 0.48139575768761855,
+              "f_penetration": 0.939471302268685,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.0004309117145607777,
+              "rel_change_under_2pct_iid_multiplicative": 1.40942131072741e-05
+            },
+            "p90": {
+              "ref_unit": 0.07122670774897369,
+              "ratio_exact": 0.32896321852666616,
+              "f_penetration": 0.6402313566387087,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.007650458294073514,
+              "rel_change_under_2pct_iid_multiplicative": 5.726887423929128e-05
+            },
+            "p95": {
+              "ref_unit": 0.08246479728728244,
+              "ratio_exact": 0.29446116181798115,
+              "f_penetration": 0.5726919421198677,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.010009502338759302,
+              "rel_change_under_2pct_iid_multiplicative": 0.0005161920286013144
+            },
+            "p99": {
+              "ref_unit": 0.1114104720493213,
+              "ratio_exact": 0.23013330629020515,
+              "f_penetration": 0.44697029914234304,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.01548573753814031,
+              "rel_change_under_2pct_iid_multiplicative": 0.004050453438311563
+            },
+            "p99.9": {
+              "ref_unit": 0.149793084572474,
+              "ratio_exact": 0.17648383825168568,
+              "f_penetration": 0.3423391236851751,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.021577370001557794,
+              "rel_change_under_2pct_iid_multiplicative": 0.000488561610271554
+            },
+            "max": {
+              "ref_unit": 0.17510423177480716,
+              "ratio_exact": 0.15218216653290167,
+              "f_penetration": 0.295017442694464,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.025011090336503505,
+              "rel_change_under_2pct_iid_multiplicative": 0.011384967990077488
+            },
+            "mean": {
+              "ref_unit": 0.041545272799152246,
+              "ratio_exact": 0.4679602474279959,
+              "f_penetration": 0.9130413269733918,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.002725429222811826,
+              "rel_change_under_2pct_iid_multiplicative": 8.607368588886555e-05
+            },
+            "rms": {
+              "ref_unit": 0.04762078967479152,
+              "ratio_exact": 0.43159310769264836,
+              "f_penetration": 0.8415542975245223,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.005295633596106741,
+              "rel_change_under_2pct_iid_multiplicative": 0.00023048480514065162
+            },
+            "L4": {
+              "ref_unit": 0.05842522935874508,
+              "ratio_exact": 0.37830060554112876,
+              "f_penetration": 0.7369364279551249,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.009705668626477926,
+              "rel_change_under_2pct_iid_multiplicative": 0.00029027637433598485
+            },
+            "sauter": {
+              "ref_unit": 0.05458478080560359,
+              "ratio_exact": 0.39580549614857674,
+              "f_penetration": 0.7712818216542175,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.008200578234001554,
+              "rel_change_under_2pct_iid_multiplicative": 0.00043231649875974387
+            },
+            "tail99": {
+              "ref_unit": 0.1280754427088051,
+              "ratio_exact": 0.20363538565623085,
+              "f_penetration": 0.39526541693094014,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.018382670656773903,
+              "rel_change_under_2pct_iid_multiplicative": 0.0018701336764448406
+            },
+            "tail95": {
+              "ref_unit": 0.10017082410516896,
+              "ratio_exact": 0.2517925655528099,
+              "f_penetration": 0.48927021891073535,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.013680769530553638,
+              "rel_change_under_2pct_iid_multiplicative": 0.0006273810138658353
+            },
+            "tail90": {
+              "ref_unit": 0.08813564043614881,
+              "ratio_exact": 0.27944660286431117,
+              "f_penetration": 0.543323431770947,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.011427361244216505,
+              "rel_change_under_2pct_iid_multiplicative": 0.0006298804787235879
+            },
+            "fixed": {
+              "ref_unit": 0.1114104720493213,
+              "ratio_exact": 0.23013330629020515,
+              "f_penetration": 0.44697029914234304,
+              "worst_rel_change_under_pure_scale": 3.398536175461251,
+              "rel_change_under_2pct_shape_warp": 0.00138806941098224,
+              "rel_change_under_2pct_iid_multiplicative": 3.438740579020383e-05
+            }
+          }
+        },
+        {
+          "drug": "paclitaxel",
+          "c_bath_uM": 0.06858492641188492,
+          "shipped_ratio": 0.15028661822296227,
+          "conventions": {
+            "p50": {
+              "ref_unit": 0.00686956936621809,
+              "ratio_exact": 0.4805531333848367,
+              "f_penetration": 0.9327544743265961,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.0001996024006849506,
+              "rel_change_under_2pct_iid_multiplicative": 0.0005021067361209441
+            },
+            "p90": {
+              "ref_unit": 0.018549438571961924,
+              "ratio_exact": 0.2611667738169315,
+              "f_penetration": 0.5032859693515661,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.009850558268309051,
+              "rel_change_under_2pct_iid_multiplicative": 0.00028403531110465785
+            },
+            "p95": {
+              "ref_unit": 0.023659171051617797,
+              "ratio_exact": 0.21626449947670498,
+              "f_penetration": 0.4159454518000467,
+              "worst_rel_change_under_pure_scale": 3.3306690738754696e-16,
+              "rel_change_under_2pct_shape_warp": 0.013573115506938072,
+              "rel_change_under_2pct_iid_multiplicative": 0.0008644947946786496
+            },
+            "p99": {
+              "ref_unit": 0.0361854353695614,
+              "ratio_exact": 0.15028661822296227,
+              "f_penetration": 0.2880857093715395,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.021153990845565795,
+              "rel_change_under_2pct_iid_multiplicative": 0.00034456793547721354
+            },
+            "p99.9": {
+              "ref_unit": 0.054193491529594934,
+              "ratio_exact": 0.10254820564597117,
+              "f_penetration": 0.1960077943366626,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.02940950286871591,
+              "rel_change_under_2pct_iid_multiplicative": 0.007879371386496747
+            },
+            "max": {
+              "ref_unit": 0.06813484927570003,
+              "ratio_exact": 0.08147731657730352,
+              "f_penetration": 0.1555085390387923,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.03442587441683842,
+              "rel_change_under_2pct_iid_multiplicative": 0.00010880867873175326
+            },
+            "mean": {
+              "ref_unit": 0.008705264876637316,
+              "ratio_exact": 0.42536750926132905,
+              "f_penetration": 0.8243622137232216,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.00530416189439753,
+              "rel_change_under_2pct_iid_multiplicative": 0.00010578079762357806
+            },
+            "rms": {
+              "ref_unit": 0.011635022320944488,
+              "ratio_exact": 0.3591614946832268,
+              "f_penetration": 0.6946236427260494,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.010272721018586672,
+              "rel_change_under_2pct_iid_multiplicative": 0.0002698521927767539
+            },
+            "L4": {
+              "ref_unit": 0.01730929197736463,
+              "ratio_exact": 0.2747994986378991,
+              "f_penetration": 0.5298481275872347,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.01822656558300384,
+              "rel_change_under_2pct_iid_multiplicative": 0.0005481060689237482
+            },
+            "sauter": {
+              "ref_unit": 0.015550789818260977,
+              "ratio_exact": 0.29659072386216356,
+              "f_penetration": 0.5723462749160999,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.01638153256053876,
+              "rel_change_under_2pct_iid_multiplicative": 0.0007358147524720859
+            },
+            "tail99": {
+              "ref_unit": 0.04376965371578318,
+              "ratio_exact": 0.12603006115612236,
+              "f_penetration": 0.24124773470662192,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.0251364191857516,
+              "rel_change_under_2pct_iid_multiplicative": 0.0004921314584160896
+            },
+            "tail95": {
+              "ref_unit": 0.0313902296436453,
+              "ratio_exact": 0.1705393381346886,
+              "f_penetration": 0.32726658833722144,
+              "worst_rel_change_under_pure_scale": 3.3306690738754696e-16,
+              "rel_change_under_2pct_shape_warp": 0.0189330151305378,
+              "rel_change_under_2pct_iid_multiplicative": 0.000724403712806243
+            },
+            "tail90": {
+              "ref_unit": 0.026073157923130145,
+              "ratio_exact": 0.19974455063771815,
+              "f_penetration": 0.3838740306814903,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.015819494217081287,
+              "rel_change_under_2pct_iid_multiplicative": 0.0003959717437281851
+            },
+            "fixed": {
+              "ref_unit": 0.0361854353695614,
+              "ratio_exact": 0.15028661822296227,
+              "f_penetration": 0.2880857093715395,
+              "worst_rel_change_under_pure_scale": 5.734582691753323,
+              "rel_change_under_2pct_shape_warp": 0.0020306381174198807,
+              "rel_change_under_2pct_iid_multiplicative": 0.00011004419771198926
+            }
+          }
+        },
+        {
+          "drug": "docetaxel",
+          "c_bath_uM": 0.0566993234737221,
+          "shipped_ratio": 0.14842965466495936,
+          "conventions": {
+            "p50": {
+              "ref_unit": 0.006296766113201247,
+              "ratio_exact": 0.4804132734042014,
+              "f_penetration": 0.9324118394247388,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.00021422430058870567,
+              "rel_change_under_2pct_iid_multiplicative": 7.585524273667765e-05
+            },
+            "p90": {
+              "ref_unit": 0.017209921754411137,
+              "ratio_exact": 0.2595090402352217,
+              "f_penetration": 0.49998553538445056,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.009885027758139597,
+              "rel_change_under_2pct_iid_multiplicative": 0.0007423231747589742
+            },
+            "p95": {
+              "ref_unit": 0.022047034347606742,
+              "ratio_exact": 0.21415925905202157,
+              "f_penetration": 0.41178724513614856,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.013663891562870512,
+              "rel_change_under_2pct_iid_multiplicative": 0.0001661058181441355
+            },
+            "p99": {
+              "ref_unit": 0.03381399487434252,
+              "ratio_exact": 0.14842965466495936,
+              "f_penetration": 0.2844358231662181,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.021282047679279215,
+              "rel_change_under_2pct_iid_multiplicative": 0.003935777185653522
+            },
+            "p99.9": {
+              "ref_unit": 0.05072564161328571,
+              "ratio_exact": 0.10109412317010799,
+              "f_penetration": 0.19316040336389695,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.0295608428375973,
+              "rel_change_under_2pct_iid_multiplicative": 0.00393576430622633
+            },
+            "max": {
+              "ref_unit": 0.0638253674966416,
+              "ratio_exact": 0.08024596050842231,
+              "f_penetration": 0.15310205484205264,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.03458898630034135,
+              "rel_change_under_2pct_iid_multiplicative": 0.0044432750083867045
+            },
+            "mean": {
+              "ref_unit": 0.008035049782160877,
+              "ratio_exact": 0.4238811247348495,
+              "f_penetration": 0.8213758169626445,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.0053922084260228376,
+              "rel_change_under_2pct_iid_multiplicative": 0.00012207621070581265
+            },
+            "rms": {
+              "ref_unit": 0.010796730281095599,
+              "ratio_exact": 0.35682562309830673,
+              "f_penetration": 0.6899805062532461,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.01043396359475579,
+              "rel_change_under_2pct_iid_multiplicative": 0.0001957872748618028
+            },
+            "L4": {
+              "ref_unit": 0.01615152610721789,
+              "ratio_exact": 0.27191543071400204,
+              "f_penetration": 0.5241549041689262,
+              "worst_rel_change_under_pure_scale": 6.661338147750939e-16,
+              "rel_change_under_2pct_shape_warp": 0.018452986367633373,
+              "rel_change_under_2pct_iid_multiplicative": 0.0006501813720816152
+            },
+            "sauter": {
+              "ref_unit": 0.014507612015239747,
+              "ratio_exact": 0.29356065977267143,
+              "f_penetration": 0.5663614549527712,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.01664644652436853,
+              "rel_change_under_2pct_iid_multiplicative": 0.0004237463115248641
+            },
+            "tail99": {
+              "ref_unit": 0.040950714072848254,
+              "ratio_exact": 0.1243156072438598,
+              "f_penetration": 0.2378854967265963,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.025285036657493598,
+              "rel_change_under_2pct_iid_multiplicative": 0.0005768572802009597
+            },
+            "tail95": {
+              "ref_unit": 0.02930413883973791,
+              "ratio_exact": 0.1685961872933827,
+              "f_penetration": 0.3234406163248177,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.019052961101815424,
+              "rel_change_under_2pct_iid_multiplicative": 0.0005763906441719202
+            },
+            "tail90": {
+              "ref_unit": 0.02430054987051974,
+              "ratio_exact": 0.19776443076609473,
+              "f_penetration": 0.3799646230609191,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.01592131977295863,
+              "rel_change_under_2pct_iid_multiplicative": 0.0004987963236342541
+            },
+            "fixed": {
+              "ref_unit": 0.03381399487434252,
+              "ratio_exact": 0.14842965466495936,
+              "f_penetration": 0.2844358231662181,
+              "worst_rel_change_under_pure_scale": 5.818745772943193,
+              "rel_change_under_2pct_shape_warp": 0.002050970873165525,
+              "rel_change_under_2pct_iid_multiplicative": 8.693274643378768e-05
+            }
+          }
+        },
+        {
+          "drug": "epirubicin",
+          "c_bath_uM": 0.8411910287790403,
+          "shipped_ratio": 0.23013330629020515,
+          "conventions": {
+            "p50": {
+              "ref_unit": 0.03951348732273718,
+              "ratio_exact": 0.48139575768761844,
+              "f_penetration": 0.9394713022686849,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.00043091171456055566,
+              "rel_change_under_2pct_iid_multiplicative": 3.5598794014601864e-05
+            },
+            "p90": {
+              "ref_unit": 0.07122670774897369,
+              "ratio_exact": 0.32896321852666616,
+              "f_penetration": 0.6402313566387087,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.0076504582940737365,
+              "rel_change_under_2pct_iid_multiplicative": 1.6565992324357737e-05
+            },
+            "p95": {
+              "ref_unit": 0.08246479728728244,
+              "ratio_exact": 0.2944611618179811,
+              "f_penetration": 0.5726919421198676,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.010009502338759302,
+              "rel_change_under_2pct_iid_multiplicative": 0.0015249890019839452
+            },
+            "p99": {
+              "ref_unit": 0.1114104720493213,
+              "ratio_exact": 0.23013330629020515,
+              "f_penetration": 0.44697029914234304,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.015485737538140643,
+              "rel_change_under_2pct_iid_multiplicative": 0.00021646816859677287
+            },
+            "p99.9": {
+              "ref_unit": 0.149793084572474,
+              "ratio_exact": 0.17648383825168565,
+              "f_penetration": 0.34233912368517505,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.021577370001557683,
+              "rel_change_under_2pct_iid_multiplicative": 0.0002931889351416306
+            },
+            "max": {
+              "ref_unit": 0.17510423177480716,
+              "ratio_exact": 0.15218216653290167,
+              "f_penetration": 0.295017442694464,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.025011090336503727,
+              "rel_change_under_2pct_iid_multiplicative": 0.012309856162033839
+            },
+            "mean": {
+              "ref_unit": 0.041545272799152246,
+              "ratio_exact": 0.46796024742799597,
+              "f_penetration": 0.9130413269733918,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.002725429222811937,
+              "rel_change_under_2pct_iid_multiplicative": 0.00010874694183427014
+            },
+            "rms": {
+              "ref_unit": 0.04762078967479152,
+              "ratio_exact": 0.43159310769264836,
+              "f_penetration": 0.8415542975245222,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.005295633596106741,
+              "rel_change_under_2pct_iid_multiplicative": 0.0002565241998957468
+            },
+            "L4": {
+              "ref_unit": 0.05842522935874508,
+              "ratio_exact": 0.3783006055411287,
+              "f_penetration": 0.7369364279551249,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.009705668626477815,
+              "rel_change_under_2pct_iid_multiplicative": 0.0004794824982297108
+            },
+            "sauter": {
+              "ref_unit": 0.05458478080560359,
+              "ratio_exact": 0.39580549614857674,
+              "f_penetration": 0.7712818216542175,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.008200578234001554,
+              "rel_change_under_2pct_iid_multiplicative": 0.0003025616058603964
+            },
+            "tail99": {
+              "ref_unit": 0.1280754427088051,
+              "ratio_exact": 0.20363538565623085,
+              "f_penetration": 0.39526541693094014,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.018382670656773903,
+              "rel_change_under_2pct_iid_multiplicative": 0.000860374910916839
+            },
+            "tail95": {
+              "ref_unit": 0.10017082410516896,
+              "ratio_exact": 0.2517925655528099,
+              "f_penetration": 0.48927021891073535,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.013680769530553638,
+              "rel_change_under_2pct_iid_multiplicative": 0.00020988971734603457
+            },
+            "tail90": {
+              "ref_unit": 0.08813564043614881,
+              "ratio_exact": 0.27944660286431117,
+              "f_penetration": 0.5433234317709467,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.011427361244216505,
+              "rel_change_under_2pct_iid_multiplicative": 0.0007350807075992005
+            },
+            "fixed": {
+              "ref_unit": 0.1114104720493213,
+              "ratio_exact": 0.23013330629020515,
+              "f_penetration": 0.44697029914234304,
+              "worst_rel_change_under_pure_scale": 3.398536175461251,
+              "rel_change_under_2pct_shape_warp": 0.00138806941098224,
+              "rel_change_under_2pct_iid_multiplicative": 8.674291075139173e-05
+            }
+          }
+        },
+        {
+          "drug": "5-fluorouracil",
+          "c_bath_uM": 201.17979284381485,
+          "shipped_ratio": 0.3378821161474709,
+          "conventions": {
+            "p50": {
+              "ref_unit": 7.795175361180341,
+              "ratio_exact": 0.4888958017419569,
+              "f_penetration": 0.9673114064936857,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.0005766537137327221,
+              "rel_change_under_2pct_iid_multiplicative": 0.0007093871370100757
+            },
+            "p90": {
+              "ref_unit": 11.210192685765744,
+              "ratio_exact": 0.3854954942050116,
+              "f_penetration": 0.762797587567734,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.005454970355859734,
+              "rel_change_under_2pct_iid_multiplicative": 0.00016100258040263604
+            },
+            "p95": {
+              "ref_unit": 12.037986143961144,
+              "ratio_exact": 0.3660809968200393,
+              "f_penetration": 0.7243887614494542,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.006597896048482377,
+              "rel_change_under_2pct_iid_multiplicative": 0.0009444273322627428
+            },
+            "p99": {
+              "ref_unit": 13.389003518303133,
+              "ratio_exact": 0.3378821161474709,
+              "f_penetration": 0.6685972822687316,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.008411325133922287,
+              "rel_change_under_2pct_iid_multiplicative": 0.0013496868106427362
+            },
+            "p99.9": {
+              "ref_unit": 14.755045446417013,
+              "ratio_exact": 0.31306504118883344,
+              "f_penetration": 0.619493335365545,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.010174339840000046,
+              "rel_change_under_2pct_iid_multiplicative": 0.0010811599622703172
+            },
+            "max": {
+              "ref_unit": 15.989026239429588,
+              "ratio_exact": 0.29329890612220233,
+              "f_penetration": 0.5803814679086391,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.011704184631491366,
+              "rel_change_under_2pct_iid_multiplicative": 0.016053818308395362
+            },
+            "mean": {
+              "ref_unit": 7.795601068518793,
+              "ratio_exact": 0.4888799521353247,
+              "f_penetration": 0.9672800653260628,
+              "worst_rel_change_under_pure_scale": 5.551115123125783e-16,
+              "rel_change_under_2pct_shape_warp": 0.00124754169762753,
+              "rel_change_under_2pct_iid_multiplicative": 0.00010904170813852421
+            },
+            "rms": {
+              "ref_unit": 8.20462457450596,
+              "ratio_exact": 0.47405424424998227,
+              "f_penetration": 0.9379624385957563,
+              "worst_rel_change_under_pure_scale": 1.1102230246251565e-16,
+              "rel_change_under_2pct_shape_warp": 0.002330136922524928,
+              "rel_change_under_2pct_iid_multiplicative": 0.00019915558896677066
+            },
+            "L4": {
+              "ref_unit": 8.887568832039303,
+              "ratio_exact": 0.45098094185505777,
+              "f_penetration": 0.8923310352569274,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.0038967980767341537,
+              "rel_change_under_2pct_iid_multiplicative": 0.0004613130476596172
+            },
+            "sauter": {
+              "ref_unit": 8.635108930911146,
+              "ratio_exact": 0.45927733175630653,
+              "f_penetration": 0.9087391432977394,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.00347146626504391,
+              "rel_change_under_2pct_iid_multiplicative": 0.0003684848365060889
+            },
+            "tail99": {
+              "ref_unit": 13.910408999553407,
+              "ratio_exact": 0.3280098168597782,
+              "f_penetration": 0.6490639455296541,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.009104633653771121,
+              "rel_change_under_2pct_iid_multiplicative": 0.0038121141641239698
+            },
+            "tail95": {
+              "ref_unit": 12.848932217465759,
+              "ratio_exact": 0.34867754249110433,
+              "f_penetration": 0.6899565504795853,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.007715609438918802,
+              "rel_change_under_2pct_iid_multiplicative": 0.0021340724411046397
+            },
+            "tail90": {
+              "ref_unit": 12.22306495583634,
+              "ratio_exact": 0.3619754285727185,
+              "f_penetration": 0.7162661767066738,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.0068824442688407705,
+              "rel_change_under_2pct_iid_multiplicative": 0.001212648953701212
+            },
+            "fixed": {
+              "ref_unit": 13.389003518303133,
+              "ratio_exact": 0.3378821161474709,
+              "f_penetration": 0.6685972822687316,
+              "worst_rel_change_under_pure_scale": 1.9958943961836364,
+              "rel_change_under_2pct_shape_warp": 0.0009770324783916484,
+              "rel_change_under_2pct_iid_multiplicative": 9.104478156318763e-05
+            }
+          }
+        },
+        {
+          "drug": "cisplatin",
+          "c_bath_uM": 82.41570389441263,
+          "shipped_ratio": 0.3084627482484707,
+          "conventions": {
+            "p50": {
+              "ref_unit": 6.716795444675209,
+              "ratio_exact": 0.4855993528375945,
+              "f_penetration": 0.9563462190033447,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.0006297624276152547,
+              "rel_change_under_2pct_iid_multiplicative": 8.932759503310628e-05
+            },
+            "p90": {
+              "ref_unit": 10.059374385810482,
+              "ratio_exact": 0.3728416868006165,
+              "f_penetration": 0.7338541981878642,
+              "worst_rel_change_under_pure_scale": 3.3306690738754696e-16,
+              "rel_change_under_2pct_shape_warp": 0.005971955082045843,
+              "rel_change_under_2pct_iid_multiplicative": 0.0008334977492679974
+            },
+            "p95": {
+              "ref_unit": 11.017116781331955,
+              "ratio_exact": 0.3487741493494104,
+              "f_penetration": 0.6863939863845648,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.007437133749991998,
+              "rel_change_under_2pct_iid_multiplicative": 0.0008728614859310202
+            },
+            "p99": {
+              "ref_unit": 12.915949842750729,
+              "ratio_exact": 0.3084627482484707,
+              "f_penetration": 0.6069252983353418,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.010214336645738786,
+              "rel_change_under_2pct_iid_multiplicative": 0.000591711639867265
+            },
+            "p99.9": {
+              "ref_unit": 15.037130434565034,
+              "ratio_exact": 0.2723542678079978,
+              "f_penetration": 0.535768111404969,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.013107348607179103,
+              "rel_change_under_2pct_iid_multiplicative": 0.0008086434282319477
+            },
+            "max": {
+              "ref_unit": 16.443467028045177,
+              "ratio_exact": 0.2523550987127859,
+              "f_penetration": 0.4963676846565136,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.014906381963249005,
+              "rel_change_under_2pct_iid_multiplicative": 0.015599728994675766
+            },
+            "mean": {
+              "ref_unit": 6.720046776070497,
+              "ratio_exact": 0.4854610727530281,
+              "f_penetration": 0.9560732260385124,
+              "worst_rel_change_under_pure_scale": 3.3306690738754696e-16,
+              "rel_change_under_2pct_shape_warp": 0.0015362983671889374,
+              "rel_change_under_2pct_iid_multiplicative": 0.00014288062705292148
+            },
+            "rms": {
+              "ref_unit": 7.193354044257311,
+              "ratio_exact": 0.46604509529613164,
+              "f_penetration": 0.9177456117643268,
+              "worst_rel_change_under_pure_scale": 3.3306690738754696e-16,
+              "rel_change_under_2pct_shape_warp": 0.0029211670032923687,
+              "rel_change_under_2pct_iid_multiplicative": 0.00023720655386150202
+            },
+            "L4": {
+              "ref_unit": 7.976244236496267,
+              "ratio_exact": 0.4367826102048411,
+              "f_penetration": 0.8599936378256299,
+              "worst_rel_change_under_pure_scale": 0.0,
+              "rel_change_under_2pct_shape_warp": 0.004944452655022191,
+              "rel_change_under_2pct_iid_multiplicative": 0.0005494976601611024
+            },
+            "sauter": {
+              "ref_unit": 7.699997355716351,
+              "ratio_exact": 0.446728937009612,
+              "f_penetration": 0.8796218223687563,
+              "worst_rel_change_under_pure_scale": 4.440892098500626e-16,
+              "rel_change_under_2pct_shape_warp": 0.004403770119374983,
+              "rel_change_under_2pct_iid_multiplicative": 0.0003301432697982998
+            },
+            "tail99": {
+              "ref_unit": 13.842493747643335,
+              "ratio_exact": 0.2916957481444976,
+              "f_penetration": 0.5738802919301872,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.011528183932190128,
+              "rel_change_under_2pct_iid_multiplicative": 0.0016182622963851756
+            },
+            "tail95": {
+              "ref_unit": 12.186686253355246,
+              "ratio_exact": 0.3229138038141941,
+              "f_penetration": 0.6354102121294367,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.009220816161403023,
+              "rel_change_under_2pct_iid_multiplicative": 0.001247590704753998
+            },
+            "tail90": {
+              "ref_unit": 11.336405101402155,
+              "ratio_exact": 0.3413568706032781,
+              "f_penetration": 0.6717695348118888,
+              "worst_rel_change_under_pure_scale": 2.220446049250313e-16,
+              "rel_change_under_2pct_shape_warp": 0.007989277414338969,
+              "rel_change_under_2pct_iid_multiplicative": 0.0012084630524417106
+            },
+            "fixed": {
+              "ref_unit": 12.915949842750729,
+              "ratio_exact": 0.3084627482484707,
+              "f_penetration": 0.6069252983353418,
+              "worst_rel_change_under_pure_scale": 2.2816250958333875,
+              "rel_change_under_2pct_shape_warp": 0.001071688954914496,
+              "rel_change_under_2pct_iid_multiplicative": 6.652816785512883e-05
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "comparison": "ratio(dx=12) / ratio(dx=8) - 1",
+  "slab_geometry": "vessel (a = 7.5 um), exchange OFF",
+  "rows": [
+    {
+      "tissue": "gbm",
+      "drug": "temozolomide",
+      "bath_multiple": 0.165,
+      "ratio_dx12": 0.2626,
+      "ratio_dx8": 0.2574,
+      "tissue_step": 0.02020202020202011,
+      "slab_step_predicted": 0.03176696262824641,
+      "sign_agrees": true,
+      "slab_over_tissue": 1.5724646500982045
+    },
+    {
+      "tissue": "gbm",
+      "drug": "cisplatin",
+      "bath_multiple": 1.0,
+      "ratio_dx12": 0.2791,
+      "ratio_dx8": 0.2689,
+      "tissue_step": 0.03793231684641141,
+      "slab_step_predicted": 0.02392032928751897,
+      "sign_agrees": true,
+      "slab_over_tissue": 0.6306055436680229
+    },
+    {
+      "tissue": "gbm",
+      "drug": "doxorubicin",
+      "bath_multiple": 1.0,
+      "ratio_dx12": 0.2077,
+      "ratio_dx8": 0.2049,
+      "tissue_step": 0.013665202537823218,
+      "slab_step_predicted": 0.02392032928751897,
+      "sign_agrees": true,
+      "slab_over_tissue": 1.7504555253616703
+    },
+    {
+      "tissue": "breast",
+      "drug": "doxorubicin",
+      "bath_multiple": 1.0,
+      "ratio_dx12": 0.2301,
+      "ratio_dx8": 0.2296,
+      "tissue_step": 0.00217770034843201,
+      "slab_step_predicted": 0.02392032928751897,
+      "sign_agrees": true,
+      "slab_over_tissue": 10.984215208828942
+    },
+    {
+      "tissue": "breast",
+      "drug": "paclitaxel",
+      "bath_multiple": 1.0,
+      "ratio_dx12": 0.1503,
+      "ratio_dx8": 0.1537,
+      "tissue_step": -0.022121014964216146,
+      "slab_step_predicted": 0.02392032928751897,
+      "sign_agrees": false,
+      "slab_over_tissue": -1.0813395916151889
+    },
+    {
+      "tissue": "breast",
+      "drug": "docetaxel",
+      "bath_multiple": 1.0,
+      "ratio_dx12": 0.1484,
+      "ratio_dx8": 0.1521,
+      "tissue_step": -0.024326101249178222,
+      "slab_step_predicted": 0.02392032928751897,
+      "sign_agrees": false,
+      "slab_over_tissue": -0.9833194823328725
+    },
+    {
+      "tissue": "breast",
+      "drug": "epirubicin",
+      "bath_multiple": 1.0,
+      "ratio_dx12": 0.2301,
+      "ratio_dx8": 0.2296,
+      "tissue_step": 0.00217770034843201,
+      "slab_step_predicted": 0.02392032928751897,
+      "sign_agrees": true,
+      "slab_over_tissue": 10.984215208828942
+    },
+    {
+      "tissue": "breast",
+      "drug": "5-fluorouracil",
+      "bath_multiple": 1.0,
+      "ratio_dx12": 0.3379,
+      "ratio_dx8": 0.3354,
+      "tissue_step": 0.007453786523553996,
+      "slab_step_predicted": 0.02392032928751897,
+      "sign_agrees": true,
+      "slab_over_tissue": 3.2091513772135323
+    },
+    {
+      "tissue": "breast",
+      "drug": "cisplatin",
+      "bath_multiple": 1.0,
+      "ratio_dx12": 0.3085,
+      "ratio_dx8": 0.304,
+      "tissue_step": 0.014802631578947345,
+      "slab_step_predicted": 0.02392032928751897,
+      "sign_agrees": true,
+      "slab_over_tissue": 1.615951134090173
+    }
+  ],
+  "summary": {
+    "n": 9,
+    "tissue_step_min": -0.024326101249178222,
+    "tissue_step_max": 0.03793231684641141,
+    "tissue_spread_pct_points": 6.225841809558963,
+    "slab_step_at_1xIC50": 0.02392032928751897,
+    "n_sign_agree": 7,
+    "n_sign_opposite": 2,
+    "opposite_drugs": [
+      "paclitaxel",
+      "docetaxel"
+    ],
+    "verdict": "The slab error is drug-INDEPENDENT by construction; the tissue error is drug-dependent and not one-signed. The slab figure is a correct measurement of the scoring statistic's error in isolation and is valid for RANKING conventions, but it does not transfer as a bias correction to a tissue verdict."
+  }
+}

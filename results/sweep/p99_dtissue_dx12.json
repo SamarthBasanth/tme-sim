@@ -1,0 +1,1125 @@
+{
+  "dx_um": 12.0,
+  "alpha_published": 148.60815765445545,
+  "D_shipping_cm2_s": 1.404089e-06,
+  "D_perturbed_cm2_s": 4.559e-07,
+  "n_tumor": 89785,
+  "arms": [
+    {
+      "mode": "frozen",
+      "drug": "doxorubicin",
+      "alpha_perturbed": 148.60815765445545,
+      "exposure_mean_fold": 0.9632784537509002,
+      "exposure_p99_fold": 1.2836821489891481,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.48139575768761855,
+          "ratio_perturbed": 0.4795708008818638,
+          "ratio_fold": 0.996209030144925,
+          "abs_ln_fold": 0.0037981737936687797
+        },
+        "p90": {
+          "ratio_reference": 0.32896321852666616,
+          "ratio_perturbed": 0.2842828281108254,
+          "ratio_fold": 0.864178157619105,
+          "abs_ln_fold": 0.14597633048653672
+        },
+        "p95": {
+          "ratio_reference": 0.29446116181798115,
+          "ratio_perturbed": 0.24120489479180116,
+          "ratio_fold": 0.8191399276652317,
+          "abs_ln_fold": 0.19950035787248302
+        },
+        "p99": {
+          "ratio_reference": 0.23013330629020515,
+          "ratio_perturbed": 0.17474067038597307,
+          "ratio_fold": 0.7593019593853126,
+          "abs_ln_fold": 0.2753557422509188
+        },
+        "p99.9": {
+          "ratio_reference": 0.17648383825168568,
+          "ratio_perturbed": 0.12411486488221993,
+          "ratio_fold": 0.7032647641378825,
+          "abs_ln_fold": 0.3520218376798503
+        },
+        "max": {
+          "ratio_reference": 0.15218216653290167,
+          "ratio_perturbed": 0.10025759438096864,
+          "ratio_fold": 0.6587998887457882,
+          "abs_ln_fold": 0.4173354495526973
+        },
+        "mean": {
+          "ratio_reference": 0.4679602474279959,
+          "ratio_perturbed": 0.44220431405018595,
+          "ratio_fold": 0.9449612792553005,
+          "abs_ln_fold": 0.05661132666088057
+        },
+        "rms": {
+          "ratio_reference": 0.43159310769264836,
+          "ratio_perturbed": 0.3866022466939368,
+          "ratio_fold": 0.895756303340342,
+          "abs_ln_fold": 0.11008688588034046
+        },
+        "L4": {
+          "ratio_reference": 0.37830060554112876,
+          "ratio_perturbed": 0.31112322404992265,
+          "ratio_fold": 0.8224232779244055,
+          "abs_ln_fold": 0.19550007981264153
+        },
+        "sauter": {
+          "ratio_reference": 0.39580549614857674,
+          "ratio_perturbed": 0.3330784410774909,
+          "ratio_fold": 0.8415205051939464,
+          "abs_ln_fold": 0.17254489821625438
+        },
+        "tail99": {
+          "ratio_reference": 0.20363538565623085,
+          "ratio_perturbed": 0.14903400904991668,
+          "ratio_fold": 0.7318669521490236,
+          "abs_ln_fold": 0.31215654090031697
+        },
+        "tail95": {
+          "ratio_reference": 0.2517925655528099,
+          "ratio_perturbed": 0.19606129989459645,
+          "ratio_fold": 0.778661988943734,
+          "abs_ln_fold": 0.25017823106983
+        },
+        "tail90": {
+          "ratio_reference": 0.27944660286431117,
+          "ratio_perturbed": 0.22523992086345102,
+          "ratio_fold": 0.806021324126882,
+          "abs_ln_fold": 0.21564508009237776
+        },
+        "fixed": {
+          "ratio_reference": 0.23013330629020515,
+          "ratio_perturbed": 0.2168223119361141,
+          "ratio_fold": 0.9421596353493246,
+          "abs_ln_fold": 0.05958055448580801
+        }
+      }
+    },
+    {
+      "mode": "frozen",
+      "drug": "paclitaxel",
+      "alpha_perturbed": 148.60815765445545,
+      "exposure_mean_fold": 0.9239228986444399,
+      "exposure_p99_fold": 1.343852827663365,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.4805531333848367,
+          "ratio_perturbed": 0.48458304795628765,
+          "ratio_fold": 1.0083859916656162,
+          "abs_ln_fold": 0.008351024590568457
+        },
+        "p90": {
+          "ratio_reference": 0.2611667738169315,
+          "ratio_perturbed": 0.21458838125112276,
+          "ratio_fold": 0.8216526861933114,
+          "abs_ln_fold": 0.1964374960930837
+        },
+        "p95": {
+          "ratio_reference": 0.21626449947670498,
+          "ratio_perturbed": 0.16336407469689834,
+          "ratio_fold": 0.7553901592364454,
+          "abs_ln_fold": 0.28052089601070945
+        },
+        "p99": {
+          "ratio_reference": 0.15028661822296227,
+          "ratio_perturbed": 0.10250613998394169,
+          "ratio_fold": 0.6820709734240317,
+          "abs_ln_fold": 0.3826215599490764
+        },
+        "p99.9": {
+          "ratio_reference": 0.10254820564597117,
+          "ratio_perturbed": 0.06929427357300424,
+          "ratio_fold": 0.6757239011302644,
+          "abs_ln_fold": 0.3919707166502118
+        },
+        "max": {
+          "ratio_reference": 0.08147731657730352,
+          "ratio_perturbed": 0.05500008931210745,
+          "ratio_fold": 0.6750356003676781,
+          "abs_ln_fold": 0.39298984821493094
+        },
+        "mean": {
+          "ratio_reference": 0.42536750926132905,
+          "ratio_perturbed": 0.37520479597851913,
+          "ratio_fold": 0.8820720619449288,
+          "abs_ln_fold": 0.12548152342743787
+        },
+        "rms": {
+          "ratio_reference": 0.3591614946832268,
+          "ratio_perturbed": 0.28704485855042444,
+          "ratio_fold": 0.7992083305132479,
+          "abs_ln_fold": 0.22413362813699325
+        },
+        "L4": {
+          "ratio_reference": 0.2747994986378991,
+          "ratio_perturbed": 0.19697999210395792,
+          "ratio_fold": 0.7168135061393134,
+          "abs_ln_fold": 0.3329395752286822
+        },
+        "sauter": {
+          "ratio_reference": 0.29659072386216356,
+          "ratio_perturbed": 0.2088442257090966,
+          "ratio_fold": 0.704149553261666,
+          "abs_ln_fold": 0.35076451177459805
+        },
+        "tail99": {
+          "ratio_reference": 0.12603006115612236,
+          "ratio_perturbed": 0.08511634620819022,
+          "ratio_fold": 0.6753654281159999,
+          "abs_ln_fold": 0.39250135961351035
+        },
+        "tail95": {
+          "ratio_reference": 0.1705393381346886,
+          "ratio_perturbed": 0.12071223981395586,
+          "ratio_fold": 0.707826365073727,
+          "abs_ln_fold": 0.34555646243740507
+        },
+        "tail90": {
+          "ratio_reference": 0.19974455063771815,
+          "ratio_perturbed": 0.14779535411755243,
+          "ratio_fold": 0.7399218333901518,
+          "abs_ln_fold": 0.30121072891707035
+        },
+        "fixed": {
+          "ratio_reference": 0.15028661822296227,
+          "ratio_perturbed": 0.13323929494182563,
+          "ratio_fold": 0.8865679227950584,
+          "abs_ln_fold": 0.12039753734480513
+        }
+      }
+    },
+    {
+      "mode": "frozen",
+      "drug": "docetaxel",
+      "alpha_perturbed": 148.60815765445545,
+      "exposure_mean_fold": 0.9224896179211367,
+      "exposure_p99_fold": 1.343776880631848,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.4804132734042014,
+          "ratio_perturbed": 0.48465648505681963,
+          "ratio_fold": 1.0088324196843081,
+          "abs_ln_fold": 0.008793642031960496
+        },
+        "p90": {
+          "ratio_reference": 0.2595090402352217,
+          "ratio_perturbed": 0.21319608560514766,
+          "ratio_fold": 0.8215362571257807,
+          "abs_ln_fold": 0.19657920720695038
+        },
+        "p95": {
+          "ratio_reference": 0.21415925905202157,
+          "ratio_perturbed": 0.16156769350636954,
+          "ratio_fold": 0.7544277759530491,
+          "abs_ln_fold": 0.28179572973907463
+        },
+        "p99": {
+          "ratio_reference": 0.14842965466495936,
+          "ratio_perturbed": 0.10103008729479236,
+          "ratio_fold": 0.6806597207467809,
+          "abs_ln_fold": 0.38469277356127657
+        },
+        "p99.9": {
+          "ratio_reference": 0.10109412317010799,
+          "ratio_perturbed": 0.06822211103376709,
+          "ratio_fold": 0.6748375562738878,
+          "abs_ln_fold": 0.39328327444425754
+        },
+        "max": {
+          "ratio_reference": 0.08024596050842231,
+          "ratio_perturbed": 0.054078232303504774,
+          "ratio_fold": 0.6739059755890009,
+          "abs_ln_fold": 0.39466467989462256
+        },
+        "mean": {
+          "ratio_reference": 0.4238811247348495,
+          "ratio_perturbed": 0.3729762883657014,
+          "ratio_fold": 0.8799077538520013,
+          "abs_ln_fold": 0.1279382021726072
+        },
+        "rms": {
+          "ratio_reference": 0.35682562309830673,
+          "ratio_perturbed": 0.28408340327460674,
+          "ratio_fold": 0.7961407053897045,
+          "abs_ln_fold": 0.2279793431939903
+        },
+        "L4": {
+          "ratio_reference": 0.27191543071400204,
+          "ratio_perturbed": 0.19411730233413277,
+          "ratio_fold": 0.7138885124114321,
+          "abs_ln_fold": 0.33702847391649293
+        },
+        "sauter": {
+          "ratio_reference": 0.29356065977267143,
+          "ratio_perturbed": 0.20548190160518962,
+          "ratio_fold": 0.6999640270747158,
+          "abs_ln_fold": 0.3567263351525013
+        },
+        "tail99": {
+          "ratio_reference": 0.1243156072438598,
+          "ratio_perturbed": 0.0837252611665859,
+          "ratio_fold": 0.6734895402340663,
+          "abs_ln_fold": 0.39528281371398577
+        },
+        "tail95": {
+          "ratio_reference": 0.1685961872933827,
+          "ratio_perturbed": 0.11895736384772841,
+          "ratio_fold": 0.7055756465045365,
+          "abs_ln_fold": 0.3487412894762741
+        },
+        "tail90": {
+          "ratio_reference": 0.19776443076609473,
+          "ratio_perturbed": 0.1459768603855884,
+          "ratio_fold": 0.7381350621044797,
+          "abs_ln_fold": 0.3036284601444516
+        },
+        "fixed": {
+          "ratio_reference": 0.14842965466495936,
+          "ratio_perturbed": 0.13131125149595554,
+          "ratio_fold": 0.8846699252407204,
+          "abs_ln_fold": 0.1225406693729555
+        }
+      }
+    },
+    {
+      "mode": "frozen",
+      "drug": "epirubicin",
+      "alpha_perturbed": 148.60815765445545,
+      "exposure_mean_fold": 0.9632784537509002,
+      "exposure_p99_fold": 1.2836821489891481,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.48139575768761844,
+          "ratio_perturbed": 0.4795708008818638,
+          "ratio_fold": 0.9962090301449252,
+          "abs_ln_fold": 0.003798173793668557
+        },
+        "p90": {
+          "ratio_reference": 0.32896321852666616,
+          "ratio_perturbed": 0.28428282811082534,
+          "ratio_fold": 0.8641781576191049,
+          "abs_ln_fold": 0.14597633048653683
+        },
+        "p95": {
+          "ratio_reference": 0.2944611618179811,
+          "ratio_perturbed": 0.24120489479180116,
+          "ratio_fold": 0.8191399276652318,
+          "abs_ln_fold": 0.19950035787248288
+        },
+        "p99": {
+          "ratio_reference": 0.23013330629020515,
+          "ratio_perturbed": 0.17474067038597302,
+          "ratio_fold": 0.7593019593853124,
+          "abs_ln_fold": 0.2753557422509191
+        },
+        "p99.9": {
+          "ratio_reference": 0.17648383825168565,
+          "ratio_perturbed": 0.12411486488221993,
+          "ratio_fold": 0.7032647641378826,
+          "abs_ln_fold": 0.3520218376798501
+        },
+        "max": {
+          "ratio_reference": 0.15218216653290167,
+          "ratio_perturbed": 0.10025759438096864,
+          "ratio_fold": 0.6587998887457882,
+          "abs_ln_fold": 0.4173354495526973
+        },
+        "mean": {
+          "ratio_reference": 0.46796024742799597,
+          "ratio_perturbed": 0.44220431405018595,
+          "ratio_fold": 0.9449612792553004,
+          "abs_ln_fold": 0.05661132666088069
+        },
+        "rms": {
+          "ratio_reference": 0.43159310769264836,
+          "ratio_perturbed": 0.3866022466939366,
+          "ratio_fold": 0.8957563033403415,
+          "abs_ln_fold": 0.11008688588034096
+        },
+        "L4": {
+          "ratio_reference": 0.3783006055411287,
+          "ratio_perturbed": 0.3111232240499226,
+          "ratio_fold": 0.8224232779244055,
+          "abs_ln_fold": 0.19550007981264153
+        },
+        "sauter": {
+          "ratio_reference": 0.39580549614857674,
+          "ratio_perturbed": 0.3330784410774908,
+          "ratio_fold": 0.8415205051939462,
+          "abs_ln_fold": 0.17254489821625466
+        },
+        "tail99": {
+          "ratio_reference": 0.20363538565623085,
+          "ratio_perturbed": 0.14903400904991668,
+          "ratio_fold": 0.7318669521490236,
+          "abs_ln_fold": 0.31215654090031697
+        },
+        "tail95": {
+          "ratio_reference": 0.2517925655528099,
+          "ratio_perturbed": 0.19606129989459645,
+          "ratio_fold": 0.778661988943734,
+          "abs_ln_fold": 0.25017823106983
+        },
+        "tail90": {
+          "ratio_reference": 0.27944660286431117,
+          "ratio_perturbed": 0.225239920863451,
+          "ratio_fold": 0.8060213241268819,
+          "abs_ln_fold": 0.21564508009237787
+        },
+        "fixed": {
+          "ratio_reference": 0.23013330629020515,
+          "ratio_perturbed": 0.2168223119361141,
+          "ratio_fold": 0.9421596353493246,
+          "abs_ln_fold": 0.05958055448580801
+        }
+      }
+    },
+    {
+      "mode": "frozen",
+      "drug": "5-fluorouracil",
+      "alpha_perturbed": 148.60815765445545,
+      "exposure_mean_fold": 0.9938166778866213,
+      "exposure_p99_fold": 1.184796463361287,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.4888958017419569,
+          "ratio_perturbed": 0.4841982722746711,
+          "ratio_fold": 0.9903915528614721,
+          "abs_ln_fold": 0.009654906105269683
+        },
+        "p90": {
+          "ratio_reference": 0.3854954942050116,
+          "ratio_perturbed": 0.36500382781246987,
+          "ratio_fold": 0.94684330504355,
+          "abs_ln_fold": 0.05462166406597723
+        },
+        "p95": {
+          "ratio_reference": 0.3660809968200393,
+          "ratio_perturbed": 0.33910006248197183,
+          "ratio_fold": 0.9262979106469955,
+          "abs_ln_fold": 0.07655937831468557
+        },
+        "p99": {
+          "ratio_reference": 0.3378821161474709,
+          "ratio_perturbed": 0.2924967315132732,
+          "ratio_fold": 0.8656768663826264,
+          "abs_ln_fold": 0.14424357355869064
+        },
+        "p99.9": {
+          "ratio_reference": 0.31306504118883344,
+          "ratio_perturbed": 0.25143835291624916,
+          "ratio_fold": 0.8031505273199363,
+          "abs_ln_fold": 0.21921312641388055
+        },
+        "max": {
+          "ratio_reference": 0.29329890612220233,
+          "ratio_perturbed": 0.23310266155889997,
+          "ratio_fold": 0.7947614419733917,
+          "abs_ln_fold": 0.22971328234815763
+        },
+        "mean": {
+          "ratio_reference": 0.4888799521353247,
+          "ratio_perturbed": 0.4829636732287749,
+          "ratio_fold": 0.9878982992026801,
+          "abs_ln_fold": 0.012175522562221914
+        },
+        "rms": {
+          "ratio_reference": 0.47405424424998227,
+          "ratio_perturbed": 0.4607308141727856,
+          "ratio_fold": 0.971894714077972,
+          "abs_ln_fold": 0.028507799238431292
+        },
+        "L4": {
+          "ratio_reference": 0.45098094185505777,
+          "ratio_perturbed": 0.4276120721671896,
+          "ratio_fold": 0.9481821347222722,
+          "abs_ln_fold": 0.05320866994634019
+        },
+        "sauter": {
+          "ratio_reference": 0.45927733175630653,
+          "ratio_perturbed": 0.4386421536825803,
+          "ratio_fold": 0.9550703319172842,
+          "abs_ln_fold": 0.04597029522645433
+        },
+        "tail99": {
+          "ratio_reference": 0.3280098168597782,
+          "ratio_perturbed": 0.272412251724206,
+          "ratio_fold": 0.8305003012780567,
+          "abs_ln_fold": 0.18572698716177713
+        },
+        "tail95": {
+          "ratio_reference": 0.34867754249110433,
+          "ratio_perturbed": 0.309079647235181,
+          "ratio_fold": 0.8864340531569119,
+          "abs_ln_fold": 0.12054854635688358
+        },
+        "tail90": {
+          "ratio_reference": 0.3619754285727185,
+          "ratio_perturbed": 0.32986406474740987,
+          "ratio_fold": 0.9112885536128105,
+          "abs_ln_fold": 0.09289568806282375
+        },
+        "fixed": {
+          "ratio_reference": 0.3378821161474709,
+          "ratio_perturbed": 0.33414649128978463,
+          "ratio_fold": 0.9889439994626534,
+          "abs_ln_fold": 0.011117572357278005
+        }
+      }
+    },
+    {
+      "mode": "frozen",
+      "drug": "cisplatin",
+      "alpha_perturbed": 148.60815765445545,
+      "exposure_mean_fold": 0.9844930949603709,
+      "exposure_p99_fold": 1.2266523093538442,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.4855993528375945,
+          "ratio_perturbed": 0.4826244859048095,
+          "ratio_fold": 0.9938738243463436,
+          "abs_ln_fold": 0.006145017660101336
+        },
+        "p90": {
+          "ratio_reference": 0.3728416868006165,
+          "ratio_perturbed": 0.3447457552116175,
+          "ratio_fold": 0.9246438030304701,
+          "abs_ln_fold": 0.07834669343610619
+        },
+        "p95": {
+          "ratio_reference": 0.3487741493494104,
+          "ratio_perturbed": 0.31413084131410257,
+          "ratio_fold": 0.9006712277847136,
+          "abs_ln_fold": 0.10461498498521223
+        },
+        "p99": {
+          "ratio_reference": 0.3084627482484707,
+          "ratio_perturbed": 0.2550615455209399,
+          "ratio_fold": 0.826879572879525,
+          "abs_ln_fold": 0.19009621381283495
+        },
+        "p99.9": {
+          "ratio_reference": 0.2723542678079978,
+          "ratio_perturbed": 0.2035711342072046,
+          "ratio_fold": 0.7474497677073912,
+          "abs_ln_fold": 0.29108817636679285
+        },
+        "max": {
+          "ratio_reference": 0.2523550987127859,
+          "ratio_perturbed": 0.18027563675672154,
+          "ratio_fold": 0.7143728724970186,
+          "abs_ln_fold": 0.336350222569404
+        },
+        "mean": {
+          "ratio_reference": 0.4854610727530281,
+          "ratio_perturbed": 0.47493596162386525,
+          "ratio_fold": 0.9783193509842604,
+          "abs_ln_fold": 0.021919127499455553
+        },
+        "rms": {
+          "ratio_reference": 0.46604509529613164,
+          "ratio_perturbed": 0.4447764991817064,
+          "ratio_fold": 0.954363652081971,
+          "abs_ln_fold": 0.0467104934982987
+        },
+        "L4": {
+          "ratio_reference": 0.4367826102048411,
+          "ratio_perturbed": 0.40040312301959297,
+          "ratio_fold": 0.9167103123263378,
+          "abs_ln_fold": 0.08696376467619997
+        },
+        "sauter": {
+          "ratio_reference": 0.446728937009612,
+          "ratio_perturbed": 0.41495459254288014,
+          "ratio_fold": 0.9288733237666934,
+          "abs_ln_fold": 0.0737829070905019
+        },
+        "tail99": {
+          "ratio_reference": 0.2916957481444976,
+          "ratio_perturbed": 0.22977617732641656,
+          "ratio_fold": 0.7877254940740244,
+          "abs_ln_fold": 0.23860560758900318
+        },
+        "tail95": {
+          "ratio_reference": 0.3229138038141941,
+          "ratio_perturbed": 0.2746495589613995,
+          "ratio_fold": 0.8505352069725515,
+          "abs_ln_fold": 0.16188947238565105
+        },
+        "tail90": {
+          "ratio_reference": 0.3413568706032781,
+          "ratio_perturbed": 0.3004194149141673,
+          "ratio_fold": 0.880074317482574,
+          "abs_ln_fold": 0.12774892339098445
+        },
+        "fixed": {
+          "ratio_reference": 0.3084627482484707,
+          "ratio_perturbed": 0.30108038431822803,
+          "ratio_fold": 0.9760672432176605,
+          "abs_ln_fold": 0.024223798202909687
+        }
+      }
+    },
+    {
+      "mode": "recal",
+      "drug": "doxorubicin",
+      "alpha_perturbed": 48.06186704442017,
+      "exposure_mean_fold": 3.073589135450728,
+      "exposure_p99_fold": 3.058601668267232,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.48139575768761855,
+          "ratio_perturbed": 0.4810466253025869,
+          "ratio_fold": 0.9992747497678237,
+          "abs_ln_fold": 0.000725513353352746
+        },
+        "p90": {
+          "ratio_reference": 0.32896321852666616,
+          "ratio_perturbed": 0.3290646271357406,
+          "ratio_fold": 1.0003082673179349,
+          "abs_ln_fold": 0.00030821981332771495
+        },
+        "p95": {
+          "ratio_reference": 0.29446116181798115,
+          "ratio_perturbed": 0.2950505433467164,
+          "ratio_fold": 1.0020015594759473,
+          "abs_ln_fold": 0.00199955902468275
+        },
+        "p99": {
+          "ratio_reference": 0.23013330629020515,
+          "ratio_perturbed": 0.2311547173416201,
+          "ratio_fold": 1.0044383451829737,
+          "abs_ln_fold": 0.004428524775841289
+        },
+        "p99.9": {
+          "ratio_reference": 0.17648383825168568,
+          "ratio_perturbed": 0.178373604083285,
+          "ratio_fold": 1.0107078690622329,
+          "abs_ln_fold": 0.010650945822829022
+        },
+        "max": {
+          "ratio_reference": 0.15218216653290167,
+          "ratio_perturbed": 0.15394387788667552,
+          "ratio_fold": 1.011576332456753,
+          "abs_ln_fold": 0.011509839392047938
+        },
+        "mean": {
+          "ratio_reference": 0.4679602474279959,
+          "ratio_perturbed": 0.46809809149654336,
+          "ratio_fold": 1.0002945636286524,
+          "abs_ln_fold": 0.0002945202533044285
+        },
+        "rms": {
+          "ratio_reference": 0.43159310769264836,
+          "ratio_perturbed": 0.4319358918827369,
+          "ratio_fold": 1.0007942299911161,
+          "abs_ln_fold": 0.0007939147573777361
+        },
+        "L4": {
+          "ratio_reference": 0.37830060554112876,
+          "ratio_perturbed": 0.37924594375365434,
+          "ratio_fold": 1.0024989074790756,
+          "abs_ln_fold": 0.0024957904015600056
+        },
+        "sauter": {
+          "ratio_reference": 0.39580549614857674,
+          "ratio_perturbed": 0.39634247156296276,
+          "ratio_fold": 1.0013566648760845,
+          "abs_ln_fold": 0.0013557454377773697
+        },
+        "tail99": {
+          "ratio_reference": 0.20363538565623085,
+          "ratio_perturbed": 0.20524094724333855,
+          "ratio_fold": 1.0078844920883159,
+          "abs_ln_fold": 0.007853571900879423
+        },
+        "tail95": {
+          "ratio_reference": 0.2517925655528099,
+          "ratio_perturbed": 0.25278640008674574,
+          "ratio_fold": 1.003947036846596,
+          "abs_ln_fold": 0.003939267733269345
+        },
+        "tail90": {
+          "ratio_reference": 0.27944660286431117,
+          "ratio_perturbed": 0.2802308035544885,
+          "ratio_fold": 1.0028062631004968,
+          "abs_ln_fold": 0.0028023328952785373
+        },
+        "fixed": {
+          "ratio_reference": 0.23013330629020515,
+          "ratio_perturbed": 0.5046736247087248,
+          "ratio_fold": 2.1929621263613006,
+          "abs_ln_fold": 0.7852531990455338
+        }
+      }
+    },
+    {
+      "mode": "recal",
+      "drug": "paclitaxel",
+      "alpha_perturbed": 48.06186704442017,
+      "exposure_mean_fold": 3.091792943337938,
+      "exposure_p99_fold": 3.064842716264184,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.4805531333848367,
+          "ratio_perturbed": 0.48014011265422807,
+          "ratio_fold": 0.999140530563812,
+          "abs_ln_fold": 0.0008598389918068593
+        },
+        "p90": {
+          "ratio_reference": 0.2611667738169315,
+          "ratio_perturbed": 0.26177786453871915,
+          "ratio_fold": 1.0023398486448205,
+          "abs_ln_fold": 0.0023371154616398573
+        },
+        "p95": {
+          "ratio_reference": 0.21626449947670498,
+          "ratio_perturbed": 0.2173723139721574,
+          "ratio_fold": 1.005122498136,
+          "abs_ln_fold": 0.00510942277575335
+        },
+        "p99": {
+          "ratio_reference": 0.15028661822296227,
+          "ratio_perturbed": 0.15160934119744218,
+          "ratio_fold": 1.0088013356752599,
+          "abs_ln_fold": 0.008762829691546221
+        },
+        "p99.9": {
+          "ratio_reference": 0.10254820564597117,
+          "ratio_perturbed": 0.1041098405370161,
+          "ratio_fold": 1.0152283004973892,
+          "abs_ln_fold": 0.015113513799968857
+        },
+        "max": {
+          "ratio_reference": 0.08147731657730352,
+          "ratio_perturbed": 0.08318350696330128,
+          "ratio_fold": 1.0209406796599514,
+          "abs_ln_fold": 0.020724437259533192
+        },
+        "mean": {
+          "ratio_reference": 0.42536750926132905,
+          "ratio_perturbed": 0.425961450676107,
+          "ratio_fold": 1.0013963017904433,
+          "abs_ln_fold": 0.0013953278675863322
+        },
+        "rms": {
+          "ratio_reference": 0.3591614946832268,
+          "ratio_perturbed": 0.36035512903693495,
+          "ratio_fold": 1.0033233917649245,
+          "abs_ln_fold": 0.0033178815036423704
+        },
+        "L4": {
+          "ratio_reference": 0.2747994986378991,
+          "ratio_perturbed": 0.2769643389108384,
+          "ratio_fold": 1.007877890184188,
+          "abs_ln_fold": 0.007847021620761185
+        },
+        "sauter": {
+          "ratio_reference": 0.29659072386216356,
+          "ratio_perturbed": 0.29827254106037615,
+          "ratio_fold": 1.0056704983092937,
+          "abs_ln_fold": 0.005654481553886583
+        },
+        "tail99": {
+          "ratio_reference": 0.12603006115612236,
+          "ratio_perturbed": 0.12756771404855977,
+          "ratio_fold": 1.0122006835379744,
+          "abs_ln_fold": 0.012126855096935247
+        },
+        "tail95": {
+          "ratio_reference": 0.1705393381346886,
+          "ratio_perturbed": 0.17191461039271952,
+          "ratio_fold": 1.0080642523483043,
+          "abs_ln_fold": 0.008031910026747913
+        },
+        "tail90": {
+          "ratio_reference": 0.19974455063771815,
+          "ratio_perturbed": 0.20096217773518732,
+          "ratio_fold": 1.0060959214836234,
+          "abs_ln_fold": 0.006077416519383141
+        },
+        "fixed": {
+          "ratio_reference": 0.15028661822296227,
+          "ratio_perturbed": 0.3583486132655342,
+          "ratio_fold": 2.384434605707178,
+          "abs_ln_fold": 0.8689620336399544
+        }
+      }
+    },
+    {
+      "mode": "recal",
+      "drug": "docetaxel",
+      "alpha_perturbed": 48.06186704442017,
+      "exposure_mean_fold": 3.092322275217128,
+      "exposure_p99_fold": 3.066238772392295,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.4804132734042014,
+          "ratio_perturbed": 0.48021740748813363,
+          "ratio_fold": 0.9995922970348428,
+          "abs_ln_fold": 0.00040778609860774473
+        },
+        "p90": {
+          "ratio_reference": 0.2595090402352217,
+          "ratio_perturbed": 0.26018600571649575,
+          "ratio_fold": 1.0026086393008138,
+          "abs_ln_fold": 0.002605242707022629
+        },
+        "p95": {
+          "ratio_reference": 0.21415925905202157,
+          "ratio_perturbed": 0.21534664042105092,
+          "ratio_fold": 1.0055443849324344,
+          "abs_ln_fold": 0.005529071406939657
+        },
+        "p99": {
+          "ratio_reference": 0.14842965466495936,
+          "ratio_perturbed": 0.14969789088366645,
+          "ratio_fold": 1.0085443587507483,
+          "abs_ln_fold": 0.008508062324097466
+        },
+        "p99.9": {
+          "ratio_reference": 0.10109412317010799,
+          "ratio_perturbed": 0.10256415673198478,
+          "ratio_fold": 1.0145412365801245,
+          "abs_ln_fold": 0.01443652665344313
+        },
+        "max": {
+          "ratio_reference": 0.08024596050842231,
+          "ratio_perturbed": 0.08186287598226867,
+          "ratio_fold": 1.0201494936767148,
+          "abs_ln_fold": 0.019949178985108118
+        },
+        "mean": {
+          "ratio_reference": 0.4238811247348495,
+          "ratio_perturbed": 0.4244760863588793,
+          "ratio_fold": 1.001403604900789,
+          "abs_ln_fold": 0.0014026207682115372
+        },
+        "rms": {
+          "ratio_reference": 0.35682562309830673,
+          "ratio_perturbed": 0.35801232085142765,
+          "ratio_fold": 1.0033257077863884,
+          "abs_ln_fold": 0.0033201898508909877
+        },
+        "L4": {
+          "ratio_reference": 0.27191543071400204,
+          "ratio_perturbed": 0.27403742104549506,
+          "ratio_fold": 1.0078038613914666,
+          "abs_ln_fold": 0.0077735687627424385
+        },
+        "sauter": {
+          "ratio_reference": 0.29356065977267143,
+          "ratio_perturbed": 0.2952256350828441,
+          "ratio_fold": 1.0056716567930526,
+          "abs_ln_fold": 0.005655633504842301
+        },
+        "tail99": {
+          "ratio_reference": 0.1243156072438598,
+          "ratio_perturbed": 0.12582788307998077,
+          "ratio_fold": 1.0121648107558567,
+          "abs_ln_fold": 0.01209141408371647
+        },
+        "tail95": {
+          "ratio_reference": 0.1685961872933827,
+          "ratio_perturbed": 0.16993270447761769,
+          "ratio_fold": 1.0079273274543823,
+          "abs_ln_fold": 0.007896071270768606
+        },
+        "tail90": {
+          "ratio_reference": 0.19776443076609473,
+          "ratio_perturbed": 0.19894778392314824,
+          "ratio_fold": 1.0059836501056811,
+          "abs_ln_fold": 0.005965819165437473
+        },
+        "fixed": {
+          "ratio_reference": 0.14842965466495936,
+          "ratio_perturbed": 0.35450646870499625,
+          "ratio_fold": 2.3883803375087056,
+          "abs_ln_fold": 0.8706154531617142
+        }
+      }
+    },
+    {
+      "mode": "recal",
+      "drug": "epirubicin",
+      "alpha_perturbed": 48.06186704442017,
+      "exposure_mean_fold": 3.073589135450728,
+      "exposure_p99_fold": 3.058601668267232,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.48139575768761844,
+          "ratio_perturbed": 0.4810466253025869,
+          "ratio_fold": 0.9992747497678239,
+          "abs_ln_fold": 0.0007255133533525238
+        },
+        "p90": {
+          "ratio_reference": 0.32896321852666616,
+          "ratio_perturbed": 0.32906462713574053,
+          "ratio_fold": 1.0003082673179347,
+          "abs_ln_fold": 0.00030821981332749296
+        },
+        "p95": {
+          "ratio_reference": 0.2944611618179811,
+          "ratio_perturbed": 0.29505054334671627,
+          "ratio_fold": 1.002001559475947,
+          "abs_ln_fold": 0.0019995590246825283
+        },
+        "p99": {
+          "ratio_reference": 0.23013330629020515,
+          "ratio_perturbed": 0.2311547173416201,
+          "ratio_fold": 1.0044383451829737,
+          "abs_ln_fold": 0.004428524775841289
+        },
+        "p99.9": {
+          "ratio_reference": 0.17648383825168565,
+          "ratio_perturbed": 0.178373604083285,
+          "ratio_fold": 1.010707869062233,
+          "abs_ln_fold": 0.010650945822829242
+        },
+        "max": {
+          "ratio_reference": 0.15218216653290167,
+          "ratio_perturbed": 0.15394387788667552,
+          "ratio_fold": 1.011576332456753,
+          "abs_ln_fold": 0.011509839392047938
+        },
+        "mean": {
+          "ratio_reference": 0.46796024742799597,
+          "ratio_perturbed": 0.46809809149654336,
+          "ratio_fold": 1.0002945636286522,
+          "abs_ln_fold": 0.0002945202533042065
+        },
+        "rms": {
+          "ratio_reference": 0.43159310769264836,
+          "ratio_perturbed": 0.4319358918827369,
+          "ratio_fold": 1.0007942299911161,
+          "abs_ln_fold": 0.0007939147573777361
+        },
+        "L4": {
+          "ratio_reference": 0.3783006055411287,
+          "ratio_perturbed": 0.37924594375365434,
+          "ratio_fold": 1.0024989074790758,
+          "abs_ln_fold": 0.002495790401560227
+        },
+        "sauter": {
+          "ratio_reference": 0.39580549614857674,
+          "ratio_perturbed": 0.39634247156296276,
+          "ratio_fold": 1.0013566648760845,
+          "abs_ln_fold": 0.0013557454377773697
+        },
+        "tail99": {
+          "ratio_reference": 0.20363538565623085,
+          "ratio_perturbed": 0.20524094724333855,
+          "ratio_fold": 1.0078844920883159,
+          "abs_ln_fold": 0.007853571900879423
+        },
+        "tail95": {
+          "ratio_reference": 0.2517925655528099,
+          "ratio_perturbed": 0.25278640008674574,
+          "ratio_fold": 1.003947036846596,
+          "abs_ln_fold": 0.003939267733269345
+        },
+        "tail90": {
+          "ratio_reference": 0.27944660286431117,
+          "ratio_perturbed": 0.2802308035544885,
+          "ratio_fold": 1.0028062631004968,
+          "abs_ln_fold": 0.0028023328952785373
+        },
+        "fixed": {
+          "ratio_reference": 0.23013330629020515,
+          "ratio_perturbed": 0.5046736247087248,
+          "ratio_fold": 2.1929621263613006,
+          "abs_ln_fold": 0.7852531990455338
+        }
+      }
+    },
+    {
+      "mode": "recal",
+      "drug": "5-fluorouracil",
+      "alpha_perturbed": 48.06186704442017,
+      "exposure_mean_fold": 2.9600474476085927,
+      "exposure_p99_fold": 2.9713062296371193,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.4888958017419569,
+          "ratio_perturbed": 0.4887016840118612,
+          "ratio_fold": 0.9996029466209281,
+          "abs_ln_fold": 0.0003971322256363912
+        },
+        "p90": {
+          "ratio_reference": 0.3854954942050116,
+          "ratio_perturbed": 0.38490204066942046,
+          "ratio_fold": 0.9984605435225254,
+          "abs_ln_fold": 0.001540642658136213
+        },
+        "p95": {
+          "ratio_reference": 0.3660809968200393,
+          "ratio_perturbed": 0.365481637081118,
+          "ratio_fold": 0.9983627674090498,
+          "abs_ln_fold": 0.0016385743209112642
+        },
+        "p99": {
+          "ratio_reference": 0.3378821161474709,
+          "ratio_perturbed": 0.3368566354642159,
+          "ratio_fold": 0.9969649749594696,
+          "abs_ln_fold": 0.003039640069212709
+        },
+        "p99.9": {
+          "ratio_reference": 0.31306504118883344,
+          "ratio_perturbed": 0.31199519564107975,
+          "ratio_fold": 0.9965826732244167,
+          "abs_ln_fold": 0.003423179173570264
+        },
+        "max": {
+          "ratio_reference": 0.29329890612220233,
+          "ratio_perturbed": 0.29383000718198515,
+          "ratio_fold": 1.0018107843183075,
+          "abs_ln_fold": 0.0018091468248507654
+        },
+        "mean": {
+          "ratio_reference": 0.4888799521353247,
+          "ratio_perturbed": 0.4887552898192511,
+          "ratio_fold": 0.9997450042376884,
+          "abs_ln_fold": 0.0002550282792588879
+        },
+        "rms": {
+          "ratio_reference": 0.47405424424998227,
+          "ratio_perturbed": 0.47375293375863803,
+          "ratio_fold": 0.9993643965959614,
+          "abs_ln_fold": 0.0006358054855158312
+        },
+        "L4": {
+          "ratio_reference": 0.45098094185505777,
+          "ratio_perturbed": 0.4504616549394173,
+          "ratio_fold": 0.9988485391123083,
+          "abs_ln_fold": 0.0011521243281123284
+        },
+        "sauter": {
+          "ratio_reference": 0.45927733175630653,
+          "ratio_perturbed": 0.4588009100099109,
+          "ratio_fold": 0.99896267088869,
+          "abs_ln_fold": 0.001037867509515592
+        },
+        "tail99": {
+          "ratio_reference": 0.3280098168597782,
+          "ratio_perturbed": 0.32709897212635153,
+          "ratio_fold": 0.9972231174598776,
+          "abs_ln_fold": 0.0027807452309262185
+        },
+        "tail95": {
+          "ratio_reference": 0.34867754249110433,
+          "ratio_perturbed": 0.34780436050292735,
+          "ratio_fold": 0.997495732068264,
+          "abs_ln_fold": 0.002507408855578624
+        },
+        "tail90": {
+          "ratio_reference": 0.3619754285727185,
+          "ratio_perturbed": 0.3612099267366526,
+          "ratio_fold": 0.9978852104987227,
+          "abs_ln_fold": 0.002117028826285689
+        },
+        "fixed": {
+          "ratio_reference": 0.3378821161474709,
+          "ratio_perturbed": 0.643210577481036,
+          "ratio_fold": 1.9036538092483786,
+          "abs_ln_fold": 0.6437750969636402
+        }
+      }
+    },
+    {
+      "mode": "recal",
+      "drug": "cisplatin",
+      "alpha_perturbed": 48.06186704442017,
+      "exposure_mean_fold": 3.0049767748931355,
+      "exposure_p99_fold": 3.013423896247068,
+      "conventions": {
+        "p50": {
+          "ratio_reference": 0.4855993528375945,
+          "ratio_perturbed": 0.4855987366085946,
+          "ratio_fold": 0.9999987309929548,
+          "abs_ln_fold": 1.269007850413824e-06
+        },
+        "p90": {
+          "ratio_reference": 0.3728416868006165,
+          "ratio_perturbed": 0.37238474960219414,
+          "ratio_fold": 0.9987744471323918,
+          "abs_ln_fold": 0.0012263044716735911
+        },
+        "p95": {
+          "ratio_reference": 0.3487741493494104,
+          "ratio_perturbed": 0.3484137803340391,
+          "ratio_fold": 0.9989667553743775,
+          "abs_ln_fold": 0.0010337787908312626
+        },
+        "p99": {
+          "ratio_reference": 0.3084627482484707,
+          "ratio_perturbed": 0.30774060563339467,
+          "ratio_fold": 0.9976588984596145,
+          "abs_ln_fold": 0.0023438462031228676
+        },
+        "p99.9": {
+          "ratio_reference": 0.2723542678079978,
+          "ratio_perturbed": 0.27305253571527943,
+          "ratio_fold": 1.0025638221603852,
+          "abs_ln_fold": 0.002560541175062239
+        },
+        "max": {
+          "ratio_reference": 0.2523550987127859,
+          "ratio_perturbed": 0.2539476625004896,
+          "ratio_fold": 1.0063108048770446,
+          "abs_ln_fold": 0.006290975131986798
+        },
+        "mean": {
+          "ratio_reference": 0.4854610727530281,
+          "ratio_perturbed": 0.48534253327083277,
+          "ratio_fold": 0.9997558208292107,
+          "abs_ln_fold": 0.00024420898737688706
+        },
+        "rms": {
+          "ratio_reference": 0.46604509529613164,
+          "ratio_perturbed": 0.46580716679968925,
+          "ratio_fold": 0.9994894732315739,
+          "abs_ln_fold": 0.0005106571315878954
+        },
+        "L4": {
+          "ratio_reference": 0.4367826102048411,
+          "ratio_perturbed": 0.4364575145129644,
+          "ratio_fold": 0.999255703674365,
+          "abs_ln_fold": 0.000744573451662962
+        },
+        "sauter": {
+          "ratio_reference": 0.446728937009612,
+          "ratio_perturbed": 0.4463732148608505,
+          "ratio_fold": 0.9992037181402604,
+          "abs_ln_fold": 0.0007965990605383153
+        },
+        "tail99": {
+          "ratio_reference": 0.2916957481444976,
+          "ratio_perturbed": 0.2917374541689814,
+          "ratio_fold": 1.000142977827922,
+          "abs_ln_fold": 0.00014296760756659204
+        },
+        "tail95": {
+          "ratio_reference": 0.3229138038141941,
+          "ratio_perturbed": 0.32267347883273345,
+          "ratio_fold": 0.9992557612012185,
+          "abs_ln_fold": 0.0007445158819621982
+        },
+        "tail90": {
+          "ratio_reference": 0.3413568706032781,
+          "ratio_perturbed": 0.3410248838411537,
+          "ratio_fold": 0.9990274495968466,
+          "abs_ln_fold": 0.0009730236371508543
+        },
+        "fixed": {
+          "ratio_reference": 0.3084627482484707,
+          "ratio_perturbed": 0.6114011699090354,
+          "ratio_fold": 1.982090782049779,
+          "abs_ln_fold": 0.6841522381130364
+        }
+      }
+    }
+  ]
+}
