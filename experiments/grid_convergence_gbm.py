@@ -139,6 +139,11 @@ Run:
 Writes:
     results/sweep/gbmgrid_records.jsonl   (restart-safe checkpoint, one run/line)
     results/sweep/gbmgrid_raw.json        (assembled raw results)
+    results/sweep/gbmgrid_e_unit.npz      (per-cell exposure vector per rung,
+                                           float32, ~2.4 MB full ladder -- so a
+                                           different normalising convention can
+                                           be re-scored in seconds instead of a
+                                           1.5-2.5 h re-run; see store_e_unit)
     results/grid_convergence_gbm.md       (the report)
 
 Nothing under ``tmesim/`` is touched and no existing results file is written.
@@ -198,6 +203,10 @@ CHECKPOINT = os.path.join(OUT_DIR, "gbmgrid_records.jsonl")
 RAW_JSON = os.path.join(OUT_DIR, "gbmgrid_raw.json")
 CFL_JSON = os.path.join(OUT_DIR, "gbmgrid_cfl_probe.json")
 OUT_MD = os.path.join(_ROOT, "results", "grid_convergence_gbm.md")
+
+#: Per-cell exposure vectors, one array per rung, keyed exactly as :func:`_key`.
+#: See :func:`store_e_unit` for why this exists and what it costs.
+E_UNIT_STORE = os.path.join(OUT_DIR, "gbmgrid_e_unit.npz")
 
 #: The 3 drugs ``results/kill_calibration.md`` §3 formally tests. All three carry
 #: their own drug-matched literature band, so none falls back to the broad
@@ -366,6 +375,80 @@ def load_checkpoint(path: str) -> Dict[str, Dict]:
             done[_key(float(r["dx_um"]), r["drug"],
                       float(r.get("dt_s", DT_S)))] = r
     return done
+
+
+# --------------------------------------------------------------------------- #
+# Per-cell exposure vectors -- persisted, so re-scoring is free
+# --------------------------------------------------------------------------- #
+#
+# WHY THIS EXISTS. Every rung of this ladder computes ``e_unit``, the per-tumour-
+# cell unit-plasma exposure, and every scalar this study reports is a reduction
+# of it (mean, median, p01, p99, max, and the kill integral). Until now only
+# those reductions were kept. That made any question the reductions do not
+# already answer -- a tail mean, a different percentile, a different normalising
+# convention -- cost a FULL LADDER RE-RUN of 1.5-2.5 h, which is what
+# ``results/tail90_falsification.md`` hit. The vectors are the expensive part;
+# the scoring is microseconds. Keeping them turns that re-run into a file read.
+#
+# FORMAT AND COST. One compressed ``.npz``, one array per rung, member name ==
+# :func:`_key` verbatim so a record and its vector cannot be mismatched.
+# Stored as float32: measured on a real cached exposure vector, compressed
+# float64 costs 7.40 bytes/element and float32 3.40 bytes/element, and the
+# float32 round trip is exact to 5.9e-8 relative on nonzero entries (8.9e-11 on
+# the sum) -- far below anything a percentile or tail mean of this quantity can
+# resolve. At 23,812 tumour cells x 30 rungs (3 drugs x the dx ladder plus the
+# dt-control points) the full GBM store is ~2.4 MB. The float64 alternative
+# would be ~5.3 MB; the JSON-inside-the-sweep-file alternative would be ~14 MB
+# of text and would bloat a file other tools already parse.
+#
+# WRITE DISCIPLINE. Rewritten after every solve, mirroring the JSONL
+# checkpoint's restart-safety: an interrupted ladder keeps every vector it
+# already paid for. Merging and rewriting the full 2.4 MB archive measures at
+# 0.08 s, against a multi-minute solve. The
+# write is atomic (temp file + ``os.replace``) so a kill mid-write cannot leave
+# a corrupt archive. This file is PURELY ADDITIVE -- no existing output changes
+# meaning, and ``results/sweep/gbmgrid_raw.json`` and the JSONL checkpoint stay
+# byte-compatible with everything already written against them.
+def load_e_unit(path: str = E_UNIT_STORE) -> Dict[str, np.ndarray]:
+    """Load every persisted per-cell exposure vector, keyed by :func:`_key`."""
+    if not os.path.exists(path):
+        return {}
+    with np.load(path) as z:
+        return {k: z[k] for k in z.files}
+
+
+def store_e_unit(key: str, e_unit: np.ndarray,
+                 path: str = E_UNIT_STORE) -> None:
+    """Merge one rung's per-cell exposure vector into the store, atomically."""
+    data = load_e_unit(path)
+    data[key] = np.asarray(e_unit, dtype=np.float32)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp.npz"
+    np.savez_compressed(tmp, **data)
+    os.replace(tmp, path)
+
+
+def e_unit_manifest(path: str = E_UNIT_STORE) -> Dict:
+    """Provenance for the store, embedded in the assembled sweep JSON."""
+    keys = sorted(load_e_unit(path))
+    return {
+        "path": os.path.relpath(path, _ROOT),
+        "format": "npz (deflate), one array per rung",
+        "key_format": "f'{dx_um:g}|{dt_s:g}|{drug}'  (same as the record keys)",
+        "dtype": "float32",
+        "dtype_note": ("float32 round trip is exact to 5.9e-8 relative on "
+                       "nonzero entries and 8.9e-11 on the sum; the float64 "
+                       "_e_unit_sum in each record remains the byte-level "
+                       "control"),
+        "quantity": ("per-tumour-cell unit-plasma exposure e_unit = "
+                     "AUC/duration, the vector every reported scalar reduces"),
+        "why": ("so a different normalising convention or a tail statistic can "
+                "be re-scored from disk in seconds instead of a 1.5-2.5 h "
+                "ladder re-run (results/tail90_falsification.md)"),
+        "n_keys": len(keys),
+        "keys": keys,
+        "bytes": os.path.getsize(path) if os.path.exists(path) else 0,
+    }
 
 
 def cfl_probe(dx_list: Sequence[float]) -> List[Dict]:
@@ -558,6 +641,8 @@ def run_ladder(dx_ladder: Sequence[float] = DX_LADDER,
                         if tr.times.size and tr.times[-1] > 0 else 1.0)
             e_unit = (auc / duration)[tumor]
             e_unit_by_key[k] = e_unit
+            store_e_unit(k, e_unit)   # persist BEFORE scoring: the vector is
+                                      # the expensive part, the scoring is free
 
             rec = score(name, e_unit, sens, resist, drug, pd_cfg, bands,
                         plasma_mean)
@@ -602,6 +687,7 @@ def run_ladder(dx_ladder: Sequence[float] = DX_LADDER,
         "drug_static": drug_static,
         "bands": bands, "grids": grids, "records": records,
         "field_distinctness": distinct,
+        "e_unit_store": e_unit_manifest(),
         "published_ratio": PUBLISHED_RATIO, "published_verdict": PUBLISHED_VERDICT,
         "published_f_penetration": PUBLISHED_FPEN,
         "elapsed_s": time.time() - t0,
@@ -1852,6 +1938,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                "drugs": list(drugs), "drug_static": drug_static,
                "bands": build_bands(ic50_hill), "grids": grids,
                "records": records, "field_distinctness": distinct,
+               "e_unit_store": e_unit_manifest(),
                "published_ratio": PUBLISHED_RATIO,
                "published_verdict": PUBLISHED_VERDICT,
                "published_f_penetration": PUBLISHED_FPEN,

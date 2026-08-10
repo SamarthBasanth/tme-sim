@@ -68,6 +68,11 @@ Run:
 Writes:
     results/sweep/gridconv_records.jsonl   (restart-safe checkpoint, one run per line)
     results/sweep/gridconv_breast.json     (assembled raw results)
+    results/sweep/gridconv_breast_e_unit.npz  (per-cell exposure vector per rung,
+                                           float32, ~12.8 MB full ladder -- so a
+                                           different normalising convention can
+                                           be re-scored in seconds instead of a
+                                           1.5-2.5 h re-run; see store_e_unit)
     results/grid_convergence_breast.md     (the report)
 
 Nothing under ``tmesim/`` is touched. Every physics/scoring function is imported
@@ -130,6 +135,11 @@ OUT_DIR = os.path.join(_ROOT, "results", "sweep")
 CHECKPOINT = os.path.join(OUT_DIR, "gridconv_records.jsonl")
 RAW_JSON = os.path.join(OUT_DIR, "gridconv_breast.json")
 OUT_MD = os.path.join(_ROOT, "results", "grid_convergence_breast.md")
+
+#: Per-cell exposure vectors, one array per rung, keyed exactly as :func:`_key`
+#: (dt-control points get a ``|dt=<s>`` suffix). See :func:`store_e_unit` for
+#: why this exists and what it costs.
+E_UNIT_STORE = os.path.join(OUT_DIR, "gridconv_breast_e_unit.npz")
 
 #: The 6 drugs ``results/kill_calibration_breast.md`` calls formally testable.
 TESTABLE: Tuple[str, ...] = ("doxorubicin", "paclitaxel", "docetaxel",
@@ -254,6 +264,85 @@ def load_checkpoint(path: str) -> Dict[str, Dict]:
     return done
 
 
+# --------------------------------------------------------------------------- #
+# Per-cell exposure vectors -- persisted, so re-scoring is free
+# --------------------------------------------------------------------------- #
+#
+# WHY THIS EXISTS. Every rung of this ladder computes ``e_unit``, the per-tumour-
+# cell unit-plasma exposure, and every scalar this study reports is a reduction
+# of it (mean, median, p01, p99, max, and the kill integral). Until now the
+# vector was computed, reduced, and dropped on the floor. That made any question
+# the reductions do not already answer -- a tail mean, a different percentile, a
+# different normalising convention -- cost a FULL LADDER RE-RUN of 1.5-2.5 h,
+# which is what ``results/tail90_falsification.md`` hit. The vectors are the
+# expensive part; the scoring is microseconds. Keeping them turns that re-run
+# into a file read.
+#
+# FORMAT AND COST. One compressed ``.npz``, one array per rung, member name ==
+# :func:`_key` verbatim (dt-control points carry a ``|dt=<s>`` suffix, since
+# this script's key does not encode dt) so a record and its vector cannot be
+# mismatched. Stored as float32: measured on a real cached exposure vector,
+# compressed float64 costs 7.40 bytes/element and float32 3.40 bytes/element,
+# and the float32 round trip is exact to 5.9e-8 relative on nonzero entries
+# (8.9e-11 on the sum) -- far below anything a percentile or tail mean of this
+# quantity can resolve. This section is the larger of the two: at 89,785 tumour
+# cells x 42 ladder rungs (6 drugs x 7 grids) the store is ~12.8 MB, plus
+# ~1.2 MB if the dt-control points are run. The float64 alternative would be
+# ~28 MB; inlining into ``results/sweep/gridconv_breast.json`` would add ~75 MB
+# of text to a file other tools already parse.
+#
+# WRITE DISCIPLINE. Rewritten after every solve, mirroring the JSONL
+# checkpoint's restart-safety: an interrupted ladder keeps every vector it
+# already paid for. Merging and rewriting the full 13 MB archive measures at
+# 0.4 s, against a multi-minute solve. The write is atomic (temp file +
+# ``os.replace``) so a kill mid-write
+# cannot leave a corrupt archive. This file is PURELY ADDITIVE -- no existing
+# output changes meaning, and ``results/sweep/gridconv_breast.json`` and the
+# JSONL checkpoint stay byte-compatible with everything already written against
+# them.
+def load_e_unit(path: str = E_UNIT_STORE) -> Dict[str, np.ndarray]:
+    """Load every persisted per-cell exposure vector, keyed by :func:`_key`."""
+    if not os.path.exists(path):
+        return {}
+    with np.load(path) as z:
+        return {k: z[k] for k in z.files}
+
+
+def store_e_unit(key: str, e_unit: np.ndarray,
+                 path: str = E_UNIT_STORE) -> None:
+    """Merge one rung's per-cell exposure vector into the store, atomically."""
+    data = load_e_unit(path)
+    data[key] = np.asarray(e_unit, dtype=np.float32)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp.npz"
+    np.savez_compressed(tmp, **data)
+    os.replace(tmp, path)
+
+
+def e_unit_manifest(path: str = E_UNIT_STORE) -> Dict:
+    """Provenance for the store, embedded in the assembled sweep JSON."""
+    keys = sorted(load_e_unit(path))
+    return {
+        "path": os.path.relpath(path, _ROOT),
+        "format": "npz (deflate), one array per rung",
+        "key_format": ("f'{dx_um:g}|{drug}' for the dx ladder; the same with a "
+                       "'|dt={dt_s:g}' suffix for the dt-control points"),
+        "dtype": "float32",
+        "dtype_note": ("float32 round trip is exact to 5.9e-8 relative on "
+                       "nonzero entries and 8.9e-11 on the sum; the float64 "
+                       "_e_unit_sum in each record remains the byte-level "
+                       "control"),
+        "quantity": ("per-tumour-cell unit-plasma exposure e_unit = "
+                     "AUC/duration, the vector every reported scalar reduces"),
+        "why": ("so a different normalising convention or a tail statistic can "
+                "be re-scored from disk in seconds instead of a 1.5-2.5 h "
+                "ladder re-run (results/tail90_falsification.md)"),
+        "n_keys": len(keys),
+        "keys": keys,
+        "bytes": os.path.getsize(path) if os.path.exists(path) else 0,
+    }
+
+
 def run_ladder(dx_ladder: Sequence[float] = DX_LADDER,
                drugs: Sequence[str] = TESTABLE,
                checkpoint: str = CHECKPOINT,
@@ -369,6 +458,8 @@ def run_ladder(dx_ladder: Sequence[float] = DX_LADDER,
             auc = np.asarray(tr.auc, dtype=np.float64)[row, col]
             duration = float(tr.times[-1]) if tr.times.size and tr.times[-1] > 0 else 1.0
             e_unit = (auc / duration)[tumor]
+            store_e_unit(k, e_unit)   # persist BEFORE scoring: the vector is
+                                      # the expensive part, the scoring is free
 
             rec = score(name, e_unit, sens, resist, drug, pd_cfg, bands, plasma_mean)
             rec.update(ginfo)
@@ -405,6 +496,7 @@ def run_ladder(dx_ladder: Sequence[float] = DX_LADDER,
         "drug_static": drug_static,
         "bands": bands, "grids": grids, "records": records,
         "field_distinctness": distinct,
+        "e_unit_store": e_unit_manifest(),
         "published_ratio": PUBLISHED_RATIO, "published_verdict": PUBLISHED_VERDICT,
         "elapsed_s": time.time() - t0,
     }
@@ -505,6 +597,9 @@ def run_dt_control(points: Sequence[Tuple[float, float]],
                 auc = np.asarray(tr.auc, dtype=np.float64)[row, col]
                 dur = float(tr.times[-1]) if tr.times.size and tr.times[-1] > 0 else 1.0
                 e_unit = (auc / dur)[tumor]
+                # dt is not part of _key here, so tag it to keep the
+                # dt-control vectors distinct from the ladder's own rungs
+                store_e_unit(f"{_key(float(dx), name)}|dt={dt:g}", e_unit)
                 rec = score(name, e_unit, sens, resist, compiled[name], pd_cfg,
                             bands, plasma_mean)
                 rec.update({"dx_um": float(dx), "dt_s": float(dt),
@@ -1128,6 +1223,7 @@ def main() -> None:
                "save_every": SAVE_EVERY, "seed": SEED, "dx_ladder": dxs,
                "drugs": list(drugs), "drug_static": drug_static, "bands": {},
                "grids": grids, "records": recs, "field_distinctness": {},
+               "e_unit_store": e_unit_manifest(),
                "published_ratio": PUBLISHED_RATIO,
                "published_verdict": PUBLISHED_VERDICT,
                "elapsed_s": sum(float(r.get("solve_s", 0.0)) for r in recs)}

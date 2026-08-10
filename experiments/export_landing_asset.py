@@ -108,11 +108,36 @@ WHAT IS DISPLAYED, AND THE ONE DISPLAY CHOICE IN IT
 ---------------------------------------------------
 The solved field's structure is much FINER than a pixel at the zoom the landing
 page draws the section at. With the discrete vessel source, the screening
-length sqrt(K/(a+d)) is of order 60 um, so p is a superposition of thousands of
-small per-vessel haloes: thresholding the raw field yields ~1,400-3,000
-disconnected components, each a fraction of a screen pixel across when 8.1 mm
-of tissue is fitted into ~2.6 scene units. Drawn literally it is invisible
-speckle, not a field.
+length sqrt(K/(a+d)) is of order 7 um (median 7.1 um on THIS section at
+dx = 12; `results/ifp_validation.md` §5.1 measured it directly), so p is a
+superposition of thousands of small per-vessel haloes: thresholding the raw
+field yields ~1,400-3,000 disconnected components, each a fraction of a screen
+pixel across when 8.1 mm of tissue is fitted into ~2.6 scene units. Drawn
+literally it is invisible speckle, not a field.
+
+An earlier version of this file said that screening length was "of order
+60 um". It is not; that figure was ~8.5x too large and is corrected here and in
+the exported metadata. The correction makes the coarse-graining MORE necessary,
+not less — but it also carries a caveat the metadata now states outright, see
+below.
+
+THE RESOLUTION CAVEAT THE METADATA CARRIES
+------------------------------------------
+Because the screening length (~7 um) is BELOW every grid spacing the engine
+runs at, including this export's dx = 12 um, the discretised operator does not
+resolve the operator it approximates: at 99.8 % of tissue nodes L < dx, and the
+reaction term dominates the diagonal (median (a+d)dx^2/K = 2.87). Each node
+then relaxes toward its own local algebraic equilibrium a*p_v/(a+d) with the
+Laplacian barely coupling neighbours, and the solved field correlates with that
+pointwise limit at r = 0.90 on this section.
+
+So the exported field is a genuine solve of the stated equation — nothing is
+authored, nothing is fitted — but at this resolution it is closer to a
+pointwise nonlinear map of the vascular-density field than to a resolved
+transport solve, and the margin pressure gradient that carries the Jain effect
+is not resolved. That is stated in the JSON under ``resolution_caveat``,
+because a provenance block that reports only the solver and not what the mesh
+actually resolves is not provenance.
 
 So what is contoured is the field's LOCAL MEAN over a
 :data:`IFP_COARSE_GRAIN_UM` micrometre Gaussian window, computed only over
@@ -201,9 +226,23 @@ IFP_OUT_REL = os.path.join("landing-3d", "public", "models", "ifp_contours.json"
 
 #: Gaussian averaging length applied to the SOLVED field before contouring, in
 #: micrometres. The only transformation between solver and contour vertices;
-#: see the module docstring for why it is required (the raw field's ~60 um
+#: see the module docstring for why it is required (the raw field's ~7 um
 #: per-vessel structure is far below one screen pixel at the page's zoom).
 IFP_COARSE_GRAIN_UM = 250.0
+
+#: Measured resolution diagnostics for THIS section at THIS dx, quoted into the
+#: exported metadata. Not estimated here: these are the GBM / dx = 12 um row of
+#: ``results/sweep/ifp_validation.json`` (written by ``experiments/
+#: ifp_validation.py``, reported in ``results/ifp_validation.md`` §5.1-5.2),
+#: which computes L = sqrt(K/(a+d)) node-by-node from the shipped coefficients.
+#: Restated here rather than recomputed so this exporter adds no second
+#: implementation of the same quantity that could disagree with the first.
+IFP_SCREENING_LENGTH_MEDIAN_UM = 7.1        # p50 of sqrt(K/(a+d)) over tissue
+IFP_SCREENING_LENGTH_P5_P99_UM = (6.6, 9.8)  # spread of the same
+IFP_FRAC_TISSUE_L_BELOW_DX = 0.998          # nodes with L < dx at dx = 12
+IFP_REACTION_DOMINANCE_MEDIAN = 2.87        # median (a+d)*dx^2/K at dx = 12
+IFP_CORR_VS_LOCAL_EQUILIBRIUM = 0.90        # r(solved p, a*p_v/(a+d))
+IFP_RESOLUTION_SOURCE = "results/ifp_validation.md §5.1-5.2 (GBM, dx = 12 um)"
 
 #: Iso-levels as fractions of the coarse-grained field's in-tissue maximum,
 #: outermost (lowest) first. Fractions rather than round mmHg values so that
@@ -510,10 +549,45 @@ def export_ifp_contours(path, micro, x_mid, y_mid, scale, sample, dx_um):
             "Contours are of the solved field's local mean over a "
             f"{IFP_COARSE_GRAIN_UM:g} um Gaussian window taken across tissue "
             "nodes only. The raw field's structure is per-vessel (screening "
-            "length ~60 um) and lies below one screen pixel at the zoom the "
-            "page draws the whole 8.1 mm section at, so it is averaged for "
-            "display. No solver term was changed. Because this is a MEAN, the "
-            "level values below are much lower than raw_field_max_mmhg."
+            f"length ~{IFP_SCREENING_LENGTH_MEDIAN_UM:g} um) and lies far "
+            "below one screen pixel at the zoom the page draws the whole "
+            "8.1 mm section at, so it is averaged for display. No solver term "
+            "was changed. Because this is a MEAN, the level values below are "
+            "much lower than raw_field_max_mmhg."
+        ),
+        "screening_length_um": {
+            "definition": "L = sqrt(K/(a+d)), the screened-Poisson operator's "
+                          "decay length, evaluated node-by-node on this "
+                          "section from the shipped coefficients",
+            "median": IFP_SCREENING_LENGTH_MEDIAN_UM,
+            "p5_p99": list(IFP_SCREENING_LENGTH_P5_P99_UM),
+            "source": IFP_RESOLUTION_SOURCE,
+            "correction_note": (
+                "Supersedes a figure of '~60 um' published in earlier versions "
+                "of this file, which was ~8.5x too large. The measured value "
+                "is 7.1 um."
+            ),
+        },
+        "resolution_caveat": (
+            "WHAT THE MESH ACTUALLY RESOLVES, stated because the solver name "
+            "alone would overstate it. The screening length above "
+            f"(~{IFP_SCREENING_LENGTH_MEDIAN_UM:g} um) is BELOW this export's "
+            f"grid spacing of {dx:g} um, at "
+            f"{100.0 * IFP_FRAC_TISSUE_L_BELOW_DX:.1f} % of tissue nodes, and "
+            "the reaction term dominates the diagonal (median (a+d)*dx^2/K = "
+            f"{IFP_REACTION_DOMINANCE_MEDIAN:g}). Each node therefore relaxes "
+            "toward its own local algebraic equilibrium a*p_v/(a+d) with the "
+            "Laplacian barely coupling neighbours: the solved field correlates "
+            f"with that pointwise limit at r = "
+            f"{IFP_CORR_VS_LOCAL_EQUILIBRIUM:g} on this section. So this IS a "
+            "real solve of the stated equation — nothing authored, nothing "
+            "fitted to this patient — but at this resolution it is closer to a "
+            "pointwise nonlinear map of the vascular-density field than to a "
+            "resolved transport solve, and the margin pressure gradient that "
+            "carries the Jain effect into the convection term is not "
+            f"resolved. Measured in {IFP_RESOLUTION_SOURCE}. Refining the mesh "
+            "does not currently fix this and is not free: the field is not "
+            "grid-converged either."
         ),
         "displayed_field_max_mmhg": round(disp_max, 5),
         "ramp": "viridis",
