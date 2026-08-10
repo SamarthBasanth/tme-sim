@@ -21,6 +21,11 @@ Both take the ECM as a random matrix of cylindrical fibres of radius
 `fiber_radius_nm` (~2 nm, collagen-scale) at volume fraction
 `fiber_volume_fraction` (~0.05, loose interstitial matrix; higher = denser mesh).
 
+A THIRD obstacle population -- CELLS -- is added by `cell_exclusion` below. The
+two ECM methods above resolve solute SIZE against a nm-scale fibre mesh; neither
+of them, nor `brownian.py`, carries a cellular volume fraction, and tumour tissue
+is mostly cells. See that function's docstring for the physics and the citations.
+
 Units: length nm (mesh scale), time s, diffusivity um^2/s (tissue convention;
 1 um^2 = 1e6 nm^2). Deterministic given `seed`. No external dependencies beyond
 numpy. Does NOT import or modify any existing module.
@@ -34,6 +39,20 @@ References
   diffusion factor for a sphere in a pore (steric x hydrodynamic).
 * Faxen drag polynomial as compiled by Deen, W.M. (1987) AIChE J. 33, 1409-1425
   ("Hindered transport of large molecules in liquid-filled pores").
+* Maxwell, J.C. (1873) "A Treatise on Electricity and Magnetism", Vol. 1,
+  Art. 314 (Clarendon Press). -> effective conductivity of a dilute dispersion
+  of spheres; the impermeable-inclusion limit used by `cell_exclusion`.
+* Hashin, Z. & Shtrikman, S. (1962) J. Appl. Phys. 33, 3125-3131,
+  doi:10.1063/1.1728579. -> the variational bounds that make the Maxwell
+  expression the rigorous UPPER bound when the inclusions are impermeable.
+* Bruggeman, D.A.G. (1935) Ann. Phys. (Leipzig) 416(7), 636-664,
+  doi:10.1002/andp.19354160705. -> the differential/self-consistent effective
+  medium. NOTE: the simple `(1-phi)^(3/2)` form is a later SPECIALISATION
+  commonly called the "Bruggeman correlation"; Bruggeman's own paper does not
+  state it (see Tjaden et al. (2016) Curr. Opin. Chem. Eng. 12, 44-51,
+  doi:10.1016/j.coche.2016.02.006, "On the origin and application of the
+  Bruggeman correlation..."). It is reported by `cell_exclusion` as a bound,
+  never as the default.
 """
 from __future__ import annotations
 
@@ -157,6 +176,191 @@ def ogston_renkin_hindrance(
         "effective_hindrance": partition * kd,
         "mesh_pore_nm": r_pore,
         "lambda": float(lam),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Method 3: CELLULAR volume exclusion -- the obstacle population that is
+# missing from every other hindrance term in this package.
+# ---------------------------------------------------------------------------
+#: Laws implemented by :func:`cell_exclusion`. ``maxwell`` is the default and the
+#: only one any caller should use for a prediction; ``bruggeman`` exists so the
+#: report can state which side of the Maxwell value the truth must lie on.
+CELL_EXCLUSION_LAWS = ("maxwell", "bruggeman")
+
+
+def cell_exclusion(cell_volume_fraction: float) -> Dict[str, float]:
+    """Hindrance of an EXTRACELLULAR solute by impermeable CELLS at volume
+    fraction ``phi_c``. Size-independent by construction.
+
+    Why this term exists
+    --------------------
+    Every other hindrance in this package counts only matrix: `ogston_partition`
+    and `_faxen_drag` see a fibre volume fraction (~0.05 collagen mesh), and
+    `brownian.simulate_effective_diffusivity` is driven by the ECM density field.
+    Tumour tissue is mostly cells, and a cell is an impermeable inclusion for a
+    solute confined to the interstitium. That obstacle population was absent, so
+    the model could not distinguish tissue from matrix-filled water.
+
+    The physics implemented (and why THIS law)
+    ------------------------------------------
+    Maxwell's (1873, Art. 314) effective-medium result for a dispersion of
+    spheres of conductivity ``s2`` at volume fraction ``phi`` in a matrix of
+    conductivity ``s1``, taken in the impermeable limit ``s2 -> 0``:
+
+        D_eff / D_0 = (1 - phi) / (1 + phi/2)                       [flux basis]
+
+    Diffusion in a two-phase medium obeys the same Laplace problem as
+    conduction, so the conductivity result transfers unchanged. Equivalently
+    this factors into a POROSITY ``(1 - phi)`` -- the fraction of the tissue the
+    solute may occupy at all -- and a TORTUOSITY ``1/lambda^2 = 1/(1 + phi/2)``
+    -- the lengthening of the diffusion path around the inclusions.
+
+    Maxwell was chosen on two grounds stated BEFORE any comparison to data:
+
+    1. It is the exact result in the dilute limit, derived from the single-sphere
+       solution of Laplace's equation with no adjustable parameter.
+    2. Hashin & Shtrikman (1962) proved it is the rigorous UPPER bound on the
+       effective conductivity of *any* isotropic two-phase composite whose
+       inclusion phase has zero conductivity. So it is the LEAST-hindering law
+       consistent with the physics: the real tissue can only diffuse more slowly
+       than this, never faster. Any error it makes is conservative, which is the
+       property you want in a term you are adding to close a known gap.
+
+    `bruggeman_hindrance` = ``(1 - phi)^(3/2)`` (Bruggeman 1935, the
+    differential/self-consistent effective medium, and the "Bruggeman relation"
+    ``lambda^2 = porosity^(-1/2)`` of the porous-media literature) is returned
+    alongside. It is the standard treatment at HIGH inclusion fraction, where
+    Maxwell's dilute derivation is out of its range, and it always lies BELOW the
+    Maxwell value -- consistent with the bound. **It is reported, never used as
+    the prediction.** Reporting a bracket and choosing the conservative end is
+    the opposite of tuning to a target.
+
+    Which basis to use
+    ------------------
+    ``hindrance`` (the flux basis, ``(1-phi)/(1+phi/2)``) is the quantity a slab
+    flux or tracer experiment measures and reports as "the tissue diffusion
+    coefficient", and it is the one to compare against such measurements.
+    ``tortuosity_factor`` (``1/(1+phi/2)``) is the smaller, tortuosity-only
+    factor that would belong in a transport PDE which already carried an
+    explicit interstitial porosity in its accumulation and source terms. Both
+    are returned so a caller cannot silently pick the wrong one; nothing here
+    decides for the caller.
+
+    Parameters
+    ----------
+    cell_volume_fraction : float
+        Volume fraction of tissue occupied by cells, in [0, 1).
+
+    Returns
+    -------
+    dict
+        ``cell_volume_fraction``, ``porosity`` (= 1 - phi),
+        ``tortuosity_lambda_sq`` (= 1 + phi/2), ``tortuosity_factor``,
+        ``hindrance`` (Maxwell, flux basis -- the value to use),
+        ``fold_reduction`` (= 1/hindrance), ``bruggeman_hindrance`` (bound),
+        ``bruggeman_fold_reduction``, and ``law``.
+    """
+    phi = float(cell_volume_fraction)
+    if not (0.0 <= phi < 1.0):
+        raise ValueError(
+            f"cell_volume_fraction must be in [0,1), got {cell_volume_fraction!r}"
+        )
+    porosity = 1.0 - phi
+    lam_sq = 1.0 + phi / 2.0
+    tort = 1.0 / lam_sq
+    hind = porosity * tort                       # Maxwell / HS upper bound
+    brugg = porosity ** 1.5                      # Bruggeman DEM (a lower value)
+    return {
+        "cell_volume_fraction": phi,
+        "porosity": porosity,
+        "tortuosity_lambda_sq": lam_sq,
+        "tortuosity_factor": tort,
+        "hindrance": hind,
+        "fold_reduction": (1.0 / hind) if hind > 0 else float("inf"),
+        "bruggeman_hindrance": brugg,
+        "bruggeman_fold_reduction": (1.0 / brugg) if brugg > 0 else float("inf"),
+        "law": "maxwell",
+    }
+
+
+def cell_volume_fraction_from_section(
+    total_cell_area_um2: float,
+    tissue_area_um2: float,
+) -> float:
+    """Cell VOLUME fraction from a 2-D section, by Delesse's principle.
+
+    Delesse (1847): for a randomly oriented plane through a statistically
+    isotropic and homogeneous two-phase medium, the expected AREAL fraction of a
+    phase on the section equals its VOLUME fraction. So a spatial-omics section
+    that carries a segmented area per cell measures ``phi_c`` directly, with no
+    assumed cell radius and no assumed section thickness:
+
+        phi_c = sum(cell_area) / tissue_area.
+
+    This is why the number is DERIVED from the reconstruction rather than
+    assumed. Two caveats travel with any value produced this way and must be
+    quoted with it:
+
+    * it inherits the upstream SEGMENTATION convention. A boundary drawn by
+      expanding nuclei outward until they meet will tile the section and
+      therefore over-estimate ``phi_c``; a membrane-marker boundary will not.
+    * Delesse assumes isotropy. A section cut along a strongly anisotropic
+      structure (ducts, fibre tracts) is not a random plane.
+
+    Returns the ratio, clipped to [0, 1) at the top by ``1 - 1e-9`` only to keep
+    downstream laws finite; a raw value at or above 1 means the segmentation
+    over-covers the section and the caller is told by that clip that the input,
+    not the law, is the thing to fix.
+    """
+    if tissue_area_um2 <= 0:
+        raise ValueError(f"tissue_area_um2 must be positive, got {tissue_area_um2!r}")
+    if total_cell_area_um2 < 0:
+        raise ValueError(
+            f"total_cell_area_um2 must be >= 0, got {total_cell_area_um2!r}"
+        )
+    return float(min(total_cell_area_um2 / tissue_area_um2, 1.0 - 1e-9))
+
+
+def tissue_hindrance(
+    solute_radius_nm: float,
+    cell_volume_fraction: float,
+    fiber_radius_nm: float = 2.0,
+    fiber_volume_fraction: float = 0.05,
+) -> Dict[str, float]:
+    """Total hindrance of a solute by BOTH obstacle populations: the nm-scale
+    ECM fibre mesh and the ~10 um-scale impermeable cells.
+
+    ``total_hindrance = ecm_hindrance * cell_hindrance``, where the ECM leg is
+    `ogston_renkin_hindrance` (size-resolving, matrix only) and the cell leg is
+    `cell_exclusion` (size-independent, cells only).
+
+    The product form is sequential homogenisation and is licensed by SCALE
+    SEPARATION: the fibre mesh has a ~7 nm pore and the cells are ~10 um across,
+    three orders of magnitude apart, so the mesh can be homogenised into a local
+    interstitial diffusivity which the cell-scale Maxwell problem then takes as
+    its matrix conductivity. This is the same composition rule
+    `compile_drug.build_profile` already uses to multiply its micro-tortuosity by
+    the mesh gate; the cell term is a third factor of the same kind.
+
+    Returns the two legs and their product, each with its fold reduction.
+    """
+    ecm = ogston_renkin_hindrance(
+        solute_radius_nm, fiber_radius_nm, fiber_volume_fraction
+    )
+    cell = cell_exclusion(cell_volume_fraction)
+    total = ecm["effective_hindrance"] * cell["hindrance"]
+    return {
+        "solute_radius_nm": float(solute_radius_nm),
+        "cell_volume_fraction": cell["cell_volume_fraction"],
+        "ecm_hindrance": ecm["effective_hindrance"],
+        "ecm_fold_reduction": (1.0 / ecm["effective_hindrance"]
+                               if ecm["effective_hindrance"] > 0 else float("inf")),
+        "cell_hindrance": cell["hindrance"],
+        "cell_fold_reduction": cell["fold_reduction"],
+        "total_hindrance": total,
+        "total_fold_reduction": (1.0 / total) if total > 0 else float("inf"),
+        "mesh_pore_nm": ecm["mesh_pore_nm"],
     }
 
 
@@ -468,6 +672,54 @@ if __name__ == "__main__":
         f"Dense-mesh Brownian size gate too weak: {bd_dense_ratio:.1f}x"
     assert ab_bd["accessible_fraction"] < 0.10, \
         f"antibody not near-excluded from dense mesh: {ab_bd['accessible_fraction']}"
+
+    # ---- [5] CELLULAR volume exclusion --------------------------------------
+    print("\n[5] Cellular volume exclusion (Maxwell; Bruggeman as a bound):")
+    print(f"    {'phi_cell':>9} {'porosity':>9} {'1/lambda^2':>11} "
+          f"{'maxwell_h':>10} {'fold':>7} {'brugg_h':>9} {'fold':>7}")
+    phis_c = [0.0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8]
+    prev = None
+    for pc in phis_c:
+        c = cell_exclusion(pc)
+        print(f"    {pc:9.2f} {c['porosity']:9.3f} {c['tortuosity_factor']:11.4f} "
+              f"{c['hindrance']:10.4f} {c['fold_reduction']:7.2f} "
+              f"{c['bruggeman_hindrance']:9.4f} "
+              f"{c['bruggeman_fold_reduction']:7.2f}")
+        # monotone decreasing, in [0,1], and Maxwell is the UPPER bound
+        assert 0.0 <= c["hindrance"] <= 1.0, f"maxwell hindrance out of [0,1] at {pc}"
+        assert c["bruggeman_hindrance"] <= c["hindrance"] + 1e-12, (
+            f"Bruggeman above the Hashin-Shtrikman upper bound at phi={pc}: "
+            f"{c['bruggeman_hindrance']} > {c['hindrance']}")
+        if prev is not None:
+            assert c["hindrance"] < prev, "hindrance must decrease with phi_cell"
+        prev = c["hindrance"]
+    assert abs(cell_exclusion(0.0)["hindrance"] - 1.0) < 1e-12, \
+        "no cells must be a no-op"
+    # dilute limit: (1-p)/(1+p/2) -> 1 - 1.5p, the classic Maxwell slope
+    small = cell_exclusion(1e-4)["hindrance"]
+    assert abs((1.0 - small) / 1e-4 - 1.5) < 1e-3, \
+        f"dilute Maxwell slope is not 3/2: {(1.0-small)/1e-4}"
+
+    # Delesse: areal fraction on a section IS the volume fraction.
+    assert abs(cell_volume_fraction_from_section(790.0, 1000.0) - 0.79) < 1e-12
+    assert cell_volume_fraction_from_section(2000.0, 1000.0) < 1.0, \
+        "over-covering segmentation must still return a usable fraction < 1"
+
+    # Combined ECM x cell law: strictly more hindering than ECM alone.
+    comb = tissue_hindrance(SMALL, cell_volume_fraction=0.7,
+                            fiber_radius_nm=R_F, fiber_volume_fraction=PHI)
+    print(f"\n    combined (r_s={SMALL} nm, phi_cell=0.7): ECM leg "
+          f"{comb['ecm_hindrance']:.4f} ({comb['ecm_fold_reduction']:.2f}x) x cell leg "
+          f"{comb['cell_hindrance']:.4f} ({comb['cell_fold_reduction']:.2f}x) "
+          f"= {comb['total_hindrance']:.4f} ({comb['total_fold_reduction']:.2f}x)")
+    assert comb["total_hindrance"] < comb["ecm_hindrance"], \
+        "adding cells must hinder MORE than ECM alone"
+    assert abs(comb["total_hindrance"]
+               - comb["ecm_hindrance"] * comb["cell_hindrance"]) < 1e-12
+    # zero cells reproduces the pure-ECM law exactly (backwards compatible)
+    zero = tissue_hindrance(SMALL, 0.0, R_F, PHI)
+    assert abs(zero["total_hindrance"]
+               - ogston_renkin_hindrance(SMALL, R_F, PHI)["effective_hindrance"]) < 1e-12
 
     print("\nSummary: SIZE strongly gates ECM diffusion. Analytic Ogston-Renkin gives")
     print(f"  a {og_ratio:.0f}x small-molecule/antibody hindrance gap even in loose matrix;")
