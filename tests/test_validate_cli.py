@@ -25,6 +25,8 @@ removed.
 from __future__ import annotations
 
 import json
+import os
+import sys
 
 import pytest
 
@@ -392,6 +394,89 @@ class TestRegistryHygiene:
     def test_both_tissues_are_represented(self):
         tissues = {g.tissue for g in SC.build_registry()}
         assert {"GBM", "breast"} <= tissues
+
+    def test_mcl_coefficient_anchors_are_analytic_and_never_enter_the_solver(
+            self):
+        """The Hicks MCL rows score the solver's INPUT COEFFICIENTS, not any
+        solved field, and must never be tagged as PDE evidence.
+
+        This is the one mis-tag that would be actively harmful rather than
+        merely wrong: three more PDE-scoped rows would move the summary's
+        "N of N scored rows never invoke the transport PDE" line without a
+        single extra solve, which is the precise disclosure that line exists to
+        make. So the scope tag is asserted here, and so is the fact behind it --
+        that running the anchor enters neither transport entry point.
+        """
+        group = next(g for g in SC.build_registry()
+                     if g.key == "mcl-transport-coefficients")
+        assert group.scope == SC.SCOPE_ANALYTIC
+        assert group.tier == SC.TIER_QUICK
+        assert not group.needs, "an analytic coefficient row needs no tissue"
+
+        from tmesim.physics import diffusion as _diff
+        from tmesim.sim import engine as _eng
+
+        seen = []
+        solver_files = {os.path.abspath(_diff.__file__),
+                        os.path.abspath(_eng.__file__)}
+
+        def _profile(frame, event, arg):
+            if event == "call" and frame.f_code.co_filename in solver_files:
+                seen.append(frame.f_code.co_name)
+            return None
+
+        sys.setprofile(_profile)
+        try:
+            rows = SC._stamp_physics(list(group.runner()))
+        finally:
+            sys.setprofile(None)
+
+        assert not seen, f"the transport solver was entered: {sorted(set(seen))}"
+        assert len(rows) == 3, "diffusivity, hindrance and k are separate rows"
+        for r in rows:
+            assert r.scope == SC.SCOPE_ANALYTIC, r.label
+            assert r.physics == SC.PHYSICS_NOT_APPLICABLE, r.label
+            assert "coefficient-not-field" in r.conditional, r.label
+            assert "mcl-no-vasculature" in r.conditional, r.label
+
+    def test_mcl_verdicts_are_scored_on_the_engine_as_it_ships(self):
+        """The cellular-exclusion term is merged but DEFAULT-OFF, so it must not
+        supply a verdict -- and the hindrance row must record that the engine
+        lands SHORT rather than being marked a pass because it improved."""
+        rows = SC._run_mcl_transport_coefficients()
+        hind = next(r for r in rows if r.label.startswith("hindrance"))
+        v = hind.values
+        # Scored on the shipping compiled value, not on the cell-term-on arm.
+        assert hind.status == SC.FAIL
+        assert v["shipped_fold"] < v["cell_term_on_armB_fold"] < v["measured_fold"]
+        assert v["armB_shortfall_x"] > 1.0, (
+            "arm B must be recorded as SHORT of the measurement")
+        assert "cell-exclusion-default-off" in hind.conditional
+
+        diff = next(r for r in rows
+                    if r.label.startswith("effective diffusivity"))
+        lo, hi = diff.values["measured_band_um2s"]
+        # The cell-term-on arm lands INSIDE the measured band; the shipping
+        # value does not, and the shipping value is the one that is scored.
+        assert lo <= diff.values["cell_term_on_armB_D_eff_um2s"] <= hi
+        assert not (lo <= diff.values["shipped_D_eff_um2s"] <= hi)
+        assert diff.status == SC.FAIL
+
+    def test_mcl_consumption_rate_declines_to_score_and_says_which_way(self):
+        """NOT TESTABLE here removes a would-be PASS, not a FAIL, and the row
+        has to say so -- otherwise it reads as a softened failure."""
+        row = next(r for r in SC._run_mcl_transport_coefficients()
+                   if r.label.startswith("first-order"))
+        assert row.status == SC.NOT_TESTABLE
+        assert row.reason and row.bar == "n/a"
+        assert "REMOVES a pass" in row.reason
+        v = row.values
+        # The two readings of the engine's own k straddle the measurement by an
+        # order of magnitude, which is WHY no single verdict is available: one
+        # would read as a clean failure and the other as a comfortable pass.
+        assert max(v["raw_ratio_to_measured"]) < 0.1
+        assert min(v["calibrated_ratio_to_measured"]) > 0.3
+        assert v["k_calibrated_per_s"] > 10 * v["k_raw_per_s"]
 
 
 class TestRowHonestyInvariants:

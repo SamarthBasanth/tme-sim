@@ -241,6 +241,60 @@ CONDITIONALS: Dict[str, str] = {
         "smoothing scale is 40/60/90/120 um at dx = 8/12/18/24 um and the "
         "model itself changes with the mesh."
     ),
+    "mcl-no-vasculature": (
+        "COMMENSURABILITY BOUND, and it is the load-bearing caveat on this "
+        "group. A multicellular layer is a stack of cells grown on a porous "
+        "support: packed cells, little stroma, NO VASCULATURE, no necrosis, no "
+        "interstitial convection and no plasma source term. Hicks measured flux "
+        "across that slab and fitted it to a diffusion-reaction equation of the "
+        "SAME FORM the engine solves, which is exactly what makes D and k "
+        "commensurable AS COEFFICIENTS. What that licenses: scoring the "
+        "engine's compiled per-drug D_eff, and the hindrance law that produces "
+        "it, against a directly measured tissue diffusion coefficient in the "
+        "same units and the same functional role. What it does NOT license: any "
+        "claim about a vascularised tissue section. Nothing in an MCL "
+        "constrains vessel spacing, the transvascular source term, IFP-driven "
+        "convection, or the spatial concentration field the solver produces on "
+        "real reconstructed geometry. Reading an MCL row as evidence that the "
+        "engine's tissue predictions are validated would be the modality "
+        "pooling results/external_anchor_survey.md sec. 0 catalogues three live "
+        "instances of, and which this project has manufactured a false "
+        "regression from twice."
+    ),
+    "cell-exclusion-default-off": (
+        "The cellular volume-exclusion term "
+        "(molecular/ecm_mesh.py::cell_exclusion, Maxwell's "
+        "impermeable-inclusion limit) is MERGED BUT NOT WIRED IN. "
+        "results/cellular_exclusion.md sec. 7 recommends merging the physics and "
+        "explicitly NOT flipping the default; nothing in compile_drug calls it, "
+        "so DrugParams.diffusivity is bit-identical to the pre-merge value. "
+        "Every VERDICT in this group is therefore scored on the engine AS IT "
+        "SHIPS, with the term OFF. The cell-term-ON arm is reported alongside "
+        "each verdict and carries three caveats of its own, none of which is a "
+        "footnote: (a) phi_cell = 0.7892 is measured by Delesse's principle on "
+        "the repo's real Xenium BREAST TUMOUR section and then applied to a V79 "
+        "hamster multicellular layer — a literature search for an MCL "
+        "extracellular-volume measurement returned nothing usable, so the "
+        "packing density is imported from the wrong system "
+        "(cellular_exclusion.md sec. 4.1); (b) Xenium's boundary segmentation "
+        "tiles the section, so phi_cell is an UPPER estimate and every "
+        "hindrance derived from it is too; (c) stacking the cell term on the "
+        "existing chain DOUBLE-COUNTS by up to ~1.9x, because brownian.py's "
+        "300 nm obstacle field and ALPHA_TORTUOSITY = 0.6 were partly standing "
+        "in for cell-scale obstruction, and cellular_exclusion.md sec. 5.3 "
+        "states in terms that it cannot resolve which."
+    ),
+    "coefficient-not-field": (
+        "This row scores an INPUT COEFFICIENT of the transport PDE, not any "
+        "solved field. The prediction is read straight off MolecularProfile "
+        "after descriptors.from_smiles -> compile_drug.build_profile; the "
+        "solver is never entered, verified by a call counter on "
+        "physics.diffusion.simulate_drug_transport and "
+        "sim.engine.simulate_response and recorded in "
+        "results/anchor_registration.md sec. 3. It is a stronger row than an "
+        "unanchored coefficient and a weaker one than a field test: it can "
+        "FALSIFY the hindrance law, and it cannot confirm or refute the solver."
+    ),
     "brain-permeability-in-breast": (
         "PS is bbb_penetrance, a blood-BRAIN-barrier term, applied to breast "
         "tissue. results/transvascular_exchange_revalidation.md sec. 5 states the "
@@ -684,6 +738,279 @@ def _run_immune_sink() -> List[Row]:
         conditional=(),
         values={"n_drugs_with_measured_uptake_ratio": 0, "n_drugs": 3},
     )]
+
+
+#: Cell volume fraction of the repo's own real Xenium breast section, derived by
+#: Delesse's principle (areal fraction = volume fraction on a random plane) from
+#: 167,780 segmented cells: sum(cell_area) 3.249e+07 um^2 over a 4.118e+07 um^2
+#: bounding box. Published in results/cellular_exclusion.md sec. 3.2 and produced
+#: by experiments/cellular_exclusion.py --stage phi. It is NOT a code default —
+#: nothing in tmesim/ reads it — and it is used here ONLY to report the
+#: cell-term-ON arm alongside each verdict. NO VERDICT IN THIS GROUP DEPENDS ON
+#: IT: every status below is computed from the shipping compiled coefficient.
+PHI_CELL_BREAST_SECTION = 0.7892
+
+
+def _run_mcl_transport_coefficients() -> List[Row]:
+    """The engine's two compiled transport coefficients vs Hicks' MEASURED
+    multicellular-layer diffusion coefficient, hindrance factor and consumption
+    rate.
+
+    Why this group is worth a registry slot
+    ---------------------------------------
+    The transport PDE has exactly two per-drug coefficients,
+    ``dC/dt = D_eff*lap(C) - k*C + S``, and Hicks fitted flux through a
+    multicellular layer **to a diffusion-reaction model of the same form** to
+    obtain both. Same units, same functional role, same equation: no unit
+    conversion, no compartment translation, no modality bridge to get wrong.
+    Tirapazamine is not on the engine's panel and nothing in the repo was ever
+    fitted to a TPZ measurement, so all three rows are fully out-of-sample.
+
+    Why the scope is ``analytic`` and not ``PDE`` — the crux
+    -------------------------------------------------------
+    These rows score the solver's INPUTS, not its OUTPUTS. The prediction comes
+    from ``descriptors.from_smiles`` -> ``compile_drug.build_profile`` and is
+    read off ``MolecularProfile``; no solve happens. Registering them as PDE
+    evidence would move the summary's "N of N scored rows never invoke the
+    transport PDE" line for free and by mislabelling, which is worse than
+    leaving that line where it is. They are ``analytic`` for the same reason
+    ``glioma_regional_pk`` is, and they carry ``coefficient-not-field`` to say
+    so in the row rather than in a footnote.
+
+    Three separate rows, because they can pass and fail independently
+    ----------------------------------------------------------------
+    The diffusivity is absolute in um^2/s, the hindrance is a dimensionless
+    ratio against the same drug's free diffusivity, and the consumption rate is
+    an absolute 1/s. The engine can be wrong about any one without being wrong
+    about the others — and in fact is: it misses the absolute band and the
+    dimensionless ratio by different factors and in a way that
+    results/cellular_exclusion.md sec. 4.2 reads as a residual ``D_free`` error.
+
+    Scored ON THE ENGINE AS IT SHIPS
+    --------------------------------
+    The cellular volume-exclusion term is merged but default-off and nothing
+    calls it (``cell-exclusion-default-off``), so the verdicts below are the
+    shipping compiled numbers. The cell-term-on arm is computed live and
+    reported in every row's note and ``values``, never as the verdict — a
+    scorecard that scored a configuration the engine does not run would be
+    reporting a different program.
+
+    NOTHING IS TUNED HERE. The measured constants are imported from
+    ``experiments/anchor_prototype.py``, which owns them and traces each to its
+    PMID; the predictions come from the unmodified molecular pipeline at the
+    repo's own ``ecm_reference = 0.4``.
+    """
+    from ..molecular import compile_drug, descriptors, ecm_mesh
+    from .pk_reality import ORDER_OF_MAGNITUDE_FACTOR
+
+    AP = _import_experiment("anchor_prototype")
+
+    mol = descriptors.from_smiles("tirapazamine", AP.TPZ_SMILES)
+    prof = compile_drug.build_profile(mol, ecm_reference=AP.ECM_REFERENCE)
+
+    d_ship = float(prof.effective_diffusivity)
+    d_free = float(prof.free_diffusivity)
+    fold_ship = 1.0 / float(prof.hindrance)
+
+    # The merged-but-default-off cell term, computed live rather than quoted.
+    cell = ecm_mesh.cell_exclusion(PHI_CELL_BREAST_SECTION)
+    cell_scale = float(cell["hindrance"])
+    # Arm B ("cell term ALONE") is the MCL-appropriate arm: an MCL is packed
+    # cells with little matrix, and the repo's ECM legs describe matrix the MCL
+    # does not have. Arm A is the whole existing chain with the cell term added.
+    d_armB, fold_armB = d_free * cell_scale, 1.0 / cell_scale
+    d_armA = d_ship * cell_scale
+    fold_armA = d_free / d_armA
+
+    lo = min(v[0] for v in AP.D_MCL_MEASURED_UM2_S.values())
+    hi = max(v[0] for v in AP.D_MCL_MEASURED_UM2_S.values())
+    d_pmids = tuple(dict.fromkeys(v[2] for v in AP.D_MCL_MEASURED_UM2_S.values()))
+
+    mcl_arm = (
+        f"Cell-term-ON arm, reported and NOT scored: arm B (cell term alone, "
+        f"the MCL-appropriate arm) gives D_eff {d_armB:.1f} um^2/s and "
+        f"{fold_armB:.2f}-fold hindrance; arm A (the full existing chain plus "
+        f"the cell term) gives {d_armA:.1f} um^2/s and {fold_armA:.2f}-fold. "
+        f"Arm A's proximity to the measurement is partly the WRONG TERM DOING "
+        f"THE RIGHT WORK — it credits an MCL with ECM the MCL does not have "
+        f"(results/cellular_exclusion.md sec. 4.1). Arm B's fold is "
+        f"{fold_armB:.4f} exactly; cellular_exclusion.md sec. 0 prints it as "
+        f"6.61x, rounded down, so the two are the same number.")
+
+    rows: List[Row] = []
+
+    # ---------------------------------------------------------------- row 1 #
+    rows.append(Row(
+        group="mcl-transport-coefficients",
+        label="effective diffusivity (tirapazamine)",
+        status=classify(d_ship, lo, hi), scope=SCOPE_ANALYTIC,
+        quantity="compiled MolecularProfile.effective_diffusivity (um^2/s) — "
+                 "the D_eff the transport PDE would be handed — vs the MEASURED "
+                 "tissue diffusion coefficient of the same drug in "
+                 "multicellular layers, obtained by fitting slab flux to a "
+                 "diffusion-reaction model of the same form",
+        predicted=f"{d_ship:.1f} um^2/s as shipped "
+                  f"({d_ship / lo:.2f}x the lowest measured cell line, "
+                  f"{d_ship / hi:.2f}x the highest)",
+        measured=f"{lo:.0f}-{hi:.0f} um^2/s across three MCL cell lines "
+                 f"(V79-171b 74, MGH-U1 130, PMID 9806526; SiHa 130 +/- 5, "
+                 f"PMID 17869669)",
+        pmids=d_pmids,
+        bar=f"inside the measured {lo:.0f}-{hi:.0f} um^2/s range. "
+            f"results/external_anchor_survey.md sec. 4 recommends this anchor "
+            f"as a FAIL row and that is the bar adopted",
+        note=f"The three measurements agree with EACH OTHER to 1.8x while the "
+             f"engine misses all three IN THE SAME DIRECTION — a systematic "
+             f"bias, not scatter. It does pass the repo's loosest declared band "
+             f"({ORDER_OF_MAGNITUDE_FACTOR:.0f}x, "
+             f"pk_reality.ORDER_OF_MAGNITUDE_FACTOR), which is not the bar "
+             f"here. {mcl_arm} Arm B lands INSIDE the measured band at "
+             f"{d_armB:.1f}; that is reported and deliberately not scored, "
+             f"because nothing in the shipping engine computes it, and because "
+             f"the same phi_cell that puts arm B inside on this absolute row "
+             f"leaves the dimensionless hindrance row 1.8x SHORT — the "
+             f"signature of a residual free-diffusivity error rather than of a "
+             f"cell fraction tuned to a target "
+             f"(results/cellular_exclusion.md sec. 4.2).",
+        conditional=("mcl-no-vasculature", "cell-exclusion-default-off",
+                     "coefficient-not-field"),
+        values={"shipped_D_eff_um2s": d_ship,
+                "free_diffusivity_um2s": d_free,
+                "measured_band_um2s": [float(lo), float(hi)],
+                "cell_term_on_armA_D_eff_um2s": d_armA,
+                "cell_term_on_armB_D_eff_um2s": d_armB,
+                "phi_cell": PHI_CELL_BREAST_SECTION,
+                "ecm_reference": float(AP.ECM_REFERENCE)},
+    ))
+
+    # ---------------------------------------------------------------- row 2 #
+    # The measured 12-fold carries NO published uncertainty (the abstract says
+    # "12-fold lower than in culture medium" and nothing more), so a band has to
+    # come from somewhere. Rather than invent one, use the repo's own loosest
+    # declared band — the 3x order-of-magnitude factor pk_reality already ships.
+    # That is the most generous bar available, and the shipping engine still
+    # misses it.
+    h_lo, h_hi = (AP.MEASURED_HINDRANCE_FOLD_V79 / ORDER_OF_MAGNITUDE_FACTOR,
+                  AP.MEASURED_HINDRANCE_FOLD_V79 * ORDER_OF_MAGNITUDE_FACTOR)
+    rows.append(Row(
+        group="mcl-transport-coefficients",
+        label="hindrance factor D_free/D_eff (tirapazamine)",
+        status=classify(fold_ship, h_lo, h_hi), scope=SCOPE_ANALYTIC,
+        quantity="compiled 1/MolecularProfile.hindrance — the dimensionless "
+                 "fold reduction of the same drug's diffusivity in tissue "
+                 "versus in free medium — vs the MEASURED fold reduction of "
+                 "tirapazamine's diffusion coefficient in a V79-171b "
+                 "multicellular layer relative to culture medium",
+        predicted=f"{fold_ship:.2f}-fold as shipped "
+                  f"({fold_ship / AP.MEASURED_HINDRANCE_FOLD_V79:.2f}x "
+                  f"measured); {fold_armB:.2f}-fold with the merged-but-"
+                  f"default-off cell term "
+                  f"({fold_armB / AP.MEASURED_HINDRANCE_FOLD_V79:.2f}x "
+                  f"measured — STILL SHORT)",
+        measured=f"{AP.MEASURED_HINDRANCE_FOLD_V79:.0f}-fold lower than in "
+                 f"culture medium (V79-171b MCL; no uncertainty published)",
+        pmids=("9806526",),
+        bar=f"within the repo's own loosest declared band, "
+            f"pk_reality.ORDER_OF_MAGNITUDE_FACTOR = "
+            f"{ORDER_OF_MAGNITUDE_FACTOR:.0f}x either side of the measured "
+            f"{AP.MEASURED_HINDRANCE_FOLD_V79:.0f}-fold, i.e. "
+            f"{h_lo:.1f}-{h_hi:.1f}-fold. The measured value carries no "
+            f"published uncertainty, so inventing a tighter band would be "
+            f"inventing a number; this is the most GENEROUS bar available and "
+            f"the shipping engine still misses it",
+        note=f"THE SHARPEST ROW IN THIS GROUP: no units, no compartment "
+             f"translation, no cohort matching — a pure dimensionless ratio of "
+             f"one drug's diffusivity in tissue versus in free medium. "
+             f"THE CELL TERM IMPROVES THIS ROW AND DOES NOT PASS IT, and the "
+             f"distinction is the whole point: {fold_ship:.2f}x -> "
+             f"{fold_armB:.2f}x is a 3.7x improvement that closes most of the "
+             f"6.8x error, and it still lands SHORT of the measured 12x by "
+             f"{AP.MEASURED_HINDRANCE_FOLD_V79 / fold_armB:.1f}x. Improving is "
+             f"not passing and is not recorded as one. {mcl_arm} The diagnosis "
+             f"is structural and visible in the code: the engine's only "
+             f"obstacle population is ECM, and hydrodynamic_radius_nm makes the "
+             f"tracer a function of MW alone, so cellular volume exclusion — "
+             f"most of a tumour's volume — is absent from the shipping "
+             f"hindrance law. An MCL is almost pure packed cells, which is "
+             f"exactly why it exposes this.",
+        conditional=("mcl-no-vasculature", "cell-exclusion-default-off",
+                     "coefficient-not-field"),
+        values={"shipped_fold": fold_ship,
+                "measured_fold": float(AP.MEASURED_HINDRANCE_FOLD_V79),
+                "band_fold": [float(h_lo), float(h_hi)],
+                "cell_term_on_armA_fold": fold_armA,
+                "cell_term_on_armB_fold": fold_armB,
+                "armB_shortfall_x": float(
+                    AP.MEASURED_HINDRANCE_FOLD_V79 / fold_armB),
+                "phi_cell": PHI_CELL_BREAST_SECTION},
+    ))
+
+    # ---------------------------------------------------------------- row 3 #
+    k_raw = float(prof.clearance + prof.tissue_binding_rate)
+    from .calibration import calibrate_alpha
+
+    alpha = float(calibrate_alpha())
+    k_cal = float(prof.clearance + alpha * prof.tissue_binding_rate)
+    k_meas = {line: v[0] for line, v in AP.K_CONSUMPTION_MEASURED_PER_S.items()}
+    k_lo, k_hi = min(k_meas.values()), max(k_meas.values())
+    rows.append(Row(
+        group="mcl-transport-coefficients",
+        label="first-order tissue consumption rate k (tirapazamine)",
+        status=NOT_TESTABLE, scope=SCOPE_ANALYTIC,
+        quantity="the engine's first-order interstitial loss rate k (1/s) — "
+                 "the -kC sink of the transport PDE — vs the MEASURED anoxic "
+                 "metabolic consumption rate constant of tirapazamine fitted "
+                 "in the same position of the same diffusion-reaction equation",
+        predicted=f"TWO readings that differ by {k_cal / k_raw:.0f}x and land "
+                  f"on OPPOSITE sides of the measurement: k_raw = clearance + "
+                  f"binding = {k_raw:.3e} /s ({k_raw / k_hi:.4f}-"
+                  f"{k_raw / k_lo:.4f}x measured), and k_calibrated = clearance "
+                  f"+ alpha*binding = {k_cal:.3e} /s at alpha = {alpha:.4f} "
+                  f"({k_cal / k_hi:.3f}-{k_cal / k_lo:.3f}x measured)",
+        measured=f"{k_hi:.3e} /s (0.52 /min, V79-171b) and {k_lo:.3e} /s "
+                 f"(0.31 /min, MGH-U1)",
+        pmids=("9806526",),
+        bar="n/a",
+        reason=(
+            "PARTIALLY COMMENSURABLE ONLY, and the owning survey says so before "
+            "any number is quoted. TWO INDEPENDENT REASONS, either sufficient. "
+            "(1) THE PROCESS IS NOT THE SAME PROCESS. The measured constant is "
+            "ANOXIC BIOREDUCTIVE METABOLISM of a hypoxia-activated prodrug — a "
+            "real, drug-specific consumption reaction that the engine's panel "
+            "drugs do not have — while the engine's k is a generic "
+            "binding-plus-clearance sink. Same units, same slot in the same "
+            "equation, DIFFERENT PHYSICAL PROCESS. "
+            "results/external_anchor_survey.md sec. 2.1 declares it a measured "
+            "ORDER-OF-MAGNITUDE BOUND on how large a real interstitial "
+            "consumption rate can be, and explicitly NOT a like-for-like "
+            "score. (2) THE ENGINE HAS NO SINGLE NUMBER TO SCORE. k_raw and "
+            f"k_calibrated differ by {k_cal / k_raw:.0f}x and straddle the "
+            "measurement: the uncalibrated sink is 53-89x TOO SMALL (which "
+            "independently reproduces results/pk_reality.md's ~300x diagnosis "
+            "on a different drug, in a different system, against a directly "
+            "measured rate constant rather than a penetration depth — that "
+            "FAIL-shaped fact is recorded here, not suppressed), while the "
+            "alpha-amplified sink lands within 1.2-2.0x. Picking the flattering "
+            "reading would manufacture a PASS and picking the other would "
+            "manufacture a FAIL, and nothing about this anchor determines the "
+            "choice. NOTE WHICH WAY THIS COSTS: scored on k_calibrated — the "
+            "value the solver actually uses — this row would PASS the repo's "
+            "3x band. Declining to score it REMOVES a pass from the tally "
+            "rather than removing a failure."),
+        note="What may honestly be said: the magnitude alpha implies for a "
+             "small-molecule interstitial loss rate is not absurd, and is "
+             "within 2x of one independently measured rate constant of the same "
+             "class, in a fit that saw no tirapazamine, no MCL and no rate "
+             "constant. That is weaker than validation and stronger than "
+             "nothing (results/external_anchor_survey.md sec. 3.3).",
+        conditional=("mcl-no-vasculature", "alpha-fit", "coefficient-not-field"),
+        values={"k_raw_per_s": k_raw, "k_calibrated_per_s": k_cal,
+                "alpha": alpha,
+                "measured_k_per_s": {k: float(v) for k, v in k_meas.items()},
+                "raw_ratio_to_measured": [k_raw / k_hi, k_raw / k_lo],
+                "calibrated_ratio_to_measured": [k_cal / k_hi, k_cal / k_lo]},
+    ))
+    return rows
 
 
 # --------------------------------------------------------------------------- #
@@ -1640,8 +1967,14 @@ def _run_ifp_wick_in_needle() -> List[Row]:
         note=("Not a null result: the DISCRIMINATING version of this same "
               "comparison is the breast row below, which the engine FAILS by "
               "~40x. Read the two together. " + unresolved),
+        # ``ifp-grid-unconverged`` belongs on THIS row too, not only on the
+        # breast one below. The caveat's own text describes the GBM ladder
+        # (0.358 -> 0.434 -> 0.462 -> 0.370 mmHg, non-monotone, 1.29x spread),
+        # and the median quoted above is one point on it. A row that declines
+        # to score still PUBLISHES a number, and that number is no more
+        # grid-converged than the breast one.
         conditional=("ifp-uncalibrated", "ifp-unresolved-mesh",
-                     "untreated-section"),
+                     "ifp-grid-unconverged", "untreated-section"),
         values={"wick250_tumour_median_mmhg": g["p50_mmhg"],
                 "wick250_tumour_iqr_mmhg": [g["p25_mmhg"], g["p75_mmhg"]],
                 "raw_field_max_mmhg": gbm["raw"]["max_mmhg"],
@@ -1859,6 +2192,22 @@ def build_registry(exchange: bool = False) -> List[AnchorGroup]:
             runner=_run_immune_sink, est="<1 s",
         ),
         AnchorGroup(
+            key="mcl-transport-coefficients",
+            title="Compiled transport coefficients vs measured multicellular-"
+                  "layer D, hindrance and consumption rate (Hicks 1998/2007)",
+            tissue="MCL", tier=TIER_QUICK, scope=SCOPE_ANALYTIC,
+            source="experiments/anchor_prototype.py (owns the measured "
+                   "constants, each traced to its PMID) driving the unmodified "
+                   "molecular pipeline descriptors.from_smiles -> "
+                   "compile_drug.build_profile; the cell-term-on arm calls "
+                   "molecular/ecm_mesh.py::cell_exclusion, which is merged but "
+                   "DEFAULT-OFF and scores nothing",
+            report="results/external_anchor_survey.md sec. 2.1 + 3, "
+                   "results/cellular_exclusion.md, "
+                   "results/anchor_registration.md",
+            runner=_run_mcl_transport_coefficients, est="~10 s",
+        ),
+        AnchorGroup(
             key="breast-transvascular",
             title="Breast interstitial:plasma AUC vs measured human microdialysis",
             tissue="breast", tier=TIER_FULL, scope=SCOPE_PDE,
@@ -2070,6 +2419,43 @@ OUT_OF_SCOPE: Tuple[Tuple[str, str], ...] = (
      "registered check. None introduces a new measurement."),
     ("results/tumour_physiology_pbpk_literature.md",
      "explicitly 'reference material, not wired into any model' — a survey."),
+    ("Pruijn 2008 (doi:10.1071/CH08240) — D_mcl for 71 compounds spanning "
+     "~69-fold, and the bounded version in PMID 16912264 (2.7-187 um^2/s "
+     "across 16 TPZ analogues in HT29 MCLs)",
+     "THE HIGHEST-VALUE UNREGISTERED ANCHOR IDENTIFIED, and it is blocked on "
+     "retrieval, not on judgement. The engine derives D_eff from a "
+     "Stokes-Einstein radius that is a function of MW ALONE times a hindrance "
+     "that depends on the ECM fraction and not on the molecule, so across a "
+     "congeneric series it must predict a near-constant D_eff while the "
+     "measurement spans 69-fold — a decisive falsification of the diffusivity "
+     "model that needs only the compound list. The publisher returns HTTP 403 "
+     "to automated retrieval and the record is not in PubMed or PMC, so the "
+     "compound-by-compound table is UNVERIFIED and no row can be built from it "
+     "without inventing numbers (results/external_anchor_survey.md sec. 2.5)."),
+    ("Capecitabine tumour:plasma 1.76 and tumour:s.c. 1.11 in human breast "
+     "lesions (PMID 12618890)",
+     "COMMENSURABLE and recommended for adoption by "
+     "results/external_anchor_survey.md sec. 4, but NO MODULE COMPUTES IT: it "
+     "would reuse experiments/breast_kp_anchor.py's solve path against a new "
+     "anchor table, which is new code in a file this registration does not "
+     "own. Registering a row whose runner does not exist is not possible; this "
+     "entry records the omission so it stays visible. When it is built, score "
+     "the PARENT DRUG ONLY — DFCR, DFUR and 5-FU are metabolites generated "
+     "intracellularly en route, so their interstitial concentration carries a "
+     "local generation term the engine does not model."),
+    ("Tunggal 1999 (PMID 10389947) and Cowan 2001 (PMID 11149410) "
+     "multicellular-layer flux ratios on FOUR OF THE ENGINE'S OWN PANEL DRUGS",
+     "NOT ACTIONABLE WITHOUT NEW GEOMETRY, and the omission is expensive. "
+     "'% of the rate through the blank Teflon membrane' is a ratio of "
+     "steady-state fluxes through a 1-D slab with reaction; the engine solves "
+     "2-D reconstructed tissue with vessel sources and has no 1-D slab "
+     "configuration. The measurement says doxorubicin and mitoxantrone are "
+     "3-5x slower than methotrexate while the calibrated panel puts "
+     "doxorubicin at L = 64.9 um and methotrexate at 75.2 um — essentially "
+     "equal, i.e. a DIRECTIONAL DISAGREEMENT on the engine's own drugs that "
+     "nothing currently scores. Cowan's concentration invariance from 10 uM to "
+     "3 mM is separately a direct test of the engine's first-order-sink "
+     "linearity assumption, and it CONFIRMS it over 300-fold."),
 )
 
 
