@@ -209,6 +209,38 @@ CONDITIONALS: Dict[str, str] = {
         "measured drug response on this tissue; the anchor is a cohort-level "
         "literature value, not this patient's outcome."
     ),
+    "ifp-uncalibrated": (
+        "Every coefficient in tmesim/physics/pressure.py is a hardcoded "
+        "order-of-magnitude constant, by its own docstring 'not "
+        "patient-calibrated': _K0 = 1.2, _K_ECM_ATTEN = 0.6, _PV = 25.0 mmHg, "
+        "_LP_NORMAL = 1e-3, _LEAK_GAIN = 12.0, _LAMBDA_LYMPH = 3e-2. None was "
+        "fitted to any measurement, which makes any IFP score genuinely "
+        "out-of-sample — and also means nothing constrains the absolute scale. "
+        "_PV = 25.0 in particular is an upper bound on the predicted core "
+        "plateau and was NOT chosen against any of the anchors scored here."
+    ),
+    "ifp-unresolved-mesh": (
+        "The screened-Poisson screening length sqrt(K/(a+d)) implied by those "
+        "coefficients is ~6-7 um on both real sections, BELOW every grid "
+        "spacing the engine runs at (8-30 um), at >99.7% of tissue nodes. The "
+        "reaction term dominates the diagonal, so the discrete solution "
+        "collapses toward the pointwise algebraic limit a*p_v/(a+d) (measured "
+        "correlation r = 0.90 GBM / 0.93 breast) and the interior Laplacian "
+        "barely couples neighbours. Any IFP number is conditional on a mesh "
+        "that does not resolve the operator being solved "
+        "(results/ifp_validation.md sec. 5)."
+    ),
+    "ifp-grid-unconverged": (
+        "The wick-scale IFP statistic is not grid-converged. Across dx = 24, "
+        "18, 12, 8 um it moves 0.358 -> 0.434 -> 0.462 -> 0.370 mmHg on GBM "
+        "(non-monotone, 1.29x spread) and 0.621 -> 0.424 -> 0.370 -> 0.286 "
+        "mmHg on breast (monotone, 2.17x spread, still falling 22.5% over the "
+        "last refinement with no plateau). Two contributions are known: the "
+        "vascular-density KDE is rebuilt per grid, and _TUMOR_SIGMA = 5.0 in "
+        "pressure.py is specified in GRID CELLS, so the physical tumour "
+        "smoothing scale is 40/60/90/120 um at dx = 8/12/18/24 um and the "
+        "model itself changes with the mesh."
+    ),
     "brain-permeability-in-breast": (
         "PS is bbb_penetrance, a blood-BRAIN-barrier term, applied to breast "
         "tissue. results/transvascular_exchange_revalidation.md sec. 5 states the "
@@ -1479,6 +1511,269 @@ def _run_heldout_patient_geometry() -> List[Row]:
     return rows
 
 
+def _run_ifp_wick_in_needle() -> List[Row]:
+    """Solved interstitial fluid pressure vs MEASURED human wick-in-needle IFP.
+
+    The engine solves IFP natively in mmHg (``physics/pressure.py``: ``_PV =
+    25.0`` mmHg, ``K`` in um^2/(mmHg*s)), with no conversion at the display
+    layer, so it is one of the very few ABSOLUTE dimensioned quantities the
+    engine emits. Until now nothing external scored it, while the landing page
+    displayed a specific mmHg range taken from it.
+
+    Three rows, and the split between them is the whole point.
+
+    1. **GBM vs Boucher 1997 (PMID 9062403) -- NOT TESTABLE.** Not because the
+       units or the technique fail to line up (they do line up), but because
+       the ANCHOR CANNOT DISCRIMINATE. The measured intracranial-tumour value is
+       2.0 +/- 2.5 mmHg where the 2.5 is a **standard deviation** (the paper's
+       Statistical analysis section says so verbatim), n = 11, on a
+       non-negative quantity whose solver clips at zero -- so the admissible
+       band is effectively 0 to 4.5 mmHg and a model that produced NOTHING
+       would pass it. The killer is the cross-check: Less 1992 (PMID 1423283),
+       same wick-in-needle technique with Boucher and Jain on both author
+       lists, measured NORMAL tissue at 2 +/- 4 mmHg, n = 11 -- statistically
+       indistinguishable from the intracranial TUMOUR figure. An anchor that
+       cannot separate tumour from normal tissue cannot separate this engine
+       from one with no tumour in it. Registering that as a PASS would be the
+       weakest row on the scorecard while reading like one of the strongest.
+    2. **Breast vs Less 1992 (PMID 1423283) -- the DISCRIMINATING row, and it
+       FAILS.** Primary breast carcinoma IFP is 15 +/- 9 mmHg (SD), far from
+       zero and far from normal tissue, so a wrong model cannot pass by
+       producing nothing. The engine lands ~40x low.
+    3. **A numerical-resolution row**, which is why row 2 fails the way it
+       does: the screened-Poisson operator's screening length
+       ``sqrt(K/(a+d))`` is ~6-7 um on both real sections, BELOW every grid
+       spacing the engine ever runs at, so > 99.7% of tissue nodes are
+       unresolved and the field collapses toward the pointwise algebraic limit
+       ``a*p_v/(a+d)``.
+
+    NOTHING IS TUNED HERE. ``experiments/ifp_validation.py`` imports
+    ``physics/pressure.py`` and calls it as it ships; no coefficient is read
+    back, fitted or adjusted toward any measured value.
+    """
+    for need in ("data_cache/xenium_gbm", "data_cache/xenium_breast_janesick/rep1"):
+        if not os.path.isdir(_repo_path(*need.split("/"))):
+            raise NotTestable(f"requires the real Xenium cache at {need} (absent)")
+    IV = _import_experiment("ifp_validation")
+
+    gbm = IV.measure_section("gbm", 12.0)
+    breast = IV.measure_section("breast", 12.0)
+    sc = IV.score([gbm, breast])
+    A, B = IV.ANCHOR, IV.BREAST_ANCHOR
+
+    def _wick(rec):
+        return rec["wick"]["sigma_250um"]["tumour_phi_ge_0.5"]
+
+    g, b = _wick(gbm), _wick(breast)
+    commensurability = (
+        "COMMENSURABILITY. A wick-in-needle probe is a 23-gauge needle whose "
+        "side hole equilibrates with the mobile interstitial fluid over a "
+        "sub-millimetre to millimetre contact region, at ONE placement inside "
+        "the tumour mass. The commensurable model statistic is therefore the "
+        "solved field's local mean over a wick-sized window at tumour-bearing "
+        "locations -- NOT the domain mean, NOT the field maximum, and NOT the "
+        "landing page's iso-contour levels, which are fractions of a "
+        "coarse-grained maximum chosen for rendering. Reported here as the "
+        "median over placements at a 250 um Gaussian window over nodes with "
+        "tumour occupancy >= 0.5; the 125 um and 500 um windows are in "
+        "results/sweep/ifp_validation.json and move it by under 1.4x.")
+    unresolved = (
+        f"The screened-Poisson screening length sqrt(K/(a+d)) has median "
+        f"{gbm['resolution']['screening_length_um']['p50']:.1f} um (GBM) and "
+        f"{breast['resolution']['screening_length_um']['p50']:.1f} um (breast), "
+        f"BELOW the 12 um production spacing at "
+        f"{100 * gbm['resolution']['frac_tissue_screening_below_dx']:.2f}% and "
+        f"{100 * breast['resolution']['frac_tissue_screening_below_dx']:.2f}% "
+        f"of tissue nodes respectively.")
+
+    rows: List[Row] = []
+
+    rows.append(Row(
+        group="ifp-wick-in-needle",
+        label="GBM section IFP vs human intracranial-tumour IFP",
+        status=NOT_TESTABLE, scope=SCOPE_PDE,
+        quantity="solved interstitial fluid pressure (mmHg) at wick-scale "
+                 "placements in the tumour mass of the real Xenium GBM section "
+                 "vs MEASURED intraoperative wick-in-needle IFP in human "
+                 "intracranial tumours",
+        predicted=f"{g['p50_mmhg']:.3f} mmHg (median over placements; IQR "
+                  f"{g['p25_mmhg']:.3f}-{g['p75_mmhg']:.3f}, max "
+                  f"{g['max_mmhg']:.3f})",
+        measured=f"{A['mean_mmhg']} +/- {A['spread_mmhg']} mmHg "
+                 f"(mean +/- SD, n={A['n']}); 10 of 11 tumours lay in 0.0-3.0, "
+                 f"one astrocytoma at 9.5; glioblastoma-only subset n=5 mean "
+                 f"{sc['anchor_recomputed']['glioblastoma_only_mean_mmhg']:.1f}, "
+                 f"range 0.0-3.0",
+        pmids=(A["pmid"], B["pmid"]),
+        bar="n/a — no bar is declared, because no bar on this anchor "
+            "discriminates",
+        reason=(
+            "THE ANCHOR CANNOT DISCRIMINATE, for three independent reasons, and "
+            "the engine's number would sit inside it either way. "
+            "(1) UNCERTAINTY. The paper's Statistical analysis section states "
+            "verbatim that 'the data are presented as the mean +/- standard "
+            "deviation', so 2.5 is an SD over 11 patients, not an SEM. On a "
+            "non-negative quantity that the solver clips at zero, mean +/- 1 SD "
+            "is effectively 0.0-4.5 mmHg, and the paper's own per-patient table "
+            "has 10 of 11 tumours in 0.0-3.0 INCLUDING A MEASURED 0.0. Any "
+            "engine output from nothing up to 4.5 mmHg passes. A verdict that "
+            "cannot be failed is not a verdict. "
+            "(2) IT DOES NOT SEPARATE TUMOUR FROM NORMAL TISSUE. Less 1992 "
+            "(PMID 1423283) measured normal human tissue at 2 +/- 4 mmHg, n=11, "
+            "by the SAME wick-in-needle technique with Boucher and Jain on both "
+            "author lists. The intracranial-tumour figure is statistically "
+            "indistinguishable from it, so agreement with it is not evidence "
+            "that the engine reproduces tumour interstitial hypertension -- it "
+            "is equally consistent with the engine having no tumour effect at "
+            "all, which on this section is close to what it has. "
+            "(3) TREATED, DECOMPRESSED STATE. All 11 patients received "
+            "dexamethasone 10 mg + mannitol 0.5 mg/kg + furosemide 20 mg i.v. "
+            "and were hyperventilated to PaCO2 25-32 mmHg, and IFP was taken "
+            "after the cranium was opened and the dura removed. The authors' "
+            "own conclusion is that 'antioedema therapy in patients with brain "
+            "tumours is responsible in part for the low tumour IFP', and the "
+            "same paper measures a 17-50% fall in rodent tumour IFP from "
+            "hypocapnia alone (27 +/- 15 -> 18 +/- 10 mmHg). The engine models "
+            "no steroid, no osmotic agent, no diuretic and no decompression, so "
+            "even a matching number would be matching a different physiological "
+            "state. " + commensurability),
+        note=("Not a null result: the DISCRIMINATING version of this same "
+              "comparison is the breast row below, which the engine FAILS by "
+              "~40x. Read the two together. " + unresolved),
+        conditional=("ifp-uncalibrated", "ifp-unresolved-mesh",
+                     "untreated-section"),
+        values={"wick250_tumour_median_mmhg": g["p50_mmhg"],
+                "wick250_tumour_iqr_mmhg": [g["p25_mmhg"], g["p75_mmhg"]],
+                "raw_field_max_mmhg": gbm["raw"]["max_mmhg"],
+                "raw_field_median_in_tissue_mmhg": gbm["raw"]["p50_mmhg"],
+                "raw_field_mean_in_tissue_mmhg": gbm["raw"]["mean_in_tissue_mmhg"],
+                "anchor_mean_mmhg": A["mean_mmhg"],
+                "anchor_sd_mmhg": A["spread_mmhg"],
+                "normal_tissue_reference_mmhg": [2.0, 4.0],
+                "dx_um": 12.0},
+        physics=physics_label(repo_default_exchange()),
+    ))
+
+    blo, bhi = B["mean_mmhg"] - B["spread_mmhg"], B["mean_mmhg"] + B["spread_mmhg"]
+    rows.append(Row(
+        group="ifp-wick-in-needle",
+        label="breast section IFP vs human primary-breast-carcinoma IFP",
+        status=classify(b["p50_mmhg"], blo, bhi), scope=SCOPE_PDE,
+        quantity="solved interstitial fluid pressure (mmHg) at wick-scale "
+                 "placements in the tumour mass of the real Xenium breast "
+                 "section vs MEASURED wick-in-needle IFP in human primary "
+                 "breast carcinoma",
+        predicted=f"{b['p50_mmhg']:.3f} mmHg (median over placements; IQR "
+                  f"{b['p25_mmhg']:.3f}-{b['p75_mmhg']:.3f}, max "
+                  f"{b['max_mmhg']:.3f}) — "
+                  f"{sc['breast_vs_breast_anchor']['fold_low_vs_mean']:.0f}x "
+                  f"BELOW the measured mean, "
+                  f"{sc['breast_vs_breast_anchor']['fold_low_vs_band_floor']:.0f}x "
+                  f"below the band floor",
+        measured=f"{B['mean_mmhg']:.0f} +/- {B['spread_mmhg']:.0f} mmHg "
+                 f"(mean +/- SD) in primary breast carcinoma; all neoplasms "
+                 f"{B['all_neoplasms_mmhg']}; normal tissue "
+                 f"{B['normal_tissue_mmhg']}",
+        pmids=(B["pmid"], "7850532"),
+        bar=f"inside the measured mean +/- 1 SD = {blo:.0f}-{bhi:.0f} mmHg",
+        note=("THE LOAD-BEARING ROW OF THIS GROUP, and it is the one the "
+              "intracranial anchor could not be. 15 +/- 9 mmHg is far from zero "
+              "and 7x the same study's normal-tissue value, so unlike the brain "
+              "figure it cannot be passed by producing nothing — and the engine "
+              "does not pass it. Corroborated independently by Nathanson 1994 "
+              "(PMID 7850532), 29 +/- 3 mmHg in invasive ductal carcinoma, n=25 "
+              "— whose uncertainty is a STANDARD ERROR, not an SD, and must not "
+              "be read as one; against that value the engine is ~78x low. "
+              "The direction is consistent with every other absolute quantity "
+              "this engine has been scored on. Mechanistically the miss is not "
+              "mysterious: pressure.py's own docstring predicts a flat tumour "
+              "plateau approaching _PV = 25 mmHg, but on real reconstructed "
+              "tissue the vascular density that drives the Starling source is "
+              "zero at 94.3% of breast tissue nodes (97.3% on GBM), so the "
+              "solved field is near-zero almost everywhere (median "
+              f"{breast['raw']['p50_mmhg']:.4f} mmHg in tissue) with isolated "
+              f"spikes to {breast['raw']['max_mmhg']:.1f} mmHg at endothelial "
+              "cells. The engine reproduces the peak magnitude and misses the "
+              "plateau, which is the opposite of the Jain effect it claims. " +
+              commensurability),
+        conditional=("ifp-uncalibrated", "ifp-unresolved-mesh",
+                     "ifp-grid-unconverged", "untreated-section"),
+        values={"wick250_tumour_median_mmhg": b["p50_mmhg"],
+                "wick250_tumour_iqr_mmhg": [b["p25_mmhg"], b["p75_mmhg"]],
+                "band_mmhg": [blo, bhi],
+                "fold_below_measured_mean":
+                    sc["breast_vs_breast_anchor"]["fold_low_vs_mean"],
+                "raw_field_max_mmhg": breast["raw"]["max_mmhg"],
+                "raw_field_median_in_tissue_mmhg": breast["raw"]["p50_mmhg"],
+                "dx_um": 12.0},
+        physics=physics_label(repo_default_exchange()),
+    ))
+
+    rows.append(Row(
+        group="ifp-wick-in-needle",
+        label="IFP solve is under-resolved on every grid the engine runs at",
+        status=NOT_TESTABLE, scope=SCOPE_PDE,
+        quantity="screened-Poisson screening length sqrt(K/(a+d)) implied by "
+                 "physics/pressure.py's own shipped coefficients vs the grid "
+                 "spacings the engine actually solves on (8-30 um)",
+        predicted=f"median screening length "
+                  f"{gbm['resolution']['screening_length_um']['p50']:.1f} um "
+                  f"(GBM) / "
+                  f"{breast['resolution']['screening_length_um']['p50']:.1f} um "
+                  f"(breast); L/dx = "
+                  f"{gbm['resolution']['median_L_over_dx']:.2f} / "
+                  f"{breast['resolution']['median_L_over_dx']:.2f} at the 12 um "
+                  f"production spacing",
+        measured="n/a — this row is scored against the discretisation, not "
+                 "against a measurement",
+        pmids=(), bar="n/a",
+        reason=(
+            "NO MEASUREMENT IS INVOLVED; this row is registered so that the two "
+            "rows above cannot be quoted without it. " + unresolved + " A "
+            "screened-Poisson solve whose screening length is below the mesh "
+            "cannot represent the operator it discretises: the reaction term "
+            "dominates the diagonal (median (a+d)*dx^2/K = "
+            f"{gbm['resolution']['reaction_dominance_median']:.1f} on GBM, "
+            f"{breast['resolution']['reaction_dominance_median']:.1f} on "
+            "breast), so each node relaxes toward its own LOCAL algebraic "
+            "equilibrium a*p_v/(a+d) with the Laplacian barely coupling "
+            "neighbours. Measured directly: the solved field correlates with "
+            "that pointwise algebraic limit at r = "
+            f"{gbm['resolution']['corr_solved_vs_local_equilibrium']:.2f} (GBM) "
+            f"and {breast['resolution']['corr_solved_vs_local_equilibrium']:.2f} "
+            "(breast). At production dx the 'solved pressure field' is "
+            "therefore closer to a pointwise nonlinear map of the vascular-"
+            "density KDE than to a transport solve, and the margin pressure "
+            "gradient that carries the Jain effect into the convection term is "
+            "not resolved. Refining the mesh does not fix it and is not free: "
+            "the field is not grid-converged either (see the "
+            "ifp-grid-unconverged conditional), and pressure.py's tumour-"
+            "occupancy smoothing _TUMOR_SIGMA = 5.0 is specified in GRID CELLS, "
+            "so the physical smoothing scale is itself a function of dx (60 um "
+            "at dx=12, 120 um at dx=24) and the model changes as the mesh "
+            "changes."),
+        note="Grid ladder, wick-scale tumour median: GBM 0.358 -> 0.434 -> "
+             "0.462 -> 0.370 mmHg and breast 0.621 -> 0.424 -> 0.370 -> 0.286 "
+             "mmHg at dx = 24, 18, 12, 8 um. Full ladder in "
+             "results/sweep/ifp_validation.json.",
+        conditional=("ifp-unresolved-mesh", "ifp-grid-unconverged"),
+        values={"screening_length_um_gbm":
+                    gbm["resolution"]["screening_length_um"],
+                "screening_length_um_breast":
+                    breast["resolution"]["screening_length_um"],
+                "frac_tissue_unresolved_gbm":
+                    gbm["resolution"]["frac_tissue_screening_below_dx"],
+                "frac_tissue_unresolved_breast":
+                    breast["resolution"]["frac_tissue_screening_below_dx"],
+                "corr_solved_vs_local_equilibrium_gbm":
+                    gbm["resolution"]["corr_solved_vs_local_equilibrium"],
+                "corr_solved_vs_local_equilibrium_breast":
+                    breast["resolution"]["corr_solved_vs_local_equilibrium"]},
+        physics=physics_label(repo_default_exchange()),
+    ))
+    return rows
+
+
 # --------------------------------------------------------------------------- #
 # The registry
 # --------------------------------------------------------------------------- #
@@ -1641,6 +1936,19 @@ def build_registry(exchange: bool = False) -> List[AnchorGroup]:
             est="~2-3 min (measured 126 s on a loaded machine: load + "
                 "reconstruct 816,769 cells + vessel segmentation; NO PDE solve)",
             needs=("data_cache/xenium_gbm_io",),
+        ),
+        AnchorGroup(
+            key="ifp-wick-in-needle",
+            title="Solved interstitial fluid pressure vs measured human "
+                  "wick-in-needle IFP (GBM not testable, breast FAILS ~40x)",
+            tissue="GBM + breast", tier=TIER_FULL, scope=SCOPE_PDE,
+            source="experiments/ifp_validation.py::measure_section + score "
+                   "(calls tmesim.physics.pressure.solve_ifp exactly as it "
+                   "ships; no coefficient is read back or fitted)",
+            report="results/ifp_validation.md",
+            runner=_run_ifp_wick_in_needle, est="~15 s (2 sections, no drug)",
+            needs=("data_cache/xenium_gbm",
+                   "data_cache/xenium_breast_janesick/rep1"),
         ),
     ]
 

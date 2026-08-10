@@ -16,7 +16,6 @@ import Annotation from "./Annotation";
 import { ConcentrationSource, VesselNetwork } from "./Markers";
 import Loader from "./Loader";
 import { ENTRY_POINTS } from "./shaders/viridis";
-import { IFP_LEVEL_RANGE_LABEL } from "@/lib/ifpContours";
 import {
   fieldLabelOpacity,
   regionLabelOpacity,
@@ -178,14 +177,43 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
                   was still at 38% opacity. The offset is set from the left
                   extreme of that sweep, not from its resting position.
                 */}
+                {/*
+                  THE NUMERIC RANGE WAS REMOVED, and it must not come back.
+
+                  The label used to end with the iso-contour levels
+                  (`IFP_LEVEL_RANGE_LABEL`, 0.22-0.65 mmHg). Two independent
+                  reasons that was wrong, both measured:
+
+                  1. It quoted the wrong quantity. Those are contour LEVELS of
+                     a 250 um coarse-grained field; the raw field spans
+                     0-12.93 mmHg with a median in tissue of 0.0036. This
+                     module's own header (ifpContours.ts, "the page must never
+                     quote one as the other") warned against exactly this, and
+                     the annotation did it anyway.
+                  2. The magnitude is not defensible. results/ifp_validation.md
+                     scored the solved field against wick-in-needle
+                     measurements and it comes out 41x LOW on breast against
+                     15 +/- 9 mmHg (PMID 1423283) -- and refining the grid
+                     makes it worse, not better. The GBM comparison is
+                     NOT TESTABLE rather than a pass: Boucher's intracranial
+                     2.0 +/- 2.5 mmHg (SD, PMID 9062403) is statistically
+                     indistinguishable from normal brain, so it cannot
+                     separate this engine from one with no tumour in it.
+
+                  What survives is the SHAPE, which is what this beat is for:
+                  the field is genuinely solved on measured geometry, and
+                  showing where pressure rises is a real claim. The absolute
+                  scale is not, so the label now says "relative, uncalibrated"
+                  instead of a number the project cannot stand behind.
+                */}
                 <Annotation
                   anchor={[-0.831, -0.33, 0]}
                   labelOffset={isMobile ? [0.48, 0.5, 0] : [0.78, 0.58, 0]}
                   label="Interstitial pressure"
                   detail={
                     isMobile
-                      ? "Solved · 250 µm mean"
-                      : `Solved · 250 µm mean · ${IFP_LEVEL_RANGE_LABEL}`
+                      ? "Solved · relative"
+                      : "Solved · relative, uncalibrated · 250 µm mean"
                   }
                   getOpacity={fieldLabelOpacity}
                 />
