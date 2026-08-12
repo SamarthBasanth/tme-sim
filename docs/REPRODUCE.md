@@ -110,6 +110,59 @@ constraints.txt`, so the image and the informational cross-platform reference jo
 are pinned the same way. That is what makes a red in that job mean *genuine
 linux/amd64 float divergence* rather than version drift.
 
+#### Measured: macOS/arm64 → linux/amd64 diverges, by 10–81 ULP, in the AUC only
+
+That job has now run, and **it is red — reproducibly, with byte-identical numbers
+in two separate runs** (`31147942003` and `31152915639`, both 2026-08-07). So the
+linux/amd64 values are themselves deterministic; they are simply not the stored
+ones. Result each time: `6 failed, 203 passed, 81 skipped, 12 deselected`.
+
+The environment fingerprint rules out the boring explanation first — the job
+printed numpy 2.0.2, scipy 1.13.1, scikit-learn 1.6.1, scikit-image 0.24.0,
+pandas 2.3.3, h5py 3.14.0, tifffile 2024.8.30, imagecodecs 2024.12.30, rdkit
+2025.09.2, i.e. exactly the table above. **This is not version drift.** What does
+differ: CPython 3.11.15 on Linux x86_64 / glibc 2.39, with numpy built against
+`scipy-openblas`, `OpenBLAS 0.3.27 USE64BITINT DYNAMIC_ARCH NO_AFFINITY Zen
+MAX_THREADS=64`.
+
+Five of the six failures are the tolerance-free comparisons in
+`tests/test_time_resolved_pk.py`, and they are tightly localised:
+
+| test | linux/amd64 | stored reference | ULP | relative |
+|---|---|---|---|---|
+| `test_static_path_matches_stored_reference_bitwise[default_1dose]` | 186951012.7370696 | 186951012.7370672 | 81 | 1.29e-14 |
+| `…[weak_1dose]` | 22995503.100990858 | 22995503.10099082 | 10 | 1.62e-15 |
+| `…[weak_3dose]` | 51200707.894960985 | 51200707.89496109 | 14 | 2.04e-15 |
+| `…[weak_10dose_noconv]` | 16491978.822995484 | 16491978.822995463 | 11 | 1.24e-15 |
+| `test_static_solver_matches_stored_reference_bitwise` | 20642672.153042287 | 20642672.15304199 | 80 | 1.44e-14 |
+
+Two things make this a narrow finding rather than "the references don't hold":
+
+* **Every divergent value is an AUC accumulation** — `res.extras["mean_auc"]` in
+  the four parametrised cases, `res.auc.sum()` in the fifth. That is a summation
+  order, which is exactly what a different vectorised reduction changes.
+* **`kill_fraction` matched bit-for-bit in all four parametrised cases**, asserted
+  on the line immediately before the one that failed. The nonlinear kill model did
+  not amplify the difference here.
+
+The sixth red is not numerics at all:
+`test_mgmt_scalar.py::test_visium_pseudobulk_mgmt_is_recovered_and_labelled_pseudobulk`
+fails with `no cached Visium GBM sections found` — it reaches for real data
+without a skip guard and is missing from that job's `--deselect` list.
+
+**What is still unmeasured.** This covers the *synthetic* references only: the
+failing cases build their tissue with `_build_selftest_micro()` and
+`make_flat_micro()`, while the real-tissue bitwise test
+(`test_real_tissue_static_path_matches_stored_reference_bitwise`) is deselected
+because `data_cache/` is not available in CI. The real-tissue references have
+never been evaluated on a second architecture.
+
+Practically: reproduce on macOS/arm64 if you intend to match a stored value to the
+last bit. On linux/amd64, expect agreement to ~1e-14 on AUC-derived quantities and
+exact agreement on `kill_fraction`, and treat anything larger — or any
+`kill_fraction` mismatch — as unexplained, because the measurement above does not
+account for it. Do not widen a tolerance or edit a reference to absorb it.
+
 ### Extras that `pyproject.toml` does not declare
 
 Three packages are imported by the codebase but are **missing from
@@ -508,6 +561,10 @@ concentration and no microenvironment) and `moncayo_explant.{md,png}`.
   average it over seeds 0–3.
 * `data_cache/` and `results/regime_pp*/` are git-ignored, so a fresh clone always
   starts from the acquisition step.
+* **Architecture changes the last digits.** Measured on linux/amd64: AUC-derived
+  values differ from the macOS/arm64 references by 10–81 ULP (≤1.4e-14) while
+  `kill_fraction` matches bit-for-bit. Match a stored value to the last bit only
+  on macOS/arm64 — see §1a.
 * Do not compare numbers across grid resolutions. Anything quoted at dx = 30 µm or
   dx = 100 µm is superseded by the dx = 12 µm value.
 * The CLI `--dx` **default is 30.0**, not 12. Always pass `--dx 12` for anything

@@ -41,7 +41,20 @@
 # Pinning versions is NOT the same as pinning results across machines. It removes
 # version drift; it does not remove CPU, BLAS vendor or BLAS thread count. The
 # macOS/arm64 -> linux/amd64 question is exactly what the informational job in
-# .github/workflows/docker.yml exists to measure, and it is still open.
+# .github/workflows/docker.yml exists to measure, and it has now been MEASURED:
+# that job is red on linux/amd64, reproducibly and with identical numbers, in
+# runs 31147942003 and 31152915639 (both 2026-08-07). With every version below
+# applied -- the job's fingerprint printed numpy 2.0.2 / scipy 1.13.1 /
+# scikit-learn 1.6.1 / scikit-image 0.24.0 / pandas 2.3.3, so this is NOT version
+# drift -- five tolerance-free AUC references in tests/test_time_resolved_pk.py
+# differ by 10-81 ULP (1.2e-15 to 1.4e-14 relative), while kill_fraction matches
+# bit-for-bit in every one of them. numpy there is built against scipy-openblas
+# (OpenBLAS 0.3.27 USE64BITINT DYNAMIC_ARCH NO_AFFINITY Zen MAX_THREADS=64);
+# the reference machine's own BLAS was never fingerprinted, so the pair is
+# "differs from" rather than a named A-vs-B. So: this file does its job, and
+# the residual is the architecture, exactly as the paragraph above says.
+# See docs/REPRODUCE.md 1a for the numbers and what is still unmeasured (the
+# real-tissue references -- that job runs without data_cache/).
 
 # --------------------------------------------------------------------------- #
 # 1. Numerically load-bearing. A change here can change a published number.
