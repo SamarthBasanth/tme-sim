@@ -227,8 +227,14 @@ reanalysis figures (78.1 / 82.4 / p = 0.27 / ρ = +0.516 / +0.735 / MOESM2 `UM 8
 - **Length.** Still long for a cold email. If cutting, keep: the GSE232173 reanalysis numbers
   (paragraph 2), the three-point ask, the order-reversal paragraph, and the pre-registration
   offer. Cut the audit paragraph to one sentence and link out.
-- **The pre-registration this email promises does not exist yet.** There is no pre-registration
-  file in `results/`. Write it before sending, or delete the offer.
+- **The pre-registration this email promises now EXISTS**, at
+  [`results/preregistration_erasmus_ic50.md`](../../results/preregistration_erasmus_ic50.md).
+  It registers the drug-ordering prediction outright (both arms, with the
+  falsification criteria and the ruled-out post-hoc moves), and registers
+  per-region exposure and the MGMT effect size as a two-stage protocol, because
+  both depend on tissue this project does not have and putting a number on them
+  today would be fabrication. It has not been reviewed by a human — read it
+  before sending, since the email makes you accountable to it.
 - **Attachments.** Attach nothing on the first email. Link to one page if the repo is public.
 - **Do not claim** the specific instrument at PARTS. Reporting of a 2024 10x spatial
   acquisition is secondary-source and unverified; the PARTS page itself lists no instruments.

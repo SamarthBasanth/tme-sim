@@ -17,7 +17,7 @@ PMID-anchored regional PK measurements (`results/glioma_regional_pk.md`).
 | Axis | Result |
 |---|---|
 | **Partition magnitude** | 5/6 drugs within 10x, 4/6 within 3x. Aggregate bias 2.02x — **but 1.01x (essentially unbiased) excluding one outlier** |
-| **Cross-drug ordering** | Measured penetrant-vs-excluded separation 4.66x; **model predicts 3.65x from structure alone** |
+| **Cross-drug ordering** | Measured penetrant-vs-excluded separation 4.66x pooled, 9.3x in intact-barrier tissue; **the model over-separates at 17.20x**. ~~3.65x from structure alone~~ is the PRE-veto-fix value and must not be quoted as current — the fix changed the error's SIGN (3.65x under-stated the intact-barrier 9.3x by 2.5x; 17.20x over-states it by 1.8x). See [`glioma_regional_pk.md`](glioma_regional_pk.md) §P2 |
 | **Regional ordering** | **FAIL.** Measured CE-vs-non-enhancing 1.45x-4.26x (p<0.0001, within-patient permutation); model predicts exactly 1.00x |
 
 The regional failure has a precise cause — there is no barrier-integrity term anywhere in
