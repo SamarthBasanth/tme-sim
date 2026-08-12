@@ -663,3 +663,172 @@ class TestPhysicsProvenance:
         # stamping on REAL registry rows rather than synthetic ones.
         for r in SC.run_suite(only=["ps-scale", "immune-sink"])["rows"]:
             assert r["physics"], f"{r['group']} carries no physics provenance"
+
+
+# --------------------------------------------------------------------------- #
+# 5. Zero-width bands, and the two paths that must not disagree about them
+# --------------------------------------------------------------------------- #
+#
+# The defect these guard against, recorded in results/zero_width_bands.md:
+# ``vivum validate`` scored the breast kill panel 3 PASS / 3 FAIL while
+# results/kill_calibration_breast.md published 5 PASS / 1 FAIL, because the
+# scorecard and the report generator each decided SEPARATELY which band a drug
+# is scored against. Two of the scorecard's FAILs were rendered against
+# zero-width bands (0.1636-0.1636 and 0.0412-0.0412) built by taking a min-max
+# over a SINGLE literature row.
+class TestZeroWidthBands:
+    """A band with no width is not a bar. It must never produce a verdict."""
+
+    @pytest.mark.parametrize("predicted", [0.0, 0.0412, 0.1636, 0.5, 1.0, 1e9])
+    def test_a_degenerate_band_is_never_scored(self, predicted):
+        from tmesim.validation import kill_calibration as KC
+
+        t = KC.ratio_test(predicted, 0.0412, 0.0412)
+        assert t["verdict"] == SC.NOT_TESTABLE
+        assert t["verdict"] != SC.FAIL
+        assert t["degenerate"] is True
+        assert t["reason"], "a verdictless row must say why"
+
+    def test_a_real_interval_is_still_scored_both_ways(self):
+        from tmesim.validation import kill_calibration as KC
+
+        assert KC.ratio_test(0.5, 0.2, 0.8)["verdict"] == SC.PASS
+        assert KC.ratio_test(0.9, 0.2, 0.8)["verdict"] == SC.FAIL
+        assert KC.ratio_test(0.1, 0.2, 0.8)["verdict"] == SC.FAIL
+
+    def test_band_degeneracy_covers_crossed_and_non_finite_edges(self):
+        from tmesim.validation import kill_calibration as KC
+
+        assert KC.band_is_degenerate(0.3, 0.3) is True
+        assert KC.band_is_degenerate(float("nan"), 0.3) is True
+        assert KC.band_is_degenerate(float("inf"), 0.3) is True
+        assert KC.band_is_degenerate(0.2, 0.8) is False
+        # A crossed pair still encloses an interval and is tolerated, exactly
+        # as SC.classify tolerates reversed bounds.
+        assert KC.band_is_degenerate(0.8, 0.2) is False
+
+    def test_one_study_is_a_point_estimate_not_an_interval(self):
+        from tmesim.validation import kill_calibration as KC
+
+        bridge = {"n": 1, "rows": [{"pmid": "41422245", "fold": 25.0}],
+                  "fold_median": 25.0, "fold_min": 25.0, "fold_max": 25.0}
+        band = KC.bridge_to_kill_ratio_band(bridge, 1.0, 1.0, 1.0)
+        assert band["degenerate"] is True
+        assert band["n_rows"] == 1
+        s = KC.score_ratio_row(0.1503, specific_bridge=bridge, specific_band=band)
+        assert s["status"] == SC.NOT_TESTABLE
+        assert s["scored"] is False
+        assert "n=1" in s["reason"]
+
+    def test_the_broad_band_is_never_substituted_to_rescue_a_point_estimate(self):
+        # The honest fix must not become "widen the bar until it passes": the
+        # broad cross-tumour band is CONTEXT on a single-study row, never the
+        # scored band, even when the prediction would land inside it.
+        from tmesim.validation import kill_calibration as KC
+
+        one = {"n": 1, "fold_median": 25.0, "fold_min": 25.0, "fold_max": 25.0}
+        broad = {"n": 20, "fold_median": 4.0, "fold_min": 0.4, "fold_max": 25.0}
+        band = KC.bridge_to_kill_ratio_band(one, 1.0, 1.0, 1.0)
+        ctx = KC.bridge_to_kill_ratio_band(broad, 1.0, 1.0, 1.0)
+        s = KC.score_ratio_row(0.5, specific_bridge=one, specific_band=band,
+                               context_bridge=broad, context_band=ctx)
+        assert s["context_test"]["verdict"] == SC.PASS   # it WOULD have passed
+        assert s["status"] == SC.NOT_TESTABLE            # and it still is not scored
+        assert s["band"] is band and s["test"] is None
+
+    def test_two_studies_do_define_an_interval(self):
+        from tmesim.validation import kill_calibration as KC
+
+        bridge = {"n": 2, "fold_median": 33.0, "fold_min": 8.3, "fold_max": 58.0}
+        band = KC.bridge_to_kill_ratio_band(bridge, 1.0, 1.0, 1.0)
+        assert band["degenerate"] is False
+        s = KC.score_ratio_row(band["ratio_central"], specific_bridge=bridge,
+                               specific_band=band)
+        assert s["scored"] is True
+        assert s["status"] in (SC.PASS, SC.FAIL)
+
+    def test_the_kill_row_renderer_refuses_a_degenerate_band(self):
+        # Belt and braces: even if a caller hands _kill_rows a pre-computed
+        # verdict against a zero-width band, the renderer downgrades it.
+        t = {"predicted_ratio": 0.34, "lit_ratio_lo": 0.1636,
+             "lit_ratio_hi": 0.1636, "verdict": SC.FAIL, "direction": "outside",
+             "implied_fold": 3.77, "fold_lo": 7.5, "fold_hi": 7.5,
+             "scope": "drug:5-fluorouracil"}
+        rows = SC._kill_rows("g", "tissue", {"5-fluorouracil": t}, {}, ())
+        assert [r.status for r in rows] == [SC.NOT_TESTABLE]
+        assert rows[0].reason
+
+
+class TestBreastKillPanelCannotDiverge:
+    """The scorecard and the published report must render ONE decision.
+
+    Data-free: a synthetic ``res`` is fed to the real
+    ``build_ratio_section``, and the verdict the DOCUMENT would print is
+    compared cell-for-cell with the status ``vivum validate`` assigns. No
+    tissue, no PDE, no data_cache.
+    """
+
+    @staticmethod
+    def _fake_res():
+        kcb = SC._import_experiment("kill_calibration_breast")
+        # Ratios chosen to straddle the bands: whatever they score, the two
+        # paths have to score them the SAME.
+        per_drug = {}
+        for i, name in enumerate(kcb.DRUGS):
+            ratio = 0.05 + 0.06 * i
+            per_drug[name] = {
+                "ic50_uM": 1.0, "hill": 1.0,
+                "headline": {"ratio_exact": ratio, "implied_ic50_fold": 1.0 / ratio,
+                             "label": name, "c_bath_uM": 1.0},
+            }
+        return {"per_drug": per_drug}
+
+    def _section(self):
+        rep = SC._import_experiment("kill_calibration_breast_report")
+        return rep, rep.build_ratio_section(self._fake_res())
+
+    def test_document_verdict_matches_scorecard_status_for_every_drug(
+            self, monkeypatch):
+        rep, section = self._section()
+        kcb = SC._import_experiment("kill_calibration_breast")
+        res = self._fake_res()
+
+        monkeypatch.setattr(kcb, "run", lambda **kw: res)
+        monkeypatch.setattr(SC.os.path, "isdir", lambda p: True)
+        sc_rows = {r.label: r.status for r in SC._run_breast_kill_3d2d()}
+
+        assert set(sc_rows) == set(section)
+        for name, row in section.items():
+            line = rep.ratio_table_row(name, row)
+            cell = line.rsplit("|", 2)[1].replace("*", "")
+            doc_verdict = ("NOT TESTABLE" if "NOT TESTABLE" in cell
+                           else cell.strip())
+            assert doc_verdict == sc_rows[name], (
+                f"{name}: report says {doc_verdict!r}, scorecard says "
+                f"{sc_rows[name]!r} — the two paths have diverged again")
+
+    def test_no_scorecard_row_is_scored_against_a_zero_width_band(
+            self, monkeypatch):
+        from tmesim.validation import kill_calibration as KC
+
+        kcb = SC._import_experiment("kill_calibration_breast")
+        res = self._fake_res()
+        monkeypatch.setattr(kcb, "run", lambda **kw: res)
+        monkeypatch.setattr(SC.os.path, "isdir", lambda p: True)
+        for r in SC._run_breast_kill_3d2d():
+            if r.status in (SC.PASS, SC.FAIL):
+                lo = r.values["lit_ratio_lo"]
+                hi = r.values["lit_ratio_hi"]
+                assert not KC.band_is_degenerate(lo, hi), (
+                    f"{r.label} carries a verdict against a zero-width band")
+
+    def test_single_study_drugs_are_not_testable_not_failed(self, monkeypatch):
+        # Pins the specific rows the defect was found on. If new literature
+        # gives either drug a second study, this test SHOULD be updated -- and
+        # the panel tally with it.
+        _rep, section = self._section()
+        for name in ("paclitaxel", "5-fluorouracil"):
+            s = section[name]["scored"]
+            assert s["n_rows"] == 1
+            assert s["status"] == SC.NOT_TESTABLE
+            assert s["scored"] is False

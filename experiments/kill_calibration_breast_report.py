@@ -33,6 +33,7 @@ from tmesim.validation.kill_calibration import (  # noqa: E402
     p_hill,
     ratio_test,
     resistance_vector,
+    score_ratio_row,
     state_dependency,
 )
 
@@ -153,10 +154,6 @@ DRUG_LIT_SCOPE = {
 }
 
 
-def _verb(verdict: str) -> str:
-    return "passes" if verdict == "PASS" else "fails"
-
-
 def _fmt(x, n=4, dash="—"):
     if x is None:
         return dash
@@ -191,9 +188,21 @@ def solid_bridge() -> Dict:
 
 
 def build_ratio_section(res: Dict) -> Dict:
-    """Per-drug 3-D:2-D ratio test, using a drug-matched band where one
-    exists (doxorubicin, paclitaxel) and the broad cross-class 'solid' band
-    as context-only where none exists (cyclophosphamide, tamoxifen)."""
+    """Per-drug 3-D:2-D ratio test.
+
+    The PASS/FAIL/NOT-TESTABLE decision itself is NOT made here. It is made once,
+    in ``tmesim.validation.kill_calibration.score_ratio_row``, and stored on each
+    row under ``"scored"``. Both consumers of this function — ``render_markdown``
+    below, which writes ``results/kill_calibration_breast.md``, and
+    ``tmesim.validation.scorecard._run_breast_kill_3d2d``, which is what
+    ``vivum validate`` prints — render that one decision rather than re-deriving
+    it. They used to re-derive it separately and disagreed about this exact panel
+    (see ``results/zero_width_bands.md``).
+
+    The legacy keys (``band``, ``test``, ``testable``, ``band_is_drug_matched``,
+    ``band_solid``, ``test_solid``) are kept for existing readers, but
+    ``row["scored"]`` is the authoritative verdict.
+    """
     solid = solid_bridge()
     out = {}
     for name, d in res["per_drug"].items():
@@ -203,21 +212,76 @@ def build_ratio_section(res: Dict) -> Dict:
         specific = drug_specific_bridge(name)
         row = {"headline": headline, "c_bath": c_bath, "specific_bridge": specific,
                "solid_bridge": solid}
-        if specific is not None:
-            band = bridge_to_kill_ratio_band(specific, c_bath, ic50, hill)
-            row["band"] = band
-            row["test"] = ratio_test(headline["ratio_exact"], band["ratio_lo"], band["ratio_hi"])
-            row["testable"] = True
-            row["band_is_drug_matched"] = specific["n"] > 1  # n=1 has no spread
-        # always also compute against the broad band, for context / cross-check
+        band = (bridge_to_kill_ratio_band(specific, c_bath, ic50, hill)
+                if specific is not None else None)
         band_solid = bridge_to_kill_ratio_band(solid, c_bath, ic50, hill)
+
+        scored = score_ratio_row(headline["ratio_exact"],
+                                 specific_bridge=specific, specific_band=band,
+                                 context_bridge=solid, context_band=band_solid)
+        row["scored"] = scored
+
+        # --- legacy keys, derived FROM the shared decision, never beside it ---
+        if band is not None:
+            row["band"] = band
+            row["test"] = scored["test"] or ratio_test(
+                headline["ratio_exact"], band["ratio_lo"], band["ratio_hi"])
+        row["testable"] = bool(scored["scored"])
+        row["band_is_drug_matched"] = bool(scored["band_is_drug_matched"])
         row["band_solid"] = band_solid
-        row["test_solid"] = ratio_test(headline["ratio_exact"], band_solid["ratio_lo"], band_solid["ratio_hi"])
-        if specific is None:
-            row["testable"] = False
-            row["band_is_drug_matched"] = False
+        row["test_solid"] = scored["context_test"]
         out[name] = row
     return out
+
+
+#: Which drugs' OWN drug-matched/point bridge literature is itself breast tissue
+#: (docetaxel/epirubicin: new for this expansion; paclitaxel: already
+#: breast-specific in the original panel) vs cross-tumour-type (doxorubicin,
+#: cisplatin: reused GBM bands; 5-fluorouracil: the existing colorectal row) --
+#: so the table's own "drug-matched" label is accurate for each drug, not a
+#: copy-pasted assumption.
+BREAST_SPECIFIC_BRIDGE = frozenset({"paclitaxel", "docetaxel", "epirubicin"})
+
+
+def ratio_table_row(name: str, row: Dict) -> str:
+    """One markdown row of the §3 verdict table.
+
+    A module-level function rather than an inline loop body so that the
+    DOCUMENT's rendered verdict can be compared, in a data-free test, against
+    the verdict ``vivum validate`` prints for the same drug. Every branch here
+    RENDERS ``row["scored"]["status"]``; none of them decides it. The decision
+    is ``kill_calibration.score_ratio_row``'s, and the scorecard renders the
+    identical object — see ``results/zero_width_bands.md`` for what happened
+    when the two rendered separately-derived verdicts.
+    """
+    h = row["headline"]
+    s = row["scored"]
+    tissue_tag = ("breast-specific" if name in BREAST_SPECIFIC_BRIDGE
+                  else "cross-tumour-type")
+    if s["scored"]:
+        band = s["band"]
+        return (f"| {name} | 1xIC50 | **{h['ratio_exact']:.4f}** | "
+                f"{h['implied_ic50_fold']:.2f}x | drug-matched ({tissue_tag}, "
+                f"n={s['n_rows']}) | "
+                f"{band['fold_lo']:.1f}-{band['fold_hi']:.1f}x | "
+                f"**{s['status']}** |")
+    ctx = s["context_band"]
+    if s["n_rows"] == 1:
+        band = s["band"]
+        return (f"| {name} | 1xIC50 | {h['ratio_exact']:.4f} | "
+                f"{h['implied_ic50_fold']:.2f}x | "
+                f"single POINT only ({tissue_tag}, {band['fold_central']:.1f}x, "
+                f"n=1) -> ZERO-WIDTH band, nothing can pass it | "
+                f"{band['fold_lo']:.1f}-{band['fold_hi']:.1f}x | "
+                f"**{s['status']}** (context only, NOT a verdict: "
+                f"{s['context_test']['verdict']} vs the broad "
+                f"{ctx['fold_lo']:.1f}-{ctx['fold_hi']:.1f}x non-matched band) |")
+    return (f"| {name} | 1xIC50 | {h['ratio_exact']:.4f} | "
+            f"{h['implied_ic50_fold']:.2f}x | "
+            f"NONE drug-matched (broad 'solid' class shown for context) | "
+            f"{ctx['fold_lo']:.1f}-{ctx['fold_hi']:.1f}x | **{s['status']}** "
+            f"(context only: {s['context_test']['verdict']} vs the "
+            f"non-matched band) |")
 
 
 def build_state_dependency(res: Dict, name: str) -> List[Dict]:
@@ -318,9 +382,18 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
     cis_headline = pd_["cisplatin"]["headline"]
     plb_headline = pd_["palbociclib"]["headline"]
 
-    n_tested = sum(1 for v in ratio_section.values() if v["testable"])
-    verdicts = {n: v["test"]["verdict"] for n, v in ratio_section.items() if v["testable"]}
+    # "Testable" means SCORED — the shared decision in
+    # kill_calibration.score_ratio_row said a real interval exists. A drug whose
+    # only drug-matched study is a single point is NOT testable, however real
+    # that point is: a zero-width band is not an interval.
+    n_tested = sum(1 for v in ratio_section.values() if v["scored"]["scored"])
+    verdicts = {n: v["scored"]["status"] for n, v in ratio_section.items()
+                if v["scored"]["scored"]}
     n_drugs = len(DRUGS)
+    # Context-only verdicts against the broad non-drug-matched band. Quoted so a
+    # reader can see what the substitution WOULD have said; never a verdict.
+    pac_solid_t = ratio_section["paclitaxel"]["scored"]["context_test"]["verdict"]
+    fu_solid_t = ratio_section["5-fluorouracil"]["scored"]["context_test"]["verdict"]
 
     A("# Breast-cancer kill calibration: the 3-D:2-D ratio test, on the real Xenium section\n")
     A("**Breast-cancer analogue of `results/kill_calibration.md` (the GBM module) — same "
@@ -340,31 +413,36 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       f"don't change between tissues); docetaxel and epirubicin get NEW, genuinely "
       f"breast-specific bands built for this expansion (Dubois et al. 2017, PMID 29221130, "
       f"MDA-MB-231/SUM1315 TNBC spheroids); paclitaxel and 5-fluorouracil reuse existing "
-      f"single-point/single-row literature. Doxorubicin: ratio "
+      f"single-point/single-row literature, which turns out NOT to be testable at all "
+      f"(see the paclitaxel / 5-fluorouracil sentences below). Doxorubicin: ratio "
       f"**{dox_headline['ratio_exact']:.4f}** (implied fold "
       f"**{dox_headline['implied_ic50_fold']:.2f}x**) vs 1-19x (n=5, cross-tumour-type) — "
-      f"**{ratio_section['doxorubicin']['test']['verdict']}**. Cisplatin: ratio "
+      f"**{ratio_section['doxorubicin']['scored']['status']}**. Cisplatin: ratio "
       f"**{cis_headline['ratio_exact']:.4f}** (implied fold "
       f"**{cis_headline['implied_ic50_fold']:.2f}x**) vs the SAME GBM drug:cisplatin band "
       f"(n=5, cross-tumour-type, folds 0.4-6.0x) — **"
-      f"{ratio_section['cisplatin']['test']['verdict']}**. Docetaxel: ratio "
+      f"{ratio_section['cisplatin']['scored']['status']}**. Docetaxel: ratio "
       f"**{dtx_headline['ratio_exact']:.4f}** (implied fold "
       f"**{dtx_headline['implied_ic50_fold']:.2f}x**) vs its own NEW breast-specific band "
       f"(n=2, MDA-MB-231, folds 8.3-58x) — **"
-      f"{ratio_section['docetaxel']['test']['verdict'] if ratio_section['docetaxel']['testable'] and ratio_section['docetaxel']['band_is_drug_matched'] else ratio_section['docetaxel']['test_solid']['verdict']}**. "
+      f"{ratio_section['docetaxel']['scored']['status']}**. "
       f"Epirubicin: ratio **{epi_headline['ratio_exact']:.4f}** (implied fold "
       f"**{epi_headline['implied_ic50_fold']:.2f}x**) vs its own NEW breast-specific band "
       f"(n=2, MDA-MB-231/SUM1315, folds 1.0-76x) — **"
-      f"{ratio_section['epirubicin']['test']['verdict'] if ratio_section['epirubicin']['testable'] and ratio_section['epirubicin']['band_is_drug_matched'] else ratio_section['epirubicin']['test_solid']['verdict']}**. "
+      f"{ratio_section['epirubicin']['scored']['status']}**. "
       f"Paclitaxel: ratio **{pac_headline['ratio_exact']:.4f}** (implied fold "
       f"**{pac_headline['implied_ic50_fold']:.2f}x**); the one breast-specific point estimate "
-      f"(PMID 41422245, 25x, n=1) has no spread to test, so the formal verdict uses the broad "
-      f"cross-tumour band (0.4-25x, n=20) — **"
-      f"{ratio_section['paclitaxel']['test_solid']['verdict']}**. 5-fluorouracil: ratio "
+      f"(PMID 41422245, 25x, n=1) has no spread, so its min-max band is ZERO-WIDTH and nothing "
+      f"can land inside it — **{ratio_section['paclitaxel']['scored']['status']}**, not FAIL "
+      f"and not a pass borrowed from the broad non-drug-matched band (it would score "
+      f"{pac_solid_t} against that band; that is context, not a verdict). 5-fluorouracil: ratio "
       f"**{fu_headline['ratio_exact']:.4f}** (implied fold "
       f"**{fu_headline['implied_ic50_fold']:.2f}x**) vs its own single cross-tumour-type row "
-      f"(Koch et al., colorectal, fold=7.5, n=1, no spread) — formal verdict also falls back "
-      f"to the broad band — **{ratio_section['5-fluorouracil']['test_solid']['verdict']}**.\n>")
+      f"(Koch et al., colorectal, fold=7.5, n=1, no spread) — likewise zero-width, likewise "
+      f"**{ratio_section['5-fluorouracil']['scored']['status']}** "
+      f"({fu_solid_t} against the broad band, again context only). See "
+      f"`results/zero_width_bands.md` for why a single study is a point estimate rather than "
+      f"an interval, and why the broad band is not substituted for it.\n>")
     A(f"> **Cyclophosphamide, tamoxifen and vinorelbine cannot be tested at all — an honest "
       f"null, not a gap papered over.** A structured PubMed search (this report; see §1) found "
       f"ZERO published 3-D-vs-2-D spheroid/monolayer potency comparisons for any of the three, "
@@ -527,24 +605,29 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
       f"*'Transition from 2D monolayer to 3D spheroid culture markedly increased paclitaxel "
       f"resistance, with IC50 values elevated by roughly 25-fold.'* This is a single POINT "
       f"estimate across the three lines collectively (not a per-line range), so it cannot "
-      f"supply a band on its own — reported prominently, but the formal test uses the "
-      f"broader class band.\n")
+      f"supply a band on its own. Its min-max interval is ZERO-WIDTH, which no predicted "
+      f"ratio can land inside, so paclitaxel is reported **NOT TESTABLE** — not FAIL, and "
+      f"not re-scored against the broader class band. See `results/zero_width_bands.md`.\n")
     A(f"* **5-fluorouracil** (n={fu_b['n']}, cross-tumour-type — the SAME row already present "
       f"in the shared `LIT_2D3D` table, added for the GBM report's own context band, reused "
       f"here as a drug-matched-but-not-breast-specific single point): Koch J *et al.* PLoS "
       f"One 2021;16(1):e0244513 (PMID **33395433**), four colorectal lines, per-line folds "
       f"7.5 / 6.0 / 10.0 / 1.2, averaged fold **{fu_b['fold_median']:.1f}x** (the only drug in "
       f"that panel with a statistically significant averaged 3-D shift, p=0.027). A single "
-      f"point, not a range, so — like paclitaxel — the formal test falls back to the broad "
-      f"class band.\n")
+      f"point, not a range, so — like paclitaxel — its min-max interval is ZERO-WIDTH and "
+      f"5-fluorouracil is reported **NOT TESTABLE** rather than scored, here or by "
+      f"`vivum validate`. See `results/zero_width_bands.md`.\n")
     A(f"* **the broader 'solid tumours generally' band** (n={solid_b['n']}, reused verbatim "
       f"from `tmesim.validation.kill_calibration.LIT_2D3D`, the same 20-row cross-drug set "
       f"the GBM report assembled — byte-for-byte unmodified by this expansion): median fold "
       f"**{solid_b['fold_median']:.1f}x**, range **{solid_b['fold_min']:.1f}-"
-      f"{solid_b['fold_max']:.1f}x**. Used as the FORMAL test band for paclitaxel and "
-      f"5-fluorouracil (single points) and as CONTEXT ONLY (not a verdict) for "
-      f"cyclophosphamide, tamoxifen, vinorelbine and palbociclib, which have no band of their "
-      f"own at all.\n")
+      f"{solid_b['fold_max']:.1f}x**. Used as CONTEXT ONLY — never as a formal test band — "
+      f"for all six drugs that have no testable drug-matched interval: paclitaxel and "
+      f"5-fluorouracil (a single point each, zero-width) and cyclophosphamide, tamoxifen, "
+      f"vinorelbine and palbociclib (no band of their own at all). It spans "
+      f"{solid_b['fold_max'] / solid_b['fold_min']:.0f}x, which is most of the published "
+      f"range of 3-D:2-D effects for cytotoxics, so a 'pass' against it would carry almost "
+      f"no information about the drug it was borrowed for.\n")
     A("**Things that must not be glossed over.**\n")
     A("1. **Cyclophosphamide's absence is not a search-quality failure.** It is a pro-drug: "
       "the parent compound is not meaningfully cytotoxic in any cell-culture format (2-D or "
@@ -621,65 +704,37 @@ def render_markdown(res, anchors, absolute, ratio_section, fastpath,
     # (doxorubicin, cisplatin: reused GBM bands; 5-fluorouracil: the existing
     # colorectal row) -- so the table's own "drug-matched" label is accurate
     # for each drug, not a copy-pasted assumption.
-    BREAST_SPECIFIC_BRIDGE = {"paclitaxel", "docetaxel", "epirubicin"}
     for name in DRUGS:
-        row = ratio_section[name]
-        h = row["headline"]
-        tissue_tag = "breast-specific" if name in BREAST_SPECIFIC_BRIDGE else "cross-tumour-type"
-        # Formal PASS/FAIL uses a drug-matched band ONLY if that band has real
-        # spread (n>1); paclitaxel's and 5-fluorouracil's own literature is a
-        # single point (n=1), which cannot be tested against as an interval,
-        # so their formal verdicts fall back to the broad 'solid' class band
-        # too -- exactly like cyclophosphamide/tamoxifen, just with a real
-        # point to quote alongside it.
-        if row["testable"] and row["band_is_drug_matched"]:
-            band = row["band"]
-            t = row["test"]
-            A(f"| {name} | 1xIC50 | **{h['ratio_exact']:.4f}** | "
-              f"{h['implied_ic50_fold']:.2f}x | drug-matched ({tissue_tag}) | "
-              f"{band['fold_lo']:.1f}-{band['fold_hi']:.1f}x | **{t['verdict']}** |")
-        elif row["testable"] and not row["band_is_drug_matched"]:
-            band = row["band_solid"]
-            t = row["test_solid"]
-            A(f"| {name} | 1xIC50 | {h['ratio_exact']:.4f} | {h['implied_ic50_fold']:.2f}x | "
-              f"single POINT only ({tissue_tag}, {row['specific_bridge']['fold_median']:.1f}x, "
-              f"n=1, no spread to test) -> broad 'solid' class band used instead | "
-              f"{band['fold_lo']:.1f}-{band['fold_hi']:.1f}x | **{t['verdict']}** "
-              f"(vs the broad band; not a drug-matched verdict) |")
-        else:
-            band = row["band_solid"]
-            t = row["test_solid"]
-            A(f"| {name} | 1xIC50 | {h['ratio_exact']:.4f} | {h['implied_ic50_fold']:.2f}x | "
-              f"NONE drug-matched (broad 'solid' class shown for context) | "
-              f"{band['fold_lo']:.1f}-{band['fold_hi']:.1f}x | NOT TESTABLE "
-              f"(context only: {t['verdict']} vs the non-matched band) |")
+        A(ratio_table_row(name, ratio_section[name]))
     A("")
-    dox_t = ratio_section["doxorubicin"]["test"]["verdict"]
-    cis_t = ratio_section["cisplatin"]["test"]["verdict"]
-    dtx_row = ratio_section["docetaxel"]
-    dtx_t = dtx_row["test"]["verdict"] if dtx_row["testable"] and dtx_row["band_is_drug_matched"] else dtx_row["test_solid"]["verdict"]
-    epi_row = ratio_section["epirubicin"]
-    epi_t = epi_row["test"]["verdict"] if epi_row["testable"] and epi_row["band_is_drug_matched"] else epi_row["test_solid"]["verdict"]
-    pac_solid_t = ratio_section["paclitaxel"]["test_solid"]["verdict"]
-    fu_solid_t = ratio_section["5-fluorouracil"]["test_solid"]["verdict"]
-    n_pass = sum(1 for n in ("doxorubicin", "cisplatin", "docetaxel", "epirubicin",
-                             "paclitaxel", "5-fluorouracil")
-                if (ratio_section[n]["test"]["verdict"]
-                    if ratio_section[n]["testable"] and ratio_section[n]["band_is_drug_matched"]
-                    else ratio_section[n]["test_solid"]["verdict"]) == "PASS")
+    dox_t = ratio_section["doxorubicin"]["scored"]["status"]
+    cis_t = ratio_section["cisplatin"]["scored"]["status"]
+    dtx_t = ratio_section["docetaxel"]["scored"]["status"]
+    epi_t = ratio_section["epirubicin"]["scored"]["status"]
+    pac_solid_t = ratio_section["paclitaxel"]["scored"]["context_test"]["verdict"]
+    fu_solid_t = ratio_section["5-fluorouracil"]["scored"]["context_test"]["verdict"]
+    n_scored = sum(1 for r in ratio_section.values() if r["scored"]["scored"])
+    n_pass = sum(1 for r in ratio_section.values()
+                 if r["scored"]["status"] == "PASS")
     A(f"**VERDICT: partial generalisation across an expanded panel, not a clean sweep.** "
-      f"Of the 6 formally-testable drugs, **{n_pass}/6 land inside their comparison band** "
-      f"(PASS). Doxorubicin's verdict is **{dox_t}** against its own (cross-tumour-type) "
+      f"Of the {n_scored} formally-testable drugs, **{n_pass}/{n_scored} land inside their "
+      f"comparison band** (PASS). Doxorubicin's verdict is **{dox_t}** against its own "
+      f"(cross-tumour-type) "
       f"band — the strongest result in this section because it is the SAME molecule and the "
       f"SAME literature band the GBM report already used, just driven through different "
       f"measured tissue geometry. Cisplatin, whose molecule is likewise reused verbatim from "
       f"the GBM library, verdicts **{cis_t}** against that same GBM-assembled band. Docetaxel "
       f"and epirubicin get NEW, genuinely breast-specific bands built for this expansion — "
-      f"docetaxel verdicts **{dtx_t}**, epirubicin verdicts **{epi_t}**. Paclitaxel's own "
-      f"breast-specific data point (25x) has no spread to test against, but its ratio "
-      f"{_verb(pac_solid_t)} the broad cross-tumour band (0.4-25x) that its point estimate "
-      f"sits at the very top of. 5-fluorouracil's own single cross-tumour point (7.5x) "
-      f"{_verb(fu_solid_t)} the broad band too. Cyclophosphamide, tamoxifen and vinorelbine "
+      f"docetaxel verdicts **{dtx_t}**, epirubicin verdicts **{epi_t}**. Paclitaxel and "
+      f"5-fluorouracil are **NOT TESTABLE**, and the reason is not that no measurement exists "
+      f"but that ONE does: a single study (25x breast-specific for paclitaxel, 7.5x colorectal "
+      f"for 5-fluorouracil) is a point estimate, and its min-max band is zero-width, so no "
+      f"predicted ratio can land inside it. They are NOT re-scored against the broad "
+      f"cross-tumour band — that band would say {pac_solid_t} and {fu_solid_t} respectively, "
+      f"but it is the same non-drug-matched band the no-literature drugs below are explicitly "
+      f"refused a verdict on, and swapping it in is widening the bar until the drug passes. "
+      f"Both numbers are quoted as context and neither is a verdict "
+      f"(`results/zero_width_bands.md`). Cyclophosphamide, tamoxifen and vinorelbine "
       f"are honest nulls: the test the GBM report ran cannot be run on them at all with data "
       f"currently in the literature. Palbociclib's ratio is shown for completeness against "
       f"the broad band only — see §1 for why it is a genuine mechanism-category mismatch "

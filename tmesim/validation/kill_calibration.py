@@ -681,14 +681,61 @@ def state_breakdown(state: np.ndarray, pd_cfg: PDConfig) -> Dict:
 # --------------------------------------------------------------------------- #
 # 3. THE TEST
 # --------------------------------------------------------------------------- #
+#: A literature bridge needs at least this many independent measured rows before
+#: it defines an INTERVAL. One row is a point estimate, and a min-max over a
+#: single point collapses to a degenerate (zero-width) interval — see
+#: :func:`band_is_degenerate` and ``results/zero_width_bands.md``.
+MIN_ROWS_FOR_BAND = 2
+
+#: The verdict a degenerate band earns. Deliberately the same status the
+#: scorecard gives the GBM wick-in-needle IFP row: a bar nothing can PASS is the
+#: mirror of a bar nothing can FAIL, and neither is a verdict.
+NOT_TESTABLE = "NOT TESTABLE"
+
+DEGENERATE_BAND_REASON = (
+    "ZERO-WIDTH BAND — the literature interval collapsed to a single point "
+    "({lo:.4g}), so no continuous prediction can land inside it. A bar nothing "
+    "can pass is not a bar. This is the mirror of the defect for which the GBM "
+    "wick-in-needle IFP row is reported NOT TESTABLE (a bar nothing can fail), "
+    "and it is reported the same way. See results/zero_width_bands.md.")
+
+
+def band_is_degenerate(lit_ratio_lo: float, lit_ratio_hi: float) -> bool:
+    """True when the two band edges do not enclose any interval at all.
+
+    A band whose edges are equal (or crossed, or non-finite) is not an interval
+    and cannot be tested against: the set of predictions that satisfy it has
+    measure zero. This is the single place that judgement is spelled out, so
+    every band consumer inherits it rather than re-deriving it.
+    """
+    lo, hi = float(lit_ratio_lo), float(lit_ratio_hi)
+    if not (math.isfinite(lo) and math.isfinite(hi)):
+        return True
+    return not (min(lo, hi) < max(lo, hi))
+
+
 def ratio_test(predicted_ratio: float, lit_ratio_lo: float, lit_ratio_hi: float
                ) -> Dict:
     """Pass/fail: does the model's predicted 3D:2D kill ratio land in the
     literature-measured band?  Remember the direction: a SMALLER kill ratio is a
     LARGER 3-D penalty, so ``lit_ratio_lo`` corresponds to the LARGEST measured
-    fold shift."""
-    inside = bool(lit_ratio_lo <= predicted_ratio <= lit_ratio_hi)
-    if inside:
+    fold shift.
+
+    A DEGENERATE band (``lit_ratio_lo == lit_ratio_hi``, or crossed, or
+    non-finite) returns ``verdict = "NOT TESTABLE"`` with a stated ``reason``
+    and NEVER ``FAIL``. Scoring a continuous prediction against a single point
+    is not a test — it is a guaranteed failure dressed as one. The guard lives
+    here, in the only function that renders a 3-D:2-D verdict, so that no caller
+    can score against a zero-width band by forgetting to check.
+    """
+    degenerate = band_is_degenerate(lit_ratio_lo, lit_ratio_hi)
+    inside = bool(not degenerate and lit_ratio_lo <= predicted_ratio <= lit_ratio_hi)
+    reason = ""
+    if degenerate:
+        verdict = NOT_TESTABLE
+        direction = "not tested — the band is a point, not an interval"
+        reason = DEGENERATE_BAND_REASON.format(lo=float(lit_ratio_lo))
+    elif inside:
         verdict, direction = "PASS", "inside"
     elif predicted_ratio > lit_ratio_hi:
         verdict, direction = "FAIL", "model predicts a SMALLER 3-D penalty than measured"
@@ -697,7 +744,8 @@ def ratio_test(predicted_ratio: float, lit_ratio_lo: float, lit_ratio_hi: float
     return {"predicted_ratio": float(predicted_ratio),
             "lit_ratio_lo": float(lit_ratio_lo),
             "lit_ratio_hi": float(lit_ratio_hi),
-            "inside": inside, "verdict": verdict, "direction": direction}
+            "inside": inside, "verdict": verdict, "direction": direction,
+            "degenerate": bool(degenerate), "reason": reason}
 
 
 # --------------------------------------------------------------------------- #
@@ -1086,14 +1134,111 @@ def bridge_to_kill_ratio_band(bridge: Dict, c_bath: float, ic50: float,
     Note the inversion: the LARGEST fold shift gives the SMALLEST kill ratio.
     """
     lo_fold, hi_fold = float(bridge[key_lo]), float(bridge[key_hi])
+    ratio_hi = ic50_fold_to_kill_ratio(lo_fold, c_bath, ic50, hill)
+    ratio_lo = ic50_fold_to_kill_ratio(hi_fold, c_bath, ic50, hill)
     return {
-        "ratio_hi": ic50_fold_to_kill_ratio(lo_fold, c_bath, ic50, hill),
-        "ratio_lo": ic50_fold_to_kill_ratio(hi_fold, c_bath, ic50, hill),
+        "ratio_hi": ratio_hi,
+        "ratio_lo": ratio_lo,
         "ratio_central": ic50_fold_to_kill_ratio(bridge["fold_median"], c_bath,
                                                  ic50, hill),
         "fold_lo": lo_fold, "fold_hi": hi_fold,
         "fold_central": float(bridge["fold_median"]),
+        # Carried so a consumer can see WHY a band is untestable without
+        # re-deriving it: n is the number of measured rows behind the interval,
+        # and a band built from one row is a point by construction.
+        "n_rows": int(bridge.get("n", 0)),
+        "degenerate": band_is_degenerate(ratio_lo, ratio_hi),
     }
+
+
+def score_ratio_row(predicted_ratio: float, *,
+                    specific_bridge: Optional[Dict] = None,
+                    specific_band: Optional[Dict] = None,
+                    context_bridge: Optional[Dict] = None,
+                    context_band: Optional[Dict] = None) -> Dict:
+    """THE decision: which band, if any, a 3-D:2-D row is formally scored against.
+
+    This exists because the same scored quantity used to be decided in two
+    places — ``experiments/kill_calibration_breast_report.render_markdown`` and
+    ``validation.scorecard._run_breast_kill_3d2d`` — and they disagreed about
+    the breast panel (5 PASS / 1 FAIL published, 3 PASS / 3 FAIL from the
+    shipping tool). Both consumers now call this and render what it returns;
+    neither re-derives a verdict. See ``results/zero_width_bands.md``.
+
+    The rule, and why:
+
+    * **No drug-matched literature at all** → ``NOT TESTABLE``. Unchanged; this
+      is how cyclophosphamide, tamoxifen, vinorelbine and palbociclib are
+      already reported.
+    * **Drug-matched literature with fewer than :data:`MIN_ROWS_FOR_BAND` rows**
+      (i.e. a single study) → ``NOT TESTABLE``. One study is a point estimate,
+      not an interval; a min-max over it is zero-width. The row is NOT silently
+      re-scored against the broad cross-tumour-type ``solid`` band instead,
+      because that band is *the same non-drug-matched band* the four drugs above
+      are explicitly refused a verdict on, and substituting it would be widening
+      the bar until the drug passes.
+    * **A degenerate band from any other cause** (edges equal after the
+      fold→ratio mapping saturates, non-finite edges) → ``NOT TESTABLE``, same
+      reason.
+    * **Otherwise** → the drug-matched band is scored by :func:`ratio_test`.
+
+    ``context_band`` / ``context_bridge`` (the broad ``solid`` class) are
+    evaluated and returned for CONTEXT on every row, and are never the scored
+    band. A context verdict is not a verdict.
+    """
+    n_rows = int((specific_bridge or {}).get("n", 0))
+    context_test = None
+    if context_band is not None:
+        context_test = ratio_test(predicted_ratio, context_band["ratio_lo"],
+                                  context_band["ratio_hi"])
+
+    out = {
+        "predicted_ratio": float(predicted_ratio),
+        "n_rows": n_rows,
+        "band": specific_band,
+        "test": None,
+        "status": NOT_TESTABLE,
+        "scored": False,
+        "band_is_drug_matched": False,
+        "reason": "",
+        "context_band": context_band,
+        "context_test": context_test,
+        "context_bridge": context_bridge,
+    }
+
+    if specific_bridge is None or specific_band is None or n_rows < 1:
+        out["reason"] = (
+            "NO MEASURED TARGET EXISTS — no published 3-D-vs-2-D potency "
+            "comparison for this drug in any tumour type. The broad "
+            "cross-tumour-type band is reported for context only and is "
+            "deliberately NOT scored.")
+        return out
+
+    if n_rows < MIN_ROWS_FOR_BAND:
+        out["reason"] = (
+            f"SINGLE-STUDY BAND (n={n_rows}) — the only drug-matched "
+            f"measurement is a point estimate "
+            f"({specific_band['fold_central']:.4g}x fold shift), so the min-max "
+            f"interval is zero-width "
+            f"({specific_band['ratio_lo']:.4f}-{specific_band['ratio_hi']:.4f}) "
+            f"and no prediction can land inside it. Reported NOT TESTABLE "
+            f"rather than FAIL, and NOT re-scored against the broad "
+            f"cross-tumour-type band, which is the same non-drug-matched band "
+            f"the no-literature drugs in this panel are explicitly refused a "
+            f"verdict on. See results/zero_width_bands.md.")
+        return out
+
+    test = ratio_test(predicted_ratio, specific_band["ratio_lo"],
+                      specific_band["ratio_hi"])
+    out["test"] = test
+    if test["verdict"] == NOT_TESTABLE:
+        out["reason"] = test["reason"]
+        return out
+
+    out["status"] = test["verdict"]
+    out["scored"] = True
+    out["band_is_drug_matched"] = True
+    return out
 
 
 # --------------------------------------------------------------------------- #

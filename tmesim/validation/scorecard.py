@@ -1156,21 +1156,35 @@ def _kill_rows(group: str, tissue_note: str, tests: Dict, per_drug: Dict,
     override those rows would print "PMID n/a", which for an external-anchor
     scorecard is not a cosmetic defect.
     """
+    from .kill_calibration import band_is_degenerate
+
     rows: List[Row] = []
     for name in sorted(tests):
         t = tests[name]
         d = per_drug.get(name, {})
-        status = PASS if t["verdict"] == PASS else FAIL
+        # A degenerate (zero-width) band is refused a verdict here as well as in
+        # kill_calibration.ratio_test, so that NO path into this renderer — GBM,
+        # breast, or one added later — can print PASS/FAIL against a bar nothing
+        # can pass. Same treatment the GBM wick-in-needle IFP row gets for the
+        # mirror defect, a bar nothing can fail.
+        degenerate = (bool(t.get("degenerate"))
+                      or t.get("verdict") == NOT_TESTABLE
+                      or band_is_degenerate(t["lit_ratio_lo"], t["lit_ratio_hi"]))
+        status = (NOT_TESTABLE if degenerate
+                  else (PASS if t["verdict"] == PASS else FAIL))
         matched = t.get("scope", "")
         note = f"literature scope used: {matched}"
         if matched == "solid":
             note += (" — NO drug-matched 3-D:2-D band exists, so this falls back "
                      "to the broad cross-tumour-type cytotoxic band")
-        if t["verdict"] != PASS:
+        if t["verdict"] not in (PASS, NOT_TESTABLE):
             note += f". {t['direction']}"
         note += f". {tissue_note}"
         rows.append(Row(
             group=group, label=name, status=status, scope=SCOPE_PDE,
+            reason=(t.get("reason") or
+                    "ZERO-WIDTH literature band: no prediction can land inside "
+                    "it, so no verdict is rendered.") if degenerate else "",
             quantity="predicted 3-D:2-D kill ratio on the real section "
                      "(delivery x cell-state resistance) vs MEASURED "
                      "spheroid-vs-monolayer IC50 fold shift",
@@ -1231,9 +1245,25 @@ def _run_gbm_kill_3d2d() -> List[Row]:
 def _run_breast_kill_3d2d() -> List[Row]:
     """Breast 3-D:2-D kill ratio on the real Janesick Xenium breast section.
 
-    Drugs with NO published 3-D-vs-2-D comparison in any tumour type are
-    reported NOT TESTABLE rather than scored against a non-drug-matched band —
-    an honest null, exactly as ``results/kill_calibration_breast.md`` reports it.
+    **This function decides nothing.** Which band a drug is scored against, and
+    whether it can be scored at all, is decided once by
+    ``kill_calibration.score_ratio_row`` and carried on
+    ``build_ratio_section(...)[drug]["scored"]``; the report generator that
+    writes ``results/kill_calibration_breast.md`` renders the same object. That
+    is deliberate: this function and that generator used to derive the verdict
+    separately and disagreed about this exact panel — the report published
+    5 PASS / 1 FAIL while ``vivum validate`` printed 3 PASS / 3 FAIL, two of the
+    FAILs against zero-width bands. See ``results/zero_width_bands.md``.
+
+    Two kinds of NOT TESTABLE reach this scorecard, and they are different
+    facts about the literature:
+
+    * **No published 3-D-vs-2-D comparison in any tumour type** (cyclophosphamide,
+      tamoxifen, vinorelbine, palbociclib) — no measured target exists.
+    * **Exactly one published comparison** (paclitaxel, 5-fluorouracil) — a
+      measured target exists but it is a POINT, and a min-max over one point is a
+      zero-width interval. Not re-scored against the broad non-drug-matched band,
+      which is the same band the four drugs above are refused a verdict on.
     """
     kcb = _import_experiment("kill_calibration_breast")
     rep = _import_experiment("kill_calibration_breast_report")
@@ -1248,38 +1278,51 @@ def _run_breast_kill_3d2d() -> List[Row]:
     for name in sorted(section):
         row = section[name]
         h = row["headline"]
-        if not row.get("testable"):
+        s = row["scored"]
+        if not s["scored"]:
+            band = s["band"]
+            ctx = s["context_test"]
+            measured = "NONE"
+            if band is not None:
+                measured = (f"a single measured point, fold "
+                            f"{band['fold_central']:.4g}x -> zero-width ratio "
+                            f"band {band['ratio_lo']:.4f}-{band['ratio_hi']:.4f}")
+            reason = s["reason"]
+            if ctx is not None:
+                reason += (f" For context only, and NOT a verdict: against the "
+                           f"broad non-drug-matched 'solid' band "
+                           f"({s['context_band']['fold_lo']:.4g}-"
+                           f"{s['context_band']['fold_hi']:.4g}x, n="
+                           f"{s['context_band']['n_rows']}) this ratio would "
+                           f"score {ctx['verdict']}.")
             rows.append(Row(
                 group="breast-kill-3d2d", label=name, status=NOT_TESTABLE,
                 scope=SCOPE_PDE,
                 quantity="predicted 3-D:2-D kill ratio vs MEASURED "
                          "spheroid-vs-monolayer IC50 fold shift",
                 predicted=f"ratio {h['ratio_exact']:.4f}",
-                measured="NONE",
-                pmids=(), bar="n/a",
-                reason="NO MEASURED TARGET EXISTS. A structured PubMed search "
-                       "found ZERO published 3-D-vs-2-D spheroid/monolayer "
-                       "potency comparisons for this drug in ANY tumour type. "
-                       "Its predicted ratio is reported for completeness and is "
-                       "deliberately NOT scored against the broad, "
-                       "non-drug-matched band "
-                       "(results/kill_calibration_breast.md).",
+                measured=measured,
+                # The predicted ratio IS a solver output — the row is
+                # verdictless because no bar exists, not because nothing ran —
+                # so the delivery law is declared rather than stamped "not
+                # applicable".
+                physics=physics_label(repo_default_exchange()),
+                pmids=tuple(_rows_pmids(row.get("specific_bridge"))), bar="n/a",
+                reason=reason,
                 conditional=("alpha-fit", "gdsc-potency"),
-                values={"predicted_ratio": float(h["ratio_exact"])},
+                values={"predicted_ratio": float(h["ratio_exact"]),
+                        "n_literature_rows": int(s["n_rows"])},
             ))
             continue
-        t = row["test"]
-        t = dict(t)
+        t = dict(s["test"])
         t.setdefault("scope", f"drug:{name}")
-        t["fold_lo"] = row["band"]["fold_lo"]
-        t["fold_hi"] = row["band"]["fold_hi"]
+        t["fold_lo"] = s["band"]["fold_lo"]
+        t["fold_hi"] = s["band"]["fold_hi"]
         t["implied_fold"] = h.get("implied_ic50_fold", float("nan"))
         rows.extend(_kill_rows(
             "breast-kill-3d2d",
             "Real untreated Janesick Xenium breast section (PMID 38114474), "
-            "dx = 12 um, 6 h window."
-            + ("" if row.get("band_is_drug_matched")
-               else " Single-row band (n=1): no spread to test against."),
+            f"dx = 12 um, 6 h window. Drug-matched band, n={s['n_rows']}.",
             {name: t}, res["per_drug"],
             ("alpha-fit", "gdsc-potency", "untreated-section"),
             pmids={name: _rows_pmids(row.get("specific_bridge"))},
