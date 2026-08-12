@@ -12,7 +12,72 @@
 > of *unit*, not of physics — the dose-matched, geometry-only effect on coverage is
 > <= 0.0166). To recover the old numbers, re-run with `mode='kde'`.
 >
-> **The conclusion of this report is essentially invariant to the promotion, which is the informative result.** P(cisplatin = rank 1) **0.927 -> 0.931**, P(cisplatin > doxorubicin) **0.955 -> 0.958**, P(top-2 set = {cisplatin, doxorubicin}) **0.565 -> 0.563**; most destabilising input still `IC50 x (cisplatin)` (swing 0.167 -> 0.161). The ordering **cisplatin > doxorubicin > lomustine > methotrexate > temozolomide** is identical at both dx = 15 and dx = 12 µm and in all 40 outer draws. This is what the ranking being dose-invariant looks like: a 3.36x change in the absolute exposure unit moves the decision probabilities by <= 0.004. **Caveat on the prose:** `KDE bandwidth` is still listed as a swept input; that label is now inaccurate (the run used the discrete segmented source) but it is baked into `tmesim/validation/ranking_robustness.py`, which this pass was not permitted to edit. Its influence is nil either way (swing 0.005).
+> **The conclusion of this report is essentially invariant to the promotion, which is the informative result.** P(cisplatin = rank 1) **0.927 -> 0.931**, P(cisplatin > doxorubicin) **0.955 -> 0.958**, P(top-2 set = {cisplatin, doxorubicin}) **0.565 -> 0.563**; most destabilising input still `IC50 x (cisplatin)` (swing 0.167 -> 0.161). The ordering **cisplatin > doxorubicin > lomustine > methotrexate > temozolomide** is identical at both dx = 15 and dx = 12 µm and in all 40 outer draws. This is what the ranking being dose-invariant looks like: a 3.36x change in the absolute exposure unit moves the decision probabilities by <= 0.004. **Caveat on the prose:** `KDE bandwidth` is still listed as a swept input; that label is now inaccurate (the run used the discrete segmented source) but it is baked into `tmesim/validation/ranking_robustness.py`, which this pass was not permitted to edit. Its influence is nil either way (swing 0.005). **That invariance is to a COMMON-MODE perturbation — a 3.36x change in the shared exposure unit, which moves every drug together. It does NOT generalise to a drug-specific one; see the conditional-retraction notice immediately below.**
+
+> ### ⚠ CONDITIONAL RETRACTION — the DECISION-GRADE verdict does not survive a corrected delivery law
+>
+> **What is published in this report:** on the shipped default transport path,
+> `P(cisplatin = rank 1) = 0.931` (90% CI 0.929–0.934) with the runner-up
+> doxorubicin at 0.041 (CI ≤ 0.043), which meets the bar §1 pre-declares
+> (leader entirely above 0.90, runner-up entirely below 0.10). That remains the
+> literal output of the shipped default, and it is not retracted as arithmetic.
+>
+> **What it becomes under bounded physics.** The default vascular source is a
+> ONE-WAY leak, `S = PS*Cp`, with no path back from interstitium to blood, so
+> tissue concentration is unbounded above the plasma level — on this GBM panel
+> **5 of 11 drugs are predicted above plasma** (cisplatin 2.71x), which passive
+> delivery cannot do. Re-run with the physically correct gradient-driven form
+> `S = PS*(Cp - C)` (`PDEConfig(transvascular_exchange=True)`, opt-in and
+> OFF by default), this module's own Monte-Carlo panel gives:
+>
+> | statistic | one-way (published) | exchange |
+> |---|---:|---:|
+> | P(cisplatin = rank 1) | 0.9277 | **0.3965** |
+> | P(doxorubicin = rank 1) | 0.0430 | **0.5586** |
+>
+> The modal order reverses and **the pre-declared decision-grade bar is met OFF
+> and destroyed ON**. (The re-validation's own OFF arm, 0.9277, reproduces the
+> 0.931 reported below; it reproduced the published baseline before comparing.)
+>
+> **It is not a near-tie and not a mesh artefact.** On the nominal panel the
+> kill-rank correlation stays high (Spearman **+0.9273**, Kendall **+0.8222**)
+> and the ordering still breaks: **top-1 changes cisplatin → vincristine**, the
+> top-3 set changes, 4 of 45 pairs swap, and two of those cross gaps of
+> **40.5% and 35.6% of the leader's kill** against a Bernoulli sd of ~0.003 —
+> roughly 50-sigma reversals. Refining the grid does not remove it: the
+> decisive cisplatin/doxorubicin swap persists at dx = 8 um (0.2335 vs 0.2547,
+> versus 0.2311 vs 0.2547 at dx = 12 um).
+>
+> **Why no prior in §3 and no constant could have caught it.** The attenuation
+> is `(clearance+binding)/(PS + clearance+binding)`, and PS is driven by
+> `bbb_penetrance`, which spans **47x** across the GBM panel; AUC ON/OFF runs
+> from 0.228 (cisplatin) to 0.975 (vincristine). This is a **differential
+> re-weighting by permeability**, not a global rescale, so it is exactly the
+> class of perturbation the shared-nuisance argument in §3.1 does *not* protect
+> the order against. Every historical robustness result for this ranking — to
+> alpha, to the 3.36x KDE→discrete source change, to the cell-state route — was
+> common-mode.
+>
+> **Name the quantity.** DELIVERY-rank invariance does not imply KILL-rank
+> invariance. On the breast panel the AUC ranking is perfectly preserved between
+> the two delivery laws (rho = **1.000**) while the kill ranking scrambles
+> (rho = **0.830**), because the Hill map saturates: drugs on the plateau lose
+> almost no kill when AUC drops, drugs on the steep limb lose most of theirs.
+> Every rank probability in this report is about **kill**.
+>
+> **What this notice is conditional on.** The exchange arm, not a fitted
+> parameter — the corrected form introduces no new parameter, is the same source
+> minus a first-order loss at the same rate, and reproduces its closed-form
+> steady state to 6.3e-15. But every exchange-ON number above is itself
+> conditional on the transvascular rate scale `PS_SCALE_S_INV`
+> (`tmesim/treatment/drugs.py`, default **1.0**, calibrated **0.16122 1/s**),
+> an implicit and so far uncalibrated factor of exactly 1 s^-1 that both arms
+> inherit. A calibrated scale would move the exchange column.
+>
+> Full evidence and the eleven-module sweep it belongs to:
+> [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md)
+> §4.1. Do not quote a top-1 drug from this report in external material without
+> the condition attached.
 
 **Module:** `tmesim/validation/ranking_robustness.py` (run: `python -m tmesim.validation.ranking_robustness`)
 
@@ -30,7 +95,9 @@ On the real 10x Xenium GBM section, propagating the reconstruction, calibration 
 * **P(top-2 set = {cisplatin, doxorubicin}) = 0.563 ± 0.003** (90% CI 0.558–0.568)
 * **P(the full published order holds) = 0.288 ± 0.003**
 
-> **The top-1 call IS decision-grade.** `cisplatin` holds rank 1 with probability 0.931 (90% CI 0.929–0.934), the runner-up `doxorubicin` never gets within reach (0.041, CI ≤ 0.043), and the two intervals do not overlap. The pre-declared bar (leader CI entirely above 0.90, runner-up entirely below 0.10) is met.
+> **The top-1 call IS decision-grade *within the priors of §3, on the shipped one-way delivery law*.** `cisplatin` holds rank 1 with probability 0.931 (90% CI 0.929–0.934), the runner-up `doxorubicin` never gets within reach (0.041, CI ≤ 0.043), and the two intervals do not overlap. The pre-declared bar (leader CI entirely above 0.90, runner-up entirely below 0.10) is met.
+>
+> **It is NOT decision-grade against the delivery law itself, which is not one of the priors sampled here.** Under the corrected gradient-driven source the same panel gives P(cisplatin = rank 1) = **0.3965** and P(doxorubicin = rank 1) = **0.5586**: the bar is destroyed and the modal order reverses. This is a KILL ranking; the delivery (AUC) ranking is far more stable than it. See the conditional-retraction notice at the top of this file and [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §4.1.
 
 **The top-2 SET is also not decision-grade at the 0.90 bar** (0.563, 90% CI 0.558–0.568). See §4 for which set competes.
 
@@ -238,12 +305,14 @@ The Monte Carlo runs at dx = 15 µm / dt = 20 s / convection off for affordabili
 
 **The order is identical at both resolutions** (cisplatin > doxorubicin > lomustine > methotrexate > temozolomide), and the cisplatin−doxorubicin gap moves from +0.1646 to +0.1735. The instability reported above is therefore *parameter* uncertainty, not a mesh artifact — which is the point: refining the grid will not fix it.
 
+**Nor is the reordering under a corrected delivery law a resolution artifact**, which was checked separately and against an explicit prediction that failed. Exchange introduces a perivascular length scale `sqrt(D_eff/(PS + clearance + binding))` that collapses to ~15–17 µm for `bbb_penetrance` ≳ 0.6, and dx = 12 µm was predicted to be inadequate and to be inflating the ON-arm values. Swept at dx = 12 / 10 / 8 µm on this section, the ON-arm ratios move **UP** by only **1.3–2.6%** (lomustine +1.9%, carmustine +1.4%, procarbazine +1.8%, ribociclib +2.6%, cisplatin +1.3%), with a low-permeability doxorubicin control flat at −0.2%; kills move +1.0% to +2.0%. The cisplatin/doxorubicin swap persists at dx = 8 µm (0.2335 vs 0.2547). → [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §5.
+
 ---
 
 ## 7. What this does and does NOT establish
 
 1. **These are probabilities over EXPERT PRIORS, not a validated predictive distribution.** No outcome label exists for this section — it is an untreated resection with no measured response to any of the five drugs. `P(cisplatin is rank 1) = 0.93` means *the model's own ranking is that stable inside the priors declared in §3*. It is NOT a claim that cisplatin is the best drug for this patient 93% of the time.
-2. **Model-form error is not in these bars, and is plausibly the largest term.** Every draw is computed inside one fixed structure: a first-order `k = clearance + binding` sink, `D_eff = D·(1 − α·ECM)`, a KDE-smoothed endothelial density standing in for a vessel network never imaged, a Hill kill on AUC, plasma-averaged delivery, and no efflux transporters. If that structure is wrong, no amount of parameter sampling detects it. `results/vessel_network_impact.md` shows the KDE→discrete-vessel swap alone moves doxorubicin's coverage by −0.017 dose-controlled (−0.586 naively) — a structural move that no prior in §3 can produce.
+2. **Model-form error is not in these bars, and is plausibly the largest term — and it has now been demonstrated, not merely warned about.** Every draw is computed inside one fixed structure: a first-order `k = clearance + binding` sink, `D_eff = D·(1 − α·ECM)`, a KDE-smoothed endothelial density standing in for a vessel network never imaged, a Hill kill on AUC, plasma-averaged delivery, and no efflux transporters. If that structure is wrong, no amount of parameter sampling detects it. `results/vessel_network_impact.md` shows the KDE→discrete-vessel swap alone moves doxorubicin's coverage by −0.017 dose-controlled (−0.586 naively) — a structural move that no prior in §3 can produce. **One item on that list has since been shown wrong and fixed behind a flag:** the delivery source is a one-way leak with no back-flux, and correcting it takes P(cisplatin = rank 1) from 0.9277 to **0.3965** — a structural move an order of magnitude larger than the widest prior sampled here, and the reason the top-of-file notice exists.
 3. **Every drug's exposure rides on ONE anchor.** α is fitted to a single doxorubicin penetration measurement in a different tumour model. Its 0.5×–2× prior is a judgement about how far that anchor transfers, not a meta-analysis. If it does not transfer, the whole distribution translates.
 4. **Absolute kills are an upper bound.** `uniform` mode models no intrinsic per-cell resistance for any drug. That is what makes the ranking fair; it also means no absolute kill here should be quoted as an expected response.
 5. **One section, one segmentation, no replicate.** Section-to-section and patient-to-patient variability is entirely absent. This is uncertainty *within one measured tumour*.
@@ -251,7 +320,7 @@ The Monte Carlo runs at dx = 15 µm / dt = 20 s / convection off for affordabili
 
 ## 8. What measurement would actually settle the top-1 call
 
-The top-1 call already clears the bar in scenario B. The measurement that would make it robust to the STRESS scenario (C), where P(cisplatin = rank 1) falls to 0.587, is the same one listed below: a patient-specific potency readout.
+The top-1 call clears the bar in scenario B **on the one-way delivery law only**; under gradient-driven exchange it does not clear it at all (0.3965). Two different measurements are therefore needed, and they are on different axes. On the POTENCY axis, the measurement that would make the call robust to the STRESS scenario (C), where P(cisplatin = rank 1) falls to 0.587, is the patient-specific potency readout listed below. On the DELIVERY axis, no prior sampled here reaches the question at all: the delivery law's *form* is now corrected (opt-in), but its *value* is not — PS is `bbb_penetrance`, which is perfectly confounded with `vascular_density` (scaling either by f gives a bit-identical PS field), and it carries an uncalibrated rate scale (`PS_SCALE_S_INV`, default 1.0, calibrated 0.16122 1/s). Separating those needs an independent absolute permeability or perfusion measurement this project does not have.
 
 The ranking is decided by **delivery × potency**, and the two candidates sit at opposite ends of both axes — cisplatin has ~157× the mean AUC and ~49× the IC50 of doxorubicin. So the useful measurements are, in order of decisiveness:
 

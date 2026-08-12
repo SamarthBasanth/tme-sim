@@ -286,6 +286,7 @@ that work.
 | **Delivery / partition magnitude, in human glioma** | **VALIDATED, with an error budget** | Scored against **125 human glioma tissue samples across 42 patients** plus 27 PMID-anchored regional PK measurements: 5/6 drugs within 10×, 4/6 within 3×; aggregate bias 2.02×, but **1.01× — essentially unbiased — excluding one outlier**. Cross-drug ordering: measured penetrant-vs-excluded separation **4.66×**, model predicts **3.65×** from structure alone. → [`results/glioma_regional_pk.md`](results/glioma_regional_pk.md) |
 | **Regional (CE vs non-enhancing) ordering** | **FAILS** | Measured contrast-enhancing vs non-enhancing separation is **1.45×–4.26×** (p < 0.0001, within-patient permutation); the model predicts exactly **1.00×**, because there is **no barrier-integrity term anywhere in it**. The validation derived the fix from the data: a multiplicative barrier cannot work (3.2× spread across drugs) but an **additive leak is drug-independent to within 1.3×** (L = 0.211 / 0.230 / 0.272 across three independent studies), giving `source = vascular_density · (bbb_penetrance + L · bbb_disruption) · plasma`, **L ≈ 0.24** — the signature of size-nonselective paracellular opening. That term now exists in `tmesim/reconstruct/barrier.py` and is reachable via `treatment.drugs.delivery_source(..., bbb_disruption=...)`, but it is **opt-in and OFF by default** — passing `None` reproduces the pre-fix source exactly, so every shipped result still predicts 1.00×. |
 | **Spatial / vessel-relative claims** | **CONFOUNDED** | By our own vascular smoothing — correction 5 above. |
+| **The vascular delivery law itself** | **DEFECT FOUND; CORRECTED FORM IMPLEMENTED, OPT-IN, OFF BY DEFAULT** | The shipped source is a **one-way leak**, `S = PS·Cp`, with no path back from interstitium to blood, so steady-state tissue concentration is unbounded above the plasma level — and on the GBM flagship **5 of 11 drugs are predicted above plasma** (cisplatin **2.71×**, carmustine 2.54×, lomustine 1.39×, procarbazine 1.23×, temozolomide 1.14×), which passive delivery cannot do. The gradient-driven form `S = PS·(Cp − C)` is the same source minus a first-order loss at the same rate, needs **no new parameter**, and reproduces its closed-form steady state to **6.3e-15**; it is reachable as `PDEConfig(transvascular_exchange=True)` and is **off by default**, so every number shipped in this repo is still the one-way arm and is bit-for-bit unchanged. Turning it on moves absolute kills (temozolomide **−56%**, cisplatin **−77%**, doxorubicin **−3.5%**) **and changes the kill ranking** — see the two ranking bullets below. Separately, the PS field carries an implicit, uncalibrated rate scale of exactly 1 s⁻¹ (`tmesim/treatment/drugs.py::PS_SCALE_S_INV`, default **1.0**, calibrated value **0.16122 1/s**), so every exchange-on number anywhere in this repo is conditional on that scale as well. → [`results/transvascular_exchange_revalidation.md`](results/transvascular_exchange_revalidation.md) |
 | **Passive transport as a sufficient explanation of tissue partition** | **FALSIFIED, diagnostically** | On 6 matched human GIST tumour/normal imatinib MSI pairs the transport-only model gives 7.9× geometric-mean fold error vs 13.0× for the no-partitioning null — it beats the null by only ~1.6× and 4 of 5 liver pairs lie *below* the model's structural floor, so **no penetration length can reproduce them**. The missing physics is active hepatic uptake and lysosomal ion-trapping, neither of which is a diffusion process. → [`results/gist_imatinib.md`](results/gist_imatinib.md) |
 | **Predicted drug RESPONSE vs real patient outcomes** | **CANNOT BE VALIDATED with open data** | A 39-agent, 164-dataset sweep established that **no open dataset anywhere pairs measured spatial drug distribution with measured treatment response in the same tumour** — not one — and **no glioma + temozolomide spatial drug map exists at all** (METASPACE: zero). The experiment that would close the loop (the Agar/White adavosertib GBM platform) has **no accession**; it is a months-long collaboration request. → [`results/DATA_HUNT.md`](results/DATA_HUNT.md) |
 
@@ -303,12 +304,42 @@ that work.
   0.035 against a measured 0.0051) and all 6 drugs move inside the
   order-of-magnitude band. It makes two drugs *worse* — methotrexate and cefazolin
   carry disqualifying descriptors too — and the module says so.
-* **The top-1 drug call is probably not decision-grade.** Cisplatin (0.241) and
-  doxorubicin (0.231) differ by ~4%, well inside plausible parameter uncertainty.
-  Report it as a tie until shown otherwise.
+* **The top-1 drug call is not decision-grade, and it does not survive a change
+  of delivery law.** On the shipped one-way source, cisplatin (0.241) and
+  doxorubicin (0.231) differ by ~4%, well inside plausible parameter
+  uncertainty. Under gradient-driven exchange the pair **reverses** — cisplatin
+  0.2311 vs doxorubicin 0.2547 at dx = 12 µm, and 0.2335 vs 0.2547 at dx = 8 µm,
+  so it is not a mesh artefact — and on the full 11-drug GBM panel top-1 moves
+  **cisplatin → vincristine** with the top-3 set changing too. The Monte-Carlo
+  ranking panel that certified this call goes **P(cisplatin rank 1) 0.9277 →
+  0.3965** and P(doxorubicin rank 1) 0.0430 → 0.5586, which destroys that
+  module's own pre-declared decision-grade bar. Report the top of the panel as a
+  **set**, not a winner. →
+  [`results/transvascular_exchange_revalidation.md`](results/transvascular_exchange_revalidation.md)
+  §4.1, [`results/ranking_robustness.md`](results/ranking_robustness.md)
+* **"Ranking is invariant" is false as written, and a ranking claim has to name
+  the quantity it is about.** DELIVERY-rank invariance does not imply KILL-rank
+  invariance: on the breast panel the AUC ranking is *perfectly* preserved
+  across the two delivery laws (Spearman ρ = **1.000**) while the kill ranking
+  scrambles (ρ = **0.830**), because the Hill map saturates — drugs on the
+  plateau lose almost no kill when AUC drops, drugs on the steep limb lose most
+  of theirs. On GBM the kill-rank correlation is high (ρ = +0.9273, Kendall
+  +0.8222) and the top-1 still changes; 4 of 45 pairs swap, two of them across
+  gaps of 40.5% and 35.6% of the leader's kill against a Bernoulli sd of ~0.003.
+  No constant absorbs this: the attenuation is
+  `(clearance+binding)/(PS+clearance+binding)` and PS is driven by
+  `bbb_penetrance`, which spans **47×** across the GBM panel, so it is a
+  **differential re-weighting by permeability**, not a rescale. The ranking's
+  historical robustness (to α, to the 3.36× KDE→discrete source change, to the
+  cell-state route) does not generalise, because those perturbations were
+  common-mode and this one is drug-specific. →
+  [`results/transvascular_exchange_revalidation.md`](results/transvascular_exchange_revalidation.md)
+  §4.1
 * **Absolute kill fractions** are conditional on the sensitivity model, on the
-  single-anchor α, and on 2D geometry. Rankings are far more trustworthy than
-  absolutes; ratios more than either.
+  single-anchor α, on 2D geometry, and on the delivery law (temozolomide −56%,
+  cisplatin −77%, doxorubicin −3.5% under exchange). Ratios and same-tissue
+  comparisons are more trustworthy than absolutes — but see the two bullets
+  above for exactly where a ranking still breaks.
 
 Authoritative current state: [`results/SESSION_AUDIT.md`](results/SESSION_AUDIT.md).
 Every equation with its provenance:
@@ -334,7 +365,7 @@ data/real/  ─►  reconstruct/real_*  ─►  Microenvironment  ─►  physic
 | `tmesim.reconstruct` | Real tissue → real niche. `real_xenium` (threshold-gated marker typing, geometric tissue mask, per-cell sensitivity), `marker_panels` (panel-aware marker selection: `brain_319` vs `io_480`), `real_visium` (NNLS deconvolution vs the Darmanis atlas), `deconvolve`, `real_fields` (endothelial-KDE vasculature, matrix-transcript ECM, oxygen hand-off), `region_label` (Ivy GAP niche zones), `vessel_network` (the discrete-vessel replacement for the KDE, correction 5), `real_pipeline` (`reconstruct_real`, `apply_drug_sensitivity`, `reconstruction_report`). |
 | `tmesim.physics` | `diffusion` (convection–diffusion–reaction transport → `TransportResult`), `oxygen` (steady-state O₂ + hypoxia banding), `pressure` (interstitial fluid pressure and the Jain-effect velocity). |
 | `tmesim.cells` | `agents` (oxygen → cell state), `pkpd` (local drug AUC → Hill kill probability, modulated by sensitivity and state). |
-| `tmesim.treatment` | `drugs` — drug lookup, plasma PK profile, and the spatial delivery source (`vascular_density × bbb_penetrance × plasma`). |
+| `tmesim.treatment` | `drugs` — drug lookup, plasma PK profile, and the spatial delivery source (`vascular_density × bbb_penetrance × plasma`, a one-way leak by default; `exchange_coefficient` supplies the gradient-driven `PS·(Cp − C)` form used when `PDEConfig(transvascular_exchange=True)`), plus `PS_SCALE_S_INV`, the transvascular rate scale that is implicitly 1 s⁻¹ today. |
 | `tmesim.sim` | `engine.simulate_response` — the deterministic per-tissue integrator. |
 | `tmesim.validation` | The honesty layer, and where this project spends most of its code. **Internal:** `calibration` (the single α), `numerical_rigor`, `uncertainty`, `reconstruction_fidelity`, `vascular_validation`, `cellstate_validation`, `delivery_metrics` (the defensible replacements for `penetration_index`), `vessel_profile`, `ranking_robustness`. **Against real external measurements:** `pk_anchors` / `pk_multidrug` / `pk_reality` (tissue PK), `glioma_regional_pk` (human glioma partition), `gist_imatinib` (human GIST MSI), `gbm_tmz_exvivo` (GSE232173 — glioma + TMZ + measured ex-vivo response), `moncayo_explant` (HGSOC MALDI-MSI + GeoMx), `pharmacology_real` (GDSC vs HGCC). **Under construction:** `cellstate_validation`, `ranking_robustness`, `vessel_network_impact` — these have no entry point yet and produce nothing; see [`docs/REPRODUCE.md`](docs/REPRODUCE.md) §3. **Retired:** `experiment`, `baselines`, `metrics` — the synthetic-cohort harness. |
 | `tmesim.viz` | `plots`, `molecular_plots`, `explainer`, `patient_report`. |
@@ -364,8 +395,17 @@ the crux:
 The real panel makes the point concretely. Ranking by **AUC/IC50** reproduces the
 simulated kill ordering exactly: delivery spans **120×**, potency spans **1212×**,
 and the *product* decides. Doxorubicin is **49× more potent** than cisplatin, is
-**120× less delivered**, and loses. That trade-off is exactly the term a
-non-spatial model has no way to represent.
+**120× less delivered**, and — on the shipped one-way delivery law — loses. That
+trade-off is exactly the term a non-spatial model has no way to represent.
+
+It is also exactly why the *outcome* of that contest is not a fixed fact. The
+delivery axis is the fragile one: correcting the delivery law compresses the GBM
+panel's delivery spread from **386× to 90×** by re-weighting every drug by its
+own permeability, and this particular contest reverses (cisplatin 0.2311 vs
+doxorubicin 0.2547). The mechanism — delivery × potency, resolved in space — is
+the durable claim; the winner is not. →
+[`results/transvascular_exchange_revalidation.md`](results/transvascular_exchange_revalidation.md)
+§4.1
 
 ---
 
@@ -423,6 +463,7 @@ green throughout.
 | How do the pieces fit together? | [`docs/architecture.md`](docs/architecture.md) |
 | What open data exists to validate this, and what does not? | [`results/DATA_HUNT.md`](results/DATA_HUNT.md) |
 | How should I compare drugs? | [`results/delivery_metrics.md`](results/delivery_metrics.md) |
+| Does the drug ranking survive a corrected delivery law? | [`results/transvascular_exchange_revalidation.md`](results/transvascular_exchange_revalidation.md) — no, not the KILL ranking |
 | Is the solver trustworthy? | [`results/numerical_rigor.md`](results/numerical_rigor.md) |
 | Is the vasculature real? | [`results/vascular_validation.md`](results/vascular_validation.md) |
 | What did the synthetic era show? | [`archive/synthetic_era/README.md`](archive/synthetic_era/README.md) |

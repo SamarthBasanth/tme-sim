@@ -9,8 +9,13 @@
  * surgical use, AI or machine learning of any kind, "digital twin", or
  * personalised medicine for an individual patient. Absolute kill fraction
  * is not a defensible output; relative ranking on the same tissue and
- * spatial delivery attribution are. Every number that appears below must
- * be traceable to a real run or a real dataset count.
+ * spatial delivery attribution are. Ranking copy must name the QUANTITY
+ * being ranked and must never claim the ranking is invariant: correcting
+ * the transvascular delivery law preserves the delivery (AUC) ranking
+ * exactly on breast (rho = 1.000) while scrambling the kill ranking
+ * (rho = 0.830), and it changes the top pick on glioblastoma. See
+ * results/transvascular_exchange_revalidation.md section 4.1. Every number
+ * that appears below must be traceable to a real run or a real dataset count.
  */
 
 export interface SectionCopy {

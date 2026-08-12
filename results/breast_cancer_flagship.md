@@ -11,6 +11,52 @@
 - `tests/test_breast_drug_panel.py` — 23 new tests (all pass; full suite 552 passed, 0 failed, up from a 518-passed baseline — the extra 34 include 23 of mine and unrelated concurrent work in this shared checkout, `tests/test_gbmspace_adapter.py`, that this task did not touch and is not responsible for).
 - `tmesim/core`, `tmesim/physics`, `tmesim/sim`, `tmesim/molecular`'s existing GBM calibration, and `tmesim/reconstruct/real_pipeline.py` / `real_xenium.py` were **not modified**. `reconstruct_real()` was called exactly as GBM calls it.
 
+> ## SCOPE NOTICE — the delivery law under which every number here was produced
+>
+> Every AUC, kill and mechanism split in this report is on the shipped **one-way**
+> vascular source, `S = PS*Cp`, which has no path back from interstitium to blood
+> and so lets tissue concentration exceed the plasma level without bound. On the
+> breast panel **3 of 10 drugs are predicted above plasma**, which passive
+> delivery cannot do, and the defect was *found* on breast tissue: the model
+> missed a measured human microdialysis anchor by **12.8x too high (5-FU)** and
+> **10.5x too low (methotrexate)**, in opposite directions, so no calibration
+> constant could absorb it (`results/breast_kp_validation.md`).
+>
+> The physically correct form, `S = PS*(Cp - C)`, is implemented as
+> `PDEConfig(transvascular_exchange=True)` — **opt-in and OFF by default**, so
+> nothing below has changed — and reproduces its closed-form steady state to
+> 6.3e-15. What it does to breast results:
+>
+> * **Absolute delivery numbers are invalidated, not rescaled.** The breast
+>   panel's delivery spread goes **970x → 104x**, because the attenuation is
+>   `(clearance+binding)/(PS + clearance+binding)` and PS is drug-specific. The
+>   elasticity of AUC to PS is exactly **1.0000** under the one-way law for every
+>   drug and drops to **0.085–0.966** under exchange, so §4's "mean AUC is almost
+>   exactly proportional to vascular density" is a property of the one-way law,
+>   not of transport.
+> * **The KILL ranking is not preserved; the DELIVERY ranking is.** On the full
+>   10-drug breast panel (the grown panel described in §2's update note) top-1 survives
+>   (vinorelbine) but **the top-3 set changes and 7 of 45 pairs are discordant**,
+>   with kill-rank Spearman **rho = 0.830** — while the AUC ranking is *perfectly*
+>   preserved, **rho = 1.000**. The Hill map is what separates them: drugs on its
+>   plateau lose almost no kill when AUC drops, drugs on the steep limb lose most
+>   of theirs. Any ranking claim taken from this report must say which quantity it
+>   is about. The four drugs below span `bbb_penetrance` from **0.021**
+>   (doxorubicin) to **0.973** (cyclophosphamide) — that spread is exactly the
+>   axis along which exchange re-weights, so this panel is not exempt.
+> * **What survives.** The breast 3-D:2-D kill calibration holds (**5/6 PASS,
+>   docetaxel FAIL, zero flips**), and the reconstruction, marker-panel and
+>   mechanism-reconciliation results in this report do not touch the delivery law
+>   at all.
+> * **Not fixed by this.** Methotrexate does not improve on breast (0.10x → 0.09x
+>   of measured): its defect is the wrong permeability value, not the wrong law.
+>   And every exchange-on number quoted here is conditional on the transvascular
+>   rate scale `PS_SCALE_S_INV` (`tmesim/treatment/drugs.py`, default **1.0**,
+>   calibrated **0.16122 1/s**).
+>
+> → [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md)
+> §4.1 (ranking), §2 and §4.3 (levels), §5 (what the fix does not remove).
+
 **One-line summary.** Breast cancer now runs through the identical engine GBM does — real reconstruction, real calibrated transport physics, real GDSC-measured potency, real mechanism attribution — with **zero core-engine changes** and **one small, additive registry entry**. The 2D drug-transport simulation is real and de-risked (four drugs, one real tumor, bit-exact mechanism reconciliation on every drug). The genuinely new 3D reconstruction from the earlier registration task is real geometry but is **not** yet transportable: this report specifies exactly what 2D-only code would need to become 3D-capable, rather than forcing a fake 3D result.
 
 ---
@@ -116,6 +162,8 @@ Runtime: 222 s total for all four drugs at converged resolution (49–67 s each)
 
 Read plainly: doxorubicin and paclitaxel's low kill is mostly oxygen/hypoxia-gated resistance among cells that *did* get an adequate dose; cyclophosphamide's is almost entirely underdosing (consistent with its ~330× higher IC50 than doxorubicin — the tissue concentration achieved is real, it is simply not enough relative to that potency); tamoxifen's poor kill is dominated by delivery+dose shortfall with almost no resistance component (consistent with a modestly-potent SERM that is not, in this framework, being modelled as a direct high-potency cytotoxic). This is exactly the kind of interpretable, drug-specific story the mechanism module is built to produce, reproduced unmodified on a tissue it was never built for.
 
+**One structural caution on that story, from the same re-validation.** These splits are computed under the one-way source, and the exposure bands take precedence over the biology bands by design. When exposure falls below IC50 population-wide — which bounded physics produces for most of the GBM panel — RESISTANCE and CHANCE go to **exactly zero cells** and the decomposition degenerates to delivery-vs-dose. That is what happened to cisplatin on GBM, where the same table inverted from 96.42 % RESISTANCE to 95.71 % DOSE (`results/mechanism_attribution.md`). The four splits above have not been re-run under exchange, so treat the resistance columns specifically as conditional on the delivery law; the bit-exact reconciliation itself holds in every arm tested.
+
 `penetration_index` again does **not** separate the drugs meaningfully (0.204–0.398, driven mostly by vascular geometry, same finding the GBM panel already reported) — quote mean AUC or kill_fraction, not the index, exactly as the GBM report already instructs.
 
 ---
@@ -134,7 +182,7 @@ Doxorubicin's **structural** parameters — free diffusivity, `bbb_penetrance`, 
 
 The two numbers that should move only through ECM tortuosity — the analytic e-folding penetration length `L = sqrt(D_eff/k_eff)` (`pk_reality.penetration_length_um`, holding the drug's calibrated `k_eff` fixed, changing only `ecm_density`) — do exactly that, and only that: **L(GBM ecm=0.076) = 72.8 µm** vs **L(breast ecm=0.242) = 68.8 µm**, a **0.946× ratio**, matching `sqrt((1−0.6·0.242)/(1−0.6·0.076))` to 3 decimal places — i.e. **100% of the shift is the declared tortuosity term, nothing else moved.** Both land comfortably inside the same ~60–75 µm regime the calibration itself targets (the anchor is 64.9 µm), which is the honest reading: this is the *same drug, same calibrated physics*, translated onto denser, more fibrotic real tissue, and the transport physics degrades it by the amount that tortuosity term says it should — not more, not less.
 
-The larger, more interesting difference is delivery, not diffusion: breast's measured vascular density is 2.1× GBM's, `delivery_source` is linear in vascular density, and mean AUC came out 2.12× higher — almost exactly proportional. Kill rose 1.36×, less than proportional to AUC, because doxorubicin's kill is 80.6% resistance-limited on this tissue (§3) — more drug arriving does not convert 1:1 into more kill once resistance, not delivery, is the binding constraint. **None of this required touching a single calibrated constant.** It is what the frozen, doxorubicin-calibrated engine predicts when driven by two different tissues' own measured geometry, and the two ways it moves (tortuosity down, delivery up) are both independently explainable from measured inputs rather than from anything fit to this run.
+The larger, more interesting difference is delivery, not diffusion: breast's measured vascular density is 2.1× GBM's, `delivery_source` is linear in vascular density, and mean AUC came out 2.12× higher — almost exactly proportional. **That proportionality is a property of the one-way delivery law, not of transport:** the elasticity of AUC to PS is exactly **1.0000** for every drug under `S = PS*Cp` and falls to a drug-specific **0.085–0.966** under `S = PS*(Cp − C)`, because the back-flux is largest where the source is largest. Under bounded physics a 2.1× denser vascular field does not buy 2.1× the exposure, and the agreement below should be read as a check on the shipped source term rather than as a transport invariant. See the scope notice at the top. Kill rose 1.36×, less than proportional to AUC, because doxorubicin's kill is 80.6% resistance-limited on this tissue (§3) — more drug arriving does not convert 1:1 into more kill once resistance, not delivery, is the binding constraint. **None of this required touching a single calibrated constant.** It is what the frozen, doxorubicin-calibrated engine predicts when driven by two different tissues' own measured geometry, and the two ways it moves (tortuosity down, delivery up) are both independently explainable from measured inputs rather than from anything fit to this run.
 
 **Caveat, stated plainly.** `bbb_penetrance` is architecturally a blood-*brain*-barrier permeability term (CNS-MPO-style structure rules), reused here as a generic vascular-leak-in permeability factor because that is the physical role `delivery_source` gives it (`S = vascular_density · bbb_penetrance · plasma_conc`), not because breast capillaries are behind a real BBB. Real peripheral tumour capillaries are typically *more* permissive than the BBB (the EPR effect), so this term is a known, honestly-flagged approximation carried over from the GBM engine — it likely under-states delivery for a non-CNS tumour, in a direction that would make the breast kill numbers above conservative, not inflated. `core.DrugParams`'s frozen schema was not touched to relabel or fix this.
 
@@ -171,5 +219,6 @@ This is a clear, bounded, buildable next task (Domain schema + three stencil ext
 - **Zero core-engine changes**: `tmesim/core`, `tmesim/physics`, `tmesim/sim`, GBM's molecular calibration, and `real_pipeline.py`/`real_xenium.py`'s reconstruction logic are byte-for-byte untouched. Every simulated number above came from calling existing, frozen functions.
 - **Mechanism attribution reconciles bit-exact on every drug** — the same contract the GBM engine enforces, unmodified, holding on tissue it was never built for.
 - **Cross-cancer sanity check is genuinely quantitative, not just qualitative**: doxorubicin's penetration-length shift between the two tumours (0.946×) matches the declared ECM-tortuosity formula to 3 decimal places, with no unexplained residual.
+- **The delivery law under all of this is a one-way leak**, and the corrected gradient-driven form (opt-in, off by default) invalidates the absolute AUC/kill levels rather than rescaling them, and re-weights the panel by permeability: on the full 10-drug breast panel the kill ranking loses its top-3 set and 7 of 45 pairs (rho = 0.830) while the delivery ranking is untouched (rho = 1.000). See the scope notice at the top.
 - **No outcome label**: Rep1, like the GBM section, is an untreated resection. Every kill/penetration number here is a **prediction of validated-elsewhere physics on real tissue**, not a validated response. Do not read the panel as clinical efficacy.
 - **The 3D wall is real and precisely scoped**, not hand-waved: a `Domain` schema change plus three independent sparse-operator extensions plus two field-builder extensions — and, independently of any of that code, not enough z-resolution in the currently-registered dataset to make it matter yet.

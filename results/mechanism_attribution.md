@@ -86,56 +86,92 @@ Identical to the last bit of the mantissa, not to a tolerance.
 
 ---
 
-> ### ⚠ CONDITIONAL RETRACTION NOTICE — added after this report was written
+> ### ⚠ CONDITIONAL RETRACTION — cisplatin's mechanism verdict. SETTLED; READ IN FULL BEFORE QUOTING §3
 >
-> **The cisplatin half of §3 inverts under corrected transport physics.** It is
-> not retracted *yet*, because it is still the literal output of the shipped
-> default path — but it will be the moment that default changes, and anyone
-> quoting it should know that now.
+> This notice is self-contained. Nothing below it needs to be opened to act on
+> it.
 >
-> `results/breast_kp_validation.md` established that the historical vascular
-> source is ONE-WAY (`S = PS*Cp`, no path back from interstitium to blood), so
-> tissue concentration is unbounded above plasma. On this section cisplatin
-> runs at **2.60x plasma on average and 11.53x at maximum** — physically
-> unavailable to a passively delivered drug.
+> **WHAT WAS PUBLISHED.** §3 of this report says cisplatin on this section is
+> **96.42 % RESISTANCE-limited** — delivery solved, biology limiting — on
+> `therapeutic_coverage_1x = 0.9955`, median tumour E/IC50 = 3.19,
+> `kill_fraction` = 0.4362. That is the literal, reproducible output of the
+> shipped default path and it is not retracted as arithmetic.
 >
-> That is precisely what produces the 96.42 % RESISTANCE figure below. With
-> every tumour cell driven past IC50 (`coverage_1x = 0.9955`, `p05 E/IC50 =
-> 1.79`), the UNREACHED and UNDERDOSED bands are **empty by construction**, so
-> by the documented precedence rule every survivor *must* fall through to
-> RESISTANCE. The label was forced by the delivery law, not inferred from the
-> biology.
+> **WHY IT IS WRONG AS A CONCLUSION.** The default vascular source is a ONE-WAY
+> leak, `S = PS*Cp`, with no path back from interstitium to blood, so
+> steady-state tissue concentration is unbounded above the plasma level. On this
+> section cisplatin runs at **2.60x plasma on average and 11.53x at maximum** —
+> a concentration passive delivery cannot produce. That is precisely what
+> manufactures the 96.42 %: with every tumour cell driven past IC50
+> (`p05 E/IC50 = 1.79`), the UNREACHED and UNDERDOSED bands are **empty by
+> construction**, so by this report's own documented precedence rule every
+> survivor *must* fall through to RESISTANCE. The label was forced by the
+> delivery law, not inferred from the biology.
 >
-> Re-run on branch `transvascular-exchange` with
-> `PDEConfig(transvascular_exchange=True)`, which bounds tissue concentration
-> by the plasma level (`C_ss = PS*Cp/(PS + clearance + binding) <= Cp`):
+> **WHAT IT BECOMES.** The physically correct source is gradient-driven
+> exchange, `S = PS*(Cp - C)` — the same source minus a first-order loss at the
+> same rate — which bounds tissue concentration by the plasma level
+> (`C_ss = PS*Cp/(PS + clearance + binding) <= Cp`). It is implemented as
+> `PDEConfig(transvascular_exchange=True)`, **opt-in and OFF by default**, and
+> reproduces its closed-form steady state to 6.3e-15. Same section, same seed,
+> same everything else:
 >
-> | cisplatin, same section | one-way (below) | exchange |
+> | cisplatin, same section | one-way (published, §3 below) | exchange |
 > |---|---:|---:|
 > | mean tissue / plasma | 2.60x (max 11.53x) | 0.61x (max 0.96x) |
 > | median tumour E/IC50 | 3.19 | 0.79 |
+> | IC50 coverage at 1x | 99.55 % | **4.67 %** |
 > | survival: DOSE | 0.44 % | **95.71 %** |
 > | survival: RESISTANCE | **96.42 %** | 3.59 % |
 > | `kill_fraction` | 0.4362 | 0.2311 |
 >
-> **The conclusion flips from "cisplatin is a biology problem" to "cisplatin is
-> a dose problem" — the opposite reading.** 12,943 survivors move out of the
-> resistance bucket, leaving 657.
+> **"Cisplatin is a biology problem" becomes "cisplatin is a dose problem" — the
+> opposite operational reading.** 12,943 survivors move out of the resistance
+> bucket, leaving 657.
 >
-> What SURVIVES unchanged: the bit-exact reconciliation against
-> `kill_fraction` (verified 0.0 absolute difference across all 10 re-runs, 0
+> **FOUR INDEPENDENT CODE PATHS REPRODUCED IT**, each re-running its own module
+> and each reproducing that module's published baseline first: this **mechanism
+> attribution** re-run, the **GBM 3-D:2-D kill-calibration** re-run, the
+> **cross-drug ranking** re-run, and the **dose-schedule** re-run
+> (`results/dose_schedule.md` carries the matching notice: IC50 coverage at 1x
+> 99.55 % → 4.67 %). It is not one script's result.
+>
+> **WHAT THE NOTICE IS CONDITIONAL ON — and what it is NOT.** It is conditional
+> on the **arm**, not on any fitted parameter: the exchange form introduces no
+> new parameter, no constant was refitted, and the GBM calibration chain is
+> unchanged (alpha = 148.60815765445545, held-out mitoxantrone still passes). It
+> is therefore not something a recalibration can absorb.
+>
+> **BUT every exchange-ON number above is itself conditional on the
+> transvascular rate scale.** `delivery_source` computes
+> `vascular_density * bbb_penetrance * plasma` — a product of two dimensionless
+> quantities with a concentration — and the engine reads the result as `uM/s`,
+> obtaining `s^-1` from an implicit, unjustified factor of exactly 1 s^-1. That
+> factor is now explicit as `PS_SCALE_S_INV` in `tmesim/treatment/drugs.py`:
+> **default 1.0** (so every shipped number is bit-identical), **calibrated value
+> 0.16122 1/s**, fit against measured rodent brain PS products. Both arms
+> inherit it, and the exchange steady state
+> `k_0*PS'*Cp / (k_0*PS' + k)` depends on it, so a calibrated scale would move
+> the exchange column of the table above. Read those numbers as conditional on
+> `PS_SCALE_S_INV = 1.0`.
+>
+> **WHAT SURVIVES UNCHANGED.** The bit-exact reconciliation against
+> `kill_fraction` (0.0 absolute difference across all 10 re-runs, 0
 > UNATTRIBUTED cells in every arm), and the temozolomide half of §3, which gets
 > *stronger* — TMZ goes from 97.10 % to 100.00 % DELIVERY-limited, because the
 > DOSE bucket empties entirely.
 >
-> One structural side-effect to note before relying on this decomposition:
-> for any drug whose exposure falls below IC50 population-wide, RESISTANCE and
-> CHANCE go to exactly **zero cells**, because the exposure bands take
-> precedence. Under bounded physics that is most of this panel, so
-> "delivery vs dose vs resistance" degenerates to a two-category answer more
-> often than this report implies.
+> **ONE STRUCTURAL SIDE-EFFECT of the corrected physics, which limits this
+> decomposition generally.** For any drug whose exposure falls below IC50
+> population-wide, RESISTANCE and CHANCE go to exactly **zero cells**, because
+> the exposure bands take precedence. Under bounded physics that is most of this
+> panel, so "delivery vs dose vs resistance" degenerates to a two-category
+> answer more often than this report implies.
 >
-> Do not quote cisplatin as resistance-limited in any external material.
+> **Do not quote cisplatin as resistance-limited in any external material.**
+> Full evidence:
+> [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md)
+> §4.2.
 
 ## 3. The finding: temozolomide vs cisplatin on the flagship section
 
@@ -176,6 +212,13 @@ Cisplatin is the clean contrast and it inverts completely: coverage 0.9955, medi
 3.19× IC50, and **96.4 % of its survivors are RESISTANCE-limited**. Delivery is solved; what
 stops it is the tumour's own oxygen-driven state.
 
+> **Conditional on the delivery law — see the retraction notice above.** Every number in this
+> paragraph is produced by the one-way source that puts cisplatin at 2.60x plasma. Under
+> gradient-driven exchange coverage falls 0.9955 → 0.0467, the median cell sits at 0.79× IC50,
+> and 95.71 % of survivors are DOSE-limited, not resistance-limited: **cisplatin becomes the
+> delivery/dose case, not the biology case.** Temozolomide's half of the contrast strengthens
+> (97.10 % → 100.00 % DELIVERY-limited).
+
 ### 3.2 What "DELIVERY-limited" does and does not mean here
 
 This must be read precisely, because the categories describe *the kill model*, not biology in
@@ -208,8 +251,14 @@ HYPOXIC or QUIESCENT, and it lands directly on this section's documented limitat
 (`results/cell_state_impact.md` §5) and `kill_fraction` on this section carries an unresolved
 uncertainty of up to 0.3252 absolute purely from the choice of state route. Cisplatin's
 "96.4 % RESISTANCE-limited" therefore inherits that uncertainty in full, and the run's own
-caveats say so. **The cross-drug contrast (delivery-limited vs resistance-limited) is the
-defensible output; the absolute size of the resistance bucket is not.**
+caveats say so. **The cross-drug contrast (delivery-limited vs resistance-limited) was
+published as the defensible output, with the absolute size of the resistance bucket flagged as
+not defensible. The corrected delivery law breaks the contrast too**: under exchange cisplatin
+is 95.71 % DOSE-limited and temozolomide 100.00 % DELIVERY-limited, so the two drugs stop
+contrasting on that axis at all, and for any drug below IC50 population-wide the RESISTANCE and
+CHANCE buckets are exactly zero by the precedence rule. What is defensible across both arms is
+narrower: the **per-cell exposure distribution relative to IC50**, which is what the labels are
+computed from, and the bit-exact reconciliation that they add back up.
 
 ---
 

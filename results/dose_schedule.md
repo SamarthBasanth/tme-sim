@@ -31,7 +31,14 @@
 > * **Cisplatin's verdict flips** (see the conditional-retraction box at that
 >   drug's section below), and the headline "at high enough dose >95 % of
 >   tumour cells clear IC50 for both drugs" FAILS for temozolomide, whose 30x
->   coverage goes 97.80 % → 3.43 %.
+>   coverage goes 97.80 % → 3.43 %. Both statements are repeated at their point
+>   of use — §2.1, §3, §6 — so neither can be quoted out of this banner.
+> * **Every exchange-ON number in this file is conditional on the transvascular
+>   rate scale**, `PS_SCALE_S_INV` (`tmesim/treatment/drugs.py`, default **1.0**,
+>   calibrated **0.16122 1/s**). The engine gets `s^-1` from an implicit factor
+>   of exactly 1 s^-1 that nothing derives; both arms inherit it and the exchange
+>   steady state depends on it. The ON column is conditional on the arm AND on
+>   that scale — but on no refitted parameter: the corrected form adds none.
 >
 > **⚠ HAZARD IF REGENERATING THIS REPORT WITH THE FLAG ON.** Temozolomide's
 > leg-A kill spread at the reference dose prints as `0.00e+00` again —
@@ -155,6 +162,8 @@ Read that table before reading anything else. The ceiling is **not** a delivery 
 
 **Saturation.** **Kill has NOT saturated within the swept range** — it is still climbing at 30x nominal, reaching 90% of its 30x value only at 30x itself. Over this whole range more drug is still buying more kill; IC50 coverage passes 90% of tumor cells by **30x**. At 30x the predicted kill is 0.3549 = 64.5% of the 0.5502 ceiling, so the residual 35.5% of the ceiling is what *no achievable dose* recovers — that residual is the hypoxic/quiescent fraction the Hill term can never reach past.
 
+> **⚠ The 30x coverage figure does NOT survive the corrected delivery law, and it is the one this report's headline rests on.** Under `PDEConfig(transvascular_exchange=True)` temozolomide's IC50 coverage at 30x falls **97.80 % → 3.43 %**. So "at high enough dose the drug clears IC50 across the tumour" is **FALSE for temozolomide** under bounded physics: 30x nominal is 1500 uM plasma peak already, and coverage does not arrive. The dose-response *shape* claims (not saturated in range, dose is the dominant lever) survive; this coverage crossing does not. → [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §4.3.
+
 **At the approximate clinical plasma band.** Published Cmax for temozolomide is of order 30–70 uM, i.e. **0.6x–1.4x** of the shared nominal level used for the axis. Interpolating the sweep there gives kill 0.0126–0.0316 (2–6% of ceiling) and IC50 coverage 0.0–0.0% of tumor cells. *This band is an order-of-magnitude literature reference attached for scale only — it is not fitted, not patient-specific, and not a dose recommendation.*
 
 **What 30x buys over 1x.** kill 0.0184 → 0.3549 (+0.3365 absolute, 19.29x relative) for a 30-fold increase in systemic exposure — i.e. a 95% share of the final kill bought at 30x the systemic toxicity.
@@ -180,6 +189,20 @@ Read that table before reading anything else. The ceiling is **not** a delivery 
 ---
 
 ## 3. Delivery geometry: what the exposure field actually looks like
+
+> **⚠ EVERY NUMBER IN THIS SECTION IS INVALIDATED — NOT RESCALED — UNDER THE
+> CORRECTED DELIVERY LAW.** With `PDEConfig(transvascular_exchange=True)` the
+> back-flux `-PS*C` removes drug fastest exactly where the source is strongest,
+> so it **flattens** the field instead of scaling it: temozolomide's penetration
+> index rises **0.5112 → 0.7140 (+40 %)**. A flattening is not a constant, so no
+> multiplier recovers the half-distances, floor levels, plateau ratios or
+> penetration indices tabulated below — they have to be regenerated. The
+> section's *qualitative* claims all survive: the measured gradient is
+> essentially the source geometry, a large fraction of the field is floor rather
+> than gradient, and depth cannot be bought with dose. Do not quote a geometry
+> figure from this section without regenerating it. →
+> [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md)
+> §4.3.
 
 Because the field is linear in dose, **dose moves the amplitude of the perivascular exposure profile and nothing else** — the shape is fixed by `D_eff`, the loss rate `k`, and the vascular geometry. Panel C shows this: the curves are parallel on a log axis at every dose. This is exact, not approximate: the transport operator is linear, so scaling the source scales the field.
 
@@ -248,6 +271,8 @@ The schedule effect is a fixed *relative* change in exposure, so the *absolute* 
 | 3x | 0.041492 | 0.041408 | 0.041156 | **3.36e-04** | 0.00e+00 |
 | 10x | 0.138166 | 0.137872 | 0.137452 | **7.14e-04** | 0.00e+00 |
 | 30x | 0.295187 | 0.294431 | 0.293927 | **1.26e-03** | 0.00e+00 |
+
+> **⚠ DO NOT DELETE THIS LADDER, AND DO NOT READ A ZERO IN ITS TOP ROW AS THE RETRACTED ARTEFACT.** This ladder is the only thing separating a real quantisation floor from the solver artefact this file was rewritten to retract, and the two are about to look identical. Regenerated with `PDEConfig(transvascular_exchange=True)`, temozolomide's leg-A kill spread at the reference dose prints **`0.00e+00`** — cosmetically the same as the static-source zero above it. **It is NOT that artefact.** The continuous exposure spread is **0.3792 %**, non-zero and still monotone in n; the schedule effect is real and still matches its `τ_tissue/T` bound (0.3387 % predicted vs 0.3792 % measured ON, the same relation as 0.7668 % vs 0.7724 % OFF). What happened is that kill is counted over 23,812 tumour cells, so it is quantised at **1/23,812 = 4.2e-05**, and the kill level itself fell **2.6x** under exchange — which drops an already-marginal effect below the counting quantum. The up-dose rows recover it, exactly as they do here. Regenerating this file without the ladder republishes a spurious zero against a retraction. → [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §5.
 
 ### 4.x Interpretation — what the corrected model actually says
 
@@ -345,7 +370,9 @@ The hypothesis under test was: *if delivery is transport-limited, a sustained lo
 > 
 > **On this tumor the response is DOSE-limited, not delivery-limited — and above the dose-limited range it becomes RESISTANCE-limited, never delivery-limited.**
 > 
-> Delivery is not the binding constraint here. The exposure field reaches the whole section: at high enough dose >95% of tumor cells clear IC50 for both drugs, and the far-field floor (section 3) means even tissue a millimetre from a vessel is exposed. What limits the answer is, in order: (1) at clinically plausible plasma levels, simply not enough drug — the sub-saturating part of the curve, where more exposure genuinely buys more kill; and (2) above that, a hard ceiling that dose cannot touch.
+> Delivery is not the binding constraint here. The exposure field reaches the whole section: at high enough dose >95% of tumor cells clear IC50 for both drugs, and the far-field floor (section 3) means even tissue a millimetre from a vessel is exposed. What limits the answer is, in order:
+>
+> > **⚠ "AT HIGH ENOUGH DOSE >95 % OF TUMOR CELLS CLEAR IC50 FOR BOTH DRUGS" FAILS UNDER THE CORRECTED DELIVERY LAW.** Under `PDEConfig(transvascular_exchange=True)` temozolomide's coverage at 30x nominal goes **97.80 % → 3.43 %**, and cisplatin's at 1x goes **99.55 % → 4.67 %** (see the retraction box under *cisplatin* below). Neither drug clears IC50 across the tumour at any dose in this sweep once tissue concentration is bounded by plasma. The "delivery is not the binding constraint" verdict is therefore a **one-way-law verdict**, and the sentence above must not be quoted without it. What survives is the *ceiling* argument in the third paragraph of this headline, which is a cell-state result and not a transport result. → [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §4.3. (1) at clinically plausible plasma levels, simply not enough drug — the sub-saturating part of the curve, where more exposure genuinely buys more kill; and (2) above that, a hard ceiling that dose cannot touch.
 > 
 > **Either way, this is NOT a schedule verdict, and now that is a measurement rather than an assumption.** Sections 4-5 show the schedule effect on this tumor is real but bounded by `τ_tissue/T_window` — orders of magnitude below the dose lever. The static-source version of this file reported it as exactly zero, which was an artefact; the corrected answer is small, not zero.
 > 
@@ -361,35 +388,81 @@ The hypothesis under test was: *if delivery is transport-limited, a sustained lo
 
 **DOSE-limited over the swept range, then sensitivity-limited.**
 
-At the nominal dose 0.0% of tumor cells clear IC50, rising to 97.8% by 30x — the drug *can* reach essentially the whole tumor once enough of it is given, so the binding constraint over this range is how much drug is present, not how far it travels. Kill climbs with dose (0.0184 → 0.3549), and at 30x it has reached 64.5% of the 0.5502 ceiling without yet flattening — the sweep never gets far enough for delivery to stop mattering.
+At the nominal dose 0.0% of tumor cells clear IC50, rising to 97.8% by 30x — the drug *can* reach essentially the whole tumor once enough of it is given, so the binding constraint over this range is how much drug is present, not how far it travels. **(That 97.8 % is a one-way-law number: under corrected exchange physics 30x coverage is 3.43 %, so "it can reach essentially the whole tumor" does not hold — see §2.1's notice. The DOSE-limited verdict itself survives, and strengthens.)** Kill climbs with dose (0.0184 → 0.3549), and at 30x it has reached 64.5% of the 0.5502 ceiling without yet flattening — the sweep never gets far enough for delivery to stop mattering.
 
 Geometry check: near-field exposure decay length **L = 292 um** (d ≤ p90) vs median distance-to-vessel **43 um** and p90 **85 um**. IC50 depth at 1x: — (below IC50 even at the vessel wall) um; at 30x: 146 um — but see section 3: with a far-field plateau at 0.56 of the perivascular value, the large depths are the FLOOR clearing IC50, not a diffusion front reaching further.
 
 ### cisplatin
 
-> **⚠ CONDITIONAL RETRACTION — this verdict inverts under corrected transport
-> physics.** Not retracted yet, because it remains the literal output of the
-> shipped default path, but it will be the moment that default changes.
+> ### ⚠ CONDITIONAL RETRACTION — cisplatin's verdict. SETTLED; READ IN FULL BEFORE QUOTING THIS SECTION
 >
-> The "99.6 % of tumour cells above IC50" figure this verdict rests on is
-> produced by the one-way delivery law, which lets tissue concentration exceed
-> plasma without bound (`results/breast_kp_validation.md`). Cisplatin runs at
-> **2.71x plasma** on this section, which passive delivery cannot do. With
-> `PDEConfig(transvascular_exchange=True)`, IC50 coverage at 1x falls
-> **99.55 % → 4.67 %**, kill goes 78.4 % → 43.1 % of ceiling, saturation moves
-> from ~3x to ~10x, and the 30x/1x kill ratio goes 1.25 → 2.22. **At the
-> nominal dose cisplatin becomes DOSE-limited** — the opposite operational
-> reading.
+> This notice is self-contained. Nothing below it needs to be opened to act on
+> it.
 >
-> Note this is the direction the "Important qualification" paragraph below
-> already anticipated on clinical-dose grounds. Corrected physics says it
-> applies at the nominal dose too, not only down at clinical Cmax.
+> **WHAT WAS PUBLISHED.** The verdict immediately below: cisplatin on this
+> section is **SENSITIVITY-limited**, neither dose- nor delivery-limited,
+> resting on **99.6 % of tumour cells above IC50 at the nominal dose**, kill at
+> 78.4 % of the 0.3254 ceiling, saturating by ~3x, 30x/1x kill ratio 1.25. That
+> is the literal, reproducible output of the shipped default path and it is not
+> retracted as arithmetic.
 >
-> The same inversion was reproduced independently in
-> `results/mechanism_attribution.md` §3 (RESISTANCE 96.42 % → 3.59 %,
-> DOSE 0.44 % → 95.71 %) and in the GBM 3-D:2-D and cross-drug ranking
-> re-runs. Four independent code paths, same result. Do not quote cisplatin as
-> sensitivity-limited or resistance-limited in external material.
+> **WHY IT IS WRONG AS A CONCLUSION.** The default vascular source is a ONE-WAY
+> leak, `S = PS*Cp`, with no path back from interstitium to blood, so
+> steady-state tissue concentration is unbounded above the plasma level.
+> Cisplatin runs at **2.71x plasma** on this section — a concentration passive
+> delivery cannot produce. The 99.6 % coverage that the whole verdict rests on
+> is that excess.
+>
+> **WHAT IT BECOMES.** The physically correct source is gradient-driven
+> exchange, `S = PS*(Cp - C)` — the same source minus a first-order loss at the
+> same rate, no new parameter — which bounds tissue concentration by the plasma
+> level (`C_ss = PS*Cp/(PS + clearance + binding) <= Cp`) and reproduces its
+> closed-form steady state to 6.3e-15. It ships as
+> `PDEConfig(transvascular_exchange=True)`, **opt-in and OFF by default**.
+>
+> | cisplatin, this section | one-way (published below) | exchange |
+> |---|---:|---:|
+> | mean tissue / plasma | 2.71x | 0.62x |
+> | IC50 coverage at 1x | 99.55 % | **4.67 %** |
+> | kill, as % of ceiling, at 1x | 78.4 % | **43.1 %** |
+> | saturation dose | ~3x | ~10x |
+> | 30x / 1x kill ratio | 1.25 | **2.22** |
+>
+> **At the nominal dose cisplatin becomes DOSE-limited** — the opposite
+> operational reading. This is the direction the "Important qualification"
+> paragraph below already anticipated on clinical-dose grounds; corrected
+> physics says it applies at the *nominal* dose too, not only down at clinical
+> Cmax.
+>
+> **FOUR INDEPENDENT CODE PATHS REPRODUCED IT**, each re-running its own module
+> and each reproducing that module's published baseline first: this
+> **dose-schedule** re-run, the **mechanism-attribution** re-run
+> (`results/mechanism_attribution.md` §3: RESISTANCE 96.42 % → 3.59 %, DOSE
+> 0.44 % → 95.71 %), the **GBM 3-D:2-D kill-calibration** re-run, and the
+> **cross-drug ranking** re-run. It is not one script's result.
+>
+> **WHAT THE NOTICE IS CONDITIONAL ON — and what it is NOT.** It is conditional
+> on the **arm**, not on any fitted parameter: no constant was refitted, the
+> corrected form adds none, and the GBM calibration chain is unchanged
+> (alpha = 148.60815765445545, held-out mitoxantrone still passes). A
+> recalibration cannot absorb it.
+>
+> **BUT every exchange-ON number above is itself conditional on the
+> transvascular rate scale.** `delivery_source` computes
+> `vascular_density * bbb_penetrance * plasma` — two dimensionless quantities
+> times a concentration — and the engine reads the result as `uM/s`, obtaining
+> `s^-1` from an implicit factor of exactly 1 s^-1 that nothing derives. That
+> factor is now explicit as `PS_SCALE_S_INV` in `tmesim/treatment/drugs.py`:
+> **default 1.0** (so every shipped number stays bit-identical), **calibrated
+> value 0.16122 1/s**, fit against measured rodent brain PS products. Both arms
+> inherit it and the exchange steady state depends on it, so a calibrated scale
+> would move the exchange column above. Read those numbers as conditional on
+> `PS_SCALE_S_INV = 1.0`.
+>
+> **Do not quote cisplatin as sensitivity-limited or resistance-limited in
+> external material.** Full evidence:
+> [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md)
+> §4.2.
 
 **NEITHER dose- nor delivery-limited — it is SENSITIVITY-limited.**
 
@@ -420,6 +493,15 @@ Geometry check: near-field exposure decay length **L = 153 um** (d ≤ p90) vs m
 9. **Cell-state banding dominates the ceiling.** 90% of tumor cells are labelled QUIESCENT by the oxygen model (x0.5 kill) and 0% HYPOXIC (x0.35). That labelling is a model assignment from the simulated oxygen field, not a measurement; it is being tested independently against measured MKI67. If the quiescent fraction is wrong, every absolute kill and the ceiling move with it.
 10. **Scope was cut for the compute budget** (see the banner at the top): 7 dose points; schedule + half-life for temozolomide only; 3 schedules; 3 half-lives; 12 h schedule window; 3 engine verification runs. Nothing was extrapolated to fill the gaps — the gaps are named instead.
 11. **One calibration constant** (`alpha`, fit once on doxorubicin) sets the perivascular sink for every drug; the penetration lengths and therefore every depth number inherit its uncertainty.
-12. **The absolute kill levels shifted slightly from the static-source version of this file, and not only in the schedule sections.** The dose-response leg is also solved with a time-resolved source now (a decaying bolus over the 6 h dose window), so its exposure field is a little different too. Cross-file comparisons of absolute kill against the superseded version are therefore not apples to apples; comparisons *within* this file are.
+12. **The delivery law is a one-way leak, and correcting it invalidates part of this report.** `S = PS*Cp` has no back-flux, so tissue concentration is unbounded above plasma — cisplatin sits at 2.71x plasma here. The corrected gradient-driven form is implemented, verified to 6.3e-15 against its closed form, and OFF by default. Under it: every absolute AUC and kill moves (temozolomide −56 %, cisplatin −77 %, doxorubicin −3.5 %), section 3's geometry table is invalidated rather than rescaled (penetration index 0.5112 → 0.7140), temozolomide's 30x IC50 coverage falls 97.80 % → 3.43 %, and cisplatin's verdict inverts from sensitivity-limited to dose-limited. Every schedule conclusion survives with its number roughly halved. Exchange-on numbers are additionally conditional on `PS_SCALE_S_INV` (default 1.0, calibrated 0.16122 1/s). → [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md).
+13. **The absolute kill levels shifted slightly from the static-source version of this file, and not only in the schedule sections.** The dose-response leg is also solved with a time-resolved source now (a decaying bolus over the 6 h dose window), so its exposure field is a little different too. Cross-file comparisons of absolute kill against the superseded version are therefore not apples to apples; comparisons *within* this file are.
 
 *Generated by `experiments/dose_schedule.py` — ONE reconstruction reused everywhere, 9 transport solves (`PDEConfig.time_resolved=True`), 3 full-engine verification runs, 46.7 min total, seed 0, deterministic.*
+
+> **BEFORE YOU REGENERATE THIS FILE, three things that will bite:**
+>
+> 1. **`PDEConfig(transvascular_exchange=True)` is a SILENT NO-OP here.** This module calls `simulate_drug_transport` directly rather than going through `simulate_response`, so setting the flag on the config changes nothing and the run reports "no difference" while being bit-identical: `auc_sum` 1.554447793e+09 with the flag set but `exchange_k` not passed, versus the same 1.554447793e+09 with the flag off, versus 6.86608671e+08 when `exchange_k` is genuinely passed. **Pass `exchange_k` explicitly and prove the two arms differ before trusting any comparison.**
+> 2. **Keep the up-dose ladder in §4.1.** With exchange on, temozolomide's leg-A kill spread prints `0.00e+00` at the reference dose because kill is quantised at 1/23,812 and the level fell 2.6x — not because the retracted static-source artefact has returned (continuous spread 0.3792 %, monotone). Without the ladder that zero is indistinguishable from the thing this file retracts.
+> 3. **Section 3's geometry table is invalidated rather than rescaled** (exchange flattens the field; temozolomide penetration index 0.5112 → 0.7140), and every absolute AUC and kill moves (temozolomide −56 %, cisplatin −77 %, doxorubicin −3.5 %). Every exchange-ON number in this file is additionally conditional on `PS_SCALE_S_INV` (`tmesim/treatment/drugs.py`, default 1.0, calibrated 0.16122 1/s).
+>
+> → [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §4.3, §5, §6.
