@@ -39,11 +39,27 @@ travels; the reconstruction layer does not"*:
 ``results/cell_state_impact.md`` supplies the capability rule. Its §3.2 measures
 absolute kill moving by up to **0.3252 absolute (1.77x relative, i.e. 77%)**
 purely with the choice of cell-state route, with tissue, drug, transport and RNG
-held identical, while §3.3 finds the ranking **INVARIANT** across all three
-routes. Its §5 conclusion is that a panel carrying no hypoxia-response
-transcript cannot support an absolute kill under *any* route — the default
-route's HYPOXIC band is empty for a bookkeeping reason, the marker route
-declares hypoxia UNMEASURED, and the vessel-distance route is a geometric proxy.
+held identical, while §3.3 finds the KILL ranking **INVARIANT** across all three
+CELL-STATE routes. Its §5 conclusion is that a panel carrying no
+hypoxia-response transcript cannot support an absolute kill under *any* route —
+the default route's HYPOXIC band is empty for a bookkeeping reason, the marker
+route declares hypoxia UNMEASURED, and the vessel-distance route is a geometric
+proxy.
+
+**That invariance is scoped to those routes and does not generalise.** All three
+are COMMON-MODE perturbations: they move every drug together. The vascular
+delivery law does not. Correcting the one-way source ``S = PS*Cp`` to the
+gradient-driven ``S = PS*(Cp - C)`` re-weights each drug by its own
+``bbb_penetrance``, which spans **47x** across the GBM panel, and it changes the
+GBM top-1 (cisplatin -> vincristine), changes the top-3 set on both panels and
+swaps 4 of 45 GBM pairs — two of them across gaps of 40.5% and 35.6% of the
+leader's kill (``results/transvascular_exchange_revalidation.md`` §4.1). Note
+also that DELIVERY-rank invariance does not imply KILL-rank invariance: on
+breast the AUC ranking is preserved exactly (rho = 1.000) while the kill ranking
+scrambles (rho = 0.830), because the Hill map saturates. Every claim here is
+about a KILL ranking. Every exchange-arm number is itself conditional on
+``PS_SCALE_S_INV`` (``tmesim/treatment/drugs.py``, default 1.0, calibrated
+0.16122 1/s; §7.3).
 
 So this module makes **rank agreement the primary result**, and refuses to
 present a cross-specimen absolute-kill delta as a finding unless *both*
@@ -124,7 +140,10 @@ def capability_report(section_id: str) -> Dict:
     'oxygen' default's band is empty for a bookkeeping reason, 'markers' declares
     hypoxia UNMEASURED, and 'vessel_distance' is a geometric proxy — so NO route
     clears the bar and the 0.3252-absolute swing (§3.2) is unresolved. The
-    cross-drug RANKING is invariant across all three routes and is what survives.
+    cross-drug KILL RANKING is invariant across all three STATE routes and is
+    what survives that swing — but not across the vascular delivery law, which
+    changes the GBM top-1
+    (``results/transvascular_exchange_revalidation.md`` §4.1).
 
     Note what this does NOT claim: a gene being ON the panel says nothing about
     its detection RATE, which is a property of the count matrix and is only
@@ -238,8 +257,11 @@ def capability_report(section_id: str) -> Dict:
             f"by up to {STATE_ROUTE_KILL_SWING_ABS} absolute "
             f"({STATE_ROUTE_KILL_SWING_REL}x relative) purely with the choice of "
             "route, with tissue, drug, transport and RNG held identical. The "
-            "CROSS-DRUG RANKING is invariant across all three routes and is the "
-            "defensible output; the level is not."
+            "CROSS-DRUG KILL RANKING is invariant across all three STATE routes "
+            "and is the defensible output of that comparison; the level is not. "
+            "It is NOT invariant across the vascular delivery law, which changes "
+            "the GBM top-1 "
+            "(results/transvascular_exchange_revalidation.md §4.1)."
         )
     else:
         absolute_ok = True

@@ -853,8 +853,10 @@ def check_capability(section_id: str, state_mode: str,
             f"ABSOLUTE KILL MUST NOT BE QUOTED FROM {section_id!r} UNDER ANY "
             "STATE ROUTE. Its panel carries no hypoxia-response transcript, so "
             "no route clears the bar (results/cell_state_impact.md §5). The "
-            "cross-drug RANKING is invariant across routes and is the "
-            "defensible output.",
+            "cross-drug KILL RANKING is invariant across the three STATE routes "
+            "and is the defensible output of that comparison — but NOT across "
+            "the vascular delivery law, which changes the GBM top-1 "
+            "(results/transvascular_exchange_revalidation.md §4.1).",
             code="caveat", line=line, col=col)
 
     if sensitivity_mode == "uniform":

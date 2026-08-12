@@ -617,6 +617,20 @@ comparison. `drug` and `resistance_off` are likewise owned by the report (they a
 other `RunSpec` field may be supplied in `spec_overrides`; overriding an owned field is a
 warning, not an error, and the override is reported back as ignored.
 
+**Scope of the `ranking_is_the_output` limit, which every report emits.** What that limit is
+entitled to say is that the **kill** ranking is invariant across the three **cell-state** routes
+(`results/cell_state_impact.md` §3.3) and across the measured potency band. It is **not** a
+statement that the ranking is invariant in general. Under the corrected gradient-driven vascular
+source `S = PS*(Cp - C)` the GBM top-1 changes (cisplatin -> vincristine), the top-3 set changes on
+both panels, 4 of 45 GBM pairs swap, and the Monte-Carlo panel flips
+(`P(cisplatin rank 1)` 0.9277 -> 0.3965) — because that perturbation re-weights each drug by its own
+`bbb_penetrance`, which spans 47x, where the state routes move every drug together. Name the
+quantity too: on breast the delivery (AUC) ranking is preserved exactly (rho = 1.000) while the kill
+ranking scrambles (rho = 0.830). Every `ranking[]` array in this contract is ordered by **kill**, on
+the shipped one-way delivery law, and every exchange-arm figure quoted here is additionally
+conditional on `PS_SCALE_S_INV` (`tmesim/treatment/drugs.py`, default 1.0, calibrated 0.16122 1/s).
+Full evidence: [`results/transvascular_exchange_revalidation.md`](results/transvascular_exchange_revalidation.md) §4.1, §7.3.
+
 ```jsonc
 // POST /api/reports body
 { "section": "xenium_319",

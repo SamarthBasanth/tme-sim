@@ -997,12 +997,23 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
           "the PDE does (§3.1), and every resistant cell carries a "
           f"{dn['pd']['quiescent_resistance']}x kill multiplier.")
         A("")
-        A(f"**The cross-drug ranking is unchanged**: "
+        A(f"**The cross-drug KILL ranking is unchanged BY THE OXYGEN ROUTE**: "
           f"{' > '.join(order_a)} under the PDE, {' > '.join(order_b)} under the "
           "surrogate" + (" — identical." if order_a == order_b else " — CHANGED.")
           + " That is the expected structure: the resistance multipliers are shared "
           "across drugs, so they largely cancel out of a comparison and do not "
           "cancel out of a level.")
+        A("")
+        A("**Read the reason, and do not over-extend the claim.** \"Shared across "
+          "drugs, so it cancels out of a comparison\" is exactly why this test "
+          "cannot certify a DRUG-SPECIFIC perturbation. The vascular delivery law "
+          "is one: correcting the one-way source `S = PS*Cp` to the gradient-driven "
+          "`S = PS*(Cp - C)` re-weights each drug by its own `bbb_penetrance`, "
+          "which spans 47x across the GBM panel, and it does change the GBM top-1 "
+          "(cisplatin -> vincristine) and the top-3 set on both panels. This is a "
+          "KILL ranking; the delivery (AUC) ranking is more stable than it (breast: "
+          "rho 1.000 for AUC against 0.830 for kill). See "
+          "`results/transvascular_exchange_revalidation.md` §4.1.")
         A("")
         A("**So: how load-bearing is the oxygen field?** *Weakly.* A 2-3% relative "
           "shift in absolute kill is far smaller than the acknowledged uncertainty "
@@ -1070,10 +1081,14 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
       "therapeutic coverage is EXACTLY invariant and kill moves by at most "
       f"{max_kill_delta:.4f} absolute "
       f"({max(abs(r['delta_kill_pct']) for r in dn['rows'].values()):.1f}% "
-      "relative) with the cross-drug ranking unchanged. The measurable gain on the "
-      "drug side is therefore close to nil, while the cost is re-deriving every "
-      "kill number in `results/` (§5.1) and breaking the correspondence between "
-      "those documents and the code. Silent improvement is still silent change.")
+      "relative) with the cross-drug KILL ranking unchanged BY THIS ROUTE (a "
+      "shared-multiplier perturbation; it says nothing about the drug-specific "
+      "delivery law, which does change the GBM top-1 — "
+      "`results/transvascular_exchange_revalidation.md` §4.1). The measurable gain "
+      "on the drug side is therefore close to nil, while the cost is re-deriving "
+      "every kill number in `results/` (§5.1) and breaking the correspondence "
+      "between those documents and the code. Silent improvement is still silent "
+      "change.")
     A("   The honest asymmetry: the surrogate is unambiguously better as a "
       "*hypoxia predictor* (§1) and only marginally different as a *drug-kill "
       "input* (§3). So the recommendation splits along exactly that line — flip it "

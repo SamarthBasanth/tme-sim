@@ -912,9 +912,13 @@ def _validate_state_mode(spec: Dict, section_id, source,
             "mesh, 'markers' falls back to a neighbourhood rule whose level moves "
             "8.79x with the window radius, and 'vessel_distance' is a geometric "
             "proxy. Kill moves up to 0.3252 absolute (1.77x) across the three "
-            "routes with everything else identical. The CROSS-DRUG RANKING is "
-            "INVARIANT across all three and is the defensible output; the level "
-            "is not (results/cell_state_impact.md §3.2, §3.3, §5)."
+            "routes with everything else identical. The CROSS-DRUG KILL RANKING "
+            "is INVARIANT across all three STATE routes and is the defensible "
+            "output of that comparison; the level is not "
+            "(results/cell_state_impact.md §3.2, §3.3, §5). It is NOT invariant "
+            "across the vascular delivery law: correcting the one-way source "
+            "changes the GBM top-1 "
+            "(results/transvascular_exchange_revalidation.md §4.1)."
         )
 
 

@@ -8,7 +8,7 @@
 | mean tumour AUC, doxorubicin, S=0 -> S=20 | 11504.2 -> 5938.0 uM*s (0.516x) |
 | therapeutic coverage at 1x IC50, same range | 0.4373 -> 0.1022 |
 | predicted kill, same range | 0.2595 -> 0.1676 |
-| **cross-drug RANKING across the whole sweep** | **INVARIANT** |
+| **cross-drug KILL RANKING across the whole sweep (this term only)** | **INVARIANT** — not a general invariance; the delivery law does change it, [§4.1](transvascular_exchange_revalidation.md) |
 | spatial structure ratio (sparsest / densest immune quintile) | **2.0025x**, permutation p = 0.0476 |
 | human glioma scorecard, GM abs fold error | 1.995x -> 1.995x at best swept S (0.0) |
 | **recommendation** | **DEFAULT OFF** — see §7 |
@@ -167,6 +167,8 @@ A drug sitting FAR BELOW its IC50 is on the steep, near-proportional part of the
 
 **The ranking by predicted kill is INVARIANT across the entire swept range.** That is the expected structure and it is the same one `results/cell_state_impact.md` §3.3 found for the cell-state route: the sink is applied with the SAME strength to all three drugs, so it very largely cancels out of a comparison and does not cancel at all out of a level. A claim of the form *"cisplatin beats doxorubicin beats temozolomide on this tissue"* survives every sequestration strength tested; a claim about an absolute kill fraction does not.
 
+**And that is precisely the limit of the claim.** The reason given above — same strength on all three drugs, so it cancels out of a comparison — is exactly why this sweep cannot speak for a DRUG-SPECIFIC perturbation. The vascular delivery law is one. Correcting the one-way source `S = PS*Cp` to the gradient-driven `S = PS*(Cp - C)` attenuates each drug by `(clearance+binding)/(PS + clearance+binding)` with PS driven by `bbb_penetrance`, which spans **47x** across the GBM panel, and it changes the GBM top-1 (cisplatin -> vincristine), changes the top-3 set on both panels and swaps 4 of 45 GBM pairs. Note also that the quantity ranked matters: on breast the AUC ranking is preserved exactly (rho = 1.000) while the kill ranking scrambles (rho = 0.830), because the Hill map saturates. See [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §4.1.
+
 ## 5. THE SPATIAL QUESTION — is the reduction structured, or just smaller?
 
 This is the section the whole module exists for. **A uniform reduction is pharmacologically boring: a compartmental model reproduces it exactly by lowering one rate constant.** The question is whether tumour cells sitting in macrophage-dense neighbourhoods are measurably worse off than tumour cells that are not — because that is a statement only a spatial model can make.
@@ -275,7 +277,7 @@ Per-drug at the strength nearest the Miller anchor (S = 10, modality-aware):
 1. **The magnitude is unmeasured and the literature's own sign is contested.** The best-quantified TAM drug-handling experiment in the literature (Miller 2015) found a DEPOT that made tumours respond BETTER, and the one direct free-doxorubicin measurement (Islam 2022) found TAM uptake below detection. Turning on a sink by default would assert a direction the strongest available data does not support for free drug.
 2. **It does not improve the measured anchor**, and §6 explains why it structurally cannot: it is a one-directional term on a scorecard whose errors point both ways. This is the same outcome the efflux, uptake and ion-trapping runs reached, and the same conclusion follows.
 3. **But the spatial result is real and is worth keeping.** The reduction is structured — 2.0025x between the sparsest and densest immune quintile against a well-mixed model's exact 1.0000 — and it survives a permutation null that holds the tissue, the cell layout and the total sink magnitude fixed (p = 0.0476). That is a clean demonstration of what a microenvironment model adds over a compartmental one, and it holds at every strength because the geometry, not the magnitude, produces it.
-4. **The ranking is safe either way.** The cross-drug ranking is invariant across the entire swept range, so no comparative conclusion in `results/` is at risk from this term being off — or from it being turned on.
+4. **The ranking is safe against THIS term either way.** The cross-drug KILL ranking is invariant across the entire swept range, so no comparative conclusion in `results/` is at risk from **this** term being off — or from it being turned on. That is a statement about the immune sink, which is applied at the same strength to every drug, and it does not generalise: the vascular delivery law is drug-specific and does change the GBM top-1, so comparative conclusions ARE at risk from it ([`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §4.1). This module also calls `simulate_drug_transport` directly, so `PDEConfig(transvascular_exchange=True)` is a silent no-op here (§6 of the same file) — every number in this report is a one-way-law number.
 
 ### 7.1 What measurement would settle it
 

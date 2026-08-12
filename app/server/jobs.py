@@ -342,6 +342,13 @@ def execute_run(spec: Dict, ctx: _Ctx,
     # a section is a RANKING, a coverage map and a delivery metric; the absolute
     # level is not earned under ANY route. Derived from the panel's gene list, not
     # hardcoded to a section id.
+    #
+    # Scope of the ranking half, which is narrower than it used to read: what
+    # §3.3 measured is a KILL ranking invariant across the three CELL-STATE
+    # routes. That is a common-mode perturbation. It does NOT extend to the
+    # vascular delivery law, which re-weights drugs individually by a
+    # bbb_penetrance spanning 47x and does change the GBM top-1
+    # (results/transvascular_exchange_revalidation.md §4.1).
     support = state_route_support(section)
     if support["genes_known"] and not support["hypoxia_present"]:
         caveats.append(
@@ -351,9 +358,12 @@ def execute_run(spec: Dict, ctx: _Ctx,
             "(results/cell_state_impact.md §5): kill moves by up to 0.3252 "
             "absolute (1.77x relative) purely with the choice of state route, "
             "with tissue, drug, transport and RNG held identical. The CROSS-DRUG "
-            "RANKING is invariant across all three routes and is the defensible "
-            "output; kill_fraction and any kill ceiling on this section carry an "
-            "unresolved uncertainty of that size."
+            "KILL RANKING is invariant across all three STATE routes and is the "
+            "defensible output of that comparison; kill_fraction and any kill "
+            "ceiling on this section carry an unresolved uncertainty of that "
+            "size. The ranking is NOT invariant across the vascular delivery "
+            "law: correcting the one-way source changes the GBM top-1 "
+            "(results/transvascular_exchange_revalidation.md §4.1)."
         )
     if str(state_mode) != "oxygen":
         caveats.append(

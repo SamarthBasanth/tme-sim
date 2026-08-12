@@ -1471,14 +1471,28 @@ def write_report(res: Dict, path: str = _OUT_MD,
     A("")
     kill_same = o1["rank_by_kill"] == o2["rank_by_kill"]
     if kill_same:
-        A("**The kill ordering is IDENTICAL on both patients.** That is the "
-          "headline, and the immediate next question is whether it is identical "
-          "for a *trivial* reason.")
+        A("**The kill ordering is IDENTICAL on both patients** — across TISSUE, "
+          "which is the axis this report varies. That is the headline, and the "
+          "immediate next question is whether it is identical for a *trivial* "
+          "reason.")
     else:
         A("**The kill ordering CHANGES on the second patient.** A different "
           "ordering on a different real tumour is a legitimate finding — real "
           "inter-patient heterogeneity — not a failure. What follows is the check "
           "on whether the change is biology or bookkeeping.")
+    A("")
+    A("**Whichever branch fired, the axis is tissue and the quantity is KILL.** "
+      "Holding the delivery LAW fixed is a condition of both statements, not a "
+      "result of either. Both sections here run the shipped one-way vascular "
+      "source `S = PS*Cp`; under the corrected gradient-driven `S = PS*(Cp - C)` "
+      "the GBM kill ordering changes at top-1 (cisplatin -> vincristine) and in "
+      "the top-3 set on both panels, because the correction re-weights each drug "
+      "by its own `bbb_penetrance` — one of the very 'drug properties identical "
+      "on both sections' that §6.5 credits for the robustness seen here. And name "
+      "the quantity: on breast the delivery (AUC) ordering is preserved exactly "
+      "(rho = 1.000) while the kill ordering scrambles (rho = 0.830). See "
+      "`results/transvascular_exchange_revalidation.md` §4.1; every exchange-arm "
+      "figure there is conditional on `PS_SCALE_S_INV` (§7.3).")
     A("")
     A("### 3.4 Is the ordering trivially the IC50 ordering?")
     A("")
@@ -1560,8 +1574,13 @@ def write_report(res: Dict, path: str = _OUT_MD,
     A("")
     A("**Consequence.** Absolute kills and absolute AUCs are *not* comparable "
       "between the two sections. The **ordering** and the **within-section "
-      "spread** are the transportable quantities, and those are what §3.3 "
-      "reports.")
+      "spread** are the quantities transportable ACROSS TISSUE, and those are "
+      "what §3.3 reports. Transportable across tissue is not the same as "
+      "invariant: both mechanisms above are common-mode (they suppress every "
+      "drug together), which is exactly why they cancel — and exactly why this "
+      "says nothing about a drug-specific change such as the vascular delivery "
+      "law, which does move the ordering "
+      "(`results/transvascular_exchange_revalidation.md` §4.1).")
     A("")
 
     # --- §4 -------------------------------------------------------------------
@@ -1887,6 +1906,17 @@ def write_report(res: Dict, path: str = _OUT_MD,
       "them (the typing threshold and the 7.5 µm vessel radius) are entangled "
       "with the grid and with panel sparsity in a way that a single section "
       "could never expose.")
+    A("")
+    A("**One qualification on 'dominated by drug properties'.** That is the "
+      "reason the ordering travels across tissue, and it is also the reason it "
+      "does NOT survive a change to the delivery law. `bbb_penetrance` is one of "
+      "those drug properties, it spans 47× across the GBM panel, and the "
+      "corrected gradient-driven source re-weights each drug by exactly it — "
+      "changing the GBM top-1 (cisplatin → vincristine) and the top-3 set on "
+      "both panels, and swapping 4 of 45 GBM pairs, two across gaps of 40.5 % "
+      "and 35.6 % of the leader's kill. Robustness to tissue is not robustness "
+      "to the law that turns a drug property into an exposure "
+      "(`results/transvascular_exchange_revalidation.md` §4.1).")
     A("")
 
     # --- §7 caveats -------------------------------------------------------------

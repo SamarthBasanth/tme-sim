@@ -771,8 +771,9 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
       f"{_f(dox0['coverage_1.0x'])} -> {_f(doxmax['coverage_1.0x'])} |")
     a(f"| predicted kill, same range | {_f(dox0['kill_fraction'])} -> "
       f"{_f(doxmax['kill_fraction'])} |")
-    a(f"| **cross-drug RANKING across the whole sweep** | "
-      f"**{'INVARIANT' if sw['ranking_invariant'] else 'CHANGES'}** |")
+    a(f"| **cross-drug KILL RANKING across the whole sweep (this term only)** | "
+      f"**{'INVARIANT' if sw['ranking_invariant'] else 'CHANGES'}** — "
+      f"not a general invariance; the delivery law does change it, §4.1 |")
     a(f"| spatial structure ratio (sparsest / densest immune quintile) | "
       f"**{_f(obs['structure_ratio'], 4)}x**, permutation p = "
       f"{_f(sp['p_structure_ratio'], 4)} |")
@@ -1098,6 +1099,20 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
       "temozolomide on this tissue\"* survives every sequestration strength "
       "tested; a claim about an absolute kill fraction does not.")
     a("")
+    a("**And that is precisely the limit of the claim.** The reason given above "
+      "— same strength on all three drugs, so it cancels out of a comparison — "
+      "is exactly why this sweep cannot speak for a DRUG-SPECIFIC perturbation. "
+      "The vascular delivery law is one. Correcting the one-way source "
+      "`S = PS*Cp` to the gradient-driven `S = PS*(Cp - C)` attenuates each drug "
+      "by `(clearance+binding)/(PS + clearance+binding)` with PS driven by "
+      "`bbb_penetrance`, which spans **47x** across the GBM panel, and it changes "
+      "the GBM top-1 (cisplatin -> vincristine), changes the top-3 set on both "
+      "panels and swaps 4 of 45 GBM pairs. Note also that the quantity ranked "
+      "matters: on breast the AUC ranking is preserved exactly (rho = 1.000) "
+      "while the kill ranking scrambles (rho = 0.830), because the Hill map "
+      "saturates. See "
+      "`results/transvascular_exchange_revalidation.md` §4.1.")
+    a("")
 
     # ---------------- §5 -----------------------------------------------------
     a("## 5. THE SPATIAL QUESTION — is the reduction structured, or just smaller?")
@@ -1394,10 +1409,17 @@ def write_report(ident: Dict, fields: List[Dict], sw: Dict, sp: Dict,
           f"(p = {_f(p_sr, 4)}), so what the analysis actually establishes is "
           f"that exposure is structured by local CELLULARITY. Quoting it as a "
           f"macrophage effect would over-claim, and this report does not.")
-    a("4. **The ranking is safe either way.** "
-      f"{'The cross-drug ranking is invariant across the entire swept range' if sw['ranking_invariant'] else 'The ranking moves within the swept range'}, "
-      "so no comparative conclusion in `results/` is at risk from this term "
-      "being off — or from it being turned on.")
+    a("4. **The ranking is safe against THIS term either way.** "
+      f"{'The cross-drug KILL ranking is invariant across the entire swept range' if sw['ranking_invariant'] else 'The KILL ranking moves within the swept range'}, "
+      "so no comparative conclusion in `results/` is at risk from **this** term "
+      "being off — or from it being turned on. That is a statement about the "
+      "immune sink, which is applied at the same strength to every drug, and it "
+      "does not generalise: the vascular delivery law is drug-specific and does "
+      "change the GBM top-1, so comparative conclusions ARE at risk from it "
+      "(`results/transvascular_exchange_revalidation.md` §4.1). This module also "
+      "calls `simulate_drug_transport` directly, so "
+      "`PDEConfig(transvascular_exchange=True)` is a silent no-op here (§6 of the "
+      "same file) — every number in this report is a one-way-law number.")
     a("")
     a("### 7.1 What measurement would settle it")
     a("")

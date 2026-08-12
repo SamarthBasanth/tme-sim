@@ -364,8 +364,14 @@ axis — naming the axis, the genes, and the fact that the state is then assigne
 on any panel carrying no hypoxia-response transcript, that **absolute kill must not be
 quoted from that section under any state route**, because no route clears the bar
 there and the kill moves up to 0.3252 absolute across the three
-(`results/cell_state_impact.md` §5). The cross-drug ranking is invariant across all
-three routes and is the defensible output.
+(`results/cell_state_impact.md` §5). The cross-drug **kill** ranking is invariant
+across all three **state** routes and is the defensible output of that
+comparison. It is **not** invariant across the vascular delivery law: correcting
+the one-way source `S = PS*Cp` to `S = PS*(Cp - C)` re-weights every drug by its
+own `bbb_penetrance` (47x spread on the GBM panel) and changes the GBM top-1,
+cisplatin -> vincristine
+([`results/transvascular_exchange_revalidation.md`](../results/transvascular_exchange_revalidation.md)
+§4.1). The warning strings say so.
 
 ### The advection CFL
 
@@ -472,6 +478,15 @@ PDE's falsification (`results/oxygen_demotion.md`), and the absence of any
 outcome label anywhere in this repository. An item that does not apply to a
 section is still returned, saying why — a caveat that disappears cannot be
 audited.
+
+> **Outstanding on the ranking-is-the-output limit.** Its body in
+> `app/server/report.py::build_limits` (`id: ranking_is_the_output`) still reads
+> "INVARIANT across all three cell-state routes", unscoped. The claim is true of
+> the state routes and is not true of the vascular delivery law, which changes
+> the GBM top-1 — see
+> [`results/transvascular_exchange_revalidation.md`](../results/transvascular_exchange_revalidation.md)
+> §4.1. That string was outside the file set of the pass that scoped the rest of
+> these surfaces and still needs the same treatment.
 
 `render_html()` inlines `app/web/css/tokens.css` and emits **one self-contained
 file**: no external stylesheet, webfont, image, script or fetch of any kind, so
