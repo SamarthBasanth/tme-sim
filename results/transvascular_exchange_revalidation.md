@@ -378,6 +378,64 @@ re-run the high-permeability drugs at dx = 8-10 um to converge the §4.1
 magnitudes; then regenerate the affected reports and flip the default in a
 single commit that also updates the marketing copy.
 
+### 7.1 Status of that sequencing, and the one thing that blocks it
+
+| prerequisite | status |
+|---|---|
+| Rewrite the ranking claim on the landing page | **DONE**, earlier in this branch |
+| Re-run high-permeability drugs at dx = 8-10 um | **DONE** — measured, and it falsified its own prediction; see the struck-through entry in §5. dx = 12 um is adequate |
+| Rewrite the ranking claim across the rest of the repo | see the sweep of `README.md` and the affected `results/` docs; every surviving claim names whether it is about delivery/AUC rank or kill rank |
+| Regenerate every affected results doc | **BLOCKED — on data, not on judgement** |
+| Flip the default | blocked behind the row above |
+
+**What blocks regeneration is the environment, not the work.** Regenerating any
+affected doc means re-running the real-tissue pipeline, and the tissue is not
+obtainable from a session container: the primary Xenium GBM section (~17 MB, the
+tissue behind every headline result) is served from `cf.10xgenomics.com`, which
+the egress policy denies at CONNECT with a 403 (measured 2026-08-12). The other
+data hosts are unreachable from the same environment — `ftp.ncbi.nlm.nih.gov`,
+`glioblastoma.alleninstitute.org` and `cog.sanger.ac.uk` all fail to connect. So
+the regeneration pass has to run somewhere `data_cache/` already exists. Nothing
+about it is unresolved; it needs a machine with the data on it.
+
+### 7.2 The flip is code-ready, and that was measured rather than assumed
+
+Static sweep via `tmesim.validation.propagation` on this tree: **34 files
+contain a solver call site, 8 of them bypass the engine and call
+`simulate_drug_transport` directly** (`experiments/dose_schedule`,
+`experiments/regimen`, `validation/immune_sink_impact`,
+`validation/kill_calibration`, `validation/numerical_rigor`,
+`validation/pk_reality`, `validation/vessel_profile`, plus the solver and the
+engine themselves). Those are exactly the paths where the flag is a silent
+no-op, per §6. **`undeclared_direct_callers()` returns 0** — every one of them is
+declared and guarded, so the class of error that would have made five of the
+eleven re-validations silently report "nothing changed" is now caught by a check
+rather than by someone remembering. A file that starts calling the solver
+tomorrow shows up in that sweep whether or not anyone thought about it.
+
+### 7.3 PS_SCALE_S_INV and this flag must flip in the SAME pass
+
+This was not in the original sequencing and it changes it. §6.2 established that
+the engine's delivery term obtains `s^-1` from an implicit factor of exactly
+1 s^-1; that factor is now named `PS_SCALE_S_INV` (`tmesim/treatment/drugs.py`),
+defaults to 1.0 so every published number is bit-identical, and has a calibrated
+value of **0.16122 1/s** fit against measured rodent brain PS products.
+
+Both constants rescale every absolute delivery number in `results/`, and both
+therefore require the same regeneration pass. More sharply: **every exchange-on
+number in this document was produced at `PS_SCALE_S_INV = 1.0`, and a calibrated
+scale would change all of them.** Flipping `transvascular_exchange` while leaving
+the rate scale at an unjustified 1.0 would republish the whole results tree
+carrying a second layer of conditional numbers — trading one known-conditional
+state for another, at the cost of a full regeneration. Flip both, once, or
+neither.
+
+The ordering inside that single pass: calibrate and set `PS_SCALE_S_INV`, set
+`transvascular_exchange = True`, regenerate, re-check §4.1's top-1 against the
+regenerated panel (the cisplatin → vincristine change is what the ranking rewrite
+is written against, and it must be re-confirmed at the calibrated scale rather
+than assumed to survive), then update the marketing copy in the same commit.
+
 ## 8. Provenance
 
 Eleven parallel re-validations, each reproducing its module's published
