@@ -1,8 +1,8 @@
 # Data Access Plan — unlocking the validation frontier
 
-*Written 2026-07-27. Companion to `results/DATA_HUNT.md` (the 39-agent, 164-dataset sweep),
-`results/SESSION_AUDIT.md` (the rigour audit), and `results/ranking_robustness.md` §8 (which
-names the decisive measurement).*
+*Written 2026-07-27. Fact-checked and updated 2026-08-12 (§0, §4, §8, §11). Companion to
+`results/DATA_HUNT.md` (the 39-agent, 164-dataset sweep), `results/SESSION_AUDIT.md` (the
+rigour audit), and `results/ranking_robustness.md` §8 (which names the decisive measurement).*
 
 **This document adds nothing to the code and changes no result.** It is the access plan for
 the four or five measurements that would move `tmesim` from "a transport model with a
@@ -11,6 +11,18 @@ them is a partnership, purchase or application — not a download.
 
 Outreach drafts live in [`docs/outreach/`](outreach/). **They are drafts for human review and
 must not be sent unedited.**
+
+> ## Status, in one block
+>
+> | | |
+> |---|---|
+> | **Axis that cannot be validated from open data** | **Response** — the delivery→kill link, in space. |
+> | **Why** | No dataset anywhere, open or controlled, pairs a measured spatial drug distribution with a measured treatment response in the same tumour. 164 datasets swept 2026-07-27; landscape re-checked 2026-08-12 (§11) with the same result. For glioma + temozolomide there is no spatial drug map at all — METASPACE returns zero. |
+> | **Is this a to-do item?** | **No.** It is a structural limit of the data that exists. No further code, search or compute in this repository removes it. |
+> | **The single experiment that would close it** | The Agar/White adavosertib GBM platform — drug µM per pixel at 30 µm raster in ABTC phase-1 patient tissue, co-registered with phosphoproteomics and t-CyCIF response markers. **No accession.** Both published data-availability statements (2022, 2025) say "available on request". §4. |
+> | **What it would take** | A collaboration request on human-subject tissue from a closed trial: IRB pathway + DUA + a counterparty institution. 6–18 months, real probability of no reply. |
+> | **State of the request** | **Written, fact-checked, and UNSENT.** Four drafts in [`docs/outreach/`](outreach/). No person or group named in them has been contacted; none knows this project exists. |
+> | **What is blocking each draft** | 01 (Agar/Santagata) and 03 (dbGaP): institutional affiliation, gate G4. 02 (Erasmus MC) and 04 (GSE324268 depositors): nothing but a human decision to send, plus writing the pre-registration they promise, which does not yet exist. |
 
 ---
 
@@ -22,7 +34,8 @@ State this, unchanged, in every approach. It is the reason anyone would say yes.
 |---|---|
 | **What is built** | A patient-specific GBM microenvironment reconstruction (10x Xenium 319-gene and 480-gene panels, 4 Visium sections) feeding a mechanistic reaction–diffusion transport solver and a Hill/PD kill layer. All inputs measured; the synthetic-data era is deleted from the package. |
 | **What was found by attacking it** | **11 distinct defects**, several mutually cancelling and invisible to a green 55-test suite (`results/SESSION_AUDIT.md`). Every headline number published before the audit was wrong in at least one way. |
-| **What is externally validated** | **Delivery/partition, in human glioma**: scored against 125 tissue samples across 42 patients plus 27 PMID-anchored regional PK measurements. **~2× geometric-mean fold error**, 6/6 drugs within 10×, cross-drug penetrant-vs-excluded separation 3.65× predicted against 4.66× measured. Vascular area fraction 2.50% predicted vs 2.1 ± 0.3% measured (untuned). Reconstruction cross-platform Pearson 0.997. |
+| **What is externally validated** | **Delivery/partition, in human glioma**: scored against 125 tissue samples across 42 patients plus 27 PMID-anchored regional PK measurements. **~2× geometric-mean fold error** (1.995×), 6/6 drugs within 10×, worst case 6.94×. Regional contrast-enhancing-vs-non-enhancing ratios 1.19× / 5.87× predicted against 1.45× / 4.26× measured, after the additive barrier leak was implemented (L = 0.238). *Corrected 2026-08-12: this row previously read "separation 3.65× predicted against 4.66× measured" and "Reconstruction cross-platform Pearson 0.997". **Both are wrong as current claims** — 3.65× is the pre-fix separation (post-fix the model predicts 17.20×, an over-separation), and the 0.997 was **retracted** in `results/revalidation.md`. See §8.* |
+| **What is NOT validated at the reconstruction level** | Cross-platform composition concordance is an **open question**, not a pass. Every reconstruction-level external validation this project has made has been retracted or fails on a held-out section; every transport-level one has held. That asymmetry is the most informative pattern in the audit and it is not flattering to the part of the model that is easiest to make look impressive. |
 | **What was falsified** | The **oxygen PDE** as a value-add — beaten by plain distance-to-nearest-vessel (ρ −0.150 vs −0.113) and by its own undiffused source. The **`penetration_index`** metric — definitionally unable to discriminate drugs; retired. Both retractions are published in the repo. |
 | **What is NOT validated** | **Response.** The delivery→kill link has never been tested in space, because no open dataset pairs a measured spatial drug distribution with a measured treatment response in the same tumour. Not one, anywhere. |
 | **Stage** | Research prototype. Not clinically validated, not a device, no regulatory pathway, no patient has been or will be treated on its output. |
@@ -362,6 +375,38 @@ The data-availability statement, verbatim from PMC:
 > via the PRIDE partner repository with the dataset identifier PXD018782 and
 > 10.6019/PXD018782. **The MALDI-MSI data are available upon request.** The processed t-CyCIF
 > montage images were uploaded to Omero."
+
+**And the trial report says the same thing again, three years later.** Lee EQ, Alexander BM,
+Romo CG, Supko JG, **Agar NYR**, …, **Santagata S**, …, **Wen PY**. *Phase I Study of
+Adavosertib with Radiotherapy and Temozolomide in Newly Diagnosed Glioblastoma and Intratumoral
+Drug Levels in Recurrent Glioblastoma.* **Clin Cancer Res** 2025;31(6):983–992.
+**PMID 39820282, PMC11913579**, doi:10.1158/1078-0432.CCR-24-2311. Verified from PMC
+2026-08-12; its data-availability statement, verbatim:
+
+> "The data that support the findings of this study are available on request from the
+> corresponding author. The data are not publicly available due to privacy restrictions."
+
+This paper is the better primary citation for the outreach draft, and it adds three facts the
+2022 paper does not:
+
+- **The MSI quantitation is absolute, not arbitrary ion counts.** MALDI-FT-ICR MSI on a 9.4 T
+  instrument at a **30 µm laser raster**, quantified against a gelatin/brain-homogenate mimetic
+  calibration series (AZD1775 at 1, 2, 5, 10, 15, 20, 100 µM plus a blank). Measured range
+  **970 nM–7,270 nM** across **10 specimens from 6 patients** (3 specimens from 2 patients at
+  200 mg — 2 CE, 1 NCE; 7 from 4 patients at 425 mg — 3 CE, 4 NCE).
+- **Their two modalities disagree on region, and that disagreement is exactly what this model
+  outputs.** LC-MS/MS on homogenates gives mean intratumoral:plasma 4.18 ± 3.36 in
+  contrast-enhancing vs 0.74 ± 0.63 in non-enhancing tissue (200 mg cohort; 7.30 ± 3.13 vs
+  2.62 ± 3.00 at 425 mg), while the MSI shows "no apparent correlation between drug
+  concentration and contrast-enhancing versus non-contrast enhancing tumour". The paper
+  attributes this to specimen allocation and MSI sensitivity.
+- **The local drug↔response coupling is reported but not deposited.** "Regions of high
+  adavosertib levels showed increased levels of DNA damage response as measured by Nibrin (NBN)
+  pS343." That sentence is the axis this project cannot validate, measured, in the right
+  disease, and unavailable.
+- **The trial is closed.** NCT01849146 enrolled August 2013 – May 2020, terminated 2020-05-05,
+  71 patients, 12 through the intratumoral-drug-distribution arm, 2 through microdialysis (with
+  catheter failures). Nothing further will be collected.
 
 One of three modalities is self-serve:
 

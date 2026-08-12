@@ -21,6 +21,15 @@
 >
 > **Priority 4.** This file exists so the text is ready the day the gate opens, and so nobody
 > re-researches the mechanics.
+>
+> **Fact-check pass 2026-08-12.** No application has been filed. Gate **G4** (an affiliation or
+> a collaborating PI) has not opened, so nothing here has become filable. The Research Use
+> Statement's validation figures were re-checked against `results/glioma_regional_pk.md` and
+> are current. **Two things this route does not do, stated here so they are not rediscovered
+> at review:** it cannot validate the drug response axis — radiation dose is not drug
+> concentration — and it cannot supply a measured spatial *drug* field, because nothing in the
+> open or controlled imaging world measures a therapeutic in tissue. This is the *shape* test,
+> and only that.
 
 ---
 
@@ -207,3 +216,8 @@ worthwhile: it shows the collections were read rather than keyword-matched.
 - [ ] The hypothesis is **pre-registered** with a timestamp and git hash before the data arrives.
 - [ ] The "radiation dose is not drug concentration" caveat appears in the RUS, in the
       pre-registration, and in the caption of every resulting figure.
+- [ ] **The pre-registration file actually exists.** As of 2026-08-12 there is none in
+      `results/`. The RUS says "one pre-registered hypothesis"; that must be true before the
+      sentence is written, not after.
+- [ ] `phs004225` accession, version and release date re-checked on the dbGaP study page the
+      week of filing. The values recorded in §2.1 were correct when written and versions move.
