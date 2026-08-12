@@ -172,6 +172,99 @@ CELL_STATE_ROUTES: Tuple[Dict, ...] = (
          hypoxic=0.0026, f_state=0.9550, kind="distance-to-vessel banding"),
 )
 
+#: ``F_state`` this module's section-3 verdict table was PUBLISHED at, and the
+#: mean tumour O2 that produced it. Both are quoted from the shipped
+#: configuration; ``SHIPPED_F_STATE`` is re-checked against the live run at
+#: report-assembly time (see :func:`contingency_section`) so that a
+#: regeneration under a changed oxygen configuration cannot silently leave
+#: section 3.1's premises stale.
+SHIPPED_F_STATE: float = 0.5502
+#: Mean oxygen at tumour cells under the shipped configuration. Measured
+#: independently by two other workstreams and reported identically by both:
+#: ``results/oxygen_level_shift.md`` section 2 and
+#: ``results/oxygen_supply_calibration.md`` section 6.1.
+SHIPPED_MEAN_O2_TUMOUR: float = 0.3486
+
+#: **Configurations under which THIS module's own ``run()`` + ``analyse()`` were
+#: re-run, unmodified, by other workstreams — and the section-3 panel count each
+#: one produced.**
+#:
+#: Nothing in this tuple is computed by this module. Every row is a number
+#: lifted verbatim from the cited report, which obtained it by re-running this
+#: file's ``run()`` and ``analyse()`` under a different oxygen configuration or
+#: a different delivery-source geometry, changing nothing else. It is kept here
+#: as DATA rather than as prose in ``results/kill_calibration.md`` for one
+#: reason: this module regenerates that document from scratch, so a contingency
+#: disclosure written only into the markdown would be deleted by the next run.
+#: That failure mode has already bitten this project twice (the immune-sink and
+#: oxygen-demotion disclosures).
+#:
+#: ``ratio_tmz`` is the predicted temozolomide 3-D:2-D kill ratio at the same
+#: reporting concentration section 3 uses (100 uM, the ex-vivo assay). ``f_state``
+#: is the (b) factor of section 2 under that configuration; ``None`` means the
+#: configuration does not touch the oxygen field at all.
+#:
+#: ``key`` and ``note`` are maintainer-facing and deliberately NOT emitted into
+#: the markdown -- ``note`` records why each row matters so that whoever next
+#: revises this tuple can tell whether a row is still current without
+#: re-reading the source report. Section 3.1's prose states each of those
+#: points in its own words; the field is provenance, not a duplicate.
+VERDICT_CONTINGENCY: Tuple[Dict, ...] = (
+    dict(
+        key="kde",
+        config="historical KDE oxygen field (`mode='kde'`, the vascular-density "
+               "convention this project shipped until 2026-07-28, pre-`ceb96c0`)",
+        mean_o2=0.5945, f_state=1.0000,
+        ratio_tmz=0.46784, ratio_cis=0.49795, ratio_dox=0.36883,
+        n_pass=2, n_tot=3, fails=("temozolomide",),
+        source="`results/oxygen_level_shift.md` section 5.1 (commit `cb7b0fe`)",
+        note="verified by re-running the unmodified generator, not projected",
+    ),
+    dict(
+        key="supply_only",
+        config="literature-derived oxygen `supply` ALONE "
+               "(194 s^-1 from Secomb 2020 PMID 31423930, `consumption` left at "
+               "the uncalibrated 0.02)",
+        mean_o2=0.9925, f_state=1.0000,
+        ratio_tmz=0.46784, ratio_cis=0.498, ratio_dox=0.369,
+        n_pass=2, n_tot=3, fails=("temozolomide",),
+        source="`results/oxygen_supply_calibration.md` section 6.2 (commit `1c2bf3d`)",
+        note="reproduces the KDE row's temozolomide ratio to all sixteen digits "
+             "(0.46783514742473475) by a completely unrelated route",
+    ),
+    dict(
+        key="joint_low",
+        config="JOINT source + sink calibration (`supply` 194, `consumption` 10)",
+        mean_o2=0.2614, f_state=0.5249,
+        ratio_tmz=0.33218, ratio_cis=0.277, ratio_dox=0.221,
+        n_pass=3, n_tot=3, fails=(),
+        source="`results/oxygen_supply_calibration.md` section 6.2 (commit `1c2bf3d`)",
+        note="a DIFFERENT model passing: 40 % HYPOXIC, not 90 % QUIESCENT",
+    ),
+    dict(
+        key="joint_high",
+        config="JOINT source + sink calibration (`supply` 194, `consumption` 20)",
+        mean_o2=0.1614, f_state=0.4167,
+        ratio_tmz=0.34240, ratio_cis=0.21644, ratio_dox=0.170,
+        n_pass=3, n_tot=3, fails=(),
+        source="`results/oxygen_supply_calibration.md` section 6.2 (commit `1c2bf3d`)",
+        note="cisplatin's 0.21644 sits only 3.7 % above its band floor of "
+             "0.20864 — a modestly different `consumption` fails cisplatin "
+             "instead of temozolomide",
+    ),
+    dict(
+        key="subgrid",
+        config="alternative delivery-source geometry (`geometry='subgrid'`) — "
+               "RECOMMENDED AGAINST on physical grounds, so not a live threat",
+        mean_o2=None, f_state=None,
+        ratio_tmz=0.1550, ratio_cis=0.1042, ratio_dox=0.0660,
+        n_pass=1, n_tot=3, fails=("temozolomide", "cisplatin"),
+        source="`results/delivery_source_geometry.md` section 5.2 (commit `198e461`)",
+        note="not an oxygen change at all — the one perturbation in this table "
+             "that moves `F_penetration` rather than `F_state`",
+    ),
+)
+
 # --------------------------------------------------------------------------- #
 # 1. THE BRIDGE PARAMETER — from the literature, never fitted
 # --------------------------------------------------------------------------- #
@@ -804,6 +897,13 @@ def run(dx_um: float = DX_UM, drugs: Sequence[str] = DRUGS,
     out["pd_config"] = {"hypoxia_resistance": pd_cfg.hypoxia_resistance,
                         "quiescent_resistance": pd_cfg.quiescent_resistance,
                         "max_kill_rate": pd_cfg.max_kill_rate}
+    # The ABSOLUTE oxygen cut-offs the cell-state labels are banded against
+    # (``cells.agents.update_cell_states``: HYPOXIC below t, QUIESCENT on
+    # [t, 2t), VIABLE above). Recorded because section 3.1's mechanism turns on
+    # where this section's mean tumour O2 sits relative to the QUIESCENT
+    # ceiling, and that must regenerate with the run rather than be hard-coded.
+    out["o2_hypoxia_threshold"] = float(base_cfg.oxygen.hypoxia_threshold)
+    out["o2_quiescent_band_hi"] = float(2.0 * base_cfg.oxygen.hypoxia_threshold)
     out["nominal_plasma_mean_uM"] = window_plasma_mean(pk, WINDOW_S, DT_S)
 
     log("engine prologue (oxygen -> cell states -> IFP), once ...")
@@ -1167,6 +1267,284 @@ def _fmt(x, n=4, dash="—"):
         return str(x)
 
 
+def _f_state_one_verdicts(res: Dict, A: Dict) -> Dict[str, Dict]:
+    """Section 3's verdict re-scored at ``F_state = 1.0``, per drug.
+
+    Section 5 sweeps the forced quiescent fraction down to 0 %, which drives
+    ``F_state`` to exactly 1.0, and propagates that endpoint only into ABSOLUTE
+    kill. This closes the loop by propagating it into section 3's verdict too.
+
+    The re-scored ratio is not a re-run and not an approximation: if every
+    ``resistance_i`` is 1.0 then ``kill_3D = mean_i[p_hill(E_i) * sens_i]`` and
+    ``kill_2D = p_hill(C_bath) * mean_i[sens_i]``, so the exact 3-D:2-D ratio
+    equals ``F_penetration`` identically and the interaction term is exactly 1.
+    The band is this run's own, unmodified.
+    """
+    out: Dict[str, Dict] = {}
+    for name, d in res["per_drug"].items():
+        h, t = d["headline"], A["tests"][name]
+        r1 = float(h["f_penetration"])
+        v = ratio_test(r1, t["lit_ratio_lo"], t["lit_ratio_hi"])
+        margin = (r1 - t["lit_ratio_hi"]) / t["lit_ratio_hi"] * 100.0
+        out[name] = {
+            "label": t["label"], "ratio_shipped": t["predicted_ratio"],
+            "verdict_shipped": t["verdict"], "ratio_one": r1,
+            "verdict_one": v["verdict"], "inside_one": v["inside"],
+            "fold_one": kill_ratio_to_ic50_fold(
+                r1, h["c_bath_uM"], d["ic50_uM"], d["hill"]),
+            "lit_ratio_lo": t["lit_ratio_lo"], "lit_ratio_hi": t["lit_ratio_hi"],
+            "over_ceiling_pct": margin,
+        }
+    return out
+
+
+def _contingency_limitation(res: Dict, A: Dict) -> str:
+    """Limitation 0 — the pointer at section 3.1, in the same shape
+    ``results/kill_calibration_breast.md`` limitation 0 uses."""
+    tests = A["tests"]
+    n_tot = len(tests)
+    n_pass = sum(1 for t in tests.values() if t["inside"])
+    one = _f_state_one_verdicts(res, A)
+    n_one = sum(1 for r in one.values() if r["inside_one"])
+    fail_one = [n for n, r in one.items() if not r["inside_one"]]
+    alt = ", ".join(f"{r['n_pass']}/{r['n_tot']}" for r in VERDICT_CONTINGENCY)
+    return (
+        "**ADDED AFTER PUBLICATION — the section 3 verdict is CONTINGENT on "
+        f"uncalibrated oxygen constants, and is not {n_pass}/{n_tot} under "
+        "every configuration that has been measured.** Three separate "
+        "workstreams have since re-run this module unmodified: under the "
+        "historical KDE oxygen field this project shipped until 2026-07-28 the "
+        "panel is 2/3 with temozolomide — the matched anchor — failing "
+        "(`results/oxygen_level_shift.md`); under a literature-derived oxygen "
+        "`supply` alone it is 2/3, failing on the same drug at a "
+        "bit-identical ratio (`results/oxygen_supply_calibration.md`); under a "
+        "joint source+sink calibration it is 3/3 but with cisplatin only 3.7 % "
+        "above its band floor; and under an alternative delivery-source "
+        "geometry it is 1/3 (`results/delivery_source_geometry.md`, a change "
+        "recommended AGAINST on physical grounds, so not a live threat). "
+        f"Panel counts across those five arms: {alt}. Propagating this "
+        "report's OWN section 5 sweep to its `F_state = 1.0000` endpoint "
+        f"reproduces the {n_one}/{n_tot} result"
+        + (f" ({', '.join(fail_one)} failing)" if fail_one else "")
+        + ". **What survives untouched:** coverage is EXACTLY invariant across "
+        "these configurations and the cross-drug RANKING is unchanged across "
+        "all four orderings, because a drug-independent multiplier cannot "
+        "reorder drugs — so the ranking claim and the coverage claim are not "
+        "affected at all. **What is contingent is the per-drug PASS/FAIL "
+        "against absolute literature bands, and only that.** This is a "
+        "contingency disclosure, not a retraction: the engine reproduces this "
+        "report's numbers and the verdicts are correct for the shipped "
+        "configuration. Full record, table and mechanism: **section 3.1**."
+    )
+
+
+def contingency_section(res: Dict, A: Dict) -> str:
+    """Section 3.1 — what the section-3 verdict is contingent on.
+
+    **This section must be emitted by the generator, not written into the
+    markdown by hand.** ``main()`` rewrites ``results/kill_calibration.md`` from
+    scratch on every run, so a disclosure that lives only in the document is
+    deleted by the next regeneration — the failure mode that already removed the
+    immune-sink and oxygen-demotion disclosures from this project once each.
+    """
+    L: List[str] = []
+    tests = A["tests"]
+    n_tot = len(tests)
+    n_pass = sum(1 for t in tests.values() if t["inside"])
+    f_state_live = float(res["state_breakdown"]["f_state"])
+    sb = res["state_breakdown"]
+    one = _f_state_one_verdicts(res, A)
+
+    L.append("### 3.1 CONTINGENCY DISCLOSURE — what this verdict depends on\n")
+    L.append(
+        "**Added after publication. This is a contingency disclosure, not a "
+        "retraction.** The engine reproduces every number in sections 2-5, the "
+        "harness is sound, and the verdicts above are correct FOR THE SHIPPED "
+        f"CONFIGURATION. What follows is the part the report did not say: the "
+        f"{n_pass}/{n_tot} panel above is **contingent on constants nobody had "
+        "calibrated when it was written**, and three separate workstreams have "
+        "since re-scored this test through this module's own unmodified code — "
+        "`run()` + `analyse()` for the two oxygen arms, and "
+        "`decompose` / `ratio_test` through a harness whose control arm "
+        "reproduces all three published ratios exactly for the delivery-"
+        "geometry arm — under configurations that change the count.\n")
+
+    # ---- the table -------------------------------------------------------
+    L.append("| configuration | mean tumour O2 | `F_state` | temozolomide "
+             "predicted ratio | panel | source |")
+    L.append("|---|---:|---:|---:|---|---|")
+    L.append(f"| **shipped — the configuration section 3 is computed under** | "
+             f"{SHIPPED_MEAN_O2_TUMOUR:.4f} | **{f_state_live:.4f}** | "
+             f"**{tests['temozolomide']['predicted_ratio']:.4f}** | "
+             f"**{n_pass}/{n_tot} PASS** | this run |")
+    for row in VERDICT_CONTINGENCY:
+        o2 = "unchanged" if row["mean_o2"] is None else f"{row['mean_o2']:.4f}"
+        fs = "unchanged" if row["f_state"] is None else f"{row['f_state']:.4f}"
+        fail_txt = ("" if not row["fails"]
+                    else " (" + ", ".join(row["fails"]) + " FAIL)")
+        L.append(f"| {row['config']} | {o2} | {fs} | "
+                 f"**{row['ratio_tmz']:.5f}** | "
+                 f"**{row['n_pass']}/{row['n_tot']}**{fail_txt} | "
+                 f"{row['source']} |")
+    L.append("")
+    L.append("*(Temozolomide's literature kill-ratio band is "
+             f"{tests['temozolomide']['lit_ratio_lo']:.5f}-"
+             f"{tests['temozolomide']['lit_ratio_hi']:.5f} — this run's own, "
+             "unmodified, in every row.)*\n")
+
+    L.append(
+        "**Read the table as a whole and the exposure is plain: of the five "
+        "alternative configurations that have been measured, three change the "
+        "count, and temozolomide — the drug this report calls its matched "
+        "anchor — is among the failures in all three of them.** The historical KDE "
+        "oxygen field is not a hypothetical: it is what this project actually "
+        "shipped until 2026-07-28, and the switch away from it "
+        "(commit `ceb96c0`, discrete vessels promoted to default) was made for "
+        "unrelated reasons and never re-derived against this verdict. Under it "
+        "temozolomide's predicted ratio is 0.46784 against a band ceiling of "
+        f"{tests['temozolomide']['lit_ratio_hi']:.5f} — "
+        f"{(0.46784 - tests['temozolomide']['lit_ratio_hi']) / tests['temozolomide']['lit_ratio_hi'] * 100:.1f} % "
+        "over the edge, a FAIL by a small margin but a FAIL.\n")
+
+    # ---- the mechanism ---------------------------------------------------
+    L.append("**The mechanism, and it is the same one every time.** Oxygen does "
+             "not enter the drug model as a drug property. It enters as a "
+             "**drug-independent per-cell resistance multiplier** — the (b) "
+             "factor `F_state` of section 2 — which multiplies straight into "
+             "the predicted ratio, because `predicted 3D:2D = F_penetration x "
+             "F_state`. Cell states are assigned by banding the simulated "
+             "oxygen field against ABSOLUTE cut-offs "
+             f"(`OxygenConfig.hypoxia_threshold` = {res['o2_hypoxia_threshold']:g}, "
+             f"QUIESCENT on [{res['o2_hypoxia_threshold']:g}, "
+             f"{res['o2_quiescent_band_hi']:g}), VIABLE above), and mean tumour "
+             f"O2 on this section sits at **{SHIPPED_MEAN_O2_TUMOUR:.4f}** — "
+             f"{res['o2_quiescent_band_hi'] - SHIPPED_MEAN_O2_TUMOUR:.4f} below "
+             f"the QUIESCENT band ceiling at {res['o2_quiescent_band_hi']:g}, "
+             f"with {sb['QUIESCENT']['fraction']*100:.1f} % of tumour cells "
+             "inside that one band. A small change in the oxygen LEVEL "
+             "therefore reshuffles a large fraction of cells across a single "
+             "absolute edge, which moves `F_state`, which multiplies directly "
+             "into the score. That is why an uncalibrated oxygen constant can "
+             "move a drug-response verdict at all, and why every row above "
+             "except the delivery-geometry one is the same lever read at a "
+             "different setting.\n")
+
+    L.append("**The oxygen constants themselves are not merely uncalibrated — "
+             "one of them is now known to be wrong.** "
+             "`results/oxygen_supply_calibration.md` derives "
+             "`OxygenConfig.supply` as a transvascular mass-transfer "
+             "coefficient in s^-1 and puts its literature value at 194-251 "
+             "s^-1 against the shipped 0.05, i.e. **4,570x too small** "
+             "(Secomb 2020, PMID 31423930). It is a **compensating** error: the "
+             "sink is ~140x too small as well, which is why the shipped "
+             "absolute pO2 looks plausible. Correcting the source alone gives "
+             "2/3; correcting both gives 3/3 — but that 3/3 is a different "
+             "model passing (40-71 % HYPOXIC instead of 90 % QUIESCENT), and "
+             "cisplatin then clears its own band floor by only 3.7 %.\n")
+
+    # ---- what is NOT undermined ------------------------------------------
+    L.append("**What is NOT undermined, stated precisely, because this must not "
+             "be overstated into 'the calibration is invalid'.**\n")
+    L.append("1. **Coverage is EXACTLY invariant** across these oxygen "
+             "configurations — `==`, not `isclose`. Re-derived independently "
+             "from `delivery_metrics.compute_all` on the engine's own transport "
+             "result, all four coverage statistics (`coverage_0.5x`, "
+             "`coverage_1x`, `coverage_2x`, `median_E_over_ic50`) compare "
+             "exactly equal for all three drugs "
+             "(`results/oxygen_level_shift.md` section 4). They cannot move, "
+             "because the oxygen field is not an input to the transport solve "
+             "at all.")
+    L.append("2. **The cross-drug RANKING is unchanged** — "
+             "`[cisplatin, doxorubicin, temozolomide]` by kill under the PDE, "
+             "by kill under the surrogate, and by coverage, under both "
+             "vascular modes: four orderings, one order. This is **structural, "
+             "not empirical luck**: a drug-independent multiplier cannot "
+             "reorder drugs.")
+    L.append("3. So **the ranking claim and the coverage claim stand "
+             "untouched.** What is contingent is narrower and it is exactly "
+             "this: each drug's PASS/FAIL against an ABSOLUTE literature band. "
+             "A near-common multiplier is invisible to a ranking and goes "
+             "straight into every absolute number — the same structure that "
+             "protects the ranking is what exposes the level.\n")
+
+    # ---- the section 5 / 5.1 gap, closed ---------------------------------
+    L.append("**The section 5 / 5.1 gap, closed.** Section 5 sweeps the forced "
+             "quiescent fraction to 0 %, which drives `F_state` to exactly "
+             "1.0000, and section 5.1 reports a measured route span reaching "
+             "0.9550 — but **both propagate that endpoint only into ABSOLUTE "
+             "kill, never into section 3's verdict**, and section 5 concludes "
+             "from it that cell state is 'non-dominant'. That endpoint is not a "
+             "hypothetical worst case: it is precisely the configuration this "
+             "project shipped until 2026-07-28, and it is also where a "
+             "literature-derived `supply` lands. Propagated into section 3 "
+             "(no re-run needed — at `F_state = 1.0` every `resistance_i` is "
+             "1.0, so the exact 3-D:2-D ratio equals `F_penetration` "
+             "identically and the interaction term is exactly 1):\n")
+    L.append(f"| drug | reporting concentration | ratio at this run's "
+             f"`F_state` = {f_state_live:.4f} | verdict | ratio at "
+             f"`F_state` = 1.0000 | implied IC50 fold | literature band | "
+             f"verdict |")
+    L.append("|---|---|---:|---|---:|---:|---|---|")
+    for name, r in one.items():
+        L.append(f"| {name} | {r['label']} | {r['ratio_shipped']:.4f} | "
+                 f"{r['verdict_shipped']} | **{r['ratio_one']:.5f}** | "
+                 f"{_fmt(r['fold_one'], 2)}x | "
+                 f"{r['lit_ratio_lo']:.4f}-{r['lit_ratio_hi']:.4f} | "
+                 f"**{r['verdict_one']}** |")
+    L.append("")
+    n_pass_one = sum(1 for r in one.values() if r["inside_one"])
+    failed_one = [n for n, r in one.items() if not r["inside_one"]]
+    L.append(
+        f"**At the `F_state = 1.0` endpoint of section 5's own sweep the panel "
+        f"is {n_pass_one}/{n_tot}"
+        + (f", and the drug that fails is {', '.join(failed_one)}.**"
+           if failed_one else ".**")
+        + " Section 5's 'non-dominant' conclusion is about the SIZE of the "
+        "absolute-kill movement (2.00x, against a 17.4x potency bar) and it "
+        "stands as such. It does not license the inference that cell state "
+        "cannot change a VERDICT, because a verdict is a comparison against a "
+        "fixed absolute edge, not a magnitude — and a movement of only "
+        f"{one['temozolomide']['ratio_one'] / one['temozolomide']['ratio_shipped']:.2f}x "
+        "on the ratio, well inside that same bound, steps temozolomide over "
+        "that edge. Both statements are true at once and the report previously "
+        "carried only the first.\n")
+    if failed_one:
+        L.append(f"This is the same {n_pass_one}/{n_tot} that "
+                 "`results/oxygen_level_shift.md` and "
+                 "`results/oxygen_supply_calibration.md` each measured by "
+                 "re-running the generator; the agreement is not a coincidence "
+                 "but the identity above, and this module's own "
+                 "`F_penetration` for temozolomide at the reporting "
+                 f"concentration is "
+                 f"{res['per_drug']['temozolomide']['headline']['f_penetration']:.17g} "
+                 "— the same sixteen digits both of those reports obtained "
+                 "independently, by two unrelated routes.\n")
+
+    # ---- staleness guard --------------------------------------------------
+    if abs(f_state_live - SHIPPED_F_STATE) > 5e-4:
+        L.append(
+            f"> **STALENESS WARNING, emitted automatically.** This run's "
+            f"`F_state` is {f_state_live:.4f}, not the {SHIPPED_F_STATE:.4f} "
+            f"the contingency table's non-`this run` rows were measured "
+            f"against. The oxygen configuration has moved since those "
+            f"re-runs, so the quoted alternative-configuration ratios are no "
+            f"longer anchored to the same baseline and must be re-measured "
+            f"before this section is trusted. Update `VERDICT_CONTINGENCY` and "
+            f"`SHIPPED_F_STATE` in `tmesim/validation/kill_calibration.py`.\n")
+
+    L.append("**What would settle it.** Nothing in this section can be closed "
+             "by better bookkeeping. `OxygenConfig.supply` and "
+             "`OxygenConfig.consumption` need a joint calibration that is "
+             "adopted rather than only derived, and the resulting field needs "
+             "to be checked against measured human-GBM pO2 (the joint arm "
+             "already brackets Lally 2006's 5.1 mmHg median, which is the most "
+             "encouraging fact in this section). Until that lands, quote "
+             f"section 3 as '{n_pass}/{n_tot} under the shipped configuration', "
+             "never as an unqualified property of the model.\n")
+
+    return "\n".join(L)
+
+
 def build_markdown(res: Dict, analysis: Dict) -> str:
     """Assemble ``results/kill_calibration.md`` from a completed :func:`run`."""
     L: List[str] = []
@@ -1351,6 +1729,10 @@ def build_markdown(res: Dict, analysis: Dict) -> str:
     L.append("")
     L.append(A["test_commentary"] + "\n")
 
+    # ---- 3.1 contingency disclosure ---------------------------------------
+    # Emitted by the generator ON PURPOSE -- see contingency_section's docstring.
+    L.append(contingency_section(res, A) + "\n")
+
     # ---- 4. the anchor and the absolute kills ----------------------------
     L.append("## 4. The anchor, and the absolute kills\n")
     L.append(f"Measured ex-vivo temozolomide response ({ex['source']}, "
@@ -1444,6 +1826,18 @@ def build_markdown(res: Dict, analysis: Dict) -> str:
              f"{ref:.4f}; the swept row at the model's own "
              f"{A['q_fraction']*100:.1f}% differs slightly because the real labels "
              f"are not perfectly exposure-ordered.\n")
+    _one = _f_state_one_verdicts(res, A)
+    _one_fail = [n for n, r in _one.items() if not r["inside_one"]]
+    _one_txt = (f"{len(_one) - len(_one_fail)}/{len(_one)}"
+                + (f", with {', '.join(_one_fail)} failing" if _one_fail else ""))
+    L.append("**This sweep is propagated into section 3's verdict, not only "
+             "into absolute kill — see section 3.1.** The 0 % row's "
+             "`F_state = 1.0000` is not a hypothetical worst case: it is the "
+             "configuration this project shipped until 2026-07-28, and it is "
+             "also where a literature-derived oxygen `supply` lands. At that "
+             f"endpoint the section 3 panel is {_one_txt}, so the "
+             "'non-dominant' reading below is about the SIZE of the movement "
+             "and does not extend to the verdict.\n")
     L.append(A["blocking_commentary"] + "\n")
 
     # ---- 5.1 reconciliation with the concurrent cell-state work -----------
@@ -1485,8 +1879,18 @@ def build_markdown(res: Dict, analysis: Dict) -> str:
         L.append("")
         L.append(A["combined_commentary"] + "\n")
 
+    L.append("**And the same caveat section 5 now carries applies here.** This "
+             "subsection propagates the measured route span "
+             f"({min(r['f_state'] for r in CELL_STATE_ROUTES):.4f}-"
+             f"{max(r['f_state'] for r in CELL_STATE_ROUTES):.4f}) into the "
+             "absolute-kill band above and nowhere else. Propagated into "
+             "section 3's verdict instead, the top of that span — and the "
+             "`F_state = 1.0000` endpoint beyond it — changes the panel count. "
+             "Section 3.1 does that propagation and states the result.\n")
+
     # ---- 6. limitations ----------------------------------------------------
     L.append("## 6. Limitations\n")
+    L.append(f"0. {_contingency_limitation(res, A)}\n")
     for i, lim in enumerate(A["limitations"], 1):
         L.append(f"{i}. {lim}")
     L.append("")
@@ -1716,6 +2120,20 @@ def _prose(res: Dict, A: Dict) -> Dict:
         f"essentially **on the literature median**, from a model that has never "
         f"been fitted to any 3-D-vs-2-D measurement. It could have missed by an "
         f"order of magnitude and did not.\n>\n"
+        f"> **That headline is CONTINGENT, and section 3.1 says on what — read "
+        f"it before quoting this line.** The {n_pass}/{n_tot} result holds "
+        f"under the SHIPPED configuration. Under the historical "
+        f"oxygen field this project shipped until 2026-07-28 the panel is "
+        f"**2/3, with temozolomide — the matched anchor — failing**; under a "
+        f"literature-derived oxygen `supply` alone it is **2/3** on the same "
+        f"drug at a bit-identical ratio; under a joint source+sink calibration "
+        f"it is **3/3** but with cisplatin only 3.7 % above its band floor; "
+        f"and under an alternative delivery-source geometry it is **1/3**. "
+        f"Oxygen enters as a drug-independent per-cell multiplier, so "
+        f"**coverage is exactly invariant and the cross-drug ranking is "
+        f"unchanged** — what is contingent is the per-drug PASS/FAIL against "
+        f"absolute bands, and only that. This is a contingency disclosure, not "
+        f"a retraction.\n>\n"
         f"> **This does NOT make absolute kill defensible yet, and the reason has "
         f"moved.** The test constrains the *product* of delivery and cell-state "
         f"resistance; it does not constrain either factor separately, and it says "
