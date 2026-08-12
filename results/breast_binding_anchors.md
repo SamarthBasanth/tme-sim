@@ -345,8 +345,10 @@ decay of `mean_tumor_auc`'s underlying mean interstitial concentration.
 *Prediction:* t½ = 2.1 min (5-FU) and 26 s (MTX), reproducing `ln2/k`
 analytically inside the engine, against Blakeley's measured MTX ECF terminal
 t½ of 3.15-14.51 h. This scores the magnitude claim *in the solver* rather than
-on paper, and it is the run that would catch a silent no-op — see
-`results/` propagation checker, commit 639358d.
+on paper, and it is the run that would catch a silent no-op — instrument it
+with `tmesim/validation/propagation.py` (commit 639358d), because a driver
+that calls `simulate_drug_transport` directly and forgets `exchange_k` returns
+a bit-identical, entirely plausible wrong answer.
 
 **E3 — the requirement ladder, reported as a requirement and NOT written back.**
 Sweep `k` for both drugs over [1e-4, 3e-2] /s at fixed measured PS and report
