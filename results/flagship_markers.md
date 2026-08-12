@@ -124,7 +124,7 @@ Five drugs, `sensitivity_mode='uniform'` (identical for every drug, so it cancel
 
 > **Reproduction gate — 8/8 values reproduce `results/cell_state_impact.md` §3.2 to 5e-05 absolute.** Three drugs x two state routes plus the two shared ceilings, i.e. the transport solve, both state routes and the PD mapping are all checked against an independently published run: temozolomide kill_oxygen 0.0184 vs 0.0184; temozolomide kill_markers 0.0219 vs 0.0219; cisplatin kill_oxygen 0.4362 vs 0.4362; cisplatin kill_markers 0.5155 vs 0.5155; doxorubicin kill_oxygen 0.2595 vs 0.2595; doxorubicin kill_markers 0.3073 vs 0.3073; kill ceiling (oxygen route, shared) 0.5502 vs 0.5502; kill ceiling (markers route, shared) 0.6490 vs 0.6490. This harness is running the project's pipeline, not a variant of it.
 
-> **But note what it does NOT reproduce, because it matters for reading every older number in `results/`.** `results/real_drug_panel.md` and `results/heldout_patient.md` quote *lower* kills for these same drugs on this same section — temozolomide 0.0147, lomustine 0.1975, cisplatin 0.3699, methotrexate 0.0162, doxorubicin 0.2165 — and this run does not reproduce them. The cause is a pipeline drift, not a harness difference: those reports' own reconstruction block records mean vascular density **0.0250** and mean oxygen **0.2955** on this section, where the current code gives **0.0268** and **0.3520** on identical inputs and an unchanged alpha = 148.61. More drug reaches the tissue, so every kill rises ~1.2x. `results/cell_state_impact.md` and `results/kill_calibration.md` postdate that change and agree with this run exactly. **The two older reports' absolute numbers are stale and should be regenerated; their RANKINGS are unaffected** (the ordering below is identical to theirs).
+> **But note what it does NOT reproduce, because it matters for reading every older number in `results/`.** `results/real_drug_panel.md` and `results/heldout_patient.md` quote *lower* kills for these same drugs on this same section — temozolomide 0.0147, lomustine 0.1975, cisplatin 0.3699, methotrexate 0.0162, doxorubicin 0.2165 — and this run does not reproduce them. The cause is a pipeline drift, not a harness difference: those reports' own reconstruction block records mean vascular density **0.0250** and mean oxygen **0.2955** on this section, where the current code gives **0.0268** and **0.3520** on identical inputs and an unchanged alpha = 148.61. More drug reaches the tissue, so every kill rises ~1.2x. `results/cell_state_impact.md` and `results/kill_calibration.md` postdate that change and agree with this run exactly. **The two older reports' absolute numbers are stale and should be regenerated; their KILL RANKINGS are unaffected BY THIS DRIFT** (the ordering below is identical to theirs). That is a claim about a ~1.2x common-mode rise in delivered drug, which moves every drug together and therefore cancels out of an ordering. It is not a claim that those reports' rankings are unconditional: a DRUG-SPECIFIC change to the delivery law does move them ([`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §4.1).
 
 ## 4. Does the ranking hold across SECTIONS and across ROUTES at once?
 
@@ -143,6 +143,51 @@ Five drugs, `sensitivity_mode='uniform'` (identical for every drug, so it cancel
 
 * cisplatin > doxorubicin > lomustine > methotrexate > temozolomide — `brain_319`/markers, `brain_319`/oxygen
 * cisplatin > doxorubicin > lomustine > temozolomide > methotrexate — `gse324268_366`/markers, `gse324268_366`/oxygen, `io_480`/markers, `io_480`/oxygen
+
+> ### Resolving this file's own contradiction, in favour of the table above
+>
+> **This file asserts BOTH "the ranking is NOT invariant" (here, §4) and "invariant
+> across sections AND routes" (§6) and "cross-drug ranking | either — it is
+> invariant (§4)" (§7). They cannot all stand. The measured table above is the
+> authority and the other two are wrong as written** — they are unconditional prose
+> in `experiments/flagship_markers.py` (lines 1293 and 1360) sitting above a §4
+> paragraph that is emitted from a measured `if invariant:` branch, so the prose
+> does not track its own evidence. Fixing this file without fixing that generator
+> restores the contradiction on the next run.
+>
+> **What the six cells actually support**, stated so it cannot be over-read:
+>
+> * **The top 3 by kill — cisplatin > doxorubicin > lomustine — is invariant across
+>   all six (section x route) combinations.** That is the real, and still useful,
+>   result of §4.
+> * **Ranks 4 and 5 are NOT invariant ACROSS SECTIONS**: `brain_319` gives
+>   methotrexate > temozolomide, `gse324268_366` and `io_480` both give
+>   temozolomide > methotrexate.
+> * **Within any one section the ordering IS invariant across the two state
+>   ROUTES**, all five places, which is the `results/cell_state_impact.md` §3.3
+>   result reproduced on two further sections.
+>
+> So the axis matters: **route-invariant, top-3 section-invariant, tail
+> section-dependent.** "Invariant across sections and routes" is true only of the
+> top 3.
+>
+> **And none of the three axes covers the delivery law.** Section, route and the
+> potency band are all COMMON-MODE — they move every drug together, which is
+> exactly the cancellation mechanism the `if invariant:` branch above credits.
+> Correcting the one-way vascular source `S = PS*Cp` to the gradient-driven
+> `S = PS*(Cp - C)` is drug-specific: it re-weights each drug by its own
+> `bbb_penetrance`, which spans **47x** across the GBM panel, and it changes the
+> GBM **top-1** (cisplatin -> vincristine) — i.e. it breaks the very top-3 that
+> survives everything in this file — changes the top-3 set on both panels, and
+> swaps 4 of 45 GBM pairs, two of them across gaps of 40.5 % and 35.6 % of the
+> leader's kill against a Bernoulli sd of ~0.003. Name the quantity too: every
+> ranking in this file is by **kill**, and on breast the delivery (AUC) ranking is
+> preserved exactly (rho = 1.000) while the kill ranking scrambles (rho = 0.830),
+> because the Hill map saturates. Every exchange-arm figure is additionally
+> conditional on `PS_SCALE_S_INV` (`tmesim/treatment/drugs.py`, default 1.0,
+> calibrated 0.16122 1/s). See
+> [`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md)
+> §4.1 and §7.3.
 
 **But the invariance is not equally safe at every adjacent pair, and the narrowest gap should be quoted with it.** The engine draws kills as Bernoulli trials over tumour cells, so a gap of order the sampling scale `sqrt(p(1-p)/n)` is not a resolved ordering:
 
@@ -242,7 +287,7 @@ What is now closed on this section that was open on the 319-gene one:
 
 1. **Cell state is MEASURED, not assumed.** Both bands are traceable to measured transcripts at detection rates that are biology rather than probe sensitivity; nothing is UNMEASURED; and the labelling is mesh-independent by construction (§2). On the incumbent section hypoxia was unmeasured, proliferation was 13x below the published index, and the oxygen route's VIABLE band emptied entirely across the mask x mesh grid.
 2. **Temozolomide's resistance determinant is MEASURED** (§5). TMZ was the one drug in the panel whose kill could not be scaled by anything measured; it now can be.
-3. **The ranking survives a stronger test** — invariant across sections AND routes simultaneously (§4).
+3. **The ranking survives a stronger test — but a narrower one than this line claims.** §4's measured table gives: the top 3 (cisplatin > doxorubicin > lomustine) invariant across all six section x route cells, all five places invariant across ROUTES within a section, and ranks 4-5 NOT invariant across sections. "Invariant across sections AND routes" is true only of the top 3. See the resolution box in §4 — and note that none of these axes is the delivery law, which does change the top-1 ([`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §4.1).
 
 What remains open, in order of size:
 
@@ -253,7 +298,7 @@ What remains open, in order of size:
 5. **One calibration constant** — alpha, fit once on doxorubicin penetration depth on the 319-gene section and NOT refitted here — sets the perivascular sink for every drug on every section.
 6. **Grid convergence is inherited, not re-established.** dx = 12 um was shown converged on the 319-gene section's geometry (`results/numerical_rigor.md` §2). These sections are ~20x denser with larger vessel objects; the convergence argument is carried over.
 
-**The operative sentence.** On this section an absolute kill can for the first time be quoted with every term in it traceable to a measurement or to a named unvalidated prior — measured state, measured MGMT, measured geometry, published potency — which is a real change from the 319-gene section, where the state term was a bookkeeping choice with an unbounded swing. It still should not be quoted as a headline result, because a prediction with no outcome to score it against is not a result no matter how well-sourced its inputs are. **The cross-drug ranking remains the honest primary output, and it is now supported by a stronger invariance test than before.**
+**The operative sentence.** On this section an absolute kill can for the first time be quoted with every term in it traceable to a measurement or to a named unvalidated prior — measured state, measured MGMT, measured geometry, published potency — which is a real change from the 319-gene section, where the state term was a bookkeeping choice with an unbounded swing. It still should not be quoted as a headline result, because a prediction with no outcome to score it against is not a result no matter how well-sourced its inputs are. **The cross-drug KILL ranking remains the honest primary output, and it is now supported by a stronger invariance test than before — stronger, not unconditional.** The test covers state routes and (for the top 3) sections. It does not cover the vascular delivery law, which changes the GBM top-1 ([`results/transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §4.1).
 
 ## 7. Should this section replace the 319-gene one as the project's reference?
 
@@ -263,7 +308,7 @@ What remains open, in order of size:
 |---|---|---|
 | absolute kill, kill ceiling, state fractions | **GSE324268** | the only section where both bands are measured and MGMT is available |
 | temozolomide anything | **GSE324268** | the only section where TMZ's determinant is measurable |
-| cross-drug ranking | either — it is invariant (§4) | but quote the invariance, not one section's copy of it |
+| cross-drug ranking | either for the TOP 3, which is section- and route-invariant (§4); **section-specific for ranks 4-5**, which differ between `brain_319` and the other two | quote the invariance with its axes attached — routes and (top-3 only) sections. It is NOT invariant across the delivery law, which changes the top-1 ([§4.1](transvascular_exchange_revalidation.md)) |
 | delivery metrics (AUC, coverage, penetration length) | either | they carry no state dependence at all |
 | the vascular external anchors (endothelial fraction, vascular area fraction) | **neither is settled** | `results/heldout_patient.md` §6.2 shows both fail to replicate across sections |
 
