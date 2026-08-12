@@ -1,6 +1,6 @@
 # Data Access Plan — unlocking the validation frontier
 
-*Written 2026-07-27. Fact-checked and updated 2026-08-12 (§0, §4, §8, §11). Companion to
+*Written 2026-07-27. Fact-checked and updated 2026-08-12 (§0, §4, §7, §8.1, §8.2). Companion to
 `results/DATA_HUNT.md` (the 39-agent, 164-dataset sweep), `results/SESSION_AUDIT.md` (the
 rigour audit), and `results/ranking_robustness.md` §8 (which names the decisive measurement).*
 
@@ -17,7 +17,7 @@ must not be sent unedited.**
 > | | |
 > |---|---|
 > | **Axis that cannot be validated from open data** | **Response** — the delivery→kill link, in space. |
-> | **Why** | No dataset anywhere, open or controlled, pairs a measured spatial drug distribution with a measured treatment response in the same tumour. 164 datasets swept 2026-07-27; landscape re-checked 2026-08-12 (§11) with the same result. For glioma + temozolomide there is no spatial drug map at all — METASPACE returns zero. |
+> | **Why** | No dataset anywhere, open or controlled, pairs a measured spatial drug distribution with a measured treatment response in the same tumour. 164 datasets swept 2026-07-27; landscape re-checked 2026-08-12 (§8.2) with the same result. For glioma + temozolomide there is no spatial drug map at all — METASPACE returns zero. |
 > | **Is this a to-do item?** | **No.** It is a structural limit of the data that exists. No further code, search or compute in this repository removes it. |
 > | **The single experiment that would close it** | The Agar/White adavosertib GBM platform — drug µM per pixel at 30 µm raster in ABTC phase-1 patient tissue, co-registered with phosphoproteomics and t-CyCIF response markers. **No accession.** Both published data-availability statements (2022, 2025) say "available on request". §4. |
 > | **What it would take** | A collaboration request on human-subject tissue from a closed trial: IRB pathway + DUA + a counterparty institution. 6–18 months, real probability of no reply. |
@@ -304,7 +304,7 @@ The brief anticipated a custom-probe purchase. Confirmed mechanism, for the reco
 
 | Dataset | What it is | MGMT | Access |
 |---|---|---|---|
-| **GEO GSE324268** (Hölzel lab, Bonn; public Mar 2026) | **Xenium, human primary GBM (`GBM_tumor07`, 851,509 cells)** + a GBM-organoid-on-brain-slice sample. Panel = Xenium Human Brain v1.1 (266) **+ a custom 100-gene add-on literally named "Glioblastoma Panel"** (design_id ECQNGH) = 366 targets. | **YES — 8 probe sets. Verified in the data: 15,191 counts across 14,675 cells (1.7%).** | **Free direct download, no login, no DUA** |
+| **GEO GSE324268** (Hölzel lab, Bonn; public Mar 2026) | **Xenium, human primary GBM (`GBMtumor07`, GSM9572843, 851,509 cells)** + a GBM-organoid-on-brain-slice sample (`GBM1organoid`, GSM9572842). Panel = Xenium Human Brain hBrain_v1.1 (266 targets) **+ a custom 100-target add-on named "Glioblastoma Panel"** (design_id ECQNGH); 400 target entries in the spec, **366 `Gene Expression` features in the matrix**. | **YES — `gene_coverage = 8`, i.e. eight probe pairs on ONE target (one matrix column, not eight features). Verified in the data: 15,191 counts across 14,675 cells (1.72%).** Since analysed: detected at 6.6× the negative-control probes but **not spatially resolvable** — `results/mgmt_spatial.md`. | **Free direct download, no login, no DUA** |
 | **GEO GSE305393** | CosMx 6K Discovery, **human glioma TMA, 18 patients**, 39 FOVs, 32,953 cells | **YES**, verified in the expression matrix (~2.9% of cells) | Free direct, per-file |
 | 10x Visium HD Human Brain Cancer (6.5 mm FFPE) | Whole-transcriptome probe set v2.0 at 2/8/16 µm bins — but the tissue is **anaplastic oligodendroglioma WHO III, not GBM** | YES, 3 probes | Free direct |
 | GSE318562 / Zenodo 10.5281/zenodo.15014838 (Petti lab) | Visium, 22 samples, 9 IDH-WT GBM, core-to-edge | Present but **near the floor** (46 counts in 46/1,787 spots) | Free, CC BY |
@@ -631,7 +631,18 @@ Draft skeleton for whenever a controlled-access application *is* the right tool:
 This plan must not be purely blocked on other people. Ranked by value, all executable now with
 data already on disk or freely downloadable.
 
-1. **Re-run the MGMT analysis against GSE324268.** Free download, human primary GBM, 851,509
+> **Status as of 2026-08-12.** Items **1, 2 and 5 are DONE** — `results/mgmt_spatial.md`;
+> `results/gist_imatinib.md`, `results/moncayo_explant.md`, `results/gbm_tmz_exvivo.md`;
+> `results/cell_state_impact.md`, `results/oxygen_demotion.md`. Items **3, 4, 6, 7 and 8 remain
+> open.** Item **6 (the pre-registration) is the one that blocks outgoing email** — two drafts
+> promise a timestamped prediction that does not exist. It needs an afternoon and nobody's
+> permission.
+
+1. **Re-run the MGMT analysis against GSE324268.** ✅ **DONE** — `results/mgmt_spatial.md`. The
+   answer was: MGMT *is* detected (15,191 counts, 6.6× the negative-control probes) and is
+   *not* spatially resolvable — below the deposit's own controls at matched count depth. The
+   per-specimen scalar is vindicated as an empirical finding rather than a limitation. Original
+   framing follows. Free download, human primary GBM, 851,509
    cells, MGMT measured with **8 dedicated probes** rather than inferred from detection-floor
    whole-transcriptome counts. This is a direct test of the claim in `mgmt_scalar.md` §2 that
    MGMT can only be a per-section scalar. **Highest-value item in this section** — it either
@@ -688,6 +699,93 @@ re-propagated.
 | "Erasmus MC does the ex-vivo screen; someone else would have to do the spatial." | **Spatial capability is inside Erasmus MC and already inside their author lists** — Kros (GeoMx, and a co-author on PMID 37620410 itself), Chien (spatial single-cell, a co-author on their 2025 paper), van Leenders (Visium on surgical specimens), and PARTS, which serves external researchers. |
 | "MGMT probe design may be blocked by a pseudogene or transcript length." | Neither. Canonical MGMT is 4,739 nt across 5 exons; HGNC/Ensembl/NCBI show **no MGMT pseudogene and zero paralogues**; `ENSG00000170430` is on 10x's designable list for both v1 and Prime. |
 | "QIN-GBM-Treatment-Response contains response data." | Confirmed **trap** — a 2–5 day double-baseline test-retest study, both scans pre-therapy. |
+
+### 8.1 Added by the 2026-08-12 fact-check pass
+
+Errors found **inside this plan and inside the outreach drafts**, i.e. claims that were on
+their way out of the building.
+
+| Claim, as written | Finding |
+|---|---|
+| §0: "Reconstruction cross-platform **Pearson 0.997**" — and the same number in `outreach/02_erasmus_lamfers.md` as a headline validation | **Retracted.** `results/revalidation.md` §223 states in terms that anything downstream quoting it is now wrong: after the classifier-arity fix the 4-vector fell to 0.980 and the non-tumour subvector — the discriminating one — to **0.016**. The 0.997 was agreement between two biased estimators. Removed from §0 and from the draft. |
+| §0 and `outreach/01`, `outreach/02`: "penetrant-vs-excluded separation **3.65×** predicted against 4.66× measured" | **Pre-fix value.** `results/glioma_regional_pk.md` §P2 "Orderings preserved": post-fix the model predicts **17.20×** against measured 4.66× pooled / 9.3× intact-barrier — the veto swapped an under-separation for an over-separation of similar size. `results/SESSION_AUDIT.md` §1 still carries 3.65× in its summary table; that table predates the fix described three paragraphs below it. |
+| `outreach/02`: "cisplatin and doxorubicin differ by about **4%** in predicted kill … the honest output today is a tie" | Two revisions stale. `results/ranking_robustness.md` §0: P(cisplatin rank 1) = **0.931** (90% CI 0.929–0.934) on the shipped one-way law, but **0.397** with doxorubicin at **0.559** under the physically correct gradient-driven source `S = PS(Cp − C)` — the modal order **reverses**. The ask is better motivated by the reversal than by the old 4% margin. |
+| `outreach/04`: sample named `GBM_tumor07`; "MGMT … with 8 probe sets"; panel "= 366 targets" | Actual sample title is **`GBMtumor07`**; `gene_coverage = 8` means eight probe **pairs on one target** (one matrix column, not eight features); the spec has **400** target entries of which **366** are `Gene Expression` features. All three read off the downloaded files (`results/mgmt_spatial.md` §1). |
+| `outreach/04`: "I **suspect** MGMT is only honestly usable aggregated over regions rather than per cell" | Tested since. `results/mgmt_spatial.md`: not usable per cell (max 4 counts in any cell) **and not usable regionally** — at 400 µm bins MGMT φ = 1.382 against the deposit's own pooled negative-control probes at 1.374, falling to **1.211 ± 0.064 below the controls** when thinned to matched depth, with 46 of 47 abundance-matched genes more spatially clustered. Not an underpowered null: real genes at the same abundance reach φ = 154. |
+| `outreach/01`: led with the 2022 *Neuro-Oncology* paper and described it as "a four-year-old paper" | The **2025 trial report** (PMID 39820282) published 2025-03-17 and is the primary source for the phase-1 specimens, the MSI quantitation and the current data-availability statement. See §4.2. |
+| `outreach/01`: "Consider co-sending with Forest White … he is a corresponding author" | Corresponding-author status **not verifiable** from the PubMed record (no email carried for PMID 34383057). Softened to "senior author of the phosphoproteomics arm" with an instruction to check the journal page. He is **not** an author on the 2025 trial paper. |
+| §7 item 1: "Re-run the MGMT analysis against GSE324268" listed as pending | **Done** — `results/mgmt_spatial.md`. Items 2 and 5 are also done (`gist_imatinib.md`, `moncayo_explant.md`, `gbm_tmz_exvivo.md`; `cell_state_impact.md`, `oxygen_demotion.md`). Items 3, 4, 6, 7 remain open. |
+| Both drafts offer "a pre-registered prediction … timestamped and version-controlled" | **No pre-registration file exists in `results/`** as of 2026-08-12. §7 item 6 was never executed. The offer must be made true before either email is sent, or removed. This is the single most consequential open item in this document that requires nobody's permission. |
+
+**Verified and unchanged** (checked against the primary records, not search snippets, because
+this project has twice propagated a citation error): PMID 34383057 author list, journal, volume
+64–77, PMC8730776; PMID 37620410 Ntafoulis I … Lamfers MLM, *Br J Cancer* 129(8):1327–1338,
+with `m.lamfers@erasmusmc.nl` read off the affiliation string itself; **Kros JM** (initials
+correct); Chien MP on PMID 40425813, whose abstract confirms "114 consecutive HGG specimens",
+"96% success rate" and "screening of 20 anti-cancer agents … for 16 out of 18 HGG samples";
+PMID 35776791 (Shekarian T, *Sci Adv* 8(26):eabn9440, Hutter G senior); PMID 40295505
+(Yu KKH, *Nat Commun* 16:3957) and its quoted sentence verbatim; **Weller M and Snijder B both
+confirmed** as Tumor Profiler consortium authors on PMID 40425842 (*Nat Med* 31(7):2430–2441),
+Snijder B also on PMID 33482122 (*Cancer Cell* 39(3):288–293); Agar's DFCI address corroborated
+by a second, later record (PMID 40295505).
+
+---
+
+### 8.2 Landscape re-check — 2026-08-12
+
+Has anything appeared since the 2026-07-27 sweep that pairs a measured spatial drug
+distribution with a measured response, or has the Agar/White MSI been deposited anywhere?
+
+**No. Neither.** Recorded here with the queries, because a confirmed null is the finding.
+
+**Method and its limits.** PubMed via its API, and web search. **Direct access to NCBI, EBI
+PRIDE, METASPACE, OmicsDI and the 10x download hosts was blocked by this session's egress
+policy** (HTTP 403 at the proxy on `ftp.ncbi.nlm.nih.gov`, `www.ncbi.nlm.nih.gov`,
+`www.ebi.ac.uk`, `metaspace2020.org`, `www.omicsdi.org`). So this pass re-checked the
+*literature* thoroughly and could **not** re-run the repository-level searches directly; the
+METASPACE-zero and PXD018782-contents findings are carried forward from the sweep, not
+re-verified today. Anyone re-running this from an unrestricted network should redo those two.
+
+| # | Query | Result |
+|---|---|---|
+| 1 | PubMed: `adavosertib AND (mass spectrometry imaging OR MALDI) AND glioblastoma` | 2 hits, both already known (34383057; 25609063). **No deposit, no accession, no new paper.** |
+| 2 | PubMed: `(MALDI/MS imaging) AND drug distribution AND (spatial transcriptomics OR spatial proteomics OR multiplexed imaging) AND tumor`, 2026→ | 27 total; three most recent inspected. None pairs a measured drug field with a measured response. |
+| 3 | PubMed: `(temozolomide OR glioma OR glioblastoma) AND "mass spectrometry imaging" AND (intratumoral drug OR drug distribution OR drug penetration)`, 2025-07→ | 10 hits. Newest is Gu C et al., *Nat Nanotechnol* 2025;20(9):1262 (PMID 40523940) — nanoneedle DESI-MSI of **lipids** in TMZ-treated mouse glioma. Treatment-dependent spatial molecular change, **no measured drug concentration**. Not a counterexample. |
+| 4 | PubMed: `(spatial OR imaging) AND ("drug distribution" OR "drug penetration") AND ("treatment response" OR "response prediction") AND (glioblastoma OR glioma)`, 2025-07→ | 1 hit, from 2021. Nothing new. |
+| 5 | PubMed: `(glioma OR glioblastoma) AND (drug sensitivity OR drug screen OR pharmacoscopy OR dose-response) AND (spatial transcriptomics OR Xenium OR Visium OR GeoMx OR CosMx OR imaging mass cytometry) AND (matched OR paired)`, 2025-06→ | **Zero hits.** The same-resection ex-vivo-screen + spatial-assay experiment that `outreach/02` asks for still appears not to have been done. |
+| 6 | PubMed: `(MS imaging) AND drug AND (GeoMx OR spatial transcriptomics OR DSP) AND (patient OR human) AND response`, 2026→ | 2 hits, both checked and rejected — see below. |
+| 7 | Web: METASPACE + temozolomide; new 2026 MALDI/drug-distribution deposits on Zenodo/GEO; Agar/Santagata adavosertib data availability | Nothing. The Agar search surfaced the 2025 trial report (§4.2), whose data-availability statement is again "on request". |
+
+**The two nearest misses, and why each fails:**
+
+- **Williams EC et al., *Nat Commun* 2026;17:205 (PMID 41501078, PMC12780049), "MAGPIE".** Genuinely
+  new and genuinely relevant: a framework for co-registering spatial transcriptomics with MALDI
+  and DESI MSI on the same or consecutive sections, applied to link **small-molecule
+  co-detection with endogenous tissue response**. But the application is **drug-induced
+  pulmonary fibrosis in an animal model**, not anti-tumour response in a tumour. It supplies the
+  *integration method* this project would need; it does not supply the *measurement*. Worth
+  reading before any collaboration data arrives.
+- **Tieppo P et al., *Front Immunol* 2025;16:1702402 (PMID 41472728).** Quantitative MSI followed
+  by GeoMx on 10 tumour samples, plus Visium on biopsies from five patients treated with an A2AR
+  antagonist. Fails on two counts: the quantitative MSI is of **adenosine, an endogenous
+  metabolite**, not of the administered drug; and the treated-patient spatial arm is a different
+  set of specimens from the MSI arm, so there is no drug-concentration↔response coupling within
+  one tissue.
+
+**One thing did change, and it is not on the drug axis.** The Bonn group behind GSE324268
+published *Core2Edge* (**PMID 42521807**, *Nat Protoc*, online **2026-07-28**,
+doi:10.1038/s41596-026-01412-3) — human GBM organoids implanted into **human** organotypic brain
+slices, presented by its authors as a drug-screening platform, from a group that has already
+deposited a Xenium section of a primary human GBM. That is one institution holding both halves
+of the paired experiment §2 asks Rotterdam for. It is ex vivo and therefore **has no
+vasculature**, which for a perfusion-driven transport model is not a small caveat — it validates
+diffusion, uptake and sequestration only, exactly like the Moncayo explants. Recorded as a
+second address for the same question, not as a solution. Whether it is the publication GEO links
+to GSE324268 was **not verifiable** from this session (NCBI blocked); check the GEO record.
+
+**Conclusion, stated plainly.** Sixteen days after the sweep, the position is unchanged: the
+response axis has no open data to be validated against, the one dataset that would close it is
+still available only on request, and the request is still unsent.
 
 ---
 

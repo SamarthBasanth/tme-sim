@@ -86,7 +86,45 @@ URL, nothing findable on Minerva, cycif.org/data or HTAN) can follow a reply.
 
 ---
 
-## Draft message
+## Short version — send this one unless there is a reason not to
+
+> Dear Prof. Agar and Prof. Santagata,
+>
+> I maintain an open-source mechanistic model of drug transport through patient-specific
+> glioblastoma tissue — reconstructed from spatial transcriptomics, solving reaction–diffusion
+> transport through the tissue's own architecture. It is a research prototype, not clinically
+> validated. Its delivery predictions are scored against 125 human glioma tissue samples across
+> 42 patients plus 27 published regional PK measurements, at about a 2× geometric-mean fold
+> error, 6/6 drugs inside 10×; adavosertib is one of the six, from your trial's own tissue PK.
+>
+> I am writing because of one result in Lee et al. (*Clin Cancer Res* 2025, PMID 39820282).
+> Your two modalities disagree on region: LC-MS/MS gives a mean intratumoral:plasma ratio of
+> 4.18 in contrast-enhancing against 0.74 in non-enhancing tissue, while the MALDI-MSI shows no
+> apparent contrast-enhancing versus non-enhancing difference across the ten specimens imaged.
+> That disagreement is the exact quantity my model produces, and I have no way to test it — no
+> open dataset anywhere pairs a measured spatial drug distribution with a measured response in
+> the same tumour.
+>
+> Two requests, smallest first. **(1)** PXD018782 is public and I have downloaded it, but as
+> deposited it carries raw spectra and peptide identifications with no reporter-ion abundances
+> and no TMT-channel-to-arm mapping. Could that design map be shared? One small file, no
+> patient data, and it would make an already-public deposit usable. **(2)** Both papers state
+> the MALDI-MSI is available on request. Rather than ask about the phase-1 specimens — human
+> subject data needing an IRB pathway and a DUA — **would you consider sharing the PDX arm
+> (GBM22 / GBM84)?** It carries the number I most want to be tested against: 1–19 µM with
+> intratumoral CV 20.9–85.6%. A model that cannot reproduce that CV from tissue architecture
+> alone is wrong, and I would like to find that out. [**AFFILIATION SENTENCE — PICK ONE,
+> HONESTLY**]
+>
+> In return: a pre-registered prediction filed before I receive anything, the pipeline and
+> validation harness, and a commitment to publish the result if the model fails. Authorship as
+> you prefer, including none. If the answer is no, or no reply, I understand completely.
+>
+> [SIGNATURE BLOCK]
+
+---
+
+## Long version
 
 Dear Prof. Agar and Prof. Santagata,
 

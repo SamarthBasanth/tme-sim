@@ -39,8 +39,11 @@ the `[BRACKET]` fields, not further research.
 5. **Decide the commercial question before you send.** Erasmus MC's biobank regulation routes
    any commercial involvement through their TTO rather than the standard non-commercial MTA
    (§8.3.3). If this project has or may have a commercial dimension, say so in the first email.
-6. **Shorten.** A busy PI reads the first three lines. Keep (a) what we built, (b) what we
-   already did with *their* data, (c) the one specific thing we are asking for.
+6. **Send the short version.** Drafts 01 and 02 each carry a **Short version** (three or four
+   paragraphs) followed by a **Long version**. The short one is the one to send; the long one
+   exists because its numbers are what a reply will ask for. Drafts 03 and 04 are already
+   short. A busy PI reads the first three lines: keep (a) what we built, (b) what we already
+   did with *their* data, (c) the one specific thing we are asking for.
 
 ## Numbers that must never appear in an outgoing email
 

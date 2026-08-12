@@ -50,7 +50,49 @@ request.
 
 ---
 
-## Draft message
+## Short version — send this one unless there is a reason not to
+
+Three paragraphs. Everything below it is the long version, kept because the numbers in it are
+the ones a reply will ask for.
+
+> Dear Dr Lamfers,
+>
+> I have spent the last few weeks scoring an open-source mechanistic model of drug transport
+> through GBM tissue against your 2023 *BJC* ex-vivo screen (Ntafoulis et al., PMID 37620410,
+> GSE232173), with no parameters fitted to your data. Our extrapolated GDSC temozolomide potency
+> predicts a median 78.1% viability at 100 µM; your 40 cultures measured 82.4% (Mann-Whitney
+> p = 0.27). Re-deriving the MGMT association from the raw counts independently reproduces your
+> ρ = +0.71 through a different pipeline (ρ = +0.516, p = 0.034, n = 17; +0.735 on your
+> tissue-paired subset). Write-up at [LINK]. It is a research prototype — not clinically
+> validated, and nothing in it should inform a treatment decision.
+>
+> That reanalysis pointed at one experiment. Our panel ranking is decided by delivery ×
+> potency, and its top two candidates, cisplatin and doxorubicin, sit at opposite ends of both
+> axes — 157× apart in delivered exposure, 49× in IC50. Under the transport law we ship,
+> cisplatin holds rank 1 with probability 0.93; under the physically correct gradient-driven
+> vascular source the order **reverses** and doxorubicin takes rank 1 at 0.56. Our own
+> sensitivity analysis says the dominant term we can actually remove is "the median glioma cell
+> line" standing in for "this tumour" — and a per-patient IC50 pair for those two drugs removes
+> it. So: for one GBM resection already entering your GSC pipeline, would it be feasible to
+> retain an adjacent FFPE or OCT block, add cisplatin and doxorubicin as full dose-response
+> curves to the culture screen, and run any spatial assay on the retained block? As far as I
+> can establish, no published glioma study has run an ex-vivo sensitivity screen and a spatial
+> assay on the same resection. A retrospective version — the two extra curves on cultures whose
+> specimens already have an archived spatial section — would be nearly as useful and cheaper.
+>
+> In return: a timestamped, pre-registered prediction filed before I see anything of yours, the
+> reconstruction and transport run at no cost, the code and validation harness either way, and
+> a commitment to publish the result if the model fails. Authorship entirely as you prefer,
+> including none. If this is not something you have capacity for, a one-line no is genuinely
+> useful and I will not follow up.
+>
+> With thanks for making GSE232173 and the supplementary tables public.
+>
+> [SIGNATURE BLOCK]
+
+---
+
+## Long version
 
 Dear Dr Lamfers,
 
