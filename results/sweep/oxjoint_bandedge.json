@@ -1,0 +1,334 @@
+{
+  "band_edges": [
+    0.2,
+    0.4
+  ],
+  "dx_rungs": [
+    30.0,
+    18.0,
+    12.0,
+    8.0
+  ],
+  "arms": {
+    "shipped": {
+      "n_cells": 23812,
+      "n_rungs": 4,
+      "per_cell_grid_sigma": {
+        "median": 0.008459966466435176,
+        "mean": 0.009244562425554072,
+        "p90": 0.016875873868624068,
+        "max": 0.029848724117592172,
+        "median_mmhg": 0.29609882632523116
+      },
+      "mean_o2_per_rung": [
+        0.33635856975449263,
+        0.3481736251283784,
+        0.34862776586515865,
+        0.34824485820140866
+      ],
+      "frac_within_1sigma_of_an_edge": 0.12182932974970603,
+      "frac_within_1sigma_of_edge_lo": 0.0,
+      "frac_within_1sigma_of_edge_hi": 0.12182932974970603,
+      "frac_within_2sigma_of_an_edge": 0.1713001847807828,
+      "frac_within_2sigma_of_edge_lo": 0.0,
+      "frac_within_2sigma_of_edge_hi": 0.1713001847807828,
+      "frac_within_3sigma_of_an_edge": 0.20771039811859568,
+      "frac_within_3sigma_of_edge_lo": 0.0,
+      "frac_within_3sigma_of_edge_hi": 0.20771039811859568,
+      "frac_within_0.005_absolute_of_an_edge": 0.04858894674953805,
+      "frac_within_0.01_absolute_of_an_edge": 0.09873173189988241,
+      "frac_within_0.02_absolute_of_an_edge": 0.15630774399462455,
+      "frac_within_0.05_absolute_of_an_edge": 0.4178565429195364,
+      "band_changes_between_rungs": {
+        "dx30_vs_dx18": {
+          "n_changed_band": 1878,
+          "frac_changed_band": 0.0788677977490341,
+          "delta_f_state": 0.03603225264572485
+        },
+        "dx30_vs_dx12": {
+          "n_changed_band": 2201,
+          "frac_changed_band": 0.09243238703174869,
+          "delta_f_state": 0.04609020661851171
+        },
+        "dx30_vs_dx8": {
+          "n_changed_band": 2135,
+          "frac_changed_band": 0.08966067528976987,
+          "delta_f_state": 0.044704350747522215
+        },
+        "dx18_vs_dx12": {
+          "n_changed_band": 565,
+          "frac_changed_band": 0.023727532336636988,
+          "delta_f_state": 0.01005795397278686
+        },
+        "dx18_vs_dx8": {
+          "n_changed_band": 567,
+          "frac_changed_band": 0.02381152360154544,
+          "delta_f_state": 0.008672098101797365
+        },
+        "dx12_vs_dx8": {
+          "n_changed_band": 122,
+          "frac_changed_band": 0.005123467159415421,
+          "delta_f_state": -0.0013858558709894941
+        }
+      },
+      "frac_changing_band_somewhere_on_ladder": 0.09864774063497396,
+      "n_changing_band_somewhere_on_ladder": 2349,
+      "worst_adjacent_rung_frac_changed": 0.0788677977490341,
+      "quantiles_of_o2": {
+        "1": 0.29196572849619,
+        "5": 0.30278846014143485,
+        "10": 0.3102808430494953,
+        "25": 0.3292549265006677,
+        "50": 0.34590288313495987,
+        "75": 0.36088394121101663,
+        "90": 0.4001295197141795,
+        "99": 0.4202050384269016
+      },
+      "frac_below_edge_lo": 0.0,
+      "frac_between_edges": 0.8995884428019486,
+      "frac_above_edge_hi": 0.10041155719805141,
+      "density_at_edge_lo_per_unit_O": 0.0,
+      "density_at_edge_hi_per_unit_O": 4.936586594994121
+    },
+    "derived_supply_only": {
+      "n_cells": 23812,
+      "n_rungs": 4,
+      "per_cell_grid_sigma": {
+        "median": 0.008595951877848262,
+        "mean": 0.009865782056662666,
+        "p90": 0.018414314455268404,
+        "max": 0.03862788750325643,
+        "median_mmhg": 0.3008583157246892
+      },
+      "mean_o2_per_rung": [
+        0.9727990583886995,
+        0.9888365035310681,
+        0.9925188037551047,
+        0.9932949894153617
+      ],
+      "frac_within_1sigma_of_an_edge": 0.0,
+      "frac_within_1sigma_of_edge_lo": 0.0,
+      "frac_within_1sigma_of_edge_hi": 0.0,
+      "frac_within_2sigma_of_an_edge": 0.0,
+      "frac_within_2sigma_of_edge_lo": 0.0,
+      "frac_within_2sigma_of_edge_hi": 0.0,
+      "frac_within_3sigma_of_an_edge": 0.0,
+      "frac_within_3sigma_of_edge_lo": 0.0,
+      "frac_within_3sigma_of_edge_hi": 0.0,
+      "frac_within_0.005_absolute_of_an_edge": 0.0,
+      "frac_within_0.01_absolute_of_an_edge": 0.0,
+      "frac_within_0.02_absolute_of_an_edge": 0.0,
+      "frac_within_0.05_absolute_of_an_edge": 0.0,
+      "band_changes_between_rungs": {
+        "dx30_vs_dx18": {
+          "n_changed_band": 0,
+          "frac_changed_band": 0.0,
+          "delta_f_state": 0.0
+        },
+        "dx30_vs_dx12": {
+          "n_changed_band": 0,
+          "frac_changed_band": 0.0,
+          "delta_f_state": 0.0
+        },
+        "dx30_vs_dx8": {
+          "n_changed_band": 0,
+          "frac_changed_band": 0.0,
+          "delta_f_state": 0.0
+        },
+        "dx18_vs_dx12": {
+          "n_changed_band": 0,
+          "frac_changed_band": 0.0,
+          "delta_f_state": 0.0
+        },
+        "dx18_vs_dx8": {
+          "n_changed_band": 0,
+          "frac_changed_band": 0.0,
+          "delta_f_state": 0.0
+        },
+        "dx12_vs_dx8": {
+          "n_changed_band": 0,
+          "frac_changed_band": 0.0,
+          "delta_f_state": 0.0
+        }
+      },
+      "frac_changing_band_somewhere_on_ladder": 0.0,
+      "n_changing_band_somewhere_on_ladder": 0,
+      "worst_adjacent_rung_frac_changed": 0.0,
+      "quantiles_of_o2": {
+        "1": 0.9807643067752949,
+        "5": 0.9849740296884959,
+        "10": 0.9872931142953492,
+        "25": 0.9904832380693851,
+        "50": 0.993191299418489,
+        "75": 0.995296520129668,
+        "90": 0.9967871081163895,
+        "99": 0.9989388041903036
+      },
+      "frac_below_edge_lo": 0.0,
+      "frac_between_edges": 0.0,
+      "frac_above_edge_hi": 1.0,
+      "density_at_edge_lo_per_unit_O": 0.0,
+      "density_at_edge_hi_per_unit_O": 0.0
+    },
+    "joint_cmro2_lo": {
+      "n_cells": 23812,
+      "n_rungs": 4,
+      "per_cell_grid_sigma": {
+        "median": 0.07926173143386017,
+        "mean": 0.09663922944693218,
+        "p90": 0.18850782519344972,
+        "max": 0.48945178150702745,
+        "median_mmhg": 2.7741606001851062
+      },
+      "mean_o2_per_rung": [
+        0.11499771820530745,
+        0.20026970436006747,
+        0.26147588888307727,
+        0.2805496101819024
+      ],
+      "frac_within_1sigma_of_an_edge": 0.6644548966907442,
+      "frac_within_1sigma_of_edge_lo": 0.45813035444313793,
+      "frac_within_1sigma_of_edge_hi": 0.3204266756257349,
+      "frac_within_2sigma_of_an_edge": 0.8173609944565765,
+      "frac_within_2sigma_of_edge_lo": 0.7433226944397783,
+      "frac_within_2sigma_of_edge_hi": 0.4937426507643205,
+      "frac_within_3sigma_of_an_edge": 0.8797665042835545,
+      "frac_within_3sigma_of_edge_lo": 0.8451621031412733,
+      "frac_within_3sigma_of_edge_hi": 0.6054090374601041,
+      "frac_within_0.005_absolute_of_an_edge": 0.043801444649756424,
+      "frac_within_0.01_absolute_of_an_edge": 0.08340332605409037,
+      "frac_within_0.02_absolute_of_an_edge": 0.16777255165462793,
+      "frac_within_0.05_absolute_of_an_edge": 0.4228960188140433,
+      "band_changes_between_rungs": {
+        "dx30_vs_dx18": {
+          "n_changed_band": 8431,
+          "frac_changed_band": 0.35406517722156894,
+          "delta_f_state": 0.06413992944733748
+        },
+        "dx30_vs_dx12": {
+          "n_changed_band": 12049,
+          "frac_changed_band": 0.5060053754409541,
+          "delta_f_state": 0.13128674617839747
+        },
+        "dx30_vs_dx8": {
+          "n_changed_band": 13227,
+          "frac_changed_band": 0.5554762304720309,
+          "delta_f_state": 0.15745842432387042
+        },
+        "dx18_vs_dx12": {
+          "n_changed_band": 7740,
+          "frac_changed_band": 0.32504619519569966,
+          "delta_f_state": 0.06714681673105999
+        },
+        "dx18_vs_dx8": {
+          "n_changed_band": 8734,
+          "frac_changed_band": 0.3667898538551991,
+          "delta_f_state": 0.09331849487653293
+        },
+        "dx12_vs_dx8": {
+          "n_changed_band": 3365,
+          "frac_changed_band": 0.14131530320846633,
+          "delta_f_state": 0.026171678145472943
+        }
+      },
+      "frac_changing_band_somewhere_on_ladder": 0.6152360154543928,
+      "n_changing_band_somewhere_on_ladder": 14650,
+      "worst_adjacent_rung_frac_changed": 0.35406517722156894,
+      "quantiles_of_o2": {
+        "1": 0.03713192348361656,
+        "5": 0.06777415717394293,
+        "10": 0.09189393034543611,
+        "25": 0.14872643187490267,
+        "50": 0.234091628238865,
+        "75": 0.34794614280556524,
+        "90": 0.4637042998317113,
+        "99": 0.7306937116483168
+      },
+      "frac_below_edge_lo": 0.4022341676465648,
+      "frac_between_edges": 0.42738955148664537,
+      "frac_above_edge_hi": 0.17037628086678985,
+      "density_at_edge_lo_per_unit_O": 2.771711741978834,
+      "density_at_edge_hi_per_unit_O": 1.3984545607256846
+    },
+    "joint_cmro2_hi": {
+      "n_cells": 23812,
+      "n_rungs": 4,
+      "per_cell_grid_sigma": {
+        "median": 0.04963753117355055,
+        "mean": 0.06897147842040229,
+        "p90": 0.1423097781145715,
+        "max": 0.47337136384718564,
+        "median_mmhg": 1.7373135910742692
+      },
+      "mean_o2_per_rung": [
+        0.0723830706808591,
+        0.12209988990037882,
+        0.16135059979584923,
+        0.17385148998808936
+      ],
+      "frac_within_1sigma_of_an_edge": 0.41970435074752227,
+      "frac_within_1sigma_of_edge_lo": 0.358558709894171,
+      "frac_within_1sigma_of_edge_hi": 0.13862758273139594,
+      "frac_within_2sigma_of_an_edge": 0.5654711909961364,
+      "frac_within_2sigma_of_edge_lo": 0.54821098605745,
+      "frac_within_2sigma_of_edge_hi": 0.2431967075424156,
+      "frac_within_3sigma_of_an_edge": 0.6500503947589451,
+      "frac_within_3sigma_of_edge_lo": 0.6437510498908113,
+      "frac_within_3sigma_of_edge_hi": 0.33814883252141775,
+      "frac_within_0.005_absolute_of_an_edge": 0.02717117419788342,
+      "frac_within_0.01_absolute_of_an_edge": 0.05312447505459432,
+      "frac_within_0.02_absolute_of_an_edge": 0.10998656139761465,
+      "frac_within_0.05_absolute_of_an_edge": 0.2842264404501932,
+      "band_changes_between_rungs": {
+        "dx30_vs_dx18": {
+          "n_changed_band": 4436,
+          "frac_changed_band": 0.18629262556694104,
+          "delta_f_state": 0.01756677305560228
+        },
+        "dx30_vs_dx12": {
+          "n_changed_band": 6286,
+          "frac_changed_band": 0.26398454560725687,
+          "delta_f_state": 0.04324710230136075
+        },
+        "dx30_vs_dx8": {
+          "n_changed_band": 7165,
+          "frac_changed_band": 0.3008987065345204,
+          "delta_f_state": 0.05417856542919541
+        },
+        "dx18_vs_dx12": {
+          "n_changed_band": 4559,
+          "frac_changed_band": 0.19145808835881067,
+          "delta_f_state": 0.02568032924575847
+        },
+        "dx18_vs_dx8": {
+          "n_changed_band": 5109,
+          "frac_changed_band": 0.2145556862086343,
+          "delta_f_state": 0.03661179237359313
+        },
+        "dx12_vs_dx8": {
+          "n_changed_band": 2673,
+          "frac_changed_band": 0.11225432555014278,
+          "delta_f_state": 0.010931463127834662
+        }
+      },
+      "frac_changing_band_somewhere_on_ladder": 0.35377120779438936,
+      "n_changing_band_somewhere_on_ladder": 8424,
+      "worst_adjacent_rung_frac_changed": 0.19145808835881067,
+      "quantiles_of_o2": {
+        "1": 0.011224954348265736,
+        "5": 0.0248030768859011,
+        "10": 0.03723035383237681,
+        "25": 0.06973013518940795,
+        "50": 0.12931320996783965,
+        "75": 0.2202732172864616,
+        "90": 0.32405178589503203,
+        "99": 0.5943997102821255
+      },
+      "frac_below_edge_lo": 0.7076264068536872,
+      "frac_between_edges": 0.24659835377120778,
+      "frac_above_edge_hi": 0.04577523937510499,
+      "density_at_edge_lo_per_unit_O": 2.2026709222240886,
+      "density_at_edge_hi_per_unit_O": 0.4535528305056274
+    }
+  }
+}

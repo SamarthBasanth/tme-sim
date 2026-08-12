@@ -1,0 +1,403 @@
+{
+  "dx_fine": [
+    6.0,
+    5.0,
+    4.0
+  ],
+  "note": "oxygen-only; the steady-state O2 solve carries no CFL condition and no dt. These rungs are NOT transport runs and no verdict is taken on them.",
+  "arms": {
+    "shipped": {
+      "dx6": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          846,
+          1349
+        ],
+        "dx_um": 6.0,
+        "vessel_pixel_fraction_of_tissue": 0.026662021715148348,
+        "mean_vascular_tissue": 0.026662021715148348,
+        "o2_at_vessel_pixels": 0.3590915039874247,
+        "o2_max_anywhere": 0.42125230099672284,
+        "mean_o2_tissue": 0.3510077380409186,
+        "mean_o2_tumour": 0.3476118438596761,
+        "mean_o2_tumour_mmhg": 12.166414535088663,
+        "o2_at_vessel_pixels_mmhg": 12.568202639559864,
+        "drop_transvascular": 0.6409084960125753,
+        "drop_tissue_diffusive": 0.011479660127748592,
+        "transvascular_share_of_drop": 0.9824036349837113,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.9219721149000504,
+          "VIABLE": 0.07802788509994961
+        },
+        "f_state": 0.5390139425499748,
+        "hypoxic_frac_tumour": 0.0,
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 10.391231075995735,
+          "5": 10.60082517272026,
+          "10": 10.853370993858544,
+          "25": 11.49571961402181,
+          "50": 12.099873210086185,
+          "75": 12.598173725072925,
+          "90": 13.845831371509055,
+          "99": 14.523560696881045
+        },
+        "arm": "shipped",
+        "supply": 0.05,
+        "consumption": 0.02,
+        "median_mmhg": 12.099873210086185,
+        "solve_s": 22.644696950912476
+      },
+      "dx5": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          1015,
+          1619
+        ],
+        "dx_um": 5.0,
+        "vessel_pixel_fraction_of_tissue": 0.026665233051986453,
+        "mean_vascular_tissue": 0.026665233051986453,
+        "o2_at_vessel_pixels": 0.3592471919859528,
+        "o2_max_anywhere": 0.424528910850103,
+        "mean_o2_tissue": 0.3509901358117031,
+        "mean_o2_tumour": 0.3475722508302159,
+        "mean_o2_tumour_mmhg": 12.165028779057558,
+        "o2_at_vessel_pixels_mmhg": 12.573651719508348,
+        "drop_transvascular": 0.6407528080140472,
+        "drop_tissue_diffusive": 0.011674941155736862,
+        "transvascular_share_of_drop": 0.9821053884194944,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.9129850495548463,
+          "VIABLE": 0.0870149504451537
+        },
+        "f_state": 0.5435074752225768,
+        "hypoxic_frac_tumour": 0.0,
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 10.346571117997454,
+          "5": 10.559659884056266,
+          "10": 10.827780609642177,
+          "25": 11.48023557602432,
+          "50": 12.083285254342552,
+          "75": 12.616346750404318,
+          "90": 13.911291639775888,
+          "99": 14.56941563591234
+        },
+        "arm": "shipped",
+        "supply": 0.05,
+        "consumption": 0.02,
+        "median_mmhg": 12.083285254342552,
+        "solve_s": 39.71090507507324
+      },
+      "dx4": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          1268,
+          2023
+        ],
+        "dx_um": 4.0,
+        "vessel_pixel_fraction_of_tissue": 0.026612478681688215,
+        "mean_vascular_tissue": 0.026612478681688215,
+        "o2_at_vessel_pixels": 0.3587615085750941,
+        "o2_max_anywhere": 0.42367921618392507,
+        "mean_o2_tissue": 0.3505892096335262,
+        "mean_o2_tumour": 0.3471400352728349,
+        "mean_o2_tumour_mmhg": 12.14990123454922,
+        "o2_at_vessel_pixels_mmhg": 12.556652800128294,
+        "drop_transvascular": 0.6412384914249059,
+        "drop_tissue_diffusive": 0.011621473302259211,
+        "transvascular_share_of_drop": 0.9821991331523661,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.9146648748530153,
+          "VIABLE": 0.08533512514698471
+        },
+        "f_state": 0.5426675625734924,
+        "hypoxic_frac_tumour": 0.0,
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 10.326623099048424,
+          "5": 10.564161246949423,
+          "10": 10.810022753012305,
+          "25": 11.479737871060669,
+          "50": 12.070796216702188,
+          "75": 12.573533207732119,
+          "90": 13.895831768511767,
+          "99": 14.570129140348534
+        },
+        "arm": "shipped",
+        "supply": 0.05,
+        "consumption": 0.02,
+        "median_mmhg": 12.070796216702188,
+        "solve_s": 107.76214504241943
+      }
+    },
+    "joint_cmro2_lo": {
+      "dx6": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          846,
+          1349
+        ],
+        "dx_um": 6.0,
+        "vessel_pixel_fraction_of_tissue": 0.026662021715148348,
+        "mean_vascular_tissue": 0.026662021715148348,
+        "o2_at_vessel_pixels": 0.9319347663524075,
+        "o2_max_anywhere": 0.9997880628867224,
+        "mean_o2_tissue": 0.4127330538565245,
+        "mean_o2_tumour": 0.2864742542522745,
+        "mean_o2_tumour_mmhg": 10.026598898829608,
+        "o2_at_vessel_pixels_mmhg": 32.61771682233426,
+        "drop_transvascular": 0.06806523364759254,
+        "drop_tissue_diffusive": 0.6454605121001329,
+        "transvascular_share_of_drop": 0.09539282086628127,
+        "band_fractions": {
+          "HYPOXIC": 0.3270619855535024,
+          "QUIESCENT": 0.457584411221233,
+          "VIABLE": 0.21535360322526456
+        },
+        "f_state": 0.5586175037796068,
+        "hypoxic_frac_tumour": 0.3270619855535024,
+        "tumour_frac_below_2p5mmhg": 0.03149672434066857,
+        "tumour_frac_below_10mmhg": 0.5514866453888796,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 1.6803114317386718,
+          "5": 2.957235614204997,
+          "10": 3.9086054656473785,
+          "25": 6.03491749062738,
+          "50": 9.260659633289126,
+          "75": 13.290612350510965,
+          "90": 17.205858863576832,
+          "99": 24.43140529010073
+        },
+        "arm": "joint_cmro2_lo",
+        "supply": 194.0,
+        "consumption": 10.0,
+        "median_mmhg": 9.260659633289126,
+        "solve_s": 36.641560077667236
+      },
+      "dx5": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          1015,
+          1619
+        ],
+        "dx_um": 5.0,
+        "vessel_pixel_fraction_of_tissue": 0.026665233051986453,
+        "mean_vascular_tissue": 0.026665233051986453,
+        "o2_at_vessel_pixels": 0.9316168996159286,
+        "o2_max_anywhere": 0.9998341978374291,
+        "mean_o2_tissue": 0.4205199103568156,
+        "mean_o2_tumour": 0.28784923967592996,
+        "mean_o2_tumour_mmhg": 10.07472338865755,
+        "o2_at_vessel_pixels_mmhg": 32.606591486557505,
+        "drop_transvascular": 0.06838310038407136,
+        "drop_tissue_diffusive": 0.6437676599399986,
+        "transvascular_share_of_drop": 0.09602334813621918,
+        "band_fractions": {
+          "HYPOXIC": 0.3205106668906434,
+          "QUIESCENT": 0.4606920880228456,
+          "VIABLE": 0.218797245086511
+        },
+        "f_state": 0.561322022509659,
+        "hypoxic_frac_tumour": 0.3205106668906434,
+        "tumour_frac_below_2p5mmhg": 0.029522929615320007,
+        "tumour_frac_below_10mmhg": 0.5467411389215522,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 1.7185227500928906,
+          "5": 3.0078136590384763,
+          "10": 3.979813862395176,
+          "25": 6.109886176542544,
+          "50": 9.329440290607,
+          "75": 13.365329501470978,
+          "90": 17.16366527986219,
+          "99": 24.414756448155643
+        },
+        "arm": "joint_cmro2_lo",
+        "supply": 194.0,
+        "consumption": 10.0,
+        "median_mmhg": 9.329440290607,
+        "solve_s": 80.73599004745483
+      },
+      "dx4": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          1268,
+          2023
+        ],
+        "dx_um": 4.0,
+        "vessel_pixel_fraction_of_tissue": 0.026612478681688215,
+        "mean_vascular_tissue": 0.026612478681688215,
+        "o2_at_vessel_pixels": 0.9314550236985881,
+        "o2_max_anywhere": 0.9998267789922249,
+        "mean_o2_tissue": 0.4280503579584459,
+        "mean_o2_tumour": 0.287953572779651,
+        "mean_o2_tumour_mmhg": 10.078375047287786,
+        "o2_at_vessel_pixels_mmhg": 32.60092582945058,
+        "drop_transvascular": 0.06854497630141188,
+        "drop_tissue_diffusive": 0.6435014509189372,
+        "transvascular_share_of_drop": 0.09626475701731177,
+        "band_fractions": {
+          "HYPOXIC": 0.31719301192675964,
+          "QUIESCENT": 0.4642617167814547,
+          "VIABLE": 0.21854527129178566
+        },
+        "f_state": 0.5616936838568789,
+        "hypoxic_frac_tumour": 0.31719301192675964,
+        "tumour_frac_below_2p5mmhg": 0.027549134889971443,
+        "tumour_frac_below_10mmhg": 0.5439694271795733,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 1.7739752353273373,
+          "5": 3.0607803036263164,
+          "10": 4.017123790734167,
+          "25": 6.1769760743894,
+          "50": 9.395788843956817,
+          "75": 13.355703416225086,
+          "90": 17.08074175472626,
+          "99": 23.75176360117886
+        },
+        "arm": "joint_cmro2_lo",
+        "supply": 194.0,
+        "consumption": 10.0,
+        "median_mmhg": 9.395788843956817,
+        "solve_s": 144.6292290687561
+      }
+    },
+    "joint_cmro2_hi": {
+      "dx6": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          846,
+          1349
+        ],
+        "dx_um": 6.0,
+        "vessel_pixel_fraction_of_tissue": 0.026662021715148348,
+        "mean_vascular_tissue": 0.026662021715148348,
+        "o2_at_vessel_pixels": 0.9156434297762234,
+        "o2_max_anywhere": 0.9996729390493178,
+        "mean_o2_tissue": 0.32510489485746585,
+        "mean_o2_tumour": 0.17752077125934343,
+        "mean_o2_tumour_mmhg": 6.21322699407702,
+        "o2_at_vessel_pixels_mmhg": 32.04752004216782,
+        "drop_transvascular": 0.08435657022377663,
+        "drop_tissue_diffusive": 0.73812265851688,
+        "transvascular_share_of_drop": 0.10256376972940659,
+        "band_fractions": {
+          "HYPOXIC": 0.6459348227784311,
+          "QUIESCENT": 0.30110868469679153,
+          "VIABLE": 0.052956492524777424
+        },
+        "f_state": 0.42958802284562403,
+        "hypoxic_frac_tumour": 0.6459348227784311,
+        "tumour_frac_below_2p5mmhg": 0.1923399966403494,
+        "tumour_frac_below_10mmhg": 0.8266000335965059,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 0.5781966972592926,
+          "5": 1.1792428617240538,
+          "10": 1.680658156071294,
+          "25": 2.976552186906926,
+          "50": 5.26765062697762,
+          "75": 8.55760239507561,
+          "90": 12.007825917259028,
+          "99": 19.323561212696784
+        },
+        "arm": "joint_cmro2_hi",
+        "supply": 194.0,
+        "consumption": 20.0,
+        "median_mmhg": 5.26765062697762,
+        "solve_s": 29.486176013946533
+      },
+      "dx5": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          1015,
+          1619
+        ],
+        "dx_um": 5.0,
+        "vessel_pixel_fraction_of_tissue": 0.026665233051986453,
+        "mean_vascular_tissue": 0.026665233051986453,
+        "o2_at_vessel_pixels": 0.9153032117571867,
+        "o2_max_anywhere": 0.9997469226143119,
+        "mean_o2_tissue": 0.33389190128013607,
+        "mean_o2_tumour": 0.1782597305603165,
+        "mean_o2_tumour_mmhg": 6.239090569611077,
+        "o2_at_vessel_pixels_mmhg": 32.03561241150153,
+        "drop_transvascular": 0.08469678824281335,
+        "drop_tissue_diffusive": 0.7370434811968701,
+        "transvascular_share_of_drop": 0.10307002272210072,
+        "band_fractions": {
+          "HYPOXIC": 0.6428271459768184,
+          "QUIESCENT": 0.30556022173693936,
+          "VIABLE": 0.05161263228624223
+        },
+        "f_state": 0.4293822442465984,
+        "hypoxic_frac_tumour": 0.6428271459768184,
+        "tumour_frac_below_2p5mmhg": 0.18641861246430372,
+        "tumour_frac_below_10mmhg": 0.8250881908281539,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 0.5998526633779439,
+          "5": 1.2210821352385508,
+          "10": 1.735785222838686,
+          "25": 3.0370890533030814,
+          "50": 5.325421062450369,
+          "75": 8.596728148444582,
+          "90": 11.946537767343079,
+          "99": 19.175114778231283
+        },
+        "arm": "joint_cmro2_hi",
+        "supply": 194.0,
+        "consumption": 20.0,
+        "median_mmhg": 5.325421062450369,
+        "solve_s": 56.50467586517334
+      },
+      "dx4": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          1268,
+          2023
+        ],
+        "dx_um": 4.0,
+        "vessel_pixel_fraction_of_tissue": 0.026612478681688215,
+        "mean_vascular_tissue": 0.026612478681688215,
+        "o2_at_vessel_pixels": 0.9153098763691188,
+        "o2_max_anywhere": 0.9997428748782553,
+        "mean_o2_tissue": 0.34263942310472234,
+        "mean_o2_tumour": 0.17788921227010615,
+        "mean_o2_tumour_mmhg": 6.226122429453715,
+        "o2_at_vessel_pixels_mmhg": 32.03584567291916,
+        "drop_transvascular": 0.08469012363088124,
+        "drop_tissue_diffusive": 0.7374206640990126,
+        "transvascular_share_of_drop": 0.1030154632379138,
+        "band_fractions": {
+          "HYPOXIC": 0.6431631110364522,
+          "QUIESCENT": 0.3085419116411893,
+          "VIABLE": 0.048294977322358476
+        },
+        "f_state": 0.4276730220057114,
+        "hypoxic_frac_tumour": 0.6431631110364522,
+        "tumour_frac_below_2p5mmhg": 0.18037124139089536,
+        "tumour_frac_below_10mmhg": 0.8279438938350412,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 0.6287999004475691,
+          "5": 1.2564740717126577,
+          "10": 1.778123943333907,
+          "25": 3.0902383851763644,
+          "50": 5.37596019870479,
+          "75": 8.590824566902906,
+          "90": 11.862913957479984,
+          "99": 18.419309433159803
+        },
+        "arm": "joint_cmro2_hi",
+        "supply": 194.0,
+        "consumption": 20.0,
+        "median_mmhg": 5.37596019870479,
+        "solve_s": 141.07690501213074
+      }
+    }
+  }
+}

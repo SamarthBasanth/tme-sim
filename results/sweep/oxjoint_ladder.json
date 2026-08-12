@@ -1,0 +1,837 @@
+{
+  "sample": "data_cache/xenium_gbm",
+  "dx_rungs": [
+    30.0,
+    18.0,
+    12.0,
+    8.0
+  ],
+  "band_edges": [
+    0.2,
+    0.4
+  ],
+  "arms": {
+    "shipped": {
+      "dx30": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          170,
+          271
+        ],
+        "dx_um": 30.0,
+        "vessel_pixel_fraction_of_tissue": 0.02560046487603306,
+        "mean_vascular_tissue": 0.02560046487603306,
+        "o2_at_vessel_pixels": 0.3535943293422935,
+        "o2_max_anywhere": 0.42016000157150446,
+        "mean_o2_tissue": 0.33826462291275605,
+        "mean_o2_tumour": 0.33635856975449263,
+        "mean_o2_tumour_mmhg": 11.772549941407242,
+        "o2_at_vessel_pixels_mmhg": 12.375801526980274,
+        "drop_transvascular": 0.6464056706577065,
+        "drop_tissue_diffusive": 0.01723575958780088,
+        "transvascular_share_of_drop": 0.974028505752836,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.9917688560389719,
+          "VIABLE": 0.008231143961028054
+        },
+        "f_state": 0.504115571980514,
+        "hypoxic_frac_tumour": 0.0,
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 10.349258424678542,
+          "5": 10.538656774800298,
+          "10": 10.733055335698916,
+          "25": 11.157363572253477,
+          "50": 11.691807182384778,
+          "75": 12.331226192238175,
+          "90": 12.858681590154168,
+          "99": 13.932325414337544
+        },
+        "arm": "shipped",
+        "supply": 0.05,
+        "consumption": 0.02,
+        "median_mmhg": 11.691807182384778,
+        "dist_mean_to_edge_lo": 0.13635856975449262,
+        "dist_mean_to_edge_hi": -0.06364143024550739,
+        "nearest_edge": 0.4,
+        "dist_mean_to_nearest_edge": 0.06364143024550739
+      },
+      "dx18": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          283,
+          451
+        ],
+        "dx_um": 18.0,
+        "vessel_pixel_fraction_of_tissue": 0.026760825125441368,
+        "mean_vascular_tissue": 0.026760825125441368,
+        "o2_at_vessel_pixels": 0.3602846943239863,
+        "o2_max_anywhere": 0.4163830774705117,
+        "mean_o2_tissue": 0.3514545702604146,
+        "mean_o2_tumour": 0.3481736251283784,
+        "mean_o2_tumour_mmhg": 12.186076879493244,
+        "o2_at_vessel_pixels_mmhg": 12.60996430133952,
+        "drop_transvascular": 0.6397153056760136,
+        "drop_tissue_diffusive": 0.012111069195607893,
+        "transvascular_share_of_drop": 0.9814197926587533,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.9197043507475222,
+          "VIABLE": 0.08029564925247774
+        },
+        "f_state": 0.5401478246262389,
+        "hypoxic_frac_tumour": 0.0,
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 10.491039979793298,
+          "5": 10.783178315216956,
+          "10": 10.935206944899953,
+          "25": 11.455177221051313,
+          "50": 12.131063587388606,
+          "75": 12.601654091656314,
+          "90": 13.824966797911767,
+          "99": 14.334665368787116
+        },
+        "arm": "shipped",
+        "supply": 0.05,
+        "consumption": 0.02,
+        "median_mmhg": 12.131063587388606,
+        "dist_mean_to_edge_lo": 0.1481736251283784,
+        "dist_mean_to_edge_hi": -0.05182637487162162,
+        "nearest_edge": 0.4,
+        "dist_mean_to_nearest_edge": 0.05182637487162162
+      },
+      "dx12": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          424,
+          675
+        ],
+        "dx_um": 12.0,
+        "vessel_pixel_fraction_of_tissue": 0.02683327139848879,
+        "mean_vascular_tissue": 0.02683327139848879,
+        "o2_at_vessel_pixels": 0.36129837578114204,
+        "o2_max_anywhere": 0.4295696245297673,
+        "mean_o2_tissue": 0.35204854974974675,
+        "mean_o2_tumour": 0.34862776586515865,
+        "mean_o2_tumour_mmhg": 12.201971805280552,
+        "o2_at_vessel_pixels_mmhg": 12.645443152339972,
+        "drop_transvascular": 0.6387016242188579,
+        "drop_tissue_diffusive": 0.0126706099159834,
+        "transvascular_share_of_drop": 0.9805478200451503,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "f_state": 0.5502057785990258,
+        "hypoxic_frac_tumour": 0.0,
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0006719301192675962,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 10.21880049736665,
+          "5": 10.59759610495022,
+          "10": 10.859829506732337,
+          "25": 11.523922427523368,
+          "50": 12.106600909723596,
+          "75": 12.630937942385584,
+          "90": 14.004533189996282,
+          "99": 14.707176344941557
+        },
+        "arm": "shipped",
+        "supply": 0.05,
+        "consumption": 0.02,
+        "median_mmhg": 12.106600909723596,
+        "dist_mean_to_edge_lo": 0.14862776586515863,
+        "dist_mean_to_edge_hi": -0.05137223413484138,
+        "nearest_edge": 0.4,
+        "dist_mean_to_nearest_edge": 0.05137223413484138
+      },
+      "dx8": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          635,
+          1012
+        ],
+        "dx_um": 8.0,
+        "vessel_pixel_fraction_of_tissue": 0.026768427524063828,
+        "mean_vascular_tissue": 0.026768427524063828,
+        "o2_at_vessel_pixels": 0.36042797950683064,
+        "o2_max_anywhere": 0.4273073814317626,
+        "mean_o2_tissue": 0.3517610025927162,
+        "mean_o2_tumour": 0.34824485820140866,
+        "mean_o2_tumour_mmhg": 12.188570037049303,
+        "o2_at_vessel_pixels_mmhg": 12.614979282739073,
+        "drop_transvascular": 0.6395720204931694,
+        "drop_tissue_diffusive": 0.012183121305421984,
+        "transvascular_share_of_drop": 0.981307211061195,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.9023601545439275,
+          "VIABLE": 0.09763984545607257
+        },
+        "f_state": 0.5488199227280364,
+        "hypoxic_frac_tumour": 0.0,
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 10.360396070878416,
+          "5": 10.565600121635915,
+          "10": 10.83618245952211,
+          "25": 11.496017958617063,
+          "50": 12.106488640353254,
+          "75": 12.614126389276215,
+          "90": 13.979382066458516,
+          "99": 14.70184466496947
+        },
+        "arm": "shipped",
+        "supply": 0.05,
+        "consumption": 0.02,
+        "median_mmhg": 12.106488640353254,
+        "dist_mean_to_edge_lo": 0.14824485820140865,
+        "dist_mean_to_edge_hi": -0.051755141798591364,
+        "nearest_edge": 0.4,
+        "dist_mean_to_nearest_edge": 0.051755141798591364
+      }
+    },
+    "derived_supply_only": {
+      "dx30": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          170,
+          271
+        ],
+        "dx_um": 30.0,
+        "vessel_pixel_fraction_of_tissue": 0.02560046487603306,
+        "mean_vascular_tissue": 0.02560046487603306,
+        "o2_at_vessel_pixels": 0.9995181697340731,
+        "o2_max_anywhere": 0.9999925448602797,
+        "mean_o2_tissue": 0.9741343535445481,
+        "mean_o2_tumour": 0.9727990583886995,
+        "mean_o2_tumour_mmhg": 34.04796704360448,
+        "o2_at_vessel_pixels_mmhg": 34.98313594069256,
+        "drop_transvascular": 0.0004818302659268525,
+        "drop_tissue_diffusive": 0.026719111345373636,
+        "transvascular_share_of_drop": 0.017713734796838014,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "f_state": 1.0,
+        "hypoxic_frac_tumour": 0.0,
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 32.600582967766144,
+          "5": 33.11807605512868,
+          "10": 33.36333152103314,
+          "25": 33.769233104700916,
+          "50": 34.128905433275136,
+          "75": 34.401707438486234,
+          "90": 34.59374741949472,
+          "99": 34.9821704773379
+        },
+        "arm": "derived_supply_only",
+        "supply": 194.0,
+        "consumption": 0.02,
+        "median_mmhg": 34.128905433275136,
+        "dist_mean_to_edge_lo": 0.7727990583886994,
+        "dist_mean_to_edge_hi": 0.5727990583886995,
+        "nearest_edge": 0.4,
+        "dist_mean_to_nearest_edge": 0.5727990583886995
+      },
+      "dx18": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          283,
+          451
+        ],
+        "dx_um": 18.0,
+        "vessel_pixel_fraction_of_tissue": 0.026760825125441368,
+        "mean_vascular_tissue": 0.026760825125441368,
+        "o2_at_vessel_pixels": 0.9995317436914914,
+        "o2_max_anywhere": 0.9999933300990493,
+        "mean_o2_tissue": 0.9899207898552754,
+        "mean_o2_tumour": 0.9888365035310681,
+        "mean_o2_tumour_mmhg": 34.60927762358738,
+        "o2_at_vessel_pixels_mmhg": 34.9836110292022,
+        "drop_transvascular": 0.00046825630850855227,
+        "drop_tissue_diffusive": 0.010695240160423336,
+        "transvascular_share_of_drop": 0.04194530896406102,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "f_state": 1.0,
+        "hypoxic_frac_tumour": 0.0,
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 34.060407714292076,
+          "5": 34.25725423244973,
+          "10": 34.36099819172296,
+          "25": 34.496867650359754,
+          "50": 34.634803234738406,
+          "75": 34.7470613611864,
+          "90": 34.826976077636616,
+          "99": 34.97262270412688
+        },
+        "arm": "derived_supply_only",
+        "supply": 194.0,
+        "consumption": 0.02,
+        "median_mmhg": 34.634803234738406,
+        "dist_mean_to_edge_lo": 0.788836503531068,
+        "dist_mean_to_edge_hi": 0.5888365035310681,
+        "nearest_edge": 0.4,
+        "dist_mean_to_nearest_edge": 0.5888365035310681
+      },
+      "dx12": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          424,
+          675
+        ],
+        "dx_um": 12.0,
+        "vessel_pixel_fraction_of_tissue": 0.02683327139848879,
+        "mean_vascular_tissue": 0.02683327139848879,
+        "o2_at_vessel_pixels": 0.9995313559952049,
+        "o2_max_anywhere": 0.9999967227453955,
+        "mean_o2_tissue": 0.9935995287576457,
+        "mean_o2_tumour": 0.9925188037551047,
+        "mean_o2_tumour_mmhg": 34.73815813142866,
+        "o2_at_vessel_pixels_mmhg": 34.983597459832176,
+        "drop_transvascular": 0.0004686440047950713,
+        "drop_tissue_diffusive": 0.007012552240100223,
+        "transvascular_share_of_drop": 0.06264292359859494,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "f_state": 1.0,
+        "hypoxic_frac_tumour": 0.0,
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 34.32675073713533,
+          "5": 34.47409103909735,
+          "10": 34.55525900033722,
+          "25": 34.66691333242848,
+          "50": 34.761695479647116,
+          "75": 34.83537820453838,
+          "90": 34.88754878407364,
+          "99": 34.96285814666062
+        },
+        "arm": "derived_supply_only",
+        "supply": 194.0,
+        "consumption": 0.02,
+        "median_mmhg": 34.761695479647116,
+        "dist_mean_to_edge_lo": 0.7925188037551048,
+        "dist_mean_to_edge_hi": 0.5925188037551047,
+        "nearest_edge": 0.4,
+        "dist_mean_to_nearest_edge": 0.5925188037551047
+      },
+      "dx8": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          635,
+          1012
+        ],
+        "dx_um": 8.0,
+        "vessel_pixel_fraction_of_tissue": 0.026768427524063828,
+        "mean_vascular_tissue": 0.026768427524063828,
+        "o2_at_vessel_pixels": 0.9995298339538468,
+        "o2_max_anywhere": 0.9999990358081814,
+        "mean_o2_tissue": 0.994411155279531,
+        "mean_o2_tumour": 0.9932949894153617,
+        "mean_o2_tumour_mmhg": 34.76532462953766,
+        "o2_at_vessel_pixels_mmhg": 34.983544188384634,
+        "drop_transvascular": 0.000470166046153242,
+        "drop_tissue_diffusive": 0.006234844538485107,
+        "transvascular_share_of_drop": 0.07012159641185735,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.0,
+          "VIABLE": 1.0
+        },
+        "f_state": 1.0,
+        "hypoxic_frac_tumour": 0.0,
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 34.39358240989942,
+          "5": 34.53271389615403,
+          "10": 34.599076721078774,
+          "25": 34.69888623023428,
+          "50": 34.786412627055334,
+          "75": 34.85474520906587,
+          "90": 34.90129647900503,
+          "99": 34.95936084761565
+        },
+        "arm": "derived_supply_only",
+        "supply": 194.0,
+        "consumption": 0.02,
+        "median_mmhg": 34.786412627055334,
+        "dist_mean_to_edge_lo": 0.7932949894153616,
+        "dist_mean_to_edge_hi": 0.5932949894153616,
+        "nearest_edge": 0.4,
+        "dist_mean_to_nearest_edge": 0.5932949894153616
+      }
+    },
+    "joint_cmro2_lo": {
+      "dx30": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          170,
+          271
+        ],
+        "dx_um": 30.0,
+        "vessel_pixel_fraction_of_tissue": 0.02560046487603306,
+        "mean_vascular_tissue": 0.02560046487603306,
+        "o2_at_vessel_pixels": 0.9715206441319818,
+        "o2_max_anywhere": 0.9994031335961564,
+        "mean_o2_tissue": 0.14445563245985854,
+        "mean_o2_tumour": 0.11499771820530745,
+        "mean_o2_tumour_mmhg": 4.02492013718576,
+        "o2_at_vessel_pixels_mmhg": 34.00322254461936,
+        "drop_transvascular": 0.028479355868018197,
+        "drop_tissue_diffusive": 0.8565229259266743,
+        "transvascular_share_of_drop": 0.0321799801580907,
+        "band_fractions": {
+          "HYPOXIC": 0.8267260204938687,
+          "QUIESCENT": 0.13812363514194523,
+          "VIABLE": 0.035150344364186126
+        },
+        "f_state": 0.3935662691080128,
+        "hypoxic_frac_tumour": 0.8267260204938687,
+        "tumour_frac_below_2p5mmhg": 0.5380060473710734,
+        "tumour_frac_below_10mmhg": 0.9031160759281035,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 0.04831255897008898,
+          "5": 0.160329726471037,
+          "10": 0.32167587680875576,
+          "25": 0.8240812572451692,
+          "50": 2.1911305507606147,
+          "75": 5.086933467973566,
+          "90": 9.805543801131268,
+          "99": 33.663791061190246
+        },
+        "arm": "joint_cmro2_lo",
+        "supply": 194.0,
+        "consumption": 10.0,
+        "median_mmhg": 2.1911305507606147,
+        "dist_mean_to_edge_lo": -0.08500228179469256,
+        "dist_mean_to_edge_hi": -0.28500228179469256,
+        "nearest_edge": 0.2,
+        "dist_mean_to_nearest_edge": 0.08500228179469256
+      },
+      "dx18": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          283,
+          451
+        ],
+        "dx_um": 18.0,
+        "vessel_pixel_fraction_of_tissue": 0.026760825125441368,
+        "mean_vascular_tissue": 0.026760825125441368,
+        "o2_at_vessel_pixels": 0.9525818716568233,
+        "o2_max_anywhere": 0.9988444063036509,
+        "mean_o2_tissue": 0.2662537471003792,
+        "mean_o2_tumour": 0.20026970436006747,
+        "mean_o2_tumour_mmhg": 7.009439652602361,
+        "o2_at_vessel_pixels_mmhg": 33.340365507988814,
+        "drop_transvascular": 0.04741812834317671,
+        "drop_tissue_diffusive": 0.7523121672967559,
+        "transvascular_share_of_drop": 0.05929264978668016,
+        "band_fractions": {
+          "HYPOXIC": 0.6015454392743155,
+          "QUIESCENT": 0.3025785318326894,
+          "VIABLE": 0.09587602889299512
+        },
+        "f_state": 0.4577061985553502,
+        "hypoxic_frac_tumour": 0.6015454392743155,
+        "tumour_frac_below_2p5mmhg": 0.17831345540063834,
+        "tumour_frac_below_10mmhg": 0.772593650260373,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 0.6527469058326947,
+          "5": 1.2860980797381478,
+          "10": 1.7897415587493215,
+          "25": 3.151681307888794,
+          "50": 5.6991473401294845,
+          "75": 9.521392990677693,
+          "90": 13.817215250125447,
+          "99": 31.981230942569066
+        },
+        "arm": "joint_cmro2_lo",
+        "supply": 194.0,
+        "consumption": 10.0,
+        "median_mmhg": 5.6991473401294845,
+        "dist_mean_to_edge_lo": 0.00026970436006745757,
+        "dist_mean_to_edge_hi": -0.19973029563993255,
+        "nearest_edge": 0.2,
+        "dist_mean_to_nearest_edge": 0.00026970436006745757
+      },
+      "dx12": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          424,
+          675
+        ],
+        "dx_um": 12.0,
+        "vessel_pixel_fraction_of_tissue": 0.02683327139848879,
+        "mean_vascular_tissue": 0.02683327139848879,
+        "o2_at_vessel_pixels": 0.9382686215818284,
+        "o2_max_anywhere": 0.9993782162581322,
+        "mean_o2_tissue": 0.3580498294187376,
+        "mean_o2_tumour": 0.26147588888307727,
+        "mean_o2_tumour_mmhg": 9.151656110907705,
+        "o2_at_vessel_pixels_mmhg": 32.839401755363994,
+        "drop_transvascular": 0.061731378418171556,
+        "drop_tissue_diffusive": 0.6767927326987512,
+        "transvascular_share_of_drop": 0.0835874922550745,
+        "band_fractions": {
+          "HYPOXIC": 0.4022341676465648,
+          "QUIESCENT": 0.42738955148664537,
+          "VIABLE": 0.17037628086678985
+        },
+        "f_state": 0.5248530152864102,
+        "hypoxic_frac_tumour": 0.4022341676465648,
+        "tumour_frac_below_2p5mmhg": 0.0563161431211154,
+        "tumour_frac_below_10mmhg": 0.6266588274819419,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 1.2996173219265796,
+          "5": 2.3720955010880025,
+          "10": 3.216287562090264,
+          "25": 5.205425115621594,
+          "50": 8.193206988360274,
+          "75": 12.178114998194783,
+          "90": 16.229650494109897,
+          "99": 25.574279907691086
+        },
+        "arm": "joint_cmro2_lo",
+        "supply": 194.0,
+        "consumption": 10.0,
+        "median_mmhg": 8.193206988360274,
+        "dist_mean_to_edge_lo": 0.061475888883077257,
+        "dist_mean_to_edge_hi": -0.13852411111692275,
+        "nearest_edge": 0.2,
+        "dist_mean_to_nearest_edge": 0.061475888883077257
+      },
+      "dx8": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          635,
+          1012
+        ],
+        "dx_um": 8.0,
+        "vessel_pixel_fraction_of_tissue": 0.026768427524063828,
+        "mean_vascular_tissue": 0.026768427524063828,
+        "o2_at_vessel_pixels": 0.9336023525867032,
+        "o2_max_anywhere": 0.999721003521917,
+        "mean_o2_tissue": 0.39582560158532065,
+        "mean_o2_tumour": 0.2805496101819024,
+        "mean_o2_tumour_mmhg": 9.819236356366584,
+        "o2_at_vessel_pixels_mmhg": 32.67608234053461,
+        "drop_transvascular": 0.06639764741329679,
+        "drop_tissue_diffusive": 0.6530527424048008,
+        "transvascular_share_of_drop": 0.09228940362390303,
+        "band_fractions": {
+          "HYPOXIC": 0.3468839240718965,
+          "QUIESCENT": 0.4470015118427684,
+          "VIABLE": 0.20611456408533513
+        },
+        "f_state": 0.5510246934318831,
+        "hypoxic_frac_tumour": 0.3468839240718965,
+        "tumour_frac_below_2p5mmhg": 0.03758609104653116,
+        "tumour_frac_below_10mmhg": 0.5718125314967243,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 1.5908605887049663,
+          "5": 2.779492554646181,
+          "10": 3.7088333596693714,
+          "25": 5.78865966136134,
+          "50": 9.000944793843509,
+          "75": 13.058873776498285,
+          "90": 17.082349688797954,
+          "99": 24.52347603025115
+        },
+        "arm": "joint_cmro2_lo",
+        "supply": 194.0,
+        "consumption": 10.0,
+        "median_mmhg": 9.000944793843509,
+        "dist_mean_to_edge_lo": 0.08054961018190238,
+        "dist_mean_to_edge_hi": -0.11945038981809764,
+        "nearest_edge": 0.2,
+        "dist_mean_to_nearest_edge": 0.08054961018190238
+      }
+    },
+    "joint_cmro2_hi": {
+      "dx30": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          170,
+          271
+        ],
+        "dx_um": 30.0,
+        "vessel_pixel_fraction_of_tissue": 0.02560046487603306,
+        "mean_vascular_tissue": 0.02560046487603306,
+        "o2_at_vessel_pixels": 0.9641484498838524,
+        "o2_max_anywhere": 0.9992727331611796,
+        "mean_o2_tissue": 0.10169135698246419,
+        "mean_o2_tumour": 0.0723830706808591,
+        "mean_o2_tumour_mmhg": 2.5334074738300685,
+        "o2_at_vessel_pixels_mmhg": 33.745195745934836,
+        "drop_transvascular": 0.0358515501161476,
+        "drop_tissue_diffusive": 0.8917653792029933,
+        "transvascular_share_of_drop": 0.03864908992385702,
+        "band_fractions": {
+          "HYPOXIC": 0.9130690408197547,
+          "QUIESCENT": 0.06601713421804133,
+          "VIABLE": 0.020913824962203932
+        },
+        "f_state": 0.3734965563581388,
+        "hypoxic_frac_tumour": 0.9130690408197547,
+        "tumour_frac_below_2p5mmhg": 0.7322778431043172,
+        "tumour_frac_below_10mmhg": 0.9641777255165462,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 0.005368869279398111,
+          "5": 0.02875040189902153,
+          "10": 0.07009166359968426,
+          "25": 0.24293696698432454,
+          "50": 0.8866058373843941,
+          "75": 2.6902803687937293,
+          "90": 6.4516709229256115,
+          "99": 33.079061821181014
+        },
+        "arm": "joint_cmro2_hi",
+        "supply": 194.0,
+        "consumption": 20.0,
+        "median_mmhg": 0.8866058373843941,
+        "dist_mean_to_edge_lo": -0.12761692931914093,
+        "dist_mean_to_edge_hi": -0.32761692931914094,
+        "nearest_edge": 0.2,
+        "dist_mean_to_nearest_edge": 0.12761692931914093
+      },
+      "dx18": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          283,
+          451
+        ],
+        "dx_um": 18.0,
+        "vessel_pixel_fraction_of_tissue": 0.026760825125441368,
+        "mean_vascular_tissue": 0.026760825125441368,
+        "o2_at_vessel_pixels": 0.9421804883720762,
+        "o2_max_anywhere": 0.998422839882858,
+        "mean_o2_tissue": 0.19278243673024184,
+        "mean_o2_tumour": 0.12209988990037882,
+        "mean_o2_tumour_mmhg": 4.273496146513258,
+        "o2_at_vessel_pixels_mmhg": 32.976317093022665,
+        "drop_transvascular": 0.05781951162792376,
+        "drop_tissue_diffusive": 0.8200805984716975,
+        "transvascular_share_of_drop": 0.06586115090173823,
+        "band_fractions": {
+          "HYPOXIC": 0.8155551822610448,
+          "QUIESCENT": 0.15765160423315974,
+          "VIABLE": 0.0267932135057954
+        },
+        "f_state": 0.39106332941374095,
+        "hypoxic_frac_tumour": 0.8155551822610448,
+        "tumour_frac_below_2p5mmhg": 0.449731227952293,
+        "tumour_frac_below_10mmhg": 0.9104653116075928,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 0.15739831119037184,
+          "5": 0.39300487584627564,
+          "10": 0.6119735526874798,
+          "25": 1.2971241252933996,
+          "50": 2.8970997957129283,
+          "75": 5.7501952888292225,
+          "90": 9.644538895012131,
+          "99": 30.934259623742005
+        },
+        "arm": "joint_cmro2_hi",
+        "supply": 194.0,
+        "consumption": 20.0,
+        "median_mmhg": 2.8970997957129283,
+        "dist_mean_to_edge_lo": -0.0779001100996212,
+        "dist_mean_to_edge_hi": -0.27790011009962123,
+        "nearest_edge": 0.2,
+        "dist_mean_to_nearest_edge": 0.0779001100996212
+      },
+      "dx12": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          424,
+          675
+        ],
+        "dx_um": 12.0,
+        "vessel_pixel_fraction_of_tissue": 0.02683327139848879,
+        "mean_vascular_tissue": 0.02683327139848879,
+        "o2_at_vessel_pixels": 0.9238140466676035,
+        "o2_max_anywhere": 0.9990986114433874,
+        "mean_o2_tissue": 0.27036218774356363,
+        "mean_o2_tumour": 0.16135059979584923,
+        "mean_o2_tumour_mmhg": 5.647270992854723,
+        "o2_at_vessel_pixels_mmhg": 32.33349163336612,
+        "drop_transvascular": 0.07618595333239653,
+        "drop_tissue_diffusive": 0.7624634468717543,
+        "transvascular_share_of_drop": 0.09084362704349484,
+        "band_fractions": {
+          "HYPOXIC": 0.7076264068536872,
+          "QUIESCENT": 0.24659835377120778,
+          "VIABLE": 0.04577523937510499
+        },
+        "f_state": 0.41674365865949936,
+        "hypoxic_frac_tumour": 0.7076264068536872,
+        "tumour_frac_below_2p5mmhg": 0.25718125314967244,
+        "tumour_frac_below_10mmhg": 0.8584327229968083,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 0.3928734021893007,
+          "5": 0.8681076910065384,
+          "10": 1.303062384133188,
+          "25": 2.4405547316292786,
+          "50": 4.525962348874388,
+          "75": 7.709562605026156,
+          "90": 11.34181250632612,
+          "99": 20.803989859874388
+        },
+        "arm": "joint_cmro2_hi",
+        "supply": 194.0,
+        "consumption": 20.0,
+        "median_mmhg": 4.525962348874388,
+        "dist_mean_to_edge_lo": -0.03864940020415078,
+        "dist_mean_to_edge_hi": -0.2386494002041508,
+        "nearest_edge": 0.2,
+        "dist_mean_to_nearest_edge": 0.03864940020415078
+      },
+      "dx8": {
+        "n_tumour_cells": 23812,
+        "grid": [
+          635,
+          1012
+        ],
+        "dx_um": 8.0,
+        "vessel_pixel_fraction_of_tissue": 0.026768427524063828,
+        "mean_vascular_tissue": 0.026768427524063828,
+        "o2_at_vessel_pixels": 0.9177091714579747,
+        "o2_max_anywhere": 0.9995700095698253,
+        "mean_o2_tissue": 0.3072819319899624,
+        "mean_o2_tumour": 0.17385148998808936,
+        "mean_o2_tumour_mmhg": 6.084802149583128,
+        "o2_at_vessel_pixels_mmhg": 32.119821001029116,
+        "drop_transvascular": 0.0822908285420253,
+        "drop_tissue_diffusive": 0.7438576814698854,
+        "transvascular_share_of_drop": 0.09960779151055893,
+        "band_fractions": {
+          "HYPOXIC": 0.6609272635645893,
+          "QUIESCENT": 0.2854443137913657,
+          "VIABLE": 0.05362842264404502
+        },
+        "f_state": 0.42767512178733413,
+        "hypoxic_frac_tumour": 0.6609272635645893,
+        "tumour_frac_below_2p5mmhg": 0.21258189148328574,
+        "tumour_frac_below_10mmhg": 0.8305476230472031,
+        "tumour_o2_mmhg_percentiles": {
+          "1": 0.5213701708429792,
+          "5": 1.0718463886681389,
+          "10": 1.5689439526830968,
+          "25": 2.815536750703997,
+          "50": 5.0783109327987805,
+          "75": 8.367108673265795,
+          "90": 11.994100057540395,
+          "99": 19.5110774734759
+        },
+        "arm": "joint_cmro2_hi",
+        "supply": 194.0,
+        "consumption": 20.0,
+        "median_mmhg": 5.0783109327987805,
+        "dist_mean_to_edge_lo": -0.026148510011910653,
+        "dist_mean_to_edge_hi": -0.22614851001191066,
+        "nearest_edge": 0.2,
+        "dist_mean_to_nearest_edge": 0.026148510011910653
+      }
+    }
+  },
+  "spans": {
+    "shipped": {
+      "f_state_values_coarse_to_fine": [
+        0.504115571980514,
+        0.5401478246262389,
+        0.5502057785990258,
+        0.5488199227280364
+      ],
+      "f_state_span": 0.04609020661851171,
+      "f_state_span_relative": 0.09142785738087311,
+      "f_state_monotone": false,
+      "mean_o2_values_coarse_to_fine": [
+        0.33635856975449263,
+        0.3481736251283784,
+        0.34862776586515865,
+        0.34824485820140866
+      ],
+      "mean_o2_span": 0.012269196110666014,
+      "mean_o2_monotone": false
+    },
+    "derived_supply_only": {
+      "f_state_values_coarse_to_fine": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "f_state_span": 0.0,
+      "f_state_span_relative": 0.0,
+      "f_state_monotone": true,
+      "mean_o2_values_coarse_to_fine": [
+        0.9727990583886995,
+        0.9888365035310681,
+        0.9925188037551047,
+        0.9932949894153617
+      ],
+      "mean_o2_span": 0.02049593102666214,
+      "mean_o2_monotone": true
+    },
+    "joint_cmro2_lo": {
+      "f_state_values_coarse_to_fine": [
+        0.3935662691080128,
+        0.4577061985553502,
+        0.5248530152864102,
+        0.5510246934318831
+      ],
+      "f_state_span": 0.1574584243238703,
+      "f_state_span_relative": 0.40008109607751074,
+      "f_state_monotone": true,
+      "mean_o2_values_coarse_to_fine": [
+        0.11499771820530745,
+        0.20026970436006747,
+        0.26147588888307727,
+        0.2805496101819024
+      ],
+      "mean_o2_span": 0.16555189197659492,
+      "mean_o2_monotone": true
+    },
+    "joint_cmro2_hi": {
+      "f_state_values_coarse_to_fine": [
+        0.3734965563581388,
+        0.39106332941374095,
+        0.41674365865949936,
+        0.42767512178733413
+      ],
+      "f_state_span": 0.05417856542919536,
+      "f_state_span_relative": 0.14505773749957832,
+      "f_state_monotone": true,
+      "mean_o2_values_coarse_to_fine": [
+        0.0723830706808591,
+        0.12209988990037882,
+        0.16135059979584923,
+        0.17385148998808936
+      ],
+      "mean_o2_span": 0.10146841930723026,
+      "mean_o2_monotone": true
+    }
+  }
+}

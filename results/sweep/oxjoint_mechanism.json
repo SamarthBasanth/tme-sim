@@ -1,0 +1,91 @@
+{
+  "diffusivity_um2_s": 2000.0,
+  "vessel_radius_um": 7.5,
+  "dx_rungs": [
+    30.0,
+    18.0,
+    12.0,
+    8.0
+  ],
+  "rho_tum_stats": {
+    "mean": 0.12289937652256493,
+    "median": 0.0,
+    "p90": 1.0,
+    "p99": 1.0,
+    "max": 4.0
+  },
+  "arms": {
+    "shipped": {
+      "supply": 0.05,
+      "consumption": 0.02,
+      "source_equilibration_length_um": 200.0,
+      "sink_rate_s^-1_at_mean_rho": 0.002457987530451299,
+      "sink_diffusion_length_um_at_mean_rho": 902.0386787311814,
+      "sink_rate_s^-1_at_p90_rho": 0.02,
+      "sink_diffusion_length_um_at_p90_rho": 316.22776601683796,
+      "sink_rate_s^-1_at_p99_rho": 0.02,
+      "sink_diffusion_length_um_at_p99_rho": 316.22776601683796,
+      "L_at_p90_rho_um": 316.22776601683796,
+      "cells_per_L": {
+        "dx30": 10.5409255338946,
+        "dx18": 17.568209223157666,
+        "dx12": 26.352313834736496,
+        "dx8": 39.528470752104745
+      }
+    },
+    "derived_supply_only": {
+      "supply": 194.0,
+      "consumption": 0.02,
+      "source_equilibration_length_um": 3.210806495339678,
+      "sink_rate_s^-1_at_mean_rho": 0.002457987530451299,
+      "sink_diffusion_length_um_at_mean_rho": 902.0386787311814,
+      "sink_rate_s^-1_at_p90_rho": 0.02,
+      "sink_diffusion_length_um_at_p90_rho": 316.22776601683796,
+      "sink_rate_s^-1_at_p99_rho": 0.02,
+      "sink_diffusion_length_um_at_p99_rho": 316.22776601683796,
+      "L_at_p90_rho_um": 316.22776601683796,
+      "cells_per_L": {
+        "dx30": 10.5409255338946,
+        "dx18": 17.568209223157666,
+        "dx12": 26.352313834736496,
+        "dx8": 39.528470752104745
+      }
+    },
+    "joint_cmro2_lo": {
+      "supply": 194.0,
+      "consumption": 10.0,
+      "source_equilibration_length_um": 3.210806495339678,
+      "sink_rate_s^-1_at_mean_rho": 1.2289937652256493,
+      "sink_diffusion_length_um_at_mean_rho": 40.34039607954031,
+      "sink_rate_s^-1_at_p90_rho": 10.0,
+      "sink_diffusion_length_um_at_p90_rho": 14.142135623730951,
+      "sink_rate_s^-1_at_p99_rho": 10.0,
+      "sink_diffusion_length_um_at_p99_rho": 14.142135623730951,
+      "L_at_p90_rho_um": 14.142135623730951,
+      "cells_per_L": {
+        "dx30": 0.4714045207910317,
+        "dx18": 0.7856742013183862,
+        "dx12": 1.1785113019775793,
+        "dx8": 1.7677669529663689
+      }
+    },
+    "joint_cmro2_hi": {
+      "supply": 194.0,
+      "consumption": 20.0,
+      "source_equilibration_length_um": 3.210806495339678,
+      "sink_rate_s^-1_at_mean_rho": 2.4579875304512986,
+      "sink_diffusion_length_um_at_mean_rho": 28.52496762359417,
+      "sink_rate_s^-1_at_p90_rho": 20.0,
+      "sink_diffusion_length_um_at_p90_rho": 10.0,
+      "sink_rate_s^-1_at_p99_rho": 20.0,
+      "sink_diffusion_length_um_at_p99_rho": 10.0,
+      "L_at_p90_rho_um": 10.0,
+      "cells_per_L": {
+        "dx30": 0.3333333333333333,
+        "dx18": 0.5555555555555556,
+        "dx12": 0.8333333333333334,
+        "dx8": 1.25
+      }
+    }
+  }
+}
