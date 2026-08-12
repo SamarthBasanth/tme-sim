@@ -79,7 +79,24 @@ _PV = 25.0           # effective microvascular driving pressure, mmHg
 _LP_NORMAL = 1.0e-3  # baseline vessel-wall filtration conductance, 1/(mmHg*s)
 _LEAK_GAIN = 12.0    # tumor vessels are ~(1+gain)x leakier at phi_tumor=1
 _LAMBDA_LYMPH = 3.0e-2  # lymphatic drainage conductance in normal tissue, 1/(mmHg*s)
-_TUMOR_SIGMA = 5.0   # gaussian smoothing (grid cells) for the tumor-density field
+#: Gaussian smoothing length for the tumor-occupancy field, in MICROMETRES.
+#:
+#: This is a MODEL parameter, not a numerical one: `phi` sets both the
+#: vessel-leak gain (`lp_eff`) and the lymphatic suppression (`d`), so the
+#: length over which tumor occupancy is smeared is part of the physics. It was
+#: previously expressed in GRID CELLS (`_TUMOR_SIGMA = 5.0`) and handed
+#: straight to `ndimage.gaussian_filter`, whose `sigma` is in pixels — so the
+#: physical smoothing silently tracked the mesh (40 um at dx=8, 60 at dx=12,
+#: 75 at dx=15, 400 at dx=80) and refining the grid redefined the model. A
+#: convergence study on any IFP quantity was therefore measuring refinement and
+#: a model change at once, and could never converge.
+#:
+#: 60.0 um is exactly what the old constant produced at the production grid
+#: (5.0 cells x 12 um/cell), so dx = 12 is the exact fixed point of the change:
+#: `60.0 / 12.0 == 5.0` in IEEE-754, hence `gaussian_filter` receives a
+#: bit-identical argument and every shipped dx = 12 result is unchanged. See
+#: `results/tumor_sigma_units.md`.
+_TUMOR_SIGMA_UM = 60.0  # gaussian smoothing (MICROMETRES) for the tumor-density field
 
 
 def _tumor_field(micro: Microenvironment) -> np.ndarray:
@@ -97,7 +114,10 @@ def _tumor_field(micro: Microenvironment) -> np.ndarray:
         return phi
     col, row = micro.domain.to_index(cells.x[tum], cells.y[tum])
     np.add.at(phi, (row, col), 1.0)
-    phi = ndimage.gaussian_filter(phi, sigma=_TUMOR_SIGMA, mode="nearest")
+    # sigma is a PHYSICAL length; convert to pixels for the filter so the model
+    # is the same model on every mesh.
+    sigma_px = _TUMOR_SIGMA_UM / float(micro.domain.dx)
+    phi = ndimage.gaussian_filter(phi, sigma=sigma_px, mode="nearest")
     pmax = float(phi.max())
     if pmax > 0.0:
         phi /= pmax

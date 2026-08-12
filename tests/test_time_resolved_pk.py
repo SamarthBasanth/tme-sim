@@ -54,6 +54,42 @@ loses exposure. Two consequences, both tested here:
 * The effect is bounded by the terminal residual and therefore VANISHES as the
   window grows past washout. Schedule matters exactly insofar as the window
   truncates the response.
+
+The 2026-08-12 re-pin of ``tests/data/static_source_reference.json``
+-------------------------------------------------------------------
+The stored reference exists so that nobody can change static-source behaviour
+without it showing up. That only works if a re-pin is loud. This one was, and is
+recorded here as well as in the reference file's own ``_README._repin_history``.
+
+**Cause.** ``tmesim/physics/pressure.py`` smoothed the tumour-occupancy field
+``phi`` with ``_TUMOR_SIGMA = 5.0``, commented "grid cells" but handed straight
+to ``scipy.ndimage.gaussian_filter``, whose ``sigma`` is in PIXELS. ``phi`` sets
+the vessel-leak gain and the lymphatic suppression, so it is a MODEL parameter:
+the physical smoothing length was therefore ``5 * dx`` — 60 um at the production
+grid but 75 um at ``dx = 15`` and 400 um at ``dx = 80``. Refining the mesh
+silently redefined the model. It is now ``_TUMOR_SIGMA_UM = 60.0``, converted to
+pixels at the point of use.
+
+**What moved, and why that is the predicted result rather than a regression.**
+``phi`` reaches a transport result by exactly one route — the Darcy velocity
+``v = -K grad p`` — so it can only bite when convection is enabled. That is
+precisely the observed split: the three ``dx = 15`` convection-ON cases and the
+``dx = 80`` real-tissue case moved (by 1-3 ULP in the transport sums; more in
+``penetration_index``, which is a shape statistic); ``weak_10dose_noconv``
+(convection OFF) and ``solver_flat`` (raw solver, no IFP at all) are byte-for-byte
+unchanged and were not regenerated. ``plasma_mean``, a pure-PK quantity with no
+spatial dependence, is unchanged in every case. The superseded values are kept
+verbatim in the reference file under
+``_superseded_2026-08-12_grid_cell_tumor_sigma``.
+
+**The guard was strengthened, not weakened.** ``60.0 / 12.0 == 5.0`` exactly in
+IEEE-754, so the production grid is the fixed point of the change and every
+shipped ``dx = 12`` result is bit-identical — but until now ``dx = 12`` was the
+one grid with *no* bitwise pin, while the grids that did have pins were the ones
+whose values were wrong. :func:`test_production_dx12_static_path_matches_stored_reference_bitwise`
+closes that hole. Its values were generated BEFORE the fix and verified
+identical AFTER it, so it pins the invariance claim itself. Full write-up:
+``results/tumor_sigma_units.md``.
 """
 from __future__ import annotations
 
@@ -233,6 +269,115 @@ def test_real_tissue_static_path_matches_stored_reference_bitwise(reference,
     assert float(np.asarray(res.transport.auc).sum()) == _hex(ref["auc_sum"])
     assert (float(np.asarray(res.transport.final_concentration).sum())
             == _hex(ref["final_c_sum"]))
+
+
+# --------------------------------------------------------------------------- #
+# (3b) The PRODUCTION grid — added 2026-08-12, see the module docstring
+# --------------------------------------------------------------------------- #
+#: The exact production configuration: the same reconstruction call the landing
+#: asset and every shipped result use. ``dt`` must stay at 10 s — at dx = 12 um
+#: the advection CFL limit on this section is ~18.9 s, so dt = 20 raises.
+_DX12_PDE = dict(dt=10.0, total_time=1800.0, convection=True, save_every=30)
+
+
+@pytest.fixture(scope="module")
+def production_micro_dx12():
+    """The real Xenium GBM section on the PRODUCTION grid (dx = 12 um).
+
+    Identical arguments to ``experiments/export_landing_asset.py``, so this pins
+    the configuration the shipped IFP figures are actually computed on. Costs a
+    couple of seconds to assemble; module-scoped so both dx = 12 pins share it.
+    """
+    from tmesim.reconstruct.real_pipeline import reconstruct_real
+
+    return reconstruct_real(source="xenium", sample="data_cache/xenium_gbm",
+                            dx_um=12.0, oxygen_mode="pde", state_mode="oxygen")
+
+
+def test_production_dx12_ifp_solve_matches_stored_reference_bitwise(
+        reference, production_micro_dx12):
+    """The IFP solve itself, on the production grid, pinned bit for bit.
+
+    This is the level the tumour-sigma units fix acts at, so it is the level the
+    production guard belongs at: if ``_TUMOR_SIGMA_UM`` is ever changed, or the
+    um -> pixel conversion is dropped and the constant goes back to meaning grid
+    cells, these three numbers move immediately — no transport solve required to
+    see it.
+    """
+    from tmesim.physics.pressure import solve_ifp
+
+    p, velocity = solve_ifp(production_micro_dx12)
+    mask = np.asarray(production_micro_dx12.domain.tissue_mask, dtype=bool)
+    ref = reference["production_xenium_dx12_tmz_3dose"]
+
+    assert float(p[mask].max()) == _hex(ref["ifp_max_in_tissue_mmhg"])
+    assert float(p[mask].mean()) == _hex(ref["ifp_mean_in_tissue_mmhg"])
+    assert (float(np.hypot(velocity[0], velocity[1])[mask].max())
+            == _hex(ref["ifp_speed_max_um_s"]))
+
+
+def test_production_dx12_static_path_matches_stored_reference_bitwise(
+        reference, production_micro_dx12):
+    """End-to-end on the PRODUCTION grid, convection ON.
+
+    The reference file used to pin only dx = 15 and dx = 80 — neither of which
+    anything ships on. This closes that hole: the grid every published result in
+    ``results/`` is computed on now has a bitwise pin too, running the same
+    Darcy-convection path that the tumour-sigma fix touches.
+    """
+    from tmesim.molecular import library
+    from tmesim.molecular.binding_site_barrier import apply_barrier_to_drugparams
+    from tmesim.validation.calibration import calibrated_drugparams
+
+    drug = apply_barrier_to_drugparams(calibrated_drugparams("temozolomide"),
+                                       library.get_molecule("temozolomide"))
+    pk = PKConfig(plasma_peak=50.0, half_life=3600.0 * 4, n_doses=3,
+                  dose_interval=3600.0 * 4)
+    res = simulate_response(
+        production_micro_dx12,
+        SimConfig(drug=drug, pk=pk, pde=PDEConfig(**_DX12_PDE), seed=0),
+    )
+    ref = reference["production_xenium_dx12_tmz_3dose"]
+
+    assert float(res.kill_fraction) == _hex(ref["kill_fraction"])
+    assert float(res.extras["mean_auc"]) == _hex(ref["mean_auc"])
+    assert float(res.extras["plasma_mean"]) == _hex(ref["plasma_mean"])
+    assert float(res.extras["penetration_index"]) == _hex(ref["penetration_index"])
+    assert float(np.asarray(res.transport.auc).sum()) == _hex(ref["auc_sum"])
+    assert (float(np.asarray(res.transport.final_concentration).sum())
+            == _hex(ref["final_c_sum"]))
+    assert [float(v) for v in res.viable_history] == [
+        _hex(v) for v in ref["viable_history"]
+    ]
+
+
+def test_tumor_occupancy_smoothing_is_a_physical_length():
+    """The units fix, asserted directly so it cannot silently regress.
+
+    ``_TUMOR_SIGMA_UM`` is a MODEL parameter (it sets the vessel-leak gain and
+    the lymphatic suppression), so its value must be a physical length and the
+    pixel sigma handed to ``gaussian_filter`` must scale as ``1/dx``. Asserting
+    the conversion rather than the constant means a deliberate recalibration of
+    the 60 um is still allowed; reverting to grid-cell units is not.
+
+    Also pins the fixed point that makes the whole change safe: at the
+    production grid the conversion is EXACT in IEEE-754, so ``gaussian_filter``
+    receives a bit-identical argument and no shipped result moves.
+    """
+    from tmesim.physics import pressure as _pressure
+
+    assert not hasattr(_pressure, "_TUMOR_SIGMA"), (
+        "the grid-cell tumour-sigma constant is back; the smoothing length is a "
+        "physical length, not a pixel count"
+    )
+    sigma_um = _pressure._TUMOR_SIGMA_UM
+    assert sigma_um > 0.0
+    # dx = 12 um is the exact fixed point -> production is bit-identical.
+    assert sigma_um / 12.0 == 5.0
+    assert float.hex(sigma_um / 12.0) == float.hex(5.0)
+    # The physical smoothing length is the SAME on every mesh.
+    for dx in (8.0, 12.0, 15.0, 18.0, 24.0, 80.0):
+        assert (sigma_um / dx) * dx == pytest.approx(sigma_um, rel=1e-12)
 
 
 def test_unit_source_profile_is_bit_identical_to_none(flat_micro_factory):

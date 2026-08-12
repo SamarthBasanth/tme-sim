@@ -1,10 +1,85 @@
 {
+  "_README": {
+    "what_this_is": "Bitwise (IEEE-754 hex) reference values for the STATIC-source transport path, consumed by tests/test_time_resolved_pk.py. Its purpose is to prove that the time-resolved-source refactor did not change static-source behaviour. Its value depends on nobody quietly regenerating it to make their own change pass, so every re-pin is recorded below, in full, with the superseded values kept.",
+    "how_to_regenerate": "Deliberately NOT scripted. Re-pinning must cost someone real work and a written justification. Rebuild each case by hand from _REFERENCE_CASES in tests/test_time_resolved_pk.py, record float.hex() of every quantity, and add a _repin_history entry stating the cause, the exact set of values that moved, and why the movement is the predicted one rather than a regression.",
+    "_repin_history": [
+      {
+        "date": "2026-08-12",
+        "key_holding_superseded_values": "_superseded_2026-08-12_grid_cell_tumor_sigma",
+        "cause": "UNITS FIX in tmesim/physics/pressure.py. The tumour-occupancy smoothing constant _TUMOR_SIGMA = 5.0 was documented as 'grid cells' and passed straight to scipy.ndimage.gaussian_filter, whose sigma is in PIXELS. Because the smoothed field phi sets both the vessel-leak gain and the lymphatic suppression, that made it a MODEL parameter that silently tracked the mesh: 40 um at dx=8, 60 at dx=12, 75 at dx=15, 400 at dx=80. Refining the grid redefined the model, so no IFP convergence study could ever converge. It is now _TUMOR_SIGMA_UM = 60.0, a physical length converted to pixels at the point of use.",
+        "why_the_new_values_are_right_and_not_merely_different": "The old values encode a model whose smoothing length was an artefact of the mesh. At dx=15 the old model smoothed over 75 um and at dx=80 over 400 um; both now smooth over 60 um, the same physical length the production grid always used. The new numbers are the SAME model these cases were always meant to be running, evaluated on their own grids.",
+        "predicted_and_observed_failure_pattern": "phi reaches a transport result only through the Darcy velocity v = -K grad p, so the change can bite ONLY when convection is on. Observed exactly: default_1dose, weak_1dose, weak_3dose (dx=15, convection=True) and real_xenium_dx80_tmz_3dose (dx=80, convection=True) moved; weak_10dose_noconv (convection=False) and solver_flat (raw solver, no IFP at all) are byte-for-byte unchanged and were NOT regenerated. Movement in the transport sums is 1-3 ULP; plasma_mean, a pure-PK quantity with no spatial dependence, is unchanged in every case.",
+        "production_grid_is_unaffected": "60.0/12.0 == 5.0 exactly in IEEE-754, so at the production grid dx = 12 um gaussian_filter receives a bit-identical argument. Verified on the real Xenium GBM section: the solved IFP field, the Darcy velocity, the 250 um display coarse-grain and all 5 exported contours hash identically before and after, and the published landing figures reproduce (raw max 12.93283 mmHg, raw tissue mean 0.128387 mmHg, displayed max 0.72608 mmHg). The production_xenium_dx12_tmz_3dose entry added in this same commit was generated BEFORE the fix and verified unchanged AFTER it, so it pins that invariance permanently.",
+        "guard_strengthened_in_the_same_commit": "Before this re-pin the file pinned dx = 15 and dx = 80 only \u2014 the production grid dx = 12 had no bitwise pin at all. production_xenium_dx12_tmz_3dose now covers it, at both the IFP-solver level and end-to-end through the engine with convection ON.",
+        "see_also": "results/tumor_sigma_units.md"
+      }
+    ]
+  },
+  "_superseded_2026-08-12_grid_cell_tumor_sigma": {
+    "_note": "The values these four cases held BEFORE the 2026-08-12 units fix. They encode the GRID-CELL tumour-sigma model, in which the physical smoothing length was 5.0 * dx um (75 um at dx=15, 400 um at dx=80) instead of a fixed 60 um. Kept so a reader can see exactly what moved. NOT asserted by any test; do not restore them without restoring the defect.",
+    "_model": "_TUMOR_SIGMA = 5.0, interpreted by gaussian_filter as PIXELS",
+    "default_1dose": {
+      "auc_sum": "0x1.9127422a88cfbp+38",
+      "final_c_sum": "0x1.45e9a492a2ccap+24",
+      "kill_fraction": "0x1.b851eb851eb86p-2",
+      "mean_auc": "0x1.6494ac97960dfp+27",
+      "penetration_index": "0x1.f71577c62c534p-1",
+      "plasma_mean": "0x1.f1851798fbc96p+4",
+      "viable_history": [
+        "0x1.0000000000000p+0",
+        "0x1.f258bf258bf26p-2",
+        "0x1.f258bf258bf26p-2",
+        "0x1.f258bf258bf26p-2",
+        "0x1.f258bf258bf26p-2",
+        "0x1.f258bf258bf26p-2"
+      ]
+    },
+    "weak_1dose": {
+      "auc_sum": "0x1.8abe74fd15d9fp+35",
+      "final_c_sum": "0x1.302f6c1a37b58p+21",
+      "kill_fraction": "0x1.2c5f92c5f92c8p-4",
+      "mean_auc": "0x1.5ee22f19da88dp+24",
+      "penetration_index": "0x1.e58500d5aacf9p-1",
+      "plasma_mean": "0x1.f1851798fbc96p+4",
+      "viable_history": [
+        "0x1.0000000000000p+0",
+        "0x1.fc962fc962fc9p-1",
+        "0x1.f5c28f5c28f5cp-1",
+        "0x1.eeeeeeeeeeeefp-1",
+        "0x1.e9d0369d0369dp-1",
+        "0x1.da740da740da7p-1"
+      ]
+    },
+    "weak_3dose": {
+      "auc_sum": "0x1.b7758e30dfd88p+36",
+      "final_c_sum": "0x1.52b8d19a98591p+22",
+      "kill_fraction": "0x1.40da740da740cp-3",
+      "mean_auc": "0x1.86a161f28e15cp+25",
+      "penetration_index": "0x1.e585535a6d844p-1",
+      "plasma_mean": "0x1.1500f5d741809p+6",
+      "viable_history": [
+        "0x1.0000000000000p+0",
+        "0x1.f258bf258bf26p-1",
+        "0x1.e147ae147ae14p-1",
+        "0x1.d1eb851eb851fp-1",
+        "0x1.bd70a3d70a3d7p-1",
+        "0x1.b17e4b17e4b18p-1"
+      ]
+    },
+    "real_xenium_dx80_tmz_3dose": {
+      "auc_sum": "0x1.19f53f83d2d58p+33",
+      "final_c_sum": "0x1.af18908b6c7b1p+17",
+      "kill_fraction": "0x1.af6950cdba980p-6",
+      "mean_auc": "0x1.09bd151a1af09p+21",
+      "plasma_mean": "0x1.98dcaae19894cp+5"
+    }
+  },
   "default_1dose": {
-    "auc_sum": "0x1.9127422a88cfbp+38",
-    "final_c_sum": "0x1.45e9a492a2ccap+24",
+    "auc_sum": "0x1.9127422a88cf9p+38",
+    "final_c_sum": "0x1.45e9a492a2cc7p+24",
     "kill_fraction": "0x1.b851eb851eb86p-2",
-    "mean_auc": "0x1.6494ac97960dfp+27",
-    "penetration_index": "0x1.f71577c62c534p-1",
+    "mean_auc": "0x1.6494ac97960ddp+27",
+    "penetration_index": "0x1.f7abf951dabf6p-1",
     "plasma_mean": "0x1.f1851798fbc96p+4",
     "viable_history": [
       "0x1.0000000000000p+0",
@@ -15,27 +90,37 @@
       "0x1.f258bf258bf26p-2"
     ]
   },
-  "real_xenium_dx80_tmz_3dose": {
-    "auc_sum": "0x1.19f53f83d2d58p+33",
-    "final_c_sum": "0x1.af18908b6c7b1p+17",
-    "kill_fraction": "0x1.af6950cdba980p-6",
-    "mean_auc": "0x1.09bd151a1af09p+21",
-    "plasma_mean": "0x1.98dcaae19894cp+5"
+  "weak_1dose": {
+    "auc_sum": "0x1.8abe74fd15da6p+35",
+    "final_c_sum": "0x1.302f6c1a37b60p+21",
+    "kill_fraction": "0x1.2c5f92c5f92c8p-4",
+    "mean_auc": "0x1.5ee22f19da894p+24",
+    "penetration_index": "0x1.e6047e6ca4ea3p-1",
+    "plasma_mean": "0x1.f1851798fbc96p+4",
+    "viable_history": [
+      "0x1.0000000000000p+0",
+      "0x1.fc962fc962fc9p-1",
+      "0x1.f5c28f5c28f5cp-1",
+      "0x1.eeeeeeeeeeeefp-1",
+      "0x1.e9d0369d0369dp-1",
+      "0x1.da740da740da7p-1"
+    ]
   },
-  "solver_flat": {
-    "auc_max": "0x1.eeee76b90aff5p+13",
-    "auc_sum": "0x1.3afb70272dc28p+24",
-    "final_c_sum": "0x1.4057b589fea0bp+14",
-    "mean_hist": [
-      "0x0.0p+0",
-      "0x1.692cd86b10208p+1",
-      "0x1.54caf1ede69dap+2",
-      "0x1.e2ea7f3f498c3p+2",
-      "0x1.307fc4d93658fp+3",
-      "0x1.686cc76f8e2f8p+3",
-      "0x1.9a09de2145ec6p+3"
-    ],
-    "penetration_index": "0x1.d09c9014c213ap-1"
+  "weak_3dose": {
+    "auc_sum": "0x1.b7758e30dfd8ep+36",
+    "final_c_sum": "0x1.52b8d19a98591p+22",
+    "kill_fraction": "0x1.40da740da740cp-3",
+    "mean_auc": "0x1.86a161f28e162p+25",
+    "penetration_index": "0x1.e604c1a642441p-1",
+    "plasma_mean": "0x1.1500f5d741809p+6",
+    "viable_history": [
+      "0x1.0000000000000p+0",
+      "0x1.f258bf258bf26p-1",
+      "0x1.e147ae147ae14p-1",
+      "0x1.d1eb851eb851fp-1",
+      "0x1.bbbbbbbbbbbbcp-1",
+      "0x1.b17e4b17e4b18p-1"
+    ]
   },
   "weak_10dose_noconv": {
     "auc_sum": "0x1.1b1a842d05cf4p+35",
@@ -53,36 +138,47 @@
       "0x1.d70a3d70a3d71p-1"
     ]
   },
-  "weak_1dose": {
-    "auc_sum": "0x1.8abe74fd15d9fp+35",
-    "final_c_sum": "0x1.302f6c1a37b58p+21",
-    "kill_fraction": "0x1.2c5f92c5f92c8p-4",
-    "mean_auc": "0x1.5ee22f19da88dp+24",
-    "penetration_index": "0x1.e58500d5aacf9p-1",
-    "plasma_mean": "0x1.f1851798fbc96p+4",
-    "viable_history": [
-      "0x1.0000000000000p+0",
-      "0x1.fc962fc962fc9p-1",
-      "0x1.f5c28f5c28f5cp-1",
-      "0x1.eeeeeeeeeeeefp-1",
-      "0x1.e9d0369d0369dp-1",
-      "0x1.da740da740da7p-1"
-    ]
+  "solver_flat": {
+    "auc_max": "0x1.eeee76b90aff5p+13",
+    "auc_sum": "0x1.3afb70272dc28p+24",
+    "final_c_sum": "0x1.4057b589fea0bp+14",
+    "mean_hist": [
+      "0x0.0p+0",
+      "0x1.692cd86b10208p+1",
+      "0x1.54caf1ede69dap+2",
+      "0x1.e2ea7f3f498c3p+2",
+      "0x1.307fc4d93658fp+3",
+      "0x1.686cc76f8e2f8p+3",
+      "0x1.9a09de2145ec6p+3"
+    ],
+    "penetration_index": "0x1.d09c9014c213ap-1"
   },
-  "weak_3dose": {
-    "auc_sum": "0x1.b7758e30dfd88p+36",
-    "final_c_sum": "0x1.52b8d19a98591p+22",
-    "kill_fraction": "0x1.40da740da740cp-3",
-    "mean_auc": "0x1.86a161f28e15cp+25",
-    "penetration_index": "0x1.e585535a6d844p-1",
-    "plasma_mean": "0x1.1500f5d741809p+6",
+  "real_xenium_dx80_tmz_3dose": {
+    "auc_sum": "0x1.19f53f83d2d5ep+33",
+    "final_c_sum": "0x1.af18908b6c7b2p+17",
+    "kill_fraction": "0x1.b019754547580p-6",
+    "mean_auc": "0x1.09bd151a1af0fp+21",
+    "plasma_mean": "0x1.98dcaae19894cp+5"
+  },
+  "production_xenium_dx12_tmz_3dose": {
+    "ifp_max_in_tissue_mmhg": "0x1.9dd9bc33de2edp+3",
+    "ifp_mean_in_tissue_mmhg": "0x1.06efbb02a3549p-3",
+    "ifp_speed_max_um_s": "0x1.eb58d01c946bfp-2",
+    "kill_fraction": "0x1.88e156a6f0900p-6",
+    "mean_auc": "0x1.318fce56e16dep+16",
+    "plasma_mean": "0x1.7f40dc5588c39p+5",
+    "penetration_index": "0x1.fbd23d0cd8735p-2",
+    "auc_sum": "0x1.c3af3f5755835p+33",
+    "final_c_sum": "0x1.3a253e7ce8b16p+23",
     "viable_history": [
       "0x1.0000000000000p+0",
-      "0x1.f258bf258bf26p-1",
-      "0x1.e147ae147ae14p-1",
-      "0x1.d1eb851eb851fp-1",
-      "0x1.bd70a3d70a3d7p-1",
-      "0x1.b17e4b17e4b18p-1"
-    ]
+      "0x1.fdf513bd16259p-1",
+      "0x1.fb9d1785deb72p-1",
+      "0x1.f92f16bfb5b0ap-1",
+      "0x1.f66903bdc64a1p-1",
+      "0x1.f381e9e56c7f7p-1"
+    ],
+    "_note": "PRODUCTION-GRID pin, added 2026-08-12 alongside the tumour-sigma units fix. The real Xenium GBM section at dx = 12 um -- the grid every shipped result and the landing asset are computed on -- previously had NO bitwise pin. Convection is ON, so this exercises the Darcy velocity path that the units fix touches. These values were generated BEFORE the fix and verified identical AFTER it, so the entry pins the claim that dx = 12 is the exact fixed point of the change.",
+    "_config": "reconstruct_real(source='xenium', sample='data_cache/xenium_gbm', dx_um=12.0, oxygen_mode='pde', state_mode='oxygen'); drug = apply_barrier_to_drugparams(calibrated_drugparams('temozolomide'), library.get_molecule('temozolomide')); PKConfig(plasma_peak=50.0, half_life=4h, n_doses=3, dose_interval=4h); PDEConfig(dt=10.0, total_time=1800.0, convection=True, save_every=30); seed=0"
   }
 }
