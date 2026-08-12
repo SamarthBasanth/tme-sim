@@ -1,318 +1,444 @@
-# tmesim
+# Vivum
 
-**A glioblastoma tumour-microenvironment drug-transport simulator built entirely on
-real measured data — and adversarially audited.**
+**A mechanistic drug-transport simulator that runs on real, measured tumour tissue.**
 
-`tmesim` reconstructs a patient's glioblastoma **microenvironment** — not just the
-tumour, but the whole niche: malignant cells and their states, stroma, immune
-infiltrate, endothelium, ECM, oxygen — from real open spatial-transcriptomics
-tissue, then runs mechanistic transport and pharmacodynamics through that
-reconstruction to predict where a drug actually goes and what it can kill.
+Vivum reconstructs the microenvironment of a real tumour section from spatial
+transcriptomics — cell types and states, vasculature, ECM, oxygen — then solves
+convection–diffusion–reaction transport, interstitial fluid pressure and a
+steady-state oxygen field on that geometry, and maps the concentration each cell
+actually sees onto a Hill dose–response. Two tissues ship as flagships: a
+glioblastoma section (**40,887 measured cells**) and a breast carcinoma section
+(**167,780 measured cells**).
 
-Everything upstream of the prediction is measured. Nothing is synthetic.
+**Who it is for.** Pharma, biotech and academic *research* users asking a
+transport question: on this tissue architecture, which of these compounds
+actually reaches the cells, and is the limit delivery or potency? A compound that
+never arrives and a compound that arrives too weak look identical in a survival
+curve and need opposite fixes; Vivum separates them.
 
-> ### Read this before you read anything else
+**The single output this project will defend is the *relative* comparison of
+compounds on *one* tissue section.** Everything absolute has been tested against
+external measurement and essentially all of it has failed. Both halves of that
+sentence are documented below, with a pointer to the measurement behind each.
+
+> ### What Vivum does not do
 >
-> A rigour audit ([`results/SESSION_AUDIT.md`](results/SESSION_AUDIT.md)) attacked
-> this model and found **nine distinct defects**, several of them mutually
-> cancelling. Every headline number published before that audit was wrong in at
-> least one way. The engine and the reconstruction were sound; the *claims* were
-> not.
->
-> `SESSION_AUDIT.md` is the authoritative statement of current state — which
-> defects are fixed, which are diagnosed but outstanding, and which results are
-> retracted. **This README summarises it; where the two differ, the audit wins.**
+> * It does **not** predict clinical response or patient outcome. No open dataset
+>   anywhere pairs measured spatial drug distribution with measured treatment
+>   response in the same tumour, and there is no glioma + temozolomide spatial
+>   drug map at all — a 39-agent, 164-dataset survey established this.
+>   → [`results/DATA_HUNT.md`](results/DATA_HUNT.md)
+> * It is **not** a diagnostic, treatment-planning or surgical tool, and it is not
+>   a "digital twin" or personalised-medicine product.
+> * **Absolute kill fraction is not a defensible output**, and neither is any other
+>   absolute quantity the engine produces. See *What has failed* below.
+> * The spatial-attribution statistic is **refused in code** on spot data, where
+>   immune positions are synthesised rather than measured.
 
 ---
 
-## The real data foundation
-
-All open, all downloaded, all traceable to a citation. Per-dataset provenance is
-in [`docs/real_data/`](docs/real_data/); the complete re-download record for the
-gitignored cache is [`docs/DATA_INVENTORY.md`](docs/DATA_INVENTORY.md).
-
-| Layer | Real dataset | Scale |
-|---|---|---|
-| Single-cell spatial (primary) | **10x Xenium** GBM FFPE, Human Brain 319-gene panel (CC BY 4.0) | **40,887 cells**, true µm coordinates, 8.1 × 5.1 mm |
-| Single-cell spatial (deep) | **10x Xenium** GBM FFPE, Immuno-Oncology **480-gene** panel (CC BY 4.0) | **816,769 cells**, 11.5 × 10.8 mm — 20× the cells, 3× the area |
-| Spot spatial | 4 Visium GBM sections (10x public parent + **GSE194329** GBM1/2/3) | 1,775–4,764 spots each, whole transcriptome |
-| Cell reference | Darmanis 2017, GEO **GSE84465** | 23,460 genes × 3,589 annotated cells, 7 cell types |
-| Niche architecture | **Ivy GAP** (Allen Institute, Puchalski 2018) | 270 RNA-seq samples across 7 anatomic structures |
-| Drug potency | **GDSC2** glioma + **HGCC** (Johansson 2020, PMID 32668248) | 262 drugs × 85 patient-derived cultures |
-| Physics ground truth | **PMID-verified** tissue-PK anchors, 6 drugs | penetration lengths + brain:plasma ratios |
-| External validation corpus | the **data hunt** caches under `data_cache/hunt/` (~5.3 GB, 40 directories) | 164 datasets surveyed, 143 open — see [`results/DATA_HUNT.md`](results/DATA_HUNT.md) |
-
-The two Xenium panels are **complementary, not redundant**: they share only 60
-genes. The brain panel carries PECAM1/SOX2/OLIG2; the IO panel loses those but
-gains CD3E, FOXP3, PDCD1, CD274, **VEGFA** and **HIF1A**. Marker maps are selected
-by panel content (`reconstruct.marker_panels`), and the 319-gene behaviour is
-unchanged bit-for-bit.
-
-**Synthetic data is gone.** `tmesim/data/synthetic.py` and the fabricated-geometry
-loader are deleted from the package; the reproducibility harness fails loudly if
-either reappears. The synthetic-validation era is archived under
-[`archive/synthetic_era/`](archive/synthetic_era/README.md), with its honest
-findings — including what synthetic validation *could not* establish — preserved in
-[`results/STAGE0_FINDINGS.md`](results/STAGE0_FINDINGS.md) and
-[`results/DRUG_SELECTION_RIGOR.md`](results/DRUG_SELECTION_RIGOR.md).
-
----
-
-## Install
-
-Python ≥ 3.9 (tested on CPython 3.9.6, macOS Apple Silicon).
+## Run it
 
 ```bash
-git clone <this-repo> tme-sim
-cd tme-sim
-python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
 pip install rdkit openpyxl statsmodels xlrd pyxlsb rdata   # see docs/REPRODUCE.md §1
 ```
 
-`pip install -e .` pulls numpy, scipy, matplotlib, pandas, scikit-image, networkx,
-scikit-learn, requests and tifffile. The second line is **not** in
-`pyproject.toml` and is needed for the molecular descriptors (rdkit) and the
-external-validation readers; see [`docs/REPRODUCE.md`](docs/REPRODUCE.md) §1.
-
----
-
-## Quickstart
-
-Every command below was executed in this repo before being documented; the
-runtimes are measured, not estimated. New to this repo?
-[`docs/QUICKSTART.md`](docs/QUICKSTART.md) is a shorter, install-to-first-result
-walkthrough (CLI + Python API), aimed at someone who has never seen this
-codebase's module layout.
-
-`pip install -e .` also registers a `vivum` console script — `vivum --help` is
-the exact same tool as `python -m tmesim.cli --help` below, just installed
-rather than run as a module; either form works everywhere on this page.
+`pip install -e .` registers a `vivum` console script; `vivum <cmd>` and
+`python -m tmesim.cli <cmd>` are the same tool. The second `pip` line is not in
+`pyproject.toml` and is needed for the molecular descriptors and the
+external-validation readers. Python ≥ 3.9; pin with
+`pip install -c constraints.txt -e .` if you intend to reproduce a number rather
+than merely run the code.
 
 ```bash
-# What the CLI offers.
-python -m tmesim.cli --help
+vivum --help                    # every subcommand
+vivum acquire                   # auto-downloadable open datasets (~90 MB, measured 17 s)
+vivum molecules                 # library drugs + structure-derived descriptors, no data
+vivum reconstruct --source xenium --dx 12          # real GBM niche, 40,887 cells
+vivum simulate --source xenium --dx 12 --drug temozolomide
 
-# The 10 library GBM drugs with structure-derived descriptors (no data, ~0.5 s).
-python -m tmesim.cli molecules
+# The core use case: one reconstruction, several compounds, ranked.
+vivum compare-drugs --dx 12 --drugs temozolomide,cisplatin,doxorubicin
+vivum compare-drugs --dx 12 --library breast --sample data_cache/xenium_breast_janesick/rep1
 
-# Compare several drugs on ONE reconstructed section (new: compare-drugs).
-python -m tmesim.cli compare-drugs --drugs temozolomide,cisplatin,doxorubicin
-
-# Launch the Studio web UI (needs `pip install -e '.[app]'`).
-python -m tmesim.cli studio
-
-# Download the auto-acquirable open datasets into ./data_cache/  (~2 min, ~90 MB).
-python -m tmesim.cli acquire
-
-# Reconstruct the REAL whole-niche microenvironment from the 319-panel Xenium GBM
-# section at the PRODUCTION resolution (~6 s, 40,887 cells).
-python -m tmesim.cli reconstruct --source xenium --dx 12
-
-# Same pipeline on the 480-gene Immuno-Oncology section (~45 s, 816,769 cells).
-python -m tmesim.cli reconstruct --source xenium --sample data_cache/xenium_gbm_io --dx 12
-
-# Reconstruct a real Visium section (native ~100 µm spot pitch, ~44 s).
-python -m tmesim.cli reconstruct --source visium
-
-# Reconstruct + compile a real drug + simulate transport and kill (~2 min).
-python -m tmesim.cli simulate --source xenium --dx 12 --drug temozolomide
-
-# Same, driven from the molecular library (structure -> DrugParams -> engine).
-python -m tmesim.cli molecular-run --drug doxorubicin --source xenium --dx 12
-
-# Metric known-answer checks, no simulation (~1 s). Proves penetration_index is
-# scale-invariant and therapeutic_coverage is not.
-python -m tmesim.validation.delivery_metrics --selftest
+vivum validate --quick          # the scorecard, analytic tier only (seconds)
+vivum validate                  # full scorecard, real tissue + PDE solves (~15-25 min)
+vivum validate --list           # the anchor registry, plus what was deliberately left out
 ```
 
-`reconstruct` prints the niche report (cell-type fractions, mean vascular/ECM/
-oxygen, the ECM marker transcripts used, the tissue-mask mode, and the per-cell
-sensitivity model in force) and writes a figure. `simulate` adds the compiled drug
-parameters and the transport→kill result.
+**Pass `--dx 12` explicitly.** `compare-drugs` still defaults to `--dx 30`, and
+values quoted at dx = 30 are superseded — a coarse grid cannot resolve the
+perivascular boundary layer. dx = 12 is the production resolution, and it is
+**not** a converged one either; see *What is retracted*.
 
 The Xenium, Visium, GSE84465 and HGCC caches are open but too large for
 `acquire`; the exact `curl` commands are in
-[`docs/REPRODUCE.md`](docs/REPRODUCE.md) §2b, and the full backup record —
-including every `data_cache/hunt/` directory — is
+[`docs/REPRODUCE.md`](docs/REPRODUCE.md) §2b and the complete byte-level record is
 [`docs/DATA_INVENTORY.md`](docs/DATA_INVENTORY.md).
 
-### Reproduce everything
+**Studio** — the browser UI (reconstruct, compare, protocol editor, caveats
+panel):
 
 ```bash
-./scripts/reproduce_real.sh              # core pipeline
-./scripts/reproduce_real.sh --with-deep  # + niche / combination / dose / patient reports
-./scripts/reproduce_real.sh --list       # print the stages and exit
-./scripts/reproduce_real.sh --dry-run    # print every command, run nothing
-./scripts/reproduce_real.sh --only panel # run one stage
+pip install -e '.[app]'
+vivum studio                    # or: python -m app.server
 ```
 
-One script: preflight → data (acquire if missing) → reconstruct → flagship
-simulation → drug panel → cross-tissue → validation → external validation.
-Deterministic (seed 0). Setup, data acquisition, expected outputs and runtimes:
-[`docs/REPRODUCE.md`](docs/REPRODUCE.md).
+**`vivum validate`** is the honesty layer, and it is meant to be read as much as
+run. It scores the model against independent published measurements, prints
+PASS / FAIL / NOT TESTABLE / DEFERRED per row with the reasoning inline, refuses
+to score a solver number whose delivery law is undeclared, and **exits 1 on any
+FAIL**. It currently reports more failures than passes. That is the point of it.
+
+**Landing page** — `cd landing-3d && npm install && npm run dev`. The guardrail
+block at the top of [`landing-3d/lib/copy.ts`](landing-3d/lib/copy.ts) is the
+best-calibrated claim text on any surface in this repo.
+
+**Reproduce everything** — `./scripts/reproduce_real.sh` (add `--with-deep`,
+`--list`, `--dry-run`, `--only <stage>`). Deterministic, seed 0. Setup, expected
+outputs and measured runtimes: [`docs/REPRODUCE.md`](docs/REPRODUCE.md).
 
 ---
 
-## Five corrections — read these before quoting any number
+## The data
 
-These are real errors that were found and fixed, or real confounds that were
-found and are still open. They are here rather than in a footnote because several
-of them **retract previously published headlines**.
+All open, all cited, all traceable. **No synthetic data.** `tmesim/data/synthetic.py`
+and the fabricated-geometry loader are deleted from the package and the
+reproducibility harness fails loudly if either reappears; the synthetic era is
+archived under [`archive/synthetic_era/`](archive/synthetic_era/README.md).
 
-### 1. Production resolution is dx = 12 µm, and `penetration_index` is RETIRED
-
-Two separate problems with the same metric.
-
-* **Not converged at coarse grids.** The calibrated perivascular boundary layer is
-  ~45 µm thick, so any grid with dx ≳ 45 µm cannot resolve it and reports an
-  artificially flat (high) index. Values quoted at dx = 30 µm or dx = 100 µm are
-  superseded.
-* **Scale-invariant even when converged — it cannot discriminate drugs at all.**
-  `penetration_index = mean(AUC) / p99(AUC)` is a *ratio*: multiply the whole
-  exposure field by any constant and it does not move. At dx = 12 µm it therefore
-  reports the **vascular geometry**, which is identical for every drug on one
-  section. Across the five-drug panel it spans **0.1946–0.1959 — a spread of
-  0.0014 — while those same drugs' delivered exposure differs by 120×.** Its grid
-  drift (0.0183) is ~13× larger than its entire across-drug signal.
-
-  **Use `therapeutic_coverage` at 1× IC50 instead** — the fraction of tumour cells
-  whose time-averaged exposure `E = AUC/T` exceeds the drug's measured IC50. It is
-  dimensionally sound, grid-converged (±0.03), and spans **0.311–0.925** on the
-  same panel (separation 21.9 vs 0.08). Quote it with the 0.5×/2× IC50 band
-  beside it and `median_tumor_auc` (µM·s) as the supporting absolute.
-
-  The earlier ranking "temozolomide penetrates best, doxorubicin barely reaches
-  the tumour bulk" is **retracted**, as is the cross-tissue "kill spans 2% → 24%"
-  headline (that spread mixed dx = 12 µm with dx = 100 µm runs).
-  → [`results/delivery_metrics.md`](results/delivery_metrics.md),
-  [`results/real_drug_panel.md`](results/real_drug_panel.md)
-
-`kill_fraction`, by contrast, **is** grid-converged (plateaus by dx ≲ 20 µm).
-
-### 2. The hypoxic fraction is grid-sensitive and only order-of-magnitude
-
-The Xenium section reported ≈94% hypoxic at dx = 30 µm, ≈13% at dx = 12 µm and
-≈7% at dx = 8 µm — not converged; the same Visium tissue reports 100% at
-dx = 100 µm and 0% at dx = 12 µm. Two grid-dependence bugs (a raw-count oxygen
-sink scaling as dx², and a grid-dependent tissue mask) were **partially cancelling
-each other**, which made the output look more stable than it was. Both are now
-fixed — the tissue mask is `geometric` (the union of 30 µm physical discs around
-measured centroids, so the domain does not move with `dx`) — and the earlier
-attribution of small predicted kills to hypoxic resistance was **wrong**: they are
-driven mainly by limited delivered exposure relative to these drugs' IC50s. Treat
-any hypoxic fraction as an order-of-magnitude figure, not a measurement.
-
-### 3. α uses the E-FOLD convention — the earlier 309.6 was a unit error
-
-One mechanistic constant, α, is fit **once** to doxorubicin's real perivascular
-anchor (Primeau 2005, PMID 16361566) and then held fixed for every other drug and
-every tissue. The anchor is published as a **half-distance** `d_half`; the
-simulator's penetration length is an **e-folding length**:
-
-```
-d_half = L · ln 2        =>        L = d_half / ln 2 ≈ 1.443 · d_half
-```
-
-Fitting α to the raw half-distance skips that conversion and inflates α by exactly
-`1/ln²2 = 2.081×`. That produced the old **α = 309.6**; the correct value is
-**α ≈ 148.6** (`calibrate_alpha()` → 148.608, target e-fold length 64.92 µm).
-`calibrate_alpha` now takes an e-folding target and a regression test guards it, so
-the mistake cannot recur silently. **Any report still quoting 309.6 is stale, and
-absolute µM·s figures from before the fix are not comparable to current ones.**
-→ [`docs/MATHEMATICAL_MODEL.md`](docs/MATHEMATICAL_MODEL.md) §7–8,
-[`results/calibration.md`](results/calibration.md)
-
-### 4. Per-cell sensitivity is drug-specific from real markers — except for temozolomide
-
-`reconstruct.real_pipeline.apply_drug_sensitivity` sets each cell's intrinsic
-sensitivity from a **measured determinant transcript**, and only where the panel
-actually carries one:
-
-| drug class | determinant | basis |
+| Layer | Dataset | Scale |
 |---|---|---|
-| doxorubicin, etoposide, mitoxantrone (TOP2 poisons) | **TOP2A** | cytotoxicity scales with TOP2A level (PMID 18574145) |
-| cisplatin, lomustine, carmustine, methotrexate, vincristine | **MKI67** | proxy for cell-cycle dependence |
-| **temozolomide**, procarbazine, bevacizumab | **none — uniform 1.0** | TMZ's canonical determinant is **MGMT**, which is absent from **both** Xenium panels (319-gene *and* 480-gene), and methylation is not measurable from these transcripts at all |
+| GBM section (flagship) | 10x Xenium GBM FFPE, Human Brain 319-gene panel (CC BY 4.0) | **40,887 cells**, true µm coordinates |
+| Breast section (flagship) | 10x Xenium breast, Janesick 2023 (PMID 38114474), Rep1 | **167,780 cells** (89,785 tumour) |
+| GBM, held-out patient | 10x Xenium GBM FFPE, Immuno-Oncology 480-gene panel | **816,769 cells**, 6.2× the cell density |
+| Spot spatial | 4 Visium GBM sections (10x public + GSE194329) | 1,775–4,764 spots each |
+| Cell reference | Darmanis 2017, GEO GSE84465 | 23,460 genes × 3,589 annotated cells |
+| Niche architecture | Ivy GAP (Puchalski 2018) | 270 RNA-seq samples, 7 anatomic structures |
+| Drug potency | GDSC2 + HGCC (Johansson 2020, PMID 32668248) | 262 drugs × 85 patient-derived cultures |
+| Physics anchors | PMID-verified tissue-PK measurements | penetration lengths, brain:plasma ratios |
+| Validation corpus | `data_cache/hunt/` (~5.3 GB) | 164 datasets surveyed, 143 open — [`results/DATA_HUNT.md`](results/DATA_HUNT.md) |
 
-Uniform 1.0 is a documented no-resistance upper bound, not a measurement.
-MGMT's absence is not merely unmodelled but **unmodellable from this modality** —
-so a determinant-mode cross-drug comparison quietly advantages temozolomide,
-because its resistance determinant is the one that is *unmeasured*. That unfairness
-is a **diagnosed, unfixed defect** (audit #8). The reconstruction default is
-therefore **uniform 1.0 for every drug**, which is the only fair cross-drug mode:
-sensitivity cancels out of any ranking, and absolute kills are an equal upper bound.
-
-### 5. The vascular field is a smooth KDE, not vessels — this confounds every vessel-relative claim
-
-`vascular_density` is a **Gaussian KDE (bandwidth ~40 µm) of measured endothelial
-cell positions**, max-normalised. It is the source term for every drug
-(`delivery = vascular_density × bbb_penetrance × plasma`), and being a blur rather
-than a vessel network it produces three converging artifacts:
-
-* fitted penetration length is **26–28 µm for all five drugs** against a
-  **source-null of 23.7 µm** — the decay is measuring KDE bandwidth, not drug
-  transport ([`results/delivery_metrics.md`](results/delivery_metrics.md));
-* the exposure profile has a **flat floor at ~12% of peak**, so no tissue is truly
-  drug-starved and delivery is never the binding constraint
-  ([`results/dose_schedule.md`](results/dose_schedule.md));
-* "perivascular regions get more drug" is **circular** — the region label and the
-  drug source share the same endothelial signal
-  ([`results/niche_response.md`](results/niche_response.md)).
-
-Independently, `validation.vascular_validation` finds the arrangement is *nearly
-structureless*: median tumour-to-vessel distance is within 1% of a complete
-spatial randomness null at the same density, whereas real GBM is strongly
-clustered. The model therefore **under-represents the poorly-delivered tail**.
-
-**Treat every vessel-relative spatial claim in this repo as confounded.**
-Replacing the KDE with a discrete segmented vessel network (literature basis:
-~20 endothelial cells per mm of vessel, 1–2 EC per capillary cross-section —
-Shapson-Coe 2024 *Science*, Sargent 2023) is the single highest-value structural
-fix outstanding. `tmesim/reconstruct/vessel_network.py` exists as the beginning of
-that work.
+Per-dataset provenance: [`docs/real_data/`](docs/real_data/).
 
 ---
 
-## What is validated, and what is not
+## What is defensible
 
-| Axis | Status | Evidence |
-|---|---|---|
-| **Reconstruction fidelity** | **MIXED — one claim retracted, one recovered, two still fail** | Originally reported as VALIDATED (Xenium vs Visium, Pearson **0.997**). Re-run after a classifier-arity fix (`4ad221f`) found the number that mattered — Pearson r on the harder non-tumour subvector — collapsed **0.945 → 0.016** (rank agreement ρ = 1.00 → 0.40): **RETRACTED**, → [`results/revalidation.md`](results/revalidation.md). Separately, a held-out second patient (`results/heldout_patient.md`) originally found the endothelial-fraction-vs-human-volume-EM agreement did NOT replicate (4.18% vs the measured 8.0%) — but net of later fixes (discrete-vessel promotion, the same classifier-arity fix) it now **DOES replicate** when re-run (7.07% vs 8.0%), a genuine improvement not yet reflected in `results/SESSION_AUDIT.md`. The SAME held-out test found the **vascular area fraction** claim still fails badly (10.98% vs measured 2.1%, 5.2×) and **MVD** is not reproduced on either section — both real, current, unresolved gaps. → [`results/heldout_patient.md`](results/heldout_patient.md) is the most current single source for all of this. |
-| **Numerics** | **VALIDATED** | Mass conserved to ~1e-13 on the real irregular mask; concentrations never negative; dt-converged across a 32× range; `kill_fraction` grid-converged. Production dx = 12 µm is also the finest grid satisfying the advection CFL at dt = 10 s. → [`results/numerical_rigor.md`](results/numerical_rigor.md) |
-| **Transport physics vs measured tissue PK** | **VALIDATED out-of-sample** | With α frozen from doxorubicin, the model predicts mitoxantrone (48.2 µm) and chemically-distinct topotecan (83.6 µm), both inside their real cited bands. → [`results/pk_multidrug.md`](results/pk_multidrug.md) |
-| **Potency** | **CORROBORATED real-vs-real** | GDSC and HGCC — two independent real screens, no model in the loop — agree at Spearman **+0.83** (p = 2.4e-5). This is *why* the molecular layer uses measured IC50 rather than a structure→potency QSAR. → [`results/pharmacology_real.md`](results/pharmacology_real.md) |
-| **Delivery / partition magnitude, in human glioma** | **VALIDATED, with an error budget** | Scored against **125 human glioma tissue samples across 42 patients** plus 27 PMID-anchored regional PK measurements: 5/6 drugs within 10×, 4/6 within 3×; aggregate bias 2.02×, but **1.01× — essentially unbiased — excluding one outlier**. Cross-drug ordering: measured penetrant-vs-excluded separation **4.66×**, model predicts **3.65×** from structure alone. → [`results/glioma_regional_pk.md`](results/glioma_regional_pk.md) |
-| **Regional (CE vs non-enhancing) ordering** | **FAILS** | Measured contrast-enhancing vs non-enhancing separation is **1.45×–4.26×** (p < 0.0001, within-patient permutation); the model predicts exactly **1.00×**, because there is **no barrier-integrity term anywhere in it**. The validation derived the fix from the data: a multiplicative barrier cannot work (3.2× spread across drugs) but an **additive leak is drug-independent to within 1.3×** (L = 0.211 / 0.230 / 0.272 across three independent studies), giving `source = vascular_density · (bbb_penetrance + L · bbb_disruption) · plasma`, **L ≈ 0.24** — the signature of size-nonselective paracellular opening. That term now exists in `tmesim/reconstruct/barrier.py` and is reachable via `treatment.drugs.delivery_source(..., bbb_disruption=...)`, but it is **opt-in and OFF by default** — passing `None` reproduces the pre-fix source exactly, so every shipped result still predicts 1.00×. |
-| **Spatial / vessel-relative claims** | **CONFOUNDED** | By our own vascular smoothing — correction 5 above. |
-| **Passive transport as a sufficient explanation of tissue partition** | **FALSIFIED, diagnostically** | On 6 matched human GIST tumour/normal imatinib MSI pairs the transport-only model gives 7.9× geometric-mean fold error vs 13.0× for the no-partitioning null — it beats the null by only ~1.6× and 4 of 5 liver pairs lie *below* the model's structural floor, so **no penetration length can reproduce them**. The missing physics is active hepatic uptake and lysosomal ion-trapping, neither of which is a diffusion process. → [`results/gist_imatinib.md`](results/gist_imatinib.md) |
-| **Predicted drug RESPONSE vs real patient outcomes** | **CANNOT BE VALIDATED with open data** | A 39-agent, 164-dataset sweep established that **no open dataset anywhere pairs measured spatial drug distribution with measured treatment response in the same tumour** — not one — and **no glioma + temozolomide spatial drug map exists at all** (METASPACE: zero). The experiment that would close the loop (the Agar/White adavosertib GBM platform) has **no accession**; it is a months-long collaboration request. → [`results/DATA_HUNT.md`](results/DATA_HUNT.md) |
+These survived attacks designed to break them. The wording below is the wording
+that survived; it is deliberately narrow.
 
-### Also honest about
+**1. Ratio-type outputs are substantially insulated from absolute parameter
+error.** The delivery law was replaced with a corrected one (`S = PS·(Cp − C)`
+instead of the one-way `S = PS·Cp`) and every breast panel drug re-run.
+**Absolute delivery moved by up to 9.58×** (5-fluorouracil); **the scored 3-D:2-D
+ratio moved by at most 1.45×**, and **zero verdicts flipped**. For the three
+worst-affected drugs 84–86 % of the delivery error cancels in the ratio.
+→ [`results/breast_kill_revalidation.md`](results/breast_kill_revalidation.md) §5
 
-* **`bbb_penetrance` is a structure-only score with no efflux or carrier
-  transport**, so it is only partially concordant with measured brain:plasma
-  ratios. The audit's "a mean cannot express a veto" defect **has since been
-  fixed**: crossing the barrier is a *conjunction* (small enough AND lipophilic
-  enough AND not too polar AND not too H-bonding), so the four desirabilities are
-  now combined by a **geometric** mean, where any single near-zero desirability
-  drives the product to zero. It adds no tunable parameter — for equal
-  desirabilities the two means coincide. On the 6-drug human-glioma scorecard the
-  worst-case error falls from **65.6× to 6.9×** (the eribulin outlier: 0.334 →
-  0.035 against a measured 0.0051) and all 6 drugs move inside the
-  order-of-magnitude band. It makes two drugs *worse* — methotrexate and cefazolin
-  carry disqualifying descriptors too — and the module says so.
-* **The top-1 drug call is probably not decision-grade.** Cisplatin (0.241) and
-  doxorubicin (0.231) differ by ~4%, well inside plausible parameter uncertainty.
-  Report it as a tie until shown otherwise.
-* **Absolute kill fractions** are conditional on the sensitivity model, on the
-  single-anchor α, and on 2D geometry. Rankings are far more trustworthy than
-  absolutes; ratios more than either.
+*The limit of this.* The residual is never zero: 13.8 % at best (5-FU), ~48 % for
+the five low-permeability drugs. The cancellation is of *multiplicative scale*
+error, which the `plasma = c_bath / p99(e_unit)` renormalisation removes partly by
+construction. A *shape* perturbation is not covered — a sub-grid delivery source
+moves the score materially ([`results/delivery_source_geometry.md`](results/delivery_source_geometry.md)).
+The source file's own summary: *"'insulated' is not 'immune'."*
 
-Authoritative current state: [`results/SESSION_AUDIT.md`](results/SESSION_AUDIT.md).
-Every equation with its provenance:
-[`docs/MATHEMATICAL_MODEL.md`](docs/MATHEMATICAL_MODEL.md).
+**2. The scored ratio is essentially insensitive to the timestep.** Halving `dt`
+across six drug × grid combinations moves it by at most **0.0003 %**, with the
+exposure field itself moving 4–5 orders of magnitude more — which is what the
+renormalisation is supposed to do.
+→ [`results/grid_convergence_gbm.md`](results/grid_convergence_gbm.md) §7.3.
+That file states the limit itself: this licenses **nothing** about absolute AUC or
+absolute kill, only about the ratio.
+
+**3. Therapeutic coverage is *exactly* invariant to the oxygen field** — verified
+with `==`, not `isclose`, across both vascular modes and three drugs, and
+structurally guaranteed because oxygen is not an input to the transport solve at
+all. → [`results/oxygen_level_shift.md`](results/oxygen_level_shift.md) §4
+
+**4. Cross-drug ranking is invariant to common-mode perturbations** — all three
+cell-state routes, the oxygen route, α, and the exposure unit (a 3.36× change in
+the exposure unit moves decision probabilities by ≤ 0.004).
+→ [`results/cell_state_impact.md`](results/cell_state_impact.md) §3.3,
+[`results/oxygen_level_shift.md`](results/oxygen_level_shift.md) §4,
+[`results/ranking_robustness.md`](results/ranking_robustness.md).
+It is **not** invariant to drug-specific transport parameters — see *retracted*.
+
+**5. The solver's internal numerics.** Mass is conserved on the real irregular
+tissue mask to **~4e-14** (the round-off floor), concentrations never go negative,
+the implicit scheme never destabilises across a 32× `dt` range, and the explicit
+advection step computes its own CFL number and *raises* rather than degrading
+silently. → [`results/numerical_rigor.md`](results/numerical_rigor.md) §1, §3 —
+the sections that file's own correction block explicitly leaves standing.
+
+**6. The tissue is real.** Every reconstruction above runs on measured cell
+coordinates from a real section. Nothing upstream of the prediction is synthetic.
+
+**7. Two independent real potency screens agree.** GDSC2 and HGCC, no model in the
+loop, Spearman **0.827** (p = 2.35e-05) over the 18 shared drugs — which is why
+the molecular layer uses measured IC50 rather than a structure→potency regression.
+That same file records why the regression was rejected: a descriptor model reaches
+Spearman 0.42 on real sensitivity, but the dominant feature is molecular weight and
+the signal is a drug-**class** confound, not a within-class QSAR. Note this is a
+check on the **data**, not on any Vivum model.
+→ [`results/pharmacology_real.md`](results/pharmacology_real.md)
+
+---
+
+## What is contingent
+
+Real measurements whose verdict depends on a configuration choice that is itself
+unvalidated, or that rests on one section.
+
+**The GBM 3-D:2-D kill panel passes 3/3 — under the shipped configuration only.**
+Temozolomide 0.2626 (band 0.1590–0.4622), cisplatin 0.2791 (0.2086–1.5004),
+doxorubicin 0.2077 (0.0575–1.0000), from a model never fitted to any 3-D-vs-2-D
+measurement. Across five measured alternative configurations the panel counts are
+**2/3, 2/3, 3/3, 3/3, 1/3**, and temozolomide — the matched anchor — is among the
+failures in all three arms that change the count. The two 2/3 arms are independent
+in provenance but land on the same lever (oxygen level) and give bit-identical
+temozolomide ratios, so they are not two independent confirmations.
+→ [`results/kill_calibration.md`](results/kill_calibration.md) §3 and **§3.1**.
+Separately, the 3/3 survives on the *width of the literature bands*, not on
+numerics: `dx = 12` sits at the maximum of `F_state` over the whole grid ladder,
+biasing all three ratios high by +1.2 / +2.4 / +2.7 %
+([`results/grid_convergence_gbm.md`](results/grid_convergence_gbm.md)).
+
+**The breast kill panel's tally is currently under reconciliation — do not quote
+either figure.** [`results/kill_calibration_breast.md`](results/kill_calibration_breast.md)
+§3 reports **5 PASS / 1 FAIL** of six testable drugs, reaching that count by
+falling back to a broad cross-tumour band for two drugs whose own literature is a
+single row with no spread. The shipped `vivum validate` does not fall back and
+therefore prints **3 PASS / 3 FAIL**, scoring 5-fluorouracil and paclitaxel
+against zero-width bands. Neither bar is obviously wrong; they are different bars.
+A zero-width band on a continuous quantity is the mirror image of the defect for
+which the GBM IFP row was declared NOT TESTABLE — a bar nothing can pass, versus a
+bar nothing can fail. Reconciliation is in progress and will be recorded in
+`results/zero_width_bands.md`; until it lands, read both sources and quote
+neither count as settled.
+
+**Docetaxel on breast is the one verdict that is a function of the grid.** Its
+ratio 0.1484 sits **1.5 % outside** its band ceiling of 0.1463 — a margin smaller
+than every available estimate of the grid movement of the statistic producing it,
+and those estimates disagree in sign. The project's own position:
+*"UNDETERMINED at dx = 12 µm — not FAIL, and not PASS"*
+([`results/p99_convention.md`](results/p99_convention.md) §6.1). It survives the
+corrected delivery law (1.5 % → 2.6 % outside), and it survives a cellular-exclusion
+correction that raises hindrance from 1.77× to 6.61× in one arm while flipping to
+PASS in the other; it does not survive a 2× grid coarsening, and a sub-grid
+delivery source removes it entirely (0.1484 → 0.0752).
+
+**Ranking under oxygen perturbation is *near*-invariant, not invariant.** Relative
+kill changes span **71.4–77.0 %** against a 74 % common shift — a 5.6 pp spread
+across drugs. `kill_fraction` is a covariance, not a scalar multiple, so the
+"drug-independent per-cell multiplier" premise is false in general. Worse, the
+oxygen → resistance map is genuinely **drug-dependent** in code:
+`TMZ_HYPOXIA_RESISTANCE = 0.80` (`tmesim/core/config.py:264`) against a global
+`hypoxia_resistance = 0.35` (`:238`). That drug-dependence is inert **today only
+because the GBM section's hypoxic fraction is 0.0000 at every grid spacing
+tested** — a non-empty hypoxic band would activate it and the near-invariance
+above would have to be re-measured.
+→ [`results/oxygen_level_shift.md`](results/oxygen_level_shift.md) §4,
+[`results/grid_convergence_gbm.md`](results/grid_convergence_gbm.md) §2.1
+
+**The top-1 pick is not decision-grade.** Correcting the delivery law changes the
+top-1 GBM pick (cisplatin → vincristine), changes the top-3 set, and swaps 4 of 45
+pairs — two of them across gaps of 40.5 % and 35.6 % of the leader's kill.
+P(cisplatin rank 1) falls **0.9277 → 0.3965**.
+→ [`results/transvascular_exchange_revalidation.md`](results/transvascular_exchange_revalidation.md) §4.1.
+`results/ranking_robustness.md` §8: *"the reportable output of this pipeline for
+the top of the panel is a SET, not a winner."*
+
+**Every absolute this engine currently ships is computed under a delivery law the
+codebase documents as measurably wrong.** `transvascular_exchange: bool = False`
+(`tmesim/core/config.py:137`) selects the one-way leak `S = PS·Cp`, which has no
+path from interstitium back to blood and whose steady state is unbounded above
+plasma; five of eleven GBM drugs sit above plasma. The corrected law introduces no
+new parameter and is bounded by plasma by construction. It is off by default for a
+stated engineering reason — turning it on invalidates every published absolute and
+is a re-validation exercise, not a flag flip — but that reasoning does not extend
+to the claim surface, which is why it is stated here.
+
+**The spatial-attribution statistic is a study, not a product output.** Tumour
+cells in the macrophage-densest quintile retain **0.4291** of exposure against
+**0.8592** in the sparsest — a raw 2.0025× spread that reproduces to the digit.
+But against spatially-aware nulls that preserve the macrophages' own clustering
+the excess is only **1.08–1.21×** (nulls return 1.6581 and 1.8522), **82 % of the
+raw ratio is reproduced by distance-to-tissue-edge alone with zero immune input**
+(1.6394), p = 0.0476 is the 20-draw floor and must not be read as a resolved
+p-value, there is no confidence interval, and it is one section, one drug, one
+sink strength. The module ships **default-off** and no shipped code path imports
+it. → [`results/immune_sink_impact.md`](results/immune_sink_impact.md) §5
+
+---
+
+## What has failed
+
+Every absolute quantity this project has scored against an independent published
+measurement. These are listed so nobody has to rediscover them.
+
+| Quantity | Predicted | Measured | Error | Source |
+|---|---|---|---|---|
+| Interstitial fluid pressure, breast | 0.370 mmHg | 15 ± 9 mmHg (PMID 1423283) | **41× low** | [`ifp_validation.md`](results/ifp_validation.md) §4.2 |
+| IFP, GBM | 0.462 mmHg | 2.0 ± 2.5 mmHg | 4.3× low, but registered **NOT TESTABLE** — a model outputting zero would pass | [`ifp_validation.md`](results/ifp_validation.md) §4.1 |
+| Oxygen `supply` constant | 0.05 | ≈194–251 s⁻¹ (PMID 31423930) | **~4,570× low** on GBM (2,160× on breast), partly cancelled by a consumption sink **112–166× low** | [`oxygen_supply_calibration.md`](results/oxygen_supply_calibration.md) §3.3, §5 |
+| Effective diffusivity, multicellular layer | 287.3 µm²/s | 74–130 µm²/s | FAIL | [`anchor_registration.md`](results/anchor_registration.md) §1 |
+| Hindrance `D_free/D_eff` | 1.77× → **6.61×** after a cellular-exclusion correction | 12× (PMID 9806526) | **1.8× short** even after the correction | [`cellular_exclusion.md`](results/cellular_exclusion.md) §4.1 |
+| Breast Kp, 5-fluorouracil | 7.7956 | 0.61 ± 0.11 (PMID 9205062) | **12.8× high** | [`breast_kp_validation.md`](results/breast_kp_validation.md) |
+| Breast Kp, methotrexate | 0.0571 | 0.60 ± 0.20 (PMID 9679959) | **10.5× low** — opposite direction | [`breast_kp_validation.md`](results/breast_kp_validation.md) |
+| Vascular area fraction, held-out patient | 10.982 % | 4.70 ± 2.38 % (PMID 27583442) | **2.34×** — but see below | [`vascular_segmentation_audit.md`](results/vascular_segmentation_audit.md) §2.3 |
+| Microvessel density, held-out patient | 233.27 /mm² | 65 (35–95) /mm² | **3.59×** (1.70× on section 1 — the merge factor is not a constant) | [`heldout_patient.md`](results/heldout_patient.md) §2 |
+| Regional CE vs non-enhancing separation | exactly 1.00× | 1.45–4.26× (p < 0.0001) | FAIL — there is no barrier-integrity term in the shipped source | [`glioma_regional_pk.md`](results/glioma_regional_pk.md) |
+| Passive transport as a sufficient explanation of tissue partition | 7.9× geometric-mean fold error | vs 13.0× for a no-partitioning null | **FALSIFIED, diagnostically** — beats the null by only ~1.6×, and 4 of 5 liver pairs lie below the model's structural floor | [`gist_imatinib.md`](results/gist_imatinib.md) |
+
+**The vascular-area row is a trap and it cuts against us.** The commensurable
+anchor (Marien 2016 areal fraction, 4.70 %) was **added** to the scorecard, not
+substituted for the incommensurable one (Tamma 2022 CD34 stain-positivity 2.1 %,
+where the lumen contributes no stained pixels but the model paints the whole vessel
+profile). `scorecard.py` still reads the 2.1 % key, so **`vivum validate` still
+prints 5.23×**. Do not quote 2.34× as the product's number until the scorecard
+scores it. Either way it is a FAIL.
+
+**Three scored rows compare a *solved field* to an *external measurement*, and all
+three FAIL — in opposite directions**: breast IFP 41× low, 5-FU partition 12.8×
+high, methotrexate partition 10.5× low. No single constant can absorb them.
+Refinement makes IFP *worse*, not better: breast IFP falls monotonically
+0.621 → 0.424 → 0.370 → 0.286 mmHg across dx = 24/18/12/8, a 2.17× spread
+([`ifp_validation.md`](results/ifp_validation.md) §5).
+
+**And the scorecard mostly does not test the solver at all.** Live
+`vivum validate --quick` on the shipping physics returns
+**PASS 7 · FAIL 6 · NOT TESTABLE 4 · DEFERRED 8** of 25 rows, and prints its own
+disclosure: ***13 of the 13 scored rows never invoke the transport PDE.*** The full
+run does reach the solver — 12 PDE-scoped scored rows — but every PASS among them
+is a 3-D:2-D ratio conditional on the one fitted constant α, and the full tally is
+in flux while the breast zero-width-band question above is settled. The last
+recorded full run is in
+[`results/anchor_registration.md`](results/anchor_registration.md) §0.
+Roughly **18 distinct FAIL rows** exist across `results/`; they are enumerated in
+[`results/CLAIM_INVENTORY.md`](results/CLAIM_INVENTORY.md) §1e. Docetaxel is one
+falsification among many — this project's honesty record is better than "one
+instance", and should be stated that way.
+
+---
+
+## What is retracted
+
+Each of these was published by this project and is now measured false or
+superseded. They are kept visible because the retractions are load-bearing.
+
+| Retracted claim | What replaced it |
+|---|---|
+| *Ranking is unconditionally invariant.* | Invariant to **common-mode** perturbations only. A drug-specific transport parameter changes the top-1 GBM pick. → [`transvascular_exchange_revalidation.md`](results/transvascular_exchange_revalidation.md) §4.1 |
+| *dx = 12 µm is grid-converged.* | **Neither panel is in an asymptotic regime.** Breast: docetaxel is −3.4 % from its Richardson limit, its boundary layer is 28.2 µm = 2.4 cells at dx = 12, ladder spread 49.7 % ([`grid_convergence_breast.md`](results/grid_convergence_breast.md)). GBM: the ladder is **non-monotone**, observed orders 0.96 and −3.33, GCI 5.44–6.42 %, power-law fits flagged DEGENERATE ([`grid_convergence_gbm.md`](results/grid_convergence_gbm.md) §0). |
+| *dx = 12 is the finest grid satisfying the advection CFL at dt = 10 s.* | **Measured false.** dx = 10 runs at CFL 0.663; the GBM floor is **dx = 7** (CFL 0.955), with dx = 6 the first grid the solver refuses. Re-measured independently on the shipped configuration: dx = 8 at 0.939, dx = 7 at 0.955. → [`grid_convergence_gbm.md`](results/grid_convergence_gbm.md) §2.1, [`cfl_resolution.md`](results/cfl_resolution.md) §0. The present-tense comment at `tmesim/reconstruct/real_fields.py:146-149` describes a superseded reconstruction. |
+| *The mesh is not the bottleneck once dx ≲ 12 µm* / **Numerics: VALIDATED**. | Withdrawn by [`numerical_rigor.md`](results/numerical_rigor.md)'s own correction block. The elasticities were mis-attributed (|E_pen| 0.747 belongs to `grid_dx_um`, not the endothelial threshold; |E_kill| 0.610 belongs to α) and the §2 grid trend had the sign backwards. Conservation, positivity and dt behaviour still stand; the headline does not. |
+| *`penetration_index` is a delivery number.* | **Retired.** It is `mean(AUC)/p99(AUC)` — a **scale-invariant shape statistic**: multiply the whole exposure field by any constant and it does not move, so on real tissue it reports the *vascular geometry of the section*, which is shared by every drug. At dx = 12 µm it spans 0.304–0.511 across the panel while those drugs' mean delivered exposure differs by **158×**. Use `therapeutic_coverage` at 1× IC50 (spread 0.995, separation 67.7× its own grid drift, against 15.2× for `penetration_index`), quoted with its 0.5×/2× band. → [`delivery_metrics.md`](results/delivery_metrics.md) §4 |
+| *The oxygen solve is out-predicted by a distance-to-vessel baseline, so demote it.* | **Reversed — the premise was an inverted inequality.** The solve out-predicts its baseline by 1.26× (ρ = −0.1523 vs −0.1204). But ρ ≈ 0.15 is weak, within-section, one patient, and the composite is carried by VEGFA alone — HIF1A's ρ is **+0.0140, the wrong sign**. → [`oxygen_demotion.md`](results/oxygen_demotion.md), [`heldout_patient_validation.md`](results/heldout_patient_validation.md) |
+| *The vascular field is a smooth KDE, so every vessel-relative claim is confounded.* | **Superseded configuration.** `_DEFAULT_VASCULAR_MODE = "discrete"` (`tmesim/reconstruct/real_fields.py:179`) — segmented vessels, not a blur, since commit `ceb96c0`. The promotion also grew the oxygen route's downstream effect ~12×. Neither vascular mode is grid-converged at dx = 12. |
+| *Cross-platform composition concordance, Pearson 0.997.* | After a classifier-arity fix the 4-vector is 0.980 and the **non-tumour subvector collapses 0.945 → 0.016** — indistinguishable from no agreement. → [`revalidation.md`](results/revalidation.md) |
+| *Transport physics validated out-of-sample against measured tissue PK.* | Those are `analytic`-scope rows that **never invoke the solver**. `scorecard.py`'s own warning: *"'Robust under exchange' and 'never evaluates the delivery law' are very different statements."* They can falsify a coefficient law; they cannot confirm or refute the solver. |
+| *A barrier-integrity fix is specified but not implemented.* | It **is** implemented — `L_PARACELLULAR_LEAK = 0.238` in `tmesim/reconstruct/barrier.py`, reachable via `treatment.drugs.delivery_source(..., bbb_disruption=...)`. It is **opt-in and OFF by default**, so every shipped result still predicts a 1.00× regional separation. Note it was *fitted* to the same contrasts it is scored against, so leak-on scores are not out-of-sample. |
+
+One recovery, in the other direction: the held-out patient's endothelial fraction
+now reads **7.07 % against a volume-EM measured 8.0 %** (PMID 38723085) after the
+classifier fix and the discrete-vessel promotion, where it previously did not
+replicate. The owning file qualifies even this: the agreement should be read as a
+property of that section and that marker gate, not as a validated property of the
+classifier ([`heldout_patient.md`](results/heldout_patient.md) §2).
+
+---
+
+## The honest summary
+
+Vivum is a research instrument whose defensible output is the **relative
+comparison of compounds on one tissue section**, with essentially **no external
+validation of the transport physics itself**. The narrow claim has been attacked
+from several directions and held. The broad claim — that the transport physics is
+validated, or that any absolute number it produces is trustworthy — has been
+tested and is false.
+
+The sharpest available statement of that gap is
+[`results/external_anchor_survey.md`](results/external_anchor_survey.md) §5, and
+it is worth reading in full. Its verdict: the solver's **input coefficients**
+(`D_eff`, `k`, and the pressure field) *are* externally testable against public
+absolute measurements — and on first contact the engine misses all of them. The
+solver's **output fields** are a different matter: nothing public was found that
+measures a spatially resolved free-interstitial concentration field in tumour
+tissue that this engine could reconstruct. So *"our transport coefficients are
+testable and currently fail in identifiable, structural ways"* is defensible;
+*"our predicted concentration fields are validated"* is not, and no public data
+currently exists that would make it so.
+
+`vivum validate` reports more failures than passes and exits non-zero. That is
+not a defect being disclosed reluctantly; it is the product's most reliable
+component. The modules that could flatter a result and the modules that check it
+are separate, and the checking modules are allowed to fail loudly. Every
+retraction on this page was found that way, not by the test suite, which was green
+throughout.
+
+**What would most improve this, in order:** (0) reconcile `vivum validate` with
+`kill_calibration_breast.md`; (1) a **second section of the same tumour type** —
+almost every defensible claim above is *n* = 1 in tissue, and this is the cheapest
+large improvement available; (2) any external anchor that scores the solver on the
+strength of a solve **and passes** — there are three such anchors and all three
+fail, and [`results/external_anchor_survey.md`](results/external_anchor_survey.md)
+§5 reports that nothing public measures a spatially resolved free-interstitial
+concentration field in tumour tissue, so this may require generating data rather
+than finding it; (3) flip `transvascular_exchange` and re-validate, or publish the
+caveat on every absolute; (4) resolve `dx`; (5) re-derive the oxygen `supply`
+constant for the discrete-vessel referent.
+
+---
+
+## Standing limitations
+
+* **The response axis cannot currently be validated.** A data-access gap, not an
+  engineering gap. → [`results/DATA_HUNT.md`](results/DATA_HUNT.md)
+* **2D.** A whole-slide section is naturally 2D, but out-of-plane vascular
+  connectivity is invisible: a vessel just above the plane makes a point look
+  "far" when it is not. Distances are Euclidean, not geodesic.
+* **One anchor sets the delivery scale.** α is fit once, in closed form, to a
+  single doxorubicin perivascular measurement (Primeau 2005, PMID 16361566) whose
+  own uncertainty is plausibly ±50–100 %. It is the **largest** local kill
+  elasticity (|E_kill| = 0.610) and the second-largest penetration elasticity.
+  Everything downstream inherits that one fit.
+* **`D_tissue` and the perivascular sink strength are not separately identified**
+  ([`dtissue_sensitivity.md`](results/dtissue_sensitivity.md) §8), so part of the
+  observed robustness to a diffusivity change is a gauge artefact — α is re-fit to
+  the same anchor and re-exports the change as a global multiplier.
+* **Fields are inferred, not measured.** Vasculature, ECM and oxygen are
+  reconstructed from real markers. `vascular_density` is max-normalised: it carries
+  geometry, not an absolute perfused fraction, and is not comparable across tissues.
+* **Temozolomide's resistance determinant is not spatially resolvable.** MGMT is
+  absent from **both** flagship Xenium panels, so a determinant-mode comparison
+  would quietly advantage TMZ; the reconstruction default is therefore uniform
+  sensitivity 1.0 for every drug — the only fair cross-drug mode, and a documented
+  no-resistance upper bound rather than a measurement. The stronger claim that
+  MGMT is *unmodellable from spatial data* was **retracted**: a third public GBM
+  Xenium section (GSE324268) does carry an MGMT probe and detects it. It is still
+  not usable — 1.19 % of tumour cells positive, max 4 counts in any cell, and its
+  spatial clustering falls **below** the assay's own negative-control probes when
+  thinned to matched depth. The defensible position survived the test: MGMT is a
+  per-patient **scalar**, and is available as one.
+  → [`results/mgmt_spatial.md`](results/mgmt_spatial.md), [`results/mgmt_scalar.md`](results/mgmt_scalar.md)
+* **The oxygen field's constants are uncalibrated, and the hypoxic band is
+  currently empty.** GBM's hypoxic fraction is 0.0000 at every grid spacing
+  tested under the shipped configuration; under a literature-derived `supply` it
+  is 40–71 %. Treat any hypoxic fraction as a configuration output, not a
+  measurement.
+* **Reduced biology.** No adaptive resistance, no immune dynamics, and systemic PK
+  is a simplified sustained plasma level. Active efflux (P-gp / BCRP) **is**
+  implemented from literature efflux ratios and is opt-in — but default-off is the
+  *validated* recommendation, because turning it on does not improve the measured
+  anchor. ABCB1 and ABCG2 are on the explicit ABSENT list for both Xenium panels
+  (`tmesim/reconstruct/real_xenium.py:693`), so nothing spatial constrains it here.
+  → [`results/efflux_impact.md`](results/efflux_impact.md)
+* **One section per tumour, no replicates.** Where a claim rests on a single
+  section, the write-ups say so.
+* **Research prototype.** No diagnostic, regulatory or treatment-selection use.
 
 ---
 
@@ -327,85 +453,21 @@ data/real/  ─►  reconstruct/real_*  ─►  Microenvironment  ─►  physic
 
 | Package | Responsibility |
 |---|---|
-| `tmesim.core` | **Frozen** data model: `Domain`, `Microenvironment`, `CellPopulation`, `TissueFields`, `DrugParams`, the config dataclasses and the `*Result` containers. Everything builds against these. |
-| `tmesim.data.real` | Loaders for the real caches: `singlecell_spatial` (both Xenium panels — select with `load(path=...)`), `visium` (4 sections), `scref_gbm` (GSE84465), `ivygap`, `drug_response` (HGCC + GDSC2). |
-| `tmesim.data` | `acquire.py` — best-effort live download (TCGA-GBM clinical + expression, Ivy GAP, GDSC2 glioma); the only module permitted network access. `spatial_ingest.py` — the single-sample Visium reader that `real/visium` generalises. |
-| `tmesim.molecular` | Structure → physics. Verified structures/SMILES (`library`), RDKit-or-fallback `descriptors`, Stokes–Einstein radius, Brownian + Ogston–Renkin mesh hindrance, `permeability`/BBB, measured GDSC `potency`, the saturable `binding_site_barrier`, and `compile_drug` which emits a `DrugParams`. |
-| `tmesim.reconstruct` | Real tissue → real niche. `real_xenium` (threshold-gated marker typing, geometric tissue mask, per-cell sensitivity), `marker_panels` (panel-aware marker selection: `brain_319` vs `io_480`), `real_visium` (NNLS deconvolution vs the Darmanis atlas), `deconvolve`, `real_fields` (endothelial-KDE vasculature, matrix-transcript ECM, oxygen hand-off), `region_label` (Ivy GAP niche zones), `vessel_network` (the discrete-vessel replacement for the KDE, correction 5), `real_pipeline` (`reconstruct_real`, `apply_drug_sensitivity`, `reconstruction_report`). |
-| `tmesim.physics` | `diffusion` (convection–diffusion–reaction transport → `TransportResult`), `oxygen` (steady-state O₂ + hypoxia banding), `pressure` (interstitial fluid pressure and the Jain-effect velocity). |
-| `tmesim.cells` | `agents` (oxygen → cell state), `pkpd` (local drug AUC → Hill kill probability, modulated by sensitivity and state). |
-| `tmesim.treatment` | `drugs` — drug lookup, plasma PK profile, and the spatial delivery source (`vascular_density × bbb_penetrance × plasma`). |
+| `tmesim.core` | Frozen data model: `Domain`, `Microenvironment`, `CellPopulation`, `TissueFields`, `DrugParams`, the config dataclasses and the `*Result` containers. |
+| `tmesim.data.real` | Loaders for the real caches: `singlecell_spatial` (both Xenium panels), `visium`, `scref_gbm` (GSE84465), `ivygap`, `drug_response` (HGCC + GDSC2). |
+| `tmesim.molecular` | Structure → physics: verified SMILES, descriptors, Stokes–Einstein radius, Ogston–Renkin mesh hindrance, permeability/BBB score, measured GDSC potency, `compile_drug`. |
+| `tmesim.reconstruct` | Real tissue → real niche. `real_xenium` (marker typing, geometric tissue mask), `marker_panels`, `real_visium` (NNLS deconvolution), `real_fields` (vascular/ECM/oxygen fields; **discrete** vessels by default), `vessel_network` (the segmentation), `barrier` (the opt-in paracellular leak), `real_pipeline`. |
+| `tmesim.physics` | `diffusion` (convection–diffusion–reaction transport), `oxygen` (steady-state O₂ + hypoxia banding), `pressure` (IFP and the Jain-effect velocity). |
+| `tmesim.cells` | `agents` (oxygen → cell state), `pkpd` (local AUC → Hill kill probability). |
+| `tmesim.treatment` | `drugs` — lookup, plasma PK profile, spatial delivery source. |
 | `tmesim.sim` | `engine.simulate_response` — the deterministic per-tissue integrator. |
-| `tmesim.validation` | The honesty layer, and where this project spends most of its code. **Internal:** `calibration` (the single α), `numerical_rigor`, `uncertainty`, `reconstruction_fidelity`, `vascular_validation`, `cellstate_validation`, `delivery_metrics` (the defensible replacements for `penetration_index`), `vessel_profile`, `ranking_robustness`. **Against real external measurements:** `pk_anchors` / `pk_multidrug` / `pk_reality` (tissue PK), `glioma_regional_pk` (human glioma partition), `gist_imatinib` (human GIST MSI), `gbm_tmz_exvivo` (GSE232173 — glioma + TMZ + measured ex-vivo response), `moncayo_explant` (HGSOC MALDI-MSI + GeoMx), `pharmacology_real` (GDSC vs HGCC). **Under construction:** `cellstate_validation`, `ranking_robustness`, `vessel_network_impact` — these have no entry point yet and produce nothing; see [`docs/REPRODUCE.md`](docs/REPRODUCE.md) §3. **Retired:** `experiment`, `baselines`, `metrics` — the synthetic-cohort harness. |
-| `tmesim.viz` | `plots`, `molecular_plots`, `explainer`, `patient_report`. |
-| `tmesim.cli` | argparse entry point: `reconstruct`, `simulate`, `molecules`, `molecular-run`, `acquire`. |
+| `tmesim.validation` | The honesty layer, and where this project spends most of its code. `scorecard` (what `vivum validate` runs), `calibration` (the single α), `numerical_rigor`, `kill_calibration`, `delivery_metrics`, `ranking_robustness`, plus the external-measurement modules: `pk_multidrug`, `glioma_regional_pk`, `gist_imatinib`, `gbm_tmz_exvivo`, `moncayo_explant`, `pharmacology_real`, `heldout_patient`. |
+| `tmesim.cli` | `reconstruct`, `simulate`, `compare-drugs`, `validate`, `molecules`, `molecular-run`, `acquire`, `studio`. |
 | `experiments/` | Runnable real-data studies: flagship simulation, drug panel, cross-tissue, niche response, combination, dose/schedule, per-patient report. |
 
-Data-flow and physics detail: [`docs/architecture.md`](docs/architecture.md). The
-frozen public interface: [`ARCHITECTURE_CONTRACT.md`](ARCHITECTURE_CONTRACT.md);
-where the two disagree, the contract wins. The molecular layer's own contract:
-[`MOLECULAR_CONTRACT.md`](MOLECULAR_CONTRACT.md).
-
----
-
-## Why glioblastoma
-
-GBM is the disease where the microenvironment is not a second-order correction but
-the crux:
-
-* **Delivery is the binding constraint.** The blood–brain barrier admits only a
-  small, spatially heterogeneous fraction of most systemic agents.
-* **There is no clean margin.** Malignant cells infiltrate normal brain well past
-  any resectable boundary, and the drug has to physically reach them.
-* **Transport-limited regions are the resistant ones.** Sparse, tortuous
-  vasculature drives hypoxia *and* poor delivery in the same place, while elevated
-  interstitial pressure opposes inward flux.
-
-The real panel makes the point concretely. Ranking by **AUC/IC50** reproduces the
-simulated kill ordering exactly: delivery spans **120×**, potency spans **1212×**,
-and the *product* decides. Doxorubicin is **49× more potent** than cisplatin, is
-**120× less delivered**, and loses. That trade-off is exactly the term a
-non-spatial model has no way to represent.
-
----
-
-## Honest limitations
-
-* **The response axis is unvalidated and cannot currently be validated.** See the
-  table above. This is a data-access gap, not an engineering gap.
-* **The vasculature is a blur, not a vessel network.** Correction 5. This is the
-  largest structural error in the model.
-* **No barrier-integrity term.** Correction table, regional axis. The fix is
-  specified (L ≈ 0.24) and not implemented.
-* **2D.** A whole-slide section is naturally 2D, but out-of-plane vascular
-  connectivity is invisible: a vessel just above the plane makes a point look
-  "far" when it is not. Distances are Euclidean, not geodesic.
-* **One anchor sets the delivery scale.** α is fit to a single doxorubicin
-  measurement whose own uncertainty is plausibly ±50–100%. It has the *smallest*
-  local elasticity of the tuned knobs (|E_pen| ≈ 0.11) but the widest prior range,
-  so it remains a leading global uncertainty.
-* **Reconstruction gates dominate the local sensitivity.** The endothelial typing
-  threshold (|E_pen| ≈ 0.52) and the KDE bandwidth (|E_kill| ≈ 0.44) move the
-  prediction more than the solver does. The biology and the reconstruction
-  assumptions are the limiting factor, not the numerics.
-* **Fields are inferred, not measured.** Vascular density, ECM and oxygen are
-  reconstructed from real markers and real perfusion signal — faithful to the data,
-  but model fields. `vascular_density` is max-normalised, so it carries geometry,
-  not an absolute perfused fraction, and is not comparable across tissues.
-* **Reduced biology.** No adaptive resistance, no immune dynamics, no efflux or
-  carrier transport (ABCB1/ABCG2 are on neither Xenium panel either), and systemic
-  PK is a simplified sustained plasma level.
-* **One section per tumour, no replicates.** Where a claim rests on a single
-  section, the write-ups say so.
-* **Research prototype.** Not a clinical decision tool. No diagnostic, regulatory
-  or treatment-selection use.
-
-The design principle behind all of this: **the modules that could flatter the
-result and the modules that check it are separate, and the checking modules are
-allowed to fail loudly.** Every retraction in this repo — the ENDOTHELIAL argmax
-bug, the penetration-index ranking, the cross-tissue spread, the α unit error, the
-hypoxia attribution — was found that way, not by the tests. Fifty-five tests were
-green throughout.
+The frozen public interface: [`ARCHITECTURE_CONTRACT.md`](ARCHITECTURE_CONTRACT.md);
+where it and [`docs/architecture.md`](docs/architecture.md) disagree, the contract
+wins. The molecular layer's own contract: [`MOLECULAR_CONTRACT.md`](MOLECULAR_CONTRACT.md).
 
 ---
 
@@ -413,16 +475,20 @@ green throughout.
 
 | Question | File |
 |---|---|
-| **What is the current state, honestly?** | [`results/SESSION_AUDIT.md`](results/SESSION_AUDIT.md) |
-| I'm new here — how do I install this and get a first result? | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) |
-| I want to script drug/dose/sweep experiments, MATLAB-style | [`PROTOCOL_LANGUAGE.md`](PROTOCOL_LANGUAGE.md) (spec) + Studio's "protocol" tab (editor) |
-| I want my team to reach Studio from somewhere other than my own machine | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) |
+| **What does this project claim, and what backs each claim?** | [`results/CLAIM_INVENTORY.md`](results/CLAIM_INVENTORY.md) — the single settled answer, and the source for most of this page |
+| New here — install to first result | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) |
 | How do I reproduce all of this? | [`docs/REPRODUCE.md`](docs/REPRODUCE.md) |
-| Where did every byte of data come from, and how do I re-download it? | [`docs/DATA_INVENTORY.md`](docs/DATA_INVENTORY.md) |
 | What is the model, mathematically? | [`docs/MATHEMATICAL_MODEL.md`](docs/MATHEMATICAL_MODEL.md) |
-| How do the pieces fit together? | [`docs/architecture.md`](docs/architecture.md) |
+| Where did every byte of data come from? | [`docs/DATA_INVENTORY.md`](docs/DATA_INVENTORY.md) |
 | What open data exists to validate this, and what does not? | [`results/DATA_HUNT.md`](results/DATA_HUNT.md) |
 | How should I compare drugs? | [`results/delivery_metrics.md`](results/delivery_metrics.md) |
-| Is the solver trustworthy? | [`results/numerical_rigor.md`](results/numerical_rigor.md) |
-| Is the vasculature real? | [`results/vascular_validation.md`](results/vascular_validation.md) |
-| What did the synthetic era show? | [`archive/synthetic_era/README.md`](archive/synthetic_era/README.md) |
+| Is the solver trustworthy? | [`results/numerical_rigor.md`](results/numerical_rigor.md) + its correction block |
+| Is the grid fine enough? | [`results/grid_convergence_gbm.md`](results/grid_convergence_gbm.md), [`results/grid_convergence_breast.md`](results/grid_convergence_breast.md) |
+| Scripting drug/dose/sweep experiments | [`PROTOCOL_LANGUAGE.md`](PROTOCOL_LANGUAGE.md) + Studio's protocol tab |
+| Running Studio for a team | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) |
+
+[`results/SESSION_AUDIT.md`](results/SESSION_AUDIT.md) is a historical record of an
+earlier audit pass. Several of its statements have since been superseded; where it
+and [`results/CLAIM_INVENTORY.md`](results/CLAIM_INVENTORY.md) differ, the
+inventory is later and wins — and where the inventory and a primary results file
+differ, the primary file wins.
