@@ -999,6 +999,29 @@ body::after {
     bottom: 1.25rem;
     width: auto;
   }
+
+  /*
+   * The two sections that carry a readout must not centre their text into the
+   * band the readout occupies. At 390px the panels go full-bleed above, and
+   * measured, the metric card was covering the last 65px of section 04's
+   * paragraph — which is exactly the clause carrying "1.08-1.21x", the number
+   * that whole section exists to state. The readout was hiding the finding.
+   *
+   * Sections are absolutely positioned and vertically centred, so reserving
+   * the band as padding re-centres the copy in what is left rather than
+   * moving it by a hand-tuned offset that would drift with copy length. 17rem
+   * is the panel's own height plus its 1.25rem offset and a gap; both panels
+   * are the same chrome so one value covers both.
+   *
+   * nth-child rather than a modifier class because these are positional facts
+   * about the scroll timeline — the readouts appear under beats 3 and 4 — and
+   * a class would imply the coupling lives in the component, which it does
+   * not. See ScrollExperience for where the panels are mounted.
+   */
+  .narrative-layer > .narrative-section:nth-child(3),
+  .narrative-layer > .narrative-section:nth-child(4) {
+    padding-bottom: 17rem;
+  }
 }
 
 /* --------------------------------------------------------------------- */
