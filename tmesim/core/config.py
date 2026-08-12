@@ -22,8 +22,19 @@ class DrugParams:
     hill : Hill coefficient for the dose-response curve.
     binding : first-order tissue binding/uptake rate, 1/s (retention).
     clearance : first-order clearance/metabolism rate in tissue, 1/s.
-    bbb_penetrance : [0,1] fraction of vascular concentration that crosses into
-        tissue (blood-brain-barrier factor — central to glioblastoma).
+    bbb_penetrance : dimensionless brain:plasma PARTITION coefficient in [0, 1]
+        — the quasi-equilibrium tissue:plasma ratio implied by the drug's
+        structure (blood-brain-barrier factor — central to glioblastoma).
+        ``molecular/permeability.py`` computes it from MW / logP / TPSA / HBD and
+        calibrates it against measured tissue:plasma RATIOS, so it is **NOT a
+        permeability** and **NOT a rate**: it carries no units of its own, and
+        neither does ``vascular_density``, which is a volume fraction. The
+        first-order transvascular rate the transport PDE needs is built from
+        both as ``PS = PS_SCALE_S_INV * vascular_density * bbb_penetrance``
+        (1/s), where ``treatment.drugs.PS_SCALE_S_INV`` carries the whole
+        ``1/s`` — see that constant's docstring, ``reconstruct/barrier.py``, and
+        ``results/transvascular_exchange_revalidation.md`` section 6.2 for why
+        the two readings must not be conflated.
     hypoxia_resistance : optional PER-DRUG override of
         ``PDConfig.hypoxia_resistance`` (see that field's docstring for the
         general unvalidated-prior caveat). ``None`` (the default for every drug

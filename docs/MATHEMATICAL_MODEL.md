@@ -367,7 +367,10 @@ trend line, and the $\log P$ clamp is a numerical guard, not physics.
 
 ### 2.7 BBB penetrance (CNS-MPO-style rules — heuristic)
 
-`molecular/permeability.py::bbb_penetrance`, returning $\beta_{\mathrm{BBB}} \in [0,1]$.
+`molecular/permeability.py::bbb_penetrance`, returning $\beta_{\mathrm{BBB}} \in [0,1]$
+— a dimensionless brain:plasma *partition* coefficient, calibrated against
+measured tissue:plasma ratios; it is not a permeability and not a rate (the
+first-order rate the transport PDE needs is built from it in §3.9).
 Four smooth desirabilities, their mean, then a logistic squash:
 
 $$
@@ -658,9 +661,23 @@ $$
 `delivery_source` gives the linear vascular-leak source
 
 $$
-S(x,y) = \rho_{\mathrm{vasc}}(x,y)\;\beta_{\mathrm{BBB}}\;C_{\mathrm{plasma}}
+S(x,y) = \underbrace{k_0\;\rho_{\mathrm{vasc}}(x,y)\;\beta_{\mathrm{BBB}}}_{PS(x,y)\;[\mathrm{s}^{-1}]}\;C_{\mathrm{plasma}}
 \qquad [\mu M/s]
 $$
+
+**Where the $\mathrm{s}^{-1}$ comes from.** $\rho_{\mathrm{vasc}}$ is a volume
+fraction and $\beta_{\mathrm{BBB}}$ is a dimensionless brain:plasma *partition*
+coefficient (§2.7) — neither carries units, so their product with
+$C_{\mathrm{plasma}}$ is $\mu M$, not $\mu M/s$. The rate scale
+$k_0 \equiv$ `treatment/drugs.py::PS_SCALE_S_INV` carries the whole
+$\mathrm{s}^{-1}$. It defaults to $1.0$, exactly the implicit factor the engine
+used before the constant was named, so every stored result is bit-identical; its
+calibrated value is $0.16122\ \mathrm{s}^{-1}$
+(`tmesim/validation/ps_scale.py`, fit to measured rodent brain $PS$: methotrexate
+$3.3\times10^{-5}$/s PMID 524251, temozolomide $1.6\times10^{-3}$/s PMID
+39690422). $\beta_{\mathrm{BBB}}$ is a partition and $PS$ is a rate; they must not
+be read as each other — see
+`results/transvascular_exchange_revalidation.md` §6.2.
 
 **Default — plasma-averaging (`PDEConfig.time_resolved = False`).** The transport
 solver applies a *static* $S$ every step, i.e. $C_{\mathrm{plasma}}$ is replaced by
@@ -683,7 +700,7 @@ time dependence, evaluated on the solver's own step grid at the old time level o
 each step (matching the explicit convention already used for advection):
 
 $$
-S(x,y,t_n) = \rho_{\mathrm{vasc}}(x,y)\;\beta_{\mathrm{BBB}}\;C_{\mathrm{plasma}}(t_n),
+S(x,y,t_n) = k_0\;\rho_{\mathrm{vasc}}(x,y)\;\beta_{\mathrm{BBB}}\;C_{\mathrm{plasma}}(t_n),
 \qquad t_n = n\,\Delta t,\quad n = 0,\dots,N-1
 $$
 

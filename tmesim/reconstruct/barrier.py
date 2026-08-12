@@ -63,7 +63,12 @@ Scope / honesty
   about response, cell kill, or survival.
 * ``L`` is fitted to *tissue:plasma ratio* units, which under the engine's
   Stage-0 quasi-equilibrium approximation is the same dimensionless quantity as
-  ``bbb_penetrance``. It is NOT a permeability with physical units.
+  ``bbb_penetrance``. It is NOT a permeability with physical units. The
+  first-order rate the transport PDE needs is
+  ``PS = PS_SCALE_S_INV * vascular_density * effective_penetrance`` (1/s), with
+  :data:`tmesim.treatment.drugs.PS_SCALE_S_INV` carrying the whole ``1/s`` —
+  that constant is where a reader should land for the units, and
+  ``results/transvascular_exchange_revalidation.md`` section 6.2 for why.
 * Two of the three fitted values come from tissue homogenate (total drug), one
   from microdialysis (free drug). They agree to 1.3x anyway, which is the reason
   to believe the additive form; but the mixing of modalities is a real caveat.

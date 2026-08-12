@@ -41,7 +41,8 @@ plasma profile over the exposure window is collapsed to a single representative
 *static* source::
 
     plasma_mean = mean_t plasma_profile(pk, times)
-    source      = vascular_density * bbb_penetrance * plasma_mean   (uM/s)
+    PS          = PS_SCALE_S_INV * vascular_density * bbb_penetrance   (1/s)
+    source      = PS * plasma_mean                                     (uM/s)
 
 This preserves the *total* delivered drug (mean level x window duration) and the
 correct relative ranking of drugs/patients. Its cost is that the schedule is
@@ -49,11 +50,27 @@ erased before the solver ever sees it: any two schedules with the same cumulativ
 plasma exposure become **bit-identical inputs**, so fractionation and infusion
 duration are unresolvable *by construction*, not as a finding.
 
+**Where the ``1/s`` comes from.** The two spatial factors carry no units at all:
+``vascular_density`` is a volume fraction and ``bbb_penetrance`` is a
+dimensionless brain:plasma PARTITION coefficient, not a permeability and not a
+rate (see ``core/config.py``). The whole ``1/s`` is carried by
+:data:`tmesim.treatment.drugs.PS_SCALE_S_INV`, the transvascular rate scale, which
+turns that dimensionless product into the first-order rate ``PS`` the transport
+PDE needs. It defaults to **1.0** — exactly the implicit factor this engine used
+before the constant was named, so every stored result is bit-identical — and its
+calibrated value is **0.16122 1/s**, fit by :mod:`tmesim.validation.ps_scale`
+against measured rodent brain PS. See
+``results/transvascular_exchange_revalidation.md`` section 6.2.
+
 **``time_resolved=True`` — the real plasma curve drives the solve.** The unit
 delivery field is built once and rescaled by ``plasma(t_n)`` at every step::
 
-    source        = vascular_density * bbb_penetrance          (per uM of plasma)
-    S(x, y, t_n)  = plasma_profile(pk, t_n) * source(x, y)     (uM/s)
+    PS            = PS_SCALE_S_INV * vascular_density * bbb_penetrance   (1/s)
+    S(x, y, t_n)  = plasma_profile(pk, t_n) * PS(x, y)                   (uM/s)
+
+``PS`` is the same field as above — a rate, i.e. uM/s per uM of plasma — and it is
+exactly what the unit delivery field holds, so ``PS_SCALE_S_INV`` multiplies it
+once and switching plasma drivers cannot change the units of the source.
 
 Tissue concentration can then genuinely rise and fall, so *when* drug is given
 changes the answer. It costs essentially nothing: the implicit operator

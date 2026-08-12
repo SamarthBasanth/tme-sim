@@ -31,7 +31,7 @@ These ratios are **single-timepoint tissue-concentration : plasma-concentration*
 
 ## 2. How the model produces a number (assumption A1)
 
-The frozen engine's delivery term is `source = vascular_density * bbb_penetrance * plasma_mean` (`tmesim/sim/engine.py` L45), and `tmesim/core/config.py` defines `bbb_penetrance` as the *"[0,1] fraction of vascular concentration that crosses into"* tissue. With `vascular_density` normalised to 1 and the tissue at quasi-equilibrium with a sustained plasma level — the Stage-0 plasma-averaging approximation the engine already makes — the tissue:plasma exposure ratio the model implies is the identity:
+The frozen engine's delivery term is `source = PS * plasma_mean` with `PS = PS_SCALE_S_INV * vascular_density * bbb_penetrance` (1/s) (`tmesim/sim/engine.py`, `tmesim/treatment/drugs.py`), and `tmesim/core/config.py` defines `bbb_penetrance` as a dimensionless brain:plasma **partition coefficient** in [0, 1] — not a permeability, not a rate. (~~When this report was written that field read *"[0,1] fraction of vascular concentration that crosses into"* tissue~~ — **CORRECTED** to the partition wording, same quantity, stated in the units it was built in; see §2.1.) With `vascular_density` normalised to 1 and the tissue at quasi-equilibrium with a sustained plasma level — the Stage-0 plasma-averaging approximation the engine already makes — the tissue:plasma exposure ratio the model implies is the identity:
 
 > **A1:  R_predicted = `bbb_penetrance(descriptors)`**
 
@@ -40,6 +40,39 @@ The frozen engine's delivery term is `source = vascular_density * bbb_penetrance
 1. **R_predicted <= 1 by construction.** Any measured ratio above 1 is unreachable by the model at any parameterisation. Adavosertib's measured contrast-enhancing ratio is 4.18. That is a structural ceiling failure, not a tuning failure.
 2. **R_predicted carries no region term.** `bbb_penetrance` is a function of the drug's descriptors only. The model's predicted CE-vs-non-enhancing fold change is **exactly 1.000** for every drug.
 3. **R_predicted is a passive free-drug crossing fraction.** Microdialysis (Portnow, Blakeley, Jackson, Eroglu) measures *free* extracellular drug and is the modality-matched comparator. Tissue homogenate (Lee 2025, Oh 2026) measures *total* drug including intracellular and lipid-bound fractions and can exceed 1. Every scorecard row is labelled with its modality.
+
+### 2.1 Why A1 holds, and under exactly which convention
+
+> ### ⚠ CORRECTION NOTICE — added after this report was written
+>
+> A1 was stated as a bare identity between the model's tissue:plasma ratio and
+> `bbb_penetrance`, which is right about the quantity and silent about the
+> convention. `results/kill_calibration.md` §2 stated the opposite in its own
+> context — that the delivery term "is NOT a physical tissue:plasma partition
+> coefficient and must not be read as one". `results/transvascular_exchange_revalidation.md`
+> §6.2 found the contradiction and settled it: **both were half right.** A1's
+> reading of `bbb_penetrance` stands and is the correct one; what it needs is the
+> convention under which the identity is exact, which is below. The original
+> quotation of the `config.py` wording is struck through in §2 rather than
+> deleted. **No predicted, measured or fold-error number in this file changes.**
+
+The settled reading, which `core/config.py`, `reconstruct/barrier.py`,
+`treatment/drugs.py` and `sim/engine.py` now all state:
+
+* **`bbb_penetrance` IS a dimensionless brain:plasma partition coefficient** — what A1 assumes, what it was built as, and what `molecular/permeability.py` calibrates against measured tissue:plasma ratios.
+* **What the PDE integrates is a first-order RATE**, `PS = PS_SCALE_S_INV x vascular_density x bbb_penetrance` (1/s). Both spatial factors are dimensionless; `treatment/drugs.py::PS_SCALE_S_INV` carries the whole `1/s`. The engine's historical `uM/s` came from an implicit factor of exactly 1 s^-1 that nothing derived; it is now named, defaults to **1.0** (bit-identical), and has a **calibrated value of 0.16122 1/s** (`tmesim/validation/ps_scale.py`, fit to measured rodent brain PS: methotrexate 3.3e-5 /s PMID 524251, temozolomide 1.6e-3 /s PMID 39690422).
+* The two readings are not interchangeable, and the diagnostic in §6.2 is which one the drugs are coherent under: as **rates** methotrexate and temozolomide disagree by **8.7x** against the same normal rat brain; as **partitions** they agree to **1.04x**.
+
+**So A1 is a Stage-0 identity, not a general one.** The quasi-equilibrium tissue:plasma ratio the engine implies is
+
+> **Kp = PS / (PS + k_loss)**,  `PS = PS_SCALE_S_INV * vascular_density * bbb_penetrance`,  `k_loss = clearance + binding`
+
+(the gradient-driven exchange form; under the shipped one-way source the same steady state is `PS*Cp / k_loss`, which is not bounded by `Cp` at all — the defect `results/breast_kp_validation.md` found, and a second reason the raw product `vascular_density x bbb_penetrance x plasma` is not itself a partition), which collapses to `R_predicted = bbb_penetrance` only under the **Stage-0 convention** this report runs in: `vascular_density` normalised to 1, a sustained plasma level, and the delivery term read as the partition it is built from rather than as the rate it enters the PDE as (equivalently `PS_SCALE_S_INV = 1 s^-1`, its shipped default and exactly the implicit factor the engine used before the constant was named). Two things follow, and both are already visible in this report:
+
+1. **The ceiling in consequence 1 is a property of the convention as much as of the score.** `Kp <= 1` for any non-negative `PS` and `k_loss`, so adavosertib's measured 4.18 is unreachable under A1 *and* under the full Kp form. Correcting the units cannot lift it; only a modality-matched comparator (consequence 3) or a term the model does not have can.
+2. **A calibrated rate scale tightens the ceiling rather than relieving it.** `Kp` is monotone increasing in `PS`, so `PS_SCALE_S_INV = 0.16122 1/s` puts every drug strictly below its A1 value. The scorecard below is reported at the Stage-0 convention, and any re-score at the calibrated scale is an over-prediction that gets smaller, not a ceiling that moves.
+
+Cross-references: `results/kill_calibration.md` §2.1 states the same resolution from the rate side, and `results/transvascular_exchange_revalidation.md` §6.2 carries the diagnostic and the measured anchors.
 
 ## 3. The scorecard — predicted vs measured, per drug
 

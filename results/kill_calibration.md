@@ -116,7 +116,7 @@ predicted 3D:2D  =  F_penetration * F_state
 
 *Robustness of the p99 bath-reference convention:* using the **maximum** tumour-cell exposure instead of the p99 gives F_penetration 0.3340 (vs 0.4678) and an implied IC50 fold of 4.35x (vs 3.26x); using the p95 gives 2.53x. Both variants stay inside this drug's literature band, so the section 3 verdict does not turn on the convention.
 
-*Plasma leg, reported but deliberately NOT part of the 3-D:2-D comparison:* the engine's source convention puts **2.264 uM** of time-averaged tissue exposure at the p99 reference per **1 uM** of window-mean plasma, so reaching the bath concentration above needs 44.17 uM of plasma. Note that ratio exceeds 1 for temozolomide and cisplatin: the engine's delivery term `S = vascular_density x bbb_penetrance x plasma` enters the PDE as a **rate**, not a concentration (the documented Stage-0 source convention in `treatment/drugs.py`), so it is NOT a physical tissue:plasma partition coefficient and must not be read as one. **This is precisely why the 3-D:2-D comparison is matched on tissue exposure rather than on plasma** — doing so removes this convention, and the BBB, from the test entirely.
+*Plasma leg, reported but deliberately NOT part of the 3-D:2-D comparison:* the engine's source convention puts **2.264 uM** of time-averaged tissue exposure at the p99 reference per **1 uM** of window-mean plasma, so reaching the bath concentration above needs 44.17 uM of plasma. Note that ratio exceeds 1 for temozolomide and cisplatin: the engine's delivery term `S = vascular_density x bbb_penetrance x plasma` enters the PDE as a **rate**, not a concentration (the documented Stage-0 source convention in `treatment/drugs.py`), so ~~it is NOT a physical tissue:plasma partition coefficient and must not be read as one~~ — **CORRECTED, see §2.1:** the *product* is not a tissue:plasma partition coefficient and must not be read as one, while `bbb_penetrance` *itself* is exactly that partition. **This is precisely why the 3-D:2-D comparison is matched on tissue exposure rather than on plasma** — doing so removes this convention, and the BBB, from the test entirely.
 
 ### cisplatin — IC50 24.55 uM, hill 1.2, BBB 0.858
 
@@ -130,7 +130,7 @@ predicted 3D:2D  =  F_penetration * F_state
 
 *Robustness of the p99 bath-reference convention:* using the **maximum** tumour-cell exposure instead of the p99 gives F_penetration 0.3005 (vs 0.4980) and an implied IC50 fold of 7.29x (vs 4.55x); using the p95 gives 3.40x. **Not all variants stay inside this drug's literature band** — max-reference OUTSIDE, p95 INSIDE. The section 3 verdict for this drug is therefore convention-dependent and must be read as such.
 
-*Plasma leg, reported but deliberately NOT part of the 3-D:2-D comparison:* the engine's source convention puts **6.6 uM** of time-averaged tissue exposure at the p99 reference per **1 uM** of window-mean plasma, so reaching the bath concentration above needs 3.72 uM of plasma. Note that ratio exceeds 1 for temozolomide and cisplatin: the engine's delivery term `S = vascular_density x bbb_penetrance x plasma` enters the PDE as a **rate**, not a concentration (the documented Stage-0 source convention in `treatment/drugs.py`), so it is NOT a physical tissue:plasma partition coefficient and must not be read as one. **This is precisely why the 3-D:2-D comparison is matched on tissue exposure rather than on plasma** — doing so removes this convention, and the BBB, from the test entirely.
+*Plasma leg, reported but deliberately NOT part of the 3-D:2-D comparison:* the engine's source convention puts **6.6 uM** of time-averaged tissue exposure at the p99 reference per **1 uM** of window-mean plasma, so reaching the bath concentration above needs 3.72 uM of plasma. Note that ratio exceeds 1 for temozolomide and cisplatin: the engine's delivery term `S = vascular_density x bbb_penetrance x plasma` enters the PDE as a **rate**, not a concentration (the documented Stage-0 source convention in `treatment/drugs.py`), so ~~it is NOT a physical tissue:plasma partition coefficient and must not be read as one~~ — **CORRECTED, see §2.1:** the *product* is not a tissue:plasma partition coefficient and must not be read as one, while `bbb_penetrance` *itself* is exactly that partition. **This is precisely why the 3-D:2-D comparison is matched on tissue exposure rather than on plasma** — doing so removes this convention, and the BBB, from the test entirely.
 
 ### doxorubicin — IC50 0.5 uM, hill 1.2, BBB 0.021
 
@@ -144,7 +144,7 @@ predicted 3D:2D  =  F_penetration * F_state
 
 *Robustness of the p99 bath-reference convention:* using the **maximum** tumour-cell exposure instead of the p99 gives F_penetration 0.1571 (vs 0.3688) and an implied IC50 fold of 12.91x (vs 6.03x); using the p95 gives 4.12x. Both variants stay inside this drug's literature band, so the section 3 verdict does not turn on the convention.
 
-*Plasma leg, reported but deliberately NOT part of the 3-D:2-D comparison:* the engine's source convention puts **0.05634 uM** of time-averaged tissue exposure at the p99 reference per **1 uM** of window-mean plasma, so reaching the bath concentration above needs 8.875 uM of plasma. Note that ratio exceeds 1 for temozolomide and cisplatin: the engine's delivery term `S = vascular_density x bbb_penetrance x plasma` enters the PDE as a **rate**, not a concentration (the documented Stage-0 source convention in `treatment/drugs.py`), so it is NOT a physical tissue:plasma partition coefficient and must not be read as one. **This is precisely why the 3-D:2-D comparison is matched on tissue exposure rather than on plasma** — doing so removes this convention, and the BBB, from the test entirely.
+*Plasma leg, reported but deliberately NOT part of the 3-D:2-D comparison:* the engine's source convention puts **0.05634 uM** of time-averaged tissue exposure at the p99 reference per **1 uM** of window-mean plasma, so reaching the bath concentration above needs 8.875 uM of plasma. Note that ratio exceeds 1 for temozolomide and cisplatin: the engine's delivery term `S = vascular_density x bbb_penetrance x plasma` enters the PDE as a **rate**, not a concentration (the documented Stage-0 source convention in `treatment/drugs.py`), so ~~it is NOT a physical tissue:plasma partition coefficient and must not be read as one~~ — **CORRECTED, see §2.1:** the *product* is not a tissue:plasma partition coefficient and must not be read as one, while `bbb_penetrance` *itself* is exactly that partition. **This is precisely why the 3-D:2-D comparison is matched on tissue exposure rather than on plasma** — doing so removes this convention, and the BBB, from the test entirely.
 
 **Reading the decomposition.**
 
@@ -152,6 +152,33 @@ predicted 3D:2D  =  F_penetration * F_state
 * The factorisation is nearly exact: the interaction term (exact ratio / product of marginals) is 1.003-1.029, i.e. exposure, sensitivity and cell state are close to independent across tumour cells on this section. The product is a fair summary.
 * **The ratio rises steeply with dose.** For every drug F_penetration climbs towards 1 as the bath concentration saturates the Hill term, so the 3-D penalty shrinks — exactly the behaviour PMID 32365781 measured (the 2-D/3-D gap closed at the top temozolomide dose). Any single-number '3-D penalty' is meaningless without its concentration.
 * **Intrinsic sensitivity cancels.** In `mode='uniform'` (the fair cross-drug mode) per-cell sensitivity is 1.0, so F_sensitivity = 1 and the whole intrinsic-potency question lives in the IC50 — which is where section 4 anchors it. Under `mode='determinant'` the marker-derived sensitivity would scale BOTH formats and would still largely cancel.
+
+### 2.1 Units correction — the delivery term is a rate, `bbb_penetrance` is a partition
+
+> ### ⚠ CORRECTION NOTICE — added after this report was written
+>
+> The three plasma-leg notes above originally ended "*so it is NOT a physical
+> tissue:plasma partition coefficient and must not be read as one*", with "it"
+> scoping over `bbb_penetrance` as well as over the product `vascular_density x
+> bbb_penetrance x plasma`. Half of that is right and the other half contradicted
+> `results/glioma_regional_pk.md` §2 (assumption A1), which reads `bbb_penetrance`
+> as exactly that partition. `results/transvascular_exchange_revalidation.md` §6.2
+> found the contradiction and settled it. The original wording is struck through
+> above rather than deleted, because it was a recorded claim. **No number in this
+> file changes.**
+
+The settled reading, which `core/config.py`, `reconstruct/barrier.py`,
+`treatment/drugs.py` and `sim/engine.py` now all state:
+
+* **`bbb_penetrance` IS a dimensionless brain:plasma partition coefficient.** That is what it was built as and what `molecular/permeability.py` calibrates, against measured tissue:plasma ratios.
+* **What enters the PDE is a first-order RATE**, and that rate is `PS = PS_SCALE_S_INV x vascular_density x bbb_penetrance` (1/s). Both spatial factors are dimensionless; `treatment/drugs.py::PS_SCALE_S_INV` carries the whole `1/s`.
+* The engine's historical `uM/s` came from an **implicit factor of exactly 1 s^-1** that nothing derived. It is now named, **defaults to 1.0** — so every kill, ratio and plasma leg in this file is bit-identical — and has a **calibrated value of 0.16122 1/s**, fit by `tmesim/validation/ps_scale.py` against measured rodent brain permeability-surface-area products (methotrexate 3.3e-5 /s, PMID 524251; temozolomide 1.6e-3 /s, PMID 39690422).
+
+The diagnostic that settles which quantity is which (§6.2): read as **rates**, the two drugs disagree by **8.7x** against the same normal rat brain; read as **partitions**, they agree to **1.04x**. Drug-to-drug incoherence that exists only under one reading is the signature of a units error, not a calibration error.
+
+**What this changes for §2 above: nothing, and the reason it does not is the point.** The plasma legs quote **2.264 / 6.6 / 0.05634 uM** of time-averaged tissue exposure per 1 uM of window-mean plasma at `PS_SCALE_S_INV = 1`. Those are rate-driven exposure ratios of a one-way source, not partitions, which is why two of them exceed 1 — a partition cannot. **The 3-D:2-D comparison is matched on tissue exposure rather than on plasma precisely to remove this convention, and the BBB, from the test entirely**, so §3's verdicts do not depend on the rate scale at all. Under the calibrated 0.16122 1/s every plasma leg would shrink; no 3-D:2-D ratio in §3 would move, because the source enters linearly and §3 matches on tissue exposure, so a global rescale of `PS` is absorbed entirely by the plasma needed.
+
+Cross-references: `results/glioma_regional_pk.md` §2.1 states the same resolution from the partition side (where the Stage-0 identity `R_predicted = bbb_penetrance` lives), and `results/transvascular_exchange_revalidation.md` §6.2 carries the diagnostic and the measured anchors.
 
 ## 3. THE TEST — does the predicted 3D:2D ratio land inside the measured range?
 
