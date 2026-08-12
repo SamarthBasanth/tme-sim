@@ -143,10 +143,27 @@ def _kde_on_grid(
 #:    15 / 12 / 8 / 6, so the production dx = 12 um value sits ~24% below the
 #:    dx <= 8 asymptote. Bulk metrics are fine at dx = 12; quote ``L`` at
 #:    dx <= 8. (Under the KDE, ``L`` was already converged at dx = 12.)
-#: 2. **Tighter advection CFL.** A concentrated source steepens the IFP gradient,
-#:    so the max interstitial speed is ~1.6-2x the KDE's and dt_max falls to
-#:    20.5 / 15.4 / 9.5 / 6.9 s at dx = 15 / 12 / 8 / 6. The historical
-#:    dt = 10 s VIOLATES the CFL for this field at dx <= 8; use dt <= 5 s.
+#: 2. **Tighter advection CFL** -- but the numbers below are MEASURED ON A
+#:    SUPERSEDED RECONSTRUCTION and overstate the constraint on the shipped one.
+#:    A concentrated source does steepen the IFP gradient, so the max
+#:    interstitial speed is ~1.6-2x the KDE's; that part holds.
+#:
+#:    The figures originally recorded here -- dt_max 20.5 / 15.4 / 9.5 / 6.9 s at
+#:    dx = 15 / 12 / 8 / 6, and "dt = 10 s VIOLATES the CFL at dx <= 8" -- were
+#:    taken before ``4ad221f`` changed ``TYPING_AGGREGATION`` from ``mean_z`` to
+#:    ``matched_null_z``, which moved this section from 3,984 endothelial /
+#:    30,174 tumour cells to 4,295 / 23,812. On the SHIPPED field, re-measured:
+#:
+#:        dx (um)        15      12       8       7       6
+#:        max speed    0.7077  0.6336  0.7513  0.6684  0.6773
+#:        dt_max (s)   21.20   18.94   10.65   10.47    8.86
+#:        CFL @ dt=10   0.472   0.528   0.939   0.955   1.129 (solver refuses)
+#:
+#:    So dt = 10 s is admissible down to dx = 7, with little margin at dx <= 8,
+#:    and dx = 6 is refused. Prefer dt <= 5 s below dx = 8 for headroom rather
+#:    than for stability. See ``results/cfl_resolution.md``; the solver gates on
+#:    this itself and raises rather than degrading silently
+#:    (``physics/diffusion.py``), so a rung that produced a number was stable.
 #:
 #: NORMALISATION WARNING. The two fields integrate to different totals over
 #: tissue (mean 0.0250 vs 0.0840, i.e. 3.36x), because a max-normalised KDE

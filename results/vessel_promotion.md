@@ -1,5 +1,31 @@
 # Promoting the discrete vessel source to default — the two blockers, settled
 
+> ## ⚠ EVERY NUMBER IN THIS DOCUMENT IS ON A SUPERSEDED RECONSTRUCTION
+>
+> Measured, not suspected. This report was written against a section with
+> **3,984 endothelial / 30,174 tumour** cells. Commit `4ad221f` ("Classifier
+> arity fix") landed **1 h 38 min after** the promotion commit `ceb96c0` and
+> changed `TYPING_AGGREGATION` from `mean_z` to `matched_null_z`, moving the
+> same section to **4,295 endothelial / 23,812 tumour**. Those counts are
+> printed on the face of this document and of the current ladder, so the
+> divergence was visible all along and nobody read them side by side.
+>
+> Concretely, §1's eight speed cells reproduce **exactly** under
+> `reconstruct_from_xenium(typing_aggregation='mean_z')` and **do not**
+> reproduce on `HEAD`. Shipped values are in `results/cfl_resolution.md`.
+>
+> **The promotion DECISION is unaffected** — it rested on the discrete field
+> converging where the KDE does not, which is a comparison between two fields on
+> the same tissue, and that is not what the typing change moved. What is stale
+> is every absolute number here, including the CFL constraint this document
+> introduced: it reported `dt = 10 s` as violating CFL at `dx <= 8`, and on the
+> shipped reconstruction it is admissible down to `dx = 7` (CFL 0.939 / 0.955).
+>
+> Regenerating this document requires re-running ~5,700 s of grid ladder; its
+> raw drivers were reaped from a temp directory and are gone. Until then, read
+> it for its argument and not for its numbers.
+
+
 `results/vessel_network_impact.md` §8.2 refused to make the discrete segmented-vessel
 source the default for two stated reasons: **(a)** `alpha` was calibrated against the KDE
 field and would have to be re-fitted, and **(b)** grid convergence was untested — a 7.5 µm
