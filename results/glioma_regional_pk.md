@@ -74,6 +74,28 @@ The settled reading, which `core/config.py`, `reconstruct/barrier.py`,
 
 Cross-references: `results/kill_calibration.md` §2.1 states the same resolution from the rate side, and `results/transvascular_exchange_revalidation.md` §6.2 carries the diagnostic and the measured anchors.
 
+### 2.2 This report is UN-TESTABLE by the exchange flag, and §3.1 of the re-validation is not a re-test of it
+
+Two statements in `results/transvascular_exchange_revalidation.md` look like they
+contradict each other about this file, and a reader is entitled to be confused by
+them. §6.1 classes `glioma_regional_pk` as **analytic and un-testable** by
+`PDEConfig(transvascular_exchange=True)`, because A1 is a closed-form structure
+score and no transport solver is ever invoked on this path — there is no
+injection point, and passing `exchange_k` is not an available remedy either. §3.1
+reports a **partition scorecard improving** under exchange, GM |fold error|
+5.235x → 3.969x on the modality-matched microdialysis rows.
+
+**Both are true, because they are not the same computation.** §3.1 scores
+engine-computed interstitial concentrations against these anchors; this report
+scores `bbb_penetrance` itself, through A1, with no engine run behind it. The
+anchors are shared; the predictor is not.
+
+The consequence that matters: **§3.1 must not be read as re-validating A1, and
+nothing in this file should be quoted as having survived the delivery-law
+correction.** It did not survive it — it was never exposed to it. "Robust under
+exchange" and "never evaluates the delivery law" are different claims, and §6.1
+exists precisely to stop them being pooled into a coverage count.
+
 ## 3. The scorecard — predicted vs measured, per drug
 
 | drug | MW | logP | TPSA | HBD | **predicted** (A1) | **measured** mean | measured range | n | modality | fold error | 3x | 10x | PMID |

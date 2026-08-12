@@ -215,7 +215,7 @@ closed, several with answers opposite to the ones expected:
 | 4 | GIST imatinib, Moncayo, GSE232173 TMZ | **CLOSED** — [`gist_imatinib.md`](gist_imatinib.md), [`kill_calibration.md`](kill_calibration.md) |
 | 5 | cell-state vs MKI67; oxygen vs VEGFA/HIF1A | **CLOSED, negative** — [`cell_state_impact.md`](cell_state_impact.md); [`oxygen_demotion.md`](oxygen_demotion.md) falsified the oxygen PDE as a value-add |
 | 6 | cross-drug comparability modes | **CLOSED** — defect #8; `sensitivity_mode` uniform vs determinant |
-| 7 | ranking robustness (cisplatin vs doxorubicin ~4% apart) | **STILL OPEN in spirit.** On the discrete-vessel default the gap is now wide (0.436 vs 0.259), but that is a *different* configuration, not a resolution of the original tie. Re-state before any top-1 call is made |
+| 7 | ranking robustness (cisplatin vs doxorubicin ~4% apart) | **STILL OPEN, and now open in a harder way than "in spirit".** On the discrete-vessel default the gap is wide (0.436 vs 0.259), but that is a *different* configuration, not a resolution of the original tie. Since this row was written the pair has been shown to **reverse outright** under a corrected delivery law — 0.2311 vs 0.2547, and still reversed at dx = 8 µm, so not a mesh artefact — taking panel top-1 from cisplatin to vincristine and the Monte-Carlo leader probability from 0.9277 to 0.3965. A configuration change widened the gap; a physics correction inverts it. Re-state before any top-1 call is made, and see [`transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md) §4.1 |
 
 ### Added since, and now open
 
