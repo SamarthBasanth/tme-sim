@@ -79,7 +79,7 @@ export function describe(kind) {
  * Rendered as a permanent block under the run's own caveats.
  */
 export const STANDING_LIMITS = [
-  'ABSOLUTE KILL IS NOT DEFENSIBLE on any panel that cannot measure hypoxia. On such a section no state route clears the bar and kill moves by up to 0.3252 absolute (1.77x) purely with the choice of route. The cross-drug RANKING is invariant across routes and is the defensible output; the LEVEL is not.',
+  'ABSOLUTE KILL IS NOT DEFENSIBLE on any panel that cannot measure hypoxia. On such a section no state route clears the bar and kill moves by up to 0.3252 absolute (1.77x) purely with the choice of route. The cross-drug KILL RANKING is invariant across those state routes and is the defensible output of that comparison; the LEVEL is not. It is NOT invariant across the vascular delivery law, which changes the GBM top-1 — do not quote a top-1 drug externally (results/transvascular_exchange_revalidation.md §4.1).',
   'sensitivity_mode=uniform sets every cell to 1.0. Every kill number it produces is a NO-RESISTANCE UPPER BOUND, not an expected response. It is comparable across drugs precisely because it is the same assumption for all of them.',
   'NOTHING IN THIS PROJECT HAS BEEN VALIDATED AGAINST A PATIENT OUTCOME. These sections carry no treatment-response label, so every number here is a prediction of the physical model that has never been scored. NOT FOR CLINICAL USE.',
 ];

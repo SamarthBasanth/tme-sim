@@ -320,7 +320,7 @@ export function validateSpec(spec) {
     W('state_mode', 'state_mode=markers on the 319-gene panel: it carries NO hypoxia-response transcript, so HYPOXIC is UNMEASURED and assigned to no cell — that is NOT "computed and found to be zero". Proliferation detection is 13x below the published Ki-67 range, so the per-cell call falls back to a neighbourhood ENRICHMENT rule whose level is not an index.');
   }
   if (spec.section === 'xenium_319' && spec.drug) {
-    W('state_mode', 'ABSOLUTE KILL SHOULD NOT BE QUOTED FROM THIS SECTION UNDER ANY state_mode: no state route clears the bar on this panel and kill moves up to 0.3252 absolute (1.77x) across routes. The cross-drug RANKING is invariant and is the defensible output.');
+    W('state_mode', 'ABSOLUTE KILL SHOULD NOT BE QUOTED FROM THIS SECTION UNDER ANY state_mode: no state route clears the bar on this panel and kill moves up to 0.3252 absolute (1.77x) across routes. The cross-drug KILL RANKING is invariant across those state routes and is the defensible output of that comparison; it is NOT invariant across the vascular delivery law.');
   }
   if (spec.sensitivity_mode === 'determinant' && spec.drug && !['temozolomide', 'lomustine', 'carmustine'].includes(spec.drug)) {
     W('sensitivity_mode', `no determinant gene on panel for "${spec.drug}"; will fall back to uniform 1.0`);
@@ -465,7 +465,7 @@ function provenanceFor(spec, rng) {
     caveats.push(`state_mode=${spec.state_mode}: sim.engine re-bands cells.state from its own oxygen solve before the kill, so this route changed the REPORTED band occupancies and their provenance, not this run's kill_fraction.`);
   }
   if (spec.section === 'xenium_319') {
-    caveats.push('ABSOLUTE KILL MUST NOT BE QUOTED FROM THIS SECTION UNDER ANY STATE ROUTE: its panel measures no hypoxia, so no route clears the bar and kill moves up to 0.3252 absolute across routes. The cross-drug ranking is invariant and is the defensible output.');
+    caveats.push('ABSOLUTE KILL MUST NOT BE QUOTED FROM THIS SECTION UNDER ANY STATE ROUTE: its panel measures no hypoxia, so no route clears the bar and kill moves up to 0.3252 absolute across routes. The cross-drug kill ranking is invariant across those state routes and is the defensible output of that comparison; it is NOT invariant across the vascular delivery law.');
   }
   if (spec.vascular_mode === 'kde') {
     caveats.push('vascular_mode=kde did not converge under grid refinement in the held-out check; discrete vessels are the production default.');

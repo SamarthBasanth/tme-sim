@@ -1290,8 +1290,12 @@ def write_report(results: Dict[str, Dict], out_path: str = _OUT_MD) -> str:
     A("2. **Temozolomide's resistance determinant is MEASURED** (§5). TMZ was the "
       "one drug in the panel whose kill could not be scaled by anything measured; "
       "it now can be.")
-    A("3. **The ranking survives a stronger test** — invariant across sections AND "
-      "routes simultaneously (§4).")
+    A("3. **The ranking survives a stronger test** — the TOP 3 is invariant "
+      "across sections AND routes simultaneously (§4). Ranks 4-5 are NOT: "
+      "`brain_319` orders methotrexate above temozolomide and the other two "
+      "sections reverse it. And all of these axes are common-mode, so none of "
+      "them speaks for the delivery law, which breaks even the surviving top 3 "
+      "(§4).")
     A("")
     A("What remains open, in order of size:")
     A("")
@@ -1357,8 +1361,9 @@ def write_report(results: Dict[str, Dict], out_path: str = _OUT_MD) -> str:
       "section where both bands are measured and MGMT is available |")
     A("| temozolomide anything | **GSE324268** | the only section where TMZ's "
       "determinant is measurable |")
-    A("| cross-drug ranking | either — it is invariant (§4) | but quote the "
-      "invariance, not one section's copy of it |")
+    A("| cross-drug ranking | either — the TOP 3 is invariant, ranks 4-5 are not "
+      "(§4) | quote the invariance and its axis, never unqualified; it does not "
+      "hold across the delivery law |")
     A("| delivery metrics (AUC, coverage, penetration length) | either | they "
       "carry no state dependence at all |")
     A("| the vascular external anchors (endothelial fraction, vascular area "

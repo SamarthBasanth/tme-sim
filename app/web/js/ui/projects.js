@@ -12,7 +12,12 @@
 //   2. RANKING        — THE PRIMARY RESULT, and the only one two real patients
 //                       have been shown to agree on (heldout_patient.md §3.3;
 //                       cell_state_impact.md §3.3 found it invariant across all
-//                       three cell-state routes as well).
+//                       three cell-state routes as well). Both axes are
+//                       COMMON-MODE. The KILL ranking is NOT invariant across
+//                       the vascular delivery law, which changes the GBM top-1
+//                       (transvascular_exchange_revalidation.md §4.1), and
+//                       delivery-rank invariance does not imply kill-rank
+//                       invariance (breast: AUC rho 1.000, kill rho 0.830).
 //   3. ABSOLUTE KILL  — shown, but struck through and blocked wherever the
 //                       backend says `comparable: false`. Absolute kill moves
 //                       0.3252 absolute (1.77x) with the state route ALONE, and

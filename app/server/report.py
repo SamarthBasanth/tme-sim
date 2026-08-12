@@ -130,12 +130,18 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
         "title": "The RANKING is the defensible output. The absolute kill is not.",
         "source": "results/cell_state_impact.md §3.2, §3.3, §5",
         "body": (
-            "The cross-drug ordering below is INVARIANT across all three "
+            "The cross-drug KILL ordering below is INVARIANT across all three "
             "cell-state routes ('oxygen', 'vessel_distance', 'markers') and "
             "across the whole measured potency band. The absolute kill fraction "
             "is not: with tissue, drug, transport and RNG held identical, kill "
             "moves by up to 0.3252 absolute (1.77x relative) purely with the "
-            "choice of state route. Read the order. Do not read the level."
+            "choice of state route. Read the order. Do not read the level. "
+            "SCOPE: those three routes are common-mode — every drug pays the "
+            "same multiplier — so this says nothing about a DRUG-SPECIFIC "
+            "perturbation. The ordering is NOT invariant across the vascular "
+            "delivery law: correcting the one-way source to a gradient-driven "
+            "one changes the GBM top-1 (cisplatin -> vincristine). See "
+            "results/transvascular_exchange_revalidation.md §4.1."
         ),
     })
 

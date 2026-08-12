@@ -792,7 +792,8 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
         A(f"| **Temozolomide kill CEILING across routes** | {min(cs):.4f} to "
           f"{max(cs):.4f} ({max(cs) / max(min(cs), 1e-12):.2f}x) |")
     A(f"| **Cross-drug ranking** | "
-      + ("**INVARIANT** across all three routes |" if dn["ranking_invariant"]
+      + ("**INVARIANT** across all three routes — but NOT across the delivery "
+         "law (§3.3a) |" if dn["ranking_invariant"]
          else "**CHANGES** between routes |"))
     A("| **Recommendation** | see §5 |")
     A("")
@@ -1168,8 +1169,9 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
         A(f"| `{route}` | {' > '.join(dn['ranking'][route])} |")
     A("")
     if dn["ranking_invariant"]:
-        A("**The ranking is INVARIANT and the levels are not. That is the honest "
-          "and useful result.** The resistance multipliers are shared across drugs "
+        A("**The KILL ranking is INVARIANT ACROSS THESE THREE STATE ROUTES and "
+          "the levels are not. That is the honest and useful result — about "
+          "these routes.** The resistance multipliers are shared across drugs "
           "— every drug pays the same `x0.5` in the same QUIESCENT cells — so they "
           "very largely cancel out of a comparison and do not cancel at all out of "
           "a level. Concretely: a claim of the form *\"cisplatin beats "
@@ -1181,6 +1183,35 @@ def write_report(results: Dict, out_path: Optional[str] = None) -> str:
         A("**The ranking CHANGES between routes.** That is the worst case for this "
           "codebase: cross-drug comparisons were the class of claim believed to be "
           "robust to the state labelling, and on this section they are not.")
+    A("")
+    # --- 3.3a ------------------------------------------------------------- #
+    # This scope block is emitted unconditionally, and it is emitted from the
+    # GENERATOR rather than hand-added to the .md, because this section is the
+    # origin of the "ranking is invariant" claim that the app, the protocol
+    # diagnostics, API_CONTRACT.md and four other reports all cite. A hand
+    # correction to the .md is erased by the next regeneration, which is exactly
+    # the pass the exchange-default flip requires.
+    A("### 3.3a Scope — what this invariance does NOT cover")
+    A("")
+    A("Every route above is **common-mode**: each applies the same multiplier to "
+      "every drug, which is precisely why it cancels out of a comparison. So this "
+      "result is evidence about state labelling and about nothing else, and in "
+      "particular it is **not** evidence that the ranking is robust in general.")
+    A("")
+    A("**A drug-specific perturbation breaks it.** Correcting the vascular "
+      "delivery law from a one-way leak `S = PS*Cp` to the gradient-driven "
+      "`S = PS*(Cp - C)` re-weights each drug by its own permeability, and "
+      "`bbb_penetrance` spans 47x across the GBM panel. Measured: the GBM top-1 "
+      "changes (cisplatin -> vincristine), the top-3 set changes on both panels, "
+      "4 of 45 pairs swap — two across gaps of 40.5% and 35.6% of the leader's "
+      "kill against a Bernoulli sd of ~0.003 — and the Monte-Carlo leader "
+      "probability goes 0.9277 -> 0.3965. See "
+      "`results/transvascular_exchange_revalidation.md` §4.1.")
+    A("")
+    A("**And name the quantity.** Delivery-rank invariance does not imply "
+      "kill-rank invariance: on breast the AUC ranking is preserved exactly "
+      "(rho = 1.000) while the kill ranking scrambles (rho = 0.830), because the "
+      "Hill map saturates. Everything above is about the KILL ranking.")
     A("")
     max_rel = max(
         (max(r["routes"][q]["kill_fraction"] for q in ROUTES)
