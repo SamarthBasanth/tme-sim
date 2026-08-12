@@ -187,6 +187,16 @@ and leaves §3.2 untouched: the ratio would still be an unconstrained
 influx/loss balance, still free to exceed 1 without limit. Both defects have
 to be addressed for the anchor to mean anything.
 
+**Both of those have since been done, and the residual is the alpha-scaled
+binding sink `k = clearance + binding` — specifically its 4.78x drug-to-drug
+variation, against a measured permeability and a measured anchor that are both
+flat to 1.02x.** The chain is `results/breast_tissue_permeability.md`
+(measured permeability makes it worse, which localises the defect) →
+`results/binding_sink_refuted.md` (the sink is refuted in magnitude and
+inverted in direction) → **`results/breast_binding_anchors.md`**, the search
+for an independent *measurement* of tissue binding or clearance — the only
+thing that can replace `alpha` here without fitting it to this anchor.
+
 The honest fix is a real transvascular exchange term driven by
 `(plasma_conc - tissue_conc)` with a tissue-appropriate permeability-surface
 -area product, replacing the one-way leak. That is a change to a frozen

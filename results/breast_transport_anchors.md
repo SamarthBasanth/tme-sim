@@ -198,3 +198,23 @@ back-flux, which leaves the interstitial:plasma ratio unconstrained.
 
 The anchor did its job on first contact. This is the value of §1 — not that
 it confirmed the model, but that it did not.
+
+**Both diagnosed causes were subsequently tested, and the residual is now
+localised to a third term: the alpha-scaled binding sink
+`k = clearance + binding`.** `results/transvascular_exchange_revalidation.md`
+fixed the one-way source; `results/breast_tissue_permeability.md` replaced the
+blood-brain-barrier permeability with a measured breast one and it made things
+*worse*, which is what localised the defect — the PS each drug would need to
+hit its own anchor differs by 4.58x while measured breast permeability differs
+by 1.02x, and that 4.58x is inherited from `k`, which differs by 4.78x.
+`results/binding_sink_refuted.md` then refuted that term in magnitude and
+direction.
+
+**This survey therefore has a sequel.** `k` has never been constrained by a
+delivery-magnitude measurement in any tissue — `alpha` is fit on penetration
+*depth* via `L = sqrt(D_eff/k)`, in which PS does not appear. The equivalent
+literature search for `k`, in the same format as this document and with the
+same honest nulls, is **`results/breast_binding_anchors.md`**. It reports four
+new candidate anchors (three of them breast-specific), the direction the
+evidence points, and the null that survives: no measured interstitial
+loss-rate ratio exists for these two drugs in any tissue.
