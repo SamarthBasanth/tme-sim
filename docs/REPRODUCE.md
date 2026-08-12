@@ -333,6 +333,33 @@ curl -L -o data_cache/scref_gbm/GSE84465_series_matrix.txt.gz \
   https://ftp.ncbi.nlm.nih.gov/geo/series/GSE84nnn/GSE84465/matrix/GSE84465_series_matrix.txt.gz #    145,533 B
 ```
 
+**Breast Xenium (Janesick et al. 2023, PMID 38114474) — NO RECIPE, AND THAT IS A
+REAL GAP.** Every other cache in this section has a URL and a byte count. This
+one has neither, anywhere in the repository, and the pointers are circular:
+`tmesim/data/real/singlecell_spatial.py` and `QUICKSTART.md` §4 both send the
+reader here, and this section has never had a breast entry. So a fresh clone
+cannot reproduce any breast result, and the failure surfaces only as a
+file-not-found at run time.
+
+What IS known, from the code rather than from a download:
+
+* The 313-gene Xenium Human Breast panel, replicates Rep1 and Rep2
+  (`tmesim/reconstruct/marker_panels.py`), from the 10x public dataset
+  accompanying the paper.
+* Expected layout `data_cache/xenium_breast_janesick/rep1/` — plus a `rep2/`
+  sibling, which `tests/test_registration_3d.py` expects.
+* Required files, per `tmesim/data/ingest.py::resolve_xenium_files`: a cells
+  table (`cells.csv.gz`), the MEX matrix (either a `cell_feature_matrix/`
+  triple or `cell_feature_matrix.tar.gz`), and the gene-panel JSON.
+* Only 3 of the panel's 13 endothelial-informative genes are actually gated on
+  (PECAM1 / VWF / CLDN5), so a partial fetch will not fail loudly.
+
+**Whoever next fetches this section: record the exact URLs and byte counts here
+in the same form as the entries above.** Do not reconstruct them from memory
+into this file — an unverified URL in a reproduction recipe is worse than a
+stated gap, and this repo has already propagated three citation errors that
+began exactly that way.
+
 **HGCC patient-derived drug screen** (Johansson 2020, PMID 32668248). ~0.8 MB.
 
 ```bash

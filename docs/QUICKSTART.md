@@ -308,7 +308,10 @@ micro = reconstruct_real(
   this checkout. `vivum acquire` best-effort downloads the *smaller* open
   datasets; the large single-cell caches (Xenium GBM/breast, Visium, HGCC)
   are too big for that command and are fetched with the explicit `curl`
-  commands in [`docs/REPRODUCE.md`](REPRODUCE.md) §2b. If you `git clone`
+  commands in [`docs/REPRODUCE.md`](REPRODUCE.md) §2b — **except the breast
+  Xenium section, for which no recipe exists anywhere in this repo.** That is a
+  known reproducibility gap, not an omission from this page; see REPRODUCE.md
+  §2b's "Breast Xenium — NO RECIPE" note for exactly what is missing. If you `git clone`
   this repository without its data cache, `reconstruct` / `simulate` /
   `compare-drugs` will raise a clear file-not-found error naming the missing
   path rather than silently substituting synthetic data — there is no
