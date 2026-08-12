@@ -287,15 +287,17 @@ magnitude in brain — the engine's volume-averaged methotrexate PS is
 **That claim is REFUTED, and the refutation is more interesting than the
 claim.** `bbb_penetrance` is NOT a permeability. It is a dimensionless
 brain:plasma PARTITION coefficient, and it says so in three places
-(`core/config.py:25`, `reconstruct/barrier.py:66` — "It is NOT a permeability
+(`core/config.py`'s `bbb_penetrance` field doc, `reconstruct/barrier.py`'s
+scope note — "It is NOT a permeability
 with physical units" — and `molecular/permeability.py`, whose docstring
 calibrates it against measured tissue:plasma ratios). Judged in the units it
 was built in, methotrexate at 0.0225 against a measured 0.178 is if anything
 **low**, not 18x high.
 
-**But the engine uses it as a first-order RATE.** `treatment/drugs.py:228`
-declares `exchange_coefficient` returns "the permeability-surface-area field
-PS(x, y) in 1/s"; `sim/engine.py:44` declares
+**But the engine uses it as a first-order RATE.**
+`treatment/drugs.py::exchange_coefficient` declares it returns "the
+permeability-surface-area field PS(x, y) in 1/s"; `sim/engine.py`'s
+plasma-driver section declared
 `source = vascular_density * bbb_penetrance * plasma_mean (uM/s)`. The
 dimensional audit:
 
@@ -307,10 +309,22 @@ conversion factor of exactly 1 s^-1**. Nothing in the repo derives or
 justifies that scale.
 
 **The repo already contradicts itself about which quantity this is.**
-`results/kill_calibration.md:119` insists the term is "a **rate**, not a
+`results/kill_calibration.md` insisted the term is "a **rate**, not a
 concentration... **must not be read as** a physical tissue:plasma partition
-coefficient". `results/glioma_regional_pk.md:34` reads it as exactly that
-partition. Both cannot be true.
+coefficient". `results/glioma_regional_pk.md`'s assumption A1 read it as exactly
+that partition. Both cannot be true.
+
+> **RESOLVED — fix (a) below is now done.** Both were half right. The PRODUCT
+> that enters the PDE is a rate and must not be read as a partition;
+> `bbb_penetrance` ITSELF is a partition coefficient and always was. All six
+> places named in this section now say the same thing, and A1 is retained with
+> its derivation made explicit: `Kp = PS/(PS + k_loss)` reduces to
+> `bbb_penetrance` only under the Stage-0 convention. See
+> `results/kill_calibration.md` §2.1 and `results/glioma_regional_pk.md` §2.1.
+> Fix (b) is also done — the implicit scale is now `PS_SCALE_S_INV`. What
+> remains open is neither (a) nor (b) but the consequence in §7.3: the
+> calibrated scale is not yet the default, because adopting it requires the
+> same full regeneration pass as the exchange flag.
 
 **The diagnostic that settles it.** Read as RATES, the drugs are mutually
 incoherent: methotrexate is 18.3x above measured, temozolomide 2.10x — an

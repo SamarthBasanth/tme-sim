@@ -10,7 +10,10 @@ Responsibilities (see ARCHITECTURE_CONTRACT.md):
   ``physics.diffusion`` adds to the transport PDE. It is a simple linear leak
   proxy: vessels leak drug into tissue in proportion to the local vascular
   density, the drug's blood-brain-barrier penetrance, and the current blood
-  concentration.
+  concentration. Both spatial factors are DIMENSIONLESS — ``bbb_penetrance`` is
+  a partition coefficient, not a permeability — so the rate is
+  ``PS = PS_SCALE_S_INV * vascular_density * bbb_penetrance`` and the whole
+  ``1/s`` is carried by :data:`PS_SCALE_S_INV`. See its docstring below.
 
 Units: concentration uM, time seconds. All functions are vectorized and
 deterministic (no randomness).
@@ -238,7 +241,12 @@ def delivery_source(
     -------
     np.ndarray
         (ny, nx) non-negative delivery-rate source in uM/s (per unit leak),
-        same shape as the vascular density field.
+        same shape as the vascular density field. The ``1/s`` comes from
+        :data:`PS_SCALE_S_INV` alone — the two spatial factors are
+        dimensionless — so at the default scale of 1.0 the numeric values are
+        those of a concentration and the units are formally carried by an
+        unstated 1 s^-1. That is the defect :data:`PS_SCALE_S_INV` exists to
+        make visible; it is not fixed by this function.
     """
     vascular = np.asarray(micro.fields.vascular_density, dtype=np.float64)
     penetrance = drug.bbb_penetrance
