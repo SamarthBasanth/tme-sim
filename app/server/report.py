@@ -52,6 +52,7 @@ from .cache import (
     section_genes,
     state_route_support,
 )
+from .delivery_law import delivery_law
 from .jobs import PDE_DT_S, JobManager, jsonable
 
 __all__ = [
@@ -137,6 +138,24 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
             "moves by up to 0.3252 absolute (1.77x relative) purely with the "
             "choice of state route. Read the order. Do not read the level."
         ),
+    })
+
+    # 2b ------------------------------------------------------------------- #
+    # Limit 2 says the ordering is invariant. It is — to the CELL-STATE route,
+    # which is a common-mode perturbation. It is NOT invariant to the
+    # transvascular delivery law, which is drug-specific and changes top-1 on
+    # GBM. Those two sentences have to sit next to each other or the first one
+    # reads as a broader guarantee than it is. The law is read from PDEConfig at
+    # call time (app/server/delivery_law.py), so this limit cannot describe a
+    # law the engine is no longer using.
+    law = delivery_law()
+    limits.append({
+        "id": "transvascular_delivery_law",
+        "severity": "critical",
+        "applies": True,
+        "title": law["title"] + " — the ranking above is LAW-DEPENDENT",
+        "source": law["reference"],
+        "body": law["caveat"],
     })
 
     # 3 -------------------------------------------------------------------- #
@@ -634,6 +653,11 @@ class Report:
                           if self.finished_at else None),
             "progress": progress,
             "top_ranked": best,
+            # ``top_ranked`` is a RANKING, read straight off the list without
+            # opening the document, so the law that produced it travels with the
+            # SUMMARY and not only with the full view's limits block. Read from
+            # PDEConfig at call time (app/server/delivery_law.py).
+            "delivery_law": delivery_law(),
             "error": self.error,
             "not_for_clinical_use": True,
         }

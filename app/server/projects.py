@@ -66,6 +66,7 @@ from .cache import (
     repo_root,
     state_route_support,
 )
+from .delivery_law import delivery_law
 
 __all__ = [
     "PROJECT_ID_RE",
@@ -741,12 +742,20 @@ def _rank_block(specimen_values: Dict[str, Dict[str, float]],
         for s in sids
     }
 
+    # Which transvascular delivery law produced every value in this block. Read
+    # from PDEConfig at call time, never cached, because the ordering below is
+    # law-dependent: it is invariant to the COMMON-MODE perturbations the
+    # verdict cites (cell-state route, section) and NOT to this one, which is
+    # drug-specific and changes top-1 on GBM. See app/server/delivery_law.py.
+    law = delivery_law()
+
     if len(sids) < 2 or len(common_drugs) < 2:
         return {
             "metric": metric,
             "specimens": sids,
             "drugs": common_drugs,
             "by_specimen": by_specimen,
+            "delivery_law": law,
             "agrees": None,
             "pairwise": [],
             "verdict": (
@@ -798,6 +807,7 @@ def _rank_block(specimen_values: Dict[str, Dict[str, float]],
         "specimens": sids,
         "drugs": common_drugs,
         "by_specimen": by_specimen,
+        "delivery_law": law,
         "agrees": all_agree,
         "pairwise": pairwise,
         "verdict": verdict,

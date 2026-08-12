@@ -348,6 +348,20 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
           h('div.m-meta', chip('computed', 'Metric not described by the front-end table; shown verbatim from the backend.')),
         ));
       }
+      // The delivery law, on the same screen as the numbers it produced. Every
+      // metric above is an integral of one transport solve, and that solve's
+      // vascular source term is a chosen default that is measured to change
+      // which drug comes first. Putting it only in Caveats — one section down —
+      // would let a delivery number be read without it. The full statement,
+      // with its provenance, is still down there; this is the pointer that
+      // cannot be missed. Text and law come from the backend's runtime read of
+      // PDEConfig (app/server/delivery_law.py), never from a constant here.
+      const dlaw0 = (run.provenance || {}).delivery_law;
+      if (dlaw0 && dlaw0.headline) {
+        metricsEl.appendChild(h('div.caveat.crit', { title: dlaw0.caveat },
+          h('span', dlaw0.headline,
+            ' Full statement in Caveats below.')));
+      }
     }
 
     /* error surface */
@@ -368,7 +382,19 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       // cell lines, not on this section. Wearing the same green chip as the
       // cell count implies both came off this specimen; only one did.
       const ic50Measured = pv.ic50_source && /measured/i.test(pv.ic50_source);
+      // The delivery law leads the block. It is not a detail of the run — it is
+      // the source term of the transport solve every number below is integrated
+      // out of, and the only input measured to reorder the drug panel. The
+      // string is the backend's, read off PDEConfig at run time
+      // (app/server/delivery_law.py), so this row cannot describe a law the
+      // engine has stopped using.
+      const dlaw = pv.delivery_law || null;
       fill(provEl,
+        ...(dlaw ? [
+          h('dt', 'delivery law'),
+          h('dd', h('span.mono', dlaw.law),
+            chip('assumed', dlaw.caveat)),
+        ] : []),
         h('dt', 'alpha'), h('dd', auto(pv.alpha),
           chip('assumed', pv.alpha_source
             ? `${pv.alpha_source}\n\nFitted once against a published penetration distance, then held fixed; it is not re-measured per section.`

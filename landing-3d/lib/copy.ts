@@ -24,8 +24,12 @@
  *    reproducible, but a well-mixed model's 1.0 is not the comparator that
  *    bounds it: a null that preserves the macrophages' own clustering
  *    returns ~1.7, so the part attributable to where these macrophages
- *    actually are is ~1.13-1.20x. Quote both numbers or neither. Do NOT
- *    cite monotonicity across quintiles as corroboration — every control
+ *    actually are is ~1.08-1.21x (1.081 against the 400 um block shuffle,
+ *    1.208 against the clumpiness-matched permutation). Quote both numbers
+ *    or neither. Carry the confound too: distance to the tissue edge alone,
+ *    with no immune input whatsoever, already reproduces 82% of the raw
+ *    2.0x, and it is the most deflating single fact about this claim. Do
+ *    NOT cite monotonicity across quintiles as corroboration — every control
  *    reproduces it, so it carries no information. The statistic is invalid
  *    on spot data, where immune positions are synthesised rather than
  *    measured. See results/immune_sink_impact.md.
@@ -65,7 +69,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "04",
     eyebrow: "Spatial attribution",
     headline: "The mean is not the finding. The spread is.",
-    body: "In one section, tumor cells in the macrophage-densest quintile hold about 0.43 of drug exposure. In the sparsest, about 0.86 — a 2.0x spread inside a single tumor, where a well-mixed compartmental model returns exactly 1.0 by construction. That comparison flatters us, so here is the other one: relocate the same macrophages at random, keeping their real clustering, and it still returns about 1.7. Most of the spread is what clustering does at all. What these particular macrophages add is about 1.15x — smaller, and measured. A compartment expresses neither.",
+    body: "In one section, tumor cells in the macrophage-densest quintile hold about 0.43 of drug exposure. In the sparsest, about 0.86 — a 2.0x spread inside a single tumor, where a well-mixed compartmental model returns exactly 1.0 by construction. That comparison flatters us. Distance to the tissue edge alone, with no immune input, reproduces 82% of that ratio; relocating the same macrophages at random while keeping their real clustering still returns about 1.7. What these particular macrophages add is 1.08-1.21x — smaller, and measured. A compartment expresses neither.",
     align: "left",
   },
   {

@@ -160,8 +160,26 @@ export function createReportsPanel({ store, getSection }) {
       h('th', ''))),
     tbody);
 
+  // The `top-ranked` column is a RANKING, readable off this list without ever
+  // opening the document. The document's own limits block states the delivery
+  // law that produced it; this list has to state it too, or the shortest path
+  // to a top pick is also the one path with no disclosure on it. Populated from
+  // the report summaries, which carry the backend's runtime read of PDEConfig
+  // (app/server/delivery_law.py) — nothing about the law is written here, so
+  // this line cannot survive a change of default.
+  const lawEl = h('div');
+
+  function renderLaw() {
+    clear(lawEl);
+    const law = (reports.find((r) => r.delivery_law) || {}).delivery_law;
+    if (!law || !law.headline) return;
+    lawEl.appendChild(h('div.caveat.crit', { title: law.caveat },
+      h('span', h('b', 'top-ranked is LAW-DEPENDENT. '), law.headline)));
+  }
+
   function renderList() {
     clear(tbody);
+    renderLaw();
     if (!reports.length) {
       tbody.appendChild(h('tr', h('td', { colspan: '8', class: 'dim' },
         'No reports yet. Pick a drug panel and press ',
@@ -358,7 +376,8 @@ export function createReportsPanel({ store, getSection }) {
       h('div.rp-count', h('span.lbl', 'panel'), countEl),
       drugBox,
       errEl,
-      h('div.tblwrap', table)),
+      h('div.tblwrap', table),
+      lawEl),
   );
 
   document.body.appendChild(dlg);

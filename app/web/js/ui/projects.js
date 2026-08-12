@@ -472,6 +472,16 @@ export function createProjectsPanel({ store }) {
             ? p.swapped.map((s) => s.join(' ↔ ')).join('; ') : NULL_GLYPH)))))));
       mainEl.appendChild(h('div.caveat.info', h('span', rk.verdict)));
     }
+    // The verdict above is about agreement BETWEEN specimens, and it cites the
+    // invariances this repo has measured — cell-state route, section. Those are
+    // common-mode. The transvascular delivery law is not: it is drug-specific,
+    // and it changes the top-1 GBM pick. Without this line, "RANKING AGREES"
+    // reads as a broader guarantee than the evidence supports. Backend text,
+    // read from PDEConfig at request time (app/server/delivery_law.py).
+    if (rk.delivery_law && rk.delivery_law.caveat) {
+      mainEl.appendChild(h('div.caveat.crit', { title: rk.delivery_law.caveat },
+        h('span', h('b', 'LAW-DEPENDENT: '), rk.delivery_law.caveat)));
+    }
 
     /* 3. absolute kill — flagged */
     mainEl.appendChild(h('div.hr-lbl',

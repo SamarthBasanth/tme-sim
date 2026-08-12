@@ -46,6 +46,7 @@ from .cache import (
     runs_dir,
     state_route_support,
 )
+from .delivery_law import delivery_law
 from .payloads import (
     FIELD_NAMES,
     MAX_TIMELAPSE_FRAMES,
@@ -550,6 +551,23 @@ def execute_run(spec: Dict, ctx: _Ctx,
     pde = PDEConfig(dt=PDE_DT_S, total_time=total_time_s,
                     convection=PDE_CONVECTION, save_every=PDE_SAVE_EVERY,
                     time_resolved=time_resolved)
+    # --- the transvascular delivery law ------------------------------------ #
+    # Read off the PDEConfig THIS RUN is about to be handed, not off a constant
+    # written here: if the shipped default ever flips, the caveat and the
+    # provenance row rewrite themselves instead of quietly describing the wrong
+    # physics. The law is the one input that changes the top-1 GBM drug
+    # (results/transvascular_exchange_revalidation.md §4.1), so it is disclosed
+    # on every run that produces a delivery number, and it goes FIRST in the
+    # caveats list because it qualifies the headline output — the ranking —
+    # rather than a detail of it. See app/server/delivery_law.py.
+    law = delivery_law(getattr(pde, "transvascular_exchange", None))
+    provenance["delivery_law"] = law
+    provenance["pde_transvascular_exchange"] = law["transvascular_exchange"]
+    provenance["pde_transvascular_exchange_default"] = law["shipped_default"]
+    caveats.insert(0, law["caveat"])
+    ctx.log(f"delivery law: {law['law']} "
+            f"(PDEConfig.transvascular_exchange={law['transvascular_exchange']}, "
+            f"shipped default {law['shipped_default']})")
     n_frames, timelapse_reason = _plan_timelapse(
         timelapse_frames, micro.domain.shape, total_time_s)
     if timelapse_reason:
@@ -968,6 +986,28 @@ class Job:
             for k, v in self.body.items():
                 if not k.startswith("_"):
                     out[k] = v
+        # --- delivery law, backfilled for runs that predate the record ------ #
+        # Runs completed before this field existed are still served from
+        # app/runs/ and still put a ranked delivery number on screen, so they
+        # cannot be the one path through the Studio with no law on it. Every
+        # such run went through the same PDEConfig default (the flag has never
+        # been settable from a RunSpec), so the law is recoverable — but it was
+        # not RECORDED, and the difference is stated rather than smoothed over.
+        # Still a runtime read of PDEConfig; nothing is hard-coded.
+        prov = out.get("provenance")
+        if (isinstance(prov, dict) and not prov.get("delivery_law")
+                and (self.spec or {}).get("drug")):
+            law = dict(delivery_law(prov.get("pde_transvascular_exchange")))
+            law["recorded"] = False
+            law["caveat"] = law["caveat"] + (
+                " This run predates the delivery-law record, so the law above is "
+                "the one PDEConfig ships TODAY, not one this run wrote down; "
+                "re-run it if that distinction matters to you."
+            )
+            prov = dict(prov)
+            prov["delivery_law"] = law
+            prov["caveats"] = [law["caveat"]] + list(prov.get("caveats") or [])
+            out["provenance"] = prov
         return out
 
 

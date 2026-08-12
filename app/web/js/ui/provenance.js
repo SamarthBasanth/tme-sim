@@ -196,6 +196,18 @@ export function metricProvenance(key, run) {
     kind = 'assumed';
     reasons.push(`IC50 is not a measured value (${prov.ic50_source})`);
   }
+  // The transvascular delivery law. Every metric in this table is an integral
+  // of the same transport solve, and that solve's vascular source term is a
+  // CHOSEN default — so by the escalation rule at the top of this file all four
+  // read `assumed`, not `computed`. This is the one perturbation measured to
+  // change the top-1 drug, which is the decision the panel exists to support,
+  // so it is stated on the metric and not left to the caveats list alone. The
+  // text is the backend's, built from PDEConfig at run time
+  // (app/server/delivery_law.py); nothing about the law is written here.
+  if (prov.delivery_law && prov.delivery_law.caveat) {
+    kind = 'assumed';
+    reasons.push(String(prov.delivery_law.caveat));
+  }
   const why = [describe(kind), m.src, ...reasons].join('\n\n');
   return { kind, why };
 }
