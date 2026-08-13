@@ -1,0 +1,129 @@
+{
+  "ref_dx_um": 5.0,
+  "D_baseline": {
+    "f_state": 0.5436544599361667,
+    "quiescent_frac": 0.9126910801276668,
+    "hypoxic_frac": 0.0,
+    "viable_frac": 0.08730891987233327,
+    "mean_o2": 0.3476293036619795
+  },
+  "rows": [
+    {
+      "dx_um": 30.0,
+      "E": {
+        "f_state": 0.5045985217537376,
+        "quiescent_frac": 0.9908029564925248,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.009197043507475222,
+        "mean_o2": 0.3369890680847801
+      },
+      "vasc_integral_coarse_um2": 713700.0,
+      "vasc_integral_injected_um2": 713700.0,
+      "rho_integral_injected": 23811.833333333332
+    },
+    {
+      "dx_um": 24.0,
+      "E": {
+        "f_state": 0.5395178901394255,
+        "quiescent_frac": 0.920964219721149,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.079035780278851,
+        "mean_o2": 0.3469464795386885
+      },
+      "vasc_integral_coarse_um2": 748800.0,
+      "vasc_integral_injected_um2": 745875.0,
+      "rho_integral_injected": 23808.854166666668
+    },
+    {
+      "dx_um": 18.0,
+      "E": {
+        "f_state": 0.5397278683016966,
+        "quiescent_frac": 0.9205442633966068,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.07945573660339325,
+        "mean_o2": 0.3474544683619555
+      },
+      "vasc_integral_coarse_um2": 746496.0,
+      "vasc_integral_injected_um2": 744550.0,
+      "rho_integral_injected": 23846.527777777777
+    },
+    {
+      "dx_um": 16.0,
+      "E": {
+        "f_state": 0.5304888291617672,
+        "quiescent_frac": 0.9390223416764657,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.06097765832353435,
+        "mean_o2": 0.3476644515577175
+      },
+      "vasc_integral_coarse_um2": 745728.0,
+      "vasc_integral_injected_um2": 744575.0,
+      "rho_integral_injected": 23806.93359375
+    },
+    {
+      "dx_um": 12.0,
+      "E": {
+        "f_state": 0.5527045187300521,
+        "quiescent_frac": 0.8945909625398959,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.10540903746010415,
+        "mean_o2": 0.34894936017814815
+      },
+      "vasc_integral_coarse_um2": 748656.0,
+      "vasc_integral_injected_um2": 749500.0,
+      "rho_integral_injected": 23812.67361111111
+    },
+    {
+      "dx_um": 10.0,
+      "E": {
+        "f_state": 0.531013774567445,
+        "quiescent_frac": 0.93797245086511,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.06202754913488997,
+        "mean_o2": 0.3462335659633335
+      },
+      "vasc_integral_coarse_um2": 739200.0,
+      "vasc_integral_injected_um2": 739200.0,
+      "rho_integral_injected": 23812.000000000015
+    },
+    {
+      "dx_um": 8.0,
+      "E": {
+        "f_state": 0.5522845624055098,
+        "quiescent_frac": 0.8954308751889803,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.10456912481101965,
+        "mean_o2": 0.34758256146632616
+      },
+      "vasc_integral_coarse_um2": 746816.0,
+      "vasc_integral_injected_um2": 747050.0,
+      "rho_integral_injected": 23901.953125
+    },
+    {
+      "dx_um": 7.0,
+      "E": {
+        "f_state": 0.5478960188140434,
+        "quiescent_frac": 0.9042079623719134,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09579203762808668,
+        "mean_o2": 0.3492047614736167
+      },
+      "vasc_integral_coarse_um2": 741517.0,
+      "vasc_integral_injected_um2": 745925.0,
+      "rho_integral_injected": 23723.4693877551
+    },
+    {
+      "dx_um": 6.0,
+      "E": {
+        "f_state": 0.533428523433563,
+        "quiescent_frac": 0.9331429531328742,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.06685704686712582,
+        "mean_o2": 0.3478901458512086
+      },
+      "vasc_integral_coarse_um2": 743904.0,
+      "vasc_integral_injected_um2": 742850.0,
+      "rho_integral_injected": 23764.583333333332
+    }
+  ]
+}

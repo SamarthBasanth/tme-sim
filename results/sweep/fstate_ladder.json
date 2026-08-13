@@ -1,0 +1,274 @@
+{
+  "rows": [
+    {
+      "dx_um": 30.0,
+      "grid": [
+        170,
+        271
+      ],
+      "n_tumour": 23812,
+      "A_production": {
+        "f_state": 0.504115571980514,
+        "quiescent_frac": 0.9917688560389719,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.008231143961028054,
+        "mean_o2": 0.33635856975449263
+      },
+      "B_bilinear": {
+        "f_state": 0.5042205610616496,
+        "quiescent_frac": 0.9915588778767008,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.008441122123299177,
+        "mean_o2": 0.3364234742947732
+      },
+      "vasc_integral_um2": 713700.0,
+      "vasc_frac_nonzero": 0.017212936835250707,
+      "rho_integral": 23812.0,
+      "field_mean": 0.33994170999009055,
+      "secs": 3.168617010116577
+    },
+    {
+      "dx_um": 24.0,
+      "grid": [
+        213,
+        338
+      ],
+      "n_tumour": 23812,
+      "A_production": {
+        "f_state": 0.5392239207122459,
+        "quiescent_frac": 0.9215521585755081,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.07844784142449185,
+        "mean_o2": 0.3474738047758426
+      },
+      "B_bilinear": {
+        "f_state": 0.5397068704854695,
+        "quiescent_frac": 0.920586259029061,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.07941374097093902,
+        "mean_o2": 0.3475375260777097
+      },
+      "vasc_integral_um2": 748800.0,
+      "vasc_frac_nonzero": 0.01805706031058144,
+      "rho_integral": 23812.0,
+      "field_mean": 0.35258386214771104,
+      "secs": 4.391430854797363
+    },
+    {
+      "dx_um": 18.0,
+      "grid": [
+        283,
+        451
+      ],
+      "n_tumour": 23812,
+      "A_production": {
+        "f_state": 0.5401478246262389,
+        "quiescent_frac": 0.9197043507475222,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08029564925247774,
+        "mean_o2": 0.3481736251283784
+      },
+      "B_bilinear": {
+        "f_state": 0.5403368049722829,
+        "quiescent_frac": 0.9193263900554343,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08067360994456577,
+        "mean_o2": 0.3482332916265064
+      },
+      "vasc_integral_um2": 746496.0,
+      "vasc_frac_nonzero": 0.018051757774243338,
+      "rho_integral": 23811.999999999996,
+      "field_mean": 0.3523604698132401,
+      "secs": 6.272571086883545
+    },
+    {
+      "dx_um": 16.0,
+      "grid": [
+        318,
+        507
+      ],
+      "n_tumour": 23812,
+      "A_production": {
+        "f_state": 0.5333235343524273,
+        "quiescent_frac": 0.9333529312951453,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.06664706870485469,
+        "mean_o2": 0.3477841129275725
+      },
+      "B_bilinear": {
+        "f_state": 0.5334495212497901,
+        "quiescent_frac": 0.93310095750042,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.06689904249958005,
+        "mean_o2": 0.34784498127632385
+      },
+      "vasc_integral_um2": 745728.0,
+      "vasc_frac_nonzero": 0.018067805440809794,
+      "rho_integral": 23812.0,
+      "field_mean": 0.3528419796506145,
+      "secs": 393.9276211261749
+    },
+    {
+      "dx_um": 12.0,
+      "grid": [
+        424,
+        675
+      ],
+      "n_tumour": 23812,
+      "A_production": {
+        "f_state": 0.5502057785990258,
+        "quiescent_frac": 0.8995884428019486,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.10041155719805141,
+        "mean_o2": 0.34862776586515865
+      },
+      "B_bilinear": {
+        "f_state": 0.5503527633126155,
+        "quiescent_frac": 0.899294473374769,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.10070552662523098,
+        "mean_o2": 0.3486843306780669
+      },
+      "vasc_integral_um2": 748656.0,
+      "vasc_frac_nonzero": 0.018165618448637316,
+      "rho_integral": 23812.0,
+      "field_mean": 0.3538863602825404,
+      "secs": 1000.3215630054474
+    },
+    {
+      "dx_um": 10.0,
+      "grid": [
+        508,
+        810
+      ],
+      "n_tumour": 23812,
+      "A_production": {
+        "f_state": 0.5304888291617672,
+        "quiescent_frac": 0.9390223416764657,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.06097765832353435,
+        "mean_o2": 0.3461460301042975
+      },
+      "B_bilinear": {
+        "f_state": 0.5308247942214009,
+        "quiescent_frac": 0.938350411557198,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.061649588442801946,
+        "mean_o2": 0.34620328757124336
+      },
+      "vasc_integral_um2": 739200.0,
+      "vasc_frac_nonzero": 0.017964421114027414,
+      "rho_integral": 23811.999999999985,
+      "field_mean": 0.35189265671102515,
+      "secs": 89.93170499801636
+    },
+    {
+      "dx_um": 8.0,
+      "grid": [
+        635,
+        1012
+      ],
+      "n_tumour": 23812,
+      "A_production": {
+        "f_state": 0.5488199227280363,
+        "quiescent_frac": 0.9023601545439275,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09763984545607257,
+        "mean_o2": 0.34824485820140866
+      },
+      "B_bilinear": {
+        "f_state": 0.548966907441626,
+        "quiescent_frac": 0.9020661851167479,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09793381488325215,
+        "mean_o2": 0.3483024365474695
+      },
+      "vasc_integral_um2": 746816.0,
+      "vasc_frac_nonzero": 0.01815847623790109,
+      "rho_integral": 23812.0,
+      "field_mean": 0.3536013928737012,
+      "secs": 981.3076469898224
+    },
+    {
+      "dx_um": 7.0,
+      "grid": [
+        725,
+        1157
+      ],
+      "n_tumour": 23812,
+      "A_production": {
+        "f_state": 0.5406727700319167,
+        "quiescent_frac": 0.9186544599361667,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08134554006383336,
+        "mean_o2": 0.34689689094832576
+      },
+      "B_bilinear": {
+        "f_state": 0.5408197547455065,
+        "quiescent_frac": 0.918360490508987,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08163950949101294,
+        "mean_o2": 0.34695466359918303
+      },
+      "vasc_integral_um2": 741517.0,
+      "vasc_frac_nonzero": 0.018040711709832204,
+      "rho_integral": 23812.000000000007,
+      "field_mean": 0.35187841342705445,
+      "secs": 15.51548981666565
+    },
+    {
+      "dx_um": 6.0,
+      "grid": [
+        846,
+        1349
+      ],
+      "n_tumour": 23812,
+      "A_production": {
+        "f_state": 0.5390139425499748,
+        "quiescent_frac": 0.9219721149000504,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.07802788509994961,
+        "mean_o2": 0.3476118438596761
+      },
+      "B_bilinear": {
+        "f_state": 0.5391819250797917,
+        "quiescent_frac": 0.9216361498404166,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.0783638501595834,
+        "mean_o2": 0.34766939658814316
+      },
+      "vasc_integral_um2": 743904.0,
+      "vasc_frac_nonzero": 0.01810639875084775,
+      "rho_integral": 23812.0,
+      "field_mean": 0.35287341202803657,
+      "secs": 25.27462100982666
+    },
+    {
+      "dx_um": 5.0,
+      "grid": [
+        1015,
+        1619
+      ],
+      "n_tumour": 23812,
+      "A_production": {
+        "f_state": 0.5435074752225768,
+        "quiescent_frac": 0.9129850495548463,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.0870149504451537,
+        "mean_o2": 0.3475722508302159
+      },
+      "B_bilinear": {
+        "f_state": 0.5436544599361667,
+        "quiescent_frac": 0.9126910801276668,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08730891987233327,
+        "mean_o2": 0.3476293036619795
+      },
+      "vasc_integral_um2": 744000.0,
+      "vasc_frac_nonzero": 0.018110066117563297,
+      "rho_integral": 23812.000000000015,
+      "field_mean": 0.35307880722203083,
+      "secs": 53.14603900909424
+    }
+  ]
+}

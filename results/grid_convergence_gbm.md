@@ -268,6 +268,26 @@ So the score does amplify mesh error relative to the underlying delivery field, 
 
 Because the scored ratio is `F_penetration x F_state x (interaction)`, any movement in `F_state` propagates into the verdict directly and linearly. §3's per-drug tables carry both factors so the two sources of grid dependence can be told apart.
 
+> ### CORRECTION (added after this file was generated) — the mechanism named above is wrong; the measurements are right
+>
+> **⚠ THIS NOTE IS A HAND EDIT TO A MACHINE-GENERATED FILE AND WILL BE DESTROYED THE NEXT TIME `experiments/grid_convergence_gbm.py` IS RUN.** It must be re-inserted into `write_report()` immediately after the `F_state` table, near the `A("## 5. The other dx-dependent term: the cell-state label")` call at line 1588 of that script. It is recorded durably in `results/fstate_mechanism.md` §8.
+>
+> **The numbers in this section stand and are independently reproduced.** `results/fstate_mechanism.md` reproduces the `F_state` swing of **0.0461** to four decimals and the `dx = 12 um` value of **0.5502** exactly. **Only the sentence opening this section — "the oxygen PDE that assigns the QUIESCENT / HYPOXIC bands is solved on the same grid, so refining the mesh can relabel cells" — misattributes the cause.**
+>
+> The oxygen PDE is **not** the cause. `results/subgrid_closure.md` §2 measures the shipped oxygen solve's worst discretisation error at **0.170 % at `dx = 30 um`**, far too small to move a banded fraction by 4 points. `results/fstate_mechanism.md` decomposes the swing into its exact additive terms and attributes it as `cov(term, F_state)/var(F_state)`:
+>
+> | term | `cov/var` |
+> |---|---:|
+> | **vessel-source rasterisation** (write side) | **+1.057** |
+> | PDE discretisation | −0.056 |
+> | cell-to-grid sampling (`Domain.to_index`) | −0.001 |
+>
+> **The cause is the binary vessel painting, not the mesh resolving the field.** `vessel_network.discrete_vascular_field(geometry='binary')` marks a grid cell as vessel iff its centre falls within 7.5 um of an endothelial cell. A 7.5 um disc is 176.71 um² against a `dx = 30 um` grid cell's 900 um², so a vessel is quantised to 0 or 1 cells and the **total painted vessel area is not conserved under `dx`** — it spans **4.73 %** non-monotonically across this very ladder (713,700–748,800 um²). That drives mean tumour O2 by **0.0123** (`corr = 0.9868`), and because **10.10 %** of tumour cells sit within 0.01 of the `0.4` QUIESCENT ceiling, a shift that small relabels ~9 points of quiescent fraction. **This also explains the non-monotonicity §0 flags: an unconserved rasterisation has no reason to be monotone in `dx`, whereas a discretisation error would be.**
+>
+> Two consequences for how this section should be read. **(a)** The observation that `dx = 12 um` is the favourable end of the oscillation stands, but it is a favourable *rasterisation draw*, not a favourable *resolution*, so refining the mesh would not have removed it. **(b)** The sink is exonerated: the integrated tumour sink is conserved to **2.9e-11** at every rung, so `physics/oxygen.py`'s areal-density fix works as documented — the equivalent fix was simply never applied to the source.
+
+
+
 **And an observation the data forces, which "3/3 PASS" would otherwise hide.** `F_state` is at its **maximum over the entire ladder at dx = 12 um** (0.5502) — and dx = 12 um is the published grid. The published run therefore sits at the *favourable* end of the oscillation, and its ratios are correspondingly above the fine-rung mean for every drug:
 
 | drug | published ratio (dx=12) | mean over fine rungs (dx <= 18) | published is high by |

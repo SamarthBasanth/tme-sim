@@ -1,0 +1,8 @@
+{
+  "solver_max_abs_diff": 0.0,
+  "solver_bit_identical": true,
+  "band_states_identical": true,
+  "f_state_shipped": 0.5502057785990258,
+  "f_state_local": 0.5502057785990258,
+  "dx_um": 12.0
+}
