@@ -1587,11 +1587,37 @@ def write_report(res: Dict, ana: Dict, out_md: str = OUT_MD,
     # ---------------- 5. F_state -----------------------------------------
     A("## 5. The other dx-dependent term: the cell-state label")
     A("")
-    A("`F_state` is not a constant of the tissue — the oxygen PDE that assigns "
-      "the QUIESCENT / HYPOXIC bands is solved on the same grid, so refining the "
-      "mesh can relabel cells. The published report quotes F_state = "
+    A("`F_state` is not a constant of the tissue — it moves with `dx`, and the "
+      "cause is now measured. The published report quotes F_state = "
       f"{PUBLISHED_FSTATE:.4f} (90.0 % quiescent, 0.0 % hypoxic). Measured "
       "across the ladder:")
+    A("")
+    A("> **The cause is the VESSEL SOURCE RASTERISATION, not the oxygen PDE.** "
+      "This section previously said the PDE 'is solved on the same grid, so "
+      "refining the mesh can relabel cells'. That sentence is wrong and is "
+      "retracted; the numbers below are unaffected and reproduce to four "
+      "decimals in `results/fstate_mechanism.md`.")
+    A(">")
+    A("> `results/subgrid_closure.md` §2 measures the shipped oxygen solve's "
+      "worst discretisation error at **0.170 %** over dx = 2–30 µm — far too "
+      "small to move a banded fraction by four points. "
+      "`results/fstate_mechanism.md` decomposes the swing with an exact "
+      "additive identity and attributes it as `cov(term, F_state)/var(F_state)`: "
+      "vessel-source rasterisation **+1.057**, PDE discretisation **−0.056**, "
+      "cell-to-grid sampling **−0.001**.")
+    A(">")
+    A("> `discrete_vascular_field(geometry='binary')` marks a cell as vessel iff "
+      "its centre falls within 7.5 µm of an endothelial cell. That disc is "
+      "176.71 µm² against a dx = 30 cell's 900 µm², so a vessel quantises to 0 "
+      "or 1 cells and **total painted vessel area is not conserved** (4.73 % "
+      "span, non-monotone). The tumour SINK is conserved to 2.9e-11 over the "
+      "same ladder — `oxygen.py`'s areal-density fix works and was simply never "
+      "applied to the source.")
+    A(">")
+    A("> A second, separate half is **not** a defect: 10.10 % of tumour cells "
+      "sit within 0.01 of the 0.4 band ceiling, with `dq/d(mean O2) = 6.72`. "
+      "That amplification is the honest resolution limit of banding a "
+      "continuous field and no grid refinement reduces it.")
     A("")
     A("| dx (um) | quiescent frac | hypoxic frac | viable frac | F_state |")
     A("|---:|---:|---:|---:|---:|")
