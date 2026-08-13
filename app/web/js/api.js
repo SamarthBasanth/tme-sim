@@ -200,6 +200,18 @@ export const getRun = (id) => call('GET', `/api/runs/${encodeURIComponent(id)}`)
 export const getStatus = (id) => call('GET', `/api/runs/${encodeURIComponent(id)}/status`);
 export const cancelRun = (id) => call('DELETE', `/api/runs/${encodeURIComponent(id)}`);
 
+/* --- bring your own compound -------------------------------------------- */
+// A refusal comes back as 422 with `{detail: {code, message, field}}`. That is a
+// 4xx, so `call()` throws rather than retrying or falling back to the mock — the
+// UI reads `err.payload.detail` and puts the sentence on the field at fault.
+// Compiling is never mocked: js/ui/compound.js refuses outright in stub mode
+// rather than let a seeded PRNG produce something shaped like chemistry.
+export const postCompoundCompile = (body) => call('POST', '/api/compounds/compile', { body });
+export const postCompound = (body) => call('POST', '/api/compounds', { body });
+export const listCompounds = () => call('GET', '/api/compounds');
+export const getCompound = (id) => call('GET', `/api/compounds/${encodeURIComponent(id)}`);
+export const deleteCompound = (id) => call('DELETE', `/api/compounds/${encodeURIComponent(id)}`);
+
 /* --- therapy reports ---------------------------------------------------- */
 export const postReport = (body) => call('POST', '/api/reports', { body });
 export const listReports = () => call('GET', '/api/reports');

@@ -241,6 +241,8 @@ def execute_run(spec: Dict, ctx: _Ctx,
     from tmesim.validation.calibration import calibrate_alpha, calibrated_drugparams
     from tmesim.validation.pk_reality import penetration_length_um
 
+    from .compounds import user_compound_caveats, user_drugparams
+
     section = spec["section"]
     dx_um = float(spec["dx_um"])
     drug_name = spec.get("drug")
@@ -482,46 +484,87 @@ def execute_run(spec: Dict, ctx: _Ctx,
             "_payloads": payloads,
         }
 
-    pot = resolve_ic50(drug_name)
-    try:
-        mol = get_molecule(drug_name)
-    except KeyError:
-        # "palbociclib" is curated in molecular.breast_library, not here (the
-        # two drug libraries are kept disjoint), but is a valid GBM-context
-        # drug too -- calibration._compile already special-cases it. See
-        # app/server/api.py's drug_rows() for the fuller comment.
-        if drug_name == "palbociclib":
-            from tmesim.molecular.breast_library import get_molecule_breast
+    # A compound the operator compiled from their own SMILES resolves FIRST and
+    # never touches the curated libraries: it has no GDSC entry, no literature
+    # IC50 and no curated structure. It is compiled through the SAME two steps a
+    # library drug is (calibrated_drugparams with THIS run's alpha, then the
+    # binding-site barrier), because two compounds calibrated differently cannot
+    # be ranked against each other -- and the ranking is the only defensible
+    # output either of them has. See app/server/compounds.py.
+    user_compiled = user_drugparams(drug_name, alpha=alpha)
+    if user_compiled is not None:
+        dp, mol, compound_doc = user_compiled
+        pot = None
+    else:
+        compound_doc = None
+        pot = resolve_ic50(drug_name)
+        try:
+            mol = get_molecule(drug_name)
+        except KeyError:
+            # "palbociclib" is curated in molecular.breast_library, not here (the
+            # two drug libraries are kept disjoint), but is a valid GBM-context
+            # drug too -- calibration._compile already special-cases it. See
+            # app/server/api.py's drug_rows() for the fuller comment.
+            if drug_name == "palbociclib":
+                from tmesim.molecular.breast_library import get_molecule_breast
 
-            mol = get_molecule_breast(drug_name)
-        else:
-            raise
-    dp = apply_barrier_to_drugparams(
-        calibrated_drugparams(drug_name, alpha), mol
-    )
+                mol = get_molecule_breast(drug_name)
+            else:
+                raise
+        dp = apply_barrier_to_drugparams(
+            calibrated_drugparams(drug_name, alpha), mol
+        )
     ctx.log(f"compiled {drug_name}: ic50={dp.ic50:.4g} uM  D={dp.diffusivity:.1f} "
             f"um^2/s  bbb={dp.bbb_penetrance:.4f}  binding={dp.binding:.4g}")
 
-    n_lines = pot.get("n_cell_lines")
-    if pot["confidence"] == "measured":
-        ic50_source = f"GDSC measured (n={n_lines})"
-    elif pot["confidence"] == "literature":
-        ic50_source = "curated literature"
+    if compound_doc is not None:
+        ctx.log(f"{drug_name} is a USER-COMPILED compound from SMILES "
+                f"{compound_doc.get('smiles')!r}; "
+                f"{compound_doc.get('predicted_field_count')} of "
+                f"{len(compound_doc.get('fields', []))} compiled fields are "
+                "predictions, not measurements")
+        ic50_supplied = bool(compound_doc.get("ic50_supplied"))
+        provenance.update({
+            "ic50_uM": float(dp.ic50),
+            "ic50_source": ("supplied by the operator (not measured here)"
+                            if ic50_supplied
+                            else "flagged default (LOW confidence) — none supplied"),
+            "ic50_confidence": "user_supplied" if ic50_supplied else "default_LOW",
+            "ic50_note": next((f["method"] for f in compound_doc.get("fields", [])
+                               if f["key"] == "ic50"), None),
+            "ic50_n_cell_lines": None,
+            "ic50_resolved_uM": float(dp.ic50),
+            "user_compound": {
+                "name": compound_doc.get("name"),
+                "smiles": compound_doc.get("smiles"),
+                "fields": compound_doc.get("fields"),
+                "predicted_field_count": compound_doc.get("predicted_field_count"),
+                "can_conclude": compound_doc.get("can_conclude"),
+                "cannot_conclude": compound_doc.get("cannot_conclude"),
+            },
+        })
+        caveats.extend(user_compound_caveats(compound_doc))
     else:
-        ic50_source = "flagged default (LOW confidence)"
-    provenance.update({
-        "ic50_uM": float(dp.ic50),
-        "ic50_source": ic50_source,
-        "ic50_confidence": pot["confidence"],
-        "ic50_note": pot["note"],
-        "ic50_n_cell_lines": n_lines,
-        "ic50_resolved_uM": float(pot["ic50_uM"]),
-    })
-    if pot["confidence"] != "measured":
-        caveats.append(
-            f"IC50 for {drug_name} is NOT a GDSC measurement: {ic50_source}. "
-            f"{pot['note']}"
-        )
+        n_lines = pot.get("n_cell_lines")
+        if pot["confidence"] == "measured":
+            ic50_source = f"GDSC measured (n={n_lines})"
+        elif pot["confidence"] == "literature":
+            ic50_source = "curated literature"
+        else:
+            ic50_source = "flagged default (LOW confidence)"
+        provenance.update({
+            "ic50_uM": float(dp.ic50),
+            "ic50_source": ic50_source,
+            "ic50_confidence": pot["confidence"],
+            "ic50_note": pot["note"],
+            "ic50_n_cell_lines": n_lines,
+            "ic50_resolved_uM": float(pot["ic50_uM"]),
+        })
+        if pot["confidence"] != "measured":
+            caveats.append(
+                f"IC50 for {drug_name} is NOT a GDSC measurement: {ic50_source}. "
+                f"{pot['note']}"
+            )
 
     if sens_info is not None:
         provenance["sensitivity_note"] = sens_info.get("comparability")
@@ -661,13 +704,51 @@ def execute_run(spec: Dict, ctx: _Ctx,
         "exposure_window_s": float(dm["T_s"]),
         "low_o2_over_high_o2_exposure": head["low_o2_over_high_o2_exposure"],
     }
+    # RESOLUTION. This caveat used to assert that penetration_index is
+    # "OVER-ESTIMATED on grids coarser than the ~45 um perivascular boundary
+    # layer" and that "kill_fraction is grid-converged only for dx <= 20 um".
+    # Both halves are retracted by their own sources -- the penetration ladder
+    # RISES with refinement (0.1110 at dx = 60 um to 0.3062 at dx = 10 um), so
+    # the direction was backwards, and results/numerical_rigor.md now carries a
+    # CORRECTION withdrawing the convergence headline, contradicted
+    # independently by results/grid_convergence_breast.md and
+    # results/grid_convergence_gbm.md. penetration_index is itself retired in
+    # favour of therapeutic_coverage_1x. The caveat is NOT deleted (the dx a run
+    # used is exactly the kind of thing this list exists to state); it now says
+    # what was measured, in the SAME words app/server/report.py's "Resolution --
+    # the grid-convergence claim is WITHDRAWN" limit uses, so the run caveat and
+    # the rendered report cannot drift apart.
     caveats.append(
-        "penetration_index is resolution-sensitive and is OVER-ESTIMATED on "
-        "grids coarser than the ~45 um perivascular boundary layer "
-        f"(results/numerical_rigor.md section 2); this run used dx = {dx_um:g} um."
-        + ("" if dx_um <= 20.0 else
-           " kill_fraction is grid-converged only for dx <= 20 um, so this "
-           "run's kill fraction is NOT in the converged regime either.")
+        f"RESOLUTION: this run used dx = {dx_um:g} um. THERE IS NO dx AT WHICH "
+        "THIS PIPELINE HAS BEEN SHOWN TO BE GRID-CONVERGED, and an earlier "
+        "version of this caveat said otherwise: it asserted that kill_fraction "
+        "is grid-converged for dx <= 20 um and that the penetration index is "
+        "over-estimated on coarse grids. BOTH HALVES ARE WITHDRAWN. (a) The "
+        "kill plateau was measured on ONE Xenium GBM section for ONE metric and "
+        "does not transfer -- on breast, docetaxel's verdict FLIPS FAIL -> PASS "
+        "between dx = 12 and dx = 16 um, and on the GBM panel the scored ratio "
+        "is NON-MONOTONE in dx for all three drugs tested, which is not an "
+        "asymptotic regime. (b) The penetration ladder RISES with refinement -- "
+        "0.1110 at dx = 60 um to 0.3062 at dx = 10 um -- so a coarse mesh "
+        "UNDER-states the index, the opposite direction to what was printed "
+        "here. What survives, and is why this is a warning rather than a "
+        "footnote: dx is the LARGEST single driver of the penetration index "
+        "measured on that section (|elasticity| 0.747, 3.1x the next knob), and "
+        "it reaches the answer through the RECONSTRUCTION -- the oxygen solve, "
+        "the cell-state banding and the IFP/velocity solve all live on the grid "
+        "-- so a converged transport step does not imply a converged "
+        "prediction. Read every number from this run as carrying an "
+        "unquantified mesh term. This is NOT a claim that the solver is broken: "
+        "mass is conserved to ~4e-14 on the real irregular mask and the "
+        "prediction is dt-converged to <1e-2 for dt <~ 20 s, and neither of "
+        "those is affected by any of the above. "
+        "(results/numerical_rigor.md CORRECTION + section 2; "
+        "results/grid_convergence_breast.md; results/grid_convergence_gbm.md)"
+        + ("" if dx_um <= 18.0 else
+           f" This run is COARSER STILL: at dx = {dx_um:g} um it sits on the "
+           "part of both ladders where the coarse rungs (24 and 30 um) "
+           "understate the scored ratio by the largest margin measured -- up to "
+           "11.7% in a single refinement step.")
     )
     if time_resolved:
         caveats.append(
@@ -749,6 +830,13 @@ def execute_run(spec: Dict, ctx: _Ctx,
         "molecular_weight": float(dp.molecular_weight),
         "mw_from_structure": float(mol.get("mw")) if mol.get("mw") else None,
         "logp": mol.get("logp"),
+        # Where the STRUCTURE came from. A curated library entry was checked by
+        # somebody; a user SMILES was not, and the run record has to say which.
+        "structure_source": ("user_smiles" if compound_doc is not None
+                             else "curated_library"),
+        "is_user_compound": compound_doc is not None,
+        "smiles": (compound_doc.get("smiles") if compound_doc is not None
+                   else mol.smiles),
     }
     return {
         "report": jsonable(report),

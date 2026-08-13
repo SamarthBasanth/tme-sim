@@ -134,7 +134,14 @@ async function boot() {
   }
 
   /* --- panels --------------------------------------------------------- */
-  specPanel = createSpecPanel({ store, onSubmit: submitRun });
+  specPanel = createSpecPanel({
+    store,
+    onSubmit: submitRun,
+    // A user-compiled compound joins (or leaves) the drug catalogue, so every
+    // panel that lists drugs is refetched — patching only the picker would
+    // leave the reports panel offering a compound that no longer exists.
+    onDrugsChanged: () => refreshDrugs(),
+  });
   inspect = createInspectPanel({
     viewer: viewer || stubViewer(),
     onChange: () => { if (viewer) { viewer.dirty = true; } syncColourControl(); if (wl) wl.draw(); },
@@ -245,6 +252,8 @@ async function boot() {
   } catch (err) {
     notifyError('Failed to load catalogue (/api/sections, /api/drugs, /api/defaults)', err);
   }
+
+  specPanel.refreshCompounds();
 
   await refreshRuns();
 
@@ -739,6 +748,27 @@ function wireKeys() {
 }
 
 /* ============================================================ data ===== */
+
+/**
+ * Refetch the drug catalogue and repaint every panel that lists drugs.
+ *
+ * Called when the operator compiles or removes one of their own compounds
+ * (js/ui/compound.js). `GET /api/drugs` is the single source for both the run
+ * picker and the report panel's panel-selector, so both are repainted from the
+ * one response rather than each keeping its own idea of what exists.
+ */
+async function refreshDrugs() {
+  try {
+    const drugs = await api.getDrugs();
+    store.set({ drugs });
+    specPanel.setDrugs(drugs);
+    reportsPanel.setDrugs(drugs);
+    const spec = store.get().spec;
+    if (spec) specPanel.loadSpec(spec);   // keep the current selection selected
+  } catch (err) {
+    notifyError('GET /api/drugs failed after a compound change', err);
+  }
+}
 
 async function refreshRuns() {
   try {

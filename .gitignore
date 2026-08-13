@@ -16,6 +16,11 @@ app/runs/
 app/projects/
 # tmesim Studio generated therapy reports (assembled from app/runs/, regenerable)
 app/reports/
+# tmesim Studio "bring your own compound" store. USER DATA: an operator's own
+# SMILES and their own IC50s -- an unpublished compound series is exactly the
+# thing that must not be committed. Only the inputs are ever written here (every
+# compiled number is recomputed on read); see results/bring_your_own_compound.md.
+app/compounds/
 
 # Private build store for the static export (regenerate: scripts/studio_export/export_studio_runs.py)
 results/export_runs/

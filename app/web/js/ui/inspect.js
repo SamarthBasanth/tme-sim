@@ -126,7 +126,7 @@ function splitCaveat(text) {
  * @param {number} n     1-based index within its block
  * @param {string} extra extra class(es) — 'standing' for a project-level limit
  */
-function caveatNode(text, n, extra) {
+export function caveatNode(text, n, extra) {
   const c = splitCaveat(text);
   const cls = '.caveat' + (extra ? '.' + extra : '') + (c.hard ? '.sev-2' : '.sev-1');
   return h('div' + cls, { title: c.raw },
