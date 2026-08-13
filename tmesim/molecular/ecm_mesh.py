@@ -26,6 +26,14 @@ two ECM methods above resolve solute SIZE against a nm-scale fibre mesh; neither
 of them, nor `brownian.py`, carries a cellular volume fraction, and tumour tissue
 is mostly cells. See that function's docstring for the physics and the citations.
 
+`cell_exclusion` treats cells as IMPERMEABLE, so it is identical for every drug
+and cannot produce compound-to-compound spread. `tissue_hindrance_two_route`
+(below) removes that restriction by giving the cells a finite membrane
+permeability computed from `logp` and hydrogen-bond donors -- the TRANSCELLULAR
+route -- via `two_route.py`. It reduces to `cell_exclusion` exactly at zero
+permeability, and it is ADDITIVE and DEFAULT-OFF: nothing in `compile_drug.py`
+calls it. See `results/two_route_transport.md`.
+
 Units: length nm (mesh scale), time s, diffusivity um^2/s (tissue convention;
 1 um^2 = 1e6 nm^2). Deterministic given `seed`. No external dependencies beyond
 numpy. Does NOT import or modify any existing module.
@@ -360,6 +368,83 @@ def tissue_hindrance(
         "cell_fold_reduction": cell["fold_reduction"],
         "total_hindrance": total,
         "total_fold_reduction": (1.0 / total) if total > 0 else float("inf"),
+        "mesh_pore_nm": ecm["mesh_pore_nm"],
+    }
+
+
+def tissue_hindrance_two_route(
+    solute_radius_nm: float,
+    cell_volume_fraction: float,
+    logp: float,
+    hbd: float,
+    fiber_radius_nm: float = 2.0,
+    fiber_volume_fraction: float = 0.05,
+    free_D_um2s: Optional[float] = None,
+    temperature_K: float = 310.0,
+    **two_route_kw,
+) -> Dict[str, float]:
+    """`tissue_hindrance`, but with cells PERMEABLE instead of impermeable.
+
+    Wires `two_route.two_route_diffusivity` in alongside `cell_exclusion`, which
+    it strictly generalises: at zero membrane permeability the two functions
+    return the same number to machine precision. This is ADDITIVE and DEFAULT-OFF
+    -- `tissue_hindrance` is untouched, nothing in `compile_drug.py` calls this,
+    and no `DrugParams.diffusivity` moves by a bit because of it.
+
+    `cell_exclusion` cannot distinguish two drugs of the same size, and
+    `results/diffusivity_falsification.md` measured that as the model's decisive
+    failure. The transcellular route is the missing physics: it consumes `logp`
+    and `hbd`, which `descriptors.compute_descriptors` already computes and which
+    the diffusivity chain currently discards. See `two_route` for the law, its
+    citation (Hasselman & Johnson 1987) and its limits.
+
+    ``free_D_um2s`` is the solute's FREE diffusivity, needed only to convert the
+    returned dimensionless ECM hindrance into the absolute interstitial
+    conductivity the effective-medium law needs. If omitted, Stokes-Einstein at
+    the engine's interstitial viscosity is used, i.e. the same value
+    `compile_drug` would compute.
+
+    Returns the two legs, the paracellular-only (impermeable-cell) comparison,
+    and the transcellular gain over it.
+    """
+    from . import two_route as _two_route
+    from . import stokes_einstein as _se
+
+    ecm = ogston_renkin_hindrance(
+        solute_radius_nm, fiber_radius_nm, fiber_volume_fraction
+    )
+    if free_D_um2s is None:
+        free_D_um2s = _se.free_diffusivity(
+            solute_radius_nm, temperature_K=temperature_K
+        )
+    interstitial_D = float(free_D_um2s) * ecm["effective_hindrance"]
+
+    tr = _two_route.two_route_diffusivity(
+        interstitial_D,
+        solute_radius_nm,
+        logp,
+        hbd,
+        cell_volume_fraction=cell_volume_fraction,
+        temperature_K=temperature_K,
+        **two_route_kw,
+    )
+    total = ecm["effective_hindrance"] * tr["hindrance"]
+    para_only = ecm["effective_hindrance"] * tr["impermeable_hindrance"]
+    return {
+        "solute_radius_nm": float(solute_radius_nm),
+        "cell_volume_fraction": tr["cell_volume_fraction"],
+        "ecm_hindrance": ecm["effective_hindrance"],
+        "cell_hindrance": tr["hindrance"],
+        "cell_hindrance_impermeable": tr["impermeable_hindrance"],
+        "transcellular_gain": tr["transcellular_gain"],
+        "membrane_permeability_um_s": tr["membrane_permeability_um_s"],
+        "membrane_resistance_ratio": tr["membrane_resistance_ratio"],
+        "interstitial_D_um2s": interstitial_D,
+        "cytoplasm_D_um2s": tr["cytoplasm_D_um2s"],
+        "total_hindrance": total,
+        "total_fold_reduction": (1.0 / total) if total > 0 else float("inf"),
+        "paracellular_only_hindrance": para_only,
+        "effective_D_um2s": float(free_D_um2s) * total,
         "mesh_pore_nm": ecm["mesh_pore_nm"],
     }
 

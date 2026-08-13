@@ -1,0 +1,67 @@
+{
+ "prereg": {
+  "prereg": {
+   "_what": "PRE-REGISTRATION. Every parameter of the two-route effective-diffusivity model, frozen BEFORE the model was scored against Pruijn 2008. Written by hand from the sources listed; the scoring run reads these same values out of tmesim/molecular/two_route.py and asserts they match this file. Any later change to a value here is a visible diff.",
+   "_rule": "DO NOT FIT TO PRUIJN. No number below was chosen by looking at a Pruijn residual. The one value with no primary source (hbd_logp_decrement) is declared a convention, set to a round 1.0, and swept with full disclosure of the value that would maximise the score.",
+   "frozen_utc": "pre-scoring",
+   "parameters": {
+    "cell_volume_fraction": {
+     "value": 0.7892,
+     "source": "REUSED, not re-derived: results/cellular_exclusion.md 3.2 -- Delesse's principle applied to the repo's own Xenium breast section (data_cache/xenium_breast_janesick/rep1, Janesick 2023 PMID 38114474), 167780 segmented cells, sum(cell_area)=3.2495e7 um^2, bounding-box tissue area 4.118e7 um^2.",
+     "caveats": "Xenium expansion segmentation tiles the section, so this is an UPPER estimate; literature tumour band implies 0.40-0.72."
+    },
+    "cell_radius_um": {
+     "value": 7.8517,
+     "source": "Equivalent-circle radius of the MEAN segmented cell area on the same section: sqrt(193.675/pi) um. Derived from the repo's own data, not assumed.",
+     "caveats": "A 2-D segmented area, not a 3-D radius. Over-stated area -> over-stated radius -> LARGER membrane resistance group x = sigma2/(a*P) -> LESS transcellular transport. The bias is therefore conservative for this model."
+    },
+    "cytoplasm_D_over_water": {
+     "value": 0.27,
+     "source": "Kao HP, Abney JR, Verkman AS. 'Determinants of the translational mobility of a small solute in cell cytoplasm.' J Cell Biol 1993;120(1):175-184. PMID 8416987, doi:10.1083/jcb.120.1.175. Abstract, verbatim: 'the relative diffusion coefficients for BCECF translation and rotation in cytoplasm were 0.27 +/- 0.01 (SEM, n = 24, 23 degrees C)'.",
+     "applied_as": "D_cytoplasm = 0.27 * D_water(r, T), with water viscosity 6.9e-4 Pa.s at 310 K (the value permeability.py already uses). NOT 0.27 * the engine's free_D, because the engine's free_D uses an interstitial-fluid viscosity of 1.2e-3 Pa.s, which is a claim about the interstitium and not about cytoplasm. Kao's ratio is against water, so water is the correct reference."
+    },
+    "cell_partition_K": {
+     "value": 1.0,
+     "source": "NOT measured. Set to 1 (cytoplasm and interstitium equally good solvents for the solute) because no compound-specific intracellular partition is available for this compound set. Stated as an assumption, not a source."
+    },
+    "membrane_viscosity_pa_s": {
+     "value": 1.0,
+     "source": "ADOPTED UNCHANGED from the repo's already-published tmesim/molecular/permeability.py::_ETA_MEMBRANE_PA_S, which documents it as the TOP of the commonly reported 0.1-1 Pa.s bilayer-core microviscosity range and records why the bottom of that range was rejected. This choice predates and is independent of the Pruijn dataset."
+    },
+    "bilayer_thickness_nm": {
+     "value": 4.0,
+     "source": "ADOPTED UNCHANGED from permeability.py::_BILAYER_THICKNESS_NM."
+    },
+    "logk_membrane_max": {
+     "value": 3.0,
+     "source": "ADOPTED UNCHANGED from permeability.py::_LOGP_KP_MAX, documented there as PHYSICAL: bilayer/water partitioning plateaus above logP ~3 while octanol/water keeps climbing."
+    },
+    "logk_membrane_min": {
+     "value": null,
+     "source": "permeability.py's symmetric lower clamp at -3 is DELIBERATELY NOT ADOPTED. It is documented there as a numerical guard, not physics, and a floor at K=1e-3 would give urea a bilayer permeability of 0.126 um/s -- i.e. it would force the transcellular route open for exactly the hydrophilic compounds whose exclusion from it is the mechanism under test."
+    },
+    "hbd_logp_decrement": {
+     "value": 1.0,
+     "status": "DECLARED CONVENTION -- NO PRIMARY SOURCE FOR THE MAGNITUDE.",
+     "structure_source": "Two verified primary results motivate the STRUCTURE (an H-bond-donor decrement applied to octanol logP before it is used as a bilayer partition): (1) Walter A, Gutknecht J. 'Permeability of small nonelectrolytes through lipid bilayer membranes.' J Membr Biol 1986;90(3):207-217, PMID 3735402, doi:10.1007/BF01870127 -- 22 solutes across egg-PC/decane bilayers, permeability correlates with HEXADECANE/water partition at r=0.95 but with OCTANOL/water only at r=0.75, so octanol is the wrong partition solvent and must be corrected toward an alkane. (2) Conradi RA, Hilgers AR, Ho NF, Burton PS. Pharm Res 1991;8(12):1453-1460 (PMID 1808606, doi:10.1023/a:1015825912542) and 1992;9(3):435-439 (PMID 1614980, doi:10.1023/a:1015867608405) -- over peptides spanning logP -2.2 to +2.8 'no correlation was found between the observed flux and the apparent lipophilicity' while 'a strong correlation was found ... and the total number of hydrogen bonds the peptide could potentially make with water'; sequential N-methylation raised permeability with 'only slight difference in the octanol-water partition coefficient'.",
+     "magnitude_honesty": "Neither source gives a per-donor decrement in log units that this work could verify against a primary text. 1.0 log unit per donor is a ROUND NUMBER chosen before scoring, not a fitted or literature value, and it is labelled as such everywhere it appears. The scoring run sweeps it over {0.0, 0.5, 1.0, 1.5, 2.0} and DISCLOSES the value that maximises agreement with Pruijn, so the reader can check that the adopted value is not it."
+    }
+   },
+   "law": {
+    "name": "Maxwell-Garnett effective medium with an interfacial (membrane) resistance",
+    "primary": "Hasselman DPH, Johnson LF. 'Effective Thermal Conductivity of Composites with Interfacial Thermal Barrier Resistance.' J Composite Materials 1987;21(6):508-515, doi:10.1177/002199838702100602.",
+    "reduces_to": "tmesim.molecular.ecm_mesh.cell_exclusion(phi)['hindrance'] = (1-phi)/(1+phi/2) exactly, as membrane permeability P -> 0. Asserted in tests/test_two_route.py to 1e-15."
+   },
+   "prediction_registered_before_scoring": "The transcellular route can raise D_eff above the impermeable-cell value by at most the factor obtained at P -> infinity, which is set by the ratio of cytoplasmic to interstitial conductivity. With the values above that ceiling is a bounded few-fold, so the model is EXPECTED to produce spread at matched MW but is NOT expected to reach the measured 29.7-fold overall spread."
+  },
+  "live": {
+   "cell_volume_fraction": 0.7892,
+   "cell_radius_um": 7.8517,
+   "cytoplasm_D_over_water": 0.27,
+   "membrane_viscosity_pa_s": 1.0,
+   "bilayer_thickness_nm": 4.0,
+   "logk_membrane_max": 3.0,
+   "hbd_logp_decrement": 1.0
+  }
+ }
+}
