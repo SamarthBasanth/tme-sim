@@ -21,6 +21,7 @@ integration test (see ``tests/test_app_server.py`` for that).
 from __future__ import annotations
 
 import csv
+import json
 import os
 
 import pytest
@@ -34,6 +35,20 @@ XENIUM_GBM_CACHE = os.path.join(_REPO, "data_cache", "xenium_gbm")
 # Coarse grid: matches conftest.py's real_micro fixture, so reconstruction
 # finishes in a fraction of a second and the whole test file stays fast.
 _FAST_DX = 80.0
+
+
+def _csv_rows(path) -> list:
+    """Data rows of an exported comparison CSV.
+
+    The file now opens with a ``#`` provenance block (section, dx, window,
+    alpha, delivery law, NOT FOR CLINICAL USE) that travels inside the artefact
+    rather than beside it, so the reader skips comment lines — exactly what
+    ``pandas.read_csv(path, comment='#')`` does. The same block is written as a
+    ``.provenance.json`` sidecar for readers that cannot.
+    """
+    with open(path, newline="") as fh:
+        lines = [l for l in fh if not l.startswith("#")]
+    return list(csv.DictReader(lines))
 
 
 def _skip_if_no_real_data() -> None:
@@ -50,8 +65,8 @@ class TestArgparsePlumbing:
         sub = next(a for a in parser._subparsers._group_actions
                    if hasattr(a, "choices"))
         assert set(sub.choices) == {
-            "reconstruct", "simulate", "compare-drugs", "validate", "molecules",
-            "molecular-run", "acquire", "studio",
+            "reconstruct", "simulate", "compare-drugs", "validate", "ingest",
+            "molecules", "molecular-run", "acquire", "studio",
         }
 
     @pytest.mark.parametrize("args", [
@@ -60,6 +75,7 @@ class TestArgparsePlumbing:
         ["simulate", "--help"],
         ["compare-drugs", "--help"],
         ["validate", "--help"],
+        ["ingest", "--help"],
         ["molecules", "--help"],
         ["molecular-run", "--help"],
         ["acquire", "--help"],
@@ -119,12 +135,89 @@ class TestCompareDrugsEndToEnd:
         ])
         assert rc == 0
         assert csv_path.exists()
-        with open(csv_path, newline="") as fh:
-            rows = list(csv.DictReader(fh))
+        rows = _csv_rows(csv_path)
         assert {r["drug"] for r in rows} == {"temozolomide", "cisplatin"}
         for r in rows:
             assert 0.0 <= float(r["kill_fraction"]) <= 1.0
             assert float(r["ic50_uM"]) > 0.0
+
+    def test_the_exported_csv_carries_its_own_provenance(self, tmp_path):
+        """The CSV is the only machine-readable export, so it is the artefact
+        most likely to end up in a slide. It used to be eight columns and
+        nothing else: no section, no dx, no window, no alpha, no delivery law,
+        no 'not for clinical use'. Everything the run knows travels with it."""
+        _skip_if_no_real_data()
+        csv_path = tmp_path / "comparison.csv"
+        rc = cli.main([
+            "compare-drugs", "--dx", str(_FAST_DX),
+            "--drugs", "temozolomide", "--csv", str(csv_path),
+        ])
+        assert rc == 0
+
+        # (a) in the file itself, where it cannot be separated from the numbers
+        head = "\n".join(l for l in csv_path.read_text().splitlines()
+                         if l.startswith("#"))
+        assert "NOT FOR CLINICAL USE" in head
+        for key in ("section_source", "dx_um", "exposure_window_s", "alpha",
+                    "delivery_law", "sensitivity_mode", "seed"):
+            assert f"{key}:" in head, f"{key} missing from the CSV header"
+        # the law disclosure, not merely the word
+        assert "S = PS*" in head
+        assert "penetration_index is NOT in this file" in head
+
+        # (b) machine-readable, for a reader that cannot skip comments
+        side = json.loads((csv_path.parent / (csv_path.name +
+                                              ".provenance.json")).read_text())
+        assert side["exposure_window_s"] > 0
+        assert side["alpha"] > 0
+        assert side["dx_um"] == pytest.approx(_FAST_DX)
+        assert side["delivery_law"].startswith("S = PS*")
+        assert "NOT FOR CLINICAL USE" in side["not_for_clinical_use"]
+
+        # (c) and the data is still one row per drug behind the comments
+        rows = _csv_rows(csv_path)
+        assert [r["drug"] for r in rows] == ["temozolomide"]
+
+    def test_the_csv_carries_coverage_and_not_the_retired_index(self, tmp_path):
+        """`penetration_index` is retired (results/delivery_metrics.md §4): it is
+        a scale-invariant shape statistic that reports the section's vascular
+        geometry, which every drug shares. `therapeutic_coverage` @1x IC50 was
+        always computable and was never exported. They have swapped places."""
+        _skip_if_no_real_data()
+        csv_path = tmp_path / "comparison.csv"
+        rc = cli.main([
+            "compare-drugs", "--dx", str(_FAST_DX),
+            "--drugs", "temozolomide", "--csv", str(csv_path),
+        ])
+        assert rc == 0
+        rows = _csv_rows(csv_path)
+        assert "therapeutic_coverage_1x" in rows[0]
+        assert "penetration_index" not in rows[0]
+        assert 0.0 <= float(rows[0]["therapeutic_coverage_1x"]) <= 1.0
+
+    def test_it_prints_the_window_and_the_delivery_law_it_ran_under(self, capsys):
+        """The ranking is LAW-DEPENDENT and window-dependent, and this command
+        — the core use case — printed neither. The disclosure comes from the one
+        implementation that reads PDEConfig at call time, so it cannot go stale.
+        """
+        _skip_if_no_real_data()
+        rc = cli.main([
+            "compare-drugs", "--dx", str(_FAST_DX), "--drugs", "temozolomide",
+        ])
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "EXPOSURE WINDOW" in out
+        assert "1800 s" in out                 # this CLI's own default...
+        assert "43200 s" in out                # ...named against the library's
+        assert "Delivery law:" in out
+        assert "S = PS*" in out
+        assert "LAW" in out
+        # and the retired metric is no longer a COLUMN of the printed table
+        # (it survives only in the footnote that says it was retired, which is
+        # history, not a number anyone can read off)
+        header = next(l for l in out.splitlines() if "IC50(uM)" in l)
+        assert "cov@IC50" in header
+        assert "pen_idx" not in header
 
     def test_unknown_drug_is_skipped_not_fatal(self, capsys):
         # The molecular libraries are actively growing (see docs/QUICKSTART.md);

@@ -46,6 +46,24 @@ Two additive diagnostics that the contract does not forbid and the UI does not
 have to use: ``GET /api/health`` (cache + queue counters) and
 ``GET /api/runs/{id}/traceback`` (the failure stack for a ``failed`` run).
 
+One additive resource, ``/api/compounds`` (see ``app/server/compounds.py``):
+
+===========  ==================================  ==================================
+POST         /api/compounds/compile              dry-run compile of a user SMILES:
+                                                 the DrugParams a run would
+                                                 simulate + a provenance row per
+                                                 field. 422 with a specific
+                                                 refusal reason, never a stack
+                                                 trace. Stores nothing.
+GET/POST     /api/compounds                      stored user compounds / compile
+                                                 and store one
+GET/DELETE   /api/compounds/{id}                 recompile one from its stored
+                                                 inputs / forget it
+===========  ==================================  ==================================
+
+A stored compound's name becomes a legal ``RunSpec.drug`` (see ``_known_drugs``),
+which is the whole point: a researcher ranks THEIR series on THEIR section.
+
 The static front end in ``app/web/`` is mounted last, at ``/``, so it can never
 shadow an ``/api`` route.
 """
@@ -95,10 +113,20 @@ from .report import (
 __all__ = ["create_app", "app", "validate_spec", "drug_rows", "default_spec",
            "validate_report_request"]
 
-#: Grid resolutions the repo has convergence evidence for
-#: (results/numerical_rigor.md section 2).
-DX_KILL_CONVERGED_UM = 20.0
-DX_PENETRATION_CONVERGED_UM = 15.0
+#: Grid resolutions this repo has ever run a convergence LADDER at. These are
+#: NOT "converged below this" thresholds and must not be described as such: the
+#: claim that kill_fraction is grid-converged for dx <= 20 um is withdrawn (see
+#: the correction block in results/numerical_rigor.md, and the two ladders that
+#: contradict it — results/grid_convergence_breast.md, .../grid_convergence_gbm.md).
+#: They survive as the coarseness at which the measured drift becomes large
+#: enough to warn about, which is all they were ever entitled to be.
+DX_KILL_LADDER_COARSE_UM = 20.0
+DX_PENETRATION_LADDER_COARSE_UM = 15.0
+
+#: Kept as aliases so nothing importing the old names breaks; the names lie
+#: about what was measured, so nothing in this file uses them.
+DX_KILL_CONVERGED_UM = DX_KILL_LADDER_COARSE_UM
+DX_PENETRATION_CONVERGED_UM = DX_PENETRATION_LADDER_COARSE_UM
 
 #: Above this the grid is big enough that a run is measured in minutes; the UI
 #: gets a warning rather than a refusal, because it is a cost, not an error.
@@ -121,10 +149,17 @@ def drug_rows(force: bool = False) -> List[Dict]:
     ``calibrated_drugparams -> apply_barrier_to_drugparams`` chain, i.e. the
     exact ``DrugParams`` a run would simulate. A drug that fails to compile is
     returned with nulls and a ``reason``, never dropped and never faked.
+
+    Rows for compounds the operator compiled from their own SMILES
+    (``app/server/compounds.py``) are appended on EVERY call, never memoised:
+    the library is fixed for the life of the process, a user's compound list is
+    not. Those rows carry ``is_user_compound: true`` and their own
+    ``predicted_fields`` count, because the picker must be able to say that a
+    self-compiled compound is mostly predictions before it is chosen, not after.
     """
     global _drug_rows_cache
     if _drug_rows_cache is not None and not force:
-        return _drug_rows_cache
+        return _drug_rows_cache + _user_compound_rows()
 
     from tmesim.molecular.binding_site_barrier import apply_barrier_to_drugparams
     from tmesim.molecular.breast_library import get_molecule_breast
@@ -208,7 +243,93 @@ def drug_rows(force: bool = False) -> List[Dict]:
         rows.append(row)
 
     _drug_rows_cache = rows
+    return rows + _user_compound_rows()
+
+
+def _user_compound_rows() -> List[Dict]:
+    """``GET /api/drugs`` rows for the operator's own compiled compounds.
+
+    Same schema as a library row so the picker needs no second code path, plus
+    the fields that make the difference visible at the point of choice:
+    ``is_user_compound``, ``smiles``, ``predicted_fields`` / ``total_fields``,
+    and ``ic50_supplied``. A compound that no longer compiles (a physics change
+    moved a range bound under it) is returned with nulls and a ``reason`` —
+    never dropped, so the operator can see why it went away.
+    """
+    from .compounds import COMPOUND_STORE
+
+    rows: List[Dict] = []
+    try:
+        stored = COMPOUND_STORE.list()
+    except Exception as exc:  # noqa: BLE001 - a broken store must not 500 /api/drugs
+        return [{
+            "name": "(user compounds unavailable)", "mw": None, "logp": None,
+            "ic50_uM": None, "ic50_source": None, "bbb_penetrance": None,
+            "is_user_compound": True, "unavailable": True,
+            "reason": f"compound store unreadable: {type(exc).__name__}: {exc}",
+        }]
+    for rec in stored:
+        row: Dict = {
+            "name": rec.get("name"),
+            "mw": None, "logp": None, "ic50_uM": None, "ic50_source": None,
+            "bbb_penetrance": None, "ic50_confidence": None, "ic50_note": None,
+            "ic50_n_cell_lines": None, "is_antibody": False,
+            "smiles_source": "user_smiles", "diffusivity_um2_s": None,
+            "reason": None,
+            "is_user_compound": True,
+            "id": rec.get("id"),
+            "smiles": rec.get("smiles"),
+            "note": rec.get("note"),
+            "created_at": rec.get("created_at"),
+            "ic50_supplied": rec.get("ic50_uM") is not None,
+        }
+        try:
+            doc = COMPOUND_STORE.compile_stored(rec.get("id") or rec.get("name"))
+        except Exception as exc:  # noqa: BLE001
+            row["reason"] = (
+                f"this compound no longer compiles: {type(exc).__name__}: {exc}")
+            rows.append(row)
+            continue
+        dp = doc["drug_params"]
+        row.update({
+            "mw": _num(dp.get("molecular_weight")),
+            "logp": _num(doc.get("descriptors", {}).get("logp")),
+            "ic50_uM": _num(dp.get("ic50_uM")),
+            "bbb_penetrance": _num(dp.get("bbb_penetrance")),
+            "diffusivity_um2_s": _num(dp.get("diffusivity_um2_s")),
+            "ic50_confidence": "user_supplied" if row["ic50_supplied"] else "default_LOW",
+            "ic50_source": ("supplied by you (not measured here)"
+                            if row["ic50_supplied"]
+                            else "flagged default (LOW confidence) — you supplied none"),
+            "ic50_note": next((f["method"] for f in doc.get("fields", [])
+                               if f["key"] == "ic50"), None),
+            "fields": doc.get("fields"),
+            "caveats": doc.get("caveats"),
+            "warnings": doc.get("warnings"),
+            "can_conclude": doc.get("can_conclude"),
+            "cannot_conclude": doc.get("cannot_conclude"),
+            "predicted_fields": sum(1 for f in doc.get("fields", [])
+                                    if f.get("is_prediction")),
+            "total_fields": len(doc.get("fields", [])),
+        })
+        rows.append(row)
     return rows
+
+
+async def _json_body(request: Request) -> Dict:
+    """The request body as a JSON object, or a 400 saying exactly what was wrong."""
+    try:
+        body = await request.json()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=400,
+            detail=f"request body is not valid JSON: {exc}") from exc
+    if not isinstance(body, dict):
+        raise HTTPException(
+            status_code=400,
+            detail=f"request body must be a JSON object, got "
+                   f"{type(body).__name__}")
+    return body
 
 
 def _num(v):
@@ -232,23 +353,49 @@ _CROSS_LIBRARY_GBM_DRUGS = ("palbociclib",)
 
 
 def _known_drugs() -> List[str]:
+    """Every name a RunSpec's ``drug`` may take: the curated GBM library, the
+    cross-library reuses, and any compound the operator compiled from their own
+    SMILES (``app/server/compounds.py``). User compounds are included here rather
+    than special-cased at submit time so ``POST /api/validate`` and the run
+    pipeline agree about what exists."""
     from tmesim.molecular.library import GBM_DRUGS
 
-    return sorted(set(GBM_DRUGS) | set(_CROSS_LIBRARY_GBM_DRUGS))
+    from .compounds import user_compound_names
+
+    return sorted(set(GBM_DRUGS) | set(_CROSS_LIBRARY_GBM_DRUGS)
+                  | set(user_compound_names()))
 
 
 # --------------------------------------------------------------------------- #
 # Defaults
 # --------------------------------------------------------------------------- #
+#: The Studio's default exposure window, in seconds. Named rather than inlined
+#: because it is ONE OF THREE different defaults shipping in this repo — the CLI
+#: runs a fast 1,800 s window (``tmesim.cli._FAST_TOTAL_TIME``) and the library
+#: default is 43,200 s (``core.config.PDEConfig.total_time``). Exposure, coverage
+#: and kill all scale with the window, so numbers from two surfaces are not
+#: comparable unless the window matches. They are not silently harmonised: each
+#: surface states the window it used instead (the report's meta block, and
+#: ``compare-drugs`` since ``results/export_honesty.md``). This value is the 6 h
+#: window ``experiments/patient_report.py`` runs.
+STUDIO_DEFAULT_TOTAL_TIME_S = 3600.0 * 6
+
+
 def default_spec() -> Dict:
     """A valid ``RunSpec`` carrying the current production defaults.
 
-    Sourced from the production entry points, not retyped:
-    ``dx = 12 um`` and a 6 h window from ``experiments/patient_report.py``
-    (the converged resolution per ``results/numerical_rigor.md`` section 2), the
-    ``'uniform'`` sensitivity mode it ranks in, ``reconstruct.real_fields``'s
-    default ``'discrete'`` vascular mode, ``real_pipeline.OXYGEN_MODE_DEFAULT``,
-    and the ``core.PKConfig`` field defaults.
+    Sourced from the production entry points, not retyped: ``dx = 12 um`` and a
+    6 h window from ``experiments/patient_report.py``, the ``'uniform'``
+    sensitivity mode it ranks in, ``reconstruct.real_fields``'s default
+    ``'discrete'`` vascular mode, ``real_pipeline.OXYGEN_MODE_DEFAULT``, and the
+    ``core.PKConfig`` field defaults.
+
+    ``dx = 12 um`` is what the production entry point runs. It is NOT a
+    converged resolution — an earlier version of this docstring called it "the
+    converged resolution per results/numerical_rigor.md section 2", and that
+    claim is withdrawn by the correction block at the top of that file and by
+    ``results/grid_convergence_breast.md`` / ``results/grid_convergence_gbm.md``.
+    Every report says so in its own limits block.
     """
     from tmesim.core import PKConfig
     from tmesim.reconstruct.real_pipeline import (
@@ -277,7 +424,7 @@ def default_spec() -> Dict:
             "n_doses": int(pk.n_doses),
             "dose_interval_s": float(pk.dose_interval),
         },
-        "total_time_s": 3600.0 * 6,
+        "total_time_s": STUDIO_DEFAULT_TOTAL_TIME_S,
     }
 
 
@@ -445,18 +592,27 @@ def validate_spec(spec: Dict) -> Dict:
             if dx <= 0:
                 errors.append(f"dx_um: must be > 0, got {dx}")
                 dx = None
-            elif dx > DX_KILL_CONVERGED_UM:
+            elif dx > DX_KILL_LADDER_COARSE_UM:
                 warnings.append(
-                    f"dx_um = {dx:g} um is coarser than the {DX_KILL_CONVERGED_UM:g} "
-                    "um at which kill_fraction is grid-converged "
-                    "(results/numerical_rigor.md section 2). Both kill_fraction "
-                    "and penetration_index should be read as upper bounds."
+                    f"dx_um = {dx:g} um is coarser than every rung this repo "
+                    f"has run a convergence ladder on "
+                    f"({DX_KILL_LADDER_COARSE_UM:g} um and finer). NO dx is "
+                    "grid-converged here — that claim is withdrawn (see the "
+                    "correction in results/numerical_rigor.md, and "
+                    "results/grid_convergence_breast.md / "
+                    "results/grid_convergence_gbm.md, which contradict it) — "
+                    "but the coarse rungs are measurably the worst: on both "
+                    "published ladders the 24 and 30 um rungs understate the "
+                    "scored ratio by up to 11.7% in a single refinement step."
                 )
-            elif dx > DX_PENETRATION_CONVERGED_UM:
+            elif dx > DX_PENETRATION_LADDER_COARSE_UM:
                 warnings.append(
-                    f"dx_um = {dx:g} um: kill_fraction is converged, but "
-                    "penetration_index is not below ~15 um and is typically "
-                    "15-25% high."
+                    f"dx_um = {dx:g} um: the exposure metrics still move here. "
+                    "The measured penetration ladder RISES with refinement "
+                    "(0.1110 at dx = 60 um to 0.3062 at dx = 10 um), so a "
+                    "coarse mesh UNDER-states penetration. An earlier version "
+                    "of this warning said 'kill_fraction is converged' and that "
+                    "penetration is '15-25% high'; both are withdrawn."
                 )
             # `dx` is cleared above when it is non-positive, so both of the
             # remaining checks have to re-test it: a dx of -1 is an ERROR, and
@@ -516,7 +672,20 @@ def validate_spec(spec: Dict) -> Dict:
             if drug.strip().lower() not in known:
                 errors.append(
                     f"drug: unknown drug {drug!r}. Available: {known}")
-    else:
+            else:
+                from .compounds import user_compound_names
+
+                if drug.strip().lower() in set(user_compound_names()):
+                    warnings.append(
+                        f"drug {drug!r} is a SELF-COMPILED compound: every one "
+                        "of its transport parameters except molecular weight "
+                        "and TPSA is a prediction from the SMILES you supplied, "
+                        "and its logP is an RDKit Crippen prediction that cannot "
+                        "see stereochemistry. Its kill_fraction, mean_tumor_auc "
+                        "and penetration_length_um are NOT defensible as "
+                        "absolute numbers. Run it alongside other compounds on "
+                        "this same section and read the RANKING."
+                    )
         warnings.append(
             "drug is null: this is a reconstruction-only run. kill_fraction, "
             "mean_tumor_auc, therapeutic_coverage_1x and penetration_length_um "
@@ -1115,6 +1284,81 @@ def validate_report_request(body: Dict) -> Dict:
 
 
 # --------------------------------------------------------------------------- #
+# Section caveats
+#
+# A section record says what a specimen IS. This says what it CANNOT support,
+# in the one place every picker in the UI already reads. Two sources feed it:
+#
+#   1. The PLATFORM, which is knowable for every section, built-in or ingested.
+#      Spot transcriptomics is the load-bearing case: reconstruct.real_visium
+#      does not measure where the cells inside a 55 um spot sit, it SYNTHESISES
+#      12 pseudo-cells per spot at the centroid with uniform jitter. Any
+#      per-cell spatial statistic on such a section measures that jitter rather
+#      than the tissue, so results/immune_sink_impact.md §5.6 declares it
+#      INVALID and the generator refuses to compute it. `spatial_spread_valid`
+#      carries that refusal to the UI so the Studio cannot offer the number.
+#   2. The stored CAPABILITY report, which only an ingested section carries
+#      (a user's panel is the unknown one). Its NO / CAVEAT verdicts are
+#      surfaced verbatim - they are already written for a reader.
+#
+# Additive only: no existing field is changed or removed.
+# --------------------------------------------------------------------------- #
+_SPOT_SOURCES = ("visium",)
+
+#: Stated once here so the API, the picker and the report cannot drift apart.
+SPOT_SPATIAL_REFUSAL = (
+    "Per-cell spatial statistics are INVALID on this section. A Visium spot "
+    "pools several cells over ~55 um and this pipeline does not measure where "
+    "they sit - it synthesises 12 pseudo-cells per spot at the spot centroid "
+    "with uniform jitter. The per-cell attenuation spread and the "
+    "immune-neighbourhood structure ratio would measure that jitter, not the "
+    "tissue (results/immune_sink_impact.md §5.6). The cross-drug RANKING on "
+    "this section is unaffected and remains the defensible output."
+)
+
+
+def _with_caveats(section: Dict) -> Dict:
+    """Add ``spatial_spread_valid`` + ``caveats`` to a section record.
+
+    Never raises: a section that cannot be described is still listed, just
+    without its caveats, because dropping it from the picker would hide a
+    specimen rather than qualify it.
+    """
+    out = dict(section)
+    caveats: List[Dict] = []
+    try:
+        platform = str(out.get("platform") or out.get("source") or "").lower()
+        is_spot = platform in _SPOT_SOURCES
+        # A section whose platform we cannot name gets None, not True: "we did
+        # not establish this" is a different claim from "this is valid".
+        out["spatial_spread_valid"] = (None if not platform else not is_spot)
+        if is_spot:
+            caveats.append({
+                "capability": "spatial_spread",
+                "status": "NO",
+                "reason": SPOT_SPATIAL_REFUSAL,
+            })
+        for row in ((out.get("capability") or {}).get("headline") or []):
+            if row.get("status") not in ("NO", "CAVEAT"):
+                continue
+            if row.get("capability") == "spatial_spread" and is_spot:
+                continue  # already stated above, verbatim from one source
+            caveats.append({
+                "capability": row.get("capability"),
+                "status": row.get("status"),
+                "reason": row.get("reason"),
+            })
+        for issue in (out.get("detect_issues") or []):
+            caveats.append({"capability": "detection", "status": "CAVEAT",
+                            "reason": issue})
+    except Exception:  # noqa: BLE001 - a caveat must never break the listing
+        out.setdefault("spatial_spread_valid", None)
+    out["caveats"] = caveats
+    out["n_caveats_blocking"] = sum(1 for c in caveats if c["status"] == "NO")
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # App
 # --------------------------------------------------------------------------- #
 def create_app(manager: Optional[JobManager] = None,
@@ -1178,7 +1422,7 @@ def create_app(manager: Optional[JobManager] = None,
     # ----------------------------------------------------------------- #
     @app.get("/api/sections")
     def get_sections() -> List[Dict]:
-        return jsonable(list_sections())
+        return jsonable([_with_caveats(s) for s in list_sections()])
 
     @app.post("/api/sections/scan")
     async def post_scan(request: Request) -> Dict:
@@ -1244,6 +1488,69 @@ def create_app(manager: Optional[JobManager] = None,
     @app.get("/api/drugs")
     def get_drugs() -> List[Dict]:
         return jsonable(drug_rows())
+
+    # --- bring your own compound ------------------------------------------ #
+    # A researcher's own series is the point: they want to rank THEIR molecules.
+    # POST .../compile is a dry run (nothing is stored) so the form can show the
+    # per-field provenance BEFORE the operator commits to the name.
+
+    @app.post("/api/compounds/compile")
+    async def post_compound_compile(request: Request) -> Dict:
+        from .compounds import CompoundRefused, compile_preview
+
+        body = await _json_body(request)
+        try:
+            return jsonable(compile_preview(
+                body.get("name"), body.get("smiles"), body.get("ic50_uM")))
+        except CompoundRefused as exc:
+            raise HTTPException(status_code=422, detail=exc.as_dict())
+
+    @app.get("/api/compounds")
+    def get_compounds() -> List[Dict]:
+        from .compounds import COMPOUND_STORE
+
+        return jsonable(COMPOUND_STORE.list())
+
+    @app.post("/api/compounds", status_code=201)
+    async def post_compound(request: Request) -> Dict:
+        from .compounds import COMPOUND_STORE, CompoundError, CompoundRefused
+
+        body = await _json_body(request)
+        try:
+            return jsonable(COMPOUND_STORE.create(
+                body.get("name"), body.get("smiles"), body.get("ic50_uM"),
+                note=body.get("note")))
+        except CompoundRefused as exc:
+            raise HTTPException(status_code=422, detail=exc.as_dict())
+        except CompoundError as exc:
+            raise HTTPException(status_code=exc.status,
+                                detail={"code": exc.code,
+                                        "message": exc.message,
+                                        "field": "name"})
+
+    @app.get("/api/compounds/{compound_id}")
+    def get_compound(compound_id: str) -> Dict:
+        from .compounds import COMPOUND_STORE, CompoundError, CompoundRefused
+
+        try:
+            return jsonable(COMPOUND_STORE.compile_stored(compound_id))
+        except CompoundError as exc:
+            raise HTTPException(status_code=exc.status,
+                                detail={"code": exc.code,
+                                        "message": exc.message})
+        except CompoundRefused as exc:
+            raise HTTPException(status_code=422, detail=exc.as_dict())
+
+    @app.delete("/api/compounds/{compound_id}")
+    def delete_compound(compound_id: str) -> Dict:
+        from .compounds import COMPOUND_STORE
+
+        if not COMPOUND_STORE.delete(compound_id):
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "compound_not_found",
+                        "message": f"no user compound {compound_id!r}"})
+        return {"deleted": compound_id}
 
     @app.get("/api/defaults")
     def get_defaults() -> Dict:

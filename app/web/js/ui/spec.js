@@ -15,6 +15,7 @@ import { h, clear, fill, debounce } from '../util/dom.js';
 import * as api from '../api.js';
 import { toast, notifyError } from './toast.js';
 import { railGroup, railNav } from './rail.js';
+import { createCompoundPanel } from './compound.js';
 import { dur, num } from '../util/fmt.js';
 
 const MODES = {
@@ -43,14 +44,30 @@ function normDiag(d) {
   return { path, message };
 }
 
-export function createSpecPanel({ store, onSubmit }) {
+export function createSpecPanel({ store, onSubmit, onDrugsChanged }) {
   let editorFocused = false;
   let syncing = false;
   const fieldEls = new Map();
 
+  // Bring your own compound. Owned by ./compound.js; mounted in the Define
+  // group below. When the operator adds or removes one, the drug catalogue has
+  // changed for every panel that shows drugs, so the shell is asked to refetch
+  // rather than this panel patching its own <select> and leaving the reports
+  // panel stale.
+  const compoundPanel = createCompoundPanel({
+    onChanged: () => { if (onDrugsChanged) onDrugsChanged(); },
+  });
+
   /* ------------------------------------------------------------- form -- */
 
-  const sectionSel = h('select.inp', { id: 'f-section', onchange: fromForm });
+  // Last list from GET /api/sections, kept so the caveat line can be repainted
+  // on selection change without another round trip.
+  let sections_ = [];
+  const sectionCaveats = h('div.section-caveats', { style: 'display:none' });
+  const sectionSel = h('select.inp', {
+    id: 'f-section',
+    onchange: () => { fromForm(); paintSectionCaveats(); },
+  });
   const drugSel = h('select.inp', { id: 'f-drug', onchange: fromForm });
   const dxInp = h('input.inp.num', { id: 'f-dx', type: 'number', step: '0.5', min: '2', max: '100', oninput: fromForm });
   const totalInp = h('input.inp.num', { id: 'f-total', type: 'number', step: '10', min: '1', oninput: fromForm });
@@ -106,7 +123,8 @@ export function createSpecPanel({ store, onSubmit }) {
   }
 
   const formEl = h('div.fgrid',
-    row('Section', 'f-section', sectionSel, null, 'GET /api/sections'),
+    row('Section', 'f-section', h('div', sectionSel, sectionCaveats), null,
+      'GET /api/sections'),
     row('Grid dx', 'f-dx', dxInp, 'um', 'reconstruction grid pitch'),
     row('Drug', 'f-drug', drugSel, null, 'GET /api/drugs; null = reconstruction only'),
     [lbl('Sensitivity', null), segs.sensitivity_mode, h('div.field-err.hidden')],
@@ -247,6 +265,11 @@ export function createSpecPanel({ store, onSubmit }) {
       h('details.sect', { open: true },
         h('summary', 'Specimen, therapy, model', h('span.hint', 'form')),
         h('div.sect-body', formEl)),
+      // The compound compiler sits directly under the form that picks a drug,
+      // because that is the moment an operator discovers the library does not
+      // contain their molecule. It stays collapsed by default: it is a
+      // deliberate act, not part of the ordinary path.
+      compoundPanel.el,
       h('details.sect', { open: true },
         h('summary', 'Source', h('span.hint', 'JSON · two-way sync')),
         h('div.sect-body', { style: { padding: '0' } }, editorEl))),
@@ -287,13 +310,53 @@ export function createSpecPanel({ store, onSubmit }) {
 
   /* --------------------------------------------------------- behaviour -- */
 
+  // What a section CANNOT support, shown where the section is chosen rather
+  // than discovered afterwards in a run's caveat panel. `caveats` comes from
+  // GET /api/sections (see api.py::_with_caveats): platform-level refusals for
+  // every section, plus the stored capability verdicts of an ingested one.
+  function sectionTitle(s) {
+    const lines = [];
+    if (s.panel) lines.push(s.panel);
+    if (!s.available && s.reason) lines.push(s.reason);
+    for (const c of s.caveats || []) {
+      lines.push(`[${c.status}] ${c.capability}: ${c.reason}`);
+    }
+    return lines.join('\n\n');
+  }
+
   function setSections(sections) {
     clear(sectionSel);
     for (const s of sections) {
+      // A blocking caveat is not the same as unavailable: the section still
+      // runs, but something it could otherwise report is refused on it.
+      const blocking = s.n_caveats_blocking || 0;
+      const mark = s.available && blocking ? `  [${blocking} refused]` : '';
       sectionSel.appendChild(h('option', {
         value: s.id,
         disabled: !s.available,
-      }, `${s.label}${s.available ? '' : '  [unavailable]'}`));
+        title: sectionTitle(s),
+      }, `${s.label}${s.available ? '' : '  [unavailable]'}${mark}`));
+    }
+    sections_ = sections;
+    paintSectionCaveats();
+  }
+
+  // The picker's own caveat line, repainted whenever the selection changes.
+  // Silent on a section with nothing refused, so it stays meaningful.
+  function paintSectionCaveats() {
+    if (!sectionCaveats) return;
+    clear(sectionCaveats);
+    const s = (sections_ || []).find((x) => x.id === sectionSel.value);
+    const blocking = (s && s.caveats ? s.caveats : []).filter(
+      (c) => c.status === 'NO');
+    if (!blocking.length) { sectionCaveats.style.display = 'none'; return; }
+    sectionCaveats.style.display = '';
+    sectionCaveats.appendChild(h('div.hint',
+      `This section cannot support ${blocking.length} readout` +
+      `${blocking.length === 1 ? '' : 's'}:`));
+    for (const c of blocking) {
+      sectionCaveats.appendChild(
+        h('div.hint', { title: c.reason }, `• ${c.capability} — REFUSED`));
     }
   }
 
@@ -301,8 +364,29 @@ export function createSpecPanel({ store, onSubmit }) {
     clear(drugSel);
     drugSel.appendChild(h('option', { value: '' }, NO_DRUG));
     for (const d of drugs) {
-      drugSel.appendChild(h('option', { value: d.name },
-        `${d.name}  ·  IC50 ${num(d.ic50_uM, 1)} uM  ·  BBB ${num(d.bbb_penetrance, 2)}`));
+      // A self-compiled compound is marked IN THE OPTION, not only in the panel
+      // that produced it: the picker is where it gets chosen, and by then the
+      // compile screen may be closed. The suffix says how many of its fields are
+      // predictions, because that is the fact that distinguishes it from a
+      // curated row — a curated row's IC50 is a GDSC measurement, this one's is
+      // the operator's own number or a flagged placeholder.
+      const label = `${d.name}  ·  IC50 ${num(d.ic50_uM, 1)} uM  ·  BBB ${num(d.bbb_penetrance, 2)}`;
+      const suffix = d.is_user_compound
+        ? (d.reason
+          ? '   [YOURS — does not compile]'
+          : `   [YOURS · ${d.predicted_fields ?? '?'}/${d.total_fields ?? '?'} fields predicted]`)
+        : '';
+      drugSel.appendChild(h('option', {
+        value: d.name,
+        disabled: !!(d.is_user_compound && d.reason),
+        title: d.is_user_compound
+          ? (d.reason
+            || 'Compiled from a SMILES you supplied. Every transport parameter '
+             + 'except molecular weight and TPSA is a prediction. Its absolute '
+             + 'kill, AUC and penetration depth are NOT defensible — rank it '
+             + 'against other compounds on this section instead.')
+          : '',
+      }, label + suffix));
     }
   }
 
@@ -331,6 +415,7 @@ export function createSpecPanel({ store, onSubmit }) {
       }
     }
     syncing = false;
+    paintSectionCaveats();
   }
 
   function readForm() {
@@ -700,6 +785,8 @@ export function createSpecPanel({ store, onSubmit }) {
   return {
     el: root,
     setSections, setDrugs, loadSpec, track, validate: () => runValidate(true),
+    /** Repaint the operator's own compound list (GET /api/compounds). */
+    refreshCompounds: () => compoundPanel.refresh(),
     get trackedId() { return tracked; },
     focusEditor: () => ta.focus(),
     setSubmitting(on) {

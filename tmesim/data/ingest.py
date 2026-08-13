@@ -443,12 +443,35 @@ def _detect_xenium(path: str) -> Dict:
             "in place on first load (one-off, ~15 s for a 240 MB tarball)."
         )
     else:
-        issues.append(
-            "no cell-feature matrix: neither an extracted cell_feature_matrix/ "
-            "MEX triple nor a *cell_feature_matrix.tar.gz. Expression is "
-            "REQUIRED - without it no phenotyping, no ECM field and no "
-            "capability report are possible."
-        )
+        # A matrix DIRECTORY that exists but is short a file is by far the
+        # commonest real failure (an interrupted download, a partial copy), and
+        # "no cell-feature matrix" is actively misleading about it - the
+        # directory is right there. Name the missing FILE instead.
+        partial = None
+        for cand in ("cell_feature_matrix", "filtered_feature_bc_matrix",
+                     "raw_feature_bc_matrix"):
+            cand_path = os.path.join(path, cand)
+            if os.path.isdir(cand_path):
+                gap = _mex_missing(cand_path)
+                if gap:
+                    partial = (cand, gap)
+                    break
+        if partial is not None:
+            issues.append(
+                f"{partial[0]}/ is INCOMPLETE: missing {', '.join(partial[1])}. "
+                "A MEX triple needs all three of matrix.mtx[.gz], "
+                "features.tsv[.gz] and barcodes.tsv[.gz]; with any one absent "
+                "the counts cannot be aligned to genes and cells. Re-download "
+                "or re-extract that directory."
+            )
+        else:
+            issues.append(
+                "no cell-feature matrix: neither an extracted "
+                "cell_feature_matrix/ MEX triple nor a "
+                "*cell_feature_matrix.tar.gz. Expression is REQUIRED - without "
+                "it no phenotyping, no ECM field and no capability report are "
+                "possible."
+            )
         layout = "xenium_cells_only"
 
     if files["panel"] is not None:
@@ -1234,7 +1257,10 @@ def capability_report(
     * whether MGMT is on the panel;
     * whether the ECM field will be REAL (matrix transcripts) or a stromal proxy;
     * whether the vascular field - the oxygen SOURCE - has any endothelial
-      marker behind it.
+      marker behind it;
+    * whether PER-CELL SPATIAL statistics are valid at all, which is a property
+      of the PLATFORM and not of the panel: on spot data they are refused
+      outright (``results/immune_sink_impact.md`` §5.6).
 
     Parameters
     ----------
@@ -1557,6 +1583,36 @@ def capability_report(
              "'determinant' mode would be identical to 'uniform'."),
             "panel presence")
 
+    # per-cell spatial statistics: the conclusion of
+    # results/immune_sink_impact.md §5.6. A spot is not a cell, and the Visium
+    # reconstruction does not measure where the cells inside one are - it
+    # SYNTHESISES reconstruct.real_visium._CELLS_PER_SPOT (=12) pseudo-cells per
+    # spot at the spot centroid with uniform jitter inside a spot-sized disc.
+    # Any statistic over the per-cell spatial distribution therefore measures
+    # that jitter, not the tissue, so it must be refused rather than degraded.
+    if is_spot:
+        cap("spatial_spread", False,
+            "PER-CELL SPATIAL STATISTICS ARE INVALID ON THIS SAMPLE. A Visium "
+            "spot is a ~55 um well pooling several cells, and this pipeline "
+            "does not measure where they sit: reconstruct.real_visium places "
+            "12 SYNTHESISED pseudo-cells per spot at the spot centroid with "
+            "uniform jitter inside a spot-sized disc. The per-cell attenuation "
+            "spread (p90/p10) and the immune-neighbourhood structure ratio "
+            "would therefore measure that jitter, not the tissue - "
+            "results/immune_sink_impact.md §5.6 declares the statistic INVALID "
+            "on spot data and the generator refuses to compute it there. The "
+            "cross-drug RANKING on this section remains defensible; the "
+            "spatial spread does not.",
+            "platform")
+    else:
+        cap("spatial_spread", True,
+            "cell positions are MEASURED per cell, so per-cell spatial "
+            "statistics (attenuation spread, immune-neighbourhood structure) "
+            "are computable on this sample. They must still be read against a "
+            "spatially-aware null, not against a well-mixed 1.0 "
+            "(results/immune_sink_impact.md §5.1).",
+            "platform")
+
     # absolute kill: the conclusion of results/cell_state_impact.md §5
     if not hyp_present:
         cap("absolute_kill", False,
@@ -1605,8 +1661,8 @@ def capability_report(
 #: result first, the things that merely degrade it after.
 _HEADLINE_ORDER = (
     "vascular_field", "cell_typing", "hypoxia_measured", "absolute_kill",
-    "state_mode:markers", "oxygen_mode:markers", "sensitivity_mode:determinant",
-    "mgmt_from_panel", "ecm_field",
+    "spatial_spread", "state_mode:markers", "oxygen_mode:markers",
+    "sensitivity_mode:determinant", "mgmt_from_panel", "ecm_field",
 )
 
 

@@ -669,3 +669,341 @@ def test_ingested_section_survives_a_registry_reload(client, stock_xenium_bundle
     assert "p43" in ingest_registry.ingested_sections()
     assert "p43" in [r["id"] for r in client.get("/api/sections").json()]
     client.delete("/api/sections/p43")
+
+
+# --------------------------------------------------------------------------- #
+# BRING YOUR OWN TISSUE: a wholly SYNTHETIC export.
+#
+# Every fixture above symlinks real cached bytes, so all of them SKIP in a
+# checkout without ``data_cache/`` — and none of them tests the case that
+# actually matters for a new user, which is an export this repo has never seen:
+# a panel that is not one of ours, column names that are not ours, files that
+# are missing.
+#
+# These fixtures invent the BYTES (random counts, random coordinates) but never
+# invent a RESULT: nothing below asserts a scientific number. They assert what
+# the ingester SAYS about an unfamiliar directory — which platform it detected,
+# which named file or column it reports missing, and which capabilities it
+# refuses. That is exactly the surface a stranger's export exercises, and it is
+# meaningless to measure biology from random counts.
+# --------------------------------------------------------------------------- #
+_SYNTH_MARKER_PANEL = [
+    # enough real symbols that a marker map is found and the report is legible
+    "PECAM1", "VWF", "SOX2", "EGFR", "OLIG2", "PTPRC", "CD68", "AIF1",
+    "AQP4", "GJA1", "MOG", "MKI67", "TOP2A", "VEGFA", "CA9", "MGMT", "DCN",
+]
+
+
+def _write_synthetic_xenium(dest, genes, n_cells=300, seed=0,
+                            xcol="x_centroid", ycol="y_centroid",
+                            span_um=2000.0, matrix_dirname="cell_feature_matrix",
+                            write_panel=True):
+    """A 10x-Xenium-SHAPED bundle containing no byte from this repo.
+
+    Counts and coordinates are pseudo-random: the point is the directory
+    STRUCTURE and the panel, which is what a stranger's export varies.
+    """
+    from scipy.io import mmwrite
+
+    os.makedirs(dest, exist_ok=True)
+    rng = np.random.default_rng(seed)
+    xy = rng.uniform(0.0, span_um, size=(n_cells, 2))
+    ids = [f"cell_{i:05d}" for i in range(n_cells)]
+
+    with gzip.open(os.path.join(dest, "cells.csv.gz"), "wt") as fh:
+        fh.write(f"cell_id,{xcol},{ycol},transcript_counts\n")
+        for i, (x, y) in enumerate(xy):
+            fh.write(f"{ids[i]},{x:.3f},{y:.3f},50\n")
+
+    mdir = os.path.join(dest, matrix_dirname)
+    os.makedirs(mdir, exist_ok=True)
+    m = sparse.random(len(genes), n_cells, density=0.3, random_state=seed,
+                      data_rvs=lambda n: rng.integers(1, 30, size=n)).tocsr()
+    m.data = m.data.astype(np.int64)
+    plain = os.path.join(mdir, "matrix.mtx")
+    mmwrite(plain, m, field="integer")
+    with open(plain, "rb") as src, gzip.open(
+            os.path.join(mdir, "matrix.mtx.gz"), "wb") as dst:
+        dst.write(src.read())
+    os.remove(plain)
+    with gzip.open(os.path.join(mdir, "features.tsv.gz"), "wt") as fh:
+        for g in genes:
+            fh.write(f"{g}\t{g}\tGene Expression\n")
+    with gzip.open(os.path.join(mdir, "barcodes.tsv.gz"), "wt") as fh:
+        for c in ids:
+            fh.write(c + "\n")
+
+    if write_panel:
+        with open(os.path.join(dest, "gene_panel.json"), "w") as fh:
+            json.dump({"payload": {
+                "panel_info": {"name": "Synthetic Panel v1"},
+                "targets": [{"type": {"data": {"name": g}}} for g in genes],
+            }}, fh)
+    return dest
+
+
+@pytest.fixture
+def synthetic_xenium(tmp_path):
+    """An export this repo has never seen, in stock 10x layout."""
+    return _write_synthetic_xenium(
+        str(tmp_path / "PatientX_Xenium"), _SYNTH_MARKER_PANEL)
+
+
+def test_synthetic_export_is_detected_without_any_cached_data(synthetic_xenium):
+    """A stranger's bundle is recognised on STRUCTURE, not on our filenames."""
+    det = ing.detect(synthetic_xenium)
+    assert det["platform"] == "xenium"
+    assert det["ingestable"] is True
+    assert det["confidence"] == 1.0, det["issues"]
+
+
+def test_synthetic_export_reports_what_the_section_is(synthetic_xenium):
+    rec = ing.ingest(synthetic_xenium)
+    assert rec.n_cells == 300
+    assert rec.n_genes == len(_SYNTH_MARKER_PANEL)
+    ex, ey = rec.extent_um
+    # Coordinates were written in um and must be carried through as um.
+    assert 1000.0 < ex < 2000.0 and 1000.0 < ey < 2000.0
+    assert rec.validation["ok"] is True
+    assert rec.validation["measured"]["n_cells"] == 300
+
+
+def test_synthetic_export_with_an_unfamiliar_panel_is_refused_by_capability():
+    """A panel carrying no marker we know must say so, not fall back quietly."""
+    report = ing.capability_report([f"GENE{i}" for i in range(40)],
+                                   platform="xenium")
+    supports = report["supports"]
+    # The vascular field is the oxygen SOURCE: no endothelial marker is fatal.
+    assert supports["vascular_field"]["available"] is False
+    assert "PECAM1" in supports["vascular_field"]["reason"]
+    assert supports["cell_typing"]["available"] is False
+    assert supports["hypoxia_measured"]["available"] is False
+    assert report["panel"]["fits"] is False
+
+
+def test_missing_matrix_names_the_file_not_a_stack_trace(tmp_path):
+    """Delete the matrix and the reason must name what is missing."""
+    dest = _write_synthetic_xenium(str(tmp_path / "NoMatrix"),
+                                   _SYNTH_MARKER_PANEL)
+    os.remove(os.path.join(dest, "cell_feature_matrix", "matrix.mtx.gz"))
+    det = ing.detect(dest)
+    joined = " ".join(det["issues"])
+    assert det["ingestable"] is False
+    assert "matrix.mtx" in joined, joined
+    # scan_report must ANSWER rather than raise.
+    report = ing.scan_report(dest)
+    assert report["error"]
+    assert "matrix.mtx" in report["error"]
+
+
+def test_missing_coordinate_columns_name_the_columns(tmp_path):
+    """A cells table whose coordinate columns are named something else."""
+    dest = _write_synthetic_xenium(
+        str(tmp_path / "OddColumns"), _SYNTH_MARKER_PANEL,
+        xcol="centre_x_px", ycol="centre_y_px")
+    det = ing.detect(dest)
+    # Either it is refused, or it resolved columns it can actually name.
+    if det["ingestable"]:
+        cols = det["files"].get("coordinate_columns") or []
+        assert cols, det
+    else:
+        assert det["issues"]
+
+
+def test_pixel_coordinates_are_refused_with_the_measured_extent(tmp_path):
+    """Coordinates that are plainly not micrometres must be REFUSED."""
+    dest = _write_synthetic_xenium(str(tmp_path / "Pixels"),
+                                   _SYNTH_MARKER_PANEL, span_um=250_000.0)
+    with pytest.raises(ing.IngestError) as exc:
+        ing.ingest(dest)
+    msg = str(exc.value)
+    assert "10 cm" in msg or "100000" in msg
+    assert "PIXELS" in msg or "pixels" in msg
+
+
+def test_a_handful_of_cells_is_not_a_tissue_section(tmp_path):
+    dest = _write_synthetic_xenium(str(tmp_path / "Tiny"),
+                                   _SYNTH_MARKER_PANEL, n_cells=10)
+    with pytest.raises(ing.IngestError) as exc:
+        ing.ingest(dest)
+    assert str(ing.MIN_CELLS) in str(exc.value)
+
+
+# --------------------------------------------------------------------------- #
+# The spot refusal: results/immune_sink_impact.md §5.6
+# --------------------------------------------------------------------------- #
+def test_spot_platform_refuses_per_cell_spatial_statistics():
+    """Visium must REFUSE the spatial spread, whatever its panel contains."""
+    report = ing.capability_report(_SYNTH_MARKER_PANEL, platform="visium")
+    spread = report["supports"]["spatial_spread"]
+    assert spread["available"] is False
+    assert spread["evidence"] == "platform"
+    # The reason must state WHY, so a user never has to find the results file.
+    assert "12" in spread["reason"]  # the synthesised pseudo-cells per spot
+    assert "immune_sink_impact" in spread["reason"]
+    assert "RANKING" in spread["reason"]  # what IS still defensible
+
+
+def test_single_cell_platform_allows_the_spatial_statistic():
+    report = ing.capability_report(_SYNTH_MARKER_PANEL, platform="xenium")
+    assert report["supports"]["spatial_spread"]["available"] is True
+
+
+def test_the_spot_refusal_matches_reconstruct_real_visium():
+    """The refusal must quote the pseudo-cell count the code actually uses.
+
+    If ``_CELLS_PER_SPOT`` ever changes, this test fails rather than letting
+    the capability report state a stale number.
+    """
+    from tmesim.reconstruct.real_visium import _CELLS_PER_SPOT
+
+    report = ing.capability_report(["PECAM1"], platform="visium")
+    assert str(_CELLS_PER_SPOT) in report["supports"]["spatial_spread"]["reason"]
+
+
+def test_capability_headline_orders_the_spatial_refusal(synthetic_xenium):
+    names = [row["capability"] for row
+             in ing.capability_report(_SYNTH_MARKER_PANEL,
+                                      platform="visium")["headline"]]
+    assert "spatial_spread" in names
+
+
+# --------------------------------------------------------------------------- #
+# Studio: an ingested section is selectable, and its refusals travel with it
+# --------------------------------------------------------------------------- #
+def test_sections_endpoint_marks_every_spot_section_spatially_invalid(client):
+    rows = client.get("/api/sections").json()
+    by_id = {r["id"]: r for r in rows}
+    assert by_id["xenium_319"]["spatial_spread_valid"] is True
+    assert by_id["xenium_319"]["n_caveats_blocking"] == 0
+    for sid in ("visium_10x_parent_gbm", "visium_gbm1", "visium_gbm2",
+                "visium_gbm3"):
+        row = by_id[sid]
+        assert row["spatial_spread_valid"] is False, sid
+        blocking = [c for c in row["caveats"] if c["status"] == "NO"]
+        assert any(c["capability"] == "spatial_spread" for c in blocking), sid
+
+
+def test_a_synthetic_export_registers_and_becomes_selectable(client,
+                                                             synthetic_xenium):
+    """The whole point: a directory this repo has never seen shows up in the picker."""
+    body = client.post("/api/sections/scan", json={
+        "path": synthetic_xenium, "register": True, "section_id": "patient_x",
+    }).json()
+    assert body["ok"], body.get("error")
+
+    rows = client.get("/api/sections").json()
+    row = {r["id"]: r for r in rows}["patient_x"]
+    assert row["available"] is True
+    assert row["ingested"] is True
+    assert row["platform"] == "xenium"
+    assert row["n_cells"] == 300
+    # Selectable AND carrying its own capability verdicts.
+    assert row["spatial_spread_valid"] is True
+    assert isinstance(row["caveats"], list)
+    client.delete("/api/sections/patient_x")
+
+
+def test_an_ingested_section_carries_its_refusals_into_the_picker(
+        client, synthetic_xenium, tmp_path):
+    """An unfamiliar panel's NO verdicts must reach the section list."""
+    blind = _write_synthetic_xenium(str(tmp_path / "BlindPanel"),
+                                    [f"GENE{i}" for i in range(40)])
+    body = client.post("/api/sections/scan", json={
+        "path": blind, "register": True, "section_id": "blind_panel",
+    }).json()
+    assert body["ok"], body.get("error")
+    row = {r["id"]: r for r in client.get("/api/sections").json()}["blind_panel"]
+    caps = {c["capability"]: c for c in row["caveats"]}
+    # No endothelial marker -> no oxygen source -> stated BEFORE any run.
+    assert caps["vascular_field"]["status"] == "NO"
+    assert row["n_caveats_blocking"] >= 2
+    client.delete("/api/sections/blind_panel")
+
+
+def test_registering_a_synthetic_export_never_shadows_a_builtin(
+        client, synthetic_xenium):
+    body = client.post("/api/sections/scan", json={
+        "path": synthetic_xenium, "register": True, "section_id": "xenium_319",
+    }).json()
+    assert body["ok"] is False
+    assert "BUILT-IN" in body["error"]
+    row = {r["id"]: r for r in client.get("/api/sections").json()}["xenium_319"]
+    assert row["n_cells"] == 40887  # untouched
+
+
+# --------------------------------------------------------------------------- #
+# CLI: `vivum ingest`
+# --------------------------------------------------------------------------- #
+def _run_cli(argv, monkeypatch, tmp_path):
+    """Run the CLI against an ISOLATED section store."""
+    from app.server import cache as cache_mod
+    from app.server import ingest_registry
+    from tmesim.cli import main
+
+    runs = tmp_path / "cli_runs"
+    runs.mkdir(exist_ok=True)
+    monkeypatch.setattr(cache_mod, "runs_dir", lambda: str(runs))
+    monkeypatch.setattr(ingest_registry, "_store", None)
+    return main(argv)
+
+
+def test_cli_ingest_scan_succeeds_on_a_synthetic_export(
+        synthetic_xenium, monkeypatch, tmp_path, capsys):
+    rc = _run_cli(["ingest", synthetic_xenium], monkeypatch, tmp_path)
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "platform      : xenium" in out
+    assert "CAPABILITY REPORT" in out
+    # A read-only scan must not register anything.
+    assert "nothing was registered" in out
+
+
+def test_cli_ingest_refuses_a_directory_that_is_not_a_sample(
+        monkeypatch, tmp_path, capsys):
+    empty = tmp_path / "empty_dir"
+    empty.mkdir()
+    rc = _run_cli(["ingest", str(empty)], monkeypatch, tmp_path)
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "REFUSED" in out
+    # The refusal must name the layouts it looked for.
+    assert "cells.csv.gz" in out and "spatial/" in out
+
+
+def test_cli_ingest_refuses_a_path_that_is_not_a_directory(
+        monkeypatch, tmp_path, capsys):
+    rc = _run_cli(["ingest", str(tmp_path / "nope")], monkeypatch, tmp_path)
+    assert rc == 1
+    assert "not a directory" in capsys.readouterr().out
+
+
+def test_cli_ingest_register_then_list_then_remove(
+        synthetic_xenium, monkeypatch, tmp_path, capsys):
+    rc = _run_cli(["ingest", synthetic_xenium, "--register", "--id", "cli_px"],
+                  monkeypatch, tmp_path)
+    out = capsys.readouterr().out
+    assert rc == 0, out
+    assert "registered as section id 'cli_px'" in out
+
+    assert _run_cli(["ingest", "--list"], monkeypatch, tmp_path) == 0
+    assert "cli_px" in capsys.readouterr().out
+
+    assert _run_cli(["ingest", "--remove", "cli_px"], monkeypatch, tmp_path) == 0
+    assert "removed" in capsys.readouterr().out
+
+
+def test_cli_ingest_json_is_machine_readable(
+        synthetic_xenium, monkeypatch, tmp_path, capsys):
+    rc = _run_cli(["ingest", synthetic_xenium, "--json"], monkeypatch, tmp_path)
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["detection"]["platform"] == "xenium"
+    assert payload["capability"]["supports"]["spatial_spread"]["available"] is True
+
+
+def test_cli_ingest_without_a_path_is_a_usage_error(monkeypatch, tmp_path,
+                                                    capsys):
+    rc = _run_cli(["ingest"], monkeypatch, tmp_path)
+    assert rc == 2
+    assert "required" in capsys.readouterr().out

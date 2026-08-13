@@ -42,6 +42,14 @@ Subcommands
     only the analytic anchors (seconds, no ``data_cache/``); the full run needs
     real tissue and takes minutes. **Exits non-zero if any anchor FAILS**, so it
     is usable as a CI gate. See :mod:`tmesim.validation.scorecard`.
+``ingest``
+    Point Vivum at YOUR OWN raw 10x Xenium / Visium export directory. Detects
+    the platform, validates the bytes, and reports what the section IS (cells,
+    extent, panel) and what it CANNOT support — a missing endothelial marker
+    means no oxygen or delivery result at all, and on spot data the per-cell
+    spatial statistics are refused outright. ``--register`` makes it selectable
+    in the Studio. See :mod:`tmesim.data.ingest` and
+    ``results/bring_your_own_tissue.md``.
 ``acquire``
     Best-effort live download of open glioblastoma datasets into a cache dir.
 ``studio``
@@ -69,8 +77,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
 import sys
+import textwrap
 from typing import List, Optional
 
 # Fast default simulated-exposure window (seconds) for the CLI. The library
@@ -283,6 +293,62 @@ def _compile_drug_for_comparison(name: str, alpha: float, library: str):
     return mol, dp
 
 
+def _wrap(text: str, indent: str = "  ") -> str:
+    """Wrap a long disclosure for a terminal without truncating a word of it."""
+    return textwrap.fill(str(text), width=86, subsequent_indent=indent)
+
+
+def _delivery_law_note(transvascular_exchange: bool) -> Optional[dict]:
+    """The transvascular delivery-law disclosure for a run, or ``None``.
+
+    ``compare-drugs`` prints a RANKING, and the ranking is not law-independent:
+    the two source terms disagree on top-1 for GBM. The Studio has carried this
+    disclosure on every one of its surfaces for a while; this command — the one
+    the README calls the core use case — did not.
+
+    There is exactly ONE implementation of the disclosure
+    (``app/server/delivery_law.py``) and it is a RUNTIME read of ``PDEConfig``,
+    so it cannot go stale. It is imported rather than restated here precisely so
+    that no second copy of the claim can drift from the first. That module
+    imports nothing but ``typing`` at module scope, so this does not pull in the
+    optional ``[app]`` extra; if the ``app`` package is genuinely absent, the
+    caller says so loudly instead of quietly printing nothing.
+    """
+    _ensure_repo_root_on_path()
+    try:
+        from app.server.delivery_law import delivery_law
+    except Exception:  # noqa: BLE001 — absence is reported, never swallowed
+        return None
+    return delivery_law(bool(transvascular_exchange))
+
+
+def _coverage_at_1x_ic50(micro, result, dp) -> float:
+    """``therapeutic_coverage`` at 1x IC50 — the headline delivery metric.
+
+    Same code path ``validation.delivery_metrics.compute_all`` uses (it calls
+    exactly these three functions); the expensive distance transform behind
+    ``penetration_length_fit`` is not needed for coverage and is not run.
+
+    This is what replaced ``penetration_index`` in this command's output.
+    ``penetration_index = mean(AUC)/p99(AUC)`` is a scale-invariant SHAPE
+    statistic — multiply the exposure field by any constant and it is unchanged
+    — so on real tissue it reports the section's vascular geometry, shared by
+    every drug (``results/delivery_metrics.md`` §4). It was retired there, and
+    this table used to demonstrate exactly why: temozolomide carried the highest
+    penetration index of the panel while ranking last.
+    """
+    from tmesim.validation.delivery_metrics import (
+        exposure_window_s,
+        therapeutic_coverage,
+        tumor_cell_exposure,
+    )
+
+    exp = tumor_cell_exposure(micro, result)
+    cov = therapeutic_coverage(exp["auc_uM_s"], float(dp.ic50),
+                               exposure_window_s(result))
+    return float(cov["coverage_1x"])
+
+
 def cmd_compare_drugs(args: argparse.Namespace) -> int:
     """Reconstruct a real microenvironment ONCE and simulate several drugs on
     that SAME reconstruction, so every kill/exposure difference is attributable
@@ -296,7 +362,7 @@ def cmd_compare_drugs(args: argparse.Namespace) -> int:
     experiment scripts (``experiments/real_drug_panel.py``,
     ``experiments/breast_drug_panel.py``) use.
     """
-    from tmesim.core import SimConfig
+    from tmesim.core import PDEConfig, SimConfig
     from tmesim.reconstruct.real_pipeline import (
         reconstruct_real,
         reconstruction_report,
@@ -315,7 +381,49 @@ def cmd_compare_drugs(args: argparse.Namespace) -> int:
                   f"docs/QUICKSTART.md for how this one was downloaded.")
             return 1
 
-    print(f"[compare-drugs] reconstructing REAL microenvironment "
+    # --- the two conditions every number below is contingent on ------------- #
+    # Printed BEFORE the reconstruction, not after the table, because they are
+    # conditions on the whole run rather than footnotes to it.
+    #
+    # (1) The exposure window. Three surfaces ship three different defaults —
+    #     this CLI's fast window, the Studio's, and the library's PDEConfig —
+    #     and AUC, coverage and kill all scale with it, so two numbers taken
+    #     from two surfaces are not comparable. They are deliberately NOT
+    #     silently harmonised here: raising this command's window to the library
+    #     default would multiply every quickstart run's cost ~24x, and lowering
+    #     the others would change what the Studio has already published. Instead
+    #     each surface states the window it used, which is the honest version of
+    #     the same fix (``cmd_simulate`` and ``cmd_molecular_run`` already did;
+    #     this command did not).
+    # (2) The transvascular delivery law, read from PDEConfig at call time.
+    probe = _build_sim_config(args.seed, total_time=args.total_time)
+    window_s = float(probe.pde.total_time)
+    exchange = bool(getattr(probe.pde, "transvascular_exchange", False))
+    library_window_s = float(PDEConfig().total_time)
+    law = _delivery_law_note(exchange)
+
+    print(f"\n[compare-drugs] EXPOSURE WINDOW = {window_s:.0f} s "
+          f"({window_s / 3600.0:.2f} h) — "
+          + ("this CLI's fast default (--total-time to change it)"
+             if args.total_time is None else "set by --total-time")
+          + f". The library default (core.config.PDEConfig.total_time) is "
+            f"{library_window_s:.0f} s and the Studio submits a different one "
+            f"again; exposure, coverage and kill ALL scale with the window, so "
+            f"numbers taken from two surfaces are not comparable unless the "
+            f"window matches.")
+
+    if law is not None:
+        print("\n[compare-drugs] " + _wrap(law["headline"]))
+        print("[compare-drugs] " + _wrap(law["caveat"]))
+    else:
+        print(f"\n[compare-drugs] WARNING: the delivery-law disclosure could "
+              f"not be loaded (app/server/delivery_law.py is not importable "
+              f"from here). This run uses "
+              f"PDEConfig.transvascular_exchange={exchange!r}. The two source "
+              f"terms disagree on the top-1 GBM drug, so the ranking below is "
+              f"LAW-DEPENDENT and you are reading it without its disclosure.")
+
+    print(f"\n[compare-drugs] reconstructing REAL microenvironment "
           f"(source={args.source}, sample={sample}, dx={args.dx} um) — once, "
           f"reused for every drug ...")
     micro = reconstruct_real(source=args.source, sample=sample, dx_um=args.dx)
@@ -361,7 +469,11 @@ def cmd_compare_drugs(args: argparse.Namespace) -> int:
             bbb_penetrance=float(dp.bbb_penetrance),
             diffusivity_um2_s=float(dp.diffusivity),
             kill_fraction=float(result.kill_fraction),
-            penetration_index=float(result.extras.get("penetration_index", float("nan"))),
+            # therapeutic_coverage @1x IC50 REPLACES penetration_index here, in
+            # the printed table and in the CSV. See _coverage_at_1x_ic50 for
+            # why the index is not carried under any name: it is retired, and
+            # this is the export most likely to end up in a slide.
+            therapeutic_coverage_1x=_coverage_at_1x_ic50(micro, result, dp),
             mean_auc_uM_s=float(result.extras.get("mean_auc", float("nan"))),
         ))
         print(f" kill={rows[-1]['kill_fraction']:.4f}  "
@@ -375,28 +487,143 @@ def cmd_compare_drugs(args: argparse.Namespace) -> int:
 
     rows.sort(key=lambda r: r["kill_fraction"], reverse=True)
     cols = ["drug", "mw", "ic50_uM", "bbb_penetrance", "diffusivity_um2_s",
-            "kill_fraction", "penetration_index", "mean_auc_uM_s"]
+            "kill_fraction", "therapeutic_coverage_1x", "mean_auc_uM_s"]
     print("\n=== drug comparison (sorted by predicted kill_fraction, best first) ===")
     print("PREDICTIONS on a real reconstructed section, not validated clinical "
           "outcomes — see docs/QUICKSTART.md.")
     hdr = f"{'drug':16s} {'MW':>8s} {'IC50(uM)':>9s} {'bbb':>6s} " \
-          f"{'D_eff':>8s} {'pen_idx':>8s} {'mean_auc':>10s} {'kill':>7s}"
+          f"{'D_eff':>8s} {'cov@IC50':>9s} {'mean_auc':>10s} {'kill':>7s}"
     print(hdr); print("-" * len(hdr))
     for r in rows:
         print(f"{r['drug']:16s} {r['mw']:8.0f} {r['ic50_uM']:9.3g} "
               f"{r['bbb_penetrance']:6.3f} {r['diffusivity_um2_s']:8.1f} "
-              f"{r['penetration_index']:8.3f} {r['mean_auc_uM_s']:10.3g} "
+              f"{r['therapeutic_coverage_1x']:9.4f} {r['mean_auc_uM_s']:10.3g} "
               f"{r['kill_fraction']:7.4f}")
+    print(f"\ncov@IC50 = therapeutic_coverage at 1x IC50: the fraction of this "
+          f"section's tumour cells whose time-averaged exposure exceeds that "
+          f"drug's own IC50 over the {window_s:.0f} s window. It replaces the "
+          f"pen_idx column this table used to print — penetration_index is a "
+          f"scale-invariant shape statistic that reports the section's vascular "
+          f"geometry rather than the drug's delivery, and it is retired "
+          f"(results/delivery_metrics.md §4).")
+    if law is not None:
+        print("\n" + _wrap("RANKING CONDITION — " + law["headline"], indent=""))
 
     if args.csv:
+        prov = _comparison_provenance(
+            args=args, sample=sample, library=library, alpha=alpha,
+            window_s=window_s, report=report, law=law, exchange=exchange,
+            n_drugs=len(rows))
         os.makedirs(os.path.dirname(os.path.abspath(args.csv)) or ".", exist_ok=True)
         with open(args.csv, "w", newline="") as fh:
+            # A comment block FIRST, so the provenance cannot be separated from
+            # the numbers by copying the file. `pandas.read_csv(..., comment='#')`
+            # and every `#`-aware reader skip it; the sidecar below exists for
+            # readers that do not.
+            for line in _provenance_comment_lines(prov):
+                fh.write(f"# {line}\n" if line else "#\n")
             writer = csv.DictWriter(fh, fieldnames=cols)
             writer.writeheader()
             writer.writerows(rows)
+        side = os.path.abspath(args.csv) + ".provenance.json"
+        with open(side, "w") as fh:
+            json.dump(prov, fh, indent=1, sort_keys=True)
         print(f"\n[compare-drugs] comparison table written: {os.path.abspath(args.csv)}")
+        print(f"[compare-drugs] it opens with a `#` provenance header — section, "
+              f"dx, window, alpha, delivery law, sensitivity mode and NOT FOR "
+              f"CLINICAL USE — so read it with "
+              f"pandas.read_csv(path, comment='#'). The same block, "
+              f"machine-readable, is in: {side}")
 
     return 0
+
+
+def _comparison_provenance(*, args, sample, library, alpha, window_s, report,
+                           law, exchange, n_drugs) -> dict:
+    """Everything a reader needs to know what a comparison CSV actually is.
+
+    The exported CSV used to carry eight columns and nothing else: no section,
+    no ``dx``, no exposure window, no ``alpha``, no delivery law, no sensitivity
+    mode and no "not for clinical use". It is the only machine-readable export
+    in the product and therefore the artefact most likely to become a slide, so
+    everything the run knows about its own conditions travels inside it.
+
+    Every value here is READ from the run — the reconstruction report, the
+    config actually used, the calibrated alpha — never restated from memory.
+    """
+    sens = (report or {}).get("sensitivity") or {}
+    return {
+        "not_for_clinical_use": (
+            "NOT FOR CLINICAL USE. Every number in this file is a PREDICTION of "
+            "a physical model, not a measurement of a patient. Nothing here has "
+            "been validated against a treatment outcome. Do not use it to "
+            "select, rank, exclude or dose any therapy for any patient."
+        ),
+        "generator": "tmesim.cli cmd_compare_drugs (vivum compare-drugs)",
+        "section_source": (report or {}).get("source", args.source),
+        "sample_path": sample,
+        "patient_id": (report or {}).get("patient_id"),
+        "library": library,
+        "n_drugs": int(n_drugs),
+        "dx_um": (report or {}).get("dx_um", args.dx),
+        "grid": list((report or {}).get("grid") or []),
+        "n_cells": (report or {}).get("n_cells"),
+        "n_tumor": (report or {}).get("n_tumor"),
+        "exposure_window_s": float(window_s),
+        "plasma_peak_uM_override": (float(args.plasma)
+                                    if args.plasma is not None else None),
+        "seed": int(args.seed),
+        "alpha": float(alpha),
+        "alpha_source": ("validation.calibration.calibrate_alpha — ONE "
+                         "doxorubicin penetration measurement (PMID 16361566), "
+                         "shared by every drug in this file"),
+        "oxygen_mode": (report or {}).get("oxygen_mode"),
+        "state_mode": (report or {}).get("state_mode"),
+        "sensitivity_mode": sens.get("mode") or "uniform 1.0 (reconstruction default)",
+        "sensitivity_is_upper_bound": bool(sens.get("upper_bound", True)),
+        "transvascular_exchange": bool(exchange),
+        "delivery_law": (law or {}).get("law"),
+        "delivery_law_caveat": (
+            (law or {}).get("caveat")
+            or (f"UNAVAILABLE — app/server/delivery_law.py was not importable "
+                f"when this file was written. The run used "
+                f"PDEConfig.transvascular_exchange={bool(exchange)}, and the two "
+                f"source terms disagree on the top-1 GBM drug, so this ranking "
+                f"is LAW-DEPENDENT.")
+        ),
+        "retired_metric_note": (
+            "penetration_index is NOT in this file. It is mean(AUC)/p99(AUC), a "
+            "scale-invariant shape statistic that reports the section's "
+            "vascular geometry rather than a drug's delivery, and it is retired "
+            "(results/delivery_metrics.md section 4). The column "
+            "therapeutic_coverage_1x replaces it."
+        ),
+        "what_is_defensible": (
+            "The ORDER, under the delivery law named above. The absolute "
+            "kill_fraction is not: it is a no-intrinsic-resistance UPPER BOUND "
+            "and, where it has been interval-propagated at all, the interval "
+            "spans ~30x (results/kill_calibration.md section 5.1)."
+        ),
+    }
+
+
+def _provenance_comment_lines(prov: dict) -> List[str]:
+    """The provenance block as `#`-comment lines, wrapped for a terminal."""
+    out: List[str] = ["NOT FOR CLINICAL USE — see not_for_clinical_use below.",
+                      ""]
+    for key, value in prov.items():
+        if value is None or value == []:
+            value = "—"
+        text = f"{key}: {value}"
+        out.extend(textwrap.wrap(text, width=94, subsequent_indent="    ")
+                   or [text])
+        out.append("")
+    out.extend(textwrap.wrap(
+        "--- data below: one row per drug, header row next. Every line above "
+        "starts with '#'; read with pandas.read_csv(path, comment='#') or skip "
+        "'#' lines. The same block is in <this file>.provenance.json.",
+        width=94, subsequent_indent="    "))
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -692,6 +919,177 @@ def cmd_acquire(args: argparse.Namespace) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# ingest — bring your own tissue
+# --------------------------------------------------------------------------- #
+def _ingest_print_detection(det: dict) -> None:
+    """Print what the directory was recognised AS, and why."""
+    print("\n=== detection ===")
+    print(f"  platform      : {det.get('platform', '?')}")
+    if det.get("layout"):
+        print(f"  layout        : {det['layout']}")
+    conf = det.get("confidence")
+    if conf is not None:
+        print(f"  confidence    : {float(conf):.2f}")
+    print(f"  ingestable    : {'yes' if det.get('ingestable') else 'NO'}")
+    for issue in det.get("issues") or []:
+        print(f"  ! {issue}")
+
+
+def _ingest_print_sample(sample: dict) -> None:
+    """Print what the ingested section IS: size, extent, and what was checked."""
+    print("\n=== sample ===")
+    print(f"  cells         : {sample.get('n_cells'):,}")
+    print(f"  panel genes   : {sample.get('n_genes'):,}")
+    ext = sample.get("extent_um") or [float("nan")] * 2
+    print(f"  extent        : {ext[0]:,.1f} x {ext[1]:,.1f} um")
+    print(f"  coordinates   : {sample.get('coordinate_units', '?')}")
+    val = sample.get("validation") or {}
+    meas = val.get("measured") or {}
+    if "cell_density_per_mm2" in meas:
+        print(f"  cell density  : {meas['cell_density_per_mm2']:,.0f} cells/mm^2")
+    if "median_counts_per_cell" in meas:
+        print(f"  median counts : {meas['median_counts_per_cell']:,.1f} per cell")
+    for w in val.get("warnings") or []:
+        print(f"  ! WARNING: {w}")
+
+
+def cmd_ingest(args: argparse.Namespace) -> int:
+    """Scan (and optionally register) a raw 10x export directory.
+
+    The default is READ-ONLY: it detects the platform, validates the bytes, and
+    prints the capability report — what this specimen can and CANNOT support —
+    without touching the section registry. ``--register`` adds it to the table
+    the Studio's section picker reads.
+
+    Returns 1 when the directory is not ingestable or registration is refused,
+    so this is usable as a gate in a data-prep script. The refusal is always a
+    named file, column or bound, never a stack trace.
+    """
+    import json
+
+    from tmesim.data import ingest as ing
+
+    # --- registry-only modes (no path needed) ------------------------------ #
+    if args.list_sections or args.remove:
+        reg = _import_ingest_registry()
+        if reg is None:
+            return 2
+        if args.remove:
+            out = reg.unregister(args.remove)
+            if not out["ok"]:
+                print(f"[ingest] REFUSED: {out['error']}")
+                return 1
+            print(f"[ingest] removed ingested section {args.remove!r}")
+            return 0
+        sections = reg.ingested_sections()
+        if args.json:
+            print(json.dumps(sections, indent=2, default=str))
+            return 0
+        if not sections:
+            print("[ingest] no ingested sections. "
+                  "Add one with: vivum ingest <dir> --register")
+            return 0
+        print(f"=== ingested sections ({len(sections)}) ===")
+        for sid, rec in sections.items():
+            runnable = "runnable" if rec.get("runnable", True) else "INSPECT-ONLY"
+            print(f"  {sid:24s} {rec.get('platform', '?'):8s} "
+                  f"{rec.get('n_cells_ingested', 0):>9,} cells  {runnable}")
+            print(f"  {'':24s} {rec.get('cache_dir', '')}")
+        return 0
+
+    if not args.path:
+        print("[ingest] a sample directory is required "
+              "(or pass --list / --remove ID)")
+        return 2
+
+    path = os.path.abspath(os.path.expanduser(args.path))
+    if not os.path.isdir(path):
+        print(f"[ingest] REFUSED: {path!r} is not a directory. Point this at "
+              "the sample folder itself — the one holding cells.csv.gz + "
+              "cell_feature_matrix/ (Xenium), or spatial/ + a MEX matrix "
+              "directory (Visium).")
+        return 1
+
+    # --json must be PURE JSON on stdout: a progress line would make the
+    # output unparseable for the data-prep script this flag exists for.
+    if not args.json:
+        # --register always loads the matrix, whatever --deep says.
+        mode = "full load" if (args.deep or args.register) else "panel-only, fast"
+        print(f"[ingest] scanning {path!r} ({mode}) ...")
+
+    # --- register: the full load, refused as a whole if anything fails ----- #
+    if args.register:
+        reg = _import_ingest_registry()
+        if reg is None:
+            return 2
+        out = reg.register(path, section_id=args.id, label=args.label)
+        if args.json:
+            print(json.dumps(out, indent=2, default=str))
+            return 0 if out["ok"] else 1
+        if not out["ok"]:
+            print(f"[ingest] REFUSED — nothing was registered:\n  {out['error']}")
+            return 1
+        sec = out["section"]
+        _ingest_print_detection({
+            "platform": sec.get("platform"), "layout": sec.get("layout"),
+            "confidence": sec.get("detect_confidence"), "ingestable": True,
+            "issues": sec.get("detect_issues"),
+        })
+        print("\n=== sample ===")
+        print(f"  cells         : {sec.get('n_cells_ingested', 0):,}")
+        print(f"  panel genes   : {sec.get('n_genes_ingested', 0):,}")
+        ext = sec.get("extent_um_ingested") or [float("nan")] * 2
+        print(f"  extent        : {ext[0]:,.1f} x {ext[1]:,.1f} um")
+        print()
+        print(out["capability_text"])
+        print(f"\n[ingest] registered as section id {out['section_id']!r}")
+        if not sec.get("runnable", True):
+            print("[ingest] NOTE: this section is INSPECT-ONLY — "
+                  "reconstruct_real has no route for its platform.")
+        else:
+            print(f"[ingest] run it:  vivum compare-drugs --source "
+                  f"{sec.get('platform')} --sample {sec.get('sample')}")
+        print("[ingest] the Studio picks up sections registered by another "
+              "process on RESTART, not live.")
+        return 0
+
+    # --- scan: read-only ---------------------------------------------------- #
+    report = ing.scan_report(path, measure_detection_rates=args.deep)
+    if args.json:
+        print(json.dumps(report, indent=2, default=str))
+        return 0 if report.get("error") is None else 1
+
+    _ingest_print_detection(report.get("detection") or {})
+    if report.get("error"):
+        print(f"\n[ingest] REFUSED: {report['error']}")
+        return 1
+    if report.get("sample"):
+        _ingest_print_sample(report["sample"])
+    print()
+    print(report.get("capability_text") or "(no capability report)")
+    if not args.deep:
+        print("\n[ingest] panel PRESENCE only — no detection rate was measured. "
+              "Re-run with --deep to load the matrix and upgrade every "
+              "rate-dependent verdict.")
+    print("\n[ingest] nothing was registered (this was a read-only scan). "
+          "Add --register to make it selectable in the Studio.")
+    return 0
+
+
+def _import_ingest_registry():
+    """Lazily import the section registry, degrading with a printed reason."""
+    try:
+        from app.server import ingest_registry
+    except Exception as exc:  # noqa: BLE001 - optional 'app' extra
+        print(f"[ingest] the section registry is unavailable: {exc}")
+        print("[ingest] registering a section needs the Studio extra: "
+              "pip install -e '.[app]'. Scanning (without --register) "
+              "works without it.")
+        return None
+    return ingest_registry
+
+
+# --------------------------------------------------------------------------- #
 # molecular layer: molecules / molecular-run
 # --------------------------------------------------------------------------- #
 def _import_molecular_library():
@@ -868,8 +1266,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(
         dest="command",
-        metavar="{reconstruct,simulate,compare-drugs,validate,molecules,"
-                 "molecular-run,acquire,studio}")
+        metavar="{reconstruct,simulate,compare-drugs,validate,ingest,"
+                 "molecules,molecular-run,acquire,studio}")
     sub.required = True
 
     # reconstruct
@@ -980,6 +1378,53 @@ def build_parser() -> argparse.ArgumentParser:
     p_studio.add_argument("--cache-size", type=int, default=None,
                           help="max cached reconstructions (default 4)")
     p_studio.set_defaults(func=cmd_studio)
+
+    # ingest
+    p_ing = sub.add_parser(
+        "ingest",
+        help="scan (and optionally register) YOUR OWN raw 10x Xenium / Visium "
+             "export directory",
+        description="Point this at a raw 10x export directory and it says what "
+                    "the sample IS — platform, cell count, physical extent, "
+                    "panel — and, more importantly, what it CANNOT support: "
+                    "which cell types have no marker on the panel, whether "
+                    "hypoxia is measured at all, whether the vascular field "
+                    "has any endothelial marker behind it, and whether "
+                    "per-cell spatial statistics are valid on that platform. "
+                    "The default is a READ-ONLY scan. --register adds the "
+                    "section to the table the Studio's picker reads; "
+                    "registration is REFUSED as a whole, never degraded, when "
+                    "the sample does not validate.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p_ing.add_argument("path", nargs="?", default=None,
+                       help="the sample directory (Xenium: cells.csv.gz + "
+                            "cell_feature_matrix/; Visium: spatial/ + a MEX "
+                            "matrix directory; or a bare MEX triple beside a "
+                            "coordinates table)")
+    p_ing.add_argument("--deep", action="store_true",
+                       help="load the count matrix and measure real DETECTION "
+                            "RATES. Without it only panel PRESENCE is read "
+                            "(fast), and every rate-dependent verdict is "
+                            "reported UNMEASURED rather than guessed")
+    p_ing.add_argument("--register", action="store_true",
+                       help="add the section to the registry so the Studio and "
+                            "the other subcommands can select it (always a "
+                            "full load, whatever --deep says)")
+    p_ing.add_argument("--id", default=None,
+                       help="section id to register under "
+                            "(default: slug of the directory name). A BUILT-IN "
+                            "section id is always refused")
+    p_ing.add_argument("--label", default=None,
+                       help="human-readable label shown in the Studio picker")
+    p_ing.add_argument("--list", dest="list_sections", action="store_true",
+                       help="list the sections already ingested, then exit")
+    p_ing.add_argument("--remove", default=None, metavar="ID",
+                       help="unregister an ingested section by id "
+                            "(built-in sections are never removable)")
+    p_ing.add_argument("--json", action="store_true",
+                       help="emit the machine-readable report on stdout "
+                            "instead of the human-readable one")
+    p_ing.set_defaults(func=cmd_ingest)
 
     # acquire
     p_acq = sub.add_parser(

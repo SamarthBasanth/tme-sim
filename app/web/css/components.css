@@ -130,6 +130,16 @@ select.inp {
 .fgrid .with-unit .unit { margin: 0; }
 .frow { display: flex; align-items: center; gap: var(--sp-4); }
 
+/* What the SELECTED section cannot support, stated at the point of choosing it
+   rather than in a caveat panel after the run. Populated from the `caveats`
+   field of GET /api/sections (app/server/api.py::_with_caveats). */
+.section-caveats { margin-top: var(--sp-2); }
+.section-caveats .hint {
+  font-size: var(--fs-xs, 11px);
+  line-height: 1.45;
+  color: var(--warn, #b4884a);
+}
+
 .field-err {
   grid-column: 1 / -1;
   font-size: var(--fs-micro);
