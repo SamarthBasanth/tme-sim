@@ -301,25 +301,63 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
     })
 
     # 8 -------------------------------------------------------------------- #
+    # This limit used to assert, at the renderer's LOWEST severity, that
+    # "kill_fraction is grid-converged for dx <= 20 um" and that the penetration
+    # index is over-estimated on coarse grids. Both halves are retracted by the
+    # sources below, so the limit shipped a reassurance the documentation had
+    # already withdrawn. It is NOT deleted -- the dx a report ran at is exactly
+    # the kind of thing a limits block exists to state -- but it now reports
+    # what was actually measured, and it can no longer be filed as "info".
     if isinstance(dx, (int, float)):
-        converged = float(dx) <= 15.0
+        dx_f = float(dx)
         dx_body = (
-            f"This report ran at dx = {float(dx):g} um. kill_fraction is "
-            "grid-converged for dx <= 20 um; penetration_index is NOT converged "
-            "above ~15 um and is over-estimated on coarse grids because a mesh "
-            "coarser than the ~45 um perivascular boundary layer cannot resolve "
-            "it (0.285 at dx = 60 um falling to 0.187 at dx = 10 um)."
-        ) + ("" if converged else
-             " THIS RUN IS OUTSIDE THE CONVERGED PENETRATION REGIME; read every "
-             "penetration number as an upper bound." if float(dx) <= 20.0 else
-             " THIS RUN IS OUTSIDE THE CONVERGED REGIME FOR BOTH kill_fraction "
-             "AND penetration_index.")
+            f"This report ran at dx = {dx_f:g} um. THERE IS NO dx AT WHICH THIS "
+            "PIPELINE HAS BEEN SHOWN TO BE GRID-CONVERGED, and an earlier "
+            "version of this limit said otherwise. It asserted 'kill_fraction "
+            "is grid-converged for dx <= 20 um' and that the penetration index "
+            "is 'over-estimated on coarse grids (0.285 at dx = 60 um falling to "
+            "0.187 at dx = 10 um)'. BOTH HALVES ARE WITHDRAWN. (a) The kill "
+            "plateau was measured on ONE Xenium GBM section for ONE metric and "
+            "does not transfer: on breast, docetaxel scores 0.1484 at the "
+            "published dx = 12 um against a Richardson dx -> 0 estimate of "
+            "0.1537, and its verdict FLIPS FAIL -> PASS between dx = 12 and "
+            "dx = 16 um; on the GBM panel the scored ratio is NON-MONOTONE in "
+            "dx for all three drugs tested, which is not an asymptotic regime, "
+            "so Richardson and power-law fits are being applied outside their "
+            "assumptions (observed orders p = 0.96 and p = -3.33, GCI 5.44% and "
+            "6.42% on the finest pairs, both power-law fits flagged "
+            "DEGENERATE). (b) The penetration ladder RISES with refinement — "
+            "0.1110 at dx = 60 um to 0.3062 at dx = 10 um — so a coarse mesh "
+            "UNDER-states the index, the opposite direction to what was "
+            "printed here, and the quoted 0.285 / 0.187 pair appears nowhere in "
+            "that column. What survives, and is the reason this limit is a "
+            "warning rather than a footnote: dx is the LARGEST single driver of "
+            "the penetration index measured on that section (|elasticity| "
+            "0.747, 3.1x the next knob), and it reaches the answer through the "
+            "RECONSTRUCTION — the oxygen solve, the cell-state banding and the "
+            "IFP/velocity solve all live on the grid — so a converged transport "
+            "step does not imply a converged prediction. Read every number on "
+            "this page as carrying an unquantified mesh term. This is not a "
+            "claim that the solver is broken: mass is conserved to ~4e-14 on "
+            "the real irregular mask and the prediction is dt-converged to "
+            "<1e-2 for dt <~ 20 s, and neither of those is affected by any of "
+            "the above."
+        )
+        if dx_f > 18.0:
+            dx_body += (
+                f" This run is COARSER STILL: at dx = {dx_f:g} um it sits on "
+                "the part of both ladders where the coarse rungs (24 and 30 um) "
+                "understate the scored ratio by the largest margin measured — "
+                "up to 11.7% in a single refinement step."
+            )
         limits.append({
             "id": "resolution",
-            "severity": "info" if converged else "warn",
+            "severity": "warn",
             "applies": True,
-            "title": "Resolution sensitivity",
-            "source": "results/numerical_rigor.md §2",
+            "title": "Resolution — the grid-convergence claim is WITHDRAWN",
+            "source": ("results/numerical_rigor.md CORRECTION + §2; "
+                       "results/grid_convergence_breast.md; "
+                       "results/grid_convergence_gbm.md"),
             "body": dx_body,
         })
 
@@ -1183,11 +1221,26 @@ def _banner(where: str) -> str:
 
 
 def _ranking_table(rows: Sequence[Dict]) -> str:
+    """The ranked panel.
+
+    The ``pen. index`` column that used to sit here is GONE. ``penetration_index
+    = mean(AUC)/p99(AUC)`` is a scale-invariant SHAPE statistic — it is
+    unchanged when the whole exposure field is multiplied by any constant — so
+    on real tissue it reports the vascular geometry of the section, which every
+    drug in the panel shares (results/delivery_metrics.md §4: it spans 0.3044 to
+    0.5107 across a panel whose delivered exposure spans 158x). Its failure mode
+    used to be on display in this very table: temozolomide carries the HIGHEST
+    penetration index of the GBM panel (0.5107) while ranking LAST. Its
+    replacement, ``therapeutic_coverage`` at 1x IC50, was already computed and
+    stored for every row and simply never rendered; it scales with delivered
+    dose, it knows the drug's IC50, and on the same panel its separation
+    (across-drug spread / grid drift) is 67.7 against 15.2 for the index.
+    """
     head = (
         "<tr><th class='num'>#</th><th>drug</th><th class='num'>predicted kill</th>"
         "<th class='num'>tumour-cell AUC</th><th class='num'>IC50</th>"
         "<th>IC50 source</th><th class='num'>BBB</th><th class='num'>D_eff</th>"
-        "<th class='num'>L</th><th class='num'>pen. index</th>"
+        "<th class='num'>L</th><th class='num'>coverage @1x IC50</th>"
         "<th>dominant driver</th></tr>"
     )
     body = []
@@ -1206,7 +1259,7 @@ def _ranking_table(rows: Sequence[Dict]) -> str:
             "<td class='num'>{bbb}</td>"
             "<td class='num'>{deff}<span class='u'>um2/s</span></td>"
             "<td class='num'>{L}<span class='u'>um</span></td>"
-            "<td class='num'>{pen}</td>"
+            "<td class='num'>{cov}</td>"
             "<td>{dom}</td></tr>".format(
                 cls="top" if r.get("rank") == 1 else "",
                 rank=r.get("rank"), name=_esc(r.get("name")),
@@ -1214,7 +1267,7 @@ def _ranking_table(rows: Sequence[Dict]) -> str:
                 ic=_sig(r.get("ic50")), kind=_esc(kind),
                 src=_esc(ic50.get("source")), bbb=_fmt(r.get("bbb"), 3),
                 deff=_fmt(r.get("d_eff"), 0), L=_fmt(r.get("L_um"), 0),
-                pen=_fmt(r.get("pen"), 3), dom=_esc(r.get("dominant")),
+                cov=_fmt(r.get("coverage_1x"), 4), dom=_esc(r.get("dominant")),
             )
         )
     return (f"<div class='tblwrap'><table class='tbl'><thead>{head}</thead>"
@@ -1360,14 +1413,24 @@ def render_html(doc: Dict) -> str:
         f'<span class="v">{_esc(v if v not in (None, "") else "—")}</span></span>'
         for k, v in meta_items)
 
+    # The hero names the top of a RANKING, which is the defensible output — but
+    # it may not name it as settled while limit 2b on this same page says the
+    # ordering is law-dependent. The law is the one stored with this document
+    # (read from PDEConfig when the runs were made), falling back to the shipped
+    # default for a document that predates it. See app/server/delivery_law.py.
+    law = doc.get("delivery_law")
+    if not isinstance(law, dict):
+        law = delivery_law()
     headline = ""
     if best:
         headline = f"""
 <div class="card">
   <div class="ch">
-    <span class="n">Highest predicted kill on this specimen: {_esc(best.get('name'))}</span>
+    <span class="n">Top of this ranking, under {_esc(law.get('law'))}:
+      {_esc(best.get('name'))}</span>
     <span class="chip accent">{_fmt(best.get('kill'))}</span>
     <span class="chip crit">UPPER BOUND</span>
+    <span class="chip crit">LAW-DEPENDENT</span>
   </div>
   <p>Dominant driver <b>{_esc(best.get('dominant'))}</b> ·
      L = {_fmt(best.get('L_um'), 0)} um ·
@@ -1378,6 +1441,21 @@ def render_html(doc: Dict) -> str:
      checked against a measured response for this tissue or any other. The
      ORDER is the claim; the LEVEL is not. Treat it as a hypothesis to test in
      the lab, nothing more.</p>
+  <p><b>And the order carries a condition — read this line with the name
+     above.</b> Every delivery number here was produced under
+     <span class="mono">{_esc(law.get('law'))}</span>; under the alternative
+     source term <span class="mono">{_esc(law.get('alternative_law'))}</span>
+     the panel is re-weighted by permeability (which spans 47x across this drug
+     list) and <b>the top-1 GBM pick changes, cisplatin &rarr; vincristine</b>,
+     swapping 4 of 45 pairs (limit 2b above;
+     results/transvascular_exchange_revalidation.md §4.1). Independently of the
+     law, results/ranking_robustness.md §8 concludes that until an ex-vivo
+     potency readout exists on this patient's own cells, <b>"the reportable
+     output of this pipeline for the top of the panel is a SET, not a
+     winner"</b> — P(cisplatin = rank 1) is 0.931 under that report's declared
+     priors and falls to 0.587 in its stress scenario. So: this is the top of
+     the ranking one law and one set of priors produced, not this specimen's
+     drug.</p>
 </div>"""
 
     caveat_items = "".join(f"<li>{_esc(c)}</li>" for c in (doc.get("caveats") or []))
@@ -1409,6 +1487,21 @@ same compilation pipeline (<span class="mono">calibrate_alpha &rarr;
 calibrated_drugparams &rarr; apply_barrier_to_drugparams</span>), so every
 difference is attributable to that drug's own physics and potency on identical
 tissue. Ranked by predicted kill fraction.</p>
+<p><b>On the delivery column.</b>
+<span class="mono">coverage @1x IC50</span> is
+<span class="mono">therapeutic_coverage</span> — the fraction of this section's
+tumour cells whose time-averaged exposure exceeds that drug's own IC50 over the
+{_window_label(window_s)} window. It replaces the
+<span class="mono">pen. index</span> column earlier versions of this report
+printed. <span class="mono">penetration_index = mean(AUC)/p99(AUC)</span> is a
+scale-invariant SHAPE statistic: multiply the whole exposure field by any
+constant and it does not move, so on real tissue it reports the section's
+vascular geometry, which every drug here shares. It was retired for that reason
+(results/delivery_metrics.md §4) and the panel demonstrates why — temozolomide
+holds the HIGHEST penetration index of the GBM panel while ranking LAST.
+Coverage is not exempt from anything else on this page: it is a delivery number
+like the others, so it is produced under the delivery law named above and it
+carries the same mesh term as everything else.</p>
 
 <h2>3 · Why each drug ranks where it does</h2>
 <p>Each drug's standing is decomposed into three <b>exactly additive log10

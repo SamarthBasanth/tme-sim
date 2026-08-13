@@ -267,6 +267,44 @@ class TestLimits:
         assert "UNKNOWN" in lim["body"]
         assert "no outcome" in lim["body"].lower()
 
+    def test_the_grid_convergence_claim_is_retracted_not_asserted(self, limits):
+        """The resolution limit is PINNED, in the corrected direction.
+
+        It used to assert, at the renderer's LOWEST severity ("info"), that
+        "kill_fraction is grid-converged for dx <= 20 um", citing
+        results/numerical_rigor.md §2 — a claim that file's own correction block
+        withdraws and that results/grid_convergence_breast.md and
+        results/grid_convergence_gbm.md both contradict. It also had the sign of
+        the penetration trend backwards. This was the only place in the product
+        where a caveat surface was less honest than the documentation, so the
+        limit is kept and pinned rather than deleted: what must reach the reader
+        is that NO dx has been shown to be converged, and that the coarse-grid
+        error runs the other way.
+        """
+        lim = next(x for x in limits if x["id"] == "resolution")
+        assert lim["applies"] is True
+        # never reassurance again
+        assert lim["severity"] != "info"
+        assert "WITHDRAWN" in lim["title"]
+        body = lim["body"]
+        assert "NO dx AT WHICH THIS PIPELINE HAS BEEN SHOWN TO BE " \
+               "GRID-CONVERGED" in body.replace("THERE IS ", "")
+        # the retracted sentence survives as history, never as an assertion
+        assert "BOTH HALVES ARE WITHDRAWN" in body
+        # the two ladders that contradict it, with their measured numbers
+        assert "0.1484" in body and "0.1537" in body
+        assert "FAIL -> PASS" in body
+        assert "NON-MONOTONE" in body
+        assert "0.96" in body and "-3.33" in body
+        # the corrected direction of the penetration trend
+        assert "0.1110" in body and "0.3062" in body
+        assert "UNDER-states" in body
+        # ...and the overcorrection guard: the solver itself is not impeached
+        assert "4e-14" in body
+        for src in ("numerical_rigor.md", "grid_convergence_breast.md",
+                    "grid_convergence_gbm.md"):
+            assert src in lim["source"]
+
 
 # --------------------------------------------------------------------------- #
 # 4. The rendered document
@@ -312,6 +350,7 @@ def _doc(status="done"):
              "kill_no_resistance": 0.7377, "rho": 0.5014, "hypoxia_cost": 0.4986,
              "tumor_auc": 1.69e6, "c_tumor_uM": 78.2, "ic50": 24.6,
              "L_um": 160.0, "d_eff": 225.0, "bbb": 0.858, "pen": 0.42,
+             "coverage_1x": 0.9955,
              "mw": 298.0, "diffusivity": 236.0, "binding": 0.0087,
              "clearance": 7.6e-05, "hill": 1.2,
              "delivery_decades": 0.98, "potency_decades": -0.06,
@@ -384,6 +423,54 @@ class TestRenderedDocument:
     def test_the_counterfactual_is_named_as_the_source_of_rho(self, html):
         assert "COUNTERFACTUAL" in html
         assert "r_2" in html                        # the resistance-off arm
+
+    def test_the_hero_carries_the_condition_the_same_page_states(self, html):
+        """The hero names the top of a ranking, which is the defensible output.
+        It may NOT name it as settled: limit 2b on the same page says the
+        ordering is law-dependent, and the delivery law is precisely what
+        overturns this pick (cisplatin -> vincristine)."""
+        hero = html[html.index('<div class="ch">'):html.index("2 &middot;")] \
+            if "2 &middot;" in html else html
+        # the ranking headline is still there — it is the claim
+        assert "Top of this ranking" in html
+        assert "cisplatin" in html
+        # ...and it now states the law it is conditional on, in the hero itself
+        assert "S = PS*Cp" in html or "S = PS*(Cp - C)" in html
+        assert "LAW-DEPENDENT" in html
+        assert "vincristine" in html
+        assert "SET, not a\n     winner" in html or "SET, not a winner" in html
+        # the pre-existing honest lines are NOT weakened
+        assert "This is a model output, not a recommendation" in html
+        assert "ORDER is the claim" in html
+        assert "UPPER BOUND" in hero
+
+    def test_the_hero_names_the_law_stored_with_the_document(self):
+        """Not a constant: the law that produced THIS document."""
+        doc = _doc()
+        doc["delivery_law"] = {
+            "law": "S = PS*(Cp - C)", "alternative_law": "S = PS*Cp",
+            "title": "DELIVERY LAW S = PS*(Cp - C) (exchange)",
+            "headline": "x", "caveat": "y", "reference": "z",
+        }
+        html = render_html(doc)
+        assert "Top of this ranking, under S = PS*(Cp - C)" in " ".join(
+            html.split())
+
+    def test_the_retired_metric_lost_its_column_to_the_computed_one(self, html):
+        """`penetration_index` is retired (results/delivery_metrics.md §4) — a
+        scale-invariant shape statistic that reports the section's vascular
+        geometry, shared by every drug. `therapeutic_coverage_1x` was already
+        computed and stored for every row and was never rendered. Swapped."""
+        head = html[html.index("<th class='num'>predicted kill</th>"):]
+        head = head[:head.index("</thead>")]
+        assert "coverage @1x IC50" in head
+        # the retired metric is gone as a COLUMN; it survives only in the
+        # footnote that explains that it was retired, which is history
+        assert "pen. index" not in head
+        assert "0.9955" in html                 # the row's coverage, rendered
+        # the reader is told why, on the page, with the citation
+        assert "delivery_metrics.md" in html
+        assert "scale-invariant" in html
 
     def test_a_report_that_is_not_done_still_renders_its_limits(self):
         html = render_html(_doc(status="running"))

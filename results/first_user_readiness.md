@@ -231,7 +231,14 @@ not."*
 On the same page, limit 2b (`report.py:143-159`, added 2026-08-12) correctly
 states the ranking is **law-dependent**. And the README is blunter: "**The top-1
 pick is not decision-grade.**" Correcting the delivery law changes the top-1 GBM
-pick — cisplatin → vincristine — and `P(cisplatin rank 1)` falls 0.9277 → 0.3965;
+pick — cisplatin → vincristine. **[CORRECTED]** This line originally cited
+`P(cisplatin rank 1)` falling 0.9277 → 0.3965; **those two numbers appear
+nowhere in `ranking_robustness.md`**, which reports 0.931 (90 % CI
+0.929–0.934) under its §3 priors and 0.587 under stress scenario C — and
+whose own correction notes the top-1 call *clears* its pre-declared bar
+under those priors. Caught by the agent that acted on this report, which
+checked the citation before quoting it. The finding stands on the law-driven
+flip and on §8;
 `results/ranking_robustness.md` §8 says "the reportable output of this pipeline
 for the top of the panel is a **SET**, not a winner."
 
