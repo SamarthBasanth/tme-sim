@@ -40,6 +40,66 @@
         "n_source_cells": 2304,
         "vasc_is_binary": true,
         "dx_um": 18.0
+      },
+      {
+        "f_state": 0.5502057785990258,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "mean_o2_tumour": 0.34862776586515865,
+        "median_o2_tumour_mmhg": 12.106600909723596,
+        "mean_o2_tissue": 0.35204854974974675,
+        "source_integral": 748656.0,
+        "n_source_cells": 5199,
+        "vasc_is_binary": true,
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.5488199227280364,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.9023601545439275,
+          "VIABLE": 0.09763984545607257
+        },
+        "mean_o2_tumour": 0.34824485820140866,
+        "median_o2_tumour_mmhg": 12.106488640353254,
+        "mean_o2_tissue": 0.3517610025927162,
+        "source_integral": 746816.0,
+        "n_source_cells": 11669,
+        "vasc_is_binary": true,
+        "dx_um": 8.0
+      },
+      {
+        "f_state": 0.5390139425499748,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.9219721149000504,
+          "VIABLE": 0.07802788509994961
+        },
+        "mean_o2_tumour": 0.3476118438596761,
+        "median_o2_tumour_mmhg": 12.099873210086187,
+        "mean_o2_tissue": 0.3510077380409186,
+        "source_integral": 743904.0,
+        "n_source_cells": 20664,
+        "vasc_is_binary": true,
+        "dx_um": 6.0
+      },
+      {
+        "f_state": 0.5435074752225768,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.9129850495548463,
+          "VIABLE": 0.0870149504451537
+        },
+        "mean_o2_tumour": 0.3475722508302159,
+        "median_o2_tumour_mmhg": 12.083285254342552,
+        "mean_o2_tissue": 0.3509901358117031,
+        "source_integral": 744000.0,
+        "n_source_cells": 29760,
+        "vasc_is_binary": true,
+        "dx_um": 5.0
       }
     ],
     "shipped|subgrid|raw": [
@@ -72,6 +132,66 @@
         "n_source_cells": 9434,
         "vasc_is_binary": false,
         "dx_um": 18.0
+      },
+      {
+        "f_state": 0.5,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 1.0,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.30813900790745824,
+        "median_o2_tumour_mmhg": 10.717323915789004,
+        "mean_o2_tissue": 0.3122148907220018,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 14242,
+        "vasc_is_binary": false,
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.5,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 1.0,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.30812142809708576,
+        "median_o2_tumour_mmhg": 10.717203260386784,
+        "mean_o2_tissue": 0.3122183692758672,
+        "source_integral": 619225.0,
+        "n_source_cells": 22863,
+        "vasc_is_binary": false,
+        "dx_um": 8.0
+      },
+      {
+        "f_state": 0.5,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 1.0,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.30811249093721327,
+        "median_o2_tumour_mmhg": 10.716184310707522,
+        "mean_o2_tissue": 0.3122317558744812,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 33041,
+        "vasc_is_binary": false,
+        "dx_um": 6.0
+      },
+      {
+        "f_state": 0.5,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 1.0,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.3081072668629534,
+        "median_o2_tumour_mmhg": 10.715578951982813,
+        "mean_o2_tissue": 0.31223789237800303,
+        "source_integral": 619225.0000000002,
+        "n_source_cells": 42606,
+        "vasc_is_binary": false,
+        "dx_um": 5.0
       }
     ],
     "shipped|subgrid|closed": [
@@ -104,6 +224,66 @@
         "n_source_cells": 9434,
         "vasc_is_binary": false,
         "dx_um": 18.0
+      },
+      {
+        "f_state": 0.36874685032756593,
+        "band_fractions": {
+          "HYPOXIC": 0.8750209978162271,
+          "QUIESCENT": 0.12497900218377289,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.18436045203158735,
+        "median_o2_tumour_mmhg": 6.405463834794405,
+        "mean_o2_tissue": 0.1856036128301703,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 14242,
+        "vasc_is_binary": false,
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.47926885603897196,
+        "band_fractions": {
+          "HYPOXIC": 0.1382076264068537,
+          "QUIESCENT": 0.8617923735931463,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.2170894439315337,
+        "median_o2_tumour_mmhg": 7.57302916687101,
+        "mean_o2_tissue": 0.2193285129438049,
+        "source_integral": 619225.0,
+        "n_source_cells": 22863,
+        "vasc_is_binary": false,
+        "dx_um": 8.0
+      },
+      {
+        "f_state": 0.5,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 1.0,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.2392948805496548,
+        "median_o2_tumour_mmhg": 8.350889819303882,
+        "mean_o2_tissue": 0.24195660040120925,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 33041,
+        "vasc_is_binary": false,
+        "dx_um": 6.0
+      },
+      {
+        "f_state": 0.5,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 1.0,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.25134997986833224,
+        "median_o2_tumour_mmhg": 8.775612537968287,
+        "mean_o2_tissue": 0.25430075635076144,
+        "source_integral": 619225.0000000002,
+        "n_source_cells": 42606,
+        "vasc_is_binary": false,
+        "dx_um": 5.0
       }
     ],
     "joint_lo|binary|raw": [
@@ -136,6 +316,66 @@
         "n_source_cells": 2304,
         "vasc_is_binary": true,
         "dx_um": 18.0
+      },
+      {
+        "f_state": 0.5248530152864102,
+        "band_fractions": {
+          "HYPOXIC": 0.4022341676465648,
+          "QUIESCENT": 0.42738955148664537,
+          "VIABLE": 0.17037628086678985
+        },
+        "mean_o2_tumour": 0.26147588888307727,
+        "median_o2_tumour_mmhg": 8.193206988360275,
+        "mean_o2_tissue": 0.3580498294187376,
+        "source_integral": 748656.0,
+        "n_source_cells": 5199,
+        "vasc_is_binary": true,
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.5510246934318831,
+        "band_fractions": {
+          "HYPOXIC": 0.3468839240718965,
+          "QUIESCENT": 0.4470015118427684,
+          "VIABLE": 0.20611456408533513
+        },
+        "mean_o2_tumour": 0.2805496101819024,
+        "median_o2_tumour_mmhg": 9.000944793843509,
+        "mean_o2_tissue": 0.39582560158532065,
+        "source_integral": 746816.0,
+        "n_source_cells": 11669,
+        "vasc_is_binary": true,
+        "dx_um": 8.0
+      },
+      {
+        "f_state": 0.5586175037796068,
+        "band_fractions": {
+          "HYPOXIC": 0.3270619855535024,
+          "QUIESCENT": 0.457584411221233,
+          "VIABLE": 0.21535360322526456
+        },
+        "mean_o2_tumour": 0.2864742542522745,
+        "median_o2_tumour_mmhg": 9.260659633289126,
+        "mean_o2_tissue": 0.4127330538565245,
+        "source_integral": 743904.0,
+        "n_source_cells": 20664,
+        "vasc_is_binary": true,
+        "dx_um": 6.0
+      },
+      {
+        "f_state": 0.561322022509659,
+        "band_fractions": {
+          "HYPOXIC": 0.3205106668906434,
+          "QUIESCENT": 0.4606920880228456,
+          "VIABLE": 0.218797245086511
+        },
+        "mean_o2_tumour": 0.28784923967592996,
+        "median_o2_tumour_mmhg": 9.329440290607002,
+        "mean_o2_tissue": 0.4205199103568156,
+        "source_integral": 744000.0,
+        "n_source_cells": 29760,
+        "vasc_is_binary": true,
+        "dx_um": 5.0
       }
     ],
     "joint_lo|subgrid|raw": [
@@ -168,6 +408,66 @@
         "n_source_cells": 9434,
         "vasc_is_binary": false,
         "dx_um": 18.0
+      },
+      {
+        "f_state": 0.592888039643877,
+        "band_fractions": {
+          "HYPOXIC": 0.2927515538384008,
+          "QUIESCENT": 0.43364690072232487,
+          "VIABLE": 0.27360154543927434
+        },
+        "mean_o2_tumour": 0.31095613907131264,
+        "median_o2_tumour_mmhg": 10.000237198422981,
+        "mean_o2_tissue": 0.4191342687755454,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 14242,
+        "vasc_is_binary": false,
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.5734209642197212,
+        "band_fractions": {
+          "HYPOXIC": 0.30858390727364354,
+          "QUIESCENT": 0.4519989921048211,
+          "VIABLE": 0.23941710062153537
+        },
+        "mean_o2_tumour": 0.29613337229348297,
+        "median_o2_tumour_mmhg": 9.584763227228684,
+        "mean_o2_tissue": 0.41634804930328617,
+        "source_integral": 619225.0,
+        "n_source_cells": 22863,
+        "vasc_is_binary": false,
+        "dx_um": 8.0
+      },
+      {
+        "f_state": 0.5644695951621032,
+        "band_fractions": {
+          "HYPOXIC": 0.3178649420460272,
+          "QUIESCENT": 0.45783638501595836,
+          "VIABLE": 0.22429867293801445
+        },
+        "mean_o2_tumour": 0.28882886368227856,
+        "median_o2_tumour_mmhg": 9.406171382679887,
+        "mean_o2_tissue": 0.41704394343068885,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 33041,
+        "vasc_is_binary": false,
+        "dx_um": 6.0
+      },
+      {
+        "f_state": 0.5588715773559549,
+        "band_fractions": {
+          "HYPOXIC": 0.32214849655635813,
+          "QUIESCENT": 0.46346379976482444,
+          "VIABLE": 0.2143877036788174
+        },
+        "mean_o2_tumour": 0.2850962205969064,
+        "median_o2_tumour_mmhg": 9.30380246919294,
+        "mean_o2_tissue": 0.41830348956520463,
+        "source_integral": 619225.0000000002,
+        "n_source_cells": 42606,
+        "vasc_is_binary": false,
+        "dx_um": 5.0
       }
     ],
     "joint_lo|subgrid|closed": [
@@ -200,6 +500,66 @@
         "n_source_cells": 9434,
         "vasc_is_binary": false,
         "dx_um": 18.0
+      },
+      {
+        "f_state": 0.37665462791869647,
+        "band_fractions": {
+          "HYPOXIC": 0.9013942549974803,
+          "QUIESCENT": 0.07487821266588275,
+          "VIABLE": 0.023727532336636988
+        },
+        "mean_o2_tumour": 0.11340919465960884,
+        "median_o2_tumour_mmhg": 3.1553630849554826,
+        "mean_o2_tissue": 0.13993708969718702,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 14242,
+        "vasc_is_binary": false,
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.37329287754073576,
+        "band_fractions": {
+          "HYPOXIC": 0.8857298840920544,
+          "QUIESCENT": 0.10196539559885771,
+          "VIABLE": 0.012304720309087854
+        },
+        "mean_o2_tumour": 0.120986221040237,
+        "median_o2_tumour_mmhg": 3.6792685641148895,
+        "mean_o2_tissue": 0.16683514906374258,
+        "source_integral": 619225.0,
+        "n_source_cells": 22863,
+        "vasc_is_binary": false,
+        "dx_um": 8.0
+      },
+      {
+        "f_state": 0.3810095750041995,
+        "band_fractions": {
+          "HYPOXIC": 0.8254661515202419,
+          "QUIESCENT": 0.1648748530152864,
+          "VIABLE": 0.009658995464471696
+        },
+        "mean_o2_tumour": 0.1366564272248658,
+        "median_o2_tumour_mmhg": 4.313649504187645,
+        "mean_o2_tissue": 0.1966520927772247,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 33041,
+        "vasc_is_binary": false,
+        "dx_um": 6.0
+      },
+      {
+        "f_state": 0.3892995128506635,
+        "band_fractions": {
+          "HYPOXIC": 0.7697799428859399,
+          "QUIESCENT": 0.22068704854695112,
+          "VIABLE": 0.00953300856710902
+        },
+        "mean_o2_tumour": 0.14907615544309255,
+        "median_o2_tumour_mmhg": 4.753450486337974,
+        "mean_o2_tissue": 0.21894351990887956,
+        "source_integral": 619225.0000000002,
+        "n_source_cells": 42606,
+        "vasc_is_binary": false,
+        "dx_um": 5.0
       }
     ],
     "joint_hi|binary|raw": [
@@ -232,6 +592,66 @@
         "n_source_cells": 2304,
         "vasc_is_binary": true,
         "dx_um": 18.0
+      },
+      {
+        "f_state": 0.41674365865949936,
+        "band_fractions": {
+          "HYPOXIC": 0.7076264068536872,
+          "QUIESCENT": 0.24659835377120778,
+          "VIABLE": 0.04577523937510499
+        },
+        "mean_o2_tumour": 0.16135059979584923,
+        "median_o2_tumour_mmhg": 4.525962348874388,
+        "mean_o2_tissue": 0.27036218774356363,
+        "source_integral": 748656.0,
+        "n_source_cells": 5199,
+        "vasc_is_binary": true,
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.42767512178733413,
+        "band_fractions": {
+          "HYPOXIC": 0.6609272635645893,
+          "QUIESCENT": 0.2854443137913657,
+          "VIABLE": 0.05362842264404502
+        },
+        "mean_o2_tumour": 0.17385148998808936,
+        "median_o2_tumour_mmhg": 5.0783109327987805,
+        "mean_o2_tissue": 0.3072819319899624,
+        "source_integral": 746816.0,
+        "n_source_cells": 11669,
+        "vasc_is_binary": true,
+        "dx_um": 8.0
+      },
+      {
+        "f_state": 0.42958802284562403,
+        "band_fractions": {
+          "HYPOXIC": 0.6459348227784311,
+          "QUIESCENT": 0.30110868469679153,
+          "VIABLE": 0.052956492524777424
+        },
+        "mean_o2_tumour": 0.17752077125934343,
+        "median_o2_tumour_mmhg": 5.26765062697762,
+        "mean_o2_tissue": 0.32510489485746585,
+        "source_integral": 743904.0,
+        "n_source_cells": 20664,
+        "vasc_is_binary": true,
+        "dx_um": 6.0
+      },
+      {
+        "f_state": 0.4293822442465984,
+        "band_fractions": {
+          "HYPOXIC": 0.6428271459768184,
+          "QUIESCENT": 0.30556022173693936,
+          "VIABLE": 0.05161263228624223
+        },
+        "mean_o2_tumour": 0.1782597305603165,
+        "median_o2_tumour_mmhg": 5.325421062450369,
+        "mean_o2_tissue": 0.33389190128013607,
+        "source_integral": 744000.0,
+        "n_source_cells": 29760,
+        "vasc_is_binary": true,
+        "dx_um": 5.0
       }
     ],
     "joint_hi|subgrid|raw": [
@@ -264,6 +684,66 @@
         "n_source_cells": 9434,
         "vasc_is_binary": false,
         "dx_um": 18.0
+      },
+      {
+        "f_state": 0.45483999664034946,
+        "band_fractions": {
+          "HYPOXIC": 0.5971358978666219,
+          "QUIESCENT": 0.31404333949269275,
+          "VIABLE": 0.08882076264068536
+        },
+        "mean_o2_tumour": 0.19800415200951677,
+        "median_o2_tumour_mmhg": 5.736315744826434,
+        "mean_o2_tissue": 0.3243169772827571,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 14242,
+        "vasc_is_binary": false,
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.4383483117755753,
+        "band_fractions": {
+          "HYPOXIC": 0.6239291113724172,
+          "QUIESCENT": 0.31219553166470687,
+          "VIABLE": 0.06387535696287586
+        },
+        "mean_o2_tumour": 0.18503785452280633,
+        "median_o2_tumour_mmhg": 5.486772096066903,
+        "mean_o2_tissue": 0.32545772374451487,
+        "source_integral": 619225.0,
+        "n_source_cells": 22863,
+        "vasc_is_binary": false,
+        "dx_um": 8.0
+      },
+      {
+        "f_state": 0.42980849991600867,
+        "band_fractions": {
+          "HYPOXIC": 0.6377456744498572,
+          "QUIESCENT": 0.31131362338316815,
+          "VIABLE": 0.05094070216697463
+        },
+        "mean_o2_tumour": 0.1788687790688602,
+        "median_o2_tumour_mmhg": 5.359132298877803,
+        "mean_o2_tissue": 0.32858537352606076,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 33041,
+        "vasc_is_binary": false,
+        "dx_um": 6.0
+      },
+      {
+        "f_state": 0.42517428187468503,
+        "band_fractions": {
+          "HYPOXIC": 0.6456828489837056,
+          "QUIESCENT": 0.31026373257181256,
+          "VIABLE": 0.044053418444481775
+        },
+        "mean_o2_tumour": 0.1757472706027893,
+        "median_o2_tumour_mmhg": 5.30030402631337,
+        "mean_o2_tissue": 0.3312781558962362,
+        "source_integral": 619225.0000000002,
+        "n_source_cells": 42606,
+        "vasc_is_binary": false,
+        "dx_um": 5.0
       }
     ],
     "joint_hi|subgrid|closed": [
@@ -296,6 +776,117 @@
         "n_source_cells": 9434,
         "vasc_is_binary": false,
         "dx_um": 18.0
+      },
+      {
+        "f_state": 0.3657798588946749,
+        "band_fractions": {
+          "HYPOXIC": 0.9493952628926592,
+          "QUIESCENT": 0.03422644045019318,
+          "VIABLE": 0.016378296657147656
+        },
+        "mean_o2_tumour": 0.07559975523332768,
+        "median_o2_tumour_mmhg": 1.8564970746577758,
+        "mean_o2_tissue": 0.11115367524639697,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 14242,
+        "vasc_is_binary": false,
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.3602049386863766,
+        "band_fractions": {
+          "HYPOXIC": 0.9580043675457752,
+          "QUIESCENT": 0.034184444817738954,
+          "VIABLE": 0.007811187636485806
+        },
+        "mean_o2_tumour": 0.07847124278158182,
+        "median_o2_tumour_mmhg": 2.1603608828672773,
+        "mean_o2_tissue": 0.13430683425253906,
+        "source_integral": 619225.0,
+        "n_source_cells": 22863,
+        "vasc_is_binary": false,
+        "dx_um": 8.0
+      },
+      {
+        "f_state": 0.36007685200739126,
+        "band_fractions": {
+          "HYPOXIC": 0.9528389047539056,
+          "QUIESCENT": 0.04115571980514027,
+          "VIABLE": 0.006005375440954141
+        },
+        "mean_o2_tumour": 0.0871607875211354,
+        "median_o2_tumour_mmhg": 2.5197411729419454,
+        "mean_o2_tissue": 0.1588928106301314,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 33041,
+        "vasc_is_binary": false,
+        "dx_um": 6.0
+      },
+      {
+        "f_state": 0.36205484629598517,
+        "band_fractions": {
+          "HYPOXIC": 0.9371325382160255,
+          "QUIESCENT": 0.05761800772719637,
+          "VIABLE": 0.005249454056778095
+        },
+        "mean_o2_tumour": 0.09418514557409528,
+        "median_o2_tumour_mmhg": 2.7651548637556065,
+        "mean_o2_tissue": 0.1771622487634339,
+        "source_integral": 619225.0000000002,
+        "n_source_cells": 42606,
+        "vasc_is_binary": false,
+        "dx_um": 5.0
+      }
+    ],
+    "shipped|binary|closed": [
+      {
+        "f_state": 0.5502057785990258,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 0.8995884428019486,
+          "VIABLE": 0.10041155719805141
+        },
+        "mean_o2_tumour": 0.34862776586515865,
+        "median_o2_tumour_mmhg": 12.106600909723596,
+        "mean_o2_tissue": 0.35204854974974675,
+        "source_integral": 748656.0,
+        "n_source_cells": 5199,
+        "vasc_is_binary": true,
+        "dx_um": 12.0
+      }
+    ],
+    "joint_lo|binary|closed": [
+      {
+        "f_state": 0.5248530152864102,
+        "band_fractions": {
+          "HYPOXIC": 0.4022341676465648,
+          "QUIESCENT": 0.42738955148664537,
+          "VIABLE": 0.17037628086678985
+        },
+        "mean_o2_tumour": 0.26147588888307727,
+        "median_o2_tumour_mmhg": 8.193206988360275,
+        "mean_o2_tissue": 0.3580498294187376,
+        "source_integral": 748656.0,
+        "n_source_cells": 5199,
+        "vasc_is_binary": true,
+        "dx_um": 12.0
+      }
+    ],
+    "joint_hi|binary|closed": [
+      {
+        "f_state": 0.41674365865949936,
+        "band_fractions": {
+          "HYPOXIC": 0.7076264068536872,
+          "QUIESCENT": 0.24659835377120778,
+          "VIABLE": 0.04577523937510499
+        },
+        "mean_o2_tumour": 0.16135059979584923,
+        "median_o2_tumour_mmhg": 4.525962348874388,
+        "mean_o2_tissue": 0.27036218774356363,
+        "source_integral": 748656.0,
+        "n_source_cells": 5199,
+        "vasc_is_binary": true,
+        "dx_um": 12.0
       }
     ]
   }

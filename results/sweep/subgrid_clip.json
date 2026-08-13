@@ -1,0 +1,277 @@
+{
+  "beta_cap": 5.677,
+  "dx_ladder": [
+    30.0,
+    18.0,
+    12.0,
+    8.0
+  ],
+  "arms": {
+    "shipped|subgrid|clipped": [
+      {
+        "f_state": 0.4984755585419116,
+        "band_fractions": {
+          "HYPOXIC": 0.010162943053922392,
+          "QUIESCENT": 0.9898370569460776,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.23114431474528913,
+        "median_o2_tumour_mmhg": 8.019820138926393,
+        "mean_o2_tissue": 0.2323077127822399,
+        "source_integral": 619225.0,
+        "n_source_cells": 6140,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.3490228013029316
+        },
+        "dx_um": 30.0
+      },
+      {
+        "f_state": 0.4943557869981522,
+        "band_fractions": {
+          "HYPOXIC": 0.03762808667898539,
+          "QUIESCENT": 0.9623719133210146,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.22190040106192785,
+        "median_o2_tumour_mmhg": 7.719437456738308,
+        "mean_o2_tissue": 0.22356906044931263,
+        "source_integral": 619225.0,
+        "n_source_cells": 9434,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.41933432266270937
+        },
+        "dx_um": 18.0
+      },
+      {
+        "f_state": 0.5,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 1.0,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.23683639555851166,
+        "median_o2_tumour_mmhg": 8.253111637186432,
+        "mean_o2_tissue": 0.23927168816547031,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 14242,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.38715802799071664
+        },
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.5,
+        "band_fractions": {
+          "HYPOXIC": 0.0,
+          "QUIESCENT": 1.0,
+          "VIABLE": 0.0
+        },
+        "mean_o2_tumour": 0.2558092583325474,
+        "median_o2_tumour_mmhg": 8.92635313695219,
+        "mean_o2_tissue": 0.25878897125473493,
+        "source_integral": 619225.0,
+        "n_source_cells": 22863,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.3372567409144197
+        },
+        "dx_um": 8.0
+      }
+    ],
+    "joint_lo|subgrid|clipped": [
+      {
+        "f_state": 0.5354023181589115,
+        "band_fractions": {
+          "HYPOXIC": 0.4396942717957332,
+          "QUIESCENT": 0.35759281034772383,
+          "VIABLE": 0.2027129178565429
+        },
+        "mean_o2_tumour": 0.2667813536930695,
+        "median_o2_tumour_mmhg": 7.83775827814834,
+        "mean_o2_tissue": 0.31896593193215006,
+        "source_integral": 619225.0,
+        "n_source_cells": 6140,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.3490228013029316
+        },
+        "dx_um": 30.0
+      },
+      {
+        "f_state": 0.45722744834537205,
+        "band_fractions": {
+          "HYPOXIC": 0.5728204266756257,
+          "QUIESCENT": 0.34087854863094236,
+          "VIABLE": 0.08630102469343189
+        },
+        "mean_o2_tumour": 0.20989497506294397,
+        "median_o2_tumour_mmhg": 6.259435480112537,
+        "mean_o2_tissue": 0.2582381855310123,
+        "source_integral": 619225.0,
+        "n_source_cells": 9434,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.41933432266270937
+        },
+        "dx_um": 18.0
+      },
+      {
+        "f_state": 0.43346211993952627,
+        "band_fractions": {
+          "HYPOXIC": 0.6138081639509491,
+          "QUIESCENT": 0.3351251469847136,
+          "VIABLE": 0.05106668906433731
+        },
+        "mean_o2_tumour": 0.19162135973416816,
+        "median_o2_tumour_mmhg": 5.922643704602569,
+        "mean_o2_tissue": 0.2515351160843287,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 14242,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.38715802799071664
+        },
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.42488661179237364,
+        "band_fractions": {
+          "HYPOXIC": 0.6086846967915337,
+          "QUIESCENT": 0.35893667058625905,
+          "VIABLE": 0.03237863262220729
+        },
+        "mean_o2_tumour": 0.1873033987827425,
+        "median_o2_tumour_mmhg": 5.974092048370719,
+        "mean_o2_tissue": 0.2612455992509544,
+        "source_integral": 619225.0,
+        "n_source_cells": 22863,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.3372567409144197
+        },
+        "dx_um": 8.0
+      }
+    ],
+    "joint_hi|subgrid|clipped": [
+      {
+        "f_state": 0.4562111540399798,
+        "band_fractions": {
+          "HYPOXIC": 0.6911641189316311,
+          "QUIESCENT": 0.18906433730891986,
+          "VIABLE": 0.11977154375944901
+        },
+        "mean_o2_tumour": 0.17802264407253904,
+        "median_o2_tumour_mmhg": 4.4118232031506555,
+        "mean_o2_tissue": 0.23852458696721096,
+        "source_integral": 619225.0,
+        "n_source_cells": 6140,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.3490228013029316
+        },
+        "dx_um": 30.0
+      },
+      {
+        "f_state": 0.4046132202250966,
+        "band_fractions": {
+          "HYPOXIC": 0.8020745842432387,
+          "QUIESCENT": 0.14807660003359652,
+          "VIABLE": 0.04984881572316479
+        },
+        "mean_o2_tumour": 0.1376123205321339,
+        "median_o2_tumour_mmhg": 3.6301375029526204,
+        "mean_o2_tissue": 0.19736728042171398,
+        "source_integral": 619225.0,
+        "n_source_cells": 9434,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.41933432266270937
+        },
+        "dx_um": 18.0
+      },
+      {
+        "f_state": 0.3864585083151352,
+        "band_fractions": {
+          "HYPOXIC": 0.8353351251469847,
+          "QUIESCENT": 0.1411473206786494,
+          "VIABLE": 0.023517554174365865
+        },
+        "mean_o2_tumour": 0.12330988246390667,
+        "median_o2_tumour_mmhg": 3.4402178237061043,
+        "mean_o2_tissue": 0.1957523465314634,
+        "source_integral": 619224.9999999999,
+        "n_source_cells": 14242,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.38715802799071664
+        },
+        "dx_um": 12.0
+      },
+      {
+        "f_state": 0.3783575508147153,
+        "band_fractions": {
+          "HYPOXIC": 0.8486057450025197,
+          "QUIESCENT": 0.1400974298672938,
+          "VIABLE": 0.01129682513018646
+        },
+        "mean_o2_tumour": 0.11867422247363515,
+        "median_o2_tumour_mmhg": 3.448114364250193,
+        "mean_o2_tissue": 0.20650261027043856,
+        "source_integral": 619225.0,
+        "n_source_cells": 22863,
+        "vasc_is_binary": false,
+        "beta_stats": {
+          "beta_cap": 5.677,
+          "frac_cells_declined": 0.3372567409144197
+        },
+        "dx_um": 8.0
+      }
+    ]
+  },
+  "summary": {
+    "shipped|subgrid|clipped": {
+      "f_state_by_dx": {
+        "30.0": 0.4984755585419116,
+        "18.0": 0.4943557869981522,
+        "12.0": 0.5,
+        "8.0": 0.5
+      },
+      "f_state_span_ladder": 0.005644213001847809,
+      "frac_cells_declined": 0.3490228013029316
+    },
+    "joint_lo|subgrid|clipped": {
+      "f_state_by_dx": {
+        "30.0": 0.5354023181589115,
+        "18.0": 0.45722744834537205,
+        "12.0": 0.43346211993952627,
+        "8.0": 0.42488661179237364
+      },
+      "f_state_span_ladder": 0.11051570636653785,
+      "frac_cells_declined": 0.3490228013029316
+    },
+    "joint_hi|subgrid|clipped": {
+      "f_state_by_dx": {
+        "30.0": 0.4562111540399798,
+        "18.0": 0.4046132202250966,
+        "12.0": 0.3864585083151352,
+        "8.0": 0.3783575508147153
+      },
+      "f_state_span_ladder": 0.07785360322526452,
+      "frac_cells_declined": 0.3490228013029316
+    }
+  }
+}
