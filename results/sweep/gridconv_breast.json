@@ -350,7 +350,14 @@
    "solve_s": 5.763611793518066,
    "penetration_index": 0.2800508947626695,
    "_e_unit_sum": 3821.90272006019,
-   "_e_unit_first": 0.03485949663637098
+   "_e_unit_first": 0.03485949663637098,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.05746191856610602,
+   "band_ratio_hi": 1.0,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489132
   },
   {
    "drug": "paclitaxel",
@@ -372,10 +379,10 @@
    "e_unit_p99": 0.054426022570947336,
    "e_unit_p01": 3.136191175920529e-05,
    "e_unit_max": 0.08821661751837154,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159893,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 30.0,
@@ -400,7 +407,14 @@
    "solve_s": 5.774648189544678,
    "penetration_index": 0.14554573109128138,
    "_e_unit_sum": 805.2984664218416,
-   "_e_unit_first": 0.009854476351816828
+   "_e_unit_first": 0.009854476351816828,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (25x fold shift), so the min-max interval is zero-width (0.0412-0.0412) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.04115959040159893,
+   "band_ratio_hi": 0.04115959040159893,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159893,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "docetaxel",
@@ -450,7 +464,14 @@
    "solve_s": 5.655520915985107,
    "penetration_index": 0.14307381546205333,
    "_e_unit_sum": 743.5587311109355,
-   "_e_unit_first": 0.009176602632212805
+   "_e_unit_first": 0.009176602632212805,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.015191651385247596,
+   "band_ratio_hi": 0.1462692215159669,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489137
   },
   {
    "drug": "epirubicin",
@@ -500,7 +521,14 @@
    "solve_s": 5.769918918609619,
    "penetration_index": 0.2800508947626695,
    "_e_unit_sum": 3821.90272006019,
-   "_e_unit_first": 0.03485949663637098
+   "_e_unit_first": 0.03485949663637098,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.01100669697548635,
+   "band_ratio_hi": 1.0,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "5-fluorouracil",
@@ -522,10 +550,10 @@
    "e_unit_p99": 13.51833836602882,
    "e_unit_p01": 2.953811561621659,
    "e_unit_max": 16.15535918341592,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159892,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 30.0,
@@ -550,7 +578,14 @@
    "solve_s": 5.798399925231934,
    "penetration_index": 0.4970461959754857,
    "_e_unit_sum": 710678.9051939987,
-   "_e_unit_first": 7.165437440209071
+   "_e_unit_first": 7.165437440209071,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (7.5x fold shift), so the min-max interval is zero-width (0.1636-0.1636) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.16363821392731037,
+   "band_ratio_hi": 0.16363821392731037,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "cisplatin",
@@ -600,7 +635,14 @@
    "solve_s": 6.174941062927246,
    "penetration_index": 0.4341157343513213,
    "_e_unit_sum": 614877.5798600572,
-   "_e_unit_first": 5.719151370595233
+   "_e_unit_first": 5.719151370595233,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.20864163423872,
+   "band_ratio_hi": 1.5003511388489135,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "doxorubicin",
@@ -650,7 +692,14 @@
    "solve_s": 9.564204692840576,
    "penetration_index": 0.2934146247084852,
    "_e_unit_sum": 3755.5748378325916,
-   "_e_unit_first": 0.034544108391368254
+   "_e_unit_first": 0.034544108391368254,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.05746191856610602,
+   "band_ratio_hi": 1.0,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489132
   },
   {
    "drug": "paclitaxel",
@@ -672,10 +721,10 @@
    "e_unit_p99": 0.04508344946333813,
    "e_unit_p01": 3.805480306277341e-05,
    "e_unit_max": 0.07523144432462398,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159893,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 24.0,
@@ -700,7 +749,14 @@
    "solve_s": 9.848594188690186,
    "penetration_index": 0.16528226004609797,
    "_e_unit_sum": 789.3416969151589,
-   "_e_unit_first": 0.009148891513056421
+   "_e_unit_first": 0.009148891513056421,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (25x fold shift), so the min-max interval is zero-width (0.0412-0.0412) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.04115959040159893,
+   "band_ratio_hi": 0.04115959040159893,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159893,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "docetaxel",
@@ -750,7 +806,14 @@
    "solve_s": 9.864734888076782,
    "penetration_index": 0.1626331421989977,
    "_e_unit_sum": 728.6910268165068,
-   "_e_unit_first": 0.00851671136690655
+   "_e_unit_first": 0.00851671136690655,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.015191651385247596,
+   "band_ratio_hi": 0.1462692215159669,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489137
   },
   {
    "drug": "epirubicin",
@@ -800,7 +863,14 @@
    "solve_s": 9.496970891952515,
    "penetration_index": 0.2934146247084852,
    "_e_unit_sum": 3755.5748378325916,
-   "_e_unit_first": 0.034544108391368254
+   "_e_unit_first": 0.034544108391368254,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.01100669697548635,
+   "band_ratio_hi": 1.0,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "5-fluorouracil",
@@ -822,10 +892,10 @@
    "e_unit_p99": 13.891957137934817,
    "e_unit_p01": 3.0323959312226068,
    "e_unit_max": 17.165613955998026,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159892,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 24.0,
@@ -850,7 +920,14 @@
    "solve_s": 9.402204275131226,
    "penetration_index": 0.4684460447385821,
    "_e_unit_sum": 703608.0876204966,
-   "_e_unit_first": 6.59719197497271
+   "_e_unit_first": 6.59719197497271,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (7.5x fold shift), so the min-max interval is zero-width (0.1636-0.1636) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.16363821392731037,
+   "band_ratio_hi": 0.16363821392731037,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "cisplatin",
@@ -900,7 +977,14 @@
    "solve_s": 9.344987154006958,
    "penetration_index": 0.42233703300738135,
    "_e_unit_sum": 606833.4080638683,
-   "_e_unit_first": 5.385018899843965
+   "_e_unit_first": 5.385018899843965,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.20864163423872,
+   "band_ratio_hi": 1.5003511388489135,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "doxorubicin",
@@ -950,7 +1034,14 @@
    "solve_s": 18.480379819869995,
    "penetration_index": 0.3075935050124245,
    "_e_unit_sum": 3759.512327068028,
-   "_e_unit_first": 0.032646641104813766
+   "_e_unit_first": 0.032646641104813766,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.05746191856610602,
+   "band_ratio_hi": 1.0,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489132
   },
   {
    "drug": "paclitaxel",
@@ -972,10 +1063,10 @@
    "e_unit_p99": 0.03943679578735647,
    "e_unit_p01": 6.817120924946039e-05,
    "e_unit_max": 0.07560099690745427,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159893,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 18.0,
@@ -1000,7 +1091,14 @@
    "solve_s": 18.078782081604004,
    "penetration_index": 0.18700363786148747,
    "_e_unit_sum": 790.6286106809847,
-   "_e_unit_first": 0.006614920866465221
+   "_e_unit_first": 0.006614920866465221,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (25x fold shift), so the min-max interval is zero-width (0.0412-0.0412) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.04115959040159893,
+   "band_ratio_hi": 0.04115959040159893,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159893,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "docetaxel",
@@ -1050,7 +1148,14 @@
    "solve_s": 20.619423151016235,
    "penetration_index": 0.18425982010901443,
    "_e_unit_sum": 729.8270358713233,
-   "_e_unit_first": 0.006094550702447637
+   "_e_unit_first": 0.006094550702447637,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.015191651385247596,
+   "band_ratio_hi": 0.1462692215159669,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489137
   },
   {
    "drug": "epirubicin",
@@ -1100,7 +1205,14 @@
    "solve_s": 22.06449317932129,
    "penetration_index": 0.3075935050124245,
    "_e_unit_sum": 3759.512327068028,
-   "_e_unit_first": 0.032646641104813766
+   "_e_unit_first": 0.032646641104813766,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.01100669697548635,
+   "band_ratio_hi": 1.0,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "5-fluorouracil",
@@ -1122,10 +1234,10 @@
    "e_unit_p99": 13.378848879378687,
    "e_unit_p01": 3.0182199572937143,
    "e_unit_max": 15.793784814901057,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159892,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 18.0,
@@ -1150,7 +1262,14 @@
    "solve_s": 23.65091609954834,
    "penetration_index": 0.478931886031049,
    "_e_unit_sum": 701649.7828395123,
-   "_e_unit_first": 7.088866234797645
+   "_e_unit_first": 7.088866234797645,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (7.5x fold shift), so the min-max interval is zero-width (0.1636-0.1636) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.16363821392731037,
+   "band_ratio_hi": 0.16363821392731037,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "cisplatin",
@@ -1200,7 +1319,14 @@
    "solve_s": 29.15257692337036,
    "penetration_index": 0.4285083134156215,
    "_e_unit_sum": 605832.0006530063,
-   "_e_unit_first": 5.680932756151096
+   "_e_unit_first": 5.680932756151096,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.20864163423872,
+   "band_ratio_hi": 1.5003511388489135,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "doxorubicin",
@@ -1250,7 +1376,14 @@
    "solve_s": 36.710878133773804,
    "penetration_index": 0.31231438292564906,
    "_e_unit_sum": 3702.2064919784757,
-   "_e_unit_first": 0.027178555695738984
+   "_e_unit_first": 0.027178555695738984,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.05746191856610602,
+   "band_ratio_hi": 1.0,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489132
   },
   {
    "drug": "paclitaxel",
@@ -1272,10 +1405,10 @@
    "e_unit_p99": 0.03827604387283728,
    "e_unit_p01": 7.208076307381434e-05,
    "e_unit_max": 0.07025529393777373,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159893,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 16.0,
@@ -1300,7 +1433,14 @@
    "solve_s": 43.096822023391724,
    "penetration_index": 0.19282486602033289,
    "_e_unit_sum": 774.2044030490658,
-   "_e_unit_first": 0.006142630899246384
+   "_e_unit_first": 0.006142630899246384,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (25x fold shift), so the min-max interval is zero-width (0.0412-0.0412) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.04115959040159893,
+   "band_ratio_hi": 0.04115959040159893,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159893,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "docetaxel",
@@ -1350,7 +1490,14 @@
    "solve_s": 36.94010281562805,
    "penetration_index": 0.19014326338331797,
    "_e_unit_sum": 714.5619810983655,
-   "_e_unit_first": 0.0056883291225047344
+   "_e_unit_first": 0.0056883291225047344,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.015191651385247596,
+   "band_ratio_hi": 0.1462692215159669,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489137
   },
   {
    "drug": "epirubicin",
@@ -1400,7 +1547,14 @@
    "solve_s": 29.864591121673584,
    "penetration_index": 0.31231438292564906,
    "_e_unit_sum": 3702.2064919784757,
-   "_e_unit_first": 0.027178555695738984
+   "_e_unit_first": 0.027178555695738984,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.01100669697548635,
+   "band_ratio_hi": 1.0,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "5-fluorouracil",
@@ -1422,10 +1576,10 @@
    "e_unit_p99": 13.166343231339804,
    "e_unit_p01": 2.8039382735737846,
    "e_unit_max": 15.892885547909641,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159892,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 16.0,
@@ -1450,7 +1604,14 @@
    "solve_s": 25.173337936401367,
    "penetration_index": 0.48205261228522134,
    "_e_unit_sum": 694896.1583208531,
-   "_e_unit_first": 6.354842800883856
+   "_e_unit_first": 6.354842800883856,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (7.5x fold shift), so the min-max interval is zero-width (0.1636-0.1636) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.16363821392731037,
+   "band_ratio_hi": 0.16363821392731037,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "cisplatin",
@@ -1500,7 +1661,14 @@
    "solve_s": 24.62821364402771,
    "penetration_index": 0.4324469387950769,
    "_e_unit_sum": 599142.9523624915,
-   "_e_unit_first": 4.941295203906098
+   "_e_unit_first": 4.941295203906098,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.20864163423872,
+   "band_ratio_hi": 1.5003511388489135,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "doxorubicin",
@@ -1550,7 +1718,14 @@
    "solve_s": 50.26427507400513,
    "penetration_index": 0.31960750271704375,
    "_e_unit_sum": 3730.1423182718845,
-   "_e_unit_first": 0.03246877747614302
+   "_e_unit_first": 0.03246877747614302,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.05746191856610602,
+   "band_ratio_hi": 1.0,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489132
   },
   {
    "drug": "paclitaxel",
@@ -1572,10 +1747,10 @@
    "e_unit_p99": 0.0361854353695614,
    "e_unit_p01": 8.659281708892576e-05,
    "e_unit_max": 0.06813484927570003,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159893,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 12.0,
@@ -1600,7 +1775,14 @@
    "solve_s": 55.01297187805176,
    "penetration_index": 0.20384518308573174,
    "_e_unit_sum": 781.6022069488814,
-   "_e_unit_first": 0.008258749768962358
+   "_e_unit_first": 0.008258749768962358,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (25x fold shift), so the min-max interval is zero-width (0.0412-0.0412) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.04115959040159893,
+   "band_ratio_hi": 0.04115959040159893,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159893,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "docetaxel",
@@ -1650,7 +1832,14 @@
    "solve_s": 65.9948799610138,
    "penetration_index": 0.201241843222828,
    "_e_unit_sum": 721.4269446913144,
-   "_e_unit_first": 0.0076742651819080975
+   "_e_unit_first": 0.0076742651819080975,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.015191651385247596,
+   "band_ratio_hi": 0.1462692215159669,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489137
   },
   {
    "drug": "epirubicin",
@@ -1700,7 +1889,14 @@
    "solve_s": 58.962831258773804,
    "penetration_index": 0.31960750271704375,
    "_e_unit_sum": 3730.1423182718845,
-   "_e_unit_first": 0.03246877747614302
+   "_e_unit_first": 0.03246877747614302,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.01100669697548635,
+   "band_ratio_hi": 1.0,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "5-fluorouracil",
@@ -1722,10 +1918,10 @@
    "e_unit_p99": 13.389003518303133,
    "e_unit_p01": 3.0262729089154448,
    "e_unit_max": 15.989026239429588,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159892,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 12.0,
@@ -1750,7 +1946,14 @@
    "solve_s": 110.90075278282166,
    "penetration_index": 0.47817965699109455,
    "_e_unit_sum": 699928.0419369598,
-   "_e_unit_first": 6.801301235862265
+   "_e_unit_first": 6.801301235862265,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (7.5x fold shift), so the min-max interval is zero-width (0.1636-0.1636) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.16363821392731037,
+   "band_ratio_hi": 0.16363821392731037,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "cisplatin",
@@ -1800,7 +2003,14 @@
    "solve_s": 148.98308205604553,
    "penetration_index": 0.4328985180932382,
    "_e_unit_sum": 603359.3997894896,
-   "_e_unit_first": 5.408904518131678
+   "_e_unit_first": 5.408904518131678,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.20864163423872,
+   "band_ratio_hi": 1.5003511388489135,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "doxorubicin",
@@ -1850,7 +2060,14 @@
    "solve_s": 291.6165220737457,
    "penetration_index": 0.31820592327507324,
    "_e_unit_sum": 3731.96457449407,
-   "_e_unit_first": 0.030024062911778955
+   "_e_unit_first": 0.030024062911778955,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.05746191856610602,
+   "band_ratio_hi": 1.0,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489132
   },
   {
    "drug": "paclitaxel",
@@ -1872,10 +2089,10 @@
    "e_unit_p99": 0.03580879614132603,
    "e_unit_p01": 9.19799811705785e-05,
    "e_unit_max": 0.07300513046075914,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159893,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 10.0,
@@ -1900,7 +2117,14 @@
    "solve_s": 287.1411588191986,
    "penetration_index": 0.20511060459887695,
    "_e_unit_sum": 782.3722985449072,
-   "_e_unit_first": 0.00644266927298423
+   "_e_unit_first": 0.00644266927298423,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (25x fold shift), so the min-max interval is zero-width (0.0412-0.0412) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.04115959040159893,
+   "band_ratio_hi": 0.04115959040159893,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159893,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "docetaxel",
@@ -1950,7 +2174,14 @@
    "solve_s": 310.75417494773865,
    "penetration_index": 0.20268392027342677,
    "_e_unit_sum": 722.1529589349115,
-   "_e_unit_first": 0.005951671746316586
+   "_e_unit_first": 0.005951671746316586,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.015191651385247596,
+   "band_ratio_hi": 0.1462692215159669,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489137
   },
   {
    "drug": "epirubicin",
@@ -2000,7 +2231,14 @@
    "solve_s": 306.29593420028687,
    "penetration_index": 0.31820592327507324,
    "_e_unit_sum": 3731.96457449407,
-   "_e_unit_first": 0.030024062911778955
+   "_e_unit_first": 0.030024062911778955,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.01100669697548635,
+   "band_ratio_hi": 1.0,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "5-fluorouracil",
@@ -2022,10 +2260,10 @@
    "e_unit_p99": 13.535209149318653,
    "e_unit_p01": 3.0184471974316445,
    "e_unit_max": 15.6049186462697,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159892,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 10.0,
@@ -2050,7 +2288,14 @@
    "solve_s": 306.47915482521057,
    "penetration_index": 0.4732157330279178,
    "_e_unit_sum": 699728.4097171784,
-   "_e_unit_first": 6.706959111627203
+   "_e_unit_first": 6.706959111627203,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (7.5x fold shift), so the min-max interval is zero-width (0.1636-0.1636) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.16363821392731037,
+   "band_ratio_hi": 0.16363821392731037,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "cisplatin",
@@ -2100,7 +2345,14 @@
    "solve_s": 255.61040496826172,
    "penetration_index": 0.4270992495729937,
    "_e_unit_sum": 603376.2734751237,
-   "_e_unit_first": 5.298347975521443
+   "_e_unit_first": 5.298347975521443,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.20864163423872,
+   "band_ratio_hi": 1.5003511388489135,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "doxorubicin",
@@ -2150,7 +2402,14 @@
    "solve_s": 26107.839149951935,
    "penetration_index": 0.3184556303922657,
    "_e_unit_sum": 3732.7737458758124,
-   "_e_unit_first": 0.031700321524289206
+   "_e_unit_first": 0.031700321524289206,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.05746191856610602,
+   "band_ratio_hi": 1.0,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489132
   },
   {
    "drug": "paclitaxel",
@@ -2172,10 +2431,10 @@
    "e_unit_p99": 0.03538461219502092,
    "e_unit_p01": 9.008887037405866e-05,
    "e_unit_max": 0.07465558524972776,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159893,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 8.0,
@@ -2200,7 +2459,14 @@
    "solve_s": 2779.457962036133,
    "penetration_index": 0.206996380294044,
    "_e_unit_sum": 782.7732689268397,
-   "_e_unit_first": 0.007124989475120514
+   "_e_unit_first": 0.007124989475120514,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (25x fold shift), so the min-max interval is zero-width (0.0412-0.0412) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.04115959040159893,
+   "band_ratio_hi": 0.04115959040159893,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159893,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "docetaxel",
@@ -2250,7 +2516,14 @@
    "solve_s": 225.12075018882751,
    "penetration_index": 0.20458331946824806,
    "_e_unit_sum": 722.5291396684717,
-   "_e_unit_first": 0.0065874783394746375
+   "_e_unit_first": 0.0065874783394746375,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.015191651385247596,
+   "band_ratio_hi": 0.1462692215159669,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489137
   },
   {
    "drug": "epirubicin",
@@ -2300,7 +2573,14 @@
    "solve_s": 246.19582629203796,
    "penetration_index": 0.3184556303922657,
    "_e_unit_sum": 3732.7737458758124,
-   "_e_unit_first": 0.031700321524289206
+   "_e_unit_first": 0.031700321524289206,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.01100669697548635,
+   "band_ratio_hi": 1.0,
+   "specific_n": 2,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "5-fluorouracil",
@@ -2322,10 +2602,10 @@
    "e_unit_p99": 13.500367253132927,
    "e_unit_p01": 3.016020441037166,
    "e_unit_max": 16.210343649173982,
-   "verdict": "PASS",
-   "verdict_direction": "inside",
-   "band_used_lo": 0.04115959040159892,
-   "band_used_hi": 1.5003511388489135,
+   "verdict": "NOT TESTABLE",
+   "verdict_direction": "not scored -- see verdict_reason",
+   "band_used_lo": null,
+   "band_used_hi": null,
    "band_is_drug_matched": false,
    "verdict_solid": "PASS",
    "dx_um": 8.0,
@@ -2350,7 +2630,14 @@
    "solve_s": 239.31408309936523,
    "penetration_index": 0.4739229173535678,
    "_e_unit_sum": 699634.2200722488,
-   "_e_unit_first": 6.700062755960682
+   "_e_unit_first": 6.700062755960682,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (7.5x fold shift), so the min-max interval is zero-width (0.1636-0.1636) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "band_ratio_lo": 0.16363821392731037,
+   "band_ratio_hi": 0.16363821392731037,
+   "specific_n": 1,
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "cisplatin",
@@ -2400,7 +2687,14 @@
    "solve_s": 172.41795325279236,
    "penetration_index": 0.4266992121522385,
    "_e_unit_sum": 603348.6045383676,
-   "_e_unit_first": 5.358893065809519
+   "_e_unit_first": 5.358893065809519,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "band_ratio_lo": 0.20864163423872,
+   "band_ratio_hi": 1.5003511388489135,
+   "specific_n": 5,
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489135
   }
  ],
  "field_distinctness": {

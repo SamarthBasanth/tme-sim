@@ -7,327 +7,423 @@
           {
             "drug": "temozolomide",
             "c_bath_label": "100 uM (ex-vivo assay)",
-            "band_scope": "drug:temozolomide",
+            "band_scope": "drug-matched (n = 6)",
+            "scored": true,
+            "specific_n": 6,
             "band_ratio_lo": 0.15898511609865443,
             "band_ratio_hi": 0.4622133669344504,
             "band_fold_lo": 2.0,
             "band_fold_hi": 5.0,
+            "context_ratio_lo": 0.023373750425755038,
+            "context_ratio_hi": 2.4884615550647933,
             "conventions": {
               "p50": {
                 "ratio_exact": 0.5909731625299404,
                 "f_penetration": 1.0538405519143514,
                 "implied_ic50_fold": 1.6106702733312765,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "p90": {
                 "ratio_exact": 0.39281725906284554,
                 "f_penetration": 0.7000018008937103,
                 "implied_ic50_fold": 2.3047201814114793,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p95": {
                 "ratio_exact": 0.35272293347883493,
                 "f_penetration": 0.6284674982849777,
                 "implied_ic50_fold": 2.5301117181223565,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99": {
                 "ratio_exact": 0.2626492056468571,
                 "f_penetration": 0.46783514742473475,
                 "implied_ic50_fold": 3.260836175720401,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99.9": {
                 "ratio_exact": 0.20378151074052872,
                 "f_penetration": 0.36290753432973466,
                 "implied_ic50_fold": 4.049717058145743,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "max": {
                 "ratio_exact": 0.1875383705802326,
                 "f_penetration": 0.3339626355494146,
                 "implied_ic50_fold": 4.346163547001118,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "mean": {
                 "ratio_exact": 0.559341747368454,
                 "f_penetration": 0.9973239096691401,
                 "implied_ic50_fold": 1.691108216894715,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "rms": {
                 "ratio_exact": 0.5348856876568984,
                 "f_penetration": 0.9536365098307787,
                 "implied_ic50_fold": 1.7592182032682913,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "L4": {
                 "ratio_exact": 0.4856191821972964,
                 "f_penetration": 0.8656519628134968,
                 "implied_ic50_fold": 1.9152834497326128,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "sauter": {
                 "ratio_exact": 0.5113751121088728,
                 "f_penetration": 0.9116453371538082,
                 "implied_ic50_fold": 1.8302725595401557,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "tail99": {
                 "ratio_exact": 0.23320617185675463,
                 "f_penetration": 0.4153497082286216,
                 "implied_ic50_fold": 3.6098370478194752,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail95": {
                 "ratio_exact": 0.29004559425727966,
                 "f_penetration": 0.5166817284529115,
                 "implied_ic50_fold": 2.9947957000975576,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail90": {
                 "ratio_exact": 0.3278702454121089,
                 "f_penetration": 0.5841366216765725,
                 "implied_ic50_fold": 2.694913368494549,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "fixed": {
                 "ratio_exact": 0.2626492056468571,
                 "f_penetration": 0.46783514742473475,
                 "implied_ic50_fold": 3.260836175720401,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               }
             }
           },
           {
             "drug": "cisplatin",
             "c_bath_label": "1xIC50",
-            "band_scope": "drug:cisplatin",
+            "band_scope": "drug-matched (n = 5)",
+            "scored": true,
+            "specific_n": 5,
             "band_ratio_lo": 0.20864163423872006,
             "band_ratio_hi": 1.5003511388489135,
             "band_fold_lo": 0.4,
             "band_fold_hi": 6.0,
+            "context_ratio_lo": 0.041159590401598924,
+            "context_ratio_hi": 1.5003511388489135,
             "conventions": {
               "p50": {
                 "ratio_exact": 0.559398526125076,
                 "f_penetration": 1.004107939648861,
                 "implied_ic50_fold": 2.1996425603785386,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p90": {
                 "ratio_exact": 0.41428845323432967,
                 "f_penetration": 0.7412635851299167,
                 "implied_ic50_fold": 3.060326758300704,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p95": {
                 "ratio_exact": 0.3740820958350941,
                 "f_penetration": 0.6687388077951734,
                 "implied_ic50_fold": 3.402329799385429,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99": {
                 "ratio_exact": 0.27911792996360496,
                 "f_penetration": 0.49795474312473176,
                 "implied_ic50_fold": 4.553054111179313,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99.9": {
                 "ratio_exact": 0.18947286202061311,
                 "f_penetration": 0.33738812636781307,
                 "implied_ic50_fold": 6.559665387480209,
                 "verdict": "FAIL",
-                "direction": "model predicts a LARGER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a LARGER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "max": {
                 "ratio_exact": 0.16885470960970106,
                 "f_penetration": 0.3005459758553436,
                 "implied_ic50_fold": 7.289113091105514,
                 "verdict": "FAIL",
-                "direction": "model predicts a LARGER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a LARGER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "mean": {
                 "ratio_exact": 0.5348071037689225,
                 "f_penetration": 0.9594429692546618,
                 "implied_ic50_fold": 2.3160505332296966,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "rms": {
                 "ratio_exact": 0.5110916235907604,
                 "f_penetration": 0.9164161232527416,
                 "implied_ic50_fold": 2.4376667953520608,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "L4": {
                 "ratio_exact": 0.4566630299377412,
                 "f_penetration": 0.8178408812036053,
                 "implied_ic50_fold": 2.758803414589236,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "sauter": {
                 "ratio_exact": 0.48751522939620806,
                 "f_penetration": 0.8736873590752515,
                 "implied_ic50_fold": 2.56893048667279,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail99": {
                 "ratio_exact": 0.2336241229404176,
                 "f_penetration": 0.41639096745406234,
                 "implied_ic50_fold": 5.396819182998898,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail95": {
                 "ratio_exact": 0.30902579616990883,
                 "f_penetration": 0.5516638814685373,
                 "implied_ic50_fold": 4.12210016127337,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail90": {
                 "ratio_exact": 0.34783791882006104,
                 "f_penetration": 0.6214692754849059,
                 "implied_ic50_fold": 3.663502048688498,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "fixed": {
                 "ratio_exact": 0.27911792996360496,
                 "f_penetration": 0.49795474312473176,
                 "implied_ic50_fold": 4.553054111179313,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               }
             }
           },
           {
             "drug": "doxorubicin",
             "c_bath_label": "1xIC50",
-            "band_scope": "drug:doxorubicin",
+            "band_scope": "drug-matched (n = 5)",
+            "scored": true,
+            "specific_n": 5,
             "band_ratio_lo": 0.05746191856610602,
             "band_ratio_hi": 1.0,
             "band_fold_lo": 1.0,
             "band_fold_hi": 18.8,
+            "context_ratio_lo": 0.041159590401598924,
+            "context_ratio_hi": 1.5003511388489132,
             "conventions": {
               "p50": {
                 "ratio_exact": 0.5541961012921905,
                 "f_penetration": 0.9927497284304891,
                 "implied_ic50_fold": 2.223505822631356,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p90": {
                 "ratio_exact": 0.3601865914794267,
                 "f_penetration": 0.6421335778337321,
                 "implied_ic50_fold": 3.5363540847249673,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p95": {
                 "ratio_exact": 0.3088791562626185,
                 "f_penetration": 0.5499623719619191,
                 "implied_ic50_fold": 4.124028900729481,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99": {
                 "ratio_exact": 0.2076758749154858,
                 "f_penetration": 0.36882540737261743,
                 "implied_ic50_fold": 6.025948533555849,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99.9": {
                 "ratio_exact": 0.104886377908707,
                 "f_penetration": 0.18577085806334642,
                 "implied_ic50_fold": 11.153987098105276,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "max": {
                 "ratio_exact": 0.08875211211744424,
                 "f_penetration": 0.1571248787064518,
                 "implied_ic50_fold": 12.910664664104852,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "mean": {
                 "ratio_exact": 0.5105554647172119,
                 "f_penetration": 0.9135900331401632,
                 "implied_ic50_fold": 2.440531993486588,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "rms": {
                 "ratio_exact": 0.45978999460260533,
                 "f_penetration": 0.8217215252932678,
                 "implied_ic50_fold": 2.7385269542623334,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "L4": {
                 "ratio_exact": 0.3480440514157385,
                 "f_penetration": 0.6202994755966121,
                 "implied_ic50_fold": 3.661313123351193,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "sauter": {
                 "ratio_exact": 0.4104343313370607,
                 "f_penetration": 0.7326230986202997,
                 "implied_ic50_fold": 3.090501755613912,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail99": {
                 "ratio_exact": 0.15065267097982288,
                 "f_penetration": 0.267157824150678,
                 "implied_ic50_fold": 8.08229517074661,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail95": {
                 "ratio_exact": 0.23238585279384624,
                 "f_penetration": 0.41296996636765415,
                 "implied_ic50_fold": 5.423939284713264,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail90": {
                 "ratio_exact": 0.27548766346586495,
                 "f_penetration": 0.49009887989238626,
                 "implied_ic50_fold": 4.611088506255749,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "fixed": {
                 "ratio_exact": 0.2076758749154858,
                 "f_penetration": 0.36882540737261743,
                 "implied_ic50_fold": 6.025948533555849,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               }
             }
           }
@@ -339,654 +435,846 @@
           {
             "drug": "doxorubicin",
             "c_bath_label": "1xIC50",
-            "band_scope": "drug-matched",
+            "band_scope": "drug-matched (n = 5)",
+            "scored": true,
+            "specific_n": 5,
             "band_ratio_lo": 0.05746191856610602,
             "band_ratio_hi": 1.0,
             "band_fold_lo": 1.0,
             "band_fold_hi": 18.8,
+            "context_ratio_lo": 0.041159590401598924,
+            "context_ratio_hi": 1.5003511388489132,
             "conventions": {
               "p50": {
                 "ratio_exact": 0.48139575768761855,
                 "f_penetration": 0.939471302268685,
                 "implied_ic50_fold": 2.604865427514364,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p90": {
                 "ratio_exact": 0.32896321852666616,
                 "f_penetration": 0.6402313566387087,
                 "implied_ic50_fold": 3.874350339403108,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p95": {
                 "ratio_exact": 0.29446116181798115,
                 "f_penetration": 0.5726919421198677,
                 "implied_ic50_fold": 4.322098500201572,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99": {
                 "ratio_exact": 0.23013330629020515,
                 "f_penetration": 0.44697029914234304,
                 "implied_ic50_fold": 5.473950926315266,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99.9": {
                 "ratio_exact": 0.17648383825168568,
                 "f_penetration": 0.3423391236851751,
                 "implied_ic50_fold": 7.001169040316108,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "max": {
                 "ratio_exact": 0.15218216653290167,
                 "f_penetration": 0.295017442694464,
                 "implied_ic50_fold": 8.009022117387746,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "mean": {
                 "ratio_exact": 0.4679602474279959,
                 "f_penetration": 0.9130413269733918,
                 "implied_ic50_fold": 2.6866900089325783,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "rms": {
                 "ratio_exact": 0.43159310769264836,
                 "f_penetration": 0.8415542975245223,
                 "implied_ic50_fold": 2.930804623028625,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "L4": {
                 "ratio_exact": 0.37830060554112876,
                 "f_penetration": 0.7369364279551249,
                 "implied_ic50_fold": 3.363394154613453,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "sauter": {
                 "ratio_exact": 0.39580549614857674,
                 "f_penetration": 0.7712818216542175,
                 "implied_ic50_fold": 3.2098100779676013,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail99": {
                 "ratio_exact": 0.20363538565623085,
                 "f_penetration": 0.39526541693094014,
                 "implied_ic50_fold": 6.136928122746452,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail95": {
                 "ratio_exact": 0.2517925655528099,
                 "f_penetration": 0.48927021891073535,
                 "implied_ic50_fold": 5.0268012746680055,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail90": {
                 "ratio_exact": 0.27944660286431117,
                 "f_penetration": 0.543323431770947,
                 "implied_ic50_fold": 4.547867125976597,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "fixed": {
                 "ratio_exact": 0.23013330629020515,
                 "f_penetration": 0.44697029914234304,
                 "implied_ic50_fold": 5.473950926315266,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               }
             }
           },
           {
             "drug": "paclitaxel",
             "c_bath_label": "1xIC50",
-            "band_scope": "broad 'solid' fallback",
-            "band_ratio_lo": 0.04115959040159893,
-            "band_ratio_hi": 1.5003511388489135,
-            "band_fold_lo": 0.4,
-            "band_fold_hi": 25.0,
+            "band_scope": "single study (n = 1) \u2014 zero-width, not scored",
+            "scored": false,
+            "specific_n": 1,
+            "band_ratio_lo": null,
+            "band_ratio_hi": null,
+            "band_fold_lo": null,
+            "band_fold_hi": null,
+            "context_ratio_lo": 0.04115959040159893,
+            "context_ratio_hi": 1.5003511388489135,
             "conventions": {
               "p50": {
                 "ratio_exact": 0.4805531333848367,
                 "f_penetration": 0.9327544743265961,
                 "implied_ic50_fold": 2.6098772824367673,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "p90": {
                 "ratio_exact": 0.2611667738169315,
                 "f_penetration": 0.5032859693515661,
                 "implied_ic50_fold": 4.854188886767807,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "p95": {
                 "ratio_exact": 0.21626449947670498,
                 "f_penetration": 0.4159454518000467,
                 "implied_ic50_fold": 5.802578411367313,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "p99": {
                 "ratio_exact": 0.15028661822296227,
                 "f_penetration": 0.2880857093715395,
                 "implied_ic50_fold": 8.10003269889256,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "p99.9": {
                 "ratio_exact": 0.10254820564597117,
                 "f_penetration": 0.1960077943366626,
                 "implied_ic50_fold": 11.377204682133014,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "max": {
                 "ratio_exact": 0.08147731657730352,
                 "f_penetration": 0.1555085390387923,
                 "implied_ic50_fold": 13.908336332649048,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "mean": {
                 "ratio_exact": 0.42536750926132905,
                 "f_penetration": 0.8243622137232216,
                 "implied_ic50_fold": 2.9763162701660413,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "rms": {
                 "ratio_exact": 0.3591614946832268,
                 "f_penetration": 0.6946236427260494,
                 "implied_ic50_fold": 3.546609643641982,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "L4": {
                 "ratio_exact": 0.2747994986378991,
                 "f_penetration": 0.5298481275872347,
                 "implied_ic50_fold": 4.622245763193363,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "sauter": {
                 "ratio_exact": 0.29659072386216356,
                 "f_penetration": 0.5723462749160999,
                 "implied_ic50_fold": 4.291751193977442,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "tail99": {
                 "ratio_exact": 0.12603006115612236,
                 "f_penetration": 0.24124773470662192,
                 "implied_ic50_fold": 9.482155229686969,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "tail95": {
                 "ratio_exact": 0.1705393381346886,
                 "f_penetration": 0.32726658833722144,
                 "implied_ic50_fold": 7.223517877047416,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "tail90": {
                 "ratio_exact": 0.19974455063771815,
                 "f_penetration": 0.3838740306814903,
                 "implied_ic50_fold": 6.247639978333132,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "fixed": {
                 "ratio_exact": 0.15028661822296227,
                 "f_penetration": 0.2880857093715395,
                 "implied_ic50_fold": 8.10003269889256,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               }
             }
           },
           {
             "drug": "docetaxel",
             "c_bath_label": "1xIC50",
-            "band_scope": "drug-matched",
+            "band_scope": "drug-matched (n = 2)",
+            "scored": true,
+            "specific_n": 2,
             "band_ratio_lo": 0.015191651385247596,
             "band_ratio_hi": 0.1462692215159669,
             "band_fold_lo": 8.3,
             "band_fold_hi": 58.0,
+            "context_ratio_lo": 0.04115959040159892,
+            "context_ratio_hi": 1.5003511388489137,
             "conventions": {
               "p50": {
                 "ratio_exact": 0.4804132734042014,
                 "f_penetration": 0.9324118394247388,
                 "implied_ic50_fold": 2.610710671732542,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "p90": {
                 "ratio_exact": 0.2595090402352217,
                 "f_penetration": 0.49998553538445056,
                 "implied_ic50_fold": 4.883892172913185,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "p95": {
                 "ratio_exact": 0.21415925905202157,
                 "f_penetration": 0.41178724513614856,
                 "implied_ic50_fold": 5.855826836974125,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "p99": {
                 "ratio_exact": 0.14842965466495936,
                 "f_penetration": 0.2844358231662181,
                 "implied_ic50_fold": 8.191239348904041,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "p99.9": {
                 "ratio_exact": 0.10109412317010799,
                 "f_penetration": 0.19316040336389695,
                 "implied_ic50_fold": 11.520763832135504,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "max": {
                 "ratio_exact": 0.08024596050842231,
                 "f_penetration": 0.15310205484205264,
                 "implied_ic50_fold": 14.093494012154816,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "mean": {
                 "ratio_exact": 0.4238811247348495,
                 "f_penetration": 0.8213758169626445,
                 "implied_ic50_fold": 2.9873589574824737,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "rms": {
                 "ratio_exact": 0.35682562309830673,
                 "f_penetration": 0.6899805062532461,
                 "implied_ic50_fold": 3.57017647822289,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "L4": {
                 "ratio_exact": 0.27191543071400204,
                 "f_penetration": 0.5241549041689262,
                 "implied_ic50_fold": 4.669559878104281,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "sauter": {
                 "ratio_exact": 0.29356065977267143,
                 "f_penetration": 0.5663614549527712,
                 "implied_ic50_fold": 4.33505055349855,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "tail99": {
                 "ratio_exact": 0.1243156072438598,
                 "f_penetration": 0.2378854967265963,
                 "implied_ic50_fold": 9.598317038564936,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail95": {
                 "ratio_exact": 0.1685961872933827,
                 "f_penetration": 0.3234406163248177,
                 "implied_ic50_fold": 7.2992847162337275,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "tail90": {
                 "ratio_exact": 0.19776443076609473,
                 "f_penetration": 0.3799646230609191,
                 "implied_ic50_fold": 6.3054992396118585,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               },
               "fixed": {
                 "ratio_exact": 0.14842965466495936,
                 "f_penetration": 0.2844358231662181,
                 "implied_ic50_fold": 8.191239348904041,
                 "verdict": "FAIL",
-                "direction": "model predicts a SMALLER 3-D penalty than measured"
+                "scored": true,
+                "direction": "model predicts a SMALLER 3-D penalty than measured",
+                "context_verdict": "PASS"
               }
             }
           },
           {
             "drug": "epirubicin",
             "c_bath_label": "1xIC50",
-            "band_scope": "drug-matched",
+            "band_scope": "drug-matched (n = 2)",
+            "scored": true,
+            "specific_n": 2,
             "band_ratio_lo": 0.01100669697548635,
             "band_ratio_hi": 1.0,
             "band_fold_lo": 1.0,
             "band_fold_hi": 76.0,
+            "context_ratio_lo": 0.04115959040159892,
+            "context_ratio_hi": 1.5003511388489135,
             "conventions": {
               "p50": {
                 "ratio_exact": 0.48139575768761844,
                 "f_penetration": 0.9394713022686849,
                 "implied_ic50_fold": 2.6048654275143646,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p90": {
                 "ratio_exact": 0.32896321852666616,
                 "f_penetration": 0.6402313566387087,
                 "implied_ic50_fold": 3.874350339403107,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p95": {
                 "ratio_exact": 0.2944611618179811,
                 "f_penetration": 0.5726919421198676,
                 "implied_ic50_fold": 4.322098500201573,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99": {
                 "ratio_exact": 0.23013330629020515,
                 "f_penetration": 0.44697029914234304,
                 "implied_ic50_fold": 5.473950926315265,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99.9": {
                 "ratio_exact": 0.17648383825168565,
                 "f_penetration": 0.34233912368517505,
                 "implied_ic50_fold": 7.001169040316109,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "max": {
                 "ratio_exact": 0.15218216653290167,
                 "f_penetration": 0.295017442694464,
                 "implied_ic50_fold": 8.009022117387746,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "mean": {
                 "ratio_exact": 0.46796024742799597,
                 "f_penetration": 0.9130413269733918,
                 "implied_ic50_fold": 2.686690008932578,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "rms": {
                 "ratio_exact": 0.43159310769264836,
                 "f_penetration": 0.8415542975245222,
                 "implied_ic50_fold": 2.9308046230286244,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "L4": {
                 "ratio_exact": 0.3783006055411287,
                 "f_penetration": 0.7369364279551249,
                 "implied_ic50_fold": 3.363394154613454,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "sauter": {
                 "ratio_exact": 0.39580549614857674,
                 "f_penetration": 0.7712818216542175,
                 "implied_ic50_fold": 3.2098100779676013,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail99": {
                 "ratio_exact": 0.20363538565623085,
                 "f_penetration": 0.39526541693094014,
                 "implied_ic50_fold": 6.136928122746452,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail95": {
                 "ratio_exact": 0.2517925655528099,
                 "f_penetration": 0.48927021891073535,
                 "implied_ic50_fold": 5.0268012746680055,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail90": {
                 "ratio_exact": 0.27944660286431117,
                 "f_penetration": 0.5433234317709467,
                 "implied_ic50_fold": 4.547867125976597,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "fixed": {
                 "ratio_exact": 0.23013330629020515,
                 "f_penetration": 0.44697029914234304,
                 "implied_ic50_fold": 5.473950926315265,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               }
             }
           },
           {
             "drug": "5-fluorouracil",
             "c_bath_label": "1xIC50",
-            "band_scope": "broad 'solid' fallback",
-            "band_ratio_lo": 0.04115959040159892,
-            "band_ratio_hi": 1.5003511388489135,
-            "band_fold_lo": 0.4,
-            "band_fold_hi": 25.0,
+            "band_scope": "single study (n = 1) \u2014 zero-width, not scored",
+            "scored": false,
+            "specific_n": 1,
+            "band_ratio_lo": null,
+            "band_ratio_hi": null,
+            "band_fold_lo": null,
+            "band_fold_hi": null,
+            "context_ratio_lo": 0.04115959040159892,
+            "context_ratio_hi": 1.5003511388489135,
             "conventions": {
               "p50": {
                 "ratio_exact": 0.4888958017419569,
                 "f_penetration": 0.9673114064936857,
                 "implied_ic50_fold": 2.560934201579187,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "p90": {
                 "ratio_exact": 0.3854954942050116,
                 "f_penetration": 0.762797587567734,
                 "implied_ic50_fold": 3.2987542489879127,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "p95": {
                 "ratio_exact": 0.3660809968200393,
                 "f_penetration": 0.7243887614494542,
                 "implied_ic50_fold": 3.4783860611973894,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "p99": {
                 "ratio_exact": 0.3378821161474709,
                 "f_penetration": 0.6685972822687316,
                 "implied_ic50_fold": 3.772076692557151,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "p99.9": {
                 "ratio_exact": 0.31306504118883344,
                 "f_penetration": 0.619493335365545,
                 "implied_ic50_fold": 4.069613232131218,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "max": {
                 "ratio_exact": 0.29329890612220233,
                 "f_penetration": 0.5803814679086391,
                 "implied_ic50_fold": 4.338828854242287,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "mean": {
                 "ratio_exact": 0.4888799521353247,
                 "f_penetration": 0.9672800653260628,
                 "implied_ic50_fold": 2.561025774583903,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "rms": {
                 "ratio_exact": 0.47405424424998227,
                 "f_penetration": 0.9379624385957563,
                 "implied_ic50_fold": 2.649064587117401,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "L4": {
                 "ratio_exact": 0.45098094185505777,
                 "f_penetration": 0.8923310352569274,
                 "implied_ic50_fold": 2.7962895723147385,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "sauter": {
                 "ratio_exact": 0.45927733175630653,
                 "f_penetration": 0.9087391432977394,
                 "implied_ic50_fold": 2.7418343809881964,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "tail99": {
                 "ratio_exact": 0.3280098168597782,
                 "f_penetration": 0.6490639455296541,
                 "implied_ic50_fold": 3.8855789221462653,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "tail95": {
                 "ratio_exact": 0.34867754249110433,
                 "f_penetration": 0.6899565504795853,
                 "implied_ic50_fold": 3.6546006379818405,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "tail90": {
                 "ratio_exact": 0.3619754285727185,
                 "f_penetration": 0.7162661767066738,
                 "implied_ic50_fold": 3.51858273736089,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               },
               "fixed": {
                 "ratio_exact": 0.3378821161474709,
                 "f_penetration": 0.6685972822687316,
                 "implied_ic50_fold": 3.772076692557151,
-                "verdict": "PASS",
-                "direction": "inside"
+                "verdict": "NOT TESTABLE",
+                "scored": false,
+                "direction": "not scored \u2014 no testable band",
+                "context_verdict": "PASS"
               }
             }
           },
           {
             "drug": "cisplatin",
             "c_bath_label": "1xIC50",
-            "band_scope": "drug-matched",
+            "band_scope": "drug-matched (n = 5)",
+            "scored": true,
+            "specific_n": 5,
             "band_ratio_lo": 0.20864163423872,
             "band_ratio_hi": 1.5003511388489135,
             "band_fold_lo": 0.4,
             "band_fold_hi": 6.0,
+            "context_ratio_lo": 0.041159590401598924,
+            "context_ratio_hi": 1.5003511388489135,
             "conventions": {
               "p50": {
                 "ratio_exact": 0.4855993528375945,
                 "f_penetration": 0.9563462190033447,
                 "implied_ic50_fold": 2.580094260895933,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p90": {
                 "ratio_exact": 0.3728416868006165,
                 "f_penetration": 0.7338541981878642,
                 "implied_ic50_fold": 3.41392876083495,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p95": {
                 "ratio_exact": 0.3487741493494104,
                 "f_penetration": 0.6863939863845648,
                 "implied_ic50_fold": 3.653578916318915,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99": {
                 "ratio_exact": 0.3084627482484707,
                 "f_penetration": 0.6069252983353418,
                 "implied_ic50_fold": 4.129514883197535,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "p99.9": {
                 "ratio_exact": 0.2723542678079978,
                 "f_penetration": 0.535768111404969,
                 "implied_ic50_fold": 4.662302222014644,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "max": {
                 "ratio_exact": 0.2523550987127859,
                 "f_penetration": 0.4963676846565136,
                 "implied_ic50_fold": 5.016116240283916,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "mean": {
                 "ratio_exact": 0.4854610727530281,
                 "f_penetration": 0.9560732260385124,
                 "implied_ic50_fold": 2.580903049732904,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "rms": {
                 "ratio_exact": 0.46604509529613164,
                 "f_penetration": 0.9177456117643268,
                 "implied_ic50_fold": 2.698695441764893,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "L4": {
                 "ratio_exact": 0.4367826102048411,
                 "f_penetration": 0.8599936378256299,
                 "implied_ic50_fold": 2.8937545992643248,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "sauter": {
                 "ratio_exact": 0.446728937009612,
                 "f_penetration": 0.8796218223687563,
                 "implied_ic50_fold": 2.8248971392692845,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail99": {
                 "ratio_exact": 0.2916957481444976,
                 "f_penetration": 0.5738802919301872,
                 "implied_ic50_fold": 4.3621031985479135,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail95": {
                 "ratio_exact": 0.3229138038141941,
                 "f_penetration": 0.6354102121294367,
                 "implied_ic50_fold": 3.946607875722639,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "tail90": {
                 "ratio_exact": 0.3413568706032781,
                 "f_penetration": 0.6717695348118888,
                 "implied_ic50_fold": 3.7335352381282685,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               },
               "fixed": {
                 "ratio_exact": 0.3084627482484707,
                 "f_penetration": 0.6069252983353418,
                 "implied_ic50_fold": 4.129514883197535,
                 "verdict": "PASS",
-                "direction": "inside"
+                "scored": true,
+                "direction": "inside",
+                "context_verdict": "PASS"
               }
             }
           }
@@ -1009,6 +1297,9 @@
             "drug": "temozolomide",
             "ratio_published": 0.2626492056468571,
             "verdict_published": "PASS",
+            "scored": true,
+            "specific_n": 6,
+            "band_scope": "drug-matched (n = 6)",
             "band_ratio_lo": 0.15898511609865443,
             "band_ratio_hi": 0.4622133669344504,
             "margin_to_lo_pct": 65.20364427313838,
@@ -1079,6 +1370,9 @@
             "drug": "cisplatin",
             "ratio_published": 0.27911792996360496,
             "verdict_published": "PASS",
+            "scored": true,
+            "specific_n": 5,
+            "band_scope": "drug-matched (n = 5)",
             "band_ratio_lo": 0.20864163423872006,
             "band_ratio_hi": 1.5003511388489135,
             "margin_to_lo_pct": 33.77863482618648,
@@ -1149,6 +1443,9 @@
             "drug": "doxorubicin",
             "ratio_published": 0.2076758749154858,
             "verdict_published": "PASS",
+            "scored": true,
+            "specific_n": 5,
+            "band_scope": "drug-matched (n = 5)",
             "band_ratio_lo": 0.05746191856610602,
             "band_ratio_hi": 1.0,
             "margin_to_lo_pct": 261.4147945244273,
@@ -1224,6 +1521,9 @@
             "drug": "doxorubicin",
             "ratio_published": 0.23013330629020515,
             "verdict_published": "PASS",
+            "scored": true,
+            "specific_n": 5,
+            "band_scope": "drug-matched (n = 5)",
             "band_ratio_lo": 0.05746191856610602,
             "band_ratio_hi": 1.0,
             "margin_to_lo_pct": 300.49708055858326,
@@ -1293,33 +1593,36 @@
           {
             "drug": "paclitaxel",
             "ratio_published": 0.15028661822296227,
-            "verdict_published": "PASS",
-            "band_ratio_lo": 0.04115959040159893,
-            "band_ratio_hi": 1.5003511388489135,
-            "margin_to_lo_pct": 265.13147180668756,
-            "margin_to_hi_pct": -89.98323696822973,
+            "verdict_published": "NOT TESTABLE",
+            "scored": false,
+            "specific_n": 1,
+            "band_scope": "single study (n = 1) \u2014 zero-width, not scored",
+            "band_ratio_lo": null,
+            "band_ratio_hi": null,
+            "margin_to_lo_pct": null,
+            "margin_to_hi_pct": null,
             "corrected": {
               "-0.083": {
                 "ratio": 0.1378128289104564,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 8.755441869725155,
                 "changed": false
               },
               "-0.054": {
                 "ratio": 0.1421711408389223,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 8.51455353379129,
                 "changed": false
               },
               "-0.022": {
                 "ratio": 0.1469803126220571,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 8.263881016999678,
                 "changed": false
               },
               "-0.011": {
                 "ratio": 0.1486334654225097,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 8.181127693022638,
                 "changed": false
               }
@@ -1330,7 +1633,7 @@
                 "nearest_bath_multiple_measured": 1.0,
                 "measured_fpen_bias": 0.06978073361094911,
                 "ratio_corrected": 0.14048357154057473,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 8.606212524252374,
                 "changed": false
               },
@@ -1338,7 +1641,7 @@
                 "nearest_bath_multiple_measured": 1.0,
                 "measured_fpen_bias": 0.044789035837721126,
                 "ratio_corrected": 0.143843984831312,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 8.425628561188033,
                 "changed": false
               },
@@ -1346,7 +1649,7 @@
                 "nearest_bath_multiple_measured": 1.0,
                 "measured_fpen_bias": 0.018912489575973527,
                 "ratio_corrected": 0.1474970812120528,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 8.237831331114823,
                 "changed": false
               },
@@ -1354,7 +1657,7 @@
                 "nearest_bath_multiple_measured": 1.0,
                 "measured_fpen_bias": 0.009414893104666165,
                 "ratio_corrected": 0.14888488296494656,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 8.168688833928433,
                 "changed": false
               }
@@ -1364,6 +1667,9 @@
             "drug": "docetaxel",
             "ratio_published": 0.14842965466495936,
             "verdict_published": "FAIL",
+            "scored": true,
+            "specific_n": 2,
+            "band_scope": "drug-matched (n = 2)",
             "band_ratio_lo": 0.015191651385247596,
             "band_ratio_hi": 0.1462692215159669,
             "margin_to_lo_pct": 877.0475302579504,
@@ -1434,6 +1740,9 @@
             "drug": "epirubicin",
             "ratio_published": 0.23013330629020515,
             "verdict_published": "PASS",
+            "scored": true,
+            "specific_n": 2,
+            "band_scope": "drug-matched (n = 2)",
             "band_ratio_lo": 0.01100669697548635,
             "band_ratio_hi": 1.0,
             "margin_to_lo_pct": 1990.8480246412555,
@@ -1503,33 +1812,36 @@
           {
             "drug": "5-fluorouracil",
             "ratio_published": 0.3378821161474709,
-            "verdict_published": "PASS",
-            "band_ratio_lo": 0.04115959040159892,
-            "band_ratio_hi": 1.5003511388489135,
-            "margin_to_lo_pct": 720.9073823396096,
-            "margin_to_hi_pct": -77.47979740218027,
+            "verdict_published": "NOT TESTABLE",
+            "scored": false,
+            "specific_n": 1,
+            "band_scope": "single study (n = 1) \u2014 zero-width, not scored",
+            "band_ratio_lo": null,
+            "band_ratio_hi": null,
+            "margin_to_lo_pct": null,
+            "margin_to_hi_pct": null,
             "corrected": {
               "-0.083": {
                 "ratio": 0.3098379005072308,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 4.111448437088879,
                 "changed": false
               },
               "-0.054": {
                 "ratio": 0.3196364818755074,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 3.9867813550054776,
                 "changed": false
               },
               "-0.022": {
                 "ratio": 0.3304487095922265,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 3.856971422790838,
                 "changed": false
               },
               "-0.011": {
                 "ratio": 0.3341654128698487,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 3.8140991756239524,
                 "changed": false
               }
@@ -1540,7 +1852,7 @@
                 "nearest_bath_multiple_measured": 1.0,
                 "measured_fpen_bias": 0.06978073361094911,
                 "ratio_corrected": 0.3158424016545709,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 4.034226207721025,
                 "changed": false
               },
@@ -1548,7 +1860,7 @@
                 "nearest_bath_multiple_measured": 1.0,
                 "measured_fpen_bias": 0.044789035837721126,
                 "ratio_corrected": 0.3233974559051091,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 3.940741384830395,
                 "changed": false
               },
@@ -1556,7 +1868,7 @@
                 "nearest_bath_multiple_measured": 1.0,
                 "measured_fpen_bias": 0.018912489575973527,
                 "ratio_corrected": 0.3316105353542997,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 3.843476816907728,
                 "changed": false
               },
@@ -1564,7 +1876,7 @@
                 "nearest_bath_multiple_measured": 1.0,
                 "measured_fpen_bias": 0.009414893104666165,
                 "ratio_corrected": 0.33473066273892976,
-                "verdict": "PASS",
+                "verdict": "NOT TESTABLE",
                 "implied_ic50_fold": 3.807654111307136,
                 "changed": false
               }
@@ -1574,6 +1886,9 @@
             "drug": "cisplatin",
             "ratio_published": 0.3084627482484707,
             "verdict_published": "PASS",
+            "scored": true,
+            "specific_n": 5,
+            "band_scope": "drug-matched (n = 5)",
             "band_ratio_lo": 0.20864163423872,
             "band_ratio_hi": 1.5003511388489135,
             "margin_to_lo_pct": 47.84333403731831,

@@ -32,7 +32,12 @@
    "dx_um": 12.0,
    "D_tissue_cm2_s": 1.4040894686945413e-06,
    "cache_key": "doxorubicin|12.0|10.0|21600.0|10|ic50=0.5",
-   "n_cells_in_cache": 89785
+   "n_cells_in_cache": 89785,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "context_verdict": "PASS",
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489132
   },
   {
    "drug": "paclitaxel",
@@ -52,19 +57,24 @@
    "e_unit_median": 0.00686956936621809,
    "e_unit_p99": 0.0361854353695614,
    "e_unit_p01": 8.659281708892576e-05,
-   "verdict": "PASS",
-   "verdict_band": "broad 'solid' fallback",
+   "verdict": "NOT TESTABLE",
+   "verdict_band": "NOT SCORED -- broad 'solid' band is context only",
    "band_ratio_lo": 0.04115959040159893,
    "band_ratio_hi": 0.04115959040159893,
-   "band_used_lo": 0.04115959040159893,
-   "band_used_hi": 1.5003511388489135,
-   "verdict_direction": "inside",
+   "band_used_lo": null,
+   "band_used_hi": null,
+   "verdict_direction": "not scored -- see verdict_reason",
    "verdict_solid": "PASS",
    "mode": "published-cache",
    "dx_um": 12.0,
    "D_tissue_cm2_s": 1.1506259336661006e-06,
    "cache_key": "paclitaxel|12.0|10.0|21600.0|10|ic50=0.0685849",
-   "n_cells_in_cache": 89785
+   "n_cells_in_cache": 89785,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (25x fold shift), so the min-max interval is zero-width (0.0412-0.0412) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "context_verdict": "PASS",
+   "context_band_lo": 0.04115959040159893,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "docetaxel",
@@ -96,7 +106,12 @@
    "dx_um": 12.0,
    "D_tissue_cm2_s": 1.1877277574843121e-06,
    "cache_key": "docetaxel|12.0|10.0|21600.0|10|ic50=0.0566993",
-   "n_cells_in_cache": 89785
+   "n_cells_in_cache": 89785,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "context_verdict": "PASS",
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489137
   },
   {
    "drug": "epirubicin",
@@ -128,7 +143,12 @@
    "dx_um": 12.0,
    "D_tissue_cm2_s": 1.4040894686945413e-06,
    "cache_key": "epirubicin|12.0|10.0|21600.0|10|ic50=0.841191",
-   "n_cells_in_cache": 89785
+   "n_cells_in_cache": 89785,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "context_verdict": "PASS",
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "5-fluorouracil",
@@ -148,19 +168,24 @@
    "e_unit_median": 7.795175361180341,
    "e_unit_p99": 13.389003518303133,
    "e_unit_p01": 3.0262729089154448,
-   "verdict": "PASS",
-   "verdict_band": "broad 'solid' fallback",
+   "verdict": "NOT TESTABLE",
+   "verdict_band": "NOT SCORED -- broad 'solid' band is context only",
    "band_ratio_lo": 0.16363821392731037,
    "band_ratio_hi": 0.16363821392731037,
-   "band_used_lo": 0.04115959040159892,
-   "band_used_hi": 1.5003511388489135,
-   "verdict_direction": "inside",
+   "band_used_lo": null,
+   "band_used_hi": null,
+   "verdict_direction": "not scored -- see verdict_reason",
    "verdict_solid": "PASS",
    "mode": "published-cache",
    "dx_um": 12.0,
    "D_tissue_cm2_s": 2.460952507338863e-06,
    "cache_key": "5-fluorouracil|12.0|10.0|21600.0|10|ic50=201.18",
-   "n_cells_in_cache": 89785
+   "n_cells_in_cache": 89785,
+   "verdict_scored": false,
+   "verdict_reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (7.5x fold shift), so the min-max interval is zero-width (0.1636-0.1636) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md.",
+   "context_verdict": "PASS",
+   "context_band_lo": 0.04115959040159892,
+   "context_band_hi": 1.5003511388489135
   },
   {
    "drug": "cisplatin",
@@ -192,7 +217,12 @@
    "dx_um": 12.0,
    "D_tissue_cm2_s": 1.7950016463668362e-06,
    "cache_key": "cisplatin|12.0|10.0|21600.0|10|ic50=82.4157",
-   "n_cells_in_cache": 89785
+   "n_cells_in_cache": 89785,
+   "verdict_scored": true,
+   "verdict_reason": "",
+   "context_verdict": "PASS",
+   "context_band_lo": 0.041159590401598924,
+   "context_band_hi": 1.5003511388489135
   }
  ],
  "source": "/Users/samarthbasanth/tme-sim/data_cache/kill_calibration_breast_runs.json",
