@@ -1316,11 +1316,16 @@ class JobManager:
             job.log(f"cancelled: {exc}")
             self._persist(job, None)
         except Exception as exc:  # noqa: BLE001 - surfaced, never swallowed
-            job.status = "failed"
+            # `status` is set LAST, deliberately. A client polling /status waits
+            # for a terminal state and then reads the diagnosis; if status flips
+            # first, that client can observe "failed" with a null traceback and
+            # a null error -- a run that reports it died and cannot say how.
+            # Populate the diagnosis, then publish the state.
             job.stage = "failed"
             job.finished_at = time.time()
             job.error = f"{type(exc).__name__}: {exc}"
             job.traceback = traceback.format_exc()
+            job.status = "failed"
             job.log(f"FAILED: {job.error}")
             for line in job.traceback.rstrip().splitlines()[-12:]:
                 job.log(line)

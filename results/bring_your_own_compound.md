@@ -92,7 +92,7 @@ Worked example: aspirin (`CC(=O)Oc1ccccc1C(=O)O`) named `ACME-101`, IC50 12.5 µ
 | `free_diffusivity` | 507.6 | µm²/s | `assumed` | Stokes-Einstein on the predicted radius |
 | `diffusivity` | 286.1 | µm²/s | `assumed` | **from MW alone**, end to end |
 | `bbb_penetrance` | 0.9596 | frac | `assumed` | CNS-MPO-style rules |
-| `binding` | 5.21e-03 | 1/s | `assumed` | overwritten by `alpha × uptake_proxy` |
+| `binding` | 1.127e-02 | 1/s | `assumed` | overwritten by `alpha × uptake_proxy` |
 | `clearance` | 9.73e-05 | 1/s | `assumed` | weak logP/MW heuristic |
 | `hill` | 1.2 | — | `assumed` | a constant, for every compound |
 
@@ -200,14 +200,19 @@ a tier lands.
 
 ## 4. Parity with the library, asserted by exact equality
 
-`test_same_structure_same_alpha_gives_identical_transport` compiles ribociclib's own
-SMILES under the name `MY-RIBO` and demands `diffusivity`, `molecular_weight`, `binding`,
-`clearance`, `bbb_penetrance`, `ic50` and `hill` all equal — **exactly**, not within a
-tolerance — to `apply_barrier_to_drugparams(calibrated_drugparams("ribociclib", alpha))`.
+`test_same_structure_same_alpha_gives_identical_transport` compiles lomustine's own
+SMILES under the name `MY-LOMUSTINE` and demands `diffusivity`, `molecular_weight`,
+`binding`, `clearance`, `bbb_penetrance`, `ic50` and `hill` all equal — **exactly**, not
+within a tolerance — to
+`apply_barrier_to_drugparams(calibrated_drugparams("lomustine", alpha))`.
 
-Ribociclib is chosen because it has no by-name special case (no TMZ hypoxia override, no
-cross-library reuse) *and* its logP is `rdkit_crippen` tier, so the only remaining
-difference between the curated and the user compile is the name — which must not matter.
+Lomustine is chosen because it has no by-name special case (no TMZ hypoxia override, no
+cross-library reuse), so the only remaining difference between the curated compile and the
+user compile is the name — which must not matter.
+
+`test_logp_is_the_same_tier_for_a_user_compound_and_a_library_drug` guards the assumption
+underneath that: it asserts no library drug carries a `logp_tier`, so if a name-keyed
+measured tier ever lands, this parity test's premise fails loudly rather than silently.
 
 `test_calibrated_drugparams_passthrough_contract_holds` separately pins the contract this
 composition depends on: `calibration._compile` documents that a `DrugParams` passes
