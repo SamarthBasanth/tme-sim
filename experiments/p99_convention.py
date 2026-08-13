@@ -44,8 +44,17 @@ STAGE C -- **sensitivity to the diffusivity perturbation**, on the real breast
     published run cache and is asserted against the published record.
 
 STAGE D -- **verdict consequences**, computed LAST and reported separately, so
-    that no convention can be selected on its PASS count. Nine published
-    verdicts (3 GBM + 6 breast) recomputed under every convention.
+    that no convention can be selected on its PASS count. Nine published rows
+    (3 GBM + 6 breast) recomputed under every convention; SEVEN of them carry a
+    verdict. Breast paclitaxel and breast 5-fluorouracil have one drug-matched
+    study each, so their min-max band is a zero-width point and they are NOT
+    TESTABLE under every convention. Their ratios are still swept -- the
+    scale-invariance result is a property of the ratio and needs no band -- but
+    they are counted in no PASS denominator and are never re-scored against the
+    broad cross-tumour-type band. The verdict for every row comes from
+    ``kill_calibration.score_ratio_row``; this module does not decide it. See
+    ``results/zero_width_bands.md`` and
+    ``results/fallback_rule_propagation.md``.
 
 STAGE E -- **estimator stability**: bootstrap and subsample behaviour of each
     normaliser on the real per-cell exposure distributions. An order statistic in
@@ -741,39 +750,80 @@ def stage_c(checkpoint: Optional[str] = None) -> Dict:
 # --------------------------------------------------------------------------- #
 # STAGE D -- verdict consequences (computed LAST, reported separately)
 # --------------------------------------------------------------------------- #
+def _band_entry(spec: Optional[Dict], solid: Dict, c_bath: float, ic50: float,
+                hill: float) -> Dict:
+    """One drug's band record: the drug-matched band, the broad context band,
+    and BOTH bridges, so the consumer can hand them to
+    ``kill_calibration.score_ratio_row`` rather than choosing between them here.
+
+    Nothing in this module decides which band scores a row. It used to
+    (``used = band if band_is_drug_matched else band_solid``), and that copy of
+    the retired fallback rule is what put two broad-band substitutions into this
+    document's §5 and §6 tables. See ``results/fallback_rule_propagation.md``.
+    """
+    from tmesim.validation.kill_calibration import bridge_to_kill_ratio_band
+    band = (bridge_to_kill_ratio_band(spec, c_bath, ic50, hill)
+            if spec else None)
+    band_solid = bridge_to_kill_ratio_band(solid, c_bath, ic50, hill)
+    return {"band": band, "band_solid": band_solid,
+            "specific_bridge": spec, "solid_bridge": solid,
+            "specific_n": int(spec["n"]) if spec else 0}
+
+
 def gbm_bands(panel: Dict) -> Dict:
-    """The published GBM literature bands, from the frozen literature tables."""
-    from tmesim.validation.kill_calibration import (bridge_to_kill_ratio_band,
-                                                    literature_bridge)
+    """The published GBM literature bands, from the frozen literature tables.
+
+    All three GBM drugs have n >= 5 drug-matched rows, so none is touched by the
+    single-study rule -- but the decision is still made in one place.
+    """
+    from tmesim.validation.kill_calibration import literature_bridge
+    solid = literature_bridge(scope="solid")
     out = {}
     for name, d in panel["drugs"].items():
         b = literature_bridge(scope=f"drug:{name}")
-        scope = f"drug:{name}"
-        if not b.get("n"):
-            b, scope = literature_bridge(scope="solid"), "solid"
-        band = bridge_to_kill_ratio_band(b, d["c_bath_uM"], d["ic50_uM"],
-                                         d["hill"])
-        out[name] = {"scope": scope, "ratio_lo": band["ratio_lo"],
-                     "ratio_hi": band["ratio_hi"],
-                     "fold_lo": band["fold_lo"], "fold_hi": band["fold_hi"]}
+        spec = b if b.get("n") else None
+        out[name] = _band_entry(spec, solid, d["c_bath_uM"], d["ic50_uM"],
+                                d["hill"])
     return out
 
 
 def breast_bands(panel: Dict) -> Dict:
     """The published breast literature bands, via the breast report's own
-    band builder (drug-matched where one exists, broad 'solid' otherwise)."""
+    band builder. Both the drug-matched band and the broad context band are
+    carried; which (if either) scores a row is ``score_ratio_row``'s call."""
     from experiments.dtissue_sensitivity import build_bands
     ic50_hill = {n: (d["ic50_uM"], d["hill"])
                  for n, d in panel["drugs"].items()}
     raw = build_bands(list(panel["drugs"]), ic50_hill)
-    out = {}
-    for name, b in raw.items():
-        used = b["band"] if b["band_is_drug_matched"] else b["band_solid"]
-        out[name] = {"scope": ("drug-matched" if b["band_is_drug_matched"]
-                               else "broad 'solid' fallback"),
-                     "ratio_lo": used["ratio_lo"], "ratio_hi": used["ratio_hi"],
-                     "fold_lo": used["fold_lo"], "fold_hi": used["fold_hi"]}
-    return out
+    return {name: {"band": b["band"], "band_solid": b["band_solid"],
+                   "specific_bridge": b["specific_bridge"],
+                   "solid_bridge": b["solid_bridge"],
+                   "specific_n": b["specific_n"]}
+            for name, b in raw.items()}
+
+
+def _p99_score(predicted_ratio: float, b: Dict) -> str:
+    """The verdict for one predicted ratio against one band record.
+
+    A one-line wrapper over ``kill_calibration.score_ratio_row`` so that every
+    verdict string in this file -- published, bias-corrected, or convention-swept
+    -- comes out of the same decision. Returns the status only; callers here
+    never need the rest.
+    """
+    from tmesim.validation.kill_calibration import score_ratio_row
+    return score_ratio_row(predicted_ratio,
+                           specific_bridge=b["specific_bridge"],
+                           specific_band=b["band"],
+                           context_bridge=b["solid_bridge"],
+                           context_band=b["band_solid"])["status"]
+
+
+def _scope_label(b: Dict) -> str:
+    if b["specific_bridge"] is None:
+        return "NONE drug-matched — not scored"
+    if b["specific_n"] < 2:
+        return f"single study (n = {b['specific_n']}) — zero-width, not scored"
+    return f"drug-matched (n = {b['specific_n']})"
 
 
 def stage_d(panels: Sequence[Tuple[Dict, Dict]]) -> Dict:
@@ -785,7 +835,7 @@ def stage_d(panels: Sequence[Tuple[Dict, Dict]]) -> Dict:
     exists not to do.
     """
     from tmesim.validation.kill_calibration import (kill_ratio_to_ic50_fold,
-                                                    ratio_test)
+                                                    score_ratio_row)
     out: Dict = {"panels": []}
     for panel, bands in panels:
         prec: Dict = {"tissue": panel["tissue"], "drugs": []}
@@ -796,22 +846,42 @@ def stage_d(panels: Sequence[Tuple[Dict, Dict]]) -> Dict:
             assert_matches_shipped(e, sens, resist, cb, ic, hh, mk)
             fixed_ref = float(np.percentile(e, 99.0))
             b = bands[name]
+            scorable = b["specific_bridge"] is not None and b["specific_n"] >= 2
             row: Dict = {"drug": name, "c_bath_label": d["c_bath_label"],
-                         "band_scope": b["scope"],
-                         "band_ratio_lo": b["ratio_lo"],
-                         "band_ratio_hi": b["ratio_hi"],
-                         "band_fold_lo": b["fold_lo"],
-                         "band_fold_hi": b["fold_hi"], "conventions": {}}
+                         "band_scope": _scope_label(b),
+                         "scored": bool(scorable),
+                         "specific_n": b["specific_n"],
+                         "band_ratio_lo": (b["band"]["ratio_lo"] if scorable
+                                           else None),
+                         "band_ratio_hi": (b["band"]["ratio_hi"] if scorable
+                                           else None),
+                         "band_fold_lo": (b["band"]["fold_lo"] if scorable
+                                          else None),
+                         "band_fold_hi": (b["band"]["fold_hi"] if scorable
+                                          else None),
+                         "context_ratio_lo": b["band_solid"]["ratio_lo"],
+                         "context_ratio_hi": b["band_solid"]["ratio_hi"],
+                         "conventions": {}}
             for tag in [n["tag"] for n in NORMALISERS]:
                 dec = decompose_general(e, sens, resist, cb, ic, hh, mk,
                                         tag=tag, fixed_ref=fixed_ref)
-                t = ratio_test(dec["ratio_exact"], b["ratio_lo"], b["ratio_hi"])
+                s = score_ratio_row(dec["ratio_exact"],
+                                    specific_bridge=b["specific_bridge"],
+                                    specific_band=b["band"],
+                                    context_bridge=b["solid_bridge"],
+                                    context_band=b["band_solid"])
                 row["conventions"][tag] = {
                     "ratio_exact": dec["ratio_exact"],
                     "f_penetration": dec["f_penetration"],
                     "implied_ic50_fold": kill_ratio_to_ic50_fold(
                         dec["ratio_exact"], cb, ic, hh),
-                    "verdict": t["verdict"], "direction": t["direction"],
+                    "verdict": s["status"],
+                    "scored": bool(s["scored"]),
+                    "direction": (s["test"]["direction"] if s["scored"]
+                                  else "not scored — no testable band"),
+                    # CONTEXT ONLY: what the broad non-drug-matched band would
+                    # have said. Never counted as a verdict.
+                    "context_verdict": s["context_test"]["verdict"],
                 }
             prec["drugs"].append(row)
         out["panels"].append(prec)
@@ -849,8 +919,7 @@ def stage_d_bias(panels: Sequence[Tuple[Dict, Dict]],
     statistic; the mapping is exact only there, which is stated as a limit
     rather than hidden.
     """
-    from tmesim.validation.kill_calibration import (kill_ratio_to_ic50_fold,
-                                                    ratio_test)
+    from tmesim.validation.kill_calibration import kill_ratio_to_ic50_fold
     out: Dict = {"biases": list(biases), "panels": []}
     #: The stage-B measurement, per dx, keyed by bath multiple. Applied per drug
     #: at ITS OWN reporting concentration, because the Hill map damps the bias:
@@ -872,23 +941,38 @@ def stage_d_bias(panels: Sequence[Tuple[Dict, Dict]],
             b = bands[name]
             base = decompose_general(e, sens, resist, cb, ic, hh, mk,
                                      tag=SHIPPED_TAG)["ratio_exact"]
+            scorable = b["specific_bridge"] is not None and b["specific_n"] >= 2
+            band_lo = b["band"]["ratio_lo"] if scorable else None
+            band_hi = b["band"]["ratio_hi"] if scorable else None
+
+            def _score(x):
+                return _p99_score(x, b)
+
             row: Dict = {"drug": name, "ratio_published": base,
-                         "verdict_published": ratio_test(
-                             base, b["ratio_lo"], b["ratio_hi"])["verdict"],
-                         "band_ratio_lo": b["ratio_lo"],
-                         "band_ratio_hi": b["ratio_hi"],
-                         "margin_to_lo_pct": (base / b["ratio_lo"] - 1.0) * 100
-                         if b["ratio_lo"] > 0 else float("nan"),
-                         "margin_to_hi_pct": (base / b["ratio_hi"] - 1.0) * 100
-                         if b["ratio_hi"] > 0 else float("nan"),
+                         "verdict_published": _score(base),
+                         "scored": bool(scorable),
+                         "specific_n": b["specific_n"],
+                         "band_scope": _scope_label(b),
+                         "band_ratio_lo": band_lo,
+                         "band_ratio_hi": band_hi,
+                         # A margin is a distance to the bar this drug is held
+                         # to. An unscored drug has no bar, so it has no margin;
+                         # quoting its distance to the broad context band as one
+                         # is exactly the substitution this file used to make.
+                         "margin_to_lo_pct": ((base / band_lo - 1.0) * 100
+                                              if scorable and band_lo > 0
+                                              else None),
+                         "margin_to_hi_pct": ((base / band_hi - 1.0) * 100
+                                              if scorable and band_hi > 0
+                                              else None),
                          "corrected": {}}
             for eps in biases:
                 r = base * (1.0 + eps)
-                t = ratio_test(r, b["ratio_lo"], b["ratio_hi"])
+                v = _score(r)
                 row["corrected"][f"{eps:+.3f}"] = {
-                    "ratio": r, "verdict": t["verdict"],
+                    "ratio": r, "verdict": v,
                     "implied_ic50_fold": kill_ratio_to_ic50_fold(r, cb, ic, hh),
-                    "changed": t["verdict"] != row["verdict_published"],
+                    "changed": v != row["verdict_published"],
                 }
             # --- the MEASURED, concentration-matched correction -------------
             m = float(cb) / float(ic)
@@ -898,13 +982,13 @@ def stage_d_bias(panels: Sequence[Tuple[Dict, Dict]],
                 mm = min(table, key=lambda k: abs(math.log(k / m)))
                 bias = table[mm]
                 r = base / (1.0 + bias)      # undo an over-read of size `bias`
-                t = ratio_test(r, b["ratio_lo"], b["ratio_hi"])
+                v = _score(r)
                 row["measured_correction"][f"dx{dx:g}"] = {
                     "nearest_bath_multiple_measured": mm,
                     "measured_fpen_bias": bias,
-                    "ratio_corrected": r, "verdict": t["verdict"],
+                    "ratio_corrected": r, "verdict": v,
                     "implied_ic50_fold": kill_ratio_to_ic50_fold(r, cb, ic, hh),
-                    "changed": t["verdict"] != row["verdict_published"],
+                    "changed": v != row["verdict_published"],
                 }
             prec["drugs"].append(row)
         out["panels"].append(prec)

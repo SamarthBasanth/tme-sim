@@ -492,7 +492,11 @@ def stage_alpha() -> Dict:
 # --------------------------------------------------------------------------- #
 # Stage 4 — the delivery blast radius, both arms
 # --------------------------------------------------------------------------- #
-#: The nine formally-scored verdicts of ``results/p99_convention.md`` §6.
+#: The nine published rows of ``results/p99_convention.md`` §6. SEVEN of them
+#: are formally scored; breast paclitaxel and breast 5-fluorouracil are NOT
+#: TESTABLE (one drug-matched study each, so a zero-width band). Their ratios
+#: are still computed and compared across arms -- a ratio that moves is a real
+#: measurement of the blast radius even where no verdict exists to move.
 GBM_DRUGS = ("temozolomide", "cisplatin", "doxorubicin")
 BREAST_DRUGS = ("doxorubicin", "paclitaxel", "docetaxel", "epirubicin",
                 "5-fluorouracil", "cisplatin")
@@ -507,9 +511,11 @@ PUBLISHED_RATIO = {
 PUBLISHED_VERDICT = {
     ("gbm", "temozolomide"): "PASS", ("gbm", "cisplatin"): "PASS",
     ("gbm", "doxorubicin"): "PASS",
-    ("breast", "doxorubicin"): "PASS", ("breast", "paclitaxel"): "PASS",
+    ("breast", "doxorubicin"): "PASS",
+    ("breast", "paclitaxel"): "NOT TESTABLE",
     ("breast", "docetaxel"): "FAIL", ("breast", "epirubicin"): "PASS",
-    ("breast", "5-fluorouracil"): "PASS", ("breast", "cisplatin"): "PASS",
+    ("breast", "5-fluorouracil"): "NOT TESTABLE",
+    ("breast", "cisplatin"): "PASS",
 }
 
 
@@ -572,21 +578,113 @@ def _load_at(sample: str, dx_um: float):
     return reconstruct_real(source="xenium", sample=sample, dx_um=float(dx_um))
 
 
+def verdict_fields(scored: Dict, b: Dict) -> Dict:
+    """Render ``kill_calibration.score_ratio_row``'s decision into a blast row.
+
+    Shared by fresh panels and by :func:`rescore_panel`, so a re-scored cached
+    panel and a freshly solved one cannot say different things.
+    """
+    return {
+        "verdict": scored["status"],
+        "verdict_scored": bool(scored["scored"]),
+        "verdict_reason": scored["reason"],
+        "specific_n": int(b.get("specific_n", 0)),
+        # the band the verdict was actually taken against; None when nothing was
+        # scored, so a context band can never be read as the bar
+        "band_lo": (scored["band"]["ratio_lo"] if scored["scored"] else None),
+        "band_hi": (scored["band"]["ratio_hi"] if scored["scored"] else None),
+        # CONTEXT ONLY, never a verdict
+        "context_band_lo": b["band_solid"]["ratio_lo"],
+        "context_band_hi": b["band_solid"]["ratio_hi"],
+        "context_verdict": scored["context_test"]["verdict"],
+    }
+
+
+def rescore_panel(panel: Dict) -> int:
+    """Re-derive a cached panel's verdicts IN PLACE through the shared decision.
+
+    A panel replayed from the blast checkpoint carries whatever verdict was
+    current when it was written, and the older ones were written under the
+    retired fallback rule. The band depends only on the frozen literature tables
+    and on the row's own ``(ic50, hill, c_bath)``, all of which are stored, so
+    the re-score is exact and costs NO transport solve. Returns the number of
+    verdicts that moved.
+    """
+    from tmesim.validation.kill_calibration import score_ratio_row
+    rows = panel.get("rows", [])
+    if not rows:
+        return 0
+    if any("ic50_uM" not in r or "hill" not in r for r in rows):
+        # A panel written before this schema stored the reporting concentration
+        # but not the potency pair. Both are recovered by re-compiling the
+        # molecule -- a molecular compile only: no tissue, no transport, no PDE.
+        from tmesim.validation.calibration import calibrate_alpha
+        a = float(calibrate_alpha())
+        if panel["tissue"] == "breast":
+            from experiments.kill_calibration_breast import compile_breast_drug
+
+            def _cf(n):
+                return compile_breast_drug(n, a)[0]
+        else:
+            from tmesim.validation.kill_calibration import compile_drug
+
+            def _cf(n):
+                return compile_drug(n, a)
+        for r in rows:
+            dp = _cf(r["drug"])
+            r.setdefault("ic50_uM", float(dp.ic50))
+            r.setdefault("hill", float(dp.hill))
+    ic50_hill = {r["drug"]: (float(r["ic50_uM"]), float(r["hill"])) for r in rows}
+    baths = {r["drug"]: float(r["c_bath_uM"]) for r in rows}
+    names = [r["drug"] for r in rows]
+    if panel["tissue"] == "breast":
+        from experiments.dtissue_sensitivity import build_bands
+        bands = build_bands(names, ic50_hill)
+    else:
+        bands = _gbm_bands(names, ic50_hill, baths)
+    changed = 0
+    for r in rows:
+        b = bands[r["drug"]]
+        scored = score_ratio_row(float(r["ratio_exact"]),
+                                 specific_bridge=b["specific_bridge"],
+                                 specific_band=b["band"],
+                                 context_bridge=b["solid_bridge"],
+                                 context_band=b["band_solid"])
+        fields = verdict_fields(scored, b)
+        if r.get("verdict") != fields["verdict"]:
+            changed += 1
+        r.update(fields)
+    return changed
+
+
 def _gbm_bands(drugs: Sequence[str], ic50_hill: Dict, baths: Dict) -> Dict:
     """The GBM report's own band construction (``kill_calibration.analyze`` §THE
-    TEST): the drug-matched literature bridge where one exists, else 'solid',
-    mapped to a kill-ratio band at that drug's OWN reporting concentration."""
+    TEST): the drug-matched literature bridge, mapped to a kill-ratio band at
+    that drug's OWN reporting concentration.
+
+    The bridges are carried alongside the mapped bands so the caller can hand
+    them to ``kill_calibration.score_ratio_row``, which is the only thing
+    entitled to decide whether a row is scored at all. All three GBM drugs
+    happen to have n >= 5 drug-matched rows, so none of them is affected by the
+    single-study rule -- but the decision is still made in one place.
+    """
     from tmesim.validation.kill_calibration import (
         bridge_to_kill_ratio_band, literature_bridge)
     out = {}
+    solid = literature_bridge(scope="solid")
     for name in drugs:
         b = literature_bridge(scope=f"drug:{name}")
-        scope = f"drug:{name}"
-        if not b.get("n"):
-            b, scope = literature_bridge(scope="solid"), "solid"
+        spec = b if b.get("n") else None
         ic50, hill = ic50_hill[name]
-        out[name] = {"band": bridge_to_kill_ratio_band(b, baths[name], ic50, hill),
-                     "scope": scope}
+        out[name] = {
+            "band": (bridge_to_kill_ratio_band(spec, baths[name], ic50, hill)
+                     if spec else None),
+            "band_solid": bridge_to_kill_ratio_band(solid, baths[name], ic50, hill),
+            "specific_bridge": spec,
+            "solid_bridge": solid,
+            "specific_n": int(spec["n"]) if spec else 0,
+            "scope": (f"drug:{name}" if spec else "none"),
+        }
     return out
 
 
@@ -603,7 +701,7 @@ def _run_panel(tissue: str, arm: str, alpha: float, drugs: Sequence[str],
     from tmesim.core import PDConfig, PDEConfig, PKConfig, SimConfig
     from tmesim.validation.kill_calibration import (
         decompose, expected_kill, kill_ratio_to_ic50_fold, prepare_tissue,
-        ratio_test, resistance_vector, unit_transport, window_plasma_mean)
+        resistance_vector, score_ratio_row, unit_transport, window_plasma_mean)
 
     if tissue == "breast":
         from experiments.dtissue_sensitivity import build_bands
@@ -679,15 +777,18 @@ def _run_panel(tissue: str, arm: str, alpha: float, drugs: Sequence[str],
         dec = decompose(e_unit, sens[name], resist, c_bath, drug.ic50, drug.hill,
                         pd_cfg.max_kill_rate)
         b = bands[name]
-        if tissue == "breast":
-            t_spec = (ratio_test(dec["ratio_exact"], b["band"]["ratio_lo"],
-                                 b["band"]["ratio_hi"]) if b["band"] else None)
-            t_solid = ratio_test(dec["ratio_exact"], b["band_solid"]["ratio_lo"],
-                                 b["band_solid"]["ratio_hi"])
-            formal = t_spec if b["band_is_drug_matched"] else t_solid
-        else:
-            formal = ratio_test(dec["ratio_exact"], b["band"]["ratio_lo"],
-                                b["band"]["ratio_hi"])
+        # THE shared band decision, for both tissues. Which band (if any) a row
+        # is scored against is not decided here and must never be: this driver
+        # previously carried its own copy of the retired fallback rule
+        # (``formal = t_spec if band_is_drug_matched else t_solid``), which
+        # substituted the broad 62x-wide cross-tumour-type band for a
+        # single-study drug's zero-width one. See
+        # ``results/fallback_rule_propagation.md``.
+        scored = score_ratio_row(dec["ratio_exact"],
+                                 specific_bridge=b["specific_bridge"],
+                                 specific_band=b["band"],
+                                 context_bridge=b["solid_bridge"],
+                                 context_band=b["band_solid"])
         # the AUC field itself, so 'the exposure moved' is measurable and not
         # inferred from the score
         auc_t = np.asarray(tr.auc, dtype=np.float64)[tissue_mask] / dur
@@ -710,8 +811,8 @@ def _run_panel(tissue: str, arm: str, alpha: float, drugs: Sequence[str],
                 pd_cfg.max_kill_rate)),
             "implied_ic50_fold": kill_ratio_to_ic50_fold(
                 dec["ratio_exact"], c_bath, drug.ic50, drug.hill),
-            "verdict": formal["verdict"],
-            "band_lo": formal["lit_ratio_lo"], "band_hi": formal["lit_ratio_hi"],
+            "ic50_uM": float(drug.ic50), "hill": float(drug.hill),
+            **verdict_fields(scored, b),
             "_e_unit_sum": float(e_unit.sum()),
             "_e_unit_first": float(e_unit[0]),
             "solve_s": time.time() - ts,
@@ -814,6 +915,14 @@ def stage_blast(dx_um: float = 12.0, tissues: Sequence[str] = ("breast", "gbm"),
                 ck.flush()
     if ck is not None:
         ck.close()
+    # Every panel -- cached or freshly solved -- is re-derived through the shared
+    # band decision before it is written out, so a panel replayed from a
+    # checkpoint written under the retired fallback rule cannot publish that
+    # rule's verdict. This re-scores a stored ratio; it solves nothing.
+    for p in out["panels"]:
+        n = rescore_panel(p)
+        log(f"{p['tissue']}|{p['arm']}: {n} verdict(s) re-derived under "
+            f"kill_calibration.score_ratio_row")
     return out
 
 

@@ -2,11 +2,19 @@
 
 Why this file exists
 --------------------
-``results/kill_calibration_breast.md`` publishes 6 formally-testable 3-D:2-D
-ratio verdicts on the real Xenium breast section at ``dx = 12 um``: 5 PASS and
+``results/kill_calibration_breast.md`` publishes 4 formally-testable 3-D:2-D
+ratio verdicts on the real Xenium breast section at ``dx = 12 um``: 3 PASS and
 ONE FAIL (docetaxel, ratio 0.1484 vs a band top edge of 0.1463). That single
 FAIL is the load-bearing evidence, cited in several documents, that the
 calibration is falsifiable rather than tuned.
+
+Two further drugs are swept here -- paclitaxel and 5-fluorouracil -- because
+their RATIOS are published and are worth converging. Their VERDICTS are not:
+each has exactly one drug-matched study, so its min-max band is a zero-width
+point that nothing can land inside, and it is reported NOT TESTABLE rather than
+re-scored against the broad cross-tumour-type band. See
+``results/zero_width_bands.md``; this driver's own former use of that
+substitution is recorded in ``results/fallback_rule_propagation.md``.
 
 ``results/dtissue_sensitivity.md`` §7.2 turned up an incidental result that puts
 it in doubt: at ``dx = 24 um`` the same docetaxel ratio is **0.1200**, i.e.
@@ -100,12 +108,14 @@ from tmesim.reconstruct.real_pipeline import reconstruct_real  # noqa: E402
 from tmesim.validation.calibration import calibrate_alpha  # noqa: E402
 from tmesim.validation.kill_calibration import (  # noqa: E402
     BATH_REFERENCE_PCT,
+    NOT_TESTABLE,
     decompose,
     expected_kill,
     kill_ratio_to_ic50_fold,
     prepare_tissue,
     ratio_test,
     resistance_vector,
+    score_ratio_row,
     unit_transport,
     window_plasma_mean,
 )
@@ -154,9 +164,14 @@ DX_LADDER: Tuple[float, ...] = (30.0, 24.0, 18.0, 16.0, 12.0, 10.0, 8.0)
 PUBLISHED_RATIO = {"doxorubicin": 0.2301, "paclitaxel": 0.1503,
                    "docetaxel": 0.1484, "epirubicin": 0.2301,
                    "5-fluorouracil": 0.3379, "cisplatin": 0.3085}
-PUBLISHED_VERDICT = {"doxorubicin": "PASS", "paclitaxel": "PASS",
+#: Paclitaxel and 5-fluorouracil are NOT TESTABLE in the published table (n = 1
+#: each: a single study is a point estimate, so its min-max band is zero-width
+#: and nothing can land inside it). Their published RATIOS above are real and are
+#: still reproduced and swept here; what they have no more of is a verdict. See
+#: ``results/zero_width_bands.md`` and ``results/fallback_rule_propagation.md``.
+PUBLISHED_VERDICT = {"doxorubicin": "PASS", "paclitaxel": NOT_TESTABLE,
                      "docetaxel": "FAIL", "epirubicin": "PASS",
-                     "5-fluorouracil": "PASS", "cisplatin": "PASS"}
+                     "5-fluorouracil": NOT_TESTABLE, "cisplatin": "PASS"}
 
 
 # --------------------------------------------------------------------------- #
@@ -175,16 +190,28 @@ def build_bands(ic50_hill: Dict[str, Tuple[float, float]]) -> Dict:
         out[name] = {
             "band": band,
             "band_solid": bridge_to_kill_ratio_band(solid, c_bath, ic50, hill),
+            # carried so ``score_ratio_row`` can see ``n`` -- a one-study point
+            # estimate is not an interval, and only the shared decision gets to
+            # say what that means
+            "specific_bridge": spec,
+            "solid_bridge": solid,
             "band_is_drug_matched": bool(spec is not None and spec["n"] > 1),
+            "specific_n": (int(spec["n"]) if spec else 0),
         }
     return out
 
 
 def score(name: str, e_unit: np.ndarray, sens: np.ndarray, resist: np.ndarray,
           drug, pd_cfg: PDConfig, bands: Dict, plasma_mean: float) -> Dict:
-    """``experiments/kill_calibration_breast.run``'s own scoring, unmodified:
-    ``decompose`` at 1x IC50 (the reporting concentration the verdict is taken
-    at) then the frozen ``ratio_test`` against the frozen literature band.
+    """``experiments/kill_calibration_breast.run``'s own scoring: ``decompose``
+    at 1x IC50 (the reporting concentration the verdict is taken at), then THE
+    shared band decision, ``kill_calibration.score_ratio_row``.
+
+    Which band a row is scored against is NOT decided here. It used to be
+    (``formal = t_specific if band_is_drug_matched else t_solid``), which is the
+    retired rule that silently substituted the broad 62x-wide cross-tumour-type
+    band for a single-study drug's zero-width one -- see
+    ``results/zero_width_bands.md`` and ``results/fallback_rule_propagation.md``.
 
     NOTE the ``resistance_vector`` call takes NO ``drug=`` argument, exactly as
     ``kill_calibration_breast.py`` line 344 does. That matters: the sibling
@@ -197,11 +224,11 @@ def score(name: str, e_unit: np.ndarray, sens: np.ndarray, resist: np.ndarray,
                     pd_cfg.max_kill_rate)
     fold = kill_ratio_to_ic50_fold(dec["ratio_exact"], c_bath, drug.ic50, drug.hill)
     b = bands[name]
-    t_specific = (ratio_test(dec["ratio_exact"], b["band"]["ratio_lo"],
-                             b["band"]["ratio_hi"]) if b["band"] else None)
-    t_solid = ratio_test(dec["ratio_exact"], b["band_solid"]["ratio_lo"],
-                         b["band_solid"]["ratio_hi"])
-    formal = t_specific if b["band_is_drug_matched"] else t_solid
+    scored = score_ratio_row(dec["ratio_exact"],
+                             specific_bridge=b["specific_bridge"],
+                             specific_band=b["band"],
+                             context_bridge=b["solid_bridge"],
+                             context_band=b["band_solid"])
     return {
         "drug": name,
         "c_bath_uM": c_bath,
@@ -224,13 +251,67 @@ def score(name: str, e_unit: np.ndarray, sens: np.ndarray, resist: np.ndarray,
         "e_unit_p99": float(np.percentile(e_unit, BATH_REFERENCE_PCT)),
         "e_unit_p01": float(np.percentile(e_unit, 1.0)),
         "e_unit_max": float(e_unit.max()),
-        "verdict": formal["verdict"],
-        "verdict_direction": formal["direction"],
-        "band_used_lo": formal["lit_ratio_lo"],
-        "band_used_hi": formal["lit_ratio_hi"],
-        "band_is_drug_matched": b["band_is_drug_matched"],
-        "verdict_solid": t_solid["verdict"],
+        **verdict_fields(scored, b),
     }
+
+
+def verdict_fields(scored: Dict, b: Dict) -> Dict:
+    """Render the shared decision into this script's record schema.
+
+    Shared by fresh scoring and by :func:`rescore_rows`, so a re-scored cached
+    record and a freshly solved one cannot disagree.
+    """
+    return {
+        "verdict": scored["status"],
+        "verdict_scored": bool(scored["scored"]),
+        "verdict_reason": scored["reason"],
+        "verdict_direction": (scored["test"]["direction"] if scored["scored"]
+                              else "not scored -- see verdict_reason"),
+        # None when nothing was scored, so no reader can mistake the broad
+        # context band for the bar this drug was held to
+        "band_used_lo": (scored["band"]["ratio_lo"] if scored["scored"] else None),
+        "band_used_hi": (scored["band"]["ratio_hi"] if scored["scored"] else None),
+        "band_ratio_lo": (b["band"]["ratio_lo"] if b["band"] else None),
+        "band_ratio_hi": (b["band"]["ratio_hi"] if b["band"] else None),
+        "band_is_drug_matched": bool(scored["scored"]),
+        "specific_n": int(b.get("specific_n", 0)),
+        # CONTEXT ONLY, never a verdict
+        "context_band_lo": b["band_solid"]["ratio_lo"],
+        "context_band_hi": b["band_solid"]["ratio_hi"],
+        "verdict_solid": scored["context_test"]["verdict"],
+    }
+
+
+def rescore_rows(rows: Sequence[Dict]) -> int:
+    """Re-derive stored verdicts IN PLACE through the shared decision.
+
+    Records written before ``2466ce1`` carry a verdict produced by the retired
+    fallback rule. The band depends only on the frozen literature tables and on
+    ``(ic50, hill)``, neither of which ``dx`` touches, so a cached record is
+    re-scored exactly from its own stored ratio -- with NO transport solve.
+    Returns the number of rows whose verdict string changed.
+    """
+    cache: Dict[tuple, Dict] = {}
+    changed = 0
+    for r in rows:
+        name = r["drug"]
+        ic50 = float(r.get("ic50_uM", r["c_bath_uM"]))
+        hill = float(r.get("hill", 0.0)) or float(
+            compile_breast_drug(name, float(calibrate_alpha()))[0].hill)
+        key = (name, ic50, hill)
+        if key not in cache:
+            cache[key] = build_bands({name: (ic50, hill)})[name]
+        b = cache[key]
+        scored = score_ratio_row(float(r["ratio_exact"]),
+                                 specific_bridge=b["specific_bridge"],
+                                 specific_band=b["band"],
+                                 context_bridge=b["solid_bridge"],
+                                 context_band=b["band_solid"])
+        fields = verdict_fields(scored, b)
+        if r.get("verdict") != fields["verdict"]:
+            changed += 1
+        r.update(fields)
+    return changed
 
 
 # --------------------------------------------------------------------------- #
@@ -718,8 +799,15 @@ def analyse(res: Dict) -> Dict:
 
         band_lo = rows[0]["band_used_lo"]
         band_hi = rows[0]["band_used_hi"]
+        scored_drug = bool(rows[0].get("verdict_scored",
+                                       rows[0]["band_used_lo"] is not None))
 
         def verdict_of(q):
+            # An extrapolated ratio is scored by the same rule as a solved one:
+            # if the drug has no testable band, extrapolating it to dx -> 0 does
+            # not create one.
+            if not scored_drug:
+                return NOT_TESTABLE
             if q is None or not math.isfinite(q):
                 return None
             return "PASS" if band_lo <= q <= band_hi else "FAIL"
@@ -753,9 +841,11 @@ def analyse(res: Dict) -> Dict:
         flips = [{"between_dx": [a[0], b[0]], "from": a[1], "to": b[1]}
                  for a, b in zip(verdicts, verdicts[1:]) if a[1] != b[1]]
 
-        # distance from the nearer band edge, as a fraction of the ratio
+        # distance from the nearer band edge, as a fraction of the ratio. Only
+        # meaningful where a band was actually scored; a margin to a band the
+        # drug is not held to is not a margin.
         margin = {}
-        if r12 is not None:
+        if r12 is not None and scored_drug:
             q12 = float(r12["ratio_exact"])
             margin["dist_to_hi_pct"] = 100.0 * (q12 - band_hi) / band_hi
             margin["dist_to_lo_pct"] = 100.0 * (q12 - band_lo) / band_lo
@@ -766,6 +856,10 @@ def analyse(res: Dict) -> Dict:
             "verdicts": verdicts, "flips": flips, "steps": steps,
             "monotone": monotone, "settling": settling,
             "band_lo": band_lo, "band_hi": band_hi,
+            "scored": scored_drug,
+            "specific_n": int(rows[0].get("specific_n", 0)),
+            "context_band_lo": rows[0].get("context_band_lo"),
+            "context_band_hi": rows[0].get("context_band_hi"),
             "band_is_drug_matched": bool(rows[0]["band_is_drug_matched"]),
             "fit": fit, "fit_f_penetration": fit_pen, "richardson": rich,
             "estimates": est, "error_at_dx12": err12, "margin_at_dx12": margin,
@@ -838,6 +932,35 @@ def write_report(res: Dict, ana: Dict, out_md: str = OUT_MD,
       "the verdict it produces. The convergence curve is reported as measured and the "
       "conclusion follows from it, whichever way it falls.\n")
 
+    # A regeneration that re-scores stored ratios cannot re-solve them. Every rung
+    # except dx = 12 was solved under the superseded pixel-space _TUMOR_SIGMA, and
+    # this ladder is exactly the kind of study that constant used to confound.
+    stale = [d for d in sorted(dxs) if abs(float(d) - 12.0) > 1e-9]
+    if stale:
+        A("> ### STALE TRANSPORT WARNING — every rung except `dx = 12 um` predates the "
+          "`_TUMOR_SIGMA` units fix\n>\n"
+          "> The interstitial-pressure solve smooths the tumour-occupancy field with a "
+          "gaussian whose width was, until commit `5d6e8e4`, expressed in GRID CELLS "
+          "(`_TUMOR_SIGMA = 5.0`) and so tracked the mesh — 40 um at `dx = 8`, 60 at 12, "
+          "80 at 16, 120 at 24. It is now a physical length (`_TUMOR_SIGMA_UM = 60.0`). "
+          "**That is precisely the defect a grid-convergence study cannot tolerate**: "
+          "refining the mesh was silently redefining the model, so the ladder below "
+          "measures discretisation error and a model change at once. "
+          "`results/tumor_sigma_units.md` §3 measures it on the mean tissue IFP: "
+          "**1.89x spread across the ladder before, 1.09x after**.\n>\n"
+          f"> **`dx = 12 um` is the exact fixed point** (`60.0 / 12.0 == 5.0` in "
+          f"IEEE-754), so the published rung, the §1 control and the §1c cache "
+          f"comparison are bit-identical and unaffected. The other rungs "
+          f"({', '.join(f'{d:g}' for d in stale)} um) were solved under the old constant "
+          f"and **have NOT been re-solved here** — this regeneration re-scored stored "
+          f"ratios against the corrected literature bands and solved no PDE "
+          f"(`results/fallback_rule_propagation.md`). The verdicts below are correct for "
+          f"the ratios shown; the ratios at every rung but 12 would move by an unmeasured "
+          f"amount on a re-run, and with them the Richardson and power-law "
+          f"extrapolations. **The docetaxel conclusion should be re-derived from a "
+          f"re-solved ladder before it is quoted again.** Re-solving costs 42 transport "
+          f"solves (~541 min) and was deliberately not done here.\n")
+
     # ---------------- 0. bottom line ---------------------------------------
     A("## 0. Bottom line\n")
     doce = ana["docetaxel"]
@@ -854,10 +977,19 @@ def write_report(res: Dict, ana: Dict, out_md: str = OUT_MD,
       f"({doce['estimates'].get('fit_verdict', 'n/a')}).\n")
 
     flipping = [d for d in drugs if ana[d]["flips"]]
-    A(f"**Verdict stability over the ladder.** "
-      f"{len(drugs) - len(flipping)}/{len(drugs)} verdicts are constant at every grid; "
+    unscored = [d for d in drugs if not ana[d]["scored"]]
+    n_scored = len(drugs) - len(unscored)
+    A(f"**Verdict stability over the ladder.** Of the {n_scored} of {len(drugs)} swept "
+      f"drugs that carry a scorable band, "
+      f"{n_scored - len(flipping)}/{n_scored} verdicts are constant at every grid; "
       f"{len(flipping)} flip somewhere on the ladder"
-      + (f" (**{', '.join(flipping)}**)." if flipping else ".") + "\n")
+      + (f" (**{', '.join(flipping)}**)." if flipping else ".")
+      + (f" **{', '.join(unscored)}** carry no verdict at any grid — each has exactly "
+         f"one drug-matched study, so its min-max band is a zero-width point and "
+         f"nothing can land inside it (`results/zero_width_bands.md`). Their ratios "
+         f"still move with `dx`, and are reported below; there is simply no bar for "
+         f"them to move across, so they are counted in no stability denominator."
+         if unscored else "") + "\n")
 
     A(f"**Grid limit.** The explicit upwind advection step carries the CFL condition "
       f"`dt*(|vx|+|vy|)/dx <= 1` and the solver RAISES if it is violated. On this section "
@@ -1015,10 +1147,17 @@ def write_report(res: Dict, ana: Dict, out_md: str = OUT_MD,
       "SHIPPING delivery law — the length scale the mesh has to resolve.\n")
     for name in drugs:
         a = ana[name]
-        band_kind = ("drug-matched" if a["band_is_drug_matched"]
-                     else "broad 'solid' fallback")
-        A(f"### {name} — band **{_f(a['band_lo'])}–{_f(a['band_hi'])}** "
-          f"({band_kind}), "
+        if a["scored"]:
+            head = (f"band **{_f(a['band_lo'])}–{_f(a['band_hi'])}** "
+                    f"(drug-matched, n = {a['specific_n']})")
+        else:
+            head = (f"**NO TESTABLE BAND** (drug-matched literature is a single "
+                    f"study, n = {a['specific_n']}, so its min-max interval is "
+                    f"zero-width); ratios below are reported, not scored, and the "
+                    f"broad 'solid' band "
+                    f"**{_f(a.get('context_band_lo'))}–{_f(a.get('context_band_hi'))}** "
+                    f"is context only")
+        A(f"### {name} — {head}, "
           f"L = **{a['L_um']:.1f} um** (= {a['L_over_dx12']:.1f} cells at dx = 12)\n")
         A("| dx (um) | F_pen | F_state | **3-D:2-D ratio** | implied fold | "
           "mean exposure (uM per uM plasma) | kill at nominal dose | solve (s) | verdict |")
@@ -1230,10 +1369,27 @@ def main() -> None:
     else:
         res = run_ladder(dx_ladder, drugs)
 
+    # Every stored verdict is re-derived through the shared decision before any
+    # analysis reads it, so a record written under the retired fallback rule
+    # cannot reach the document. A re-score of a stored ratio; no solve.
+    n_moved = rescore_rows(res["records"])
+    print(f"re-scored {len(res['records'])} record(s) through "
+          f"kill_calibration.score_ratio_row: {n_moved} verdict(s) moved",
+          flush=True)
+
     ana = analyse(res)
     ctl = cache_control(res, drugs)
     write_report(res, ana, OUT_MD, control=ctl, dtctl=load_dt_control())
     print(f"wrote {OUT_MD}", flush=True)
+    # Persist the re-scored records, so the on-disk sweep artefact cannot keep
+    # asserting a verdict the document no longer makes. Only verdict fields
+    # move; no ratio is touched.
+    if os.path.exists(RAW_JSON):
+        raw = json.load(open(RAW_JSON))
+        rescore_rows(raw["records"])
+        with open(RAW_JSON, "w") as fh:
+            json.dump(raw, fh, indent=1, default=float)
+        print(f"re-scored verdicts persisted to {RAW_JSON}", flush=True)
 
 
 if __name__ == "__main__":

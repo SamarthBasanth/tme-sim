@@ -71,14 +71,17 @@ the tissue verdicts it has been applied to. It does not.
    variance and no detectable half-sample bias.
 
 6. **Verdict consequences, computed last and never used to select** (§5):
-   `tail90` reproduces the published verdict set **exactly** — 8/9 PASS, the same
-   8 and the same 1 FAIL. Nothing is bought or lost at the verdict level.
+   `tail90` reproduces the published verdict set **exactly** — 6/7 PASS, the same
+   6 and the same 1 FAIL. Nothing is bought or lost at the verdict level. (Nine rows
+   are swept; two of them — breast paclitaxel and 5-fluorouracil — carry no verdict
+   under any convention, having one drug-matched study each and therefore a zero-width
+   band. See §5.)
 
 7. **The slab's "+8.3 % at dx = 12" does NOT transfer to tissue, and it has
    been read as though it does.** `results/boundary_layer_resolution.md` §8 says
    dx = 12 um carries that bias for "every 3-D:2-D verdict in this repo".
    Measured like-for-like (the same dx = 12 -> 8 step on both), the slab predicts
-   a uniform **+2.39 %** while the nine tissue verdicts move **-2.43 % to
+   a uniform **+2.39 %** while the nine tissue ratios move **-2.43 % to
    +3.79 %** — a 6.2-point, drug-ordered spread — and the two shortest-`L` drugs
    (paclitaxel, docetaxel) move in the **opposite direction**. The slab number is
    a correct measurement of the *scoring statistic's* error in isolation and is
@@ -88,11 +91,12 @@ the tissue verdicts it has been applied to. It does not.
    reconstruction dominates" — so its §6 and its §8 are in tension, and §6 is the
    one that is right.
 
-8. **Exactly one of the nine published verdicts is grid-sensitive at all: breast
+8. **Exactly one of the seven scored verdicts is grid-sensitive at all: breast
    docetaxel**, the repo's only FAIL, whose margin to its band is **+1.5 %**
    against grid movements of 2.4-7.0 % from every available estimate — which
-   disagree in sign with each other. The other eight carry **33.8 %-1991 %**
-   margins and are untouchable. **The honest verdict is UNDETERMINED at
+   disagree in sign with each other. The other six carry **33.8 %-1991 %**
+   margins and are untouchable; the remaining two rows have no band and so no
+   margin to be grid-sensitive in. **The honest verdict is UNDETERMINED at
    dx = 12 um** — not FAIL, and emphatically not PASS (§6).
 
 **Recommendation (§7): change the convention to `tail90`, and state the residual
@@ -565,7 +569,7 @@ reads **-3.4 %** low and paclitaxel **-3.1 %** low.
    **-2.43 % to +3.79 %** over the same dx step, a **6.2-percentage-point** spread
    ordered by decay length `L`. **No single figure, +8.3 % or otherwise, describes
    the tissue's grid dependence.**
-2. **For 7 of 9 the sign agrees and the slab over-states the magnitude** by
+2. **For 7 of the 9 swept ratios the sign agrees and the slab over-states the magnitude** by
    1.6x-11x (the exception is GBM cisplatin, where the tissue moves 1.6x *more*).
 3. **For the 2 taxanes the sign is opposite**, on both comparisons. These are the
    two shortest-`L` drugs in either panel (28.2 / 28.8 um, i.e. 2.4 cells at
@@ -679,7 +683,8 @@ fields was asserted bit-distinct from its reference before being scored.
 **These numbers were not used to select anything.** The recommendation in §3.6
 follows from §3.1-3.5 and is unchanged by this section.
 
-Scored 3-D:2-D ratio and verdict, all nine published tests, all conventions:
+Scored 3-D:2-D ratio and verdict, all nine published rows (seven of which carry a
+verdict), all conventions:
 
 **GBM panel** (published grid dx = 12 um)
 
@@ -694,26 +699,48 @@ Scored 3-D:2-D ratio and verdict, all nine published tests, all conventions:
 | drug | band (ratio) | p50 | p90 | p95 | **p99** | p99.9 | max | **tail90** | tail95 | tail99 | mean | rms | e-wtd mean |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | doxorubicin | 0.0575-1.0000 | 0.4814 P | 0.3290 P | 0.2945 P | 0.2301 P | 0.1765 P | 0.1522 P | 0.2794 P | 0.2518 P | 0.2036 P | 0.4680 P | 0.4316 P | 0.3958 P |
-| paclitaxel | 0.0412-1.5004 | 0.4806 P | 0.2612 P | 0.2163 P | 0.1503 P | 0.1025 P | 0.0815 P | 0.1997 P | 0.1705 P | 0.1260 P | 0.4254 P | 0.3592 P | 0.2966 P |
+| paclitaxel | *none (n = 1)* | 0.4806 — | 0.2612 — | 0.2163 — | 0.1503 — | 0.1025 — | 0.0815 — | 0.1997 — | 0.1705 — | 0.1260 — | 0.4254 — | 0.3592 — | 0.2966 — |
 | docetaxel | 0.0152-0.1463 | 0.4804 **F** | 0.2595 **F** | 0.2142 **F** | 0.1484 **F** | 0.1011 P | 0.0802 P | 0.1978 **F** | 0.1686 **F** | 0.1243 P | 0.4239 **F** | 0.3568 **F** | 0.2936 **F** |
 | epirubicin | 0.0110-1.0000 | 0.4814 P | 0.3290 P | 0.2945 P | 0.2301 P | 0.1765 P | 0.1522 P | 0.2794 P | 0.2518 P | 0.2036 P | 0.4680 P | 0.4316 P | 0.3958 P |
-| 5-fluorouracil | 0.0412-1.5004 | 0.4889 P | 0.3855 P | 0.3661 P | 0.3379 P | 0.3131 P | 0.2933 P | 0.3620 P | 0.3487 P | 0.3280 P | 0.4889 P | 0.4741 P | 0.4593 P |
+| 5-fluorouracil | *none (n = 1)* | 0.4889 — | 0.3855 — | 0.3661 — | 0.3379 — | 0.3131 — | 0.2933 — | 0.3620 — | 0.3487 — | 0.3280 — | 0.4889 — | 0.4741 — | 0.4593 — |
 | cisplatin | 0.2086-1.5004 | 0.4856 P | 0.3728 P | 0.3488 P | 0.3085 P | 0.2724 P | 0.2524 P | 0.3414 P | 0.3229 P | 0.2917 P | 0.4855 P | 0.4660 P | 0.4467 P |
 
-(`P` = PASS, `**F**` = FAIL.)
+(`P` = PASS, `**F**` = FAIL, `—` = **NOT TESTABLE**, no verdict under any convention.)
 
-**PASS count out of 9** — reported for completeness and *deliberately last*:
+**Two of the nine rows carry no verdict, under any convention.** Breast paclitaxel and
+breast 5-fluorouracil each have exactly one drug-matched 3-D-vs-2-D study, so the
+min-max interval over that literature is a zero-width point and no continuous
+prediction can land inside it. They are NOT re-scored against the broad 62x-wide
+cross-tumour-type band — that is the same non-drug-matched band four other panel drugs
+are explicitly refused a verdict on (`results/kill_calibration_breast.md` §3,
+`results/zero_width_bands.md`). Their RATIOS are unchanged and are still swept across
+all twelve conventions above, because the scale-invariance result of §0.1 is a property
+of the ratio and needs no band. **This table previously scored both drugs against the
+broad band and reported twelve columns of `P` for each** — see
+`results/fallback_rule_propagation.md`.
+
+**PASS count out of the 7 SCORED verdicts** — reported for completeness and
+*deliberately last*:
 
 | p50 | p90 | p95 | **p99** | p99.9 | max | **tail90** | tail95 | tail99 | mean | rms | e-wtd mean |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 7 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 9 | 7 | 7 | 7 |
+| 5 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 7 | 5 | 5 | 5 |
+
+**Every count in this row is exactly 2 lower than the version this document previously
+published (7/8/8/8/8/8/8/8/9/7/7/7 out of 9), and the drop is the same 2 in every
+column.** That is not a coincidence and it is the reason the comparison below survives
+intact: paclitaxel and 5-fluorouracil scored PASS against the broad band under *all*
+twelve conventions, so they were constant columns that discriminated between no two
+conventions. Removing them lowers every total by 2 and changes no ranking, no gap and
+no recommendation. The old table was wrong; it was not wrong in a way that was doing
+any work.
 
 Read it as follows.
 
 * **`tail90`, the convention selected on numerical grounds, changes nothing.**
   Same 8 PASS, same 1 FAIL, same drugs. The recommendation costs no verdict and
   buys no verdict.
-* **`tail99` would give 9/9** — the only candidate that would clear the docetaxel
+* **`tail99` would give 7/7** — the only candidate that would clear the docetaxel
   FAIL. It is **not** recommended, and it is worse than tail90 on grid error
   (+2.37 % vs -0.08 % at dx = 12) and on bootstrap variance (up to 2.37 % vs
   0.76 %). That it flatters the panel is precisely why the selection had to be
@@ -730,7 +757,7 @@ Read it as follows.
 
 ---
 
-## 6. How many of the nine published verdicts does the bias put at risk?
+## 6. How many of the published verdicts does the bias put at risk?
 
 **Read §3.5 first.** This section computes the correction the slab's bias *would*
 imply if it transferred, because that is the question asked, and because it
@@ -754,19 +781,28 @@ limit and the Hill map damps it to +6.98 % at 1xIC50 and +9.50 % at temozolomide
 | gbm | cisplatin | 1.000 | 0.2086-1.5004 | 0.2791 | +33.8 % | -81.4 % | +6.98 % | 0.2609 | PASS -> PASS | no |
 | gbm | doxorubicin | 1.000 | 0.0575-1.0000 | 0.2077 | +261.4 % | -79.2 % | +6.98 % | 0.1941 | PASS -> PASS | no |
 | breast | doxorubicin | 1.000 | 0.0575-1.0000 | 0.2301 | +300.5 % | -77.0 % | +6.98 % | 0.2151 | PASS -> PASS | no |
-| breast | paclitaxel | 1.000 | 0.0412-1.5004 | 0.1503 | +265.1 % | -90.0 % | +6.98 % | 0.1405 | PASS -> PASS | no |
+| breast | paclitaxel | 1.000 | *none (n = 1)* | 0.1503 | — | — | +6.98 % | 0.1405 | NOT TESTABLE (no verdict to change) | n/a |
 | breast | docetaxel | 1.000 | 0.0152-0.1463 | 0.1484 | +877.0 % | +1.5 % | +6.98 % | 0.1387 | FAIL -> PASS | **YES** |
 | breast | epirubicin | 1.000 | 0.0110-1.0000 | 0.2301 | +1990.8 % | -77.0 % | +6.98 % | 0.2151 | PASS -> PASS | no |
-| breast | 5-fluorouracil | 1.000 | 0.0412-1.5004 | 0.3379 | +720.9 % | -77.5 % | +6.98 % | 0.3158 | PASS -> PASS | no |
+| breast | 5-fluorouracil | 1.000 | *none (n = 1)* | 0.3379 | — | — | +6.98 % | 0.3158 | NOT TESTABLE (no verdict to change) | n/a |
 | breast | cisplatin | 1.000 | 0.2086-1.5004 | 0.3085 | +47.8 % | -79.4 % | +6.98 % | 0.2883 | PASS -> PASS | no |
 
-**Answer to the question: one of nine.** Breast docetaxel — and it is the repo's
+**Answer to the question: one of the seven scored verdicts.** Breast docetaxel — and it is the repo's
 only FAIL. Its published ratio 0.1484 sits **+1.5 %** above its band ceiling of
 0.1463, a margin **4.7x smaller** than the slab bias at that concentration
 (+6.98 %) and **1.6x smaller** than its own directly-measured tissue movement over
 dx = 12 -> 8 (-2.43 %). Applying the slab correction would give 0.1387, inside the
-band. **Every other verdict's margin exceeds every estimate of its grid movement
+band. **Every other scored verdict's margin exceeds every estimate of its grid movement
 by at least an order of magnitude.**
+
+Two rows carry no margin at all, and that is the honest reading rather than a gap in
+the table. Breast paclitaxel and breast 5-fluorouracil have no testable band (one
+drug-matched study each, hence a zero-width interval), so there is no edge for their
+ratio to sit near and no verdict for a grid correction to put at risk. This table
+formerly reported their distances to the broad non-drug-matched context band — +265.1 %
+and +720.9 % — as verdict margins, and counted them among the nine. They were never
+margins to a bar either drug is held to. Their corrected ratios are still shown,
+because the correction arithmetic is about the ratio and is unaffected.
 
 ### 6.1 It must NOT be read as "docetaxel passes" — every estimate disagrees with every other
 
@@ -795,7 +831,7 @@ that cannot be decomposed.
 
 **The defensible statement:**
 
-> Breast docetaxel is the only one of the nine published verdicts whose result is
+> Breast docetaxel is the only one of the seven scored verdicts whose result is
 > a function of the grid at all. Its margin to its band (1.5 %) is smaller than
 > every available estimate of the grid movement of the statistic that produces it
 > (2.4 %, 3.4 %, 7.0 %), and those estimates disagree in sign. **The verdict is
@@ -849,7 +885,7 @@ grid error at the shipped dx = 12 um is -0.08 % against p99's +6.98 %.*
 **State a grid band on every scored ratio, and state it MEASURED ON TISSUE, not
 from the slab.** §3.5 is explicit that the slab number does not transfer, so the
 honest band under the current convention is the one the tissue ladders measure:
-**-2.4 % to +3.8 %** over dx = 12 -> 8 across the nine verdicts
+**-2.4 % to +3.8 %** over dx = 12 -> 8 across the nine swept ratios
 (`grid_convergence_gbm.md`, `grid_convergence_breast.md`), drug-ordered by decay
 length and **not one-signed**. The slab's +7.0 % is the right figure for the
 *statistic's* contribution to that band and the wrong figure for the band itself.
@@ -970,4 +1006,4 @@ The minimum honest position, requiring no compute:
   normaliser makes a weak test *numerically clean*; it does not make it strong.
 * **No parameter was tuned, and no convention was selected on its verdict count.**
   §3.1-3.5 were computed and the recommendation fixed before §5 was generated;
-  the candidate that maximises PASSes (`tail99`, 9/9) is explicitly rejected.
+  the candidate that maximises PASSes (`tail99`, 7/7) is explicitly rejected.

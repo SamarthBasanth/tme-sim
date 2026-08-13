@@ -2,8 +2,15 @@
 
 Why this file exists
 --------------------
-``results/kill_calibration_breast.md`` publishes 6 formally-testable 3-D:2-D
-ratio verdicts (5 PASS + docetaxel FAIL). Every one of them is computed from a
+``results/kill_calibration_breast.md`` publishes 4 formally-testable 3-D:2-D
+ratio verdicts (3 PASS + docetaxel FAIL) among the 6 drugs swept here.
+Paclitaxel and 5-fluorouracil are swept too, and their ratios are reported, but
+they carry NO verdict: each has exactly one drug-matched study, so its min-max
+"band" is a zero-width point that nothing can land inside, and it is reported
+NOT TESTABLE rather than re-scored against the broad cross-tumour-type band
+(``results/zero_width_bands.md``; this driver's own former use of that
+substitution is recorded in ``results/fallback_rule_propagation.md``). Every one
+of the reported ratios is computed from a
 transport solve whose tissue diffusivity comes out of the molecular compile as
 
     D_free(doxorubicin)   = 351.31 um^2/s  = 3.513e-6 cm^2/s
@@ -110,12 +117,14 @@ from tmesim.validation.calibration import (  # noqa: E402
 )
 from tmesim.validation.kill_calibration import (  # noqa: E402
     BATH_REFERENCE_PCT,
+    NOT_TESTABLE,
     decompose,
     expected_kill,
     kill_ratio_to_ic50_fold,
     prepare_tissue,
     ratio_test,
     resistance_vector,
+    score_ratio_row,
     unit_transport,
     window_plasma_mean,
 )
@@ -141,10 +150,11 @@ from experiments.kill_calibration_breast_report import (  # noqa: E402
 
 OUT_DIR = os.path.join(_ROOT, "results", "sweep")
 
-#: The 6 drugs that ``results/kill_calibration_breast.md`` calls formally
-#: testable (a drug-matched band, or a fallback to the broad 'solid' band for
-#: the two single-point drugs). The other 4 panel drugs have no band at all and
-#: cannot flip a verdict, so they are not swept.
+#: The 6 drugs of ``results/kill_calibration_breast.md`` that have ANY
+#: drug-matched literature row. Four of them (doxorubicin, docetaxel,
+#: epirubicin, cisplatin) have n > 1 and are formally scored; paclitaxel and
+#: 5-fluorouracil have n = 1 and are swept and reported but NOT TESTABLE. The
+#: other 4 panel drugs have no drug-matched row at all and are not swept.
 TESTABLE: Sequence[str] = ("doxorubicin", "paclitaxel", "docetaxel",
                            "epirubicin", "5-fluorouracil", "cisplatin")
 
@@ -279,8 +289,15 @@ def e_unit_for(work, labeled, tumor, drug, pde, velocity) -> np.ndarray:
 
 def score(name: str, e_unit: np.ndarray, sens: np.ndarray, resist: np.ndarray,
           drug, pd_cfg, bands: Dict, plasma_mean: float) -> Dict:
-    """The published scoring path, unmodified: decompose at 1x IC50, then the
-    frozen ``ratio_test`` against the frozen literature band.
+    """The published scoring path: decompose at 1x IC50, then THE shared band
+    decision, :func:`tmesim.validation.kill_calibration.score_ratio_row`.
+
+    This function does NOT decide which band a row is scored against, and must
+    never be made to. That decision was previously written here a second time
+    (``formal = t_specific if band_is_drug_matched else t_solid``), which is the
+    retired rule that silently re-scored a single-study drug against the broad
+    62x-wide cross-tumour-type band -- see ``results/zero_width_bands.md`` and
+    ``results/fallback_rule_propagation.md``. It is now imported, not copied.
 
     ``plasma_mean`` additionally drives the frozen ``expected_kill`` at the
     repo-nominal plasma level. That is the ABSOLUTE output of the product (a
@@ -293,11 +310,11 @@ def score(name: str, e_unit: np.ndarray, sens: np.ndarray, resist: np.ndarray,
                     pd_cfg.max_kill_rate)
     fold = kill_ratio_to_ic50_fold(dec["ratio_exact"], c_bath, drug.ic50, drug.hill)
     b = bands[name]
-    t_specific = (ratio_test(dec["ratio_exact"], b["band"]["ratio_lo"],
-                             b["band"]["ratio_hi"]) if b["band"] else None)
-    t_solid = ratio_test(dec["ratio_exact"], b["band_solid"]["ratio_lo"],
-                         b["band_solid"]["ratio_hi"])
-    formal = t_specific if b["band_is_drug_matched"] else t_solid
+    scored = score_ratio_row(dec["ratio_exact"],
+                             specific_bridge=b["specific_bridge"],
+                             specific_band=b["band"],
+                             context_bridge=b["solid_bridge"],
+                             context_band=b["band_solid"])
     return {
         "drug": name,
         "c_bath_uM": c_bath,
@@ -320,16 +337,77 @@ def score(name: str, e_unit: np.ndarray, sens: np.ndarray, resist: np.ndarray,
         "e_unit_median": float(np.median(e_unit)),
         "e_unit_p99": float(np.percentile(e_unit, BATH_REFERENCE_PCT)),
         "e_unit_p01": float(np.percentile(e_unit, 1.0)),
-        "verdict": formal["verdict"],
-        "verdict_band": ("drug-matched" if b["band_is_drug_matched"]
-                         else "broad 'solid' fallback"),
+        **verdict_fields(scored, b),
+    }
+
+
+def verdict_fields(scored: Dict, b: Dict) -> Dict:
+    """Render ``score_ratio_row``'s decision into this script's record schema.
+
+    One function so that a FRESHLY scored record and a RE-scored cached record
+    (:func:`rescore_rows`) cannot end up saying different things, and so that
+    the only place a verdict string is produced is downstream of the shared
+    decision.
+    """
+    return {
+        "verdict": scored["status"],
+        "verdict_scored": bool(scored["scored"]),
+        "verdict_band": ("drug-matched" if scored["scored"]
+                         else "NOT SCORED -- broad 'solid' band is context only"),
+        "verdict_reason": scored["reason"],
         "band_ratio_lo": (b["band"]["ratio_lo"] if b["band"] else None),
         "band_ratio_hi": (b["band"]["ratio_hi"] if b["band"] else None),
-        "band_used_lo": formal["lit_ratio_lo"],
-        "band_used_hi": formal["lit_ratio_hi"],
-        "verdict_direction": formal["direction"],
-        "verdict_solid": t_solid["verdict"],
+        # the band the verdict was actually taken against; None when the row was
+        # not scored at all, so a reader cannot mistake a context band for a bar
+        "band_used_lo": (scored["band"]["ratio_lo"] if scored["scored"] else None),
+        "band_used_hi": (scored["band"]["ratio_hi"] if scored["scored"] else None),
+        "verdict_direction": (scored["test"]["direction"] if scored["scored"]
+                              else "not scored -- see verdict_reason"),
+        # CONTEXT ONLY. Never a verdict; kept so the writeup can quote what the
+        # broad non-drug-matched band would have said without scoring against it.
+        "context_verdict": scored["context_test"]["verdict"],
+        "context_band_lo": b["band_solid"]["ratio_lo"],
+        "context_band_hi": b["band_solid"]["ratio_hi"],
+        "verdict_solid": scored["context_test"]["verdict"],
     }
+
+
+def rescore_rows(rows: Sequence[Dict]) -> int:
+    """Re-derive every stored verdict IN PLACE through the shared decision.
+
+    Records written before ``2466ce1`` carry a verdict produced by the retired
+    fallback rule. The band depends only on the frozen literature tables and on
+    the row's own ``(ic50_uM, hill)``, both of which are stored -- so a cached
+    record can be re-scored exactly, with NO transport solve. Returns the number
+    of rows whose verdict string changed.
+    """
+    cache: Dict[tuple, Dict] = {}
+    changed = 0
+    for r in rows:
+        name = r["drug"]
+        # Older record schemas (the refcheck rows) stored the reporting
+        # concentration but not the potency pair. For this panel c_bath IS
+        # 1x IC50, and ``hill`` is recovered by re-compiling the molecule --
+        # a molecular compile, no transport, no tissue.
+        if "ic50_uM" in r and "hill" in r:
+            ic50, hill = float(r["ic50_uM"]), float(r["hill"])
+        else:
+            ic50 = float(r["c_bath_uM"])
+            hill = float(_compile_breast_cached(name, float(calibrate_alpha()))[0].hill)
+        key = (name, ic50, hill)
+        if key not in cache:
+            cache[key] = build_bands([name], {name: (ic50, hill)})[name]
+        b = cache[key]
+        scored = score_ratio_row(float(r["ratio_exact"]),
+                                 specific_bridge=b["specific_bridge"],
+                                 specific_band=b["band"],
+                                 context_bridge=b["solid_bridge"],
+                                 context_band=b["band_solid"])
+        fields = verdict_fields(scored, b)
+        if r.get("verdict") != fields["verdict"]:
+            changed += 1
+        r.update(fields)
+    return changed
 
 
 def build_bands(drugs: Sequence[str], ic50_hill: Dict) -> Dict:
@@ -346,6 +424,12 @@ def build_bands(drugs: Sequence[str], ic50_hill: Dict) -> Dict:
         out[name] = {
             "band": band,
             "band_solid": bridge_to_kill_ratio_band(solid, c_bath, ic50, hill),
+            # The BRIDGES are carried, not just the mapped bands, because
+            # ``score_ratio_row`` needs ``n`` to tell a one-study point estimate
+            # from an interval. Consumers pass these straight through; none of
+            # them re-derives which band is scored.
+            "specific_bridge": spec,
+            "solid_bridge": solid,
             "band_is_drug_matched": bool(spec is not None and spec["n"] > 1),
             "specific_n": (int(spec["n"]) if spec else 0),
         }
@@ -434,7 +518,11 @@ def run(dx_um: float = DX_UM, drugs: Sequence[str] = TESTABLE,
                     continue
                 if float(r.get("dx_um", -1)) == float(dx_um):
                     done[_key(r["mode"], r["D_tissue_cm2_s"], r["drug"])] = r
-        log(f"checkpoint: {len(done)} records already complete, resuming")
+        # A resumed record may predate the shared band decision, so its verdict
+        # is re-derived from its own stored ratio before it is reused. No solve.
+        n_moved = rescore_rows(list(done.values()))
+        log(f"checkpoint: {len(done)} records already complete, resuming "
+            f"({n_moved} verdict(s) re-derived under the shared band decision)")
     ck = None
     if checkpoint:
         os.makedirs(os.path.dirname(checkpoint), exist_ok=True)
@@ -600,7 +688,9 @@ def published_reference_check(drugs: Sequence[str] = TESTABLE,
                     plasma_mean)
         rec.update({"mode": "published-cache", "dx_um": float(dx_um),
                     "D_tissue_cm2_s": float(_d_eff_tortuous(drug, DEFAULT_ECM)) * 1e-8,
-                    "cache_key": ckey, "n_cells_in_cache": int(e_unit.size)})
+                    "cache_key": ckey, "n_cells_in_cache": int(e_unit.size),
+                    # carried so this row can be re-scored later without a compile
+                    "ic50_uM": float(drug.ic50), "hill": float(drug.hill)})
         rows.append(rec)
         log(f"  {name}: ratio {rec['ratio_exact']:.4f}  F_pen "
             f"{rec['f_penetration']:.4f}  {rec['verdict']}")
@@ -856,6 +946,16 @@ def _f(x, n=4, dash="—"):
 
 def write_report(res: Dict, out_md: str, refcheck: Optional[Dict] = None,
                  confirm: Optional[Dict] = None) -> str:
+    # Every stored verdict is re-derived through the shared decision BEFORE any
+    # analysis reads it, so a record written under the retired fallback rule
+    # cannot reach the document. This is a re-score of a stored ratio against a
+    # frozen band; it solves nothing and moves no ratio.
+    n_rescored = rescore_rows(res["records"])
+    if refcheck:
+        n_rescored += rescore_rows(refcheck["rows"])
+    if confirm:
+        n_rescored += rescore_rows(confirm["records"])
+
     ref = res["reference"]
     flips = verdict_flip_map(res)
     canc = cancellation(res)
@@ -863,11 +963,16 @@ def write_report(res: Dict, out_md: str, refcheck: Optional[Dict] = None,
     A = L.append
 
     #: The published table (``results/kill_calibration_breast.md`` §3), quoted so
-    #: this report can state plainly whether it reproduces it.
+    #: this report can state plainly whether it reproduces it. Paclitaxel and
+    #: 5-fluorouracil are NOT TESTABLE there (n = 1 each: a point estimate, not
+    #: an interval), so they are NOT TESTABLE here; their ratios are still
+    #: reproduced and compared, because a ratio is a measurement even when no
+    #: bar exists to score it against.
     published = {"doxorubicin": 0.2301, "paclitaxel": 0.1503, "docetaxel": 0.1484,
                  "epirubicin": 0.2301, "5-fluorouracil": 0.3379, "cisplatin": 0.3085}
-    pub_v = {"doxorubicin": "PASS", "paclitaxel": "PASS", "docetaxel": "FAIL",
-             "epirubicin": "PASS", "5-fluorouracil": "PASS", "cisplatin": "PASS"}
+    pub_v = {"doxorubicin": "PASS", "paclitaxel": NOT_TESTABLE, "docetaxel": "FAIL",
+             "epirubicin": "PASS", "5-fluorouracil": NOT_TESTABLE,
+             "cisplatin": "PASS"}
     # At the shipping D the two modes are identical by construction (the recal
     # alpha at scale = 1 IS the published alpha), so either may be read.
     ref_mode = "recal" if "recal" in res["modes"] else res["modes"][0]
@@ -894,6 +999,32 @@ def write_report(res: Dict, out_md: str, refcheck: Optional[Dict] = None,
       "statement of which verdicts are robust and which are artefacts of one parameter "
       "choice. The recommendation at the end is justified by measurement provenance only.\n")
 
+    # A regeneration that re-scores stored ratios cannot re-solve them, so if the
+    # transport model has moved since those ratios were solved, the document must
+    # say so rather than let a fresh timestamp imply freshness.
+    if abs(float(res["dx_um"]) - 12.0) > 1e-9:
+        A(f"> ### STALE TRANSPORT WARNING — this sweep's exposure fields predate the "
+          f"`_TUMOR_SIGMA` units fix\n>\n"
+          f"> The interstitial-pressure solve smooths the tumour-occupancy field with a "
+          f"gaussian whose width was, until commit `5d6e8e4`, expressed in GRID CELLS "
+          f"(`_TUMOR_SIGMA = 5.0`) and therefore tracked the mesh. It is now a physical "
+          f"length (`_TUMOR_SIGMA_UM = 60.0`). **`dx = 12 um` is the exact fixed point** "
+          f"(`60.0 / 12.0 == 5.0` in IEEE-754), so every shipped `dx = 12` result is "
+          f"bit-identical — but this sweep ran at **`dx = {res['dx_um']:g} um`**, where the "
+          f"old constant gave a {5.0 * float(res['dx_um']):.0f} um smoothing instead of "
+          f"60 um. `results/tumor_sigma_units.md` §3 measures the consequence on the mean "
+          f"tissue IFP at `dx = 24`: **0.181899 -> 0.132363**. The velocity field feeds "
+          f"the convection term of every transport solve behind the table below.\n>\n"
+          f"> **The exposure fields and hence every RATIO in this document were solved "
+          f"before that fix and have NOT been re-solved here** — this regeneration "
+          f"re-scored stored ratios against the corrected literature bands and solved no "
+          f"PDE (`results/fallback_rule_propagation.md`). The band decision is exact "
+          f"regardless, because it consumes only the stored scalar. The ratios are not: "
+          f"they would move by an unmeasured amount on a re-run, and the §7.3 "
+          f"confirmation set at the published `dx = 12 um` grid is the part of this file "
+          f"that is unaffected by construction. Re-solving costs 120 transport solves and "
+          f"was deliberately not done here.\n")
+
     # ---------------- bottom line, computed --------------------------------
     A("## 0. Bottom line\n")
     for mode in res["modes"]:
@@ -902,11 +1033,19 @@ def write_report(res: Dict, out_md: str, refcheck: Optional[Dict] = None,
                     if flips[f"{mode}|{d}"]["verdict_everywhere"] == "PASS"]
         robust_f = [d for d in res["drugs"]
                     if flips[f"{mode}|{d}"]["verdict_everywhere"] == "FAIL"]
+        untestable = [d for d in res["drugs"]
+                      if flips[f"{mode}|{d}"]["verdict_everywhere"] == NOT_TESTABLE]
         s_ratio = [canc[f"{mode}|{d}"]["slope_ratio"] for d in res["drugs"]]
         s_kill = [canc[f"{mode}|{d}"]["slope_kill_nominal"] for d in res["drugs"]]
         A(f"**mode `{mode}`** over the full "
           f"{res['points'][-1]['D_tissue_cm2_s']/res['points'][0]['D_tissue_cm2_s']:.1f}x "
-          f"D_tissue range: "
+          f"D_tissue range, across the "
+          f"{len(res['drugs']) - len(untestable)} of {len(res['drugs'])} swept drugs that "
+          f"carry a scorable band"
+          + (f" ({', '.join(untestable)} are NOT TESTABLE at every D — a single-study "
+             f"literature point is not an interval, so there is no bar for D to move "
+             f"them across; their ratios are still swept and reported)"
+             if untestable else "") + ": "
           f"{len(robust_p)} verdict(s) PASS everywhere, {len(robust_f)} FAIL everywhere, "
           f"**{len(fragile)} flip** ({', '.join(fragile) if fragile else 'none'}). "
           f"Log-log response of the SCORED ratio to D_tissue spans "
@@ -1023,14 +1162,26 @@ def write_report(res: Dict, out_md: str, refcheck: Optional[Dict] = None,
         for drug in res["drugs"]:
             rows = _by(res, mode, drug)
             b = res["bands"][drug]
-            band_kind = ("drug-matched band" if b["band_is_drug_matched"]
-                         else "broad 'solid' fallback band (drug's own row has n=1, no spread)")
             r0 = rows[0]
-            A(f"**{drug}** — IC50 {r0['ic50_uM']:.4g} uM, hill {r0['hill']:.3g}, "
-              f"tested at 1x IC50 against its {band_kind}, "
-              f"kill-ratio band **{r0['band_used_lo']:.4f}-{r0['band_used_hi']:.4f}** "
-              f"(this band is FIXED across the sweep — it depends only on the frozen "
-              f"literature table and on (IC50, hill), neither of which D touches).\n")
+            if r0["verdict_scored"]:
+                A(f"**{drug}** — IC50 {r0['ic50_uM']:.4g} uM, hill {r0['hill']:.3g}, "
+                  f"tested at 1x IC50 against its drug-matched band "
+                  f"(n = {b['specific_n']}), "
+                  f"kill-ratio band **{r0['band_used_lo']:.4f}-{r0['band_used_hi']:.4f}** "
+                  f"(this band is FIXED across the sweep — it depends only on the frozen "
+                  f"literature table and on (IC50, hill), neither of which D touches).\n")
+            else:
+                A(f"**{drug}** — IC50 {r0['ic50_uM']:.4g} uM, hill {r0['hill']:.3g}, "
+                  f"reported at 1x IC50 but **NOT SCORED**: its drug-matched literature "
+                  f"is a single study (n = {b['specific_n']}), so the min-max interval is "
+                  f"zero-width "
+                  f"(**{_f(r0['band_ratio_lo'])}-{_f(r0['band_ratio_hi'])}**) and nothing "
+                  f"can land inside it. The broad 'solid' band "
+                  f"(**{r0['context_band_lo']:.4f}-{r0['context_band_hi']:.4f}**, which "
+                  f"this drug's ratios do sit inside) is quoted for CONTEXT and is NOT "
+                  f"substituted for the missing bar — see `results/zero_width_bands.md`. "
+                  f"The ratios below are still measurements and still move with D; what "
+                  f"is absent is a bar to move across.\n")
             A("| D_tissue (cm^2/s) | F_penetration | F_state | 3-D:2-D ratio | implied fold | "
               "mean tumour exposure (uM per uM plasma) | absolute kill at nominal dose | "
               "L um | verdict |")
@@ -1068,7 +1219,14 @@ def write_report(res: Dict, out_md: str, refcheck: Optional[Dict] = None,
             fm = flips[f"{mode}|{drug}"]
             rows = _by(res, mode, drug)
             at_ref = next(r["verdict"] for r in rows if r["is_reference"])
-            if fm["constant"]:
+            if fm["verdict_everywhere"] == NOT_TESTABLE:
+                # No bar exists, so there is nothing for D to move the drug
+                # across. Saying "ROBUST" here would claim a stability result
+                # that was never tested.
+                span = "n/a — not scored"
+                flipstr = "— (no bar to flip across)"
+                robust = "**NOT TESTABLE at every D** (no verdict, robust or otherwise)"
+            elif fm["constant"]:
                 span = ("ALL 10 points" if fm["verdict_everywhere"] == "PASS"
                         else "NONE")
                 flipstr = "— (never flips)"
@@ -1405,9 +1563,11 @@ def write_report(res: Dict, out_md: str, refcheck: Optional[Dict] = None,
             r = min(rows, key=lambda x: abs(x["D_tissue_cm2_s"] - geo))
             near[drug] = (r["D_tissue_cm2_s"], r["verdict"])
         npass = sum(1 for _, v in near.values() if v == "PASS")
+        nscored = sum(1 for _, v in near.values() if v != NOT_TESTABLE)
         d_here = next(iter(near.values()))[0]
         A(f"* mode `{mode}`, {src_note} (D = {d_here:.3e} cm^2/s): "
-          f"**{npass}/{len(near)} PASS** — "
+          f"**{npass}/{nscored} PASS** (of {len(near)} swept drugs; "
+          f"{len(near) - nscored} are NOT TESTABLE and are counted in no denominator) — "
           + ", ".join(f"{d} {v}" for d, (_, v) in sorted(near.items())))
     A("")
     A("Note the direction of that result, because it is the opposite of what a rigged "
@@ -1515,3 +1675,12 @@ if __name__ == "__main__":
     cf = (json.load(open(cf_path))
           if os.path.exists(cf_path) and cf_path != out_json else None)
     print("wrote", write_report(res, out_md, refcheck=rc, confirm=cf))
+    # write_report re-scores every record through the shared band decision. Persist
+    # that back, so the on-disk sweep artefact cannot keep asserting a verdict the
+    # document no longer makes. Only verdict fields move; no ratio is touched.
+    for path, obj in ((out_json, res), (rc_path, rc), (cf_path, cf)):
+        if obj is None or not os.path.exists(path):
+            continue
+        with open(path, "w") as fh:
+            json.dump(obj, fh, indent=1, default=float)
+    print("re-scored verdicts persisted to the sweep artefacts")

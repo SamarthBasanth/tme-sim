@@ -3,7 +3,8 @@
 *Written after tracing both vascular representations from measured endothelial cell
 positions to the PDE source, verifying the production field's link-distance invariance
 by experiment on all four cached real sections, and measuring what a switch would move
-on the nine published verdicts. No radius, bandwidth or linking distance was changed. The
+on the nine published rows (seven of which carry a verdict). No radius, bandwidth or
+linking distance was changed. The
 only edit under `tmesim/` is a DOCSTRING in `reconstruct/vessel_geometry.py` recording
 the finding; no constant, default or returned value moves, and `pytest -q` is unchanged
 at the declared 754.*
@@ -59,13 +60,15 @@ at the declared 754.*
 > **148.60815765445545 — a difference of exactly 0.0**. Unlike the `D_tissue` sweep,
 > this perturbation has **no gauge to hide in**.
 >
-> **Blast radius, measured over 27 transport solves: THREE of the nine published
+> **Blast radius, measured over 27 transport solves: THREE of the seven SCORED
 > verdicts flip.** GBM temozolomide **PASS → FAIL** (the flagship — the only drug with a
 > matched patient-derived ex-vivo anchor), GBM cisplatin **PASS → FAIL**, and breast
 > docetaxel **FAIL → PASS** — the project's *only* falsification, removed. Two more
 > survive on margins cut **17.7×** and **13.7×**. The `binary` control arm reproduces all
-> nine published ratios and all nine published margins exactly, so nothing here is the
-> harness.
+> nine published ratios exactly, so nothing here is the harness. (Two of the nine
+> published rows — breast paclitaxel and breast 5-fluorouracil — carry no verdict at
+> all: one drug-matched study each, hence a zero-width band. Their ratios reproduce and
+> move like the rest; see §5.0.)
 >
 > **And it is ~100 % SHAPE, not dose.** Holding the tissue-integrated source
 > **bit-exactly** at the production total (`match_total_to`) restores mean tumour
@@ -459,14 +462,14 @@ separable from the radius law.** See the recommendation in §7.2.
 
 ### 4.3 (c) SAFETY — **NO.** Measured in §5
 
-Three of the nine published verdicts flip, including the flagship (GBM temozolomide,
+Three of the seven scored verdicts flip, including the flagship (GBM temozolomide,
 PASS → FAIL) and the project's only falsification (breast docetaxel, FAIL → PASS); two
 more survive on margins cut by 13.7× and 17.7×. Holding the source total bit-exactly
 fixed removes ~1 % of the movement on breast and none of it on GBM.
 
 ---
 
-## 5. Blast radius — both arms, on the nine published verdicts
+## 5. Blast radius — both arms, on the nine published rows (seven scored)
 
 **27 transport solves**, `dx = 12 µm`, `dt = 10 s`, 6 h window, seed 0 — the published
 grid, timestep, window, `PDConfig`, p99 bath-matching convention and frozen literature
@@ -492,6 +495,20 @@ All nine reproduce to four decimals, and the derived margins reproduce
 `results/p99_convention.md` §6's margin column exactly (+65.2 / +33.8 / +261.4 / +300.5
 / +265.1 / +877.0 / +1990.8 / +720.9 / +47.8 %). Anything that moves below is the source
 geometry and nothing else.
+
+> **Seven of these nine rows carry a verdict; two do not.** Breast paclitaxel and breast
+> 5-fluorouracil each have exactly one drug-matched 3-D-vs-2-D study, so the min-max
+> interval over that literature is a zero-width point that no continuous prediction can
+> land inside. They are reported **NOT TESTABLE**, and they are *not* re-scored against
+> the broad cross-tumour-type "solid" band — that band spans 62× and is the same
+> non-drug-matched band four other panel drugs are explicitly refused a verdict on
+> (`results/kill_calibration_breast.md` §3, `results/zero_width_bands.md`). Their two
+> margin figures in the list above (+265.1 % and +720.9 %) are margins to that CONTEXT
+> band and are not verdict margins. Their RATIOS are unaffected and are still reported
+> and compared across arms below, because a ratio that moves is a real measurement of
+> the blast radius whether or not a bar exists for it to cross. This document formerly
+> scored both against the broad band and called the result a verdict; see
+> `results/fallback_rule_propagation.md`.
 
 ### 5.1 The two alpha arms — the refit arm is DEGENERATE, and that is the finding
 
@@ -537,16 +554,17 @@ gauge — `PS`, `bbb_penetrance`, `alpha` or plasma level — can remove.**
 | gbm | **cisplatin** | 0.2086–1.5004 | 0.2791 (+33.8 %) | **0.1042** (−50.1 %) | **0.1179** (−43.5 %) | **PASS → FAIL** |
 | gbm | doxorubicin | 0.0575–1.0000 | 0.2077 (+261.4 %) | 0.0660 (**+14.8 %**) | 0.0737 (+28.2 %) | PASS → PASS |
 | breast | doxorubicin | 0.0575–1.0000 | 0.2301 (+300.5 %) | 0.1307 (+127.5 %) | 0.1326 (+130.7 %) | PASS → PASS |
-| breast | paclitaxel | 0.0412–1.5004 | 0.1503 (+265.1 %) | 0.0763 (+85.3 %) | 0.0774 (+88.1 %) | PASS → PASS |
+| breast | paclitaxel | *none — n = 1, zero-width* | 0.1503 | 0.0763 | 0.0774 | **NOT TESTABLE** (no verdict in any arm) |
 | breast | **docetaxel** | 0.0152–0.1463 | 0.1484 (**−1.48 % over the ceiling**) | **0.0752** | **0.0764** | **FAIL → PASS** |
 | breast | epirubicin | 0.0110–1.0000 | 0.2301 (+1990.8 %) | 0.1307 (+1087.7 %) | 0.1326 (+1104.6 %) | PASS → PASS |
-| breast | 5-fluorouracil | 0.0412–1.5004 | 0.3379 (+720.9 %) | 0.2530 (+514.8 %) | 0.2558 (+521.6 %) | PASS → PASS |
+| breast | 5-fluorouracil | *none — n = 1, zero-width* | 0.3379 | 0.2530 | 0.2558 | **NOT TESTABLE** (no verdict in any arm) |
 | breast | cisplatin | 0.2086–1.5004 | 0.3085 (+47.8 %) | 0.2160 (**+3.5 %**) | 0.2186 (+4.8 %) | PASS → PASS |
 
 *(percentages are margin to the nearer band edge — the lower edge except for docetaxel,
-which is scored against its ceiling.)*
+which is scored against its ceiling. Paclitaxel and 5-fluorouracil have no band, so
+they have no margin; their ratios move exactly as before and are shown unannotated.)*
 
-> ### **Three of the nine flip, and two more of the survivors lose over 90 % of their margin.**
+> ### **Three of the seven scored verdicts flip, and two more of the survivors lose over 90 % of their margin.**
 >
 > * **GBM temozolomide: PASS → FAIL.** This is the flagship verdict — the *only* drug in
 >   the project with a matched patient-derived ex-vivo anchor (GSE232173, PMID 37620410).
@@ -561,8 +579,13 @@ which is scored against its ceiling.)*
 >   warning arriving on schedule.
 > * **GBM doxorubicin** survives on a margin cut from +261.4 % to **+14.8 %**, and
 >   **breast cisplatin** on one cut from +47.8 % to **+3.5 %** — a **13.7×** collapse.
-> * **Only four of the nine** (breast doxorubicin, paclitaxel, epirubicin,
->   5-fluorouracil) keep a margin above 80 %.
+> * **Only two of the seven scored verdicts** (breast doxorubicin, breast epirubicin)
+>   keep a margin above 80 %. This bullet formerly read *"only four of the nine"* and
+>   named paclitaxel and 5-fluorouracil among the survivors; both of those "margins"
+>   were distances to the broad non-drug-matched context band, not to a bar either drug
+>   is held to, so neither is a survivor of anything. Removing them makes this finding
+>   worse, not better — the set of verdicts that comfortably survive the source-geometry
+>   swap is half the size it was reported to be.
 
 ### 5.3 It is SHAPE, not dose — the matched arm settles it
 
@@ -759,8 +782,8 @@ them is the law a transvascular flux obeys** (§4.1). The evidence is:
 3. **A worse score on the module's own fidelity metric** (`vascular_heterogeneity`
    1.45–2.26 vs 0.94–1.01, target 1.0) — the `r ∝ k` over-dispersion the module already
    documents as a limitation.
-4. **A blast radius that is not absorbable by any gauge** (§5): three of nine verdicts
-   flip, ~100 % of the movement survives an exact dose match, and no `alpha` restores the
+4. **A blast radius that is not absorbable by any gauge** (§5): three of the seven
+   scored verdicts flip, ~100 % of the movement survives an exact dose match, and no `alpha` restores the
    published value even with the calibration anchor abandoned.
 
 **The two flips in opposite directions are the decisive practical point.** A change that
