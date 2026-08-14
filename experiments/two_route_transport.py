@@ -70,7 +70,13 @@ from experiments.diffusivity_falsification import (  # noqa: E402
 )
 
 OUT_DIR = os.path.join(_ROOT, "results", "sweep")
+#: The ORIGINAL pre-registration, frozen before the model was ever scored. NEVER
+#: edited -- that is the whole point of it.
 PREREG = os.path.join(OUT_DIR, "tworoute_prereg.json")
+#: The EXTENSION written when the model was promoted to the shipping default
+#: (results/two_route_promotion.md). It records the one parameter that moved and
+#: what sourced it. Checked alongside PREREG, not instead of it.
+PROMOTION_PREREG = os.path.join(OUT_DIR, "tworoute_promotion_prereg.json")
 
 #: Tirapazamine, exactly as experiments/anchor_prototype.py and
 #: experiments/cellular_exclusion.py compile it, so "before" columns match.
@@ -100,7 +106,13 @@ def stage_prereg() -> dict:
         "membrane_viscosity_pa_s": two_route.ETA_MEMBRANE_PA_S,
         "bilayer_thickness_nm": two_route.BILAYER_THICKNESS_NM,
         "logk_membrane_max": two_route.LOGK_MEMBRANE_MAX,
-        "hbd_logp_decrement": two_route.HBD_LOGP_DECREMENT,
+        # NOT two_route.HBD_LOGP_DECREMENT. That constant was promoted from the
+        # pre-registered 1.0 convention to the sourced 1.34 when the model became
+        # the default; the ORIGINAL pre-registration is checked against the
+        # historical value, which live code still carries by name so this check
+        # cannot rot. The promoted value is checked below against its own
+        # registration file. Neither check is skipped.
+        "hbd_logp_decrement": two_route.HBD_LOGP_DECREMENT_PREREGISTERED,
     }
     print(f"  {'parameter':28s} {'live value':>14s} {'pre-registered':>16s}  match")
     for k, v in live.items():
@@ -119,13 +131,29 @@ def stage_prereg() -> dict:
     assert two_route.ETA_WATER_PA_S == _perm._ETA_WATER_PA_S
     print("\n  membrane constants still identical to permeability.py's published"
           " values: OK")
-    print(f"\n  The ONE parameter with no primary source for its magnitude:")
-    print(f"    hbd_logp_decrement = {two_route.HBD_LOGP_DECREMENT} log units/donor"
-          f" -- {p['hbd_logp_decrement']['status']}")
-    print("    Its structure is forced by Walter & Gutknecht 1986 (PMID 3735402)")
-    print("    and Conradi 1991/1992 (PMID 1808606 / 1614980). Stage 3 sweeps it")
-    print("    and discloses the value that would maximise the Pruijn score.")
-    return {"prereg": reg, "live": live}
+
+    # ---- the ONE parameter that moved, and its own registration -------------
+    with open(PROMOTION_PREREG) as fh:
+        promo = json.load(fh)
+    ch = promo["parameters_changed"]["hbd_logp_decrement"]
+    assert float(two_route.HBD_LOGP_DECREMENT) == float(ch["value"]), (
+        f"hbd_logp_decrement is live at {two_route.HBD_LOGP_DECREMENT} but the "
+        f"promotion registration says {ch['value']}. Re-register or revert.")
+    assert (float(two_route.HBD_LOGP_DECREMENT_PREREGISTERED)
+            == float(ch["superseded_value"]) == float(p["hbd_logp_decrement"]["value"])), (
+        "the superseded convention no longer agrees across live code, the "
+        "original pre-registration and the promotion registration")
+    print(f"\n  The ONE parameter that MOVED at promotion:")
+    print(f"    hbd_logp_decrement  {ch['superseded_value']} -> "
+          f"{two_route.HBD_LOGP_DECREMENT} log units/donor")
+    print(f"    superseded status : {ch['superseded_status'].split('.')[0]}.")
+    print(f"    live status       : {ch['status']}")
+    print(f"    {ch['derivation'][:76]}...")
+    print(f"    It is NOT the value that maximises the Pruijn score (1.0 is, at")
+    print(f"    R^2 = 0.725 against this value's 0.718). It was adopted anyway.")
+    print(f"    Registered in {os.path.relpath(PROMOTION_PREREG, _ROOT)}")
+    return {"prereg": reg, "live": live, "promotion_prereg": promo,
+            "hbd_logp_decrement_live": float(two_route.HBD_LOGP_DECREMENT)}
 
 
 # =========================================================================== #
@@ -182,12 +210,16 @@ def _engine_interstitial_D(mw: float) -> float:
 
     This is the matrix (interstitial) conductivity the two-route law consumes:
     free Stokes-Einstein x Brownian micro-tortuosity x Ogston-Renkin mesh gate,
-    with no cells anywhere. Compiled through `compile_drug.build_profile` exactly
-    as `experiments/diffusivity_falsification.py` does, so the "before" column
-    here is bit-comparable with the published falsification.
+    with no cells anywhere. `two_route=False` is REQUIRED here and is not a
+    stylistic choice: since results/two_route_promotion.md `build_profile`
+    applies the two-route term itself, so the default would hand this function a
+    D that already carries it and the law would be applied twice. The value
+    returned is `profile.interstitial_diffusivity` by construction, which is what
+    every "before" column in this file and in the published falsification means.
     """
     return compile_drug.build_profile(
-        Molecule(name=f"mw{mw}", smiles="", descriptors={"mw": float(mw)})
+        Molecule(name=f"mw{mw}", smiles="", descriptors={"mw": float(mw)}),
+        two_route=False,
     ).effective_diffusivity
 
 
@@ -391,7 +423,7 @@ def stage_pruijn(verbose: bool = True) -> dict:
     out["hbd_sweep_best_r2"] = best["hbd_decrement"]
     print(f"\n  Best R^2 in the sweep is at hbd_decrement = "
           f"{best['hbd_decrement']:.1f} (R^2 = {best['r2']:.3f}). "
-          f"ADOPTED = {two_route.HBD_LOGP_DECREMENT:.1f}.")
+          f"ADOPTED = {two_route.HBD_LOGP_DECREMENT:g}, which is NOT it.")
 
     # ---------------- phi sensitivity --------------------------------------- #
     print("\n  RESULT 7 -- sensitivity to phi_cell, the widest-uncertainty input")
@@ -424,7 +456,12 @@ def stage_drugs() -> dict:
           f"{'engine D':>10}{'para':>9}{'2-route':>10}{'gain':>7}{'vs eng':>8}")
     out = []
     for name, mol in mols.items():
-        prof = compile_drug.build_profile(mol, ecm_reference=DEFAULT_ECM)
+        # two_route=False: PRE-PROMOTION baseline. compile_drug now applies the
+        # two-route term itself (results/two_route_promotion.md), so this file's
+        # 'shipping engine' column must ask for the MW-only interstitial value
+        # explicitly or the correction would be applied twice.
+        prof = compile_drug.build_profile(mol, ecm_reference=DEFAULT_ECM,
+                                          two_route=False)
         eng = float(prof.effective_diffusivity)
         radius = float(mol.get("radius_hydrodynamic_nm")
                        or stokes_einstein.hydrodynamic_radius_nm(
@@ -483,7 +520,12 @@ def stage_blast(dx_um: float = 12.0, per_drug: bool = True) -> dict:
             mol = get_molecule_breast(name)
         except KeyError:
             mol = get_molecule(name)
-        prof = compile_drug.build_profile(mol, ecm_reference=DEFAULT_ECM)
+        # two_route=False: PRE-PROMOTION baseline. compile_drug now applies the
+        # two-route term itself (results/two_route_promotion.md), so this file's
+        # 'shipping engine' column must ask for the MW-only interstitial value
+        # explicitly or the correction would be applied twice.
+        prof = compile_drug.build_profile(mol, ecm_reference=DEFAULT_ECM,
+                                          two_route=False)
         radius = float(mol.get("radius_hydrodynamic_nm")
                        or stokes_einstein.hydrodynamic_radius_nm(
                            float(mol.get("mw")), bool(mol.get("is_antibody"))))

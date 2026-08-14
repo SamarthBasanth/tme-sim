@@ -336,20 +336,25 @@ is why the product is taken rather than either alone. **Honest note:** the produ
 a modelling choice, not a theorem — the two hindrances are assumed statistically
 independent.
 
-> **Status: FALSIFIED.** Both factors depend on the solute only through its
-> hydrodynamic radius, which is $0.066\,\mathrm{MW}^{1/3}$ — so
-> $D_{\mathrm{eff}}^{\mathrm{mol}}$ is a function of **molecular weight and the ECM
-> fraction, and nothing else**. $\log P$, HBD, HBA, TPSA and charge are computed by
-> `descriptors.compute_descriptors` and discarded before this equation. Scored blind
-> against 71 compounds (Pruijn 2008, HT29 multicellular layers), the measurement
-> spans **29.7×** where this spans **2.4×**, at **R² = 0.028**; at identical MW it is
-> flat by construction (**exactly 1.00×**) against a measured **3.7×**. The
-> consequence for a user: **a ranking over similar-mass analogues carries no
-> compound-specific transport information.** A two-route model using the discarded
-> descriptors reaches R² = 0.725 blind and unfitted, but is merged, wired into
-> nothing, and default-OFF.
-> → [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md),
-> [`../results/two_route_transport.md`](../results/two_route_transport.md)
+> **Status: PARTIALLY SUPPORTED, and this equation is no longer the whole story.**
+> Both factors above depend on the solute only through its hydrodynamic radius,
+> $0.066\,\mathrm{MW}^{1/3}$, so on their own they make
+> $D_{\mathrm{eff}}^{\mathrm{mol}}$ a function of molecular weight and the ECM
+> fraction and nothing else. That model was scored blind against 71 compounds
+> (Pruijn 2008, HT29 multicellular layers) and **FALSIFIED**: the measurement spans
+> **29.7×** where it spans **2.4×**, at **R² = 0.022**, and at identical MW it is
+> flat by construction (**exactly 1.00×**) against a measured **3.7×**.
+>
+> Since 2026-08-13 the product above is multiplied by a **two-route cell term**
+> (§2.5b), which brings $\log P$ and hydrogen-bond donor count into $D_{\mathrm{eff}}$
+> through a membrane permeability. On the same 71 compounds, blind and unfitted, the
+> composed law reaches **R² = 0.718**, Spearman **+0.821**, **99 %** within 3× of
+> measurement, and orders **24 of 31** exact-mass pairs correctly against the old
+> model's **0 of 31**. It nonetheless reproduces **8.3×** of the measured **29.7×**
+> spread — about a **quarter** — so it *under-separates* a similar-mass series
+> systematically, and the whole test is **one cell line**.
+> → [`../results/two_route_promotion.md`](../results/two_route_promotion.md),
+> [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md)
 
 ### 2.6 Solubility–diffusion membrane permeability
 
@@ -1633,14 +1638,17 @@ power-law fits are flagged DEGENERATE (`results/grid_convergence_gbm.md`), and
 `penetration_index` is retired regardless (§ `results/delivery_metrics.md`).
 
 **The limiting uncertainty is not the solver** — it is, in rough order: the
-**falsified diffusivity law of §2.5** (the largest known structural error, and the
-only one that changes what a *ranking* means), the reconstruction gates
+**partially-supported diffusivity law of §2.5** (still the largest known structural
+error, and the only one that changes what a *ranking* means: it now recovers about a
+quarter of the measured compound-to-compound spread, having previously recovered
+essentially none of it), the reconstruction gates
 (endothelial typing threshold, vessel bandwidth), the single-anchor calibration α,
 the heuristic terms flagged throughout (§2.7, §2.8, §3.2, §6.2), the unresolved
 mesh term, and the placeholder per-cell sensitivity. Error bars built from the
 earlier version of this list — which omitted §2.1–§2.5 entirely — **cannot contain
-the truth for a similar-mass compound series**, because the transport spread there
-is zero by construction.
+the truth for a similar-mass compound series**. That used to be because the
+transport spread there was zero by construction; it is now because the spread is
+present but systematically about **4× too small**.
 
 ---
 

@@ -90,6 +90,46 @@ whose values were wrong. :func:`test_production_dx12_static_path_matches_stored_
 closes that hole. Its values were generated BEFORE the fix and verified
 identical AFTER it, so it pins the invariance claim itself. Full write-up:
 ``results/tumor_sigma_units.md``.
+
+The 2026-08-13 re-pin — the two-route transport model became the default
+-----------------------------------------------------------------------
+**Cause.** ``compile_drug.build_profile`` now applies a two-route cell term
+(paracellular between cells plus transcellular through membranes), so
+temozolomide's compiled diffusivity went ``277.985 -> 42.4245 um^2/s`` and the
+single perivascular-sink constant ``alpha``, fitted in closed form from
+``L = sqrt(D_eff/k_eff)`` against the same measured 64.92 um anchor, went
+``148.60815765445545 -> 22.223477711172563``. Both cases below use a COMPILED,
+alpha-calibrated temozolomide, so both had to move.
+
+**Why the new values are right rather than merely different.** The superseded
+values encode a diffusivity law whose only solute input was molecular weight,
+which was scored blind against 71 measured compounds and REFUTED at R^2 = 0.022
+(``results/diffusivity_falsification.md``). The law now in force scores
+R^2 = 0.718 on the same 71 compounds, blind and unfitted, and brings the engine's
+dimensionless multicellular-layer hindrance factor inside its measured band for
+the first time (1.77-fold -> 10.33-fold against a measured 12-fold, PMID
+9806526). These cases now run a transport coefficient that has been tested
+externally and largely agrees; they did not before.
+
+**What moved, and why that is the predicted result.** Only a case whose drug
+comes from the molecular compile can move, and only those did:
+``real_xenium_dx80_tmz_3dose`` and ``production_xenium_dx12_tmz_3dose`` were
+regenerated; ``default_1dose``, ``weak_1dose``, ``weak_3dose``,
+``weak_10dose_noconv`` and ``solver_flat`` all use hand-built ``DrugParams``
+literals with no compile in the path and are byte-for-byte unchanged; and
+:func:`test_production_dx12_ifp_solve_matches_stored_reference_bitwise`, which
+has no drug in it at all, passed untouched. ``plasma_mean`` — pure PK, no spatial
+dependence — is BIT-IDENTICAL in the cases that moved, which is the positive
+control.
+
+**The magnitudes are a finding, not a footnote.** Unlike the 2026-08-12 ULP-level
+re-pin, ``kill_fraction`` moves 2.76x at ``dx = 12`` and 5.29x at ``dx = 80``.
+Diffusivity FELL 6.6x and exposure ROSE, because the Primeau anchor pins the
+ratio ``D/k`` and the fitted loss rate fell with ``D``. The p99-normalised ratio
+the breast panel scores is immune to that common-mode change — 0 of 12 of those
+verdicts moved — but threshold statistics such as kill fraction are not. Full
+write-up: ``results/two_route_promotion.md``; superseded values under
+``_superseded_2026-08-13_mw_only_diffusivity``.
 """
 from __future__ import annotations
 

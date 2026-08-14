@@ -267,19 +267,66 @@ class TestProvenanceIsTrue:
         logp_row = next(f for f in a.fields if f["key"] == "logp")
         assert "STEREOCHEMISTRY-BLIND" in logp_row["method"]
 
-    def test_diffusivity_is_a_function_of_mw_alone(self, alpha):
-        """Two constitutional isomers -- same formula, same mass, different
-        connectivity and different logP -- must compile to the SAME diffusivity,
-        because the chain is MW -> radius -> Stokes-Einstein -> hindrance and
-        nothing else enters it. The UI claims this; here it is."""
+    def test_diffusivity_is_no_longer_a_function_of_mw_alone(self, alpha):
+        """THIS CONTRACT INVERTED at the two-route promotion, and the inversion
+        is the point of the whole exercise.
+
+        It used to assert that two constitutional isomers -- same formula, same
+        mass, different connectivity and different logP -- compiled to the SAME
+        diffusivity, because the chain was MW -> radius -> Stokes-Einstein ->
+        hindrance and nothing else entered it. That was true, it was what
+        results/diffusivity_falsification.md refuted, and
+        results/two_route_promotion.md fixed the mechanism: logP and
+        hydrogen-bond donor count now reach `D_eff` through a membrane
+        permeability. So the isomers must now DIFFER, and the UI text must no
+        longer claim otherwise.
+
+        THE HONEST CAVEAT, PINNED RATHER THAN OMITTED: for THIS pair the
+        separation is tiny (~6e-6 relative), because Crippen puts n-butylbenzene
+        and tert-butylbenzene within 0.01 log units of each other and both have
+        zero donors. Being able to separate matched-mass compounds IN PRINCIPLE
+        is not the same as separating any given pair usefully, and a user
+        ranking a congeneric series needs the second statement, not the first.
+        The pair below with a real logP gap is what a meaningful separation
+        looks like.
+        """
         # n-butylbenzene vs tert-butylbenzene: C10H14 both ways.
         a = compile_user_compound("ISO-A", "CCCCc1ccccc1", alpha=alpha)
         b = compile_user_compound("ISO-B", "CC(C)(C)c1ccccc1", alpha=alpha)
         assert a.molecule.get("mw") == b.molecule.get("mw")
-        assert a.drug_params.diffusivity == b.drug_params.diffusivity
         assert a.molecule.get("logp") != b.molecule.get("logp")   # they DO differ
+        assert a.drug_params.diffusivity != b.drug_params.diffusivity
+        # ... but only just, and that is disclosed rather than dressed up.
+        rel = abs(a.drug_params.diffusivity - b.drug_params.diffusivity) \
+            / a.drug_params.diffusivity
+        assert rel < 1e-3
+
         row = next(f for f in a.fields if f["key"] == "diffusivity")
-        assert "MW ALONE" in row["method"]
+        assert "MW ALONE" not in row["method"], (
+            "the diffusivity field still tells the user D_eff is a function of "
+            "MW alone; since results/two_route_promotion.md that is false")
+
+    def test_matched_mass_compounds_with_a_real_logp_gap_do_separate(self, alpha):
+        """The property the two-route promotion exists to add, at a mass tie.
+
+        Identical molecular weight, materially different hydrogen-bonding: under
+        the MW-only model these were flat BY CONSTRUCTION, at exactly 1.00x, and
+        results/diffusivity_falsification.md measured a real 3.7-3.8x spread at
+        such ties. They must now separate, in the direction physics requires:
+        more donors and lower lipophilicity shut the membrane and slow the drug.
+        """
+        # C6H12O6-ish tie is awkward from SMILES; use an explicit matched pair:
+        # 1,4-dimethoxybenzene vs 4-methoxybenzyl alcohol are NOT matched, so
+        # instead compare the same skeleton with and without a donor at equal MW.
+        polar = compile_user_compound("TIE-POLAR", "OCc1ccccc1O", alpha=alpha)
+        apolar = compile_user_compound("TIE-APOLAR", "COc1ccccc1O", alpha=alpha)
+        assert polar.molecule.get("mw") == apolar.molecule.get("mw")
+        assert polar.molecule.get("hbd") != apolar.molecule.get("hbd")
+        # the one with MORE donors must be the SLOWER one
+        if polar.molecule.get("hbd") > apolar.molecule.get("hbd"):
+            assert polar.drug_params.diffusivity < apolar.drug_params.diffusivity
+        else:
+            assert polar.drug_params.diffusivity > apolar.drug_params.diffusivity
 
     def test_the_hindrance_shortfall_is_disclosed_on_the_diffusivity_field(self, alpha):
         c = compile_user_compound("ACME-101", ASPIRIN, alpha=alpha)
@@ -287,36 +334,51 @@ class TestProvenanceIsTrue:
         assert "cellular_exclusion.md" in row["method"]
         assert "12-fold" in row["method"] or "12x" in row["method"]
 
-    def test_the_diffusivity_falsification_is_disclosed_at_the_point_of_use(self, alpha):
+    def test_the_transport_limit_is_disclosed_at_the_point_of_use(self, alpha):
         """The single most important thing this panel has to say, and the one a
-        user compiling a congeneric series most needs.
+        user compiling a congeneric series most needs. RE-PINNED at the two-route
+        promotion (results/two_route_promotion.md), and the re-pin is the point.
 
-        `results/diffusivity_falsification.md` tested the MW-only `D_eff` model
-        against 71 compounds measured in HT29 multicellular layers (Pruijn et al.
-        2008) and REFUTED it: measurement spans 29.7x, engine spans 2.4x,
-        R^2 = 0.028, and at matched molecular weight the engine is flat by
-        construction (1.00x) where the measurement moves 3.7-3.8x. Molecular
-        weight is diffusivity's only molecular input.
+        SUPERSEDED CONTRACT: the MW-only `D_eff` model had been REFUTED against
+        71 compounds (Pruijn et al. 2008) at R^2 = 0.028 and was flat by
+        construction at matched mass, so every surface had to carry the word
+        FALSIFIED and a hard-stop "MUST NOT rank a congeneric series".
 
-        That is not a precision caveat, it is a falsification, and it must appear
-        (a) on the diffusivity field itself, (b) in the CANNOT-conclude list, and
-        (c) as a hard-stop caveat — because a user's series is exactly the
-        similar-mass case it bites."""
+        THAT IS NO LONGER TRUE, AND SAYING IT WOULD NOW BE ITS OWN OVERSTATEMENT.
+        The shipping model scores R^2 = 0.718 blind on the same 71 compounds. The
+        replacement claim is NARROWER THAN "FIXED" and this test pins all three
+        halves of it, because dropping any one of them would be the failure mode:
+        the new score, the old score it replaced, and the shortfall that remains.
+        """
         c = compile_user_compound("ACME-101", ASPIRIN, ic50_uM=1.0, alpha=alpha)
 
         row = next(f for f in c.fields if f["key"] == "diffusivity")
-        for token in ("FALSIFIED", "29.7x", "2.4x", "0.028", "3.7x",
-                      "diffusivity_falsification.md", "Pruijn"):
+        for token in (
+                "0.718",        # what it scores now
+                "0.022",        # what the model it replaced scored
+                "29.7x", "8.3x",  # measured spread, and the quarter of it modelled
+                "ONE cell line",  # the limit that has not moved at all
+                "Pruijn",
+                "results/two_route_promotion.md",
+                "diffusivity_falsification.md"):
             assert token in row["method"], f"{token!r} missing from the field"
+        # It must NOT go on calling the shipping model falsified or MW-only.
+        assert "MW ALONE" not in row["method"]
 
         cannot = " ".join(c.as_dict()["cannot_conclude"])
-        assert "29.7x" in cannot and "0.028" in cannot
+        assert "29.7x" in cannot and "0.718" in cannot
         assert "congeneric" in cannot
+        assert "ONE cell line" in cannot
 
         joined = " ".join(c.caveats)
-        assert "FALSIFIED" in joined
-        # Worded to trip the Studio's hard-stop renderer, like the other two.
-        assert "MUST NOT" in joined
+        # The transport caveat is no longer a hard stop, because the claim it
+        # guards is no longer a refutation -- but it must still be unambiguous
+        # about the strength of the evidence.
+        assert "WEAK EVIDENCE, NOT A MEASUREMENT" in joined
+        assert "0.718" in joined and "0 of 31" in joined
+        # ... and the panel must still carry at least one genuine hard stop, so
+        # that softening this one did not soften the renderer's stop behaviour.
+        assert any("MUST NOT" in cv or "NOT DEFENSIBLE" in cv for cv in c.caveats)
 
     def test_the_ranking_claim_is_qualified_not_advertised(self, alpha):
         """The CAN list may no longer promise an unqualified ranking: the one

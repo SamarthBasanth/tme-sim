@@ -62,6 +62,63 @@
    "bilayer_thickness_nm": 4.0,
    "logk_membrane_max": 3.0,
    "hbd_logp_decrement": 1.0
-  }
+  },
+  "promotion_prereg": {
+   "_what": "REGISTRATION EXTENSION for the promotion of the two-route transport model to the shipping default. It does NOT replace results/sweep/tworoute_prereg.json, which was frozen before the model was ever scored against Pruijn 2008 and MUST NOT be edited. That file records what was registered in advance; this file records what changed at promotion, why, and against which already-published measurement. Both are checked against live code: `experiments/two_route_transport.py --stage prereg` asserts the original file against `two_route.HBD_LOGP_DECREMENT_PREREGISTERED` and every unchanged parameter, and asserts this file against `two_route.HBD_LOGP_DECREMENT`.",
+   "_rule": "DO NOT FIT TO PRUIJN. Unchanged and still binding. No number below was chosen by looking at a Pruijn residual. The one value that moved -- hbd_logp_decrement -- moved AWAY from the value that maximises the Pruijn score (1.0, R^2 = 0.725) and TO a value derived from two open-access measured coefficient sets (1.34, R^2 = 0.718). A tuner would have moved it the other way, or not at all.",
+   "promotion_utc": "2026-08-13",
+   "decision": "two_route ON as the shipping default in compile_drug.build_profile, in `recal` alpha mode (alpha re-solved on the same measured doxorubicin anchor), efflux OFF, intracellular retardation OFF, tmesim/physics/subgrid.py unchanged and still off, vessel geometry default unchanged.",
+   "parameters_unchanged_from_the_original_pre_registration": [
+    "cell_volume_fraction = 0.7892",
+    "cell_radius_um = 7.8517",
+    "cytoplasm_D_over_water = 0.27",
+    "cell_partition_K = 1.0",
+    "membrane_viscosity_pa_s = 1.0",
+    "bilayer_thickness_nm = 4.0",
+    "logk_membrane_max = 3.0",
+    "logk_membrane_min = null (permeability.py's lower clamp still deliberately not adopted)"
+   ],
+   "parameters_changed": {
+    "hbd_logp_decrement": {
+     "superseded_value": 1.0,
+     "superseded_status": "DECLARED CONVENTION -- NO PRIMARY SOURCE FOR THE MAGNITUDE. Preserved verbatim in results/sweep/tworoute_prereg.json and in live code as two_route.HBD_LOGP_DECREMENT_PREREGISTERED, so the original pre-registration stays checkable.",
+     "value": 1.34,
+     "status": "SOURCED. Derived in one line from two independently measured, open-access Abraham LSER coefficient sets.",
+     "derivation": "Abraham's LSER is log P = c + e*E + s*S + a*A + b*B + v*V with A the solute's hydrogen-bond ACIDITY. The octanol -> alkane correction is the DIFFERENCE of two such equations, so its donor term is (a_oct - a_alk)*A. a(water -> wet octan-1-ol) = +0.034 and a(water -> hexadecane) = -3.587, giving a Delta log P donor coefficient of 3.621 per unit A. The model's input is an integer donor COUNT (Lipinski.NumHDonors), not A, so a typical A per donor GROUP is required; the central aliphatic-OH value A = 0.37 gives 3.621 * 0.37 = 1.340.",
+     "source": "Abraham MH, Acree WE Jr. ACS Omega 2019;4(7):12920-12926, doi:10.1021/acsomega.8b03242, PMC6648601 -- Table 1, read VERBATIM. Cross-checked against Table 1 of J Comput Aided Mol Des 2017 (PMC5579141) and the open-access Acree/Abraham compilation (hexadecane -3.587, cyclohexane -3.740, hexane -3.578, heptane -3.571). Measured A per donor group from the open-access tables of PMC5830486 and PMC3477586.",
+     "the_one_remaining_choice": "WHICH DONOR GROUP IS TYPICAL. This converts one unsourced number into a sourced formula with one documented choice; it does not make the choice disappear. The whole measured range of A (0.16 aliphatic amine to 0.62 carboxylic acid, i.e. decrements 0.579 to 2.245) is swept in results/two_route_efflux.md section 3.3, and R^2 stays 0.588-0.722 across all of it against 0.022 for the MW-only model.",
+     "direction_of_bias": "AGAINST this number. Hexadecane is the harshest available membrane proxy; a real bilayer's interfacial region (ester carbonyls, phosphate) supplies hydrogen-bond acceptors, so the donor penalty for a liposome/water partition should be SMALLER than 3.621*A. No Abraham coefficient set for a DMPC/liposome-water system could be verified, so this is recorded rather than corrected for. 1.34 is an UPPER estimate for a bilayer, and the superseded 1.0 sits INSIDE the plausible band rather than below it.",
+     "not_used_and_why": "Abraham, Chadha, Whiting & Mitchell, J Pharm Sci 1994;83(8):1085-1100, PMID 7983591 -- the canonical Delta log P citation and the one results/two_route_transport.md section 7 named as the right source -- is HARD-CLOSED. Unpaywall (oa_status closed, empty oa_locations), OpenAlex (is_oa false) and Semantic Scholar (CLOSED) independently report no open-access copy, and no secondary source quoting its regression verbatim was located. Its fitted coefficients are recorded UNVERIFIED and are not used. Seiler P, Eur J Med Chem 1974;9:473-479 (the I_H increments) predates DOI assignment and could not be retrieved in any form; every I_H value in circulation traces to secondary quotation and is likewise UNVERIFIED.",
+     "it_is_not_the_optimum_and_that_is_the_point": "The Pruijn R^2 optimum over the whole sweep is at 1.000 (R^2 = 0.725). The adopted 1.340 scores 0.718 -- marginally WORSE on R^2 -- and better on geometric bias (1.03x against 1.25x) and within-3x coverage (99 % against 96 %). The single most attackable fact about results/two_route_transport.md was that its adopted value sat on its own sweep optimum. That no longer holds for the adopted value."
+    }
+   },
+   "terms_built_and_deliberately_left_OFF": {
+    "efflux": {
+     "state": "OFF",
+     "reason": "results/two_route_efflux.md. Three independent sourced reasons it is not commensurable with the transport anchor, the strongest being that HT-29 -- the cell line every Pruijn measurement was made in -- is functionally P-glycoprotein-negative (Wils 1994, PMID 7945455, verbatim: 'No functional expression of P-glycoprotein was found in the differentiated HT29-18-C1 cell line'). 0 of 71 Pruijn compounds carries any efflux assignment, pinned by tests/test_two_route.py::test_none_of_the_pruijn_compounds_carries_an_efflux_ratio, so applying the term would change the blind score by EXACTLY ZERO. And no primary numeric efflux ratio for paclitaxel -- the one drug it was needed for -- could be retrieved."
+    },
+    "intracellular_retardation": {
+     "state": "OFF",
+     "reason": "results/intracellular_retardation.md. Built, verified against a direct transient PDE solve to 0.01 %, and REFUTED against this anchor: R^2 0.718 -> 0.606, geometric bias 1.03x -> 0.098x, within-3x coverage 99 % -> 0 %, and matched-MW within-tie rank agreement collapsing from 77.4 % to 51.6 %, i.e. to a coin flip. Pruijn's own Discussion says why: their Dmcl is explicitly a FREE-drug coefficient, and compounds that did show sequestration had it removed into separately fitted reaction terms rather than left in D. The measurement is not the quantity a retardation term predicts."
+    },
+    "subgrid_closure": {
+     "state": "OFF, and not bundled with this change",
+     "reason": "results/area_conservation_regeneration.md found that once the vessel field is continuous the closure stops being a no-op and inflates the F_state span 325x. tmesim/physics/subgrid.py is untouched here and its default-off status is load-bearing."
+    },
+    "vessel_geometry_area": {
+     "state": "left at its current default, deliberately",
+     "reason": "Separately evidenced and must not ride along with this change. Two consequential flips in one change makes attribution impossible if anything breaks."
+    }
+   },
+   "what_this_registration_does_NOT_claim": [
+    "That the engine's diffusivity is now correct. It reproduces 24 % of the measured spread (8.3x modelled against 29.7x measured), not 100 %.",
+    "That the result generalises across cell lines. It has been scored against exactly ONE: HT-29. Pruijn's own paper reports its asymptote coefficients moving up to 100-fold across SiHa, HCT8-Ea and HCT8-Ra, and that movement remains untested.",
+    "That any absolute number this engine produces is trustworthy. The alpha gauge absorbs most of the absolute change at the anchor by construction; what the two-route model adds is the compound-to-compound DIFFERENTIAL.",
+    "That the descriptors feeding it are right. Crippen logP is ~2.4 log units too lipophilic for cisplatin and the membrane leg inherits that error linearly.",
+    "That the taxane rows are trustworthy. Choi 2011 (PMID 21225235) measures paclitaxel at 38 % penetration through an HT-29 multicellular layer at 1 uM against 100 % at 10 uM in a P-gp-negative line -- saturable intracellular binding, which this model has no capacity term for and which the retardation term was built for and could not deliver."
+   ],
+   "registered_prediction_before_the_promotion_solve": "results/two_route_efflux.md section 4.3 predicts that in `recal` -- the alpha mode the codebase actually runs -- 0 of 12 verdicts move, and that docetaxel's FAIL persists as a FAIL marginally further outside its band. This file registers that prediction as the thing the promotion run must VERIFY rather than assume. If a verdict moves in `recal`, that is the finding and it must be reported as one."
+  },
+  "hbd_logp_decrement_live": 1.34
  }
 }

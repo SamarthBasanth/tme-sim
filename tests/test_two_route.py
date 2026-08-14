@@ -2,11 +2,31 @@
 
 Three things are pinned here, in descending order of importance:
 
-1. **It is default-off and additive.** `DrugParams.diffusivity` must be
-   bit-identical with the two-route module present, and `calibrate_alpha()` must
-   still return the published 148.60815765445545. A stale agent broke exactly
-   this by changing a molecular input that flows into doxorubicin's binding;
-   alpha absorbed it and drifted, breaking two bitwise PK pins.
+1. **It is the SHIPPING transport model, and its two numbers are pinned.**
+   `DrugParams.diffusivity` for doxorubicin and `calibrate_alpha()` are both
+   bitwise pins. THEY WERE RE-PINNED when the model was promoted to the default
+   (`results/two_route_promotion.md`); the superseded values are kept beside the
+   new ones in this module, in `tests/data/two_route_promotion_reference.json`
+   and in `results/two_route_promotion.md`, and the assertions were changed
+   rather than removed. `test_two_route_is_wired_into_compile_drug` replaces the
+   old `test_compile_drug_does_not_import_two_route`, which existed to force
+   exactly this re-run and did its job.
+
+   HISTORY, so a future reader can tell a deliberate re-pin from a drift:
+
+   | | superseded | current |
+   |---|---|---|
+   | `calibrate_alpha()` | 148.60815765445545 | 22.223477711172563 |
+   | doxorubicin `DrugParams.diffusivity` | 184.74861430191334 | 27.92558262333494 |
+
+   Cause: `compile_drug.build_profile` now multiplies the interstitial `D` by the
+   two-route cell factor, which for doxorubicin is 0.15115449027238376 -- almost
+   entirely the IMPERMEABLE-cell Maxwell factor, because doxorubicin's six
+   hydrogen-bond donors shut its membrane and its transcellular gain is 1.0000002.
+   `alpha` follows because it is fitted in closed form from `L = sqrt(D_eff/k)`.
+   A stale agent once broke these pins by changing a molecular input that flows
+   into doxorubicin's binding; the pins exist for that, and a change here that is
+   NOT accompanied by a results/ document is that failure, not this one.
 2. **The limit reduces correctly.** At zero membrane permeability the two-route
    law must reproduce `ecm_mesh.cell_exclusion` to machine precision -- that is
    the real check on the algebra, and it is what makes the new law a strict
@@ -34,42 +54,119 @@ D_CYTO = 200.0    # um^2/s
 
 
 # --------------------------------------------------------------------------- #
-# 1. DEFAULT-OFF: nothing the engine ships may move.
+# 1. THE SHIPPING DEFAULT, and the two bitwise pins that move with it.
+#
+# These were `TestDefaultOff` until results/two_route_promotion.md. The class was
+# renamed and its assertions re-pinned rather than deleted; the superseded values
+# are asserted to be recoverable, which is a stronger guard than the old one.
 # --------------------------------------------------------------------------- #
-class TestDefaultOff:
-    def test_alpha_is_unchanged(self):
-        """The one number that must never drift."""
-        from tmesim.validation.calibration import calibrate_alpha
-        assert calibrate_alpha() == 148.60815765445545
+#: Re-pinned at the promotion. See this module's docstring for the cause.
+ALPHA_SUPERSEDED = 148.60815765445545
+ALPHA_CURRENT = 22.223477711172563
+DOX_D_SUPERSEDED = 184.74861430191334
+DOX_D_CURRENT = 27.92558262333494
+#: doxorubicin's two-route factor. Overwhelmingly the impermeable-cell Maxwell
+#: term: its transcellular gain is 1.0000002 because six donors shut its membrane.
+DOX_TWO_ROUTE_SCALE = 0.15115449027238376
 
-    def test_compile_drug_does_not_import_two_route(self):
-        """The two-route model must not be wired in. If someone wires it, this
-        test fails and they are forced to re-run the blast radius."""
+
+class TestShippingDefault:
+    def test_alpha_is_pinned_at_its_repinned_value(self):
+        """BITWISE pin. Re-pinned once, deliberately, at the promotion."""
+        from tmesim.validation.calibration import calibrate_alpha
+        assert calibrate_alpha() == ALPHA_CURRENT
+
+    def test_two_route_is_wired_into_compile_drug(self):
+        """The contract this test asserts was INVERTED at the promotion.
+
+        It used to assert that `compile_drug` contained no reference to
+        `two_route` at all, so that anyone wiring it in would be forced to re-run
+        the blast radius before the suite went green. That is exactly what
+        happened (results/two_route_promotion.md), so the test now pins the new
+        contract: the model IS wired in, it IS on by default, and turning it off
+        is still possible and still recovers the old number exactly.
+        """
         import inspect
 
         from tmesim.molecular import compile_drug
         src = inspect.getsource(compile_drug)
-        assert "two_route" not in src, (
-            "compile_drug now references two_route. The two-route model is "
-            "DEFAULT-OFF by decision (results/two_route_transport.md 7); wiring "
-            "it in changes every DrugParams.diffusivity and moves alpha.")
+        assert "two_route" in src, (
+            "compile_drug no longer references two_route. The two-route model is "
+            "the SHIPPING default (results/two_route_promotion.md); removing it "
+            "silently returns every DrugParams.diffusivity to the MW-only model "
+            "that results/diffusivity_falsification.md falsified.")
+        assert compile_drug._TWO_ROUTE_DEFAULT is True
+        assert (inspect.signature(compile_drug.build_profile)
+                .parameters["two_route"].default
+                is compile_drug._TWO_ROUTE_DEFAULT)
 
     def test_drugparams_diffusivity_is_bit_identical(self):
-        """BITWISE pin on the quantity the two-route model would change.
+        """BITWISE pin on the quantity the two-route model changed.
 
-        184.75 um^2/s is the value results/cellular_exclusion.md 1 and
-        results/diffusivity_falsification.md were computed against, recorded to
-        full precision here. This is the number that flows into doxorubicin's
-        `L = sqrt(D_eff/k)` and therefore into alpha; if it moves, alpha moves.
+        27.9256 um^2/s is the shipping value since the promotion. 184.7486 is what
+        results/cellular_exclusion.md 1 and results/diffusivity_falsification.md
+        were computed against, and is asserted below to be exactly recoverable.
+        This is the number that flows into doxorubicin's `L = sqrt(D_eff/k)` and
+        therefore into alpha; if it moves, alpha moves.
         """
         from tmesim.molecular import compile_drug
         from tmesim.molecular.library import get_molecule
 
         dp = compile_drug.molecule_to_drugparams(get_molecule("doxorubicin"))
-        assert dp.diffusivity == 184.74861430191334
+        assert dp.diffusivity == DOX_D_CURRENT
+
+    def test_the_superseded_value_is_still_exactly_recoverable(self):
+        """Every published number predating the promotion must stay reproducible.
+
+        This is what makes the re-pin auditable rather than a reset: the old
+        model is not gone, it is one keyword away, and it is asserted BITWISE.
+        """
+        from tmesim.molecular import compile_drug
+        from tmesim.molecular.library import get_molecule
+
+        prof = compile_drug.build_profile(get_molecule("doxorubicin"),
+                                          two_route=False)
+        assert prof.effective_diffusivity == DOX_D_SUPERSEDED
+        # and it is carried on every compile, so a caller never has to re-run one
+        on = compile_drug.build_profile(get_molecule("doxorubicin"))
+        assert on.interstitial_diffusivity == DOX_D_SUPERSEDED
+
+    def test_the_repin_is_exactly_the_two_route_factor(self):
+        """The new pins must be the OLD pins times the law, not new numbers.
+
+        If this fails, something other than the two-route term moved D, and the
+        re-pin in this module is not explained by the change it claims.
+        """
+        from tmesim.molecular import compile_drug
+        from tmesim.molecular.library import get_molecule
+
+        prof = compile_drug.build_profile(get_molecule("doxorubicin"))
+        assert prof.two_route["hindrance"] == DOX_TWO_ROUTE_SCALE
+        assert prof.effective_diffusivity == DOX_D_SUPERSEDED * DOX_TWO_ROUTE_SCALE
+        # doxorubicin's membrane is SHUT: the move is the impermeable-cell term,
+        # not the transcellular route. This is why the blast radius is small.
+        assert prof.two_route["transcellular_gain"] == pytest.approx(1.0, abs=5e-4)
+        assert prof.two_route["hindrance"] == pytest.approx(
+            ecm_mesh.cell_exclusion(two_route.DEFAULT_CELL_VOLUME_FRACTION)
+            ["hindrance"], rel=1e-4)
+
+    def test_alpha_follows_D_through_its_own_closed_form(self):
+        """alpha is a GAUGE COORDINATE (results/alpha_identifiability.md), so its
+        value moving is expected. What must hold is that it moved for the stated
+        reason and by the stated arithmetic, and NOT in proportion to D -- the
+        un-amplified passive clearance term is subtracted first, which is why the
+        alpha ratio (0.14954) is not the D ratio (0.15115)."""
+        from tmesim.validation import calibration as C
+
+        dp = C._compile("doxorubicin")
+        d_eff = C._d_eff_tortuous(dp, C.DEFAULT_ECM)
+        k_target = d_eff / (C.DOX_TARGET_EFOLD_UM ** 2)
+        assert (k_target - C.k_passive(dp)) / C.uptake_proxy(dp) == ALPHA_CURRENT
+        assert ALPHA_CURRENT / ALPHA_SUPERSEDED != pytest.approx(
+            DOX_D_CURRENT / DOX_D_SUPERSEDED, rel=1e-6)
 
     def test_existing_ecm_mesh_functions_unchanged(self):
-        """The additive wiring must not perturb the shipped ECM legs."""
+        """The wiring must not perturb the shipped ECM legs."""
         a = ecm_mesh.ogston_renkin_hindrance(0.4)
         assert a["effective_hindrance"] == pytest.approx(
             ecm_mesh.ogston_partition(0.4) * a["hindrance_diffusion"], rel=0, abs=0)
@@ -215,9 +312,17 @@ class TestMembraneLeg:
     def test_no_lower_clamp(self):
         """A floor at K = 1e-3 would force the transcellular route open for
         exactly the hydrophilic compounds whose exclusion from it is the
-        mechanism under test."""
-        assert membrane_permeability_um_s(-2.0, 4, 0.45)["log_k_membrane"] == \
-            pytest.approx(-6.0)
+        mechanism under test.
+
+        Asserted against the LAW rather than against a literal, so that promoting
+        `HBD_LOGP_DECREMENT` (1.0 -> 1.34, results/two_route_promotion.md) cannot
+        make this test pass or fail for the wrong reason. What it pins is that
+        nothing arrests the descent at permeability.py's -3.
+        """
+        got = membrane_permeability_um_s(-2.0, 4, 0.45)["log_k_membrane"]
+        assert got == pytest.approx(-2.0 - 4.0 * two_route.HBD_LOGP_DECREMENT)
+        assert got < -3.0 and not membrane_permeability_um_s(
+            -2.0, 4, 0.45)["clamped"]
 
     def test_cytoplasm_diffusivity_uses_water_not_interstitial_viscosity(self):
         """Kao 1993's 0.27 is against WATER; using the engine's interstitial
@@ -341,17 +446,42 @@ class TestEffluxComposition:
         assert a["transcellular_gain"] < 1.0001
 
     def test_an_open_membrane_is_strongly_moved_by_efflux(self):
-        """Paclitaxel-like: logP 3.74, 4 donors, membrane resistance ratio < 1.
-        Its transcellular gain must collapse toward 1 as ER rises, monotonically.
+        """A compound whose membrane is genuinely open: its transcellular gain
+        must collapse toward 1 as ER rises, monotonically.
+
+        The probe is a bare lipophile (logP 3.74, ZERO donors) rather than
+        paclitaxel-like (3.74, four donors), because at the promoted decrement
+        paclitaxel's membrane is no longer open -- see the test below, which pins
+        that as the finding it is rather than letting it silently break this one.
         """
-        a = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)
+        a = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 0)
         assert a["membrane_resistance_ratio"] < 1.0
         assert a["transcellular_gain"] > 3.0
-        gains = [two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4,
+        gains = [two_route_diffusivity(SIGMA_M, 0.626, 3.74, 0,
                                        efflux_ratio=er)["transcellular_gain"]
                  for er in (1.0, 2.0, 5.0, 20.0, 100.0, 1e4)]
         assert all(gains[i] >= gains[i + 1] for i in range(len(gains) - 1)), gains
         assert gains[-1] == pytest.approx(1.0, abs=1e-3)
+
+    def test_the_sourced_decrement_closes_paclitaxels_membrane(self):
+        """THE FINDING THAT COUPLED THE TWO BLOCKERS, pinned so it cannot rot.
+
+        results/two_route_efflux.md 4.1: at the pre-registered convention (1.0)
+        paclitaxel's membrane was nearly open -- resistance ratio 0.366, a 4.94x
+        transcellular gain, and the largest single number in the blast radius,
+        which is what made efflux look necessary. At the SOURCED decrement (1.34)
+        4 donors cost 5.36 log units instead of 4.00, the resistance ratio becomes
+        8.31, and the outlier largely disappears WITHOUT any efflux term. The 4.94x
+        was substantially an artefact of an under-sourced donor penalty.
+        """
+        at_convention = two_route_diffusivity(
+            SIGMA_M, 0.626, 3.74, 4,
+            hbd_decrement=two_route.HBD_LOGP_DECREMENT_PREREGISTERED)
+        shipping = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)
+        assert at_convention["membrane_resistance_ratio"] < 1.0
+        assert shipping["membrane_resistance_ratio"] > 8.0
+        assert at_convention["transcellular_gain"] > 3.0
+        assert shipping["transcellular_gain"] < 2.0
 
     def test_efflux_rejects_nonsense(self):
         with pytest.raises(ValueError):
@@ -380,7 +510,14 @@ class TestEffluxComposition:
 # 7. THE PRE-REGISTRATION must still describe the live code.
 # --------------------------------------------------------------------------- #
 def test_parameters_match_the_pre_registration():
-    """If a constant is later tuned to the Pruijn measurement, this fails."""
+    """If a constant is later tuned to the Pruijn measurement, this fails.
+
+    The ORIGINAL pre-registration is checked in full and is NEVER edited. The one
+    parameter that moved at the promotion is checked here against the historical
+    value that live code still carries by name, and against its own registration
+    in `test_the_promoted_parameter_matches_its_own_registration`. The
+    pre-registration was EXTENDED, not bypassed, and neither half is skipped.
+    """
     import json
     import os
 
@@ -395,7 +532,32 @@ def test_parameters_match_the_pre_registration():
     assert two_route.ETA_MEMBRANE_PA_S == p["membrane_viscosity_pa_s"]["value"]
     assert two_route.BILAYER_THICKNESS_NM == p["bilayer_thickness_nm"]["value"]
     assert two_route.LOGK_MEMBRANE_MAX == p["logk_membrane_max"]["value"]
-    assert two_route.HBD_LOGP_DECREMENT == p["hbd_logp_decrement"]["value"]
+    assert (two_route.HBD_LOGP_DECREMENT_PREREGISTERED
+            == p["hbd_logp_decrement"]["value"] == 1.0)
+
+
+def test_the_promoted_parameter_matches_its_own_registration():
+    """The sourced decrement must agree with the registration that sourced it.
+
+    The value 1.34 is NOT free: it is 3.621 * 0.37, from two open-access Abraham
+    LSER coefficient sets. If someone edits the constant without editing the
+    registration -- or edits the registration to chase a score -- this fails.
+    """
+    import json
+    import os
+
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "results", "sweep", "tworoute_promotion_prereg.json")
+    if not os.path.exists(path):
+        pytest.skip("promotion registration file not present")
+    ch = json.load(open(path))["parameters_changed"]["hbd_logp_decrement"]
+    assert two_route.HBD_LOGP_DECREMENT == ch["value"] == 1.34
+    assert two_route.HBD_LOGP_DECREMENT_PREREGISTERED == ch["superseded_value"]
+    # the derivation is arithmetic, so check the arithmetic rather than the prose
+    assert round(3.621 * 0.37, 3) == 1.34
+    # and it must NOT be the value that maximises the Pruijn score, which is the
+    # single most attackable property the parent file had.
+    assert two_route.HBD_LOGP_DECREMENT != 1.0
 
 
 # --------------------------------------------------------------------------- #

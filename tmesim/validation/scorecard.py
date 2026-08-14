@@ -788,12 +788,26 @@ def _run_mcl_transport_coefficients() -> List[Row]:
 
     Scored ON THE ENGINE AS IT SHIPS
     --------------------------------
-    The cellular volume-exclusion term is merged but default-off and nothing
-    calls it (``cell-exclusion-default-off``), so the verdicts below are the
-    shipping compiled numbers. The cell-term-on arm is computed live and
-    reported in every row's note and ``values``, never as the verdict — a
-    scorecard that scored a configuration the engine does not run would be
-    reporting a different program.
+    The verdicts below are the shipping compiled numbers, and since
+    ``results/two_route_promotion.md`` the shipping compile INCLUDES the cell
+    term: ``compile_drug.build_profile`` applies the two-route (paracellular +
+    transcellular) law by default. That promotion moved a verdict in this group,
+    which is exactly what a scorecard exists to notice:
+
+    * the dimensionless **hindrance** row goes **FAIL -> PASS** — 1.77-fold
+      shipping before, **10.33-fold** now, against a measured 12-fold;
+    * the absolute **effective diffusivity** row stays **FAIL** but FLIPS
+      DIRECTION — 287.3 um^2/s (2.21x above the measured band) before,
+      **49.3 um^2/s** (1.50x below it) now;
+    * the **consumption-rate** row stays NOT TESTABLE, but the reading it
+      declines to score changed sign: at the old alpha, scoring it would have
+      manufactured a PASS; at the new alpha it would manufacture a FAIL. That
+      sentence is corrected in the row rather than left to rot, because a
+      "declining to score removes a pass" claim that has become "removes a
+      failure" is the most damaging kind of stale disclosure.
+
+    The pre-promotion arm is computed live with ``two_route=False`` and reported
+    in every row's ``values`` under ``superseded_``, never as the verdict.
 
     NOTHING IS TUNED HERE. The measured constants are imported from
     ``experiments/anchor_prototype.py``, which owns them and traces each to its
@@ -807,19 +821,28 @@ def _run_mcl_transport_coefficients() -> List[Row]:
 
     mol = descriptors.from_smiles("tirapazamine", AP.TPZ_SMILES)
     prof = compile_drug.build_profile(mol, ecm_reference=AP.ECM_REFERENCE)
+    # The PRE-PROMOTION arm, computed live rather than quoted from a document,
+    # so the before/after in every note below cannot drift from the code.
+    prof_old = compile_drug.build_profile(mol, ecm_reference=AP.ECM_REFERENCE,
+                                          two_route=False)
 
     d_ship = float(prof.effective_diffusivity)
     d_free = float(prof.free_diffusivity)
     fold_ship = 1.0 / float(prof.hindrance)
+    d_super = float(prof_old.effective_diffusivity)
+    fold_super = 1.0 / float(prof_old.hindrance)
 
-    # The merged-but-default-off cell term, computed live rather than quoted.
+    # The IMPERMEABLE-cell term on its own, computed live rather than quoted.
     cell = ecm_mesh.cell_exclusion(PHI_CELL_BREAST_SECTION)
     cell_scale = float(cell["hindrance"])
     # Arm B ("cell term ALONE") is the MCL-appropriate arm: an MCL is packed
     # cells with little matrix, and the repo's ECM legs describe matrix the MCL
-    # does not have. Arm A is the whole existing chain with the cell term added.
+    # does not have. Arm A is the whole existing chain with the cell term added,
+    # which since the promotion is what the engine SHIPS -- the only difference
+    # from d_ship is that the shipping term is the PERMEABLE-cell generalisation,
+    # and for tirapazamine the transcellular route adds only 2.2 %.
     d_armB, fold_armB = d_free * cell_scale, 1.0 / cell_scale
-    d_armA = d_ship * cell_scale
+    d_armA = d_super * cell_scale
     fold_armA = d_free / d_armA
 
     lo = min(v[0] for v in AP.D_MCL_MEASURED_UM2_S.values())
@@ -827,15 +850,21 @@ def _run_mcl_transport_coefficients() -> List[Row]:
     d_pmids = tuple(dict.fromkeys(v[2] for v in AP.D_MCL_MEASURED_UM2_S.values()))
 
     mcl_arm = (
-        f"Cell-term-ON arm, reported and NOT scored: arm B (cell term alone, "
-        f"the MCL-appropriate arm) gives D_eff {d_armB:.1f} um^2/s and "
-        f"{fold_armB:.2f}-fold hindrance; arm A (the full existing chain plus "
-        f"the cell term) gives {d_armA:.1f} um^2/s and {fold_armA:.2f}-fold. "
-        f"Arm A's proximity to the measurement is partly the WRONG TERM DOING "
-        f"THE RIGHT WORK — it credits an MCL with ECM the MCL does not have "
-        f"(results/cellular_exclusion.md sec. 4.1). Arm B's fold is "
-        f"{fold_armB:.4f} exactly; cellular_exclusion.md sec. 0 prints it as "
-        f"6.61x, rounded down, so the two are the same number.")
+        f"PRE-PROMOTION arm, reported for comparison and NOT scored: with "
+        f"two_route=False the same compile gives D_eff {d_super:.1f} um^2/s and "
+        f"{fold_super:.2f}-fold hindrance, which is what every number in "
+        f"results/diffusivity_falsification.md and results/cellular_exclusion.md "
+        f"was computed against. Two further arms, also unscored: arm B (the "
+        f"IMPERMEABLE-cell term alone, the MCL-appropriate arm, since an MCL is "
+        f"packed cells with little matrix) gives {d_armB:.1f} um^2/s and "
+        f"{fold_armB:.2f}-fold; arm A (the old chain plus the impermeable term) "
+        f"gives {d_armA:.1f} um^2/s and {fold_armA:.2f}-fold. Arm A's proximity "
+        f"to the measurement is partly the WRONG TERM DOING THE RIGHT WORK — it "
+        f"credits an MCL with ECM the MCL does not have "
+        f"(results/cellular_exclusion.md sec. 4.1), and that objection now "
+        f"applies to the SHIPPING number too, because the shipping chain is arm "
+        f"A with a permeable membrane. Arm B's fold is {fold_armB:.4f} exactly; "
+        f"cellular_exclusion.md sec. 0 prints it as 6.61x, rounded down.")
 
     rows: List[Row] = []
 
@@ -851,7 +880,10 @@ def _run_mcl_transport_coefficients() -> List[Row]:
                  "diffusion-reaction model of the same form",
         predicted=f"{d_ship:.1f} um^2/s as shipped "
                   f"({d_ship / lo:.2f}x the lowest measured cell line, "
-                  f"{d_ship / hi:.2f}x the highest)",
+                  f"{d_ship / hi:.2f}x the highest); {d_super:.1f} um^2/s before "
+                  f"the two-route promotion, i.e. the miss FLIPPED DIRECTION "
+                  f"from {d_super / hi:.2f}x ABOVE the band to {d_ship / lo:.2f}x "
+                  f"BELOW it",
         measured=f"{lo:.0f}-{hi:.0f} um^2/s across three MCL cell lines "
                  f"(V79-171b 74, MGH-U1 130, PMID 9806526; SiHa 130 +/- 5, "
                  f"PMID 17869669)",
@@ -859,22 +891,25 @@ def _run_mcl_transport_coefficients() -> List[Row]:
         bar=f"inside the measured {lo:.0f}-{hi:.0f} um^2/s range. "
             f"results/external_anchor_survey.md sec. 4 recommends this anchor "
             f"as a FAIL row and that is the bar adopted",
-        note=f"The three measurements agree with EACH OTHER to 1.8x while the "
-             f"engine misses all three IN THE SAME DIRECTION — a systematic "
-             f"bias, not scatter. It does pass the repo's loosest declared band "
+        note=f"THE MISS FLIPPED DIRECTION AND DID NOT CLOSE. The three "
+             f"measurements agree with EACH OTHER to 1.8x. Before the two-route "
+             f"promotion the engine was above all three ({d_super:.1f} um^2/s); "
+             f"it is now below all three ({d_ship:.1f} um^2/s), by a smaller "
+             f"factor. Overshooting a band in the other direction is progress "
+             f"in magnitude and is NOT a pass, and this row is not recorded as "
+             f"one. It does pass the repo's loosest declared band "
              f"({ORDER_OF_MAGNITUDE_FACTOR:.0f}x, "
              f"pk_reality.ORDER_OF_MAGNITUDE_FACTOR), which is not the bar "
-             f"here. {mcl_arm} Arm B lands INSIDE the measured band at "
-             f"{d_armB:.1f}; that is reported and deliberately not scored, "
-             f"because nothing in the shipping engine computes it, and because "
-             f"the same phi_cell that puts arm B inside on this absolute row "
-             f"leaves the dimensionless hindrance row 1.8x SHORT — the "
-             f"signature of a residual free-diffusivity error rather than of a "
-             f"cell fraction tuned to a target "
-             f"(results/cellular_exclusion.md sec. 4.2).",
+             f"here. READ THIS ROW AGAINST THE HINDRANCE ROW BELOW, WHICH NOW "
+             f"PASSES: the dimensionless ratio lands inside its band while the "
+             f"absolute value does not, which is the signature of a residual "
+             f"FREE-diffusivity error — the hindrance is right and the thing it "
+             f"is hindering is not (results/cellular_exclusion.md sec. 4.2). "
+             f"{mcl_arm}",
         conditional=("mcl-no-vasculature", "cell-exclusion-default-off",
                      "coefficient-not-field"),
         values={"shipped_D_eff_um2s": d_ship,
+                "superseded_mw_only_D_eff_um2s": d_super,
                 "free_diffusivity_um2s": d_free,
                 "measured_band_um2s": [float(lo), float(hi)],
                 "cell_term_on_armA_D_eff_um2s": d_armA,
@@ -903,10 +938,9 @@ def _run_mcl_transport_coefficients() -> List[Row]:
                  "multicellular layer relative to culture medium",
         predicted=f"{fold_ship:.2f}-fold as shipped "
                   f"({fold_ship / AP.MEASURED_HINDRANCE_FOLD_V79:.2f}x "
-                  f"measured); {fold_armB:.2f}-fold with the merged-but-"
-                  f"default-off cell term "
-                  f"({fold_armB / AP.MEASURED_HINDRANCE_FOLD_V79:.2f}x "
-                  f"measured — STILL SHORT)",
+                  f"measured); {fold_super:.2f}-fold "
+                  f"({fold_super / AP.MEASURED_HINDRANCE_FOLD_V79:.2f}x measured) "
+                  f"before the two-route promotion",
         measured=f"{AP.MEASURED_HINDRANCE_FOLD_V79:.0f}-fold lower than in "
                  f"culture medium (V79-171b MCL; no uncertainty published)",
         pmids=("9806526",),
@@ -916,26 +950,34 @@ def _run_mcl_transport_coefficients() -> List[Row]:
             f"{AP.MEASURED_HINDRANCE_FOLD_V79:.0f}-fold, i.e. "
             f"{h_lo:.1f}-{h_hi:.1f}-fold. The measured value carries no "
             f"published uncertainty, so inventing a tighter band would be "
-            f"inventing a number; this is the most GENEROUS bar available and "
-            f"the shipping engine still misses it",
-        note=f"THE SHARPEST ROW IN THIS GROUP: no units, no compartment "
-             f"translation, no cohort matching — a pure dimensionless ratio of "
-             f"one drug's diffusivity in tissue versus in free medium. "
-             f"THE CELL TERM IMPROVES THIS ROW AND DOES NOT PASS IT, and the "
-             f"distinction is the whole point: {fold_ship:.2f}x -> "
-             f"{fold_armB:.2f}x is a 3.7x improvement that closes most of the "
-             f"6.8x error, and it still lands SHORT of the measured 12x by "
-             f"{AP.MEASURED_HINDRANCE_FOLD_V79 / fold_armB:.1f}x. Improving is "
-             f"not passing and is not recorded as one. {mcl_arm} The diagnosis "
-             f"is structural and visible in the code: the engine's only "
-             f"obstacle population is ECM, and hydrodynamic_radius_nm makes the "
-             f"tracer a function of MW alone, so cellular volume exclusion — "
-             f"most of a tumour's volume — is absent from the shipping "
-             f"hindrance law. An MCL is almost pure packed cells, which is "
-             f"exactly why it exposes this.",
+            f"inventing a number; this is the most GENEROUS bar available, it "
+            f"was chosen while the engine was FAILING it, and it has not been "
+            f"widened or moved now that the engine passes",
+        note=f"THE SHARPEST ROW IN THIS GROUP, AND THE ONE THE TWO-ROUTE "
+             f"PROMOTION MOVED: no units, no compartment translation, no cohort "
+             f"matching — a pure dimensionless ratio of one drug's diffusivity "
+             f"in tissue versus in free medium. It went "
+             f"{fold_super:.2f}x -> {fold_ship:.2f}x against a measured "
+             f"{AP.MEASURED_HINDRANCE_FOLD_V79:.0f}x, i.e. "
+             f"FAIL -> PASS ({fold_ship / AP.MEASURED_HINDRANCE_FOLD_V79:.2f}x "
+             f"measured, inside a band of {h_lo:.0f}-{h_hi:.0f}). "
+             f"WHAT THAT DOES AND DOES NOT MEAN. The diagnosis this row carried "
+             f"was structural and correct: the old engine's only obstacle "
+             f"population was ECM, so cellular volume exclusion — most of a "
+             f"tumour's volume — was absent from the hindrance law, and an MCL "
+             f"is almost pure packed cells, which is exactly why it exposed "
+             f"that. The shipping law now has cells in it and the row passes. "
+             f"But the band is 3x wide either side of a measurement that "
+             f"carries NO published uncertainty, the pass is "
+             f"{AP.MEASURED_HINDRANCE_FOLD_V79 / fold_ship:.2f}x short of the "
+             f"central value, and the ABSOLUTE diffusivity row above still "
+             f"fails — so what has been established is that the hindrance RATIO "
+             f"is now the right size, not that the transport model is right. "
+             f"{mcl_arm}",
         conditional=("mcl-no-vasculature", "cell-exclusion-default-off",
                      "coefficient-not-field"),
         values={"shipped_fold": fold_ship,
+                "superseded_mw_only_fold": fold_super,
                 "measured_fold": float(AP.MEASURED_HINDRANCE_FOLD_V79),
                 "band_fold": [float(h_lo), float(h_hi)],
                 "cell_term_on_armA_fold": fold_armA,
@@ -993,16 +1035,37 @@ def _run_mcl_transport_coefficients() -> List[Row]:
             "alpha-amplified sink lands within 1.2-2.0x. Picking the flattering "
             "reading would manufacture a PASS and picking the other would "
             "manufacture a FAIL, and nothing about this anchor determines the "
-            "choice. NOTE WHICH WAY THIS COSTS: scored on k_calibrated — the "
-            "value the solver actually uses — this row would PASS the repo's "
-            "3x band. Declining to score it REMOVES a pass from the tally "
-            "rather than removing a failure."),
-        note="What may honestly be said: the magnitude alpha implies for a "
-             "small-molecule interstitial loss rate is not absurd, and is "
-             "within 2x of one independently measured rate constant of the same "
-             "class, in a fit that saw no tirapazamine, no MCL and no rate "
-             "constant. That is weaker than validation and stronger than "
-             "nothing (results/external_anchor_survey.md sec. 3.3).",
+            "choice. NOTE WHICH WAY THIS COSTS — AND THAT IT REVERSED. Until "
+            "results/two_route_promotion.md, scoring this row on k_calibrated "
+            "would have PASSED the repo's 3x band (0.49-0.82x measured at "
+            "alpha = 148.6082), so declining to score removed a PASS from the "
+            "tally. The promotion cut alpha to 22.2235 — because doxorubicin's "
+            "compiled D fell 6.6x and alpha is fitted from L = sqrt(D/k) "
+            "against the same measured anchor — and k_calibrated fell with it. "
+            f"Scored on k_calibrated TODAY this row would FAIL: "
+            f"{k_cal / k_hi:.3f}-{k_cal / k_lo:.3f}x measured, i.e. "
+            f"{k_lo / k_cal:.1f}-{k_hi / k_cal:.1f}x TOO SMALL, outside the 3x "
+            "band. So declining to score now removes a FAILURE from the tally, "
+            "not a pass. The decision not to score is unchanged and rests on "
+            "reason (1), which is about commensurability and is untouched by "
+            "any of this; what changed is which way the omission flatters us, "
+            "and that is stated here rather than left as a stale claim."),
+        note=f"WHAT MAY HONESTLY BE SAID, AND IT IS NOW WEAKER THAN IT WAS. "
+             f"Before the two-route promotion the magnitude alpha implied for a "
+             f"small-molecule interstitial loss rate landed within 2x of one "
+             f"independently measured rate constant of the same class, in a fit "
+             f"that saw no tirapazamine, no MCL and no rate constant — weaker "
+             f"than validation, stronger than nothing "
+             f"(results/external_anchor_survey.md sec. 3.3). At the new alpha it "
+             f"lands {k_lo / k_cal:.1f}-{k_hi / k_cal:.1f}x below that "
+             f"measurement instead. THIS IS THE COST SIDE OF THE PROMOTION AND "
+             f"IT IS NOT COSMETIC: the same change that brought the "
+             f"dimensionless hindrance row inside its band pushed this reading "
+             f"out of its own. The two anchors are coupled — the Primeau "
+             f"penetration fit pins the RATIO D/k, so lowering D lowers k by the "
+             f"same factor — and they now disagree about where the engine sits. "
+             f"That disagreement is unresolved and is the sharpest open question "
+             f"the promotion leaves (results/two_route_promotion.md sec. 8).",
         conditional=("mcl-no-vasculature", "alpha-fit", "coefficient-not-field"),
         values={"k_raw_per_s": k_raw, "k_calibrated_per_s": k_cal,
                 "alpha": alpha,
@@ -2242,10 +2305,13 @@ def build_registry(exchange: bool = False) -> List[AnchorGroup]:
             source="experiments/anchor_prototype.py (owns the measured "
                    "constants, each traced to its PMID) driving the unmodified "
                    "molecular pipeline descriptors.from_smiles -> "
-                   "compile_drug.build_profile; the cell-term-on arm calls "
-                   "molecular/ecm_mesh.py::cell_exclusion, which is merged but "
-                   "DEFAULT-OFF and scores nothing",
-            report="results/external_anchor_survey.md sec. 2.1 + 3, "
+                   "compile_drug.build_profile, which since "
+                   "results/two_route_promotion.md APPLIES the two-route cell "
+                   "term -- so the verdicts are the cell-term-ON numbers. The "
+                   "pre-promotion arm (two_route=False) and the "
+                   "impermeable-cell arms are computed live and score nothing",
+            report="results/two_route_promotion.md, "
+                   "results/external_anchor_survey.md sec. 2.1 + 3, "
                    "results/cellular_exclusion.md, "
                    "results/anchor_registration.md",
             runner=_run_mcl_transport_coefficients, est="~10 s",

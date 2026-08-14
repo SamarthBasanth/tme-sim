@@ -40,23 +40,25 @@ being safe to hand to a user directly:
                           logP is also the widest-reaching estimate on the list:
                           it feeds free fraction, tissue binding, clearance,
                           membrane permeability AND BBB penetrance.
-   diffusivity            PREDICTED from MW ALONE -- and MEASURED AGAINST DATA,
-                          AND FALSIFIED. The chain is ``r = 0.066*MW^(1/3)`` ->
-                          Stokes-Einstein -> Brownian hindrance; logP, shape,
-                          charge and H-bonding never enter it. Two isomers of
-                          equal mass get equal diffusivity by construction.
-                          ``results/diffusivity_falsification.md`` tested that
-                          against 71 compounds measured in HT29 multicellular
-                          layers (Pruijn et al. 2008): the measurement spans
-                          29.7x, the engine spans 2.4x, and they correlate at
-                          R^2 = 0.028. At MATCHED molecular weight the engine is
-                          flat by construction (1.00x) where the measurement
-                          moves 3.7x (n=4 at 263 Da) and 3.8x (n=4 at 305 Da).
-                          This is not a caveat about precision. It is a
-                          measured refutation of the only molecular input this
-                          field has, and a user's series is exactly the case it
-                          bites: compounds of similar mass that this model
-                          cannot separate.
+   diffusivity            PREDICTED, and MEASURED AGAINST DATA. The chain is
+                          ``r = 0.066*MW^(1/3)`` -> Stokes-Einstein -> Brownian
+                          hindrance -> a two-route cell term that consumes logP
+                          and hydrogen-bond donor count through a membrane
+                          permeability. The MW-ONLY version of this chain was
+                          scored against 71 compounds measured in HT29
+                          multicellular layers (Pruijn et al. 2008) and
+                          REFUTED: R^2 = 0.022, flat by construction at matched
+                          mass where the measurement moves 3.7-3.8x
+                          (``results/diffusivity_falsification.md``). The
+                          shipping chain scores R^2 = 0.718 on the same 71
+                          compounds, blind and unfitted, and orders 24 of 31
+                          exact-mass pairs correctly against the old model's
+                          0 of 31 (``results/two_route_promotion.md``).
+                          WHAT IS STILL NOT TRUE: it reproduces 8.3x of a
+                          measured 29.7x spread -- about 24 % -- so a similar-
+                          mass series is separated WEAKLY rather than not at
+                          all, the whole test is ONE cell line, and no absolute
+                          number here is defensible.
    binding / clearance    ASSUMED. Structure heuristics, then OVERWRITTEN by the
                           single global constant ``alpha`` fitted on
                           doxorubicin's penetration anchor. The fit is one drug.
@@ -192,19 +194,25 @@ CANNOT_CONCLUDE: Tuple[str, ...] = (
     "Its ABSOLUTE AUC or exposure. The transvascular delivery law and the single "
     "alpha calibration set the level; both are project-wide choices fitted on one "
     "drug (doxorubicin), not on yours.",
-    "Its ABSOLUTE penetration depth in um. The hindrance law is still short of "
-    "measurement: results/cellular_exclusion.md reaches 6.6x of a measured 12x "
-    "hindrance, leaving a 1.8x gap that no compound in this repo closes.",
-    "A TRANSPORT RANKING OF ANALOGUES OF SIMILAR MOLECULAR WEIGHT. This is not a "
-    "caution, it is a measured refutation: against 71 compounds in HT29 "
-    "multicellular layers (Pruijn et al. 2008; "
-    "results/diffusivity_falsification.md) the measured tissue diffusivity spans "
-    "29.7x, this engine spans 2.4x, and they correlate at R^2 = 0.028. At matched "
-    "MW the engine is flat by construction (1.00x) where the measurement moves "
-    "3.7-3.8x. Molecular weight is the ONLY molecular input to diffusivity here, "
-    "and it explains 2.8% of the measured variance. A congeneric series -- the "
-    "usual shape of a real compound series -- is precisely the case this model "
-    "has been shown not to resolve.",
+    "Its ABSOLUTE penetration depth in um. The DIMENSIONLESS hindrance factor "
+    "now lands inside its measured band (10.3-fold shipping, against a measured "
+    "12-fold in a V79-171b multicellular layer, PMID 9806526) -- but the "
+    "ABSOLUTE diffusivity does not: tirapazamine compiles to 49.3 um^2/s against "
+    "a measured 74-130 um^2/s, i.e. 1.5x too LOW, having previously been 2.2x "
+    "too high. The two anchors disagree about where the engine sits and that is "
+    "unresolved (results/two_route_promotion.md).",
+    "A TRANSPORT RANKING OF ANALOGUES OF SIMILAR MOLECULAR WEIGHT, AS AN "
+    "ABSOLUTE OR A FINE-GRAINED ONE. The MW-only model this engine used to ship "
+    "could not resolve such a series AT ALL -- flat by construction at matched "
+    "mass, R^2 = 0.022 against 71 compounds in HT29 multicellular layers "
+    "(Pruijn et al. 2008; results/diffusivity_falsification.md). The shipping "
+    "two-route model does resolve it, at R^2 = 0.718 blind on those same 71 "
+    "compounds with 24 of 31 exact-mass pairs ordered correctly "
+    "(results/two_route_promotion.md). But it reproduces 8.3x of a measured "
+    "29.7x spread -- roughly a QUARTER -- so it under-separates a congeneric "
+    "series systematically, and it has been tested against exactly ONE cell "
+    "line. Read the ORDER over a mass-matched series as weak evidence, not as a "
+    "measurement, and read no absolute diffusivity from it at all.",
     "Anything about a stereoisomer, a salt form, a prodrug or a formulation. "
     "Crippen logP is stereochemistry-blind and there is no metabolism step, so an "
     "enantiomer pair compiles to bit-identical parameters and a prodrug compiles "
@@ -628,25 +636,32 @@ def _fields(mol: Molecule, prof: MolecularProfile, dp: DrugParams,
             "key": "diffusivity", "label": "Tissue diffusivity (engine input)",
             "unit": "um^2/s", "value": _f(dp.diffusivity),
             "kind": "assumed", "is_prediction": True,
-            "method": "FALSIFIED AGAINST MEASUREMENT -- read this before you "
-                      "rank on it. Free diffusivity x 2D Brownian-dynamics "
-                      "micro-tortuosity x an Ogston-Renkin ECM fibre-mesh size "
-                      "gate: a prediction FROM MW ALONE end to end. Tested "
+            "method": "MEASURED AGAINST DATA, PARTLY SUPPORTED -- read this "
+                      "before you rank on it. Free diffusivity x 2D "
+                      "Brownian-dynamics micro-tortuosity x an Ogston-Renkin "
+                      "ECM fibre-mesh size gate x a two-route cell term "
+                      "(paracellular between cells + transcellular through "
+                      "membranes, Hasselman & Johnson 1987), which is what "
+                      "brings your compound's logP and hydrogen-bond donor "
+                      "count into its diffusivity. Scored BLIND and UNFITTED "
                       "against 71 compounds measured in HT29 multicellular "
-                      "layers (Pruijn et al. 2008; "
-                      "results/diffusivity_falsification.md), the measurement "
-                      "spans 29.7x, this engine spans 2.4x, and they correlate "
-                      "at R^2 = 0.028 -- MW explains 2.8% of the variance. At "
-                      "MATCHED molecular weight the engine is FLAT BY "
-                      "CONSTRUCTION (1.00x) where the measurement moves 3.7x "
-                      "(n=4 at 263 Da) and 3.8x (n=4 at 305 Da). If your series "
-                      "is a set of analogues of similar mass -- the usual case "
-                      "-- this model cannot separate them, and a ranking it "
-                      "produces on transport is not supported by the one dataset "
-                      "that has tested it. The hindrance law is separately short "
-                      "of measurement: results/cellular_exclusion.md reaches "
-                      "6.6x of a measured 12-fold hindrance, a residual 1.8x "
-                      "gap.",
+                      "layers (Pruijn et al. 2008): R^2 = 0.718, Spearman "
+                      "+0.821, 99% within 3x of measurement, geometric bias "
+                      "1.03x, and 24 of 31 exact-mass pairs ordered correctly. "
+                      "The MW-only model this replaced scored R^2 = 0.022 and "
+                      "ordered 0 of 31 (results/diffusivity_falsification.md, "
+                      "results/two_route_promotion.md). WHAT IS STILL NOT TRUE, "
+                      "and it is the part that matters for a congeneric series: "
+                      "the model reproduces 8.3x of a measured 29.7x spread, "
+                      "i.e. about a QUARTER, so it UNDER-SEPARATES similar-mass "
+                      "analogues systematically rather than separating them "
+                      "correctly; the entire test is ONE cell line; and the "
+                      "absolute value here is not defensible -- the same drug's "
+                      "compiled D_eff misses the measured multicellular-layer "
+                      "band (74-130 um^2/s for tirapazamine) by 1.5x on the low "
+                      "side. The dimensionless hindrance factor, by contrast, "
+                      "now lands INSIDE its measured band (10.3-fold against a "
+                      "measured 12-fold, results/cellular_exclusion.md).",
         },
         {
             "key": "bbb_penetrance", "label": "BBB penetrance", "unit": "frac",
@@ -822,16 +837,18 @@ def compile_user_compound(
     # that, so the caveat is written to trip that rule rather than to read
     # gently.
     caveats.append(
-        "TRANSPORT RANKING IS FALSIFIED FOR SIMILAR-MASS ANALOGUES and MUST NOT "
-        "be used to order a congeneric series. Diffusivity here is a function of "
-        "molecular weight alone. Against 71 compounds measured in HT29 "
-        "multicellular layers (Pruijn et al. 2008, "
-        "results/diffusivity_falsification.md) the measurement spans 29.7x, this "
-        "engine spans 2.4x, and they correlate at R^2 = 0.028; at matched "
-        "molecular weight the engine is flat by construction (1.00x) where the "
-        "measurement moves 3.7-3.8x. If your compounds are analogues of similar "
-        "mass, this model cannot separate them on transport and any ordering it "
-        "reports on that axis is unsupported."
+        "TRANSPORT RANKING OVER SIMILAR-MASS ANALOGUES IS WEAK EVIDENCE, NOT A "
+        "MEASUREMENT. Diffusivity here consumes molecular weight, logP and "
+        "hydrogen-bond donor count through a two-route cell term. Scored blind "
+        "against 71 compounds measured in HT29 multicellular layers (Pruijn et "
+        "al. 2008, results/two_route_promotion.md) it reaches R^2 = 0.718 and "
+        "orders 24 of 31 exact-mass pairs correctly -- against R^2 = 0.022 and "
+        "0 of 31 for the molecular-weight-only model this replaced "
+        "(results/diffusivity_falsification.md). It nonetheless reproduces only "
+        "8.3x of the measured 29.7x spread, so it under-separates such a series "
+        "systematically, and it has been tested in ONE cell line. Treat the "
+        "order as a hypothesis to test, and do not quote the absolute "
+        "diffusivity at all."
     )
     caveats.append(
         "logP here is an RDKit Crippen PREDICTION, not a measurement -- as it is "

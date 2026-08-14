@@ -204,28 +204,59 @@ def _ols(xs, ys):
 
 
 def _verify_mw_only_path() -> None:
-    """Prove D_eff is a pure function of MW before trusting the MW-only compile."""
+    """Two checks, and since results/two_route_promotion.md they point OPPOSITE ways.
+
+    1. `two_route=False` -- the model this file falsified -- must STILL be a pure
+       function of molecular weight, or the falsification below is not scoring the
+       thing it claims to score.
+    2. The SHIPPING model (`two_route` on by default) must NOT be, because the
+       whole point of the promotion was to make logP and hydrogen-bond donor count
+       reach `D_eff`. A shipping engine that still agrees with the MW-only compile
+       would mean the wiring is dead, and this check would catch that.
+    """
     tpz_smiles = "C1=CC=C2C(=C1)[N+](=NC(=[N+]2[O-])N)[O-]"
-    from_smiles = compile_drug.build_profile(
-        descriptors.from_smiles("tirapazamine", tpz_smiles)
-    )
-    mw_only = compile_drug.build_profile(
-        Molecule(name="tpz_mw_only", smiles="", descriptors={"mw": 178.151})
-    )
-    a, b = from_smiles.effective_diffusivity, mw_only.effective_diffusivity
+    tpz = descriptors.from_smiles("tirapazamine", tpz_smiles)
+    mw_mol = Molecule(name="tpz_mw_only", smiles="", descriptors={"mw": 178.151})
+
+    a = compile_drug.build_profile(tpz, two_route=False).effective_diffusivity
+    b = compile_drug.build_profile(mw_mol, two_route=False).effective_diffusivity
     rel = abs(a - b) / a
-    print("PRE-FLIGHT: is D_eff a pure function of MW?")
+    print("PRE-FLIGHT 1: is the FALSIFIED model still a pure function of MW?")
     print(f"  tirapazamine via descriptors.from_smiles(SMILES) : D_eff = {a:.4f} um^2/s")
     print(f"  tirapazamine via Molecule(mw=178.151) only       : D_eff = {b:.4f} um^2/s")
     print(f"  relative difference                              : {rel:.2%}")
-    print(f"  -> logP / HBD / HBA / TPSA / charge are computed but DO NOT reach D_eff."
-          f" {'CONFIRMED' if rel < 1e-3 else 'NOT CONFIRMED'}\n")
+    print(f"  -> logP / HBD / HBA / TPSA / charge are computed but DO NOT reach it."
+          f" {'CONFIRMED' if rel < 1e-3 else 'NOT CONFIRMED'}")
+    assert rel < 1e-3, "the two_route=False path is no longer MW-only"
+
+    c = compile_drug.build_profile(tpz).effective_diffusivity
+    d = compile_drug.build_profile(mw_mol).effective_diffusivity
+    rel2 = abs(c - d) / c
+    print("\nPRE-FLIGHT 2: does the SHIPPING model now use more than MW?")
+    print(f"  tirapazamine, shipping (two-route ON)            : D_eff = {c:.4f} um^2/s")
+    print(f"  same MW with no logP and no donors               : D_eff = {d:.4f} um^2/s")
+    print(f"  relative difference                              : {rel2:.2%}")
+    print(f"  -> descriptors DO reach D_eff."
+          f" {'CONFIRMED' if rel2 > 1e-3 else 'NOT CONFIRMED -- THE WIRING IS DEAD'}\n")
+    assert rel2 > 1e-3, (
+        "the shipping compile is still MW-only: two_route is not wired in")
 
 
 def compile_engine_deff(mw: float) -> float:
-    """Compile one molecular weight through the UNMODIFIED pipeline -> D_eff."""
+    """Compile one molecular weight through the FALSIFIED MW-only pipeline -> D_eff.
+
+    `two_route=False` is load-bearing. This file's whole subject is the model in
+    which molecular weight is the only solute input, and since
+    results/two_route_promotion.md that is no longer what `build_profile`
+    returns by default. Asking for it explicitly is what keeps every number in
+    results/diffusivity_falsification.md reproducible; it is NOT a way of
+    exempting the shipping engine from the test. The shipping engine's own blind
+    score against this same dataset is R^2 = 0.718 and is reported in
+    results/two_route_promotion.md.
+    """
     return compile_drug.build_profile(
-        Molecule(name=f"mw{mw}", smiles="", descriptors={"mw": float(mw)})
+        Molecule(name=f"mw{mw}", smiles="", descriptors={"mw": float(mw)}),
+        two_route=False,
     ).effective_diffusivity
 
 

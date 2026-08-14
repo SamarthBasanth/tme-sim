@@ -31,8 +31,11 @@ and cannot produce compound-to-compound spread. `tissue_hindrance_two_route`
 (below) removes that restriction by giving the cells a finite membrane
 permeability computed from `logp` and hydrogen-bond donors -- the TRANSCELLULAR
 route -- via `two_route.py`. It reduces to `cell_exclusion` exactly at zero
-permeability, and it is ADDITIVE and DEFAULT-OFF: nothing in `compile_drug.py`
-calls it. See `results/two_route_transport.md`.
+permeability. Since `results/two_route_promotion.md` the two-route LAW is the
+shipping transport model, applied by `compile_drug.build_profile` directly
+through `two_route.two_route_diffusivity`; the convenience wrapper below is not
+on that path and remains additive. `cell_exclusion` and `tissue_hindrance` are
+untouched. See `results/two_route_promotion.md`.
 
 Units: length nm (mesh scale), time s, diffusivity um^2/s (tissue convention;
 1 um^2 = 1e6 nm^2). Deterministic given `seed`. No external dependencies beyond
@@ -387,15 +390,21 @@ def tissue_hindrance_two_route(
 
     Wires `two_route.two_route_diffusivity` in alongside `cell_exclusion`, which
     it strictly generalises: at zero membrane permeability the two functions
-    return the same number to machine precision. This is ADDITIVE and DEFAULT-OFF
-    -- `tissue_hindrance` is untouched, nothing in `compile_drug.py` calls this,
-    and no `DrugParams.diffusivity` moves by a bit because of it.
+    return the same number to machine precision.
+
+    THIS WRAPPER IS ADDITIVE AND IS NOT THE SHIPPING PATH. The two-route LAW is
+    the shipping transport model since `results/two_route_promotion.md`, but
+    `compile_drug.build_profile` calls `two_route.two_route_diffusivity`
+    directly, with the interstitial conductivity it has already computed from a
+    Brownian sim. This function recomputes that leg analytically from
+    Ogston-Renkin alone, so it is a convenience for analysis and its result is
+    NOT bit-identical to a compile. `tissue_hindrance` is untouched.
 
     `cell_exclusion` cannot distinguish two drugs of the same size, and
     `results/diffusivity_falsification.md` measured that as the model's decisive
     failure. The transcellular route is the missing physics: it consumes `logp`
-    and `hbd`, which `descriptors.compute_descriptors` already computes and which
-    the diffusivity chain currently discards. See `two_route` for the law, its
+    and `hbd`, which `descriptors.compute_descriptors` computes and which the
+    diffusivity chain used to discard. See `two_route` for the law, its
     citation (Hasselman & Johnson 1987) and its limits.
 
     ``free_D_um2s`` is the solute's FREE diffusivity, needed only to convert the

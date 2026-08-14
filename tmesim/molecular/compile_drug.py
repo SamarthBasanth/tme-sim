@@ -7,6 +7,7 @@ outputs the contract asks for:
   molecular structure
       -> Stokes-Einstein free diffusivity          (stokes_einstein.py)
       -> Brownian-dynamics hindrance in crowded ECM (brownian.py)
+      -> two-route cell term: paracellular + transcellular (two_route.py)
       -> passive permeability + BBB penetrance      (permeability.py)
       -> plasma/tissue binding + clearance          (binding.py)
       => MolecularProfile  (rich, with provenance)
@@ -20,6 +21,16 @@ is the weakest link and is treated as an INPUT or a clearly-flagged low-confiden
 default. Every quantity in the profile carries a provenance string (method +
 confidence) so each number can be defended.
 
+Honesty line on DIFFUSIVITY specifically, because it changed and the change is
+consequential. Until `results/two_route_promotion.md` this module's `D_eff` took
+MOLECULAR WEIGHT as its only solute input; that model was scored blind against 71
+compounds and FALSIFIED (R^2 = 0.022, flat by construction at matched MW). The
+two-route cell term is now ON by default and reaches R^2 = 0.718 on the same 71
+compounds, blind and unfitted. It is a large improvement and it is NOT a fix: it
+reproduces ~24 % of the measured spread, it has been tested against ONE cell
+line, and no absolute number out of this module became defensible because of it.
+Pass `two_route=False` to `build_profile` to recover the old value exactly.
+
 Units: length um (nm where noted), time s, diffusivity um^2/s, concentration uM,
 temperature K.
 """
@@ -31,6 +42,7 @@ from ..core import DrugParams
 from . import binding, permeability, stokes_einstein
 from . import brownian
 from . import ecm_mesh, potency
+from . import two_route as _two_route
 from .types import Molecule, MolecularProfile
 
 # ---------------------------------------------------------------------------
@@ -54,6 +66,29 @@ _DEFAULT_IC50_UM = 25.0
 # Default Hill coefficient handed to DrugParams (matches the engine's TMZ-like row).
 _DEFAULT_HILL = 1.2
 
+# ---------------------------------------------------------------------------
+# TWO-ROUTE TISSUE TRANSPORT -- ON by default since results/two_route_promotion.md.
+#
+# `results/diffusivity_falsification.md` measured that the diffusivity this
+# module produced was a function of MOLECULAR WEIGHT and ECM fraction only: it
+# reproduced 7.9 % of a 29.7-fold measured spread across 71 compounds at
+# R^2 = 0.022, and was flat BY CONSTRUCTION at matched molecular weight where the
+# measurement moves 3.7-3.8x. `molecular.two_route` supplies the missing physics
+# -- cells as PERMEABLE inclusions, so `logp` and `hbd` (computed here and
+# previously discarded) reach the transport calculation through a membrane
+# permeability rather than through a regression. Scored blind against the same 71
+# compounds it reaches R^2 = 0.718.
+#
+# Setting this False recovers the pre-promotion interstitial value EXACTLY, and
+# `MolecularProfile.interstitial_diffusivity` always carries it regardless. Every
+# experiment that reports a "shipping engine" baseline against the two-route
+# model passes `two_route=False` to get it.
+#
+# WHAT THIS IS NOT. R^2 = 0.718 is 24 % of the measured spread, not 100 %; the
+# test is one cell line; and no absolute number this engine produces became
+# trustworthy because of it. See results/two_route_promotion.md section 8.
+_TWO_ROUTE_DEFAULT = True
+
 
 def build_profile(
     molecule: Molecule,
@@ -61,6 +96,8 @@ def build_profile(
     ic50: Optional[float] = None,
     temperature_K: float = 310.0,
     brownian_kw: Optional[dict] = None,
+    two_route: bool = _TWO_ROUTE_DEFAULT,
+    two_route_kw: Optional[dict] = None,
 ) -> MolecularProfile:
     """Run the full molecular pipeline for one drug in one ECM context.
 
@@ -136,7 +173,31 @@ def build_profile(
     # size differences (esp. small molecule vs antibody) show up mechanistically.
     mesh = ecm_mesh.ogston_renkin_hindrance(radius_nm)
     mesh_h = float(mesh["effective_hindrance"])
-    effective_D = micro_D * mesh_h
+    interstitial_D = micro_D * mesh_h
+
+    # --- 3c. TWO-ROUTE cell term: paracellular + transcellular --------------
+    # `interstitial_D` is the ECM-hindered diffusivity BETWEEN cells. The tissue
+    # a drug actually crosses is that interstitium with ~79 % of its volume
+    # occupied by cells, which the previous model did not represent at all.
+    # `two_route` treats them as PERMEABLE inclusions (Maxwell 1873 generalised
+    # by Hasselman & Johnson 1987 to a finite interfacial conductance), with the
+    # membrane permeability computed from `logp` and `hbd`. At zero membrane
+    # permeability it reduces to `ecm_mesh.cell_exclusion` to 1e-15, so it is a
+    # strict generalisation of the impermeable-cell law and can only ever make a
+    # compound faster than paracellular-only, never slower.
+    two_route_out = None
+    if two_route:
+        two_route_out = _two_route.two_route_diffusivity(
+            interstitial_D,
+            radius_nm,
+            float(descriptors.get("logp", 0.0) or 0.0),
+            float(descriptors.get("hbd", 0) or 0),
+            temperature_K=temperature_K,
+            **(two_route_kw or {}),
+        )
+        effective_D = interstitial_D * float(two_route_out["hindrance"])
+    else:
+        effective_D = interstitial_D
     hindrance = effective_D / free_D if free_D > 0 else 0.0
 
     # --- 4. coarse hindrance curve (reduced cost) ---
@@ -187,12 +248,30 @@ def build_profile(
             f"micro-tortuosity from 2D Brownian dynamics at phi={ecm_reference} "
             f"(brownian, fit_r2={sim.get('fit_r2', float('nan')):.4f}, "
             f"D={micro_D:.1f}) x nm-scale ECM fiber-matrix size gate "
-            f"(ecm_mesh.ogston_renkin_hindrance, mesh_h={mesh_h:.3f}); confidence: "
-            "medium (genuine particle sim + Ogston-Renkin fiber theory; ECM "
-            "geometry is a stylized proxy)"
+            f"(ecm_mesh.ogston_renkin_hindrance, mesh_h={mesh_h:.3f})"
+            + ((
+                f" x TWO-ROUTE cell term (two_route.two_route_diffusivity, "
+                f"phi_cell={two_route_out['cell_volume_fraction']:.4f}, "
+                f"P_mem={two_route_out['membrane_permeability_um_s']:.3g} um/s, "
+                f"factor={two_route_out['hindrance']:.4f}, transcellular gain "
+                f"{two_route_out['transcellular_gain']:.3f}x); confidence: medium "
+                "-- effective-medium law with a primary citation (Hasselman & "
+                "Johnson 1987), scored BLIND against 71 measured compounds at "
+                "R^2 = 0.718 (results/two_route_promotion.md), but reproducing "
+                "only ~24 % of the measured spread and tested on ONE cell line. "
+                "NOT defensible as an absolute number."
+            ) if two_route_out is not None else (
+                "; TWO-ROUTE CELL TERM IS OFF -- this is the pre-promotion "
+                "MOLECULAR-WEIGHT-ONLY value, which "
+                "results/diffusivity_falsification.md measured at R^2 = 0.022 "
+                "against 71 compounds and which is flat by construction at "
+                "matched MW; confidence: FALSIFIED"
+            ))
         ),
         "hindrance": (
-            "effective_D/free_D from the Brownian sim; confidence: medium"
+            "effective_D/free_D: Brownian sim x Ogston-Renkin mesh gate"
+            + (" x two-route cell term" if two_route_out is not None else "")
+            + "; confidence: medium"
         ),
         "hindrance_curve": (
             f"brownian.hindrance_vs_ecm at phi={_CURVE_FRACTIONS} "
@@ -237,6 +316,8 @@ def build_profile(
         ecm_reference=ecm_reference,
         hindrance_curve=hindrance_curve,
         provenance=provenance,
+        interstitial_diffusivity=interstitial_D,
+        two_route=two_route_out,
     )
 
 

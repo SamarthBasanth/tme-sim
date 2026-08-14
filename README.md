@@ -23,31 +23,36 @@ sentence are documented below, with a pointer to the measurement behind each.
 
 > ### Read this before you rank a compound series
 >
-> The shipped transport model derives a compound's tissue diffusivity from
-> **molecular weight alone**, and that model is **FALSIFIED**. Scored blind
-> against 71 compounds measured by one method in one cell line
-> (Pruijn 2008, doi:10.1071/CH08240), the measurement spans **29.7×** where the
-> engine spans **2.4×**, at **R² = 0.028**. At *identical* molecular weight the
-> engine is flat **by construction — exactly 1.00×** — where the measurement
-> spans **3.7×** (four compounds at 263 Da) and **3.8×** (four at 305 Da).
+> The shipped transport model derives a compound's tissue diffusivity from its
+> **molecular weight, its logP and its hydrogen-bond donor count**, through a
+> two-route law — paracellular between cells, transcellular through their
+> membranes. Scored **blind and unfitted** against 71 compounds measured by one
+> method in one cell line (Pruijn 2008, doi:10.1071/CH08240) it reaches
+> **R² = 0.718, Spearman +0.821**, with **99 %** of compounds within 3× of
+> measurement, a geometric bias of **1.03×**, and **24 of 31** exact-mass pairs
+> ordered correctly.
 >
-> **So: a series of similar-mass analogues is the one comparison this product is
-> measured to get wrong.** Vivum cannot separate such compounds on transport, and
-> a ranking over them is carrying no transport information — only potency.
-> Ranking compounds that differ substantially in mass *and* in the properties
-> below is the supported case.
+> **That is a change of claim, and the previous one is worth stating because it
+> was worse.** Until 2026-08-13 diffusivity was a function of **molecular weight
+> alone** and that model was **FALSIFIED**: R² = 0.022 on those same compounds,
+> and flat **by construction — exactly 1.00×** — at identical molecular weight
+> where the measurement spans **3.7×** (four compounds at 263 Da) and **3.8×**
+> (four at 305 Da), so it ordered **0 of 31** mass-matched pairs.
 > → [`results/diffusivity_falsification.md`](results/diffusivity_falsification.md)
 >
-> This is not unfixed for want of physics. A two-route model (paracellular +
-> transcellular, from the hydrogen-bond-donor and logP₇.₄ terms the engine
-> currently computes and discards) reaches **R² = 0.725, Spearman +0.842**, blind
-> and unfitted, on those same 71 compounds, and orders 24 of 31 exact-MW pairs
-> correctly against the MW-only model's 0 of 31. It is **merged, wired into
-> nothing, and default-OFF**: `DrugParams.diffusivity` is bit-identical to the
-> pre-merge value and no shipped code path calls it, so **nothing you can run
-> today benefits from it**. The recommendation of its own write-up is *"MERGE the
-> physics, do NOT flip the default"* — flipping it is a re-validation exercise.
-> → [`results/two_route_transport.md`](results/two_route_transport.md)
+> **What is still not true, and it is narrower than "fixed".** The model
+> reproduces **8.3×** of the measured **29.7×** spread — about **a quarter** — so
+> it *under-separates* a congeneric series systematically rather than separating
+> it correctly. It has been scored against exactly **one cell line**. And it
+> bought nothing for absolute numbers: the same drug's compiled `D_eff` misses
+> its measured multicellular-layer band by 1.5× (49.3 µm²/s against a measured
+> 74–130), having previously missed it by 2.2× in the other direction.
+>
+> **So: read the order over a similar-mass series as a hypothesis worth testing,
+> not as a measurement.** Ranking compounds that differ substantially in mass
+> *and* in the properties below remains the best-supported case, and no absolute
+> transport number is defensible in either.
+> → [`results/two_route_promotion.md`](results/two_route_promotion.md)
 
 > ### What Vivum does not do
 >
@@ -314,8 +319,9 @@ measurement. These are listed so nobody has to rediscover them.
 | IFP, GBM | 0.462 mmHg | 2.0 ± 2.5 mmHg | 4.3× low, but registered **NOT TESTABLE** — a model outputting zero would pass | [`ifp_validation.md`](results/ifp_validation.md) §4.1 |
 | Oxygen `supply` constant | 0.05 | ≈194–251 s⁻¹ (PMID 31423930) | **~4,570× low** on GBM (2,160× on breast), partly cancelled by a consumption sink **112–166× low** | [`oxygen_supply_calibration.md`](results/oxygen_supply_calibration.md) §3.3, §5 |
 | Effective diffusivity, multicellular layer | 287.3 µm²/s | 74–130 µm²/s | FAIL | [`anchor_registration.md`](results/anchor_registration.md) §1 |
-| **Tissue diffusivity `D_eff` as a *law*, 71 compounds** | 2.4× spread, R² = 0.028 | 29.7× spread (Pruijn 2008, doi:10.1071/CH08240) | **FALSIFIED** — and exactly **1.00×** at identical MW where measurement gives **3.7×**/**3.8×**. This is the row that bears on ranking a compound series | [`diffusivity_falsification.md`](results/diffusivity_falsification.md) |
-| Hindrance `D_free/D_eff` | 1.77× → **6.61×** after a cellular-exclusion correction | 12× (PMID 9806526) | **1.8× short** even after the correction | [`cellular_exclusion.md`](results/cellular_exclusion.md) §4.1 |
+| **Tissue diffusivity `D_eff` as a *law*, 71 compounds** | 8.3× spread, **R² = 0.718** as shipped (was 2.4×, R² = 0.022) | 29.7× spread (Pruijn 2008, doi:10.1071/CH08240) | **PARTIALLY SUPPORTED** — blind and unfitted, 99 % within 3×, and **24 of 31** exact-mass pairs ordered correctly against the superseded model's **0 of 31**. Still only ~**24 %** of the measured spread, and ONE cell line. This is the row that bears on ranking a compound series | [`two_route_promotion.md`](results/two_route_promotion.md) |
+| Hindrance `D_free/D_eff` | 1.77× (superseded) → **10.33×** as shipped | 12× (PMID 9806526) | **PASS** — inside the band, 0.86× the measured value. The one external transport anchor the two-route promotion moved from FAIL to PASS | [`two_route_promotion.md`](results/two_route_promotion.md) |
+| Effective diffusivity, tirapazamine | 287.3 (superseded) → **49.3 µm²/s** as shipped | 74–130 µm²/s (PMID 9806526, 17869669) | **FAIL, direction flipped** — was 2.21× above the band, now 1.50× below it | [`two_route_promotion.md`](results/two_route_promotion.md) |
 | Breast Kp, 5-fluorouracil | 7.7956 | 0.61 ± 0.11 (PMID 9205062) | **12.8× high** | [`breast_kp_validation.md`](results/breast_kp_validation.md) |
 | Breast Kp, methotrexate | 0.0571 | 0.60 ± 0.20 (PMID 9679959) | **10.5× low** — opposite direction | [`breast_kp_validation.md`](results/breast_kp_validation.md) |
 | Vascular area fraction, held-out patient | 10.982 % | 4.70 ± 2.38 % (PMID 27583442) | **2.34×** — but see below | [`vascular_segmentation_audit.md`](results/vascular_segmentation_audit.md) §2.3 |
@@ -388,11 +394,11 @@ Vivum is a research instrument whose defensible output is the **relative
 comparison of compounds on one tissue section**, with essentially **no external
 validation of the transport physics itself**. The narrow claim has been attacked
 from several directions and held — with one measured exception that a user must
-know before running anything: **the diffusivity law is falsified, so a ranking
-over similar-mass analogues carries no transport information** (see the box at
-the top of this page). The broad claim — that the transport physics is validated,
-or that any absolute number it produces is trustworthy — has been tested and is
-false.
+know before running anything: **the diffusivity law reproduces about a quarter
+of the measured compound-to-compound spread, so a ranking over similar-mass
+analogues is weak evidence rather than a measurement** (see the box at the top of
+this page). The broad claim — that the transport physics is validated, or that
+any absolute number it produces is trustworthy — has been tested and is false.
 
 The sharpest available statement of that gap is
 [`results/external_anchor_survey.md`](results/external_anchor_survey.md) §5, and
@@ -413,11 +419,13 @@ are separate, and the checking modules are allowed to fail loudly. Every
 retraction on this page was found that way, not by the test suite, which was green
 throughout.
 
-**What would most improve this, in order:** (0) resolve the falsified
-diffusivity law — the physics that fixes it is already merged and measured
-(R² 0.028 → 0.725, blind), so this is a re-validation exercise and not a
-research one, and it is the only item on this list that changes what a *ranking*
-means; (1) a **second section of the same tumour type** —
+**What would most improve this, in order:** (0) score the transport law against
+a **second cell line** — the two-route promotion (R² 0.022 → 0.718, blind) rests
+on Pruijn's HT-29 measurements alone, and Pruijn's own paper reports its
+asymptote coefficients moving up to 100-fold across SiHa, HCT8-Ea and HCT8-Ra, so
+this is the cheapest unbought evidence in the project and the only item on this
+list that changes what a *ranking* means; (1) a **second section of the same
+tumour type** —
 almost every defensible claim above is *n* = 1 in tissue, and this is the cheapest
 large improvement available; (2) any external anchor that scores the solver on the
 strength of a solve **and passes** — there are three such anchors and all three

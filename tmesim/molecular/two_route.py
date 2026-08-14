@@ -18,14 +18,26 @@ measurement still moves 3.7-fold while the engine is flat.
 The authors of that dataset state the mechanism themselves: hydrophilic
 compounds are confined to the PARACELLULAR route between cells, while lipophilic
 ones additionally access the TRANSCELLULAR route through cell membranes. The
-engine has no membrane, so it has no transcellular route at all -- and whether a
+engine HAD no membrane, so it had no transcellular route at all -- and whether a
 molecule can cross a bilayer is exactly what `logP` and hydrogen-bond donor count
-predict. Both are computed by `descriptors.compute_descriptors` today and both
-are discarded before the diffusivity calculation.
+predict. Both were computed by `descriptors.compute_descriptors` and both were
+discarded before the diffusivity calculation. They no longer are; see below.
 
-This module adds the missing route. It is ADDITIVE and DEFAULT-OFF: nothing in
-`compile_drug.py` calls it, so `DrugParams.diffusivity` and every frozen
-`DRUG_LIBRARY` snapshot are bit-identical with this file present.
+This module adds the missing route. **It is now the SHIPPING transport model.**
+`compile_drug.build_profile` calls it on every compile (`two_route=True` by
+default), so `DrugParams.diffusivity` is the two-route value and the perivascular
+calibration constant `alpha` has been re-solved against the same measured
+doxorubicin anchor. The decision, the evidence it rests on and the complete
+before/after of every published number are in `results/two_route_promotion.md`.
+Pass `two_route=False` to `build_profile` to recover the historical MW-only
+interstitial value exactly; every experiment that reports a "shipping engine"
+baseline against this model does so.
+
+WHAT THE PROMOTION DOES NOT LICENSE. R^2 = 0.718 against 71 compounds, blind and
+unfitted, is a large improvement on 0.022 and is still only 24 % of the measured
+spread. The model reproduces neither the magnitude of the measured range nor any
+absolute number, and it has been scored against exactly ONE cell line. See
+`results/two_route_promotion.md` section 8.
 
 THE PHYSICS
 -----------
@@ -92,10 +104,15 @@ from typing import Dict, Optional
 # --------------------------------------------------------------------------- #
 # Constants. Every one is either derived from the repo's own data, adopted
 # unchanged from a module already in the package, or taken from a primary source
-# quoted verbatim. The single exception is HBD_LOGP_DECREMENT, which is labelled
-# a CONVENTION and has no source for its magnitude. See results/sweep/
-# tworoute_prereg.json, which freezes all of these before any scoring, and
-# results/two_route_transport.md.
+# quoted verbatim. HBD_LOGP_DECREMENT was the single exception -- a declared
+# convention with no source for its magnitude -- and is no longer: it is now
+# derived in one line from two open-access Abraham LSER coefficient sets, and the
+# original convention is preserved beside it as
+# HBD_LOGP_DECREMENT_PREREGISTERED. See results/sweep/tworoute_prereg.json (the
+# ORIGINAL pre-registration, frozen before any scoring and never edited),
+# results/sweep/tworoute_promotion_prereg.json (the EXTENSION that registers the
+# promoted value), results/two_route_transport.md, results/two_route_efflux.md
+# and results/two_route_promotion.md.
 # --------------------------------------------------------------------------- #
 
 _KB = 1.380649e-23  # Boltzmann constant, J/K (CODATA exact)
@@ -175,12 +192,66 @@ LOGK_MEMBRANE_MAX = 3.0
 #:     raised permeability with "only slight difference in the octanol-water
 #:     partition coefficient".
 #:
-#: The MAGNITUDE has no primary source this work could verify. 1.0 log unit per
-#: donor is a round number fixed before the model was ever scored (see
-#: results/sweep/tworoute_prereg.json). results/two_route_transport.md sweeps it
-#: and discloses the value that would maximise agreement with the measurement, so
-#: a reader can confirm the adopted value is not that one.
-HBD_LOGP_DECREMENT = 1.0
+#: THE MAGNITUDE IS NOW SOURCED, AND ITS DERIVATION IS ONE LINE.
+#:
+#: Abraham's LSER is  log P = c + e*E + s*S + a*A + b*B + v*V, with `A` the
+#: solute's hydrogen-bond ACIDITY (donor strength). The octanol -> alkane
+#: correction is the DIFFERENCE of two such equations, so its donor term is
+#: (a_oct - a_alk) * A:
+#:
+#:     a(water -> wet octan-1-ol) = +0.034
+#:     a(water -> hexadecane)     = -3.587
+#:     => Delta log P donor coefficient = 3.621 per unit A
+#:
+#: Both coefficients read VERBATIM from the open-access Table 1 of Abraham MH,
+#: Acree WE Jr, ACS Omega 2019;4(7):12920-12926, doi:10.1021/acsomega.8b03242
+#: (PMC6648601); cross-checked against Table 1 of J Comput Aided Mol Des 2017
+#: (PMC5579141) and the open-access Acree/Abraham compilation (hexadecane
+#: -3.587, cyclohexane -3.740, hexane -3.578, heptane -3.571).
+#:
+#: The model's input is an integer donor COUNT (`Lipinski.NumHDonors`), not `A`,
+#: so a typical `A` per donor GROUP is required. THIS IS THE ONE REMAINING
+#: MODELLING CHOICE AND IT IS STATED RATHER THAN BURIED. Measured `A` values,
+#: verified in the open-access tables of PMC5830486 and PMC3477586:
+#:
+#:     aliphatic amine 0.16 -> 0.579     benzamide NH2   0.49 -> 1.774
+#:     aniline NH2     0.26 -> 0.941     phenol OH       0.60 -> 2.173
+#:     aliphatic OH    0.37 -> 1.340     carboxylic acid 0.62 -> 2.245
+#:     benzyl alcohol  0.39 -> 1.412
+#:
+#: 1.34 is the CENTRAL aliphatic-OH value. It is NOT the value that maximises
+#: agreement with the Pruijn measurement -- 1.0 is (R^2 0.725 against 0.718) --
+#: and it was adopted anyway, because a sourced value that scores marginally
+#: worse is worth more than an unsourced one that scores best. It is BETTER on
+#: geometric bias (1.03x against 1.25x) and on within-3x coverage (99 % against
+#: 96 %). Across the entire measured range of A (0.16-0.62) R^2 stays 0.588-0.722
+#: against 0.022 for the MW-only model, so nothing here bets on the choice.
+#:
+#: DIRECTION OF BIAS, AND IT RUNS AGAINST THIS NUMBER. Hexadecane is the harshest
+#: available membrane proxy; a real bilayer's interfacial region supplies H-bond
+#: acceptors, so the donor penalty for a liposome/water partition should be
+#: SMALLER than 3.621*A. No Abraham coefficient set for a DMPC/liposome-water
+#: system could be verified. 1.34 is therefore an UPPER estimate for a bilayer.
+#:
+#: NOT USED, AND WHY. Abraham, Chadha, Whiting & Mitchell, J Pharm Sci
+#: 1994;83(8):1085-1100 (PMID 7983591) is the canonical Delta log P citation and
+#: is HARD-CLOSED (Unpaywall, OpenAlex and Semantic Scholar independently report
+#: no open-access copy). Seiler, Eur J Med Chem 1974;9:473-479 (the I_H
+#: increments) could not be retrieved in any form. Both are recorded UNVERIFIED
+#: and neither supplies a number used here.
+#:
+#: Registered in results/sweep/tworoute_promotion_prereg.json. Sweep and full
+#: derivation: results/two_route_efflux.md section 3.
+HBD_LOGP_DECREMENT = 1.34
+
+#: The ORIGINAL pre-registered convention, kept so that
+#: results/sweep/tworoute_prereg.json -- which was frozen before the model was
+#: ever scored and must never be edited -- stays checkable against live code.
+#: 1.0 log unit per donor: a round number with no primary source for its
+#: magnitude, which happened to sit at the Pruijn R^2 optimum. That coincidence
+#: is the reason it was replaced rather than kept. Do NOT use this value for new
+#: work; it is here as a historical anchor for the pre-registration check.
+HBD_LOGP_DECREMENT_PREREGISTERED = 1.0
 
 
 # --------------------------------------------------------------------------- #
@@ -758,8 +829,10 @@ def two_route_diffusivity(
 ) -> Dict[str, float]:
     """End-to-end: engine interstitial D + (logP, HBD, radius) -> tissue D_eff.
 
-    This is the one call an experiment or a wiring point needs. It is NOT called
-    from `compile_drug.py`; the two-route model is default-off.
+    This is the one call an experiment or a wiring point needs, and it IS the
+    wiring point: `compile_drug.build_profile` calls it on every compile with
+    `interstitial_D_um2s` set to the Brownian x Ogston-Renkin interstitial value.
+    `results/two_route_promotion.md` records the promotion and its blast radius.
 
     ``efflux_ratio`` is OPT-IN and defaults to ``None``, which is bit-identical
     to omitting it. When supplied it is applied through

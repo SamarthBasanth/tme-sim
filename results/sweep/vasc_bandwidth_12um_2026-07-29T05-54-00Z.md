@@ -1,0 +1,17 @@
+# Vascular-KDE bandwidth sweep — 12 µm
+
+One data point in a 20-point sweep of `real_fields._kde_on_grid`'s Gaussian bandwidth (production default 40 µm, `mode='kde'`). Built `vascular_density_from_cells(domain, cells, bandwidth_um=12.0, mode='kde')` in-memory on `reconstruct_real('xenium', dx_um=12)`; no existing file edited.
+
+| quantity | bandwidth=12 µm (this run) | published baseline | note |
+|---|---:|---:|---|
+| CSR median ratio (recon / Poisson null, own density) | 0.991 | 0.99 (`vascular_validation.md`) | **identical** — bandwidth-independent |
+| CSR tail ratio (frac>100µm, recon / Poisson null) | 1.307 | 1.31 | **identical** — bandwidth-independent |
+| MVD (link=20µm) /mm² | 110.8 | 111 | **identical** — bandwidth-independent |
+| endothelial-density heterogeneity, p90/p10 (500µm tiles) | 2.42× | 2.4× | **identical** — bandwidth-independent |
+| KDE area fraction ≥0.2 / ≥0.3 / ≥0.5 | 2.50% / 0.85% / 0.13% (smooth decay) | 2.68% / 2.68% / 2.68% (flat) | genuinely bandwidth-sensitive |
+| field-based hotspot distance, median/p90 (p95 threshold) | 37.9 / 80.5 µm | — | new diagnostic, no bw=40 comparator on file |
+| field sanity (dx=12 build) | 0 NaN, 0–1 range, 51.4% exactly zero | — | numerically sane |
+| cisplatin, dx=20 rough transport: mean tumour AUC | 1.71e6 µM·s | 1.69e6 µM·s (dx=12, converged, `delivery_metrics.md`) | +1.1%, sane |
+| cisplatin, dx=20 rough: coverage@1×IC50 | 0.997 | 0.994 | +0.3pp, sane |
+
+**The requested sweep target and the CSR/heterogeneity diagnostic are decoupled: bandwidth cannot move the finding it was proposed to fix.** `vascular_validation.measure()`'s clustering test (CSR ratio) and its heterogeneity test (p90/p10) are computed directly from raw endothelial-cell coordinates via DBSCAN vessel clustering and 500 µm tile-binning — neither touches `vascular_density` or any KDE bandwidth at all — so re-running `measure()` on a micro-environment with the field swapped to a 12 µm KDE reproduced the published 40 µm-era numbers (0.99/1.31/111/2.4×) to 3 significant figures. What *does* change with bandwidth is the smoothed `vascular_density` grid field itself: at 12 µm the KDE area-fraction curve is a genuine smooth decay (2.5%→0.85%→0.13% over threshold 0.2→0.5) versus the flat 2.68% plateau in the currently-published report — which on inspection is not a 40 µm KDE at all but the `mode='discrete'` segmented-vessel field that has been the pipeline default since `vessel_promotion.md` (its docstring text describing "40 µm-bandwidth Gaussian KDE" is stale). The downstream dx=20, bandwidth=12 cisplatin transport check is numerically sane (no NaN/degenerate field, 51% exactly zero) and lands close to the converged dx=12 discrete-mode baseline (mean tumour AUC +1.1%, coverage@1×IC50 +0.3pp) — reassuring for plumbing, but this drug is already near-saturated coverage (~99%) at baseline so it is a weak stress test; a less-delivered drug (e.g. methotrexate/doxorubicin) would show bandwidth effects more clearly and should be prioritized in the synthesis of the other 19 points. Bottom line for the synthesis pass: bandwidth sweeps will move the KDE-field-dependent quantities (area fraction, field-based hotspot distance, and any drug transport run in `mode='kde'`) but cannot, by construction, move the CSR/Poisson clustering verdict that motivated this sweep — fixing that verdict requires changing the DBSCAN linking distance or the vessel-object clustering logic in `vascular_validation.py`/`vessel_network.py`, not the KDE bandwidth.

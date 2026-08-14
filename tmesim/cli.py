@@ -599,29 +599,36 @@ def _comparison_provenance(*, args, sample, library, alpha, window_s, report,
             "therapeutic_coverage_1x replaces it."
         ),
         "what_is_defensible": (
-            "The ORDER, under the delivery law named above, AND ONLY BETWEEN "
-            "COMPOUNDS THAT DIFFER SUBSTANTIALLY IN MASS — see "
-            "diffusivity_is_falsified below. The absolute kill_fraction is "
-            "not defensible: it is a no-intrinsic-resistance UPPER BOUND and, "
-            "where it has been interval-propagated at all, the interval spans "
-            "~30x (results/kill_calibration.md section 5.1)."
+            "The ORDER, under the delivery law named above. It is strongest "
+            "between compounds that differ substantially in mass and WEAKER "
+            "between similar-mass analogues — see diffusivity_model below, "
+            "which now separates such compounds rather than being flat, but "
+            "reproduces only about a quarter of the measured spread. The "
+            "absolute kill_fraction is not defensible: it is a "
+            "no-intrinsic-resistance UPPER BOUND and, where it has been "
+            "interval-propagated at all, the interval spans ~30x "
+            "(results/kill_calibration.md section 5.1)."
         ),
         # The single most load-bearing caveat on this export, because the
         # comparison a real compound series asks for -- rank these analogues --
         # is exactly the one the transport model has been measured to fail.
-        "diffusivity_is_falsified": (
-            "The diffusivity_um2_s column is a function of MOLECULAR WEIGHT "
-            "alone. Measured against 71 compounds in multicellular layers "
-            "(Pruijn 2008, doi 10.1071/CH08240) it reproduces 7.9 % of the "
-            "measured spread: 29.7x measured against 2.4x modelled, "
-            "R^2 = 0.022. At MATCHED molecular weight it produces exactly "
-            "1.00x where the measurement moves 3.7-3.8x, so it cannot order "
-            "similar-mass analogues at all — and that is the usual shape of a "
-            "real compound series. Full result: "
-            "results/diffusivity_falsification.md. A two-route model that "
-            "reaches R^2 = 0.725 on the same 71 compounds exists at "
-            "tmesim/molecular/two_route.py but is DEFAULT-OFF and is NOT "
-            "wired into this run (results/two_route_transport.md)."
+        "diffusivity_model": (
+            "The diffusivity_um2_s column comes from a two-route tissue "
+            "transport model — paracellular between cells plus transcellular "
+            "through membranes — so it consumes molecular weight, logP AND "
+            "hydrogen-bond donor count. Measured blind against 71 compounds in "
+            "multicellular layers (Pruijn 2008, doi 10.1071/CH08240) it reaches "
+            "R^2 = 0.718 with 99 % of compounds within 3x of measurement and 24 "
+            "of 31 exact-mass pairs ordered correctly. The MOLECULAR-WEIGHT-ONLY "
+            "model this replaced reached R^2 = 0.022, was flat by construction "
+            "at matched mass, and ordered 0 of 31 "
+            "(results/diffusivity_falsification.md). WHAT IS STILL NOT TRUE: it "
+            "reproduces 8.3x of the measured 29.7x spread — about a QUARTER — "
+            "so it under-separates a congeneric series systematically; the whole "
+            "test is ONE cell line; and the ABSOLUTE value in this column is not "
+            "defensible, the same drug's compiled D_eff missing its measured "
+            "multicellular-layer band by 1.5x. Full result: "
+            "results/two_route_promotion.md."
         ),
     }
 

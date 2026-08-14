@@ -168,36 +168,44 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
     # ordering it produces over such a series is potency alone wearing a
     # transport label. Scored blind, unfitted, on 71 compounds.
     limits.append({
-        "id": "diffusivity_mw_only_falsified",
+        "id": "diffusivity_two_route_partial",
         "severity": "critical",
         "applies": True,
-        "title": ("Transport is a function of MOLECULAR WEIGHT ALONE, and that "
-                  "model is FALSIFIED — similar-mass analogues cannot be "
-                  "separated"),
-        "source": ("results/diffusivity_falsification.md; "
+        "title": ("Transport reproduces about a QUARTER of the measured spread "
+                  "between compounds — similar-mass analogues are separated "
+                  "weakly, not reliably"),
+        "source": ("results/two_route_promotion.md; "
+                   "results/diffusivity_falsification.md; "
                    "results/two_route_transport.md (Pruijn 2008, "
                    "doi:10.1071/CH08240)"),
         "body": (
-            "The D_eff handed to the transport solve is derived from molecular "
-            "weight and the tissue ECM fraction and NOTHING ELSE: logP, "
-            "hydrogen-bond donors and acceptors, TPSA and formal charge are all "
-            "computed by the molecular layer and DISCARDED before the transport "
-            "calculation. Scored blind and unfitted against 71 compounds "
-            "measured by one method in one cell line, the measurement spans "
-            "29.7x where this engine spans 2.4x, at R^2 = 0.028. At IDENTICAL "
-            "molecular weight the engine is flat BY CONSTRUCTION -- exactly "
-            "1.00x -- where the measurement spans 3.7x (four compounds at 263 "
-            "Da) and 3.8x (four at 305 Da). CONSEQUENCE FOR THIS PAGE: if the "
-            "drugs ranked below are a congeneric or similar-mass series, their "
-            "delivery column carries essentially no compound-specific transport "
-            "information and the order you are reading is potency plus tissue "
-            "geometry, not transport. Across drugs that differ substantially in "
-            "mass the delivery term does discriminate, and that is the "
-            "supported case. A two-route model using the discarded descriptors "
-            "reaches R^2 = 0.725 blind on the same 71 compounds and orders 24 "
-            "of 31 exact-MW pairs correctly against this model's 0 of 31, but "
-            "it is MERGED, WIRED INTO NOTHING and DEFAULT-OFF -- no number on "
-            "this page benefits from it."
+            "WHAT CHANGED, BECAUSE THIS LIMIT USED TO SAY SOMETHING STRONGER. "
+            "Until results/two_route_promotion.md the D_eff handed to the "
+            "transport solve was derived from molecular weight and the tissue "
+            "ECM fraction and NOTHING ELSE, and that model was FALSIFIED: "
+            "scored blind against 71 compounds measured by one method in one "
+            "cell line it reached R^2 = 0.022 against a 29.7x measured spread, "
+            "and at IDENTICAL molecular weight it was flat BY CONSTRUCTION -- "
+            "exactly 1.00x -- where the measurement spans 3.7-3.8x. The engine "
+            "now applies a two-route cell term that brings logP and "
+            "hydrogen-bond donor count into D_eff through a membrane "
+            "permeability. On the same 71 compounds, blind and unfitted, it "
+            "reaches R^2 = 0.718 with Spearman +0.821, 99 % of compounds within "
+            "3x of measurement, and 24 of 31 exact-mass pairs ordered correctly "
+            "against the old model's 0 of 31. "
+            "WHAT IS STILL NOT TRUE, AND IT IS WHY THIS LIMIT IS STILL "
+            "CRITICAL. The model reproduces 8.3x of the measured 29.7x spread "
+            "-- roughly a QUARTER -- so it UNDER-SEPARATES a congeneric series "
+            "systematically rather than separating it correctly. The entire "
+            "test is ONE cell line. And absolute transport remains wrong: the "
+            "same drug's compiled D_eff misses its measured multicellular-layer "
+            "band by 1.5x (49.3 um^2/s against a measured 74-130). "
+            "CONSEQUENCE FOR THIS PAGE: if the drugs ranked below are a "
+            "similar-mass series, read their ORDER as a hypothesis worth "
+            "testing rather than as a measurement, and read no absolute "
+            "delivery number from it at all. Across drugs that differ "
+            "substantially in mass the delivery term discriminates strongly, "
+            "and that remains the best-supported case."
         ),
     })
 

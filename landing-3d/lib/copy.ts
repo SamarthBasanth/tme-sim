@@ -20,18 +20,28 @@
  *    transvascular delivery law changes the top-1 GBM pick. Say the narrow
  *    version; the broad one was tested and is false.
  *    See results/transvascular_exchange_revalidation.md.
- * 1b. THE DIFFUSIVITY LAW IS FALSIFIED, AND THE COPY MUST NOT IMPLY THAT A
- *    COMPOUND'S STRUCTURE DRIVES ITS TRANSPORT. The only molecular input to
- *    D_eff is molecular weight; logP, HBD, HBA, TPSA and charge are computed
- *    and discarded. Against 71 compounds measured in one cell line the
- *    measurement spans 29.7x where the engine spans 2.4x (R^2 = 0.028), and at
- *    identical MW the engine is exactly 1.00x against a measured 3.7x. So
- *    "descriptors -> transport" is the one phrase on this page that was
- *    measured and refuted: say molecular WEIGHT, and say that similar-mass
- *    analogues are the case this does not resolve. The two-route fix reaches
- *    R^2 = 0.725 blind but is DEFAULT-OFF and wired into nothing, so it must
- *    not be described as something the product does.
- *    See results/diffusivity_falsification.md, results/two_route_transport.md.
+ * 1b. THE DIFFUSIVITY LAW NOW USES STRUCTURE, AND THE COPY MUST NOT OVERSTATE
+ *    HOW WELL. This guardrail CHANGED on 2026-08-13 and the previous version is
+ *    kept here because the copy must not drift back to EITHER extreme.
+ *    WAS: the only molecular input to D_eff was molecular weight; logP, HBD,
+ *    HBA, TPSA and charge were computed and discarded; against 71 compounds
+ *    measured in one cell line the measurement spanned 29.7x where the engine
+ *    spanned 2.4x (R^2 = 0.022), and at identical MW the engine was exactly
+ *    1.00x against a measured 3.7x. "descriptors -> transport" was therefore
+ *    measured and REFUTED.
+ *    IS: the shipping model is two-route (paracellular + transcellular) and
+ *    consumes logP and hydrogen-bond donor count. Blind and unfitted on those
+ *    same 71 compounds it reaches R^2 = 0.718, 99 % within 3x, and orders 24 of
+ *    31 exact-mass pairs correctly against the old model's 0 of 31. So
+ *    "a compound's structure drives its transport" is now SAYABLE.
+ *    THE LIMIT THAT REPLACES THE OLD ONE, AND IT IS NOT OPTIONAL: the model
+ *    reproduces 8.3x of a measured 29.7x spread -- about a QUARTER -- so it
+ *    UNDER-SEPARATES similar-mass analogues rather than resolving them, and the
+ *    whole test is ONE cell line. Do NOT write "validated", "accurate", "gets
+ *    transport right", or any absolute diffusivity figure. Say that structure
+ *    reaches transport, say it was scored blind against 71 measured compounds,
+ *    and say it recovers about a quarter of the measured spread.
+ *    See results/two_route_promotion.md, results/diffusivity_falsification.md.
  * 2. THE SPATIAL SPREAD MUST CARRY ITS HONEST NULL. The 2.0x is real and
  *    reproducible, but a well-mixed model's 1.0 is not the comparator that
  *    bounds it: a null that preserves the macrophages' own clustering
@@ -88,7 +98,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "05",
     eyebrow: "Stated limits",
     headline: "Every run ships its own caveats.",
-    body: "Ranking compounds on the same tissue is far more robust than any absolute number, and it is the output to trust. It is not unconditionally invariant, and we can tell you exactly where it breaks: correcting the transvascular delivery law re-weights the panel by permeability and changes the top pick on glioblastoma. Rank a set of similar-mass analogues and the transport term tells you nothing at all — diffusivity here comes from molecular weight alone, and we published the measurement that refutes it rather than waiting for a customer to find it. That is written up, not buried. The spatial spread needs single-cell resolved tissue — on spot data the immune positions are synthesized rather than measured, so we do not report it there. Absolute kill fraction is not defensible at all, and every run says so in its own caveats panel. Vivum does not predict patient response, and its null results are published.",
+    body: "Ranking compounds on the same tissue is far more robust than any absolute number, and it is the output to trust. It is not unconditionally invariant, and we can tell you exactly where it breaks: correcting the transvascular delivery law re-weights the panel by permeability and changes the top pick on glioblastoma. Rank a set of similar-mass analogues and the transport term separates them only weakly — diffusivity here comes from a two-route model that consumes logP and hydrogen-bond donors, scores R² = 0.718 blind against 71 measured compounds, and still recovers only about a quarter of the measured spread from a single cell line. Its predecessor used molecular weight alone and told you nothing at all; we published the measurement that refuted it rather than waiting for a customer to find it, and we published what replaced it on the same terms. That is written up, not buried. The spatial spread needs single-cell resolved tissue — on spot data the immune positions are synthesized rather than measured, so we do not report it there. Absolute kill fraction is not defensible at all, and every run says so in its own caveats panel. Vivum does not predict patient response, and its null results are published.",
     align: "right",
   },
   {

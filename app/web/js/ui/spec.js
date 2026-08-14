@@ -385,9 +385,10 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged }) {
              + 'except molecular weight and TPSA is a prediction. Its absolute '
              + 'kill, AUC and penetration depth are NOT defensible. Compare it '
              + 'against other compounds on this section and read the ordering — '
-             + 'noting that diffusivity comes from molecular weight alone, which '
-             + 'has been measured against 71 compounds and refuted (R^2 = 0.028), '
-             + 'so similar-mass analogues cannot be separated on transport.')
+             + 'noting that diffusivity comes from a two-route model scoring '
+             + 'R^2 = 0.718 blind against 71 measured compounds, which still '
+             + 'recovers only about a quarter of the measured spread from one '
+             + 'cell line, so similar-mass analogues are separated weakly.')
           : '',
       }, label + suffix));
     }

@@ -440,43 +440,75 @@ class TestRegistryHygiene:
             assert "mcl-no-vasculature" in r.conditional, r.label
 
     def test_mcl_verdicts_are_scored_on_the_engine_as_it_ships(self):
-        """The cellular-exclusion term is merged but DEFAULT-OFF, so it must not
-        supply a verdict -- and the hindrance row must record that the engine
-        lands SHORT rather than being marked a pass because it improved."""
+        """RE-PINNED at the two-route promotion (results/two_route_promotion.md).
+
+        SUPERSEDED CONTRACT: the cell term was merged but DEFAULT-OFF, so the
+        hindrance row had to be FAIL (shipping 1.77-fold against a measured
+        12-fold) and had to record that even the cell-term-on arm landed SHORT.
+        The promotion put a PERMEABLE-cell term into the shipping compile, so:
+
+        | | superseded | current |
+        |---|---|---|
+        | hindrance, shipping fold | 1.7732 | 10.3274 |
+        | hindrance verdict | FAIL | **PASS** |
+        | D_eff, shipping um^2/s | 287.32 | 49.33 |
+        | D_eff verdict | FAIL | FAIL (direction flipped) |
+
+        The verdict move is REAL and is the point of the change. What this test
+        now pins is that it was not bought by moving the bar: the band is still
+        the repo's own 3x ORDER_OF_MAGNITUDE_FACTOR either side of the measured
+        12-fold, chosen while the engine was failing it, and the ABSOLUTE row is
+        still scored and still FAILS.
+        """
         rows = SC._run_mcl_transport_coefficients()
         hind = next(r for r in rows if r.label.startswith("hindrance"))
         v = hind.values
-        # Scored on the shipping compiled value, not on the cell-term-on arm.
-        assert hind.status == SC.FAIL
-        assert v["shipped_fold"] < v["cell_term_on_armB_fold"] < v["measured_fold"]
-        assert v["armB_shortfall_x"] > 1.0, (
-            "arm B must be recorded as SHORT of the measurement")
-        assert "cell-exclusion-default-off" in hind.conditional
+        assert hind.status == SC.PASS
+        # ... and the pass must be inside the UNCHANGED band, not a widened one.
+        blo, bhi = v["band_fold"]
+        assert (blo, bhi) == (4.0, 36.0)
+        assert blo <= v["shipped_fold"] <= bhi
+        # the promotion is what moved it, and the old value is still recorded
+        assert v["superseded_mw_only_fold"] < blo < v["shipped_fold"]
+        # the pass is still SHORT of the central measured value; say so
+        assert v["shipped_fold"] < v["measured_fold"]
 
         diff = next(r for r in rows
                     if r.label.startswith("effective diffusivity"))
         lo, hi = diff.values["measured_band_um2s"]
-        # The cell-term-on arm lands INSIDE the measured band; the shipping
-        # value does not, and the shipping value is the one that is scored.
-        assert lo <= diff.values["cell_term_on_armB_D_eff_um2s"] <= hi
+        # The ABSOLUTE row is still scored, still fails, and the miss flipped
+        # sides -- which is why "the transport model is now right" is not a
+        # conclusion this group supports.
         assert not (lo <= diff.values["shipped_D_eff_um2s"] <= hi)
         assert diff.status == SC.FAIL
+        assert diff.values["superseded_mw_only_D_eff_um2s"] > hi
+        assert diff.values["shipped_D_eff_um2s"] < lo
 
     def test_mcl_consumption_rate_declines_to_score_and_says_which_way(self):
-        """NOT TESTABLE here removes a would-be PASS, not a FAIL, and the row
-        has to say so -- otherwise it reads as a softened failure."""
+        """NOT TESTABLE has to say which way the omission cuts -- and AT THE
+        PROMOTION IT REVERSED, which is the whole reason this test exists.
+
+        SUPERSEDED: at alpha = 148.6082 the calibrated reading was 0.49-0.82x
+        measured, i.e. inside the repo's 3x band, so declining to score removed a
+        would-be PASS. At alpha = 22.2235 it is 0.080-0.134x measured, outside
+        that band, so declining to score now removes a would-be FAILURE. Leaving
+        the old sentence in place would have been a disclosure that flattered us
+        while claiming to do the opposite.
+        """
         row = next(r for r in SC._run_mcl_transport_coefficients()
                    if r.label.startswith("first-order"))
         assert row.status == SC.NOT_TESTABLE
         assert row.reason and row.bar == "n/a"
-        assert "REMOVES a pass" in row.reason
+        assert "removes a FAILURE" in row.reason, (
+            "the row must state which way declining to score cuts, and since "
+            "results/two_route_promotion.md it cuts the other way")
         v = row.values
-        # The two readings of the engine's own k straddle the measurement by an
-        # order of magnitude, which is WHY no single verdict is available: one
-        # would read as a clean failure and the other as a comfortable pass.
+        # Both readings are now BELOW the measurement -- they no longer straddle
+        # it -- so the reason can no longer rest on 'straddling'. It rests on
+        # commensurability, which is reason (1) and is untouched.
         assert max(v["raw_ratio_to_measured"]) < 0.1
-        assert min(v["calibrated_ratio_to_measured"]) > 0.3
-        assert v["k_calibrated_per_s"] > 10 * v["k_raw_per_s"]
+        assert max(v["calibrated_ratio_to_measured"]) < 0.3
+        assert v["k_calibrated_per_s"] > 5 * v["k_raw_per_s"]
 
 
 class TestRowHonestyInvariants:

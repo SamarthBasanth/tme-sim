@@ -113,16 +113,20 @@ every difference in the table is attributable to that drug's own parameters
 transport calibrated once on doxorubicin) on identical tissue — the same
 methodology `experiments/real_drug_panel.py` uses, just wrapped in a CLI.
 
-> **The `D_eff` column is a function of molecular weight and nothing else, and
-> that model is FALSIFIED.** `logP`, hydrogen-bond donors, TPSA and charge are
-> computed by the molecular layer and discarded before transport. Against 71
-> compounds measured in one cell line the measurement spans **29.7×** where this
-> engine spans **2.4×** (R² = 0.028), and at *identical* molecular weight the
-> engine is flat by construction — **exactly 1.00×** — against a measured 3.7×.
-> Note the spread in the column above: three drugs inside 1.5×. **Do not read a
-> ranking over similar-mass analogues as a transport result** — for such a series
-> the delivery term carries no compound-specific information. Ranking compounds
-> that differ substantially in mass is the supported case.
+> **The `D_eff` column comes from a two-route transport model, and it recovers
+> about a quarter of the measured compound-to-compound spread.** `logP` and
+> hydrogen-bond donor count now reach transport through a membrane permeability.
+> Scored blind and unfitted against 71 compounds measured in one cell line
+> (Pruijn 2008): **R² = 0.718**, 99 % within 3× of measurement, **24 of 31**
+> exact-mass pairs ordered correctly. The molecular-weight-only model this
+> replaced was FALSIFIED on the same data — R² = 0.022, flat by construction at
+> matched mass (exactly 1.00× against a measured 3.7×), **0 of 31** pairs
+> ordered. **What is still not true:** it reproduces 8.3× of the measured 29.7×
+> spread, so it *under-separates* similar-mass analogues rather than resolving
+> them, and the whole test is one cell line. **Read a ranking over such a series
+> as a hypothesis worth testing, not as a transport measurement.** Ranking
+> compounds that differ substantially in mass remains the best-supported case.
+> → [`../results/two_route_promotion.md`](../results/two_route_promotion.md)
 > → [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md),
 > [`../results/two_route_transport.md`](../results/two_route_transport.md)
 > (the two-route fix reaches R² = 0.725 blind, but is **default-OFF and wired

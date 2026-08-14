@@ -618,7 +618,12 @@ def stage_panel() -> dict:
         rows = {}
         for d in panel:
             mol = _getmol(d)
-            prof = compile_drug.build_profile(mol, ecm_reference=DEFAULT_ECM)
+            # two_route=False: PRE-PROMOTION baseline. compile_drug now applies the
+            # two-route term itself (results/two_route_promotion.md), so this file's
+            # 'shipping engine' column must ask for the MW-only interstitial value
+            # explicitly or the correction would be applied twice.
+            prof = compile_drug.build_profile(mol, ecm_reference=DEFAULT_ECM,
+                                              two_route=False)
             radius = float(_attr(mol, "radius_hydrodynamic_nm")
                            or stokes_einstein.hydrodynamic_radius_nm(
                                float(_attr(mol, "mw")),
@@ -683,7 +688,12 @@ def stage_blast(dx_um: float = 12.0) -> dict:
     scales = {}
     for d in panel:
         mol = _getmol(d)
-        prof = compile_drug.build_profile(mol, ecm_reference=DEFAULT_ECM)
+        # two_route=False: PRE-PROMOTION baseline. compile_drug now applies the
+        # two-route term itself (results/two_route_promotion.md), so this file's
+        # 'shipping engine' column must ask for the MW-only interstitial value
+        # explicitly or the correction would be applied twice.
+        prof = compile_drug.build_profile(mol, ecm_reference=DEFAULT_ECM,
+                                          two_route=False)
         radius = float(_attr(mol, "radius_hydrodynamic_nm")
                        or stokes_einstein.hydrodynamic_radius_nm(
                            float(_attr(mol, "mw")),

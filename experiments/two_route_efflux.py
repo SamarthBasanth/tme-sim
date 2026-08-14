@@ -153,7 +153,12 @@ def _two_route_row(name: str, efflux_ratio: Optional[float] = None,
                    hbd_decrement: Optional[float] = None) -> Dict:
     """One drug through the unmodified compile pipeline, then the two-route law."""
     mol = _getmol(name)
-    prof = compile_drug.build_profile(mol, ecm_reference=DEFAULT_ECM)
+    # two_route=False: PRE-PROMOTION baseline. compile_drug now applies the
+    # two-route term itself (results/two_route_promotion.md), so this file's
+    # 'shipping engine' column must ask for the MW-only interstitial value
+    # explicitly or the correction would be applied twice.
+    prof = compile_drug.build_profile(mol, ecm_reference=DEFAULT_ECM,
+                                      two_route=False)
     radius = float(_attr(mol, "radius_hydrodynamic_nm")
                    or stokes_einstein.hydrodynamic_radius_nm(
                        float(_attr(mol, "mw")), bool(_attr(mol, "is_antibody", False))))

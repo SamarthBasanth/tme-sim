@@ -16,8 +16,21 @@ def test_alpha_calibration_hits_anchor():
     # calibrate_alpha defaults to exactly that converted target.
     alpha = calibrate_alpha(drug="doxorubicin")
     assert alpha > 0 and np.isfinite(alpha)
-    # order of magnitude matches the "~2 orders too slow" diagnosis
-    assert 50 < alpha < 2000
+    # Order of magnitude matches the "~2 orders too slow" diagnosis.
+    #
+    # RE-PINNED at the two-route promotion (results/two_route_promotion.md).
+    # SUPERSEDED BAND: 50 < alpha < 2000, when alpha was 148.6082. Doxorubicin's
+    # compiled D fell 6.616x (184.7486 -> 27.9256 um^2/s) because the shipping
+    # compile now applies the two-route cell term, and alpha is fitted in closed
+    # form from L = sqrt(D_eff/k_eff) against the SAME measured 64.92 um anchor,
+    # so it had to follow. The band is widened at the bottom rather than moved,
+    # because what it is guarding is the ORDER OF MAGNITUDE of the diagnosis --
+    # that the structure-only binding prior is ~1-2 orders too small -- and that
+    # diagnosis is unchanged: alpha is still an amplification of ~22x, i.e. the
+    # prior is still more than an order of magnitude short. The anchor assertion
+    # below is the one that actually pins correctness, and it is untouched: L
+    # must still land in the measured band, which is the whole point of the fit.
+    assert 5 < alpha < 2000
     dp = calibrated_drugparams("doxorubicin", alpha=alpha)
     L = penetration_length_um(dp)
     # sits at its calibration anchor by construction: the e-fold-equivalent band

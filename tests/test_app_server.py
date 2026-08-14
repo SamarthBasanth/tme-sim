@@ -430,7 +430,13 @@ class TestJobLifecycle:
                     f"{name} is null with no reason")
 
         p = res["provenance"]
-        assert p["alpha"] == pytest.approx(148.6, abs=0.5)
+        # RE-PINNED at the two-route promotion (results/two_route_promotion.md).
+        # SUPERSEDED: 148.6 +/- 0.5. alpha is fitted in closed form from
+        # L = sqrt(D_eff/k_eff) on doxorubicin, whose compiled D fell 6.616x when
+        # the two-route cell term became the shipping default, so alpha followed.
+        # It is a GAUGE COORDINATE (results/alpha_identifiability.md), so this
+        # pin exists to catch silent drift, not to assert a physical constant.
+        assert p["alpha"] == pytest.approx(22.2235, abs=0.5)
         assert p["ic50_uM"] > 0
         assert p["ic50_source"].startswith("GDSC measured")
         assert p["sensitivity_mode"] == "uniform"

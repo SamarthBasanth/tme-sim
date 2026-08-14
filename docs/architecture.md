@@ -650,16 +650,18 @@ bands.
   and ion trapping (`molecular/ion_trapping.py`) **are** implemented and opt-in,
   default-OFF, so the gap is that this score does not read them, not that they
   are absent from the codebase.
-- **The tissue diffusivity law is FALSIFIED.** `D_eff` is a function of molecular
-  weight and the ECM fraction only — `logP`, HBD, HBA, TPSA and charge are
-  computed and discarded. Against 71 compounds measured in one cell line the
-  measurement spans 29.7× where the engine spans 2.4× (R² = 0.028), and at
-  identical MW the engine is flat by construction (exactly 1.00×) against a
-  measured 3.7×. **A ranking over similar-mass analogues therefore carries no
-  compound-specific transport information.** A two-route fix reaches R² = 0.725
-  blind and unfitted but is merged, wired into nothing and default-OFF.
-  → [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md),
-  [`../results/two_route_transport.md`](../results/two_route_transport.md)
+- **The tissue diffusivity law reproduces about a QUARTER of the measured
+  compound-to-compound spread.** Since 2026-08-13 `D_eff` comes from a two-route
+  law (paracellular + transcellular), so `logP` and hydrogen-bond donor count
+  reach transport through a membrane permeability. Scored blind and unfitted
+  against 71 compounds measured in one cell line: **R² = 0.718**, 99 % within 3×,
+  24 of 31 exact-mass pairs ordered correctly. The MW-only model it replaced was
+  FALSIFIED on the same data (R² = 0.022, flat by construction at matched mass,
+  0 of 31 ordered). **Still not true:** 8.3× of a measured 29.7× spread, ONE cell
+  line, and absolute `D_eff` still misses its measured multicellular-layer band
+  by 1.5×. **Read a ranking over similar-mass analogues as weak evidence.**
+  → [`../results/two_route_promotion.md`](../results/two_route_promotion.md),
+  [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md)
 - **Systemic PK: averaged by default, time-resolved on request.** By default a
   single time-averaged sustained plasma level drives the transport solve; it
   preserves total delivered drug and relative ranking, but it makes any two

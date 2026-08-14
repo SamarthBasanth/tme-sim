@@ -47,6 +47,15 @@ class MolecularProfile:
     free_diffusivity : Stokes-Einstein diffusivity in dilute interstitial fluid, um^2/s.
     effective_diffusivity : diffusivity after Brownian-dynamics hindrance through the
         crowded ECM/cell medium at `ecm_reference`, um^2/s. THIS feeds DrugParams.diffusivity.
+    interstitial_diffusivity : the same quantity BEFORE the two-route cell term,
+        um^2/s -- i.e. the ECM-hindered interstitial conductivity that the
+        effective-medium law consumes as its matrix phase. Equal to
+        `effective_diffusivity` when the two-route model is off. This is the
+        number every published figure predating results/two_route_promotion.md
+        was computed against, so it is kept rather than overwritten.
+    two_route : the two-route law's own output dict for this compile (membrane
+        permeability, transcellular gain, hindrance, ...), or None when off.
+        See molecular.two_route.two_route_diffusivity.
     hindrance : effective_diffusivity / free_diffusivity in [0,1].
     hindrance_curve : {ecm_fraction: D_eff} sampled from the Brownian sim (for plots).
     membrane_permeability : passive permeability, um/s (cell/BBB-relevant).
@@ -72,6 +81,8 @@ class MolecularProfile:
     ecm_reference: float = 0.4
     hindrance_curve: Dict[float, float] = field(default_factory=dict)
     provenance: Dict[str, str] = field(default_factory=dict)
+    interstitial_diffusivity: Optional[float] = None
+    two_route: Optional[Dict[str, float]] = None
 
     def summary(self) -> Dict:
         return {
