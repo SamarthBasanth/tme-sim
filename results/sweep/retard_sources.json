@@ -1,0 +1,70 @@
+{
+ "choi_2011_verified": true,
+ "structural_rule_table": [
+  {
+   "logp": -2.62,
+   "k_bound": 19.48080113617819,
+   "retardation": 16.374248256671827
+  },
+  {
+   "logp": -1.5,
+   "k_bound": 10.774819733821982,
+   "retardation": 9.503487733932309
+  },
+  {
+   "logp": -0.8,
+   "k_bound": 9.191576645948475,
+   "retardation": 8.253992288982536
+  },
+  {
+   "logp": -0.465,
+   "k_bound": 9.022423595345884,
+   "retardation": 8.120496701446971
+  },
+  {
+   "logp": 0.0,
+   "k_bound": 9.352118756389432,
+   "retardation": 8.38069212254254
+  },
+  {
+   "logp": 1.0,
+   "k_bound": 12.879826505520205,
+   "retardation": 11.164759078156546
+  },
+  {
+   "logp": 2.0,
+   "k_bound": 24.71212050139826,
+   "retardation": 20.502805499703506
+  },
+  {
+   "logp": 2.97,
+   "k_bound": 63.82705596958582,
+   "retardation": 51.37231257119713
+  },
+  {
+   "logp": 3.26,
+   "k_bound": 90.05694555875311,
+   "retardation": 72.07294143496796
+  },
+  {
+   "logp": 3.74,
+   "k_bound": 169.27671130928053,
+   "retardation": 134.5931805652842
+  }
+ ],
+ "taxane_brackets": [
+  {
+   "kd_um": 0.87,
+   "source": "Parness & Horwitz 1981 (polymer)",
+   "k_bound_lo": 9.195402298850574,
+   "k_bound_hi": 57.47126436781609
+  },
+  {
+   "kd_um": 0.027,
+   "source": "Andreu & Barasoain 2001 (polymer)",
+   "k_bound_lo": 296.2962962962963,
+   "k_bound_hi": 1851.851851851852
+  }
+ ],
+ "structural_rule_paclitaxel": 169.27671130928053
+}

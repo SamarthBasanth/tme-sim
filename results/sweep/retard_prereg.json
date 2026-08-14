@@ -1,0 +1,108 @@
+{
+ "_what": "PRE-REGISTRATION EXTENSION for results/intracellular_retardation.md. This file EXTENDS results/sweep/tworoute_prereg.json and results/sweep/tworoute_efflux_prereg.json. It does not replace either and it changes NO value in either. tmesim/molecular/two_route.py::HBD_LOGP_DECREMENT is UNCHANGED at 1.0, so the parent's --stage prereg assertion still passes.",
+
+ "_rule": "DO NOT FIT TO PRUIJN. Nothing below was chosen by looking at a Pruijn residual. This file was written to disk BEFORE the retardation term was scored against Pruijn even once. It registers, in advance, both the rule and the specific way the author expects it to FAIL, so that a bad score cannot afterwards be reframed as an expected nuance and a good score cannot be claimed as a prediction that was never made.",
+
+ "written": "before any scoring of the retardation term",
+
+ "the_physics_registered_in_advance": {
+  "claim": "Reversible intracellular binding at local equilibrium retards the TRANSIENT apparent diffusivity and leaves the STEADY-STATE conductance EXACTLY unchanged.",
+  "why": "At steady state the bound pool is time-invariant, carries no flux, and drops out of the flux balance. Only the free profile drives transport and it obeys the unretarded conductivity. Binding changes CAPACITY, and capacity appears only in a transient.",
+  "consequence_registered_before_scoring": "Because `transcellular_gain` is a ratio of two CONDUCTANCES, this term leaves it IDENTICALLY UNCHANGED. The brief that commissioned this work predicted that 'paclitaxel's gain should fall, and if it does not that is a refutation'. Under the correct physics the gain CANNOT fall, for a reason that has nothing to do with whether the retardation hypothesis is right. The quantity that can fall, and the one that must therefore be tested, is the APPARENT diffusivity. This distinction is registered here in advance so that it cannot be mistaken for a post-hoc rescue.",
+  "the_rejected_form": "D_cyto -> D_cyto/(1+K_b) inside the inclusion conductivity sigma_c. This is the form the brief proposed. It is WRONG: it applies a capacity effect to a conductance, and it also misses the retardation of matrix-phase transport by cell storage, which at phi = 0.7892 is the dominant term. Both the correct and the rejected form are solved against a direct transient PDE in --stage algebra, and the rejected form is expected to FAIL that check.",
+
+  "homogenisation": {
+   "potential": "u, the matrix-equivalent concentration",
+   "conductance": "sigma_eff from Maxwell / Hasselman & Johnson 1987, already in the module, UNAFFECTED by binding. Matrix sigma_m, inclusion K*D_cyto.",
+   "capacity": "s_eff = (1-phi)*1 + phi*K*(1+K_b), an EXACT volume average, because the amount stored per unit volume at equilibrium is a volume average and nothing else.",
+   "apparent_D": "D_app = sigma_eff / s_eff",
+   "minimal_additive_form_adopted": "R = s_eff(K_b) / s_eff(K_b=0) = 1 + phi*K*K_b / [(1-phi) + phi*K]; at the pre-registered K = 1 this is exactly R = 1 + phi*K_b. K_b = 0 gives R = 1 exactly, so the term is BITWISE off by default. This ratio form is adopted rather than the raw s_eff so that the term isolates the new physics and does not relitigate the capacity convention the module already ships against."
+  },
+
+  "limit_of_validity_registered_in_advance": "Volume-averaging the capacity assumes LOCAL EQUILIBRIUM between cell and interstitium on the timescale of the measurement. A cell behind a shut membrane cannot store solute faster than its membrane admits it. tau = (a/3)*K*(1+K_b)/P is the loading time constant; where tau is not short compared with the experiment, R OVER-states the retardation. This is expected to bite hardest on exactly the low-permeability compounds. It is measured directly in --stage algebra, not asserted."
+ },
+
+ "quantities_added": {
+
+  "bound_to_free_ratio_K_b": {
+   "default": "None. two_route_diffusivity(..., bound_to_free_ratio=None) is the default and is BITWISE identical to omitting the argument. DrugParams.diffusivity is untouched; nothing is wired into compile_drug.py.",
+   "per_compound_sourcing_attempted": "YES, and it FAILED for the scored compound set. No per-compound intracellular bound fraction, cell-to-medium partition, or unbound fraction exists in any retrievable primary source for any of the 67 benzotriazine di-N-oxides, nor for NLCQ-1, urea, mannitol or acridan-9(10H)-one. A per-compound K_b for the Pruijn set is therefore UNAVAILABLE, and inventing one is forbidden. This is why a STRUCTURAL rule is registered instead, exactly as the commissioning brief's item 2 provides for."
+  },
+
+  "structural_rule_for_K_b": {
+   "value": "K_b = 125 * 10**(0.072*logP**2 + 0.067*logP - 1.126)",
+   "status": "SOURCED AS A STRUCTURAL RULE, from a descriptor the engine already computes (logP). It is NOT a measurement on any compound in the scored set and NOT a measurement on HT-29. It is an empirical QSAR fitted to drug-like compounds binding to LIVER MICROSOMES, transferred to whole cells by its own authors.",
+   "adopted_in_code_as_default": false,
+   "_adopted_note": "tmesim/molecular/two_route.py exposes binding_capacity_from_logp() and retardation_factor(), but two_route_diffusivity defaults bound_to_free_ratio=None, i.e. the term is OFF. Nothing is wired into compile_drug.py.",
+
+   "derivation": "Kilford 2008 predicts the fraction unbound in a hepatocyte incubation from lipophilicity alone: fu_hep = 1/(1 + 125*VR*X) with X = 10**(0.072*logP**2 + 0.067*logP - 1.126) the Hallifax & Houston microsomal binding function and VR the volume ratio of CELLS to incubation. The bound-to-free ratio in the incubation is 125*VR*X. All of that bound material sits inside the cells, which occupy a fraction VR of the incubation, so per unit CELL volume the bound-to-free ratio is (125*VR*X)/VR = 125*X. THE VOLUME RATIO CANCELS EXACTLY, which is what makes the number transferable: the result is a property of a millilitre of cells, not of Kilford's assay geometry. The constant 125 carries units of mg microsomal-protein-equivalent per mL of CELL volume, against a whole-cell protein content of order 200-250 mg/mL, so its magnitude is plausible and it is not a free parameter.",
+
+   "sources": [
+    "Kilford PJ, Gertz M, Houston JB, Galetin A. 'Hepatocellular binding of drugs: correction for unbound fraction in hepatocyte incubations using microsomal binding or drug lipophilicity data.' Drug Metab Dispos 2008;36(7):1194-1197. PMID 18411401, doi:10.1124/dmd.108.020834. Abstract VERIFIED verbatim via PubMed; it confirms the approach ('The proposed equation is further extended to allow direct prediction of fu(hep) from drug lipophilicity data by substituting the fu(mic) term by the Hallifax and Houston predictive equation') but carries NO coefficients.",
+    "Hallifax D, Houston JB. 'Binding of drugs to hepatic microsomes: comment and assessment of current prediction methodology with recommendation for improvement.' Drug Metab Dispos 2006;34(4):724-726. PMID 16552024, doi:10.1124/dmd.105.007658. Letter/Comment; PubMed carries NO abstract."
+   ],
+   "coefficient_provenance": "SEE results/intracellular_retardation.md 2 FOR THE VERIFICATION STATUS OF EACH OF 125, 0.072, 0.067 AND -1.126. Any coefficient that could not be read verbatim from a retrievable source is marked UNVERIFIED there and the consequence is stated.",
+
+   "domain_of_applicability_from_the_source_itself": "Kilford's own abstract, verbatim: 'The prediction accuracy of this approach is high for relatively hydrophilic drugs (logP/D <= 2.5), whereas less accurate prediction of the fu(hep) is observed for lipophilic drugs (logP > 3), consistent with the limitations observed for microsomal binding predictive tools.' Paclitaxel (logP 3.74) and docetaxel (logP 3.26) are both OUTSIDE the range the source vouches for.",
+
+   "acid_base_caveat": "SEE _corrections_after_writing/1 -- this field as originally written was WRONG and is superseded there. It originally read: 'The rule uses logP for neutrals and bases and logD7.4 for acids.'"
+  }
+ },
+
+ "_corrections_after_writing": {
+  "_what": "This file was written BEFORE scoring and is not rewritten to match results. Where later source verification showed a statement in it to be factually wrong, the original text is LEFT IN PLACE above and corrected here, so the audit trail shows what was believed when and nothing is silently improved. NO PARAMETER VALUE IS CHANGED BY ANY ENTRY BELOW: the rule scored is bit-identical to the rule registered.",
+
+  "1_acid_base_convention": {
+   "when": "after --stage algebra and --stage pruijn had been run; the correction does not touch any scored number",
+   "originally_written": "The rule uses logP for neutrals and bases and logD7.4 for acids.",
+   "corrected_to": "As published the rule uses logP for BASES and logD7.4 for ACIDS AND NEUTRALS. The original statement had neutrals on the wrong side.",
+   "source": "Yim DS, Bae SH, Choi S. Transl Clin Pharmacol 2021;29(2), PMID 34235120, PMC8255549, doi:10.12793/tcp.2021.29.e12, verbatim: 'In both equations, logD is used for acidic or neutral drugs and logP for basic drugs.' Corroborated by PMC6365006, which attributes the convention to Austin et al. 2002: 'Austin et al. (2002) suggested using logP for basic compounds and logD7.4 for acidic and neutral compounds.'",
+   "effect_on_the_result": "NONE numerically. The engine holds one lipophilicity per compound and does not know the acid/base class, so it could not have applied the distinction either way. For a genuinely neutral compound logP and logD7.4 coincide. The correction is recorded because the registered statement was wrong, not because a number moved."
+  },
+
+  "2_coefficient_provenance_resolved": {
+   "status": "Both primary papers are PAYWALLED AND WERE NOT READ. Kilford 2008 (doi:10.1124/dmd.108.020834) and Hallifax & Houston 2006 (doi:10.1124/dmd.105.007658) are both HTTP 403 at ASPET, neither has a PMC record, and Unpaywall reports is_oa false for both DOIs. Hallifax & Houston is a Letter and PubMed records '[Abstract not available]'.",
+   "what_was_read_instead": "The equation and all four constants (125, 0.072, 0.067, -1.126) were read VERBATIM from TWO INDEPENDENT open-access secondary sources which agree exactly: (i) Eur J Pharm Sci 2018, PMID 30098391, PMC6365006, doi:10.1016/j.ejps.2018.08.008; (ii) Yim DS, Bae SH, Choi S, Transl Clin Pharmacol 2021;29(2), PMID 34235120, PMC8255549, doi:10.12793/tcp.2021.29.e12. Both also define VR verbatim as 'the ratio of cell volume to incubation volume', '0.005 at a cell concentration of 10^6 cells/mL'.",
+   "corroboration_from_the_primary": "Kilford's own ABSTRACT is verified and confirms the substitution architecture in the authors' words: 'The proposed equation is further extended to allow direct prediction of fu(hep) from drug lipophilicity data by substituting the fu(mic) term by the Hallifax and Houston predictive equation (Drug Metab Dispos 34:724-726, 2006).' It carries no coefficients.",
+   "honest_label": "SECONDARY-SOURCED, TWO INDEPENDENT WITNESSES. This is weaker than a primary read and is labelled as such.",
+   "the_125_interpretation": "The reading of 125 as mg microsomal-protein-equivalent per mL of CELL volume follows from the algebra of the substitution (125*VR occupies exactly the slot C in mg/mL occupies, and VR is dimensionless) and nothing retrieved contradicts it. But NO SOURCE STATES THE AUTHORS INTENDED IT AS A PHYSICAL PROTEIN CONCENTRATION; Kilford's abstract calls it 'A new nonlinear empirical equation' fitted on 39 drugs. It is an empirical constant that is dimensionally interpretable this way. Recorded as an INTERPRETATION, not as a sourced physical quantity."
+  },
+
+  "3_per_compound_taxane_route_attempted_and_only_partly_sourced": {
+   "why": "The commissioning brief named tubulin-binding stoichiometry for taxanes as a candidate per-compound source for K_b. It was attempted as an independent magnitude check on the structural rule for paclitaxel.",
+   "verified": "Paclitaxel binds POLYMERISED tubulin with a stoichiometry of '0.99 +/- 0.04 ligand per alpha beta dimer' (Diaz JF, Andreu JM, Biochemistry 1993;32(11):2747-2755, PMID 8096151, doi:10.1021/bi00062a003, primary abstract). Parness J, Horwitz SB, J Cell Biol 1981;91(2):479-487, PMID 6118377, PMC2111958, doi:10.1083/jcb.91.2.479, FULL TEXT READ, verbatim: 'Microtubules assembled in the presence of [3H]taxol bind drug specifically with an apparent binding constant, K_app, of 8.7 x 10-7 M and binding saturates with a calculated maximal binding ratio, Bmax, of 0.6 mol taxol bound/mol tubulin dimer.' NOTE: the PubMed abstract string for PMID 6118377 contains a typo ('8.7 x 19(-7) M'); the PMC full text reads 10^-7 and is the one quoted. A second primary gives a ~30-fold different value: Andreu JM, Barasoain I, Biochemistry 2001;40(40):11975-11984, PMID 11580273, 'The binding equilibrium constant of Taxol has a value K(b) = 3.7 x 10(7) M(-1)'. The two are NOT averaged.",
+   "UNVERIFIED_and_therefore_blocking": "The intracellular TUBULIN CONCENTRATION. No primary mammalian value in uM or mg/mL could be retrieved. The only primary verbatim number is a PERCENTAGE: Hiller G, Weber K, Cell 1978;14(4):795-804, PMID 688394, doi:10.1016/0092-8674(78)90335-5, abstract: 'a tubulin content which corresponds to approximately 2.5--3.3% of their total protein'. The widely repeated '~20 uM' figure is a SECONDARY restatement of that paper and does not reconstruct cleanly from its own percentage. A published honest bound is 'anywhere between 8 uM and 50 uM' (eLife 2022, PMID 35029146, PMC8798059).",
+   "also_UNVERIFIED": "A Kd for UNPOLYMERISED tubulin dimer does not exist. Diaz, Menendez & Andreu, Biochemistry 1993;32(38):10067-10077, PMID 8104479: 'binding to the unassembled protein is not detected within ligand solubility limits.' Prota et al., eLife 2023;12:e84791, PMID 36876916, PMC10049219: taxane-site ligands 'show a loss of affinity of at least four orders of magnitude when binding to unassembled tubulin relative to binding to microtubules'.",
+   "consequence": "A per-compound K_b for paclitaxel from tubulin binding CANNOT be pinned, because its dominant input is unverifiable. It can only be BRACKETED. It is used in results/intracellular_retardation.md as an order-of-magnitude cross-check on the structural rule and for nothing else. It is not scored and it is not adopted."
+  }
+ },
+
+ "REGISTERED_PREDICTIONS_BEFORE_ANY_SCORING": {
+  "_why_this_block_exists": "So that the failure modes below cannot be presented afterwards as insight, and so that a good score cannot be claimed as a prediction that was never made.",
+
+  "1_the_term_is_expected_to_make_the_PRUIJN_SCORE_WORSE": "The structural rule is monotone increasing in logP above logP = -0.465 (the vertex of the log-quadratic). The measured Pruijn Dmcl INCREASES with logP -- that is the entire two-route finding. So retardation pushes the high-logP predictions DOWN, anti-correlated with the measurement, and R^2 is EXPECTED TO FALL relative to the 0.718-0.725 of the un-retarded model. A fall in R^2 is therefore NOT a surprise and must NOT be reported as one.",
+
+  "2_the_rule_is_expected_to_be_OUT_OF_DOMAIN_ON_THE_FLUX_MARKERS": "The rule's intercept is large: at logP = 0 it returns K_b = 125*10**-1.126 = 9.35, i.e. it asserts that a compound with no lipophilicity at all is 90 % bound inside a cell. Urea and mannitol are in the Pruijn set, are classical NON-BINDING flux markers, and Pruijn uses urea as its INTERNAL STANDARD. Assigning them a ~9-fold bound pool is almost certainly wrong. This is registered as a known and expected defect of the rule BEFORE it is scored.",
+
+  "3_the_geometric_BIAS_is_expected_to_collapse": "R >= 8 for every compound in the Pruijn logP range (-2.62 to +2.97), so every prediction falls by roughly an order of magnitude. The un-retarded model at hbd_decrement 1.34 was essentially unbiased at geo_bias 1.03x. The retarded model is expected to become strongly BIASED LOW. Because R^2 here is a Pearson correlation on log10, a uniform shift does not affect it; only the COMPOUND-TO-COMPOUND VARIATION in R does. Both must be reported separately so the two effects are not confused.",
+
+  "4_transcellular_gain_CANNOT_MOVE": "See the_physics_registered_in_advance. Paclitaxel's transcellular gain is a conductance ratio and is arithmetically invariant under this term. The commissioning brief treated a failure of the gain to fall as a refutation of the retardation hypothesis. Registered here in advance: that test is not diagnostic, because the gain cannot move under ANY value of K_b. The diagnostic quantity is the apparent D.",
+
+  "5_the_LOCAL_EQUILIBRIUM_assumption_is_expected_to_fail_for_the_shut_membrane_compounds": "tau = (a/3)*K*(1+K_b)/P. Doxorubicin-like compounds have P ~ 6e-5 um/s and so tau of order 10^4-10^5 seconds even before the (1+K_b) factor, i.e. far longer than any of the experiments involved. For those compounds R is an UPPER BOUND and the true retardation is smaller. Registered in advance."
+ },
+
+ "arms_registered_before_scoring": {
+  "_what": "The complete set of arms to be scored. Registered so that no arm can be added afterwards because it happened to score well, and none dropped because it did not.",
+  "A_off": "bound_to_free_ratio = None. The un-retarded two-route model. The control, and bitwise identical to what results/two_route_efflux.md scored.",
+  "B_structural": "K_b from binding_capacity_from_logp(logP) per compound. THE registered arm.",
+  "C_sweep_of_the_capacity_constant": "K_b scaled by the multiplier {0, 0.01, 0.03, 0.1, 0.3, 1, 3} on the 125 mg/mL equivalent, DISCLOSING which multiplier maximises agreement with Pruijn so that a reader can confirm the adopted value (multiplier 1, i.e. the sourced 125) is not that one. Exactly the disclosure discipline the parent applied to hbd_decrement.",
+  "D_uniform": "A single compound-INDEPENDENT K_b, swept, to separate 'retardation helps' from 'the logP dependence of this particular rule helps'. A uniform K_b cannot change R^2 at all (it is a constant shift in log space), so this arm is a CONTROL whose registered expected result is 'R^2 exactly unchanged, bias shifted'. If it changes R^2, there is a bug."
+ },
+
+ "hard_invariants_asserted_by_the_scoring_run": {
+  "alpha": "tmesim.validation.calibration.calibrate_alpha() must return 148.60815765445545.",
+  "default_off": "two_route_diffusivity(...) with bound_to_free_ratio omitted must be BITWISE identical to passing None, and apparent_D_um2s must equal effective_D_um2s exactly.",
+  "parent_prereg": "results/sweep/tworoute_prereg.json is untouched and experiments/two_route_transport.py --stage prereg still passes.",
+  "compile_drug": "tmesim/molecular/compile_drug.py is not modified and DrugParams.diffusivity is bit-identical."
+ }
+}

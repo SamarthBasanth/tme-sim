@@ -449,6 +449,248 @@ def efflux_reduced_partition(cell_partition: float, efflux_ratio: float) -> floa
     return float(cell_partition) / max(1.0, er)
 
 
+# --------------------------------------------------------------------------- #
+# Leg 3: INTRACELLULAR RETARDATION. Reversible binding inside the cell.
+#
+# See results/intracellular_retardation.md. Everything below is ADDITIVE and
+# DEFAULT-OFF: `bound_to_free_ratio=None` is bitwise identical to omitting it.
+# --------------------------------------------------------------------------- #
+
+#: Intracellular "microsomal-protein-equivalent" binding capacity, mg/mL of CELL
+#: volume, in Kilford's hepatocyte extension of the Hallifax & Houston microsomal
+#: binding equation. See :func:`binding_capacity_from_logp` for the derivation and
+#: for why the incubation volume ratio cancels exactly.
+#:
+#: Kilford PJ, Gertz M, Houston JB, Galetin A. "Hepatocellular binding of drugs:
+#: correction for unbound fraction in hepatocyte incubations using microsomal
+#: binding or drug lipophilicity data." Drug Metab Dispos 2008;36(7):1194-1197.
+#: PMID 18411401, doi:10.1124/dmd.108.020834.
+KILFORD_MG_EQUIV_PER_ML_CELL = 125.0
+
+#: Coefficients of the Hallifax & Houston (2006) log-quadratic binding function
+#: `10**(c2*logP**2 + c1*logP + c0)`, which is the `fu,mic` term Kilford substitutes.
+#:
+#: Hallifax D, Houston JB. "Binding of drugs to hepatic microsomes: comment and
+#: assessment of current prediction methodology with recommendation for
+#: improvement." Drug Metab Dispos 2006;34(4):724-726. PMID 16552024,
+#: doi:10.1124/dmd.105.007658.
+HALLIFAX_C2 = 0.072
+HALLIFAX_C1 = 0.067
+HALLIFAX_C0 = -1.126
+
+
+def binding_capacity_from_logp(
+    logp: float,
+    mg_equiv_per_ml_cell: float = KILFORD_MG_EQUIV_PER_ML_CELL,
+) -> float:
+    """Intracellular bound-to-free ratio ``K_b`` from logP alone. STRUCTURAL RULE.
+
+    ``K_b`` is the ratio of BOUND to FREE solute inside a cell at equilibrium. It
+    is the quantity that sets the retardation factor (:func:`retardation_factor`),
+    and it is the one input of the retardation term.
+
+    WHY THIS RULE, AND WHAT IT IS DERIVED FROM
+    ------------------------------------------
+    No per-compound intracellular bound fraction exists for the 71-compound
+    benzotriazine di-N-oxide set this model is scored against, so a per-compound
+    ``K_b`` cannot be sourced. What CAN be sourced is a STRUCTURAL rule from a
+    descriptor the engine already computes. Kilford 2008 predicts the fraction
+    unbound in a hepatocyte incubation from lipophilicity alone:
+
+        fu_hep = 1 / (1 + 125 * VR * X),
+        X      = 10**(0.072*logP**2 + 0.067*logP - 1.126)     [Hallifax & Houston]
+
+    where ``VR`` is the volume ratio of CELLS to incubation. The bound-to-free
+    ratio in the incubation is therefore ``125 * VR * X``. That bound material all
+    sits INSIDE the cells, which occupy a fraction ``VR`` of the incubation, so per
+    unit CELL volume the bound-to-free ratio is
+
+        K_b = (125 * VR * X) / VR = 125 * X.
+
+    **The volume ratio cancels exactly.** That is what makes this usable here: the
+    result is a property of a millilitre of cells, not of Kilford's assay geometry,
+    so it transfers to a cell sitting in a tissue. ``125`` carries units of mg
+    microsomal-protein-equivalent per mL of cell volume, against a whole-cell
+    protein content of order 200-250 mg/mL -- i.e. it is a plausible magnitude and
+    not a free parameter.
+
+    WHAT THIS RULE IS NOT, STATED HERE RATHER THAN BURIED
+    -----------------------------------------------------
+    * It is an **empirical QSAR fitted to drug-like compounds binding to liver
+      microsomes**, not a measurement on any compound in this model's compound set,
+      and not a measurement on HT-29.
+    * Its intercept is large: at ``logP = 0`` it returns ``K_b = 125*10**-1.126 =
+      9.35``, i.e. it asserts that even a compound with no lipophilicity at all is
+      90 % bound inside a cell. Applied to a genuinely non-binding flux marker such
+      as urea or mannitol -- both of which are in the Pruijn set, and one of which
+      that paper uses as its INTERNAL STANDARD -- that is almost certainly out of
+      domain. This is registered as an expected failure mode BEFORE scoring, in
+      results/sweep/retard_prereg.json, not discovered afterwards.
+    * Kilford's own abstract records that prediction accuracy is "high for
+      relatively hydrophilic drugs (logP/D <= 2.5)" and that "less accurate
+      prediction of the fu(hep) is observed for lipophilic drugs (logP > 3)".
+    * As published the rule uses **logP for BASES and logD7.4 for ACIDS AND
+      NEUTRALS** -- not, as is often misremembered, logP for neutrals. This
+      function is given whatever lipophilicity its caller holds and does not know
+      the compound's acid/base class, so it cannot apply that distinction. For a
+      genuinely neutral compound logP and logD7.4 coincide and the point is moot;
+      for the weakly basic members of the anchor set it is a real, uncorrected
+      approximation.
+
+    PROVENANCE OF THE COEFFICIENTS, STATED EXACTLY
+    ----------------------------------------------
+    **Both primary papers are paywalled and neither was read.** Kilford 2008 and
+    Hallifax & Houston 2006 are both closed at ASPET (HTTP 403), neither has a
+    PMC record, and Unpaywall reports ``is_oa: false`` for both DOIs. Kilford's
+    ABSTRACT is verified and confirms the substitution architecture in the
+    authors' own words, but carries no coefficients; Hallifax & Houston is a
+    Letter and PubMed records "[Abstract not available]".
+
+    The equation and all four constants were therefore read VERBATIM from two
+    INDEPENDENT open-access secondary sources, which agree exactly:
+      * Eur J Pharm Sci 2018, PMID 30098391, PMC6365006,
+        doi:10.1016/j.ejps.2018.08.008 -- gives both equations, defines ``C`` as
+        "the microsomal protein concentration in mg/mL", and defines ``VR`` as
+        "the ratio of cell volume to incubation volume ... 0.005 at a cell
+        concentration of 10^6 cells/mL".
+      * Yim DS, Bae SH, Choi S. Transl Clin Pharmacol 2021;29(2), PMID 34235120,
+        PMC8255549, doi:10.12793/tcp.2021.29.e12 -- same equation, same
+        constants, same ``VR`` definition and value.
+    This is a weaker provenance than a primary read and it is labelled as such
+    rather than dressed up.
+
+    Finally: the reading of ``125`` as mg protein-equivalent per mL of CELL volume
+    follows from the algebra of the substitution (``125*VR`` occupies exactly the
+    slot ``C`` in mg/mL occupies, and ``VR`` is dimensionless), and nothing
+    retrieved contradicts it -- but **no source states that the authors intended
+    it as a physical protein concentration.** Kilford's own abstract calls it "A
+    new nonlinear empirical equation". It is an empirical fit that is
+    dimensionally interpretable this way, not a measured intracellular protein
+    content, and that distinction is recorded rather than glossed.
+
+    The function is pure and total: it never returns a negative ratio.
+    """
+    lp = float(logp)
+    x = 10.0 ** (HALLIFAX_C2 * lp * lp + HALLIFAX_C1 * lp + HALLIFAX_C0)
+    return float(mg_equiv_per_ml_cell) * x
+
+
+def retardation_factor(
+    bound_to_free_ratio: float,
+    cell_volume_fraction: float = DEFAULT_CELL_VOLUME_FRACTION,
+    cell_partition: float = 1.0,
+) -> float:
+    """Retardation factor ``R`` by which reversible intracellular binding divides
+    the tissue-scale APPARENT diffusivity. ``R = 1 + phi*K*K_b``.
+
+    THE PHYSICS, AND WHY IT IS NOT WHAT IT LOOKS LIKE
+    -------------------------------------------------
+    The tempting form is "binding slows the molecule down, so put
+    ``D_cyto -> D_cyto/(1+K_b)`` into the inclusion conductivity". **That is wrong,
+    and the error matters.** Reversible binding at local equilibrium does not
+    change a STEADY-STATE conductance at all: at steady state the bound pool is
+    time-invariant, carries no flux, and drops out of the flux balance entirely.
+    Only the FREE profile drives transport, and the free profile obeys the
+    unretarded conductivity. What binding changes is CAPACITY, and capacity only
+    shows up in a TRANSIENT.
+
+    Write the homogenised problem in matrix-equivalent potential ``u`` (the
+    concentration the interstitium would hold in equilibrium with the local state).
+    Two coefficients appear, and they homogenise differently:
+
+        conductance  sigma_eff : matrix sigma_m, inclusion K*D_cyto
+                                 -> Maxwell / Hasselman & Johnson, ALREADY in this
+                                    module, and UNAFFECTED by binding.
+        capacity     s_eff     : matrix 1, inclusion K*(1 + K_b)
+                                 -> an exact VOLUME AVERAGE, because the amount
+                                    stored per unit volume at equilibrium is a
+                                    volume average and nothing else.
+
+        s_eff = (1 - phi)*1 + phi*K*(1 + K_b)
+
+    and the apparent (transient) diffusivity is ``D_app = sigma_eff / s_eff``. That
+    is the standard retardation-factor result, and `results/two_route_efflux.md`
+    2.2 (iii) already named its absence as the model's missing "capacity term".
+
+    THE MINIMAL ADDITIVE FORM, WHICH IS WHAT THIS FUNCTION RETURNS
+    --------------------------------------------------------------
+    This module's published output is a CONDUCTANCE, computed against a convention
+    in which the no-binding capacity is 1. Relitigating that convention would
+    change what the model already ships. So the retardation term is introduced as
+    the RATIO of the capacity with binding to the capacity without it, which
+    isolates exactly the new physics and nothing else:
+
+        R = s_eff(K_b) / s_eff(K_b = 0)
+          = [(1-phi) + phi*K*(1+K_b)] / [(1-phi) + phi*K]
+          = 1 + phi*K*K_b / [(1-phi) + phi*K]
+
+    and at the pre-registered ``K = 1`` the denominator is exactly 1, giving the
+    quoted ``R = 1 + phi*K_b``. ``K_b = 0`` gives ``R = 1`` exactly, so the term is
+    bitwise off by default.
+
+    THE CONSEQUENCE THAT MUST NOT BE GLOSSED
+    -----------------------------------------
+    Because binding does not touch conductance, ``transcellular_gain`` -- which is
+    a ratio of two conductances -- is **identically unchanged** by this term. Any
+    claim that retardation "reduces paclitaxel's transcellular gain" is false as
+    stated. What retardation reduces is the APPARENT diffusivity, and it reduces
+    it for every compound that partitions into cells, lipophilic ones most.
+
+    THE LIMIT OF VALIDITY, STATED HERE BECAUSE IT IS LOAD-BEARING
+    -------------------------------------------------------------
+    Volume-averaging the capacity assumes the cell interior is in LOCAL EQUILIBRIUM
+    with the interstitium on the timescale of the measurement. A cell behind a shut
+    membrane cannot store solute any faster than the membrane admits it, so for
+    large ``membrane_resistance_ratio`` the full capacity is not accessed within a
+    finite experiment and this factor OVER-states the retardation.
+    :func:`equilibration_time_s` returns the timescale that has to be short
+    compared with the experiment for this term to be applicable, and
+    ``experiments/intracellular_retardation.py --stage algebra`` measures the
+    breakdown directly rather than asserting it.
+    """
+    kb = float(bound_to_free_ratio)
+    if kb < 0:
+        raise ValueError(f"bound_to_free_ratio must be >= 0, got {kb!r}")
+    phi = float(cell_volume_fraction)
+    if not (0.0 <= phi < 1.0):
+        raise ValueError(f"cell_volume_fraction must be in [0,1), got {phi!r}")
+    k = float(cell_partition)
+    if k < 0:
+        raise ValueError(f"cell_partition must be >= 0, got {k!r}")
+    s0 = (1.0 - phi) + phi * k
+    if s0 <= 0.0:
+        return 1.0
+    return 1.0 + phi * k * kb / s0
+
+
+def equilibration_time_s(
+    bound_to_free_ratio: float,
+    membrane_permeability_um_s: float,
+    cell_radius_um: float = DEFAULT_CELL_RADIUS_UM,
+    cell_partition: float = 1.0,
+) -> float:
+    """Time for one cell to load its bound pool through its own membrane, seconds.
+
+    A sphere of radius ``a`` with capacity ``K*(1+K_b)`` per unit volume, fed
+    through a membrane of permeability ``P``, has volume-to-area ratio ``a/3`` and
+    so relaxes exponentially with time constant
+
+        tau = (a/3) * K*(1 + K_b) / P.
+
+    :func:`retardation_factor` assumes local equilibrium, i.e. ``tau`` SHORT
+    compared with the experiment being modelled. Where ``tau`` is long the
+    retardation factor is an upper bound rather than an estimate, and the honest
+    reading is that the cell's capacity is only partly accessible. Returns
+    ``inf`` at zero permeability, which is the correct statement that a sealed
+    cell never equilibrates.
+    """
+    p = float(membrane_permeability_um_s)
+    if p <= 0.0:
+        return float("inf")
+    kb = float(bound_to_free_ratio)
+    return (float(cell_radius_um) / 3.0) * float(cell_partition) * (1.0 + kb) / p
+
+
 def two_route_ceiling(
     cell_volume_fraction: float,
     interstitial_D_um2s: float,
@@ -512,6 +754,7 @@ def two_route_diffusivity(
     hbd_decrement: float = HBD_LOGP_DECREMENT,
     d_over_water: float = CYTOPLASM_D_OVER_WATER,
     efflux_ratio: Optional[float] = None,
+    bound_to_free_ratio: Optional[float] = None,
 ) -> Dict[str, float]:
     """End-to-end: engine interstitial D + (logP, HBD, radius) -> tissue D_eff.
 
@@ -526,6 +769,14 @@ def two_route_diffusivity(
     ratio*, which must stay ``None`` here rather than becoming 1.0, so that "no
     efflux measured" and "measured to have no efflux" remain distinguishable in
     the caller's reporting.
+
+    ``bound_to_free_ratio`` (``K_b``) is OPT-IN and defaults to ``None``, which is
+    bitwise identical to omitting it. When supplied it adds the intracellular
+    retardation term of :func:`retardation_factor`, which acts on CAPACITY and
+    therefore appears ONLY in the new ``apparent_*`` outputs. ``hindrance``,
+    ``effective_D_um2s`` and ``transcellular_gain`` are conductances and are
+    **unchanged by it, by construction** -- see :func:`retardation_factor` for why
+    that is the physics and not an omission.
     """
     mem = membrane_permeability_um_s(
         logp, hbd, solute_radius_nm, temperature_K=temperature_K,
@@ -556,6 +807,27 @@ def two_route_diffusivity(
         "cell_partition_passive": float(cell_partition),
         "cell_partition_effective": k_eff,
         "efflux_ratio": None if efflux_ratio is None else float(efflux_ratio),
+    })
+
+    # ---- intracellular retardation: CAPACITY, not conductance. Default-off. --
+    if bound_to_free_ratio is None:
+        r_factor = 1.0
+    else:
+        r_factor = retardation_factor(
+            bound_to_free_ratio, cell_volume_fraction=cell_volume_fraction,
+            cell_partition=k_eff)
+    res.update({
+        "bound_to_free_ratio": (None if bound_to_free_ratio is None
+                                else float(bound_to_free_ratio)),
+        "retardation_factor": r_factor,
+        "apparent_hindrance": res["hindrance"] / r_factor,
+        "apparent_D_um2s": res["effective_D_um2s"] / r_factor,
+        "equilibration_time_s": (
+            float("nan") if bound_to_free_ratio is None else
+            equilibration_time_s(bound_to_free_ratio,
+                                 mem["permeability_um_s"],
+                                 cell_radius_um=cell_radius_um,
+                                 cell_partition=k_eff)),
     })
     return res
 
@@ -689,5 +961,54 @@ if __name__ == "__main__":
           f"{open_['transcellular_gain']:.4f} -> {open_e['transcellular_gain']:.4f} "
           f"at ER = 39")
     assert open_e["transcellular_gain"] < open_["transcellular_gain"] * 0.5
+
+    # ---- [7] RETARDATION: capacity, not conductance ---------------------------
+    # The whole content of this term is that binding changes the amount a tissue
+    # can HOLD, not the rate at which it conducts. The two are separate
+    # coefficients of the homogenised problem and they compose differently: the
+    # conductance by Maxwell, the capacity by an exact volume average. The check
+    # below is that the retardation factor really is the ratio of two volume
+    # averages, and that it is arithmetically incapable of moving a conductance.
+    print("\n[7] intracellular retardation: R = s_eff(K_b)/s_eff(0)")
+    worst_r = 0.0
+    for ph in (0.1, 0.4, PHI, 0.95):
+        for kk in (0.5, 1.0, 3.0):
+            for kb in (0.0, 0.3, 3.0, 30.0, 300.0, 3000.0):
+                s0 = (1.0 - ph) + ph * kk
+                s1 = (1.0 - ph) + ph * kk * (1.0 + kb)
+                mine = retardation_factor(kb, cell_volume_fraction=ph,
+                                          cell_partition=kk)
+                worst_r = max(worst_r, abs(mine - s1 / s0) / (s1 / s0))
+    assert worst_r < 1e-14, worst_r
+    print(f"    max relative error over 72 (phi, K, K_b) points = {worst_r:.3g}")
+
+    # default-off must be BITWISE off
+    _b = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)
+    assert _b["retardation_factor"] == 1.0
+    assert _b["apparent_D_um2s"] == _b["effective_D_um2s"]
+    assert two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4,
+                                 bound_to_free_ratio=None)["hindrance"] == \
+        _b["hindrance"]
+
+    # THE PREDICTION: no value of K_b may move a conductance.
+    for _kb in (0.0, 1.0, 1e2, 1e4, 1e8):
+        _r = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4,
+                                   bound_to_free_ratio=_kb)
+        assert _r["transcellular_gain"] == _b["transcellular_gain"]
+        assert _r["hindrance"] == _b["hindrance"]
+    print("    transcellular_gain is INVARIANT under K_b, as it must be:")
+    print(f"      paclitaxel-like gain = {_b['transcellular_gain']:.4f} at K_b = 0")
+    print(f"      paclitaxel-like gain = {_r['transcellular_gain']:.4f} at K_b = 1e8")
+    print("    -> 'retardation reduces the transcellular gain' is FALSE as stated.")
+    print("       What it reduces is the APPARENT diffusivity. See")
+    print("       results/intracellular_retardation.md.")
+
+    print(f"\n    the structural rule, and the row that condemns it:")
+    print(f"      {'logP':>7}{'K_b':>10}{'bound %':>10}{'R':>10}")
+    for _lp in (-2.62, 0.0, 2.0, 3.74):
+        _kb2 = binding_capacity_from_logp(_lp)
+        print(f"      {_lp:>7.2f}{_kb2:>10.2f}{_kb2/(1+_kb2):>9.1%}"
+              f"{retardation_factor(_kb2):>10.2f}")
+    print("      logP 0 -> 90% bound. Urea and mannitol are in the anchor set.")
 
     print(f"\nAll asserts passed. Runtime {_time.time() - t0:.2f} s")

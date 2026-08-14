@@ -1,0 +1,148 @@
+{
+ "D_ship_cm2_s": 1.4040894686945413e-06,
+ "scales": {
+  "doxorubicin": 0.018033586080044593,
+  "paclitaxel": 0.0018051741260042798,
+  "docetaxel": 0.0021185404797645197,
+  "epirubicin": 0.018033586080044593,
+  "5-fluorouracil": 0.018467673482983265,
+  "cisplatin": 0.018918712533600574
+ },
+ "rows": [
+  {
+   "mode": "frozen",
+   "drug": "doxorubicin",
+   "scale": 0.018033586080044593,
+   "ratio_ship": 0.23013330629020515,
+   "ratio_corr": 0.06812529062008049,
+   "verdict_ship": "PASS",
+   "verdict_corr": "PASS",
+   "alpha_corr": 148.60815765445545,
+   "moved": false
+  },
+  {
+   "mode": "frozen",
+   "drug": "paclitaxel",
+   "scale": 0.0018051741260042798,
+   "ratio_ship": 0.15028661822296227,
+   "ratio_corr": 0.02107549385339751,
+   "verdict_ship": "NOT TESTABLE",
+   "verdict_corr": "NOT TESTABLE",
+   "alpha_corr": 148.60815765445545,
+   "moved": false
+  },
+  {
+   "mode": "frozen",
+   "drug": "docetaxel",
+   "scale": 0.0021185404797645197,
+   "ratio_ship": 0.14842965466495936,
+   "ratio_corr": 0.020970956635296887,
+   "verdict_ship": "FAIL",
+   "verdict_corr": "PASS",
+   "alpha_corr": 148.60815765445545,
+   "moved": true
+  },
+  {
+   "mode": "frozen",
+   "drug": "epirubicin",
+   "scale": 0.018033586080044593,
+   "ratio_ship": 0.23013330629020515,
+   "ratio_corr": 0.06812529062008049,
+   "verdict_ship": "PASS",
+   "verdict_corr": "PASS",
+   "alpha_corr": 148.60815765445545,
+   "moved": false
+  },
+  {
+   "mode": "frozen",
+   "drug": "5-fluorouracil",
+   "scale": 0.018467673482983265,
+   "ratio_ship": 0.3378821161474709,
+   "ratio_corr": 0.1620431759982273,
+   "verdict_ship": "NOT TESTABLE",
+   "verdict_corr": "NOT TESTABLE",
+   "alpha_corr": 148.60815765445545,
+   "moved": false
+  },
+  {
+   "mode": "frozen",
+   "drug": "cisplatin",
+   "scale": 0.018918712533600574,
+   "ratio_ship": 0.3084627482484707,
+   "ratio_corr": 0.13119260784301784,
+   "verdict_ship": "PASS",
+   "verdict_corr": "FAIL",
+   "alpha_corr": 148.60815765445545,
+   "moved": true
+  },
+  {
+   "mode": "recal",
+   "drug": "doxorubicin",
+   "scale": 0.018033586080044593,
+   "ratio_ship": 0.23013330629020515,
+   "ratio_corr": 0.23954165382112272,
+   "verdict_ship": "PASS",
+   "verdict_corr": "PASS",
+   "alpha_corr": 2.4031195642997716,
+   "moved": false
+  },
+  {
+   "mode": "recal",
+   "drug": "paclitaxel",
+   "scale": 0.0018051741260042798,
+   "ratio_ship": 0.15028661822296227,
+   "ratio_corr": 0.15201838314495278,
+   "verdict_ship": "NOT TESTABLE",
+   "verdict_corr": "NOT TESTABLE",
+   "alpha_corr": -0.01311497657029985,
+   "moved": false
+  },
+  {
+   "mode": "recal",
+   "drug": "docetaxel",
+   "scale": 0.0021185404797645197,
+   "ratio_ship": 0.14842965466495936,
+   "ratio_corr": 0.15953359525004632,
+   "verdict_ship": "FAIL",
+   "verdict_corr": "FAIL",
+   "alpha_corr": 0.03354276054823042,
+   "moved": false
+  },
+  {
+   "mode": "recal",
+   "drug": "epirubicin",
+   "scale": 0.018033586080044593,
+   "ratio_ship": 0.23013330629020515,
+   "ratio_corr": 0.23954165382112272,
+   "verdict_ship": "PASS",
+   "verdict_corr": "PASS",
+   "alpha_corr": 2.4031195642997716,
+   "moved": false
+  },
+  {
+   "mode": "recal",
+   "drug": "5-fluorouracil",
+   "scale": 0.018467673482983265,
+   "ratio_ship": 0.3378821161474709,
+   "ratio_corr": 0.30910116749236155,
+   "verdict_ship": "NOT TESTABLE",
+   "verdict_corr": "NOT TESTABLE",
+   "alpha_corr": 2.467698114084283,
+   "moved": false
+  },
+  {
+   "mode": "recal",
+   "drug": "cisplatin",
+   "scale": 0.018918712533600574,
+   "ratio_ship": 0.3084627482484707,
+   "ratio_corr": 0.28872517813579784,
+   "verdict_ship": "PASS",
+   "verdict_corr": "PASS",
+   "alpha_corr": 2.53492767165962,
+   "moved": false
+  }
+ ],
+ "n_moved": 2,
+ "n_rows": 12,
+ "out_json": "/Users/samarthbasanth/tme-sim/results/sweep/retard_sweep_dx12.json"
+}

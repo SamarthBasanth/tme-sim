@@ -396,3 +396,134 @@ def test_parameters_match_the_pre_registration():
     assert two_route.BILAYER_THICKNESS_NM == p["bilayer_thickness_nm"]["value"]
     assert two_route.LOGK_MEMBRANE_MAX == p["logk_membrane_max"]["value"]
     assert two_route.HBD_LOGP_DECREMENT == p["hbd_logp_decrement"]["value"]
+
+
+# --------------------------------------------------------------------------- #
+# 8. INTRACELLULAR RETARDATION -- the CAPACITY term.
+#
+# The point of these tests is that retardation is a statement about CAPACITY and
+# not about conductance, that it is therefore arithmetically incapable of moving
+# `transcellular_gain`, and that it is bitwise off by default. See
+# results/intracellular_retardation.md.
+# --------------------------------------------------------------------------- #
+class TestIntracellularRetardation:
+    def test_retardation_is_opt_in_and_bit_identical_when_off(self):
+        """Omitting `bound_to_free_ratio` and passing None must be BITWISE identical."""
+        a = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)
+        b = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4, bound_to_free_ratio=None)
+        assert a["hindrance"] == b["hindrance"]
+        assert a["effective_D_um2s"] == b["effective_D_um2s"]
+        assert a["retardation_factor"] == 1.0
+        assert a["apparent_D_um2s"] == a["effective_D_um2s"]
+        assert a["apparent_hindrance"] == a["hindrance"]
+
+    def test_zero_binding_is_exactly_a_no_op(self):
+        a = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)
+        b = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4, bound_to_free_ratio=0.0)
+        assert b["retardation_factor"] == 1.0
+        assert b["apparent_D_um2s"] == a["effective_D_um2s"]
+
+    def test_retardation_cannot_move_a_conductance(self):
+        """THE test. `transcellular_gain` is a ratio of two CONDUCTANCES, and
+        reversible binding does not touch a conductance. No value of K_b may
+        move it. This is what makes "retardation reduces paclitaxel's gain"
+        false as stated -- see results/intracellular_retardation.md."""
+        base = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)
+        for kb in (0.0, 1.0, 1e2, 1e4, 1e8):
+            r = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4,
+                                      bound_to_free_ratio=kb)
+            assert r["transcellular_gain"] == base["transcellular_gain"]
+            assert r["hindrance"] == base["hindrance"]
+            assert r["effective_D_um2s"] == base["effective_D_um2s"]
+
+    def test_retardation_identity_against_the_capacity_ratio(self):
+        """R must be exactly s_eff(K_b)/s_eff(0), the ratio of two volume averages.
+
+        If this fails the term is not a capacity ratio and its derivation in
+        two_route.retardation_factor does not apply.
+        """
+        worst = 0.0
+        for phi in (0.0, 0.1, 0.4, PHI, 0.95):
+            for k in (0.5, 1.0, 3.0):
+                for kb in (0.0, 0.3, 3.0, 30.0, 300.0, 3000.0):
+                    s0 = (1.0 - phi) + phi * k
+                    s1 = (1.0 - phi) + phi * k * (1.0 + kb)
+                    direct = s1 / s0
+                    mine = two_route.retardation_factor(
+                        kb, cell_volume_fraction=phi, cell_partition=k)
+                    worst = max(worst, abs(mine - direct) / direct)
+        assert worst < 1e-14, worst
+
+    def test_retardation_is_monotone_and_never_speeds_anything_up(self):
+        prev = 0.0
+        for kb in (0.0, 0.1, 1.0, 10.0, 1000.0):
+            r = two_route.retardation_factor(kb)
+            assert r >= 1.0
+            assert r >= prev
+            prev = r
+
+    def test_no_cells_means_no_retardation_however_hard_the_drug_binds(self):
+        """phi -> 0 leaves nothing to bind to, so R must be exactly 1."""
+        for kb in (0.0, 10.0, 1e6):
+            assert two_route.retardation_factor(
+                kb, cell_volume_fraction=0.0) == 1.0
+
+    def test_rejects_nonsense_inputs(self):
+        with pytest.raises(ValueError):
+            two_route.retardation_factor(-1.0)
+        with pytest.raises(ValueError):
+            two_route.retardation_factor(1.0, cell_volume_fraction=1.0)
+        with pytest.raises(ValueError):
+            two_route.retardation_factor(1.0, cell_partition=-1.0)
+
+    def test_structural_rule_reproduces_its_own_derivation(self):
+        """K_b = 125 * 10**(0.072 logP^2 + 0.067 logP - 1.126), and the value at
+        logP = 0 is the one the pre-registration calls out as out-of-domain."""
+        for lp in (-2.62, -0.8, 0.0, 2.0, 3.74):
+            expect = 125.0 * 10.0 ** (0.072 * lp * lp + 0.067 * lp - 1.126)
+            assert abs(two_route.binding_capacity_from_logp(lp) - expect) < 1e-12
+        assert abs(two_route.binding_capacity_from_logp(0.0) - 9.3521) < 1e-3
+
+    def test_equilibration_time_is_infinite_for_a_sealed_cell(self):
+        """A cell that admits nothing never loads its bound pool. This is the
+        guard on the local-equilibrium assumption that the retardation factor
+        rests on."""
+        assert two_route.equilibration_time_s(10.0, 0.0) == float("inf")
+        fast = two_route.equilibration_time_s(10.0, 1e4)
+        slow = two_route.equilibration_time_s(10.0, 1e-4)
+        assert slow > fast
+        # more binding takes proportionally longer to load
+        assert abs(two_route.equilibration_time_s(1.0, 1.0)
+                   / two_route.equilibration_time_s(0.0, 1.0) - 2.0) < 1e-12
+
+    def test_retardation_composes_with_efflux_without_interfering(self):
+        """Efflux acts on the partition K (a conductance leg) and retardation on
+        the capacity. Both may be on at once and neither may corrupt the other."""
+        a = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4, efflux_ratio=39.0)
+        b = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4, efflux_ratio=39.0,
+                                  bound_to_free_ratio=30.0)
+        assert b["hindrance"] == a["hindrance"]
+        assert b["transcellular_gain"] == a["transcellular_gain"]
+        assert b["apparent_D_um2s"] < a["apparent_D_um2s"]
+
+
+def test_retardation_parameters_match_the_pre_registration():
+    """The retardation pre-registration was written BEFORE the term was scored.
+    If a constant is later tuned to Pruijn, this fails."""
+    import json
+    import os
+
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "results", "sweep", "retard_prereg.json")
+    if not os.path.exists(path):
+        pytest.skip("retardation pre-registration file not present")
+    reg = json.load(open(path))
+    rule = reg["quantities_added"]["structural_rule_for_K_b"]["value"]
+    assert "125" in rule and "0.072" in rule and "0.067" in rule and "1.126" in rule
+    assert two_route.KILFORD_MG_EQUIV_PER_ML_CELL == 125.0
+    assert two_route.HALLIFAX_C2 == 0.072
+    assert two_route.HALLIFAX_C1 == 0.067
+    assert two_route.HALLIFAX_C0 == -1.126
+    # the term must still be OFF by default
+    assert (reg["quantities_added"]["structural_rule_for_K_b"]
+            ["adopted_in_code_as_default"]) is False
