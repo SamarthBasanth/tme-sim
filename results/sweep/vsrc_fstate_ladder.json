@@ -1,0 +1,431 @@
+{
+  "rows": [
+    {
+      "dx_um": 30.0,
+      "grid": [
+        170,
+        271
+      ],
+      "n_tumour": 23812,
+      "binary": {
+        "f_state": 0.504115571980514,
+        "quiescent_frac": 0.9917688560389719,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.008231143961028054,
+        "mean_o2": 0.33635856975449263,
+        "source_area_um2": 713700.0,
+        "source_sum_over_tissue": 793.0,
+        "oxygen_mean_tissue": 0.33826462291275605
+      },
+      "area": {
+        "f_state": 0.54239459096254,
+        "quiescent_frac": 0.9152108180749202,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.0847891819250798,
+        "mean_o2": 0.3473598367034014,
+        "source_area_um2": 742713.0,
+        "source_sum_over_tissue": 825.2366666666667,
+        "oxygen_mean_tissue": 0.35069099475459187
+      },
+      "area_matched": {
+        "f_state": 0.5123677137577692,
+        "quiescent_frac": 0.9752645724844616,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.024735427515538384,
+        "mean_o2": 0.33851331125606204,
+        "source_area_um2": 713700.0000000001,
+        "source_sum_over_tissue": 793.0,
+        "oxygen_mean_tissue": 0.34177929673188123
+      },
+      "secs": 1.0711088180541992
+    },
+    {
+      "dx_um": 24.0,
+      "grid": [
+        213,
+        338
+      ],
+      "n_tumour": 23812,
+      "binary": {
+        "f_state": 0.5392239207122459,
+        "quiescent_frac": 0.9215521585755081,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.07844784142449185,
+        "mean_o2": 0.3474738047758426,
+        "source_area_um2": 748800.0,
+        "source_sum_over_tissue": 1300.0,
+        "oxygen_mean_tissue": 0.3508551443812605
+      },
+      "area": {
+        "f_state": 0.5424575844112213,
+        "quiescent_frac": 0.9150848311775576,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08491516882244246,
+        "mean_o2": 0.347337152502983,
+        "source_area_um2": 742712.9999999999,
+        "source_sum_over_tissue": 1289.4322916666665,
+        "oxygen_mean_tissue": 0.35065046197339544
+      },
+      "area_matched": {
+        "f_state": 0.5473500755921384,
+        "quiescent_frac": 0.9052998488157231,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09470015118427684,
+        "mean_o2": 0.3491618475711076,
+        "source_area_um2": 748800.0,
+        "source_sum_over_tissue": 1300.0,
+        "oxygen_mean_tissue": 0.35248843739907987
+      },
+      "secs": 1.400390863418579
+    },
+    {
+      "dx_um": 18.0,
+      "grid": [
+        283,
+        451
+      ],
+      "n_tumour": 23812,
+      "binary": {
+        "f_state": 0.5401478246262389,
+        "quiescent_frac": 0.9197043507475222,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08029564925247774,
+        "mean_o2": 0.3481736251283784,
+        "source_area_um2": 746496.0,
+        "source_sum_over_tissue": 2304.0,
+        "oxygen_mean_tissue": 0.3514545702604146
+      },
+      "area": {
+        "f_state": 0.5422476062489501,
+        "quiescent_frac": 0.9155047875020997,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08449521249790022,
+        "mean_o2": 0.3473081790061388,
+        "source_area_um2": 742712.9999999999,
+        "source_sum_over_tissue": 2292.3240740740744,
+        "oxygen_mean_tissue": 0.35064294179869676
+      },
+      "area_matched": {
+        "f_state": 0.5454812699479255,
+        "quiescent_frac": 0.9090374601041492,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09096253989585083,
+        "mean_o2": 0.3484432647879859,
+        "source_area_um2": 746495.9999999998,
+        "source_sum_over_tissue": 2304.0,
+        "oxygen_mean_tissue": 0.3517863563510994
+      },
+      "secs": 2.5874648094177246
+    },
+    {
+      "dx_um": 16.0,
+      "grid": [
+        318,
+        507
+      ],
+      "n_tumour": 23812,
+      "binary": {
+        "f_state": 0.5333235343524273,
+        "quiescent_frac": 0.9333529312951453,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.06664706870485469,
+        "mean_o2": 0.3477841129275725,
+        "source_area_um2": 745728.0,
+        "source_sum_over_tissue": 2913.0,
+        "oxygen_mean_tissue": 0.350839224108835
+      },
+      "area": {
+        "f_state": 0.5421006215353603,
+        "quiescent_frac": 0.9157987569292794,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08420124307072065,
+        "mean_o2": 0.3472970500040988,
+        "source_area_um2": 742713.0,
+        "source_sum_over_tissue": 2901.22265625,
+        "oxygen_mean_tissue": 0.35064306437193704
+      },
+      "area_matched": {
+        "f_state": 0.5448933310935663,
+        "quiescent_frac": 0.9102133378128675,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08978666218713253,
+        "mean_o2": 0.3482017204228915,
+        "source_area_um2": 745728.0000000001,
+        "source_sum_over_tissue": 2913.0000000000005,
+        "oxygen_mean_tissue": 0.35155438769347014
+      },
+      "secs": 3.216313123703003
+    },
+    {
+      "dx_um": 12.0,
+      "grid": [
+        424,
+        675
+      ],
+      "n_tumour": 23812,
+      "binary": {
+        "f_state": 0.5502057785990258,
+        "quiescent_frac": 0.8995884428019486,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.10041155719805141,
+        "mean_o2": 0.34862776586515865,
+        "source_area_um2": 748656.0,
+        "source_sum_over_tissue": 5199.0,
+        "oxygen_mean_tissue": 0.35204854974974675
+      },
+      "area": {
+        "f_state": 0.5421636149840416,
+        "quiescent_frac": 0.9156727700319167,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08432722996808333,
+        "mean_o2": 0.34728122077493817,
+        "source_area_um2": 742712.9999999999,
+        "source_sum_over_tissue": 5157.729166666667,
+        "oxygen_mean_tissue": 0.3506589134543089
+      },
+      "area_matched": {
+        "f_state": 0.5471190996136401,
+        "quiescent_frac": 0.9057618007727196,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09423819922728036,
+        "mean_o2": 0.3490574007133154,
+        "source_area_um2": 748655.9999999998,
+        "source_sum_over_tissue": 5198.999999999998,
+        "oxygen_mean_tissue": 0.3524482144973256
+      },
+      "secs": 5.852694034576416
+    },
+    {
+      "dx_um": 10.0,
+      "grid": [
+        508,
+        810
+      ],
+      "n_tumour": 23812,
+      "binary": {
+        "f_state": 0.5304888291617672,
+        "quiescent_frac": 0.9390223416764657,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.06097765832353435,
+        "mean_o2": 0.3461460301042975,
+        "source_area_um2": 739200.0,
+        "source_sum_over_tissue": 7392.0,
+        "oxygen_mean_tissue": 0.34963265836282703
+      },
+      "area": {
+        "f_state": 0.5419746346379977,
+        "quiescent_frac": 0.9160507307240047,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.0839492692759953,
+        "mean_o2": 0.3472693398531531,
+        "source_area_um2": 742712.9999999998,
+        "source_sum_over_tissue": 7427.13,
+        "oxygen_mean_tissue": 0.3506572430507649
+      },
+      "area_matched": {
+        "f_state": 0.5386569796741139,
+        "quiescent_frac": 0.9226860406517722,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.07731395934822778,
+        "mean_o2": 0.3462118140884347,
+        "source_area_um2": 739200.0000000001,
+        "source_sum_over_tissue": 7392.000000000003,
+        "oxygen_mean_tissue": 0.34959178425362275
+      },
+      "secs": 10.513845920562744
+    },
+    {
+      "dx_um": 8.0,
+      "grid": [
+        635,
+        1012
+      ],
+      "n_tumour": 23812,
+      "binary": {
+        "f_state": 0.5488199227280363,
+        "quiescent_frac": 0.9023601545439275,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09763984545607257,
+        "mean_o2": 0.34824485820140866,
+        "source_area_um2": 746816.0,
+        "source_sum_over_tissue": 11669.0,
+        "oxygen_mean_tissue": 0.3517610025927162
+      },
+      "area": {
+        "f_state": 0.5419536368217706,
+        "quiescent_frac": 0.9160927263564589,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08390727364354107,
+        "mean_o2": 0.34725994499419216,
+        "source_area_um2": 742713.0,
+        "source_sum_over_tissue": 11604.890625,
+        "oxygen_mean_tissue": 0.35066307651630907
+      },
+      "area_matched": {
+        "f_state": 0.5453552830505627,
+        "quiescent_frac": 0.9092894338988745,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09071056610112549,
+        "mean_o2": 0.34831001746831697,
+        "source_area_um2": 746816.0000000006,
+        "source_sum_over_tissue": 11669.0,
+        "oxygen_mean_tissue": 0.3517223483594966
+      },
+      "secs": 17.011137008666992
+    },
+    {
+      "dx_um": 7.0,
+      "grid": [
+        725,
+        1157
+      ],
+      "n_tumour": 23812,
+      "binary": {
+        "f_state": 0.5406727700319167,
+        "quiescent_frac": 0.9186544599361667,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08134554006383336,
+        "mean_o2": 0.34689689094832576,
+        "source_area_um2": 741517.0,
+        "source_sum_over_tissue": 15133.0,
+        "oxygen_mean_tissue": 0.35032747742817555
+      },
+      "area": {
+        "f_state": 0.5419326390055434,
+        "quiescent_frac": 0.9161347219889131,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08386527801108684,
+        "mean_o2": 0.34725435861727677,
+        "source_area_um2": 742713.0000000002,
+        "source_sum_over_tissue": 15157.408163265312,
+        "oxygen_mean_tissue": 0.3506670896229466
+      },
+      "area_matched": {
+        "f_state": 0.5407147656643709,
+        "quiescent_frac": 0.9185704686712582,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08142953132874181,
+        "mean_o2": 0.34689475484687043,
+        "source_area_um2": 741516.9999999995,
+        "source_sum_over_tissue": 15132.999999999996,
+        "oxygen_mean_tissue": 0.35030476291296325
+      },
+      "secs": 25.852863073349
+    },
+    {
+      "dx_um": 6.0,
+      "grid": [
+        846,
+        1349
+      ],
+      "n_tumour": 23812,
+      "binary": {
+        "f_state": 0.5390139425499748,
+        "quiescent_frac": 0.9219721149000504,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.07802788509994961,
+        "mean_o2": 0.3476118438596761,
+        "source_area_um2": 743904.0,
+        "source_sum_over_tissue": 20664.0,
+        "oxygen_mean_tissue": 0.3510077380409186
+      },
+      "area": {
+        "f_state": 0.5419746346379977,
+        "quiescent_frac": 0.9160507307240047,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.0839492692759953,
+        "mean_o2": 0.34724903670928353,
+        "source_area_um2": 742713.0,
+        "source_sum_over_tissue": 20630.916666666664,
+        "oxygen_mean_tissue": 0.3506763228797066
+      },
+      "area_matched": {
+        "f_state": 0.542793549470855,
+        "quiescent_frac": 0.91441290105829,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08558709894171006,
+        "mean_o2": 0.34749021774050165,
+        "source_area_um2": 743904.0000000002,
+        "source_sum_over_tissue": 20664.0,
+        "oxygen_mean_tissue": 0.3509195353308239
+      },
+      "secs": 46.66008806228638
+    },
+    {
+      "dx_um": 5.0,
+      "grid": [
+        1015,
+        1619
+      ],
+      "n_tumour": 23812,
+      "binary": {
+        "f_state": 0.5435074752225768,
+        "quiescent_frac": 0.9129850495548463,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.0870149504451537,
+        "mean_o2": 0.3475722508302159,
+        "source_area_um2": 744000.0,
+        "source_sum_over_tissue": 29760.0,
+        "oxygen_mean_tissue": 0.3509901358117031
+      },
+      "area": {
+        "f_state": 0.5419116411893163,
+        "quiescent_frac": 0.9161767176213674,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08382328237863262,
+        "mean_o2": 0.3472428801362463,
+        "source_area_um2": 742713.0000000002,
+        "source_sum_over_tissue": 29708.52,
+        "oxygen_mean_tissue": 0.35068308423805433
+      },
+      "area_matched": {
+        "f_state": 0.5426675625734924,
+        "quiescent_frac": 0.9146648748530153,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08533512514698471,
+        "mean_o2": 0.34746166187826455,
+        "source_area_um2": 744000.0000000001,
+        "source_sum_over_tissue": 29760.000000000004,
+        "oxygen_mean_tissue": 0.3509035967361433
+      },
+      "secs": 99.47819495201111
+    }
+  ],
+  "arms": [
+    "binary",
+    "area",
+    "area_matched"
+  ],
+  "summary": {
+    "binary": {
+      "f_state_min": 0.504115571980514,
+      "f_state_max": 0.5502057785990258,
+      "f_state_span": 0.04609020661851171,
+      "mean_o2_span": 0.012269196110666014,
+      "quiescent_span": 0.0921804132370233,
+      "f_state_at_production": 0.5502057785990258,
+      "source_area_span_pct": 4.731212536985344,
+      "drift_removed_frac": 0.0
+    },
+    "area": {
+      "f_state_min": 0.5419116411893163,
+      "f_state_max": 0.5424575844112213,
+      "f_state_span": 0.000545943221904932,
+      "mean_o2_span": 0.00011695656715510205,
+      "quiescent_span": 0.001091886443809864,
+      "f_state_at_production": 0.5421636149840416,
+      "source_area_span_pct": 6.269733898662596e-14,
+      "drift_removed_frac": 0.9881548974943051
+    },
+    "area_matched": {
+      "f_state_min": 0.5123677137577692,
+      "f_state_max": 0.5473500755921384,
+      "f_state_span": 0.0349823618343692,
+      "mean_o2_span": 0.010648536315045531,
+      "quiescent_span": 0.06996472366873852,
+      "f_state_at_production": 0.5471190996136401,
+      "source_area_span_pct": 4.731212536985328,
+      "drift_removed_frac": 0.24100227790432904
+    }
+  }
+}

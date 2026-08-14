@@ -1,0 +1,12 @@
+{
+  "alpha": 148.60815765445545,
+  "alpha_expected": 148.60815765445545,
+  "alpha_unchanged": true,
+  "oxygen_supply": 0.05,
+  "oxygen_consumption": 0.02,
+  "hypoxia_threshold": 0.2,
+  "quiescent_ceiling": 0.4,
+  "vessel_radius_um": 7.5,
+  "default_vascular_mode": "discrete",
+  "discrete_default_geometry": "binary"
+}

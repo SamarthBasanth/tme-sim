@@ -1,0 +1,308 @@
+{
+  "rows": [
+    {
+      "dx_um": 30.0,
+      "grid": [
+        170,
+        271
+      ],
+      "n_endothelial_cells": 4295,
+      "n_vessels": 3091,
+      "cell_area_um2": 900.0,
+      "disc_over_cell_area": 0.19634954084936207,
+      "binary_area_um2": 713700.0,
+      "area_area_um2": 742713.0,
+      "area_unmasked_um2": 742713.0,
+      "subgrid_area_um2": 347326.706305627,
+      "binary_support_frac": 0.02560046487603306,
+      "area_support_frac": 0.21048553719008264,
+      "area_saturated_frac": 0.0,
+      "tissue_frac": 0.6723681354460603,
+      "shipped_is_binary": true,
+      "secs": 1.0817410945892334
+    },
+    {
+      "dx_um": 24.0,
+      "grid": [
+        213,
+        338
+      ],
+      "n_endothelial_cells": 4295,
+      "n_vessels": 3091,
+      "cell_area_um2": 576.0,
+      "disc_over_cell_area": 0.30679615757712825,
+      "binary_area_um2": 748800.0,
+      "area_area_um2": 742712.9999999999,
+      "area_unmasked_um2": 742712.9999999999,
+      "subgrid_area_um2": 347348.53660770034,
+      "binary_support_frac": 0.026834554649602643,
+      "area_support_frac": 0.1629270306533182,
+      "area_saturated_frac": 0.0,
+      "tissue_frac": 0.6729032974970136,
+      "shipped_is_binary": true,
+      "secs": 1.1728549003601074
+    },
+    {
+      "dx_um": 18.0,
+      "grid": [
+        283,
+        451
+      ],
+      "n_endothelial_cells": 4295,
+      "n_vessels": 3091,
+      "cell_area_um2": 324.0,
+      "disc_over_cell_area": 0.5454153912482279,
+      "binary_area_um2": 746496.0,
+      "area_area_um2": 742713.0,
+      "area_unmasked_um2": 742713.0,
+      "subgrid_area_um2": 347498.5544659735,
+      "binary_support_frac": 0.026760825125441368,
+      "area_support_frac": 0.12158520721055566,
+      "area_saturated_frac": 0.0,
+      "tissue_frac": 0.674559087383357,
+      "shipped_is_binary": true,
+      "secs": 1.535696029663086
+    },
+    {
+      "dx_um": 16.0,
+      "grid": [
+        318,
+        507
+      ],
+      "n_endothelial_cells": 4295,
+      "n_vessels": 3091,
+      "cell_area_um2": 256.0,
+      "disc_over_cell_area": 0.6902913545485385,
+      "binary_area_um2": 745728.0,
+      "area_area_um2": 742713.0,
+      "area_unmasked_um2": 742713.0,
+      "subgrid_area_um2": 347468.2499773242,
+      "binary_support_frac": 0.02673139217971424,
+      "area_support_frac": 0.1089903003496279,
+      "area_saturated_frac": 9.176585025648556e-06,
+      "tissue_frac": 0.6759021497773312,
+      "shipped_is_binary": true,
+      "secs": 1.8704900741577148
+    },
+    {
+      "dx_um": 12.0,
+      "grid": [
+        424,
+        675
+      ],
+      "n_endothelial_cells": 4295,
+      "n_vessels": 3091,
+      "cell_area_um2": 144.0,
+      "disc_over_cell_area": 1.227184630308513,
+      "binary_area_um2": 748656.0,
+      "area_area_um2": 742712.9999999999,
+      "area_unmasked_um2": 742712.9999999999,
+      "subgrid_area_um2": 347339.94,
+      "binary_support_frac": 0.02683327139848879,
+      "area_support_frac": 0.08382365085263636,
+      "area_saturated_frac": 6.709608158883521e-05,
+      "tissue_frac": 0.6769811320754717,
+      "shipped_is_binary": true,
+      "secs": 3.038707971572876
+    },
+    {
+      "dx_um": 10.0,
+      "grid": [
+        508,
+        810
+      ],
+      "n_endothelial_cells": 4295,
+      "n_vessels": 3091,
+      "cell_area_um2": 100.0,
+      "disc_over_cell_area": 1.7671458676442586,
+      "binary_area_um2": 739200.0,
+      "area_area_um2": 742712.9999999998,
+      "area_unmasked_um2": 742712.9999999998,
+      "subgrid_area_um2": 347229.6926364234,
+      "binary_support_frac": 0.026497662814372974,
+      "area_support_frac": 0.0725531243726879,
+      "area_saturated_frac": 0.0010108686300937743,
+      "tissue_frac": 0.6779624769126081,
+      "shipped_is_binary": true,
+      "secs": 4.519992113113403
+    },
+    {
+      "dx_um": 8.0,
+      "grid": [
+        635,
+        1012
+      ],
+      "n_endothelial_cells": 4295,
+      "n_vessels": 3091,
+      "cell_area_um2": 64.0,
+      "disc_over_cell_area": 2.761165418194154,
+      "binary_area_um2": 746816.0,
+      "area_area_um2": 742713.0,
+      "area_unmasked_um2": 742713.0,
+      "subgrid_area_um2": 347380.7973553719,
+      "binary_support_frac": 0.026768427524063828,
+      "area_support_frac": 0.06129967609032767,
+      "area_saturated_frac": 0.0039204081445389566,
+      "tissue_frac": 0.6783542373408857,
+      "shipped_is_binary": true,
+      "secs": 7.507988929748535
+    },
+    {
+      "dx_um": 7.0,
+      "grid": [
+        725,
+        1157
+      ],
+      "n_endothelial_cells": 4295,
+      "n_vessels": 3091,
+      "cell_area_um2": 49.0,
+      "disc_over_cell_area": 3.6064201380495073,
+      "binary_area_um2": 741517.0,
+      "area_area_um2": 742713.0000000002,
+      "area_unmasked_um2": 742713.0000000002,
+      "subgrid_area_um2": 347480.55092592596,
+      "binary_support_frac": 0.026577798853148572,
+      "area_support_frac": 0.055847976325333476,
+      "area_saturated_frac": 0.006201427856371348,
+      "tissue_frac": 0.6787887819271005,
+      "shipped_is_binary": true,
+      "secs": 9.668048858642578
+    },
+    {
+      "dx_um": 6.0,
+      "grid": [
+        846,
+        1349
+      ],
+      "n_endothelial_cells": 4295,
+      "n_vessels": 3091,
+      "cell_area_um2": 36.0,
+      "disc_over_cell_area": 4.908738521234052,
+      "binary_area_um2": 743904.0,
+      "area_area_um2": 742713.0,
+      "area_unmasked_um2": 742713.0,
+      "subgrid_area_um2": 347395.62627551024,
+      "binary_support_frac": 0.026662021715148348,
+      "area_support_frac": 0.05046868851084144,
+      "area_saturated_frac": 0.008689930132187579,
+      "tissue_frac": 0.6791082440893964,
+      "shipped_is_binary": true,
+      "secs": 14.153805017471313
+    },
+    {
+      "dx_um": 5.0,
+      "grid": [
+        1015,
+        1619
+      ],
+      "n_endothelial_cells": 4295,
+      "n_vessels": 3091,
+      "cell_area_um2": 25.0,
+      "disc_over_cell_area": 7.0685834705770345,
+      "binary_area_um2": 744000.0,
+      "area_area_um2": 742713.0000000001,
+      "area_unmasked_um2": 742713.0000000001,
+      "subgrid_area_um2": 347306.84523809527,
+      "binary_support_frac": 0.026665233051986453,
+      "area_support_frac": 0.04541691306918983,
+      "area_saturated_frac": 0.011572854506030142,
+      "tissue_frac": 0.6791639916386993,
+      "shipped_is_binary": true,
+      "secs": 28.280515909194946
+    }
+  ],
+  "pitch_rows": [
+    {
+      "dx_um": 12.0,
+      "pitch_um": 4.0,
+      "area_um2": 742512.0000000002
+    },
+    {
+      "dx_um": 12.0,
+      "pitch_um": 2.0,
+      "area_um2": 742480.0000000001
+    },
+    {
+      "dx_um": 12.0,
+      "pitch_um": 1.0,
+      "area_um2": 742712.9999999999
+    },
+    {
+      "dx_um": 12.0,
+      "pitch_um": 0.5,
+      "area_um2": 742604.9999999999
+    },
+    {
+      "dx_um": 12.0,
+      "pitch_um": 0.25,
+      "area_um2": 742643.8125
+    },
+    {
+      "dx_um": 30.0,
+      "pitch_um": 4.0,
+      "area_um2": 744370.3125
+    },
+    {
+      "dx_um": 30.0,
+      "pitch_um": 2.0,
+      "area_um2": 742480.0
+    },
+    {
+      "dx_um": 30.0,
+      "pitch_um": 1.0,
+      "area_um2": 742713.0
+    },
+    {
+      "dx_um": 30.0,
+      "pitch_um": 0.5,
+      "area_um2": 742605.0
+    },
+    {
+      "dx_um": 30.0,
+      "pitch_um": 0.25,
+      "area_um2": 742643.8125
+    }
+  ],
+  "off_lattice_rows": [
+    {
+      "dx_um": 45.0,
+      "binary_area_um2": 710775.0,
+      "area_area_um2": 741945.0
+    },
+    {
+      "dx_um": 22.5,
+      "binary_area_um2": 773043.75,
+      "area_area_um2": 742684.0619092628
+    },
+    {
+      "dx_um": 11.25,
+      "binary_area_um2": 739757.8125,
+      "area_area_um2": 742906.9335937499
+    },
+    {
+      "dx_um": 7.5,
+      "binary_area_um2": 742500.0,
+      "area_area_um2": 742906.93359375
+    },
+    {
+      "dx_um": 3.75,
+      "binary_area_um2": 744370.3125,
+      "area_area_um2": 742906.93359375
+    }
+  ],
+  "off_lattice_binary_span_pct": 8.391004115912589,
+  "off_lattice_area_span_pct": 0.12952369549324255,
+  "vessel_radius_um": 7.5,
+  "subpixel_pitch_um": 1.0,
+  "binary_span_pct": 4.731212536985344,
+  "area_span_pct": 6.269733898662596e-14,
+  "subgrid_span_pct": 0.07739758357053701,
+  "binary_span_pct_brief_rungs": 4.730707237754714,
+  "area_span_pct_brief_rungs": 1.567433474665649e-14,
+  "production_binary_area_um2": 748656.0,
+  "production_area_area_um2": 742712.9999999999,
+  "production_total_change_pct": -0.7938225299737312,
+  "binary_ladder_mean_um2": 741881.7,
+  "area_vs_binary_ladder_mean_pct": 0.1120529054699837,
+  "all_shipped_is_binary": true
+}

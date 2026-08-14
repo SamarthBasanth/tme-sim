@@ -38,6 +38,25 @@ What it does
    a documented vessel radius of a segmented vessel and **exactly zero** elsewhere.
    No Gaussian tail, no floor.
 
+THE RASTERISATION DEFECT, AND THE OPT-IN FIX (``geometry='area'``)
+------------------------------------------------------------------
+The shipped ``geometry='binary'`` painting is a *centre-in-disc vote*: a grid cell
+is 1.0 iff its centre lies within ``VESSEL_RADIUS_UM`` of an endothelial cell, and
+it then deposits a whole grid cell of vessel — area ``dx^2``. That makes the TOTAL
+painted vessel area a function of the mesh (**4.73 %** span, non-monotone, over
+``dx = 30…5 µm`` on the real GBM section), which is precisely the ``dx^2``-count
+defect ``physics.oxygen._tumor_density`` already fixed on the oxygen SINK by
+converting a count into an areal density. ``results/fstate_mechanism.md``
+attributes ~100 % of the ``F_state`` grid drift (``cov/var = +1.057``) to it.
+
+``geometry='area'`` is the same fix applied to the source: the same discs, the
+same radius, the same endothelial cells, but each grid cell carries the covered
+AREA FRACTION rather than a binary token (:func:`_area_coverage_field`). Painted
+area is then identical at every rung of the production ladder and the ``F_state``
+drift falls from 0.04609 to 0.000546. It is **OPT-IN and default-off** because it
+moves the production source total by −0.794 %, which is a deliberate
+recalibration and not a silent one. See ``results/vessel_source_conservation.md``.
+
 Both operate on the CORE interface only (``Domain`` + ``CellPopulation``), exactly
 like ``reconstruct.real_fields``. Nothing in ``core`` / ``physics`` /
 ``sim.engine`` / ``molecular`` is touched.
@@ -122,6 +141,7 @@ from ..core import CellPopulation, CellType, Domain
 __all__ = [
     "LINK_DISTANCE_UM",
     "VESSEL_RADIUS_UM",
+    "SOURCE_SUBPIXEL_PITCH_UM",
     "PUBLISHED",
     "segment_vessels",
     "discrete_vascular_field",
@@ -137,6 +157,20 @@ LINK_DISTANCE_UM = 20.0
 #: endothelial cells. See the module docstring for the full justification and for
 #: the dx = 12 µm resolution caveat.
 VESSEL_RADIUS_UM = 7.5
+
+#: Sub-pixel lattice pitch (µm) used by ``geometry='area'`` to measure what
+#: fraction of each grid cell the vessel discs actually cover. See
+#: :func:`_area_coverage_field` and ``results/vessel_source_conservation.md``.
+#:
+#: 1.0 µm is chosen so that **every rung of the production dx ladder
+#: (30/24/18/16/12/10/8/7/6/5 µm) is an exact integer multiple of it**. When that
+#: holds, ``h = dx / round(dx / pitch)`` is exactly 1.0 µm at every rung and the
+#: sub-lattice ``{(m + 0.5) * h}`` is the SAME set of physical points at every
+#: rung — so the painted vessel area is not merely convergent under ``dx``, it is
+#: *identical*, and the only residual movement is the (separately documented,
+#: separately owned) ``dx``-dependence of ``Domain.tissue_mask``. It is also
+#: ~0.13x the 7.5 µm vessel radius, so a disc is resolved by ~176 sub-pixels.
+SOURCE_SUBPIXEL_PITCH_UM = 1.0
 
 #: Published human morphometry this segmentation is compared against. Every entry
 #: is a measured value from the literature with its PMID; nothing here is estimated
@@ -501,6 +535,150 @@ def link_distance_sweep(
 # --------------------------------------------------------------------------- #
 # 2. The discrete source field
 # --------------------------------------------------------------------------- #
+def _area_coverage_field(
+    domain: Domain,
+    xy: np.ndarray,
+    radius_um: float,
+    pitch_um: float = SOURCE_SUBPIXEL_PITCH_UM,
+) -> np.ndarray:
+    """Fraction of each grid cell covered by the UNION of ``radius_um`` discs.
+
+    THE AREA-CONSERVING COUNTERPART OF THE SINK'S AREAL-DENSITY FIX
+    ---------------------------------------------------------------
+    ``physics.oxygen._tumor_density`` fixed the oxygen SINK by refusing to feed a
+    raw per-grid-cell COUNT into the PDE: a count carries a ``dx^2`` factor, so it
+    divides by the grid-cell area and re-expresses the result against a fixed
+    physical reference tile. The SOURCE has exactly the same defect in exactly the
+    same place and never received the same treatment.
+
+    The shipped ``geometry='binary'`` painting asks a YES/NO question of each grid
+    cell — "is your CENTRE within ``radius_um`` of an endothelial cell?" — and
+    deposits a whole grid cell of vessel, area ``dx^2``, whenever the answer is
+    yes. That is a count (of centres that happened to land inside a disc) dressed
+    as a field. The physical object it is meant to represent has a fixed area: a
+    7.5 µm disc is 176.71 µm^2 whatever the mesh is. At ``dx = 30 µm`` one grid
+    cell is 900 µm^2, so a single vessel is quantised to 0 or 1 cells and is
+    either missed entirely or painted 5.1x too large. Measured on the real GBM
+    section over ``dx = 30…5 µm`` the total painted vessel area spans **4.73 %**
+    and moves NON-MONOTONICALLY — see ``results/fstate_mechanism.md`` §3.1 and
+    ``results/vessel_source_conservation.md`` §1.
+
+    This function asks the quantitative question instead — "what FRACTION of your
+    area do the discs cover?" — which is what a cell-centred value of an intensive
+    field means in the first place, and which is dimensionally the same move the
+    sink fix makes (per-cell count -> per-unit-area density).
+
+    HOW THE dx-INDEPENDENCE IS OBTAINED (by construction, not by convergence)
+    ------------------------------------------------------------------------
+    The coverage fraction is measured on a sub-pixel lattice of pitch
+    ``h = dx / n_sub``, ``n_sub = ceil(dx / pitch_um)``. Sub-point ``k`` of grid
+    cell ``j`` sits at ``j*dx + (k + 0.5)*h``, i.e. at ``(m + 0.5)*h`` with
+    ``m = j*n_sub + k`` — so the sub-lattice is a single global lattice of pitch
+    ``h`` anchored at the domain origin, and the grid only decides how its points
+    are BUCKETED, never where they are. Whenever ``dx`` is an integer multiple of
+    ``pitch_um`` (true at every rung of the production ladder; see
+    :data:`SOURCE_SUBPIXEL_PITCH_UM`) ``h == pitch_um`` exactly, the lattice is
+    literally the same point set at every rung, and the painted total is therefore
+    *identical* across the ladder rather than merely convergent.
+
+    The estimator is a Riemann sum, so its absolute value carries an O(perimeter x
+    h) discretisation error against the true union area — that error is measured,
+    not assumed (``results/vessel_source_conservation.md`` §2, which reports the
+    ``pitch = 1.0 / 0.5 / 0.25 µm`` convergence). What matters here is that the
+    error does not depend on ``dx``, which is the defect being fixed.
+
+    Implementation is per-endothelial-cell and vectorised: only sub-lattice points
+    inside a cell's own bounding box can be covered by its disc, so a fixed
+    ``(2K+1)^2`` stencil around each cell's nearest lattice index enumerates every
+    candidate, and ``np.unique`` on the packed linear index takes the UNION (discs
+    around neighbouring endothelial cells overlap, so plain summation would
+    double-count and would not be an area).
+
+    Parameters
+    ----------
+    domain : Domain
+        Supplies ``shape`` and ``dx``. The tissue mask is NOT applied here; the
+        caller does that, exactly as it does for the binary painting.
+    xy : ndarray, shape (n, 2)
+        Endothelial-cell positions (µm) — ``segment_vessels(...)['xy']``.
+    radius_um : float
+        Disc radius (µm). The SAME radius the binary painting uses; this function
+        changes how the disc is measured, never how big it is.
+    pitch_um : float
+        Sub-pixel lattice pitch (µm). Default :data:`SOURCE_SUBPIXEL_PITCH_UM`.
+
+    Returns
+    -------
+    np.ndarray
+        (ny, nx) field in [0, 1]: the covered area fraction of each grid cell.
+        ``field.sum() * dx**2`` is the covered area in µm^2.
+    """
+    ny, nx = domain.shape
+    dx = float(domain.dx)
+    r = float(radius_um)
+    pitch = float(pitch_um)
+    if r <= 0.0:
+        raise ValueError(f"radius_um must be > 0, got {radius_um}")
+    if pitch <= 0.0:
+        raise ValueError(f"pitch_um must be > 0, got {pitch_um}")
+
+    field = domain.zeros()
+    xy = np.asarray(xy, dtype=np.float64)
+    if xy.shape[0] == 0:
+        return field
+
+    # Sub-lattice: n_sub sub-points per grid cell per axis, pitch h = dx/n_sub.
+    # The tiny epsilon keeps an exactly-divisible dx (the production ladder) from
+    # being pushed to n_sub+1 by floating-point noise, which is what makes
+    # h == pitch exactly and the lattice identical across rungs.
+    n_sub = int(np.ceil(dx / pitch - 1e-9))
+    n_sub = max(n_sub, 1)
+    h = dx / n_sub
+    mx_max = nx * n_sub          # number of sub-lattice columns
+    my_max = ny * n_sub
+
+    # A disc of radius r reaches at most ceil(r/h) lattice steps from the lattice
+    # point nearest its centre; +1 covers the half-step offset of that centre.
+    K = int(np.ceil(r / h)) + 1
+    off = np.arange(-K, K + 1, dtype=np.int64)
+
+    # Nearest sub-lattice index to each endothelial cell (lattice point m sits at
+    # (m + 0.5) * h, so the nearest index to position p is round(p/h - 0.5)).
+    cx = np.rint(xy[:, 0] / h - 0.5).astype(np.int64)
+    cy = np.rint(xy[:, 1] / h - 0.5).astype(np.int64)
+
+    mx = cx[:, None] + off[None, :]                      # (n, 2K+1)
+    my = cy[:, None] + off[None, :]
+    px = (mx.astype(np.float64) + 0.5) * h
+    py = (my.astype(np.float64) + 0.5) * h
+    ddx = px - xy[:, 0][:, None]
+    ddy = py - xy[:, 1][:, None]
+
+    # Full (2K+1)^2 stencil per cell, kept as an outer product of the two axes so
+    # the squared distance is formed without materialising both coordinates.
+    inside = (ddx[:, :, None] ** 2 + ddy[:, None, :] ** 2) <= r * r
+    in_dom = (
+        ((mx >= 0) & (mx < mx_max))[:, :, None]
+        & ((my >= 0) & (my < my_max))[:, None, :]
+    )
+    hit = inside & in_dom
+    if not hit.any():
+        return field
+
+    ci, xi, yi = np.nonzero(hit)
+    lin = mx[ci, xi] * np.int64(my_max) + my[ci, yi]
+    lin = np.unique(lin)                                  # UNION, not sum
+
+    gx = (lin // np.int64(my_max)) // n_sub               # grid column
+    gy = (lin % np.int64(my_max)) // n_sub                # grid row
+    counts = np.bincount(gy * nx + gx, minlength=ny * nx).astype(np.float64)
+    # count of covered sub-pixels -> covered AREA (count * h^2) -> covered area
+    # FRACTION of the grid cell (/ dx^2). This is the same "count -> areal
+    # density" division physics.oxygen._tumor_density performs on the sink.
+    field = counts.reshape(ny, nx) / float(n_sub * n_sub)
+    return field
+
+
 def discrete_vascular_field(
     domain: Domain,
     vessels: Dict,
@@ -509,6 +687,7 @@ def discrete_vascular_field(
     match_total_to: Optional[np.ndarray] = None,
     geometry: str = "binary",
     radius_mode: str = "data",
+    subpixel_pitch_um: float = SOURCE_SUBPIXEL_PITCH_UM,
 ) -> np.ndarray:
     """Source field (ny, nx) that is nonzero ONLY within ``radius_um`` of a
     segmented vessel, and EXACTLY zero everywhere else.
@@ -533,6 +712,29 @@ def discrete_vascular_field(
     (and therefore every reconstruction and every result already published against
     it) routes through this function; flipping it is a deliberate re-run, not a
     silent one.
+
+    ``geometry='area'`` — the AREA-CONSERVING painting of the SAME discs
+    -------------------------------------------------------------------
+    **ADDITIVE AND OPT-IN; the default is bit-identical to the historical field.**
+    ``'binary'`` deposits a whole grid cell of vessel (area ``dx^2``) whenever a
+    grid-cell centre lands inside a disc, so the TOTAL painted vessel area is a
+    function of the mesh: it spans **4.73 %**, non-monotonically, over
+    ``dx = 30…5 µm`` on the real GBM section. ``'area'`` paints the same discs, at
+    the same ``radius_um``, around the same endothelial cells — it changes only
+    *how the disc is measured*, replacing the centre-in-disc YES/NO with the grid
+    cell's covered-area FRACTION (:func:`_area_coverage_field`). Values are then
+    continuous in ``[0, 1]``. This is the direct counterpart of the areal-density
+    fix ``physics.oxygen._tumor_density`` already applies to the oxygen SINK, and
+    which the SOURCE never received; see ``results/vessel_source_conservation.md``.
+
+    ``'area'`` is NOT the same thing as ``'subgrid'``. ``'subgrid'`` paints one
+    footprint per segmented vessel OBJECT at a data-derived radius, which is a
+    different geometric object depositing a different total (347k vs 744k µm^2 on
+    the GBM section) and a different per-vessel weighting law
+    (``results/delivery_source_geometry.md`` rejected it for the delivery source on
+    exactly that ground). ``'area'`` keeps the shipped object, the shipped radius
+    and the shipped per-endothelial-cell weighting, and fixes only the
+    rasterisation.
 
     Normalisation — what the numbers MEAN
     -------------------------------------
@@ -576,6 +778,10 @@ def discrete_vascular_field(
     match_total_to : ndarray, optional
         Rescale so ``field.sum()`` over tissue equals this field's sum over
         tissue.
+    subpixel_pitch_um : float
+        Only consulted for ``geometry='area'``: the sub-pixel lattice pitch (µm)
+        the covered-area fraction is measured on. Default
+        :data:`SOURCE_SUBPIXEL_PITCH_UM` = 1.0 µm.
 
     Returns
     -------
@@ -584,14 +790,24 @@ def discrete_vascular_field(
         tissue.
     """
     geom_mode = str(geometry).strip().lower()
-    if geom_mode not in {"binary", "subgrid"}:
+    if geom_mode not in {"binary", "subgrid", "area"}:
         raise ValueError(f"unknown geometry {geometry!r}; "
-                         "expected 'binary' or 'subgrid'")
+                         "expected 'binary', 'subgrid' or 'area'")
 
     field = domain.zeros()
     xy = np.asarray(vessels["xy"], dtype=np.float64)
     if xy.shape[0] == 0:
         return field
+
+    if geom_mode == "area":
+        if amplitude != "unit":
+            raise ValueError(
+                f"amplitude={amplitude!r} is not defined for geometry='area': "
+                "the covered-area fraction is already the physical weight of a "
+                "grid cell, so scaling it by an unmeasured per-object caliber "
+                "proxy would re-introduce exactly the quantity the fix removes")
+        field = _area_coverage_field(domain, xy, float(radius_um),
+                                     float(subpixel_pitch_um))
 
     if geom_mode == "subgrid":
         from .vessel_geometry import subgrid_coverage_field, vessel_geometry
@@ -617,32 +833,33 @@ def discrete_vascular_field(
                 field = field * (ref_total / cur_total)
         return field
 
-    ny, nx = domain.shape
-    dx = float(domain.dx)
-    # Grid-cell CENTRES, matching Domain.to_index's convention.
-    gx = (np.arange(nx, dtype=np.float64) + 0.5) * dx
-    gy = (np.arange(ny, dtype=np.float64) + 0.5) * dx
-    GX, GY = np.meshgrid(gx, gy)
-    grid_pts = np.column_stack([GX.ravel(), GY.ravel()])
+    if geom_mode == "binary":
+        ny, nx = domain.shape
+        dx = float(domain.dx)
+        # Grid-cell CENTRES, matching Domain.to_index's convention.
+        gx = (np.arange(nx, dtype=np.float64) + 0.5) * dx
+        gy = (np.arange(ny, dtype=np.float64) + 0.5) * dx
+        GX, GY = np.meshgrid(gx, gy)
+        grid_pts = np.column_stack([GX.ravel(), GY.ravel()])
 
-    tree = cKDTree(xy)
-    if amplitude == "per_vessel_cells":
-        counts = np.asarray(vessels["cells_per_vessel"], dtype=np.float64)
-        labels = np.asarray(vessels["labels"], dtype=int)
-        d, j = tree.query(grid_pts, k=1, distance_upper_bound=float(radius_um))
-        inside = np.isfinite(d)
-        vals = np.zeros(grid_pts.shape[0], dtype=np.float64)
-        vals[inside] = counts[labels[j[inside]]]
-        if vals.max() > 0:
-            vals /= vals.max()
-        field = vals.reshape(ny, nx)
-    elif amplitude == "unit":
-        hit = tree.query_ball_point(grid_pts, r=float(radius_um),
-                                    return_length=True) > 0
-        field = hit.reshape(ny, nx).astype(np.float64)
-    else:
-        raise ValueError(f"unknown amplitude {amplitude!r}; "
-                         "expected 'unit' or 'per_vessel_cells'")
+        tree = cKDTree(xy)
+        if amplitude == "per_vessel_cells":
+            counts = np.asarray(vessels["cells_per_vessel"], dtype=np.float64)
+            labels = np.asarray(vessels["labels"], dtype=int)
+            d, j = tree.query(grid_pts, k=1, distance_upper_bound=float(radius_um))
+            inside = np.isfinite(d)
+            vals = np.zeros(grid_pts.shape[0], dtype=np.float64)
+            vals[inside] = counts[labels[j[inside]]]
+            if vals.max() > 0:
+                vals /= vals.max()
+            field = vals.reshape(ny, nx)
+        elif amplitude == "unit":
+            hit = tree.query_ball_point(grid_pts, r=float(radius_um),
+                                        return_length=True) > 0
+            field = hit.reshape(ny, nx).astype(np.float64)
+        else:
+            raise ValueError(f"unknown amplitude {amplitude!r}; "
+                             "expected 'unit' or 'per_vessel_cells'")
 
     tissue = np.asarray(domain.tissue_mask, dtype=bool)
     field = field * tissue
