@@ -599,10 +599,29 @@ def _comparison_provenance(*, args, sample, library, alpha, window_s, report,
             "therapeutic_coverage_1x replaces it."
         ),
         "what_is_defensible": (
-            "The ORDER, under the delivery law named above. The absolute "
-            "kill_fraction is not: it is a no-intrinsic-resistance UPPER BOUND "
-            "and, where it has been interval-propagated at all, the interval "
-            "spans ~30x (results/kill_calibration.md section 5.1)."
+            "The ORDER, under the delivery law named above, AND ONLY BETWEEN "
+            "COMPOUNDS THAT DIFFER SUBSTANTIALLY IN MASS — see "
+            "diffusivity_is_falsified below. The absolute kill_fraction is "
+            "not defensible: it is a no-intrinsic-resistance UPPER BOUND and, "
+            "where it has been interval-propagated at all, the interval spans "
+            "~30x (results/kill_calibration.md section 5.1)."
+        ),
+        # The single most load-bearing caveat on this export, because the
+        # comparison a real compound series asks for -- rank these analogues --
+        # is exactly the one the transport model has been measured to fail.
+        "diffusivity_is_falsified": (
+            "The diffusivity_um2_s column is a function of MOLECULAR WEIGHT "
+            "alone. Measured against 71 compounds in multicellular layers "
+            "(Pruijn 2008, doi 10.1071/CH08240) it reproduces 7.9 % of the "
+            "measured spread: 29.7x measured against 2.4x modelled, "
+            "R^2 = 0.022. At MATCHED molecular weight it produces exactly "
+            "1.00x where the measurement moves 3.7-3.8x, so it cannot order "
+            "similar-mass analogues at all — and that is the usual shape of a "
+            "real compound series. Full result: "
+            "results/diffusivity_falsification.md. A two-route model that "
+            "reaches R^2 = 0.725 on the same 71 compounds exists at "
+            "tmesim/molecular/two_route.py but is DEFAULT-OFF and is NOT "
+            "wired into this run (results/two_route_transport.md)."
         ),
     }
 
