@@ -1,0 +1,151 @@
+{
+ "_what": "PRE-REGISTRATION EXTENSION for results/two_route_efflux.md. This file EXTENDS results/sweep/tworoute_prereg.json; it does not replace it and it does not change any value in it. The parent's --stage prereg still asserts the live code matches the parent file, and that assertion still passes: HBD_LOGP_DECREMENT in tmesim/molecular/two_route.py is UNCHANGED at 1.0.",
+
+ "_rule": "DO NOT FIT TO PRUIJN. Neither quantity below was chosen by looking at a Pruijn residual. The efflux composition has NO free parameter at all -- it is an algebraic identity, verified numerically. The sourced H-bond-donor decrement was derived from published Abraham coefficients BEFORE it was scored, and it is NOT the value that maximises R^2; the value that does is the pre-registered 1.0, and that fact is disclosed in results/two_route_transport.md 4.4 and again here.",
+
+ "quantities_added": {
+
+  "efflux_composition": {
+   "value": "K -> K / ER",
+   "free_parameters": 0,
+   "status": "ALGEBRAIC IDENTITY, DERIVED. Not a modelling choice and not a fitted form.",
+   "derivation": "One cell as a slab crossed by the transport direction: entry membrane (passive permeability P, outward active clearance E), interior of conductivity sigma_c over path length L, exit membrane (same P and E). Steady state gives J = P*(C1-Ca) - E*Ca, J = (sigma_c/L)*(Ca-Cb), J = P*(Cb-C2) + E*Cb. Eliminating Ca and Cb yields, in closed form, (C1-C2)/J = 2/P + (L/sigma_c)*ER with ER = 1 + E/P. So efflux multiplies the INTERIOR resistance by ER and leaves the MEMBRANE resistance untouched. In the module's series form 1/sigma_c* = 1/sigma_c + 1/(a*P) that is exactly sigma_c -> sigma_c/ER, i.e. K -> K/ER with P unchanged.",
+   "verification": "experiments/two_route_efflux.py --stage algebra solves the slab directly at 420 (P, sigma_c, L, E) points, checks all three flux statements, and compares against the closed form. Max relative error 3.7e-16. Re-asserted in tests/test_two_route.py::TestEffluxComposition::test_the_slab_identity_that_makes_this_not_a_modelling_choice.",
+   "registered_prediction_before_scoring": "Because the term multiplies the INTERIOR resistance, a compound whose MEMBRANE is shut (large membrane_resistance_ratio) must be moved by EXACTLY NOTHING at any efflux ratio, however large. Doxorubicin and epirubicin (membrane_resistance_ratio ~2e5) must therefore be immune. Under the PREVIOUS transport model, which had no cell inclusions, K never entered the calculation and this term was identically zero for EVERY drug.",
+   "consistency_with_efflux_py": "tmesim/molecular/efflux.py's default FORM_KPUU is f = Kp,uu = P_pass/(P_pass + CL_eff) = 1/ER, an UNBOUND PARTITION RATIO across one membrane at steady state. K in two_route.py is also an unbound partition ratio across one membrane (cytoplasm over interstitium). The two are the same object, so the composition is a partition times a partition. No new constant is introduced anywhere.",
+   "default": "OFF. two_route_diffusivity(..., efflux_ratio=None) is the default and is BITWISE identical to omitting the argument. Asserted in tests."
+  },
+
+  "hbd_logp_decrement_sourced": {
+   "value": 1.34,
+   "status": "SOURCED -- DERIVED IN ONE LINE FROM TWO INDEPENDENTLY MEASURED COEFFICIENT SETS. This is NOT a directly measured per-donor decrement; no such quantity was found in any primary source. It is an improvement on the parent file's declared convention, not an elimination of all judgement.",
+   "adopted_in_code": false,
+   "_adopted_in_code_note": "tmesim/molecular/two_route.py::HBD_LOGP_DECREMENT REMAINS 1.0, the pre-registered value, so that results/sweep/tworoute_prereg.json and its checking stage stay valid and no reader has to trust that a constant was not moved after scoring. 1.34 lives in experiments/two_route_efflux.py::HBD_ABRAHAM and is passed explicitly. If the two-route model is ever flipped on, results/two_route_efflux.md 5 recommends 1.34 as the value to flip WITH, in a change that re-registers it.",
+
+   "derivation": "Abraham's linear solvation-energy relationship is log P = c + e*E + s*S + a*A + b*B + v*V, with A the solute's hydrogen-bond ACIDITY (donor strength). The octanol -> alkane correction to a partition coefficient is the DIFFERENCE of two such equations, so its donor term is (a_octanol - a_alkane)*A.",
+   "coefficients": {
+    "a_water_to_wet_octan_1_ol": 0.034,
+    "a_water_to_hexadecane": -3.587,
+    "delta_logP_donor_coefficient_per_unit_A": 3.621
+   },
+   "coefficient_sources": [
+    "Abraham MH, Acree WE Jr. ACS Omega 2019;4(7):12920-12926, doi:10.1021/acsomega.8b03242, PMC6648601, Table 1 -- read VERBATIM, open access.",
+    "J Comput Aided Mol Des 2017, PMC5579141, Table 1 -- cross-check, read VERBATIM, open access.",
+    "Acree/Abraham open-access compilation -- further cross-check: hexadecane -3.587, cyclohexane -3.740, hexane -3.578, heptane -3.571."
+   ],
+
+   "the_one_remaining_choice": "The model's input is an INTEGER donor COUNT (RDKit Lipinski.NumHDonors), not the continuous descriptor A, so a typical A per donor GROUP must be chosen. 0.37 (aliphatic OH) is adopted. This is stated, not buried, and the FULL measured range is swept in the scoring run.",
+   "A_per_donor_group_measured": {
+    "aliphatic_amine": 0.16,
+    "aniline_NH2": 0.26,
+    "aliphatic_OH_ADOPTED": 0.37,
+    "benzyl_alcohol": 0.39,
+    "benzamide_NH2": 0.49,
+    "phenol_OH": 0.60,
+    "carboxylic_acid": 0.62
+   },
+   "A_sources": [
+    "PMC5830486 -- open-access table, read VERBATIM.",
+    "PMC3477586 -- open-access table, cross-check, read VERBATIM."
+   ],
+   "descriptor_pairing_check": "The A values above are per GROUP. Lipinski.NumHDonors counts an NH2 as ONE donor; NHOHCount counts it as TWO. The engine's `hbd` is NumHDonors, which is the correct pairing. Using NHOHCount would double-penalise every primary amide, amine and sulfonamide.",
+
+   "direction_of_bias": "AGAINST this number, and it is recorded because it is not flattering. Hexadecane is the HARSHEST available membrane proxy: a real bilayer's interfacial region (ester carbonyls, phosphate) supplies hydrogen-bond acceptors, so the donor penalty for a LIPOSOME/water partition is expected to be SMALLER than 3.621*A. No Abraham coefficient set for a DMPC/liposome-water system could be verified. Therefore 1.34 is an UPPER estimate for a bilayer, and the pre-registered 1.0 sits INSIDE the plausible band rather than below it.",
+
+   "not_the_optimum": "The value that maximises R^2 against Pruijn is 1.000, the pre-registered convention -- NOT 1.34. The sourced value scores R^2 = 0.718 against 0.725, i.e. marginally WORSE, while being BETTER on geometric bias (1.03x vs 1.25x) and within-3x coverage (99% vs 96%). A sourced parameter that scores worse is worth more than an unsourced one that scores better.",
+   "robustness": "Across the ENTIRE measured range of A (0.16 to 0.62, i.e. decrement 0.579 to 2.245) R^2 stays between 0.588 and 0.722, against 0.022 for the shipping engine. The result does not depend on getting the remaining choice right."
+  }
+ },
+
+ "explicitly_NOT_used_because_UNVERIFIED": {
+  "abraham_1994_fitted_coefficients": {
+   "citation": "Abraham MH, Chadha HS, Whiting GS, Mitchell RC. J Pharm Sci 1994;83(8):1085-1100. PMID 7983591, doi:10.1002/jps.2600830806.",
+   "why_named": "This is the canonical Delta log P citation and the source results/two_route_transport.md 7 item 1 named as the right one to obtain.",
+   "status": "UNRETRIEVABLE. HARD-CLOSED. Unpaywall reports oa_status 'closed' with an empty oa_locations list; OpenAlex reports is_oa false and any_repository_has_fulltext false; Semantic Scholar reports openAccessPdf status CLOSED. Wiley and ScienceDirect are abstract-only. No secondary source quoting its regression equation verbatim was located. Its ABSTRACT is verified and states 'An analysis of 288 delta log P values shows that solute hydrogen-bond acidity is the major factor', but contains NO coefficients.",
+   "consequence": "Its fitted coefficients are NOT used and NOT quoted. The value above is derived from the two constituent open-access coefficient sets instead, and is labelled as a derivation rather than as Abraham 1994's fitted result."
+  },
+  "seiler_1974_I_H_increments": {
+   "citation": "Seiler P. Interconversion of lipophilicities from hydrocarbon/water systems into the octanol/water system. Eur J Med Chem 1974;9:473-479.",
+   "status": "UNRETRIEVABLE. Predates DOI assignment; no full text, no scan, and no secondary source quoting the numeric table was located. ZERO verified increment values. Any I_H value in circulation (e.g. 'OH = 1.82') should be treated as unsourced until someone photographs the page.",
+   "consequence": "Not used, not quoted, and named here so that a later reader does not assume it was silently adopted."
+  },
+  "clogpalk_group_increments": {
+   "citation": "Kenny PW, Montanari CA, Prokopczyk IM. J Comput Aided Mol Des 2013;27:389-402. Parameter file ClogPalk.param.1.0, read in full.",
+   "status": "RETRIEVED and VERIFIED, but NOT APPLICABLE as a drop-in. Its decrements are on log P_alk relative to a SATURATED HYDROCARBON OF EQUAL MOLECULAR SURFACE AREA, not on Delta log P(oct - alk), and each lumps a group's donor AND acceptor character together.",
+   "what_it_nevertheless_establishes": "A flat per-donor COUNT is physically wrong for chelating motifs: the file carries explicit intramolecular-H-bond interaction terms, e.g. -0.7 for catechol and -4.0 for 8-hydroxyquinoline. Group increments are the better long-term replacement for the count-based term and are recorded here as the recommended next step."
+  },
+  "bilayer_liposome_abraham_coefficients": {
+   "status": "UNVERIFIED. No published Abraham coefficient set for a DMPC/liposome-water system could be verified within this run. This is the highest-value outstanding literature item, because it would move the donor penalty in the OPPOSITE direction from the hexadecane-derived value above, i.e. it would likely LOWER 1.34 toward the pre-registered 1.0."
+  }
+ },
+
+ "efflux_rows_found_but_NOT_added_to_EFFLUX_TABLE": {
+  "_why_not_added": "Adding them would change efflux.substrate_summary() from 18 drugs to 22 and silently stale the counts quoted in three places in results/efflux_impact.md, which is generated by tmesim/validation/efflux_impact.py -- a file this work does not own and cannot re-run. The panel evaluation was done through the module's own sanctioned efflux_ratio= override instead. These rows are recorded here fully cited so the follow-up change is a copy-paste.",
+  "docetaxel": {
+   "pgp": "yes",
+   "er_pgp": 20.0,
+   "er_assay": "bidirectional Caco-2 monolayer; basolateral-to-apical permeability 20-fold higher than apical-to-basolateral; inhibited by verapamil, chlorpromazine and reserpine",
+   "er_citation": "PMID 7945455 (Wils P et al., Biochem Pharmacol 1994;48(7):1528-1530, doi:10.1016/0006-2952(94)90580-0). Quoted VERBATIM from the primary abstract.",
+   "caveats": "Concentration is not stated in the abstract (UNVERIFIED). 1994 Caco-2 clone with high endogenous P-gp. The inhibitors used are non-selective. Short communication. In vivo, docetaxel disposition is dominated by CYP3A first-pass metabolism rather than P-gp (PMID 12414642), so a knockout-derived efflux scaling would be wrong for it; the 50-fold ritonavir effect in that paper is a CYP3A number and must NOT be recorded in an efflux table."
+  },
+  "paclitaxel": {
+   "pgp": "yes",
+   "pgp_citation": "PMID 9050899 (Sparreboom 1997 PNAS), PMID 16779700 (Takeuchi 2006 Pharm Res), PMID 16093365 (Taub 2005 DMD).",
+   "bcrp": "unknown",
+   "bcrp_citation": "No primary paclitaxel-vs-BCRP transport assay located. The widely repeated 'not a substrate of wild-type ABCG2' traces only to reviews and is UNUSABLE. The R482 wild-type / R482T / R482G distinction itself is established (PMID 11559526, Honjo 2001) but was not tested for paclitaxel.",
+   "er_pgp": null,
+   "fold_ko": null,
+   "_why_no_number": "THE CENTRAL FINDING OF results/two_route_efflux.md 2.4. No in vitro monolayer ER could be retrieved: Takeuchi 2006, Taub 2005, Hugger 2002 (PMID 12210046) and Mitra 2011 (PMID 21538355) all place the ratio in paywalled tables or figures, and the one open-access source, Cai 2022 (PMID 35509628, PMC9060980), reports ERs only under inhibition, never states the paclitaxel-alone control ER in text, and reports Papp magnitudes implausibly large for paclitaxel. The in vivo figure, an 11-fold rise in paclitaxel BRAIN UPTAKE in P-gp knockout mice (PMID 12855665), is a brain LEVEL and not Kp(KO)/Kp(WT); plasma AUC also rises 1.3-2x in the same knockouts (PMID 9050899, PMID 17062689), so deriving the ratio fold would be inventing a number -- the same rejection the module already applies to methotrexate's plasma-clearance figure. Mitra 2011 further establishes that paclitaxel efflux is strongly pH-DEPENDENT, so any single ER is valid only at its measured pH. Lagas 2006 (PMID 17062689) shows MRP2/ABCC2 is a co-equal determinant of paclitaxel disposition, so a P-gp-only term is under-specified."
+  },
+  "epirubicin": {
+   "pgp": "yes",
+   "pgp_citation": "PMID 10677583 (Lo YL, Huang JD, Biochem Pharmacol 2000;59:665-672): basolateral-to-apical efflux across Caco-2 monolayers, reduced by verapamil. DIRECTION ONLY -- the ratio is not stated numerically in the abstract.",
+   "er_pgp": null,
+   "caveats": "The authors themselves hedge that 'P-gp or other transporter proteins' may be involved 'at least partially'. Anthracyclines are also MRP1 substrates, so single-transporter attribution is unsafe."
+  },
+  "5-fluorouracil": {
+   "pgp": "unknown",
+   "bcrp": "unknown",
+   "_note": "No primary evidence that 5-FU is a P-gp or BCRP substrate was found. Under the module's own convention that is 'unknown' (searched, nothing found), NOT 'no' (which requires a measured negative). A useful corroborating tissue-scale null exists: PMID 21225235 (Choi 2011) reports FULL penetration of 5-FU through HT-29 and DLD-1 multicellular layers. Do NOT record PMID 19380024 (adrenaline upregulates ABCB1 in HT-29 and confers 5-FU resistance) as substrate evidence -- that is a sensitivity endpoint, not transport."
+  }
+ },
+
+ "commensurability_findings": {
+  "_question": "Is an efflux term commensurable with the Pruijn 2008 HT-29 multicellular-layer dataset?",
+  "_answer": "NO, for three independent reasons.",
+  "reason_1_zero_coverage": "0 of the 71 Pruijn compounds carries any assignment in efflux.EFFLUX_TABLE. They are 67 benzotriazine di-N-oxide analogues of tirapazamine from the Auckland Cancer Society Research Centre plus NLCQ-1, urea, mannitol and acridan-9(10H)-one. A literature pass found NO published efflux ratio for tirapazamine, SR-4233 or any SN-numbered compound; 'tirapazamine + P-glycoprotein' returns exactly one PubMed record (PMID 33142432) and it uses tirapazamine only as a cytotoxicity reference. Applying efflux would change the Pruijn score by EXACTLY ZERO. Pinned by tests/test_two_route.py::TestEffluxComposition::test_none_of_the_pruijn_compounds_carries_an_efflux_ratio.",
+  "reason_2_HT29_is_pgp_negative": {
+   "claim": "HT-29 is functionally P-glycoprotein-NEGATIVE, while every numeric ratio in EFFLUX_TABLE comes from a transfected P-gp overexpressor or a transporter-knockout mouse.",
+   "sources": [
+    "PMID 7945455 (Wils 1994): 'No functional expression of P-glycoprotein was found in the differentiated HT29-18-C1 cell line', measured in the same experiment in which Caco-2 P-gp was 'very high'. VERBATIM from the primary abstract.",
+    "PMID 11337555 (Lorke 2001): parental HT-29 cells 'completely devoid of JSB-1 staining'; rhodamine 123 'accumulated strongly'. VERBATIM.",
+    "PMID 10334913 (Rimet 1999): HT29-D4 'constitutively expresses a very low level of the MDR1 gene product'; MDR1 had to be transfected to obtain resistance. VERBATIM."
+   ],
+   "dissenting_and_why_it_is_weak": "PMID 20217131 (Ding 2010) detects MDR1 mRNA in HT-29 by semi-quantitative RT-PCR optical density with no significant difference among four colon lines. That is not functional efflux and is not calibrated against Caco-2 or MDCKII-MDR1; it does not overturn three functional negatives.",
+   "mirror_image_caveat": "HT-29 DOES endogenously express functional BCRP/ABCG2 and MRP1 -- PMID 15367706 (Yanase 2004, 'HT-29 cells, which endogenously express BCRP'), PMID 20024169 (Jendzelovsky 2009), PMID 11507048 (Perego 2001, BCRP is the axis HT-29 amplifies under selection 'independent of expression of P-glycoprotein or MRP'). So a BCRP term WOULD be commensurable with Pruijn in principle. None of the 71 compounds has a BCRP ratio either, so this is unactionable today -- but it is the one efflux route the anchor tissue does not rule out, and it is currently unmodelled.",
+   "unverified": "No primary source quantifying HT-29 ABCB1 or ABCG2 against Caco-2 or MDCKII-MDR1 on a COMMON SCALE was found."
+  },
+  "reason_3_the_sign_is_not_settled": {
+   "claim": "Pruijn's own authors argue efflux would INCREASE multicellular-layer penetration, which is the opposite sign to the steady-state conductance result derived above.",
+   "quote": "From the paper's Conclusions, VERBATIM: 'Active transporters such as ABC pumps are known to modify extravascular drug transport in tissue, and can enhance penetration of MCLs by reducing sequestration in cells and increasing paracellular transport.' The paper never names P-gp, ABCB1, BCRP or ABCG2.",
+   "resolution": "Both can be right. Pruijn's measurement is a TRANSIENT; reducing intracellular CAPACITY speeds a transient front while reducing CONDUCTANCE slows it. The two-route model is a steady-state conductivity model with NO capacity term -- already listed as known-missing physics in results/two_route_transport.md 6 item 1 -- so it cannot represent the effect Pruijn's authors describe, and scoring a one-sided efflux term against their transient would be scoring the wrong sign."
+  },
+  "dataset_composition_confirmed": "Confirmed VERBATIM from the publisher page for doi:10.1071/CH08240: '67 structurally diverse benzotriazine di-N-oxides (analogues of the hypoxia-activated prodrug tirapazamine) plus four miscellaneous compounds' = 71. The four are NLCQ-1, urea, mannitol and acridan-9(10H)-one. The paper's own predictive model uses MW, logP7.4, H-bond donors and H-bond acceptors only, at R^2 = 0.907, with NO transporter term. NOTE: an earlier draft of this file recorded a 'bibliographic correction' to the pagination; it was WRONG and has been removed. The repository's citation, Aust J Chem 2008;61(9):687-693 (experiments/diffusivity_falsification.py, results/diffusivity_falsification.md, results/external_anchor_survey.md, results/bring_your_own_compound.md), is CORRECT and was never in error."
+ },
+
+ "the_relocated_diagnosis_for_paclitaxel": {
+  "_claim": "The best-sourced explanation for paclitaxel's poor measured tissue penetration is NOT efflux but saturable intracellular binding/sequestration -- i.e. the K > 1 retardation term the model does not have.",
+  "primary_evidence": "PMID 21225235 (Choi MS, Kim SH, Kuh HJ. Oncol Rep 2011;25(3):863-870, doi:10.3892/or.2011.1138). Paclitaxel and 5-FU through multicellular layers of HT-29 -- the SAME cell line as the Pruijn anchor. Paclitaxel penetration 38% at 24 h at 1 uM, 80% at 48 h at 1 uM, but 100% at 10 uM by 48 h. 'PTX showed limited penetration in both MCLs in contrast to the full penetration seen by 5-FU.' All VERBATIM from the primary abstract.",
+  "why_it_points_away_from_efflux": [
+   "HT-29 is P-gp-negative (see reason_2 above), so the restriction measured here cannot be P-gp efflux.",
+   "The restriction is SATURABLE -- 38% at 1 uM against 100% at 10 uM. That is the signature of binding/sequestration, not of a pump. Paclitaxel binds tubulin avidly.",
+   "Saturable intracellular binding is exactly the K > 1 retardation/capacity term already listed as missing in results/two_route_transport.md 6 item 1."
+  ],
+  "corroborating": [
+   "PMID 16424039 (Grantab, Sivananthan & Tannock 2006 Cancer Res): differential paclitaxel MCL penetration attributed to CELL PACKING DENSITY AND ADHESION, not efflux.",
+   "PMID 18271941 (Al-Abd 2008): reproduces the HT-29 > DLD-1 paclitaxel penetration ordering.",
+   "PMID 11895922 (Tannock 2002): paclitaxel penetrates EMT-6 / MGH-U1 MCLs slowly; numbers in figures only, UNUSABLE numerically."
+  ],
+  "the_one_paper_that_does_implicate_pgp_at_tissue_scale": "PMID 14562035 (Martin 2003 Br J Cancer): BODIPY-taxol distributed extensively through MCF7(WT) spheroids but showed negligible accumulation in P-gp-expressing MCF7(Adr) spheroids, restored by nicardipine. Recorded as DIRECTIONAL SUPPORT ONLY: it uses a fluorescent conjugate rather than paclitaxel, in a drug-selected line with a broad resistance phenotype, and reports fluorescence images from which NO numeric fold change is extractable."
+ }
+}

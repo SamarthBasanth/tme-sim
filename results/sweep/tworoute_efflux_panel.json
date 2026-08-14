@@ -1,0 +1,310 @@
+{
+ "coverage": [
+  {
+   "drug": "doxorubicin",
+   "pgp": "yes",
+   "bcrp": "no",
+   "er": null,
+   "reason": "substrate_but_no_published_er"
+  },
+  {
+   "drug": "paclitaxel",
+   "pgp": null,
+   "bcrp": null,
+   "er": null,
+   "reason": "not_in_table"
+  },
+  {
+   "drug": "docetaxel",
+   "pgp": null,
+   "bcrp": null,
+   "er": null,
+   "reason": "not_in_table"
+  },
+  {
+   "drug": "epirubicin",
+   "pgp": null,
+   "bcrp": null,
+   "er": null,
+   "reason": "not_in_table"
+  },
+  {
+   "drug": "5-fluorouracil",
+   "pgp": null,
+   "bcrp": null,
+   "er": null,
+   "reason": "not_in_table"
+  },
+  {
+   "drug": "cisplatin",
+   "pgp": "no",
+   "bcrp": "no",
+   "er": null,
+   "reason": "non_substrate"
+  }
+ ],
+ "n_with_ratio": 0,
+ "base": {
+  "doxorubicin": {
+   "drug": "doxorubicin",
+   "mw": 543.525,
+   "logp": 0.001,
+   "hbd": 6.0,
+   "radius_nm": 0.5386,
+   "engine_D_um2s": 184.74861430191334,
+   "P_um_s": 0.00010563735364732034,
+   "membrane_resistance_ratio": 198889.09296082595,
+   "gain": 1.0000271173356865,
+   "scale": 0.151158551795757,
+   "efflux_ratio": null
+  },
+  "paclitaxel": {
+   "drug": "paclitaxel",
+   "mw": 853.918,
+   "logp": 3.736,
+   "hbd": 4.0,
+   "radius_nm": 0.6262,
+   "engine_D_um2s": 151.39814916659216,
+   "P_um_s": 49.35950535065321,
+   "membrane_resistance_ratio": 0.3661094737198449,
+   "gain": 4.939452046080558,
+   "scale": 0.7466201716003023,
+   "efflux_ratio": null
+  },
+  "docetaxel": {
+   "drug": "docetaxel",
+   "mw": 807.89,
+   "logp": 3.26,
+   "hbd": 5.0,
+   "radius_nm": 0.6147,
+   "engine_D_um2s": 156.27996809004105,
+   "P_um_s": 1.680430861997121,
+   "membrane_resistance_ratio": 10.954964313391281,
+   "gain": 1.4645806411607663,
+   "scale": 0.22137788552752724,
+   "efflux_ratio": null
+  },
+  "epirubicin": {
+   "drug": "epirubicin",
+   "mw": 543.525,
+   "logp": 0.001,
+   "hbd": 6.0,
+   "radius_nm": 0.5386,
+   "engine_D_um2s": 184.74861430191334,
+   "P_um_s": 0.00010563735364732034,
+   "membrane_resistance_ratio": 198889.09296082595,
+   "gain": 1.0000271173356865,
+   "scale": 0.151158551795757,
+   "efflux_ratio": null
+  },
+  "5-fluorouracil": {
+   "drug": "5-fluorouracil",
+   "mw": 130.078,
+   "logp": -0.798,
+   "hbd": 2.0,
+   "radius_nm": 0.3344,
+   "engine_D_um2s": 323.8095404393241,
+   "P_um_s": 0.27028229215193006,
+   "membrane_resistance_ratio": 125.20191372169998,
+   "gain": 1.0392529813828562,
+   "scale": 0.15708771581493333,
+   "efflux_ratio": null
+  },
+  "cisplatin": {
+   "drug": "cisplatin",
+   "mw": 298.03,
+   "logp": 0.195,
+   "hbd": 2.0,
+   "radius_nm": 0.4409,
+   "engine_D_um2s": 236.18442715353106,
+   "P_um_s": 2.0171758649354534,
+   "membrane_resistance_ratio": 12.72362811645872,
+   "gain": 1.3737762146003245,
+   "scale": 0.20765239211081915,
+   "efflux_ratio": null
+  }
+ },
+ "differential_no_efflux": 4.939318104933444,
+ "sweep": [
+  {
+   "er": 1.0,
+   "gains": {
+    "doxorubicin": 1.0000271173356865,
+    "paclitaxel": 4.939452046080558,
+    "docetaxel": 1.4645806411607663,
+    "epirubicin": 1.0000271173356865,
+    "5-fluorouracil": 1.0392529813828562,
+    "cisplatin": 1.3737762146003245
+   },
+   "scales": {
+    "doxorubicin": 0.151158551795757,
+    "paclitaxel": 0.7466201716003023,
+    "docetaxel": 0.22137788552752724,
+    "epirubicin": 0.151158551795757,
+    "5-fluorouracil": 0.15708771581493333,
+    "cisplatin": 0.20765239211081915
+   },
+   "differential": 4.939318104933444
+  },
+  {
+   "er": 2.0,
+   "gains": {
+    "doxorubicin": 1.0000271171993427,
+    "paclitaxel": 3.3228946977599727,
+    "docetaxel": 1.4289118927704898,
+    "epirubicin": 1.0000271171993427,
+    "5-fluorouracil": 1.0389445437767153,
+    "cisplatin": 1.3485007643888849
+   },
+   "scales": {
+    "doxorubicin": 0.151158551775148,
+    "paclitaxel": 0.5022703300500517,
+    "docetaxel": 0.215986395379334,
+    "epirubicin": 0.151158551775148,
+    "5-fluorouracil": 0.15704109409732653,
+    "cisplatin": 0.2038318952625677
+   },
+   "differential": 3.322804592605458
+  },
+  {
+   "er": 3.0,
+   "gains": {
+    "doxorubicin": 1.0000271170630017,
+    "paclitaxel": 2.6470332608043656,
+    "docetaxel": 1.398329645786525,
+    "epirubicin": 1.0000271170630017,
+    "5-fluorouracil": 1.0386409155914353,
+    "cisplatin": 1.3264271471215205
+   },
+   "scales": {
+    "doxorubicin": 0.15115855175453946,
+    "paclitaxel": 0.4001108643177687,
+    "docetaxel": 0.21136375256833462,
+    "epirubicin": 0.15115855175453946,
+    "5-fluorouracil": 0.15699519934509862,
+    "cisplatin": 0.2004953697212222
+   },
+   "differential": 2.6469614829830688
+  },
+  {
+   "er": 5.0,
+   "gains": {
+    "doxorubicin": 1.0000271167903234,
+    "paclitaxel": 2.041165442099815,
+    "docetaxel": 1.3486156993972627,
+    "epirubicin": 1.0000271167903234,
+    "5-fluorouracil": 1.0380476444363997,
+    "cisplatin": 1.28972542990411
+   },
+   "scales": {
+    "doxorubicin": 0.15115855171332293,
+    "paclitaxel": 0.3085312456579958,
+    "docetaxel": 0.2038492682008769,
+    "epirubicin": 0.15115855171332293,
+    "5-fluorouracil": 0.15690552376824396,
+    "cisplatin": 0.1949477417351114
+   },
+   "differential": 2.0411100937453757
+  },
+  {
+   "er": 10.0,
+   "gains": {
+    "doxorubicin": 1.000027116108652,
+    "paclitaxel": 1.5423767562956876,
+    "docetaxel": 1.2657101265500024,
+    "epirubicin": 1.000027116108652,
+    "5-fluorouracil": 1.0366412220101215,
+    "cisplatin": 1.2261560089678496
+   },
+   "scales": {
+    "doxorubicin": 0.15115855161028524,
+    "paclitaxel": 0.23313711474769175,
+    "docetaxel": 0.19131772169564065,
+    "epirubicin": 0.15115855161028524,
+    "5-fluorouracil": 0.15669293675586807,
+    "cisplatin": 0.1853389406929748
+   },
+   "differential": 1.5423349341740349
+  },
+  {
+   "er": 20.0,
+   "gains": {
+    "doxorubicin": 1.0000271147454114,
+    "paclitaxel": 1.2769863523031528,
+    "docetaxel": 1.1800658781476263,
+    "epirubicin": 1.0000271147454114,
+    "5-fluorouracil": 1.0341188324226227,
+    "cisplatin": 1.1571810091672172
+   },
+   "scales": {
+    "doxorubicin": 0.15115855140422535,
+    "paclitaxel": 0.19302217343001907,
+    "docetaxel": 0.17837221218522845,
+    "epirubicin": 0.15115855140422535,
+    "5-fluorouracil": 0.15631166633779495,
+    "cisplatin": 0.17491306233504184
+   },
+   "differential": 1.2769517280821434
+  },
+  {
+   "er": 39.0,
+   "gains": {
+    "doxorubicin": 1.0000271121556312,
+    "paclitaxel": 1.1435393659412882,
+    "docetaxel": 1.111674855639055,
+    "epirubicin": 1.0000271121556312,
+    "5-fluorouracil": 1.0301723919419485,
+    "cisplatin": 1.0995145100524255
+   },
+   "scales": {
+    "doxorubicin": 0.15115855101276857,
+    "paclitaxel": 0.17285106721670984,
+    "docetaxel": 0.168034604595377,
+    "epirubicin": 0.15115855101276857,
+    "5-fluorouracil": 0.1557151442860768,
+    "cisplatin": 0.16619651421128012
+   },
+   "differential": 1.143508362964586
+  },
+  {
+   "er": 60.0,
+   "gains": {
+    "doxorubicin": 1.0000271092938178,
+    "paclitaxel": 1.093663797748122,
+    "docetaxel": 1.0786558282828622,
+    "epirubicin": 1.0000271092938178,
+    "5-fluorouracil": 1.0267522969633627,
+    "cisplatin": 1.0708037134110613
+   },
+   "scales": {
+    "doxorubicin": 0.15115855058019273,
+    "paclitaxel": 0.165312152993908,
+    "docetaxel": 0.16304363158040105,
+    "epirubicin": 0.15115855058019273,
+    "5-fluorouracil": 0.1551981817007578,
+    "cisplatin": 0.16185674945292677
+   },
+   "differential": 1.0936341500986178
+  },
+  {
+   "er": 100.0,
+   "gains": {
+    "doxorubicin": 1.000027103844417,
+    "paclitaxel": 1.0563612680410406,
+    "docetaxel": 1.050317733708863,
+    "epirubicin": 1.000027103844417,
+    "5-fluorouracil": 1.022001905337131,
+    "cisplatin": 1.04569336746796
+   },
+   "scales": {
+    "doxorubicin": 0.15115854975649154,
+    "paclitaxel": 0.15967370952463167,
+    "docetaxel": 0.15876020239913113,
+    "epirubicin": 0.15115854975649154,
+    "5-fluorouracil": 0.15448013885348286,
+    "cisplatin": 0.15806120885002578
+   },
+   "differential": 1.0563326373655848
+  }
+ ]
+}

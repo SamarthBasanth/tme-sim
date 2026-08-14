@@ -257,6 +257,126 @@ class TestEcmMeshWiring:
 
 
 # --------------------------------------------------------------------------- #
+# 6b. EFFLUX composed with the two-route law.
+#
+# The point of these tests is that the composition is an ALGEBRAIC IDENTITY with
+# no new free parameter, and that the identity has a falsifiable consequence:
+# efflux cannot move a drug whose membrane is shut. See
+# results/two_route_efflux.md.
+# --------------------------------------------------------------------------- #
+class TestEffluxComposition:
+    def test_efflux_is_opt_in_and_bit_identical_when_off(self):
+        """Omitting `efflux_ratio` and passing None must be BITWISE identical."""
+        a = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)
+        b = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4, efflux_ratio=None)
+        assert a["hindrance"] == b["hindrance"]
+        assert a["effective_D_um2s"] == b["effective_D_um2s"]
+
+    def test_efflux_ratio_of_one_is_exactly_a_no_op(self):
+        a = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)
+        b = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4, efflux_ratio=1.0)
+        assert a["hindrance"] == b["hindrance"]
+
+    def test_efflux_never_boosts(self):
+        """ER < 1 means net ABSORPTIVE transport, which this model does not
+        represent. It must clamp, exactly as `efflux._apply_form` does, and never
+        make a drug faster."""
+        a = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)
+        for er in (0.01, 0.5, 0.999):
+            b = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4, efflux_ratio=er)
+            assert b["hindrance"] == a["hindrance"]
+
+    def test_the_slab_identity_that_makes_this_not_a_modelling_choice(self):
+        """(C1-C2)/J = 2/P + (L/sigma_c)*ER for a cell with efflux at both faces.
+
+        This is the whole justification for `K -> K/ER`: efflux multiplies the
+        INTERIOR resistance by the efflux ratio and leaves the membrane
+        resistance alone. If this fails, the composition is unjustified.
+        """
+        worst = 0.0
+        for p_mem in (1e-3, 0.1, 1.0, 10.0, 1e3):
+            for sig_c in (0.5, 20.0, 500.0):
+                for length in (0.5, 5.0, 20.0):
+                    for e_pump in (0.0, 0.5, 10.0, 500.0):
+                        j = p_mem / (2.0 + (p_mem + e_pump) * length / sig_c)
+                        ca = (p_mem - j) / (p_mem + e_pump)
+                        cb = j / (p_mem + e_pump)
+                        # all three steady-state flux statements hold at this J
+                        assert p_mem * (1.0 - ca) - e_pump * ca == pytest.approx(j)
+                        assert (sig_c / length) * (ca - cb) == pytest.approx(j)
+                        assert p_mem * cb + e_pump * cb == pytest.approx(j)
+                        er = 1.0 + e_pump / p_mem
+                        want = 2.0 / p_mem + (length / sig_c) * er
+                        worst = max(worst, abs(1.0 / j - want) / want)
+        assert worst < 1e-12, worst
+
+    def test_efflux_equals_reducing_the_partition(self):
+        """`efflux_ratio=ER` must be identical to passing `cell_partition=K/ER`."""
+        for er in (2.0, 7.5, 39.0, 100.0):
+            a = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4, efflux_ratio=er)
+            b = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4,
+                                      cell_partition=1.0 / er)
+            assert a["hindrance"] == b["hindrance"]
+        assert two_route.efflux_reduced_partition(1.0, 4.0) == 0.25
+        assert two_route.efflux_reduced_partition(2.0, 4.0) == 0.5
+        assert two_route.efflux_reduced_partition(1.0, 0.3) == 1.0   # clamped
+
+    def test_a_shut_membrane_is_immune_to_efflux(self):
+        """THE FALSIFIABLE PREDICTION. Doxorubicin (logP 0, 6 donors) has a
+        membrane resistance ratio ~2e5, so the cell interior contributes nothing
+        to the series and no efflux ratio, however large, can move it.
+
+        This is why the previous transport model -- which had no membrane and no
+        cell inclusions at all -- could not have been helped by efflux: the term
+        was identically zero for EVERY drug, not just for this one.
+        """
+        a = two_route_diffusivity(SIGMA_M, 0.539, 0.0, 6)
+        assert a["membrane_resistance_ratio"] > 1e4
+        for er in (10.0, 1e3, 1e6):
+            b = two_route_diffusivity(SIGMA_M, 0.539, 0.0, 6, efflux_ratio=er)
+            assert b["hindrance"] == pytest.approx(a["hindrance"], rel=1e-4)
+            assert b["transcellular_gain"] == pytest.approx(
+                a["transcellular_gain"], rel=1e-4)
+        # and the gain was never more than a part in 1e4 above 1 to begin with
+        assert a["transcellular_gain"] < 1.0001
+
+    def test_an_open_membrane_is_strongly_moved_by_efflux(self):
+        """Paclitaxel-like: logP 3.74, 4 donors, membrane resistance ratio < 1.
+        Its transcellular gain must collapse toward 1 as ER rises, monotonically.
+        """
+        a = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)
+        assert a["membrane_resistance_ratio"] < 1.0
+        assert a["transcellular_gain"] > 3.0
+        gains = [two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4,
+                                       efflux_ratio=er)["transcellular_gain"]
+                 for er in (1.0, 2.0, 5.0, 20.0, 100.0, 1e4)]
+        assert all(gains[i] >= gains[i + 1] for i in range(len(gains) - 1)), gains
+        assert gains[-1] == pytest.approx(1.0, abs=1e-3)
+
+    def test_efflux_rejects_nonsense(self):
+        with pytest.raises(ValueError):
+            two_route.efflux_reduced_partition(1.0, 0.0)
+        with pytest.raises(ValueError):
+            two_route.efflux_reduced_partition(1.0, -3.0)
+        with pytest.raises(ValueError):
+            two_route.efflux_reduced_partition(-1.0, 2.0)
+
+    def test_none_of_the_pruijn_compounds_carries_an_efflux_ratio(self):
+        """The commensurability fact, pinned so it cannot rot silently.
+
+        If someone later adds an SN-series compound to EFFLUX_TABLE, the claim in
+        results/two_route_efflux.md that efflux is unscoreable against Pruijn
+        stops being true and this test forces a re-read.
+        """
+        from tmesim.molecular.efflux import EFFLUX_TABLE
+        from experiments.diffusivity_falsification import PRUIJN_2008_TABLE_S1
+        names = {row[0].strip().lower() for row in PRUIJN_2008_TABLE_S1}
+        assert not (names & set(EFFLUX_TABLE)), (
+            "a Pruijn compound now has an efflux assignment; "
+            "results/two_route_efflux.md 2 must be re-run")
+
+
+# --------------------------------------------------------------------------- #
 # 7. THE PRE-REGISTRATION must still describe the live code.
 # --------------------------------------------------------------------------- #
 def test_parameters_match_the_pre_registration():

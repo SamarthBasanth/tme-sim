@@ -1,0 +1,155 @@
+{
+ "D_ship_cm2_s": 1.4040894686945413e-06,
+ "scales": {
+  "1.34": {
+   "doxorubicin": 0.15115449027238376,
+   "paclitaxel": 0.24162346394457904,
+   "docetaxel": 0.15268944392567715,
+   "epirubicin": 0.15115449027238376,
+   "5-fluorouracil": 0.1524023906795775,
+   "cisplatin": 0.16372634990905624
+  }
+ },
+ "arms": {
+  "1.34": {
+   "rows": [
+    {
+     "mode": "frozen",
+     "drug": "doxorubicin",
+     "scale": 0.15115449027238376,
+     "ratio_ship": 0.23013330629020515,
+     "ratio_corr": 0.14028090910089816,
+     "verdict_ship": "PASS",
+     "verdict_corr": "PASS",
+     "alpha_corr": 148.60815765445545,
+     "moved": false
+    },
+    {
+     "mode": "frozen",
+     "drug": "paclitaxel",
+     "scale": 0.24162346394457904,
+     "ratio_ship": 0.15028661822296227,
+     "ratio_corr": 0.0913774236731313,
+     "verdict_ship": "NOT TESTABLE",
+     "verdict_corr": "NOT TESTABLE",
+     "alpha_corr": 148.60815765445545,
+     "moved": false
+    },
+    {
+     "mode": "frozen",
+     "drug": "docetaxel",
+     "scale": 0.15268944392567715,
+     "ratio_ship": 0.14842965466495936,
+     "ratio_corr": 0.07306749951301972,
+     "verdict_ship": "FAIL",
+     "verdict_corr": "PASS",
+     "alpha_corr": 148.60815765445545,
+     "moved": true
+    },
+    {
+     "mode": "frozen",
+     "drug": "epirubicin",
+     "scale": 0.15115449027238376,
+     "ratio_ship": 0.23013330629020515,
+     "ratio_corr": 0.14028090910089813,
+     "verdict_ship": "PASS",
+     "verdict_corr": "PASS",
+     "alpha_corr": 148.60815765445545,
+     "moved": false
+    },
+    {
+     "mode": "frozen",
+     "drug": "5-fluorouracil",
+     "scale": 0.1524023906795775,
+     "ratio_ship": 0.3378821161474709,
+     "ratio_corr": 0.2559315814236941,
+     "verdict_ship": "NOT TESTABLE",
+     "verdict_corr": "NOT TESTABLE",
+     "alpha_corr": 148.60815765445545,
+     "moved": false
+    },
+    {
+     "mode": "frozen",
+     "drug": "cisplatin",
+     "scale": 0.16372634990905624,
+     "ratio_ship": 0.3084627482484707,
+     "ratio_corr": 0.22003176207783745,
+     "verdict_ship": "PASS",
+     "verdict_corr": "PASS",
+     "alpha_corr": 148.60815765445545,
+     "moved": false
+    },
+    {
+     "mode": "recal",
+     "drug": "doxorubicin",
+     "scale": 0.15115449027238376,
+     "ratio_ship": 0.23013330629020515,
+     "ratio_corr": 0.23300553543755587,
+     "verdict_ship": "PASS",
+     "verdict_corr": "PASS",
+     "alpha_corr": 22.22343233256308,
+     "moved": false
+    },
+    {
+     "mode": "recal",
+     "drug": "paclitaxel",
+     "scale": 0.24162346394457904,
+     "ratio_ship": 0.15028661822296227,
+     "ratio_corr": 0.15220946610168887,
+     "verdict_ship": "NOT TESTABLE",
+     "verdict_corr": "NOT TESTABLE",
+     "alpha_corr": 35.693414998371146,
+     "moved": false
+    },
+    {
+     "mode": "recal",
+     "drug": "docetaxel",
+     "scale": 0.15268944392567715,
+     "ratio_ship": 0.14842965466495936,
+     "ratio_corr": 0.1516682866133819,
+     "verdict_ship": "FAIL",
+     "verdict_corr": "FAIL",
+     "alpha_corr": 22.45205524444388,
+     "moved": false
+    },
+    {
+     "mode": "recal",
+     "drug": "epirubicin",
+     "scale": 0.15115449027238376,
+     "ratio_ship": 0.23013330629020515,
+     "ratio_corr": 0.23300553543755578,
+     "verdict_ship": "PASS",
+     "verdict_corr": "PASS",
+     "alpha_corr": 22.22343233256308,
+     "moved": false
+    },
+    {
+     "mode": "recal",
+     "drug": "5-fluorouracil",
+     "scale": 0.1524023906795775,
+     "ratio_ship": 0.3378821161474709,
+     "ratio_corr": 0.33531344314574135,
+     "verdict_ship": "NOT TESTABLE",
+     "verdict_corr": "NOT TESTABLE",
+     "alpha_corr": 22.40932099885577,
+     "moved": false
+    },
+    {
+     "mode": "recal",
+     "drug": "cisplatin",
+     "scale": 0.16372634990905624,
+     "ratio_ship": 0.3084627482484707,
+     "ratio_corr": 0.30732180728354086,
+     "verdict_ship": "PASS",
+     "verdict_corr": "PASS",
+     "alpha_corr": 24.095255913509206,
+     "moved": false
+    }
+   ],
+   "n_moved": 1,
+   "n_rows": 12
+  }
+ },
+ "out_json": "/Users/samarthbasanth/tme-sim/results/sweep/tworoute_efflux_sweep_dx12.json",
+ "alpha_published": 148.60815765445545
+}

@@ -372,6 +372,83 @@ def two_route_factor(
     }
 
 
+def efflux_reduced_partition(cell_partition: float, efflux_ratio: float) -> float:
+    """Cytoplasm/interstitium partition ``K`` in the presence of active efflux.
+
+    ``K_eff = K / ER``. This is NOT an assumption; it is the exact steady-state
+    solution of a cell with efflux, and it is DERIVED below rather than adopted.
+
+    THE DERIVATION
+    --------------
+    Take one cell as a slab crossed by the transport direction: an entry
+    membrane, an interior of conductivity ``sigma_c`` over a path length ``L``,
+    and an exit membrane. Each membrane has passive permeability ``P`` and an
+    ADDITIONAL outward active clearance ``E`` (the pump). With outside
+    concentrations ``C1`` and ``C2`` and just-inside concentrations ``Ca``, ``Cb``,
+    the three steady-state flux statements are
+
+        J = P*(C1 - Ca) - E*Ca          [entry face: passive in, pump out]
+        J = (sigma_c/L)*(Ca - Cb)       [the interior]
+        J = P*(Cb - C2) + E*Cb          [exit face]
+
+    Eliminating ``Ca`` and ``Cb`` gives, in closed form,
+
+        (C1 - C2)/J  =  2/P  +  (L/sigma_c) * ER,        ER = 1 + E/P
+
+    i.e. **efflux multiplies the INTERIOR resistance by the efflux ratio and
+    leaves the membrane resistance untouched.** In this module's
+    series-resistance parameterisation
+
+        1/sigma_c*  =  1/sigma_c + 1/(a*P)      ->      ER/sigma_c + 1/(a*P)
+
+    which is exactly ``sigma_c -> sigma_c/ER``, and since ``sigma_c = K*D_cyto``
+    it is exactly ``K -> K/ER`` with ``P`` unchanged. So efflux enters this model
+    at a parameter that ALREADY EXISTS and introduces **no new degree of
+    freedom**. The identity is asserted numerically in the self-test below and in
+    ``tests/test_two_route.py``, not claimed in prose.
+
+    WHY THAT IS THE SAME OBJECT ``efflux.FORM_KPUU`` ALREADY MODELS
+    ---------------------------------------------------------------
+    ``efflux.py``'s default form is ``f = Kp,uu = P_pass/(P_pass + CL_eff) =
+    1/ER`` -- an UNBOUND PARTITION RATIO across one membrane at steady state.
+    ``K`` in this module is also an unbound partition ratio across one membrane
+    (cytoplasm over interstitium). They are the same quantity, so composing them
+    is multiplication of a partition by a partition, not a coincidence of form.
+    The derivation above is compartment-agnostic and does not depend on which
+    membrane is meant.
+
+    THE CONSEQUENCE THAT MATTERS, AND IT IS FALSIFIABLE
+    ---------------------------------------------------
+    The interior resistance is the term efflux multiplies. When the membrane is
+    SHUT (``1/(a*P) >> 1/sigma_c``, i.e. a large ``membrane_resistance_ratio``)
+    the interior contributes nothing to the series and efflux therefore changes
+    the tissue diffusivity by **exactly nothing**. Doxorubicin sits there
+    (``membrane_resistance_ratio`` ~ 2e5), so efflux cannot move it however large
+    its efflux ratio is. Under the PREVIOUS transport model, which had no
+    membrane and no cell inclusions at all, ``K`` never entered the calculation,
+    so this term was identically zero **for every drug**. That is the precise
+    sense in which efflux has nothing to act on until a transcellular route
+    exists -- and it is a prediction of the composition, not a rationalisation
+    of one.
+
+    Parameters
+    ----------
+    cell_partition : float
+        ``K``, the passive cytoplasm/interstitium equilibrium partition.
+    efflux_ratio : float
+        ``ER = Papp(B->A)/Papp(A->B) = 1 + CL_efflux/P_passive >= 1``. A value
+        below 1 means net absorptive transport, which this module does not
+        represent; it is clamped to 1 (never a boost), matching
+        ``efflux._apply_form``.
+    """
+    if cell_partition < 0:
+        raise ValueError(f"cell_partition must be >= 0, got {cell_partition!r}")
+    er = float(efflux_ratio)
+    if er <= 0:
+        raise ValueError(f"efflux_ratio must be positive, got {efflux_ratio!r}")
+    return float(cell_partition) / max(1.0, er)
+
+
 def two_route_ceiling(
     cell_volume_fraction: float,
     interstitial_D_um2s: float,
@@ -434,11 +511,21 @@ def two_route_diffusivity(
     cell_partition: float = 1.0,
     hbd_decrement: float = HBD_LOGP_DECREMENT,
     d_over_water: float = CYTOPLASM_D_OVER_WATER,
+    efflux_ratio: Optional[float] = None,
 ) -> Dict[str, float]:
     """End-to-end: engine interstitial D + (logP, HBD, radius) -> tissue D_eff.
 
     This is the one call an experiment or a wiring point needs. It is NOT called
     from `compile_drug.py`; the two-route model is default-off.
+
+    ``efflux_ratio`` is OPT-IN and defaults to ``None``, which is bit-identical
+    to omitting it. When supplied it is applied through
+    :func:`efflux_reduced_partition` (``K -> K/ER``), which that function derives
+    in closed form rather than assumes. Pass the value
+    ``efflux.efflux_ratio_for(drug)`` returns; ``None`` there means *no published
+    ratio*, which must stay ``None`` here rather than becoming 1.0, so that "no
+    efflux measured" and "measured to have no efflux" remain distinguishable in
+    the caller's reporting.
     """
     mem = membrane_permeability_um_s(
         logp, hbd, solute_radius_nm, temperature_K=temperature_K,
@@ -447,13 +534,16 @@ def two_route_diffusivity(
     d_cyto = cytoplasm_diffusivity_um2s(
         solute_radius_nm, temperature_K=temperature_K, d_over_water=d_over_water
     )
+    k_eff = float(cell_partition)
+    if efflux_ratio is not None:
+        k_eff = efflux_reduced_partition(k_eff, efflux_ratio)
     res = two_route_factor(
         cell_volume_fraction,
         interstitial_D_um2s,
         d_cyto,
         mem["permeability_um_s"],
         cell_radius_um=cell_radius_um,
-        cell_partition=cell_partition,
+        cell_partition=k_eff,
     )
     res.update({
         "logp": float(logp),
@@ -463,6 +553,9 @@ def two_route_diffusivity(
         "log_k_membrane": mem["log_k_membrane"],
         "membrane_clamped": mem["clamped"],
         "cytoplasm_D_um2s": d_cyto,
+        "cell_partition_passive": float(cell_partition),
+        "cell_partition_effective": k_eff,
+        "efflux_ratio": None if efflux_ratio is None else float(efflux_ratio),
     })
     return res
 
@@ -545,5 +638,56 @@ if __name__ == "__main__":
     c = two_route_diffusivity(SIGMA_M, 0.45, 2.0, 1)["hindrance"]
     assert b < a <= c, (a, b, c)
     print("    monotone: more HBD -> slower, higher logP -> faster. OK")
+
+    # ---- [6] EFFLUX: K -> K/ER is DERIVED, not assumed -------------------------
+    # Solve the three-compartment slab directly and check the closed form
+    #     (C1-C2)/J = 2/P + (L/sigma_c)*ER,   ER = 1 + E/P
+    # which is what makes `efflux_reduced_partition` an identity rather than a
+    # modelling choice. Pure Python, no numpy.
+    print("\n[6] efflux enters as K -> K/ER: direct slab solve vs the closed form")
+    worst_e = 0.0
+    for p_mem in (1e-3, 0.1, 1.0, 10.0, 1e3):
+        for sig_c in (0.5, 20.0, 500.0):
+            for length in (0.5, 5.0, 20.0):
+                for e_pump in (0.0, 0.5, 10.0, 500.0):
+                    c1, c2 = 1.0, 0.0
+                    # J = P(C1-Ca) - E*Ca ; J = (sig/L)(Ca-Cb) ; J = P(Cb-C2)+E*Cb
+                    j = p_mem * (c1 - c2) / (2.0 + (p_mem + e_pump) * length / sig_c)
+                    ca = (p_mem * c1 - j) / (p_mem + e_pump)
+                    cb = (j + p_mem * c2) / (p_mem + e_pump)
+                    # the three statements must all hold at this J
+                    assert abs(j - (p_mem * (c1 - ca) - e_pump * ca)) < 1e-9 * max(1.0, j)
+                    assert abs(j - (sig_c / length) * (ca - cb)) < 1e-9 * max(1.0, j)
+                    assert abs(j - (p_mem * (cb - c2) + e_pump * cb)) < 1e-9 * max(1.0, j)
+                    er = 1.0 + e_pump / p_mem
+                    r_direct = (c1 - c2) / j
+                    r_form = 2.0 / p_mem + (length / sig_c) * er
+                    worst_e = max(worst_e, abs(r_direct - r_form) / r_form)
+    assert worst_e < 1e-12, worst_e
+    print(f"    max relative error over 180 (P, sigma_c, L, E) points = {worst_e:.3g}")
+    print("    -> efflux multiplies the INTERIOR resistance by ER and leaves the")
+    print("       membrane resistance alone, i.e. K -> K/ER exactly. OK")
+
+    # opt-in and bit-identical when off
+    base = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)
+    assert two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4, efflux_ratio=1.0)[
+        "hindrance"] == base["hindrance"], "ER = 1 must be a no-op"
+    assert two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4, efflux_ratio=0.2)[
+        "hindrance"] == base["hindrance"], "ER < 1 must never boost"
+
+    # THE PREDICTION: efflux is invisible where the membrane is shut.
+    shut = two_route_diffusivity(SIGMA_M, 0.539, 0.0, 6)          # doxorubicin-like
+    shut_e = two_route_diffusivity(SIGMA_M, 0.539, 0.0, 6, efflux_ratio=1e4)
+    assert abs(shut_e["hindrance"] / shut["hindrance"] - 1.0) < 1e-6, (
+        "a shut membrane must be immune to efflux")
+    open_ = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4)        # paclitaxel-like
+    open_e = two_route_diffusivity(SIGMA_M, 0.626, 3.74, 4, efflux_ratio=39.0)
+    print(f"    shut membrane  (HBD 6, logP 0.0): gain "
+          f"{shut['transcellular_gain']:.4f} -> {shut_e['transcellular_gain']:.4f} "
+          f"at ER = 1e4")
+    print(f"    open membrane  (HBD 4, logP 3.74): gain "
+          f"{open_['transcellular_gain']:.4f} -> {open_e['transcellular_gain']:.4f} "
+          f"at ER = 39")
+    assert open_e["transcellular_gain"] < open_["transcellular_gain"] * 0.5
 
     print(f"\nAll asserts passed. Runtime {_time.time() - t0:.2f} s")

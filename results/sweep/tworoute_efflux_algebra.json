@@ -1,0 +1,41 @@
+{
+ "identity_max_rel_error": 3.6884485867945395e-16,
+ "n_points": 420,
+ "probes": [
+  {
+   "probe": "doxorubicin-like (logP 0.0, HBD 6)",
+   "biot": 199347.57967119833,
+   "gain_er1": 1.0000188477697154,
+   "gain_er1e4": 1.0000179475500546,
+   "moved": false
+  },
+  {
+   "probe": "5-FU-like        (logP -0.8, HBD 2)",
+   "biot": 125.77981949789304,
+   "gain_er1": 1.0477975428225388,
+   "gain_er1e4": 1.0005988027412427,
+   "moved": true
+  },
+  {
+   "probe": "cisplatin-like   (logP 0.2, HBD 2)",
+   "biot": 12.577981949789308,
+   "gain_er1": 1.3367861121928075,
+   "gain_er1e4": 1.0004586432295328,
+   "moved": true
+  },
+  {
+   "probe": "docetaxel-like   (logP 3.26, HBD 5)",
+   "biot": 10.954964313391283,
+   "gain_er1": 1.2745012657075323,
+   "gain_er1e4": 1.000328934608204,
+   "moved": true
+  },
+  {
+   "probe": "paclitaxel-like  (logP 3.74, HBD 4)",
+   "biot": 0.3627529618895015,
+   "gain_er1": 3.3054631946767272,
+   "gain_er1e4": 1.000323496908885,
+   "moved": true
+  }
+ ]
+}
