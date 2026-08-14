@@ -34,3 +34,6 @@ results/immune_sink_impact_cache.pkl
 
 # Local browser-verification screenshots (not build output, not for the repo)
 .export-drive/
+
+# Agent worktrees and session scratch — never part of the repo.
+.claude/
