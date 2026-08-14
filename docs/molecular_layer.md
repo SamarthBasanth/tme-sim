@@ -17,12 +17,17 @@ where noted; time in **seconds**; diffusivity in **µm²/s**; concentration in
 **µM**; temperature in **K**. Body temperature = 310 K. Interstitial-fluid
 viscosity ≈ 1.2×10⁻³ Pa·s (water at 37 °C).
 
-> **Implementation status (2026-07).** As of writing, `types.py` and
-> `stokes_einstein.py` are implemented and self-tested; `descriptors`,
-> `library`, `brownian`, `permeability`, `binding`, and `compile_drug` are
-> specified by the contract and documented here as the layer's design. This doc
-> describes the *contracted* behavior of each module; sections grounded in
-> already-implemented code (Stokes–Einstein) quote the actual relations.
+> **Implementation status.** This block previously said (dated 2026-07) that only
+> `types.py` and `stokes_einstein.py` were implemented and that `descriptors`,
+> `library`, `brownian`, `permeability`, `binding` and `compile_drug` were merely
+> "specified by the contract". **That is long out of date — all of them are
+> implemented and on the shipped path.** The layer is now ~22 modules, and §2
+> below documents only a subset of them: also present are `efflux.py`,
+> `ion_trapping.py`, `two_route.py`, `immune_sink.py`, `uptake.py`,
+> `lipophilicity.py`, `mgmt.py`, `byo.py`, `ecm_mesh.py`,
+> `binding_site_barrier.py`, `breast_library.py`, `potency_breast.py` and
+> `potency.py`. Several are opt-in mechanistic corrections that ship default-OFF.
+> Treat §2 as a partial reference and the source as authoritative.
 
 ---
 
@@ -342,10 +347,37 @@ transport PDE ([`architecture.md` §4.1](architecture.md)) uses an effective
 diffusivity `D_eff = D · (1 − α · ecm_density)` — a *linear phenomenological*
 tortuosity knob. The molecular layer replaces the hand-picked `D` with a
 **mechanistically derived** `effective_diffusivity`: Stokes–Einstein gives the
-molecule-specific free `D`, and the Brownian simulation at `ecm_reference` gives
-the crowding hindrance for *that* molecule's size in *that* ECM density. The
-result flows into `DrugParams.diffusivity`, so the engine's per-drug transport is
-grounded in particle physics rather than assumed.
+free `D` from the molecule's hydrodynamic radius, and the Brownian simulation at
+`ecm_reference` gives the crowding hindrance for that radius in *that* ECM
+density. The result flows into `DrugParams.diffusivity`.
+
+> **This chain has been measured against 71 compounds and it is FALSIFIED. Read
+> this before quoting anything in §4.** The radius is `0.066 · mw**(1/3)`, so the
+> *only* molecular input to `effective_diffusivity` is **molecular weight**:
+> `logP`, HBD, HBA, TPSA and formal charge are all computed by
+> `descriptors.compute_descriptors` and none of them reaches the transport
+> calculation. Scored blind and unfitted against Pruijn 2008 (71 compounds, HT29
+> multicellular layers, one method, one cell line), the measurement spans
+> **29.7×** where the engine spans **2.4×**, at **R² = 0.028**; MW alone explains
+> **2.8 %** of the variance. At *identical* molecular weight the engine is flat
+> **by construction — exactly 1.00×** — where the measurement spans **3.7×** (four
+> compounds at 263 Da) and **3.8×** (four at 305 Da).
+>
+> "Mechanistically derived" is therefore true of the *form* and false of the
+> *content*: it is derived from the molecule's **mass**, not from the molecule.
+> The practical consequence is the one a user hits first — **a series of
+> similar-mass analogues cannot be separated on transport**, and a ranking over
+> such a series carries potency and tissue geometry only.
+>
+> The two dominant predictors of the measurement are hydrogen-bond donor count
+> (R² = 0.305) and logP₇.₄ (R² = 0.290) — both already computed here and
+> discarded. A two-route model (paracellular + transcellular) using them reaches
+> **R² = 0.725, Spearman +0.842** blind and unfitted, and orders 24 of 31 exact-MW
+> pairs correctly against this model's **0 of 31**. It is **merged, wired into
+> nothing, and default-OFF**: `DrugParams.diffusivity` is bit-identical to the
+> pre-merge value.
+> → [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md),
+> [`../results/two_route_transport.md`](../results/two_route_transport.md)
 
 ---
 
@@ -358,17 +390,23 @@ separate is the whole honesty argument, so they are labeled explicitly in
 | Quantity | Module / function | Grade | Basis |
 |---|---|---|---|
 | Free diffusivity `free_diffusivity` | `stokes_einstein.free_diffusivity` | **First-principles physics** | Stokes–Einstein `D = kB T / (6πηr)` — exact hydrodynamics for a sphere in a continuum. |
-| Effective diffusivity / hindrance `effective_diffusivity`, `hindrance` | `brownian.simulate_effective_diffusivity` | **First-principles physics (simulated)** | Genuine overdamped Langevin dynamics with excluded-volume obstacles; MSD→D estimator. |
+| Effective diffusivity / hindrance `effective_diffusivity`, `hindrance` | `brownian.simulate_effective_diffusivity` | **FALSIFIED against measurement** | Genuine overdamped Langevin dynamics with excluded-volume obstacles; MSD→D estimator — but the *composed* quantity takes molecular weight as its only solute input and misses 71 measured compounds (2.4× modelled vs 29.7× measured, R² = 0.028; exactly 1.00× at matched MW vs a measured 3.7×). Sound mechanism, refuted result. |
 | Hydrodynamic radius `radius_hydrodynamic_nm` | `stokes_einstein.hydrodynamic_radius_nm` | **Empirical scaling** | Documented MW→radius power laws (small-molecule cube-root; globular-protein fit). Well-validated but empirical. |
 | Membrane permeability `membrane_permeability` | `permeability.membrane_permeability` | **Cheminformatic model** | Solubility–diffusion model (`P ≈ Kp·Dm/d`) — real physical *form*, descriptor-estimated inputs. |
 | BBB penetrance `bbb_penetrance` | `permeability.bbb_penetrance` | **Cheminformatic estimate** | Physicochemical BBB rules on MW/logP/TPSA/HBD. Structure-only; ordering-calibrated, not magnitude-calibrated. |
 | Free fraction / binding / clearance `free_fraction`, `tissue_binding_rate`, `clearance` | `binding.*` | **Cheminformatic estimate** | QSAR-style descriptor heuristics. Directionally reasonable, not fit to data. |
 | Potency `ic50` | provided, or `compile_drug` flagged estimate | **Input / low-confidence** | Not derivable from structure without docking or assay. Treated as an input; any structure-only value is explicitly flagged low-confidence in `provenance`. |
 
-The takeaway is deliberately unglamorous: **two** quantities (free diffusivity and
-the Brownian hindrance behind effective diffusivity) are real physics; the
-permeability/BBB/binding numbers are respectable cheminformatic *estimates*; and
-potency is essentially an input. We do not claim otherwise.
+The takeaway is deliberately unglamorous, and **measurement has since made it
+less glamorous still**. This paragraph used to say that two quantities — free
+diffusivity and the Brownian hindrance behind effective diffusivity — "are real
+physics". The mechanisms are; the composed prediction is not. `effective_diffusivity`
+is the **one quantity in this table that has been scored against a large external
+dataset, and it failed** — while the permeability/BBB/binding rows it was being
+favourably compared against were never tested that hard. So: the grades above
+rank *derivational purity*, and derivational purity turned out not to predict
+which row survives contact with data. Read the FALSIFIED row as the load-bearing
+one. Potency is essentially an input. We do not claim otherwise.
 
 ---
 
@@ -385,11 +423,18 @@ treating any molecular-layer number as calibrated.
   and a naive rules score can rank it lower than its real CNS exposure warrants.
   The contract pins *ordering* (TMZ > cisplatin/doxorubicin > antibody), not
   absolute magnitude.
-- **No active transport or efflux.** There is no P-glycoprotein (P-gp) or other
-  efflux/influx transporter model. Real BBB and tumor-cell drug levels are
-  strongly shaped by active efflux (P-gp pumps many agents back out); a
-  passive-only model will *over*-predict tissue exposure for P-gp substrates and
-  cannot represent transporter-mediated resistance at all.
+- **Active transport and efflux: implemented, opt-in, default-OFF.** This
+  previously read "there is no P-glycoprotein (P-gp) or other efflux/influx
+  transporter model", and that was **wrong**. `tmesim/molecular/efflux.py`
+  implements P-gp / BCRP from literature efflux ratios, and
+  `tmesim/molecular/ion_trapping.py` implements ion trapping; both are scored
+  (`results/efflux_impact.md`, `results/ion_trapping_impact.md`). Default-off is
+  the *validated* recommendation, not an admission of absence: turning efflux on
+  does not improve the measured anchor, and ABCB1/ABCG2 are on the explicit
+  ABSENT list for both Xenium panels, so nothing spatial constrains it here.
+  **As shipped (default-off) the consequence below still holds**: a passive-only
+  solve will *over*-predict tissue exposure for P-gp substrates and does not
+  represent transporter-mediated resistance.
 - **The micro-sim is 2D.** The Brownian dynamics run in a 2D box (MSD = 4Dt).
   Real crowding, percolation thresholds, and obstacle connectivity differ between
   2D and 3D; the 2D hindrance is a defensible proxy, not the true 3D value. (This
@@ -408,16 +453,29 @@ treating any molecular-layer number as calibrated.
 Even with all of the above, the layer buys something real. Before it, the tissue
 engine's per-drug parameters (diffusivity, BBB penetrance, binding, clearance)
 were **hand-set** order-of-magnitude guesses. After it, those same parameters are
-**mechanistically derived** from the drug's structure — free diffusivity from
-Stokes–Einstein, effective diffusivity from a real Brownian simulation, the rest
-from documented cheminformatic models with explicit provenance. That is a genuine
-upgrade from "assumed" to "computed from the molecule."
+derived from the drug's structure — free diffusivity from Stokes–Einstein,
+effective diffusivity from a real Brownian simulation, the rest from documented
+cheminformatic models with explicit provenance. That is a real upgrade from
+"assumed" to "computed".
 
-It is **not**, however, a substitute for validation. Mechanistic ≠ correct. The
-outputs are order-of-magnitude biologically plausible and internally consistent,
-but they have **not** been validated against measured tissue pharmacokinetics
-(intratumoral drug concentrations, microdialysis, imaging PK). Closing that gap —
-comparing the layer's `effective_diffusivity`, `bbb_penetrance`, and exposure
-predictions against real measured tissue PK — is the necessary next step before
-any of these numbers is treated as more than a defensible, first-principles-
+**But not, for diffusivity, to "computed from the molecule."** That phrase stood
+here and it is measurably wrong: `effective_diffusivity` is computed from the
+molecule's **mass** alone, and at matched mass it is flat by construction while
+the measurement moves 3.7× (see the box in §3). The upgrade is real for the
+descriptor-consuming quantities; for transport it bought a better-founded
+*form* around the same single input.
+
+It is **not**, however, a substitute for validation. Mechanistic ≠ correct — and
+this is no longer a hypothetical. This paragraph used to call the comparison
+against measured tissue PK "the necessary next step". **That step has been
+taken, and the layer lost.** `effective_diffusivity` was scored against 71
+measured compounds and falsified (§3); the multicellular-layer `D_eff` and
+hindrance anchors both FAIL in `vivum validate`; `bbb_penetrance` fails its rank
+ordering against measured brain:plasma ratios. What remains genuinely untested is
+the *solved field*: nothing public measures a spatially resolved free-interstitial
+concentration in tumour tissue. So the honest position is not "unvalidated"
+but "the input coefficients are testable and currently fail in identifiable,
+structural ways", which is a sharper and less comfortable statement than the one
+this paragraph used to make. Treat these numbers as less than a defensible,
+first-principles-
 anchored estimate.

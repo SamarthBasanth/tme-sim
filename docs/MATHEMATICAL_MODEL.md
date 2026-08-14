@@ -336,6 +336,21 @@ is why the product is taken rather than either alone. **Honest note:** the produ
 a modelling choice, not a theorem — the two hindrances are assumed statistically
 independent.
 
+> **Status: FALSIFIED.** Both factors depend on the solute only through its
+> hydrodynamic radius, which is $0.066\,\mathrm{MW}^{1/3}$ — so
+> $D_{\mathrm{eff}}^{\mathrm{mol}}$ is a function of **molecular weight and the ECM
+> fraction, and nothing else**. $\log P$, HBD, HBA, TPSA and charge are computed by
+> `descriptors.compute_descriptors` and discarded before this equation. Scored blind
+> against 71 compounds (Pruijn 2008, HT29 multicellular layers), the measurement
+> spans **29.7×** where this spans **2.4×**, at **R² = 0.028**; at identical MW it is
+> flat by construction (**exactly 1.00×**) against a measured **3.7×**. The
+> consequence for a user: **a ranking over similar-mass analogues carries no
+> compound-specific transport information.** A two-route model using the discarded
+> descriptors reaches R² = 0.725 blind and unfitted, but is merged, wired into
+> nothing, and default-OFF.
+> → [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md),
+> [`../results/two_route_transport.md`](../results/two_route_transport.md)
+
 ### 2.6 Solubility–diffusion membrane permeability
 
 `molecular/permeability.py::membrane_permeability`. Overton/Meyer picture: the solute
@@ -368,7 +383,11 @@ trend line, and the $\log P$ clamp is a numerical guard, not physics.
 ### 2.7 BBB penetrance (CNS-MPO-style rules — heuristic)
 
 `molecular/permeability.py::bbb_penetrance`, returning $\beta_{\mathrm{BBB}} \in [0,1]$.
-Four smooth desirabilities, their mean, then a logistic squash:
+Four smooth desirabilities, their **geometric** mean, then a logistic squash.
+(This section previously printed an *arithmetic* mean, $\tfrac14\sum d_i$. That
+was the pre-fix form and is retracted — the code has computed a geometric mean
+since the veto fix; see §8.3. A geometric mean is a **veto**: one disqualifying
+descriptor collapses the score, which an average cannot express.)
 
 $$
 d_{\mathrm{MW}} = \frac{1}{1+e^{(\mathrm{MW}-450)/60}},\quad
@@ -379,7 +398,7 @@ d_{\mathrm{TPSA}} = \frac{1}{1+e^{(\mathrm{TPSA}-90)/12}},\quad
 d_{\mathrm{HBD}} = \frac{1}{1+e^{(\mathrm{HBD}-3)/0.8}},
 $$
 $$
-\bar d = \tfrac14\bigl(d_{\mathrm{MW}}+d_{\log P}+d_{\mathrm{TPSA}}+d_{\mathrm{HBD}}\bigr),
+\bar d = \Bigl(d_{\mathrm{MW}}\,d_{\log P}\,d_{\mathrm{TPSA}}\,d_{\mathrm{HBD}}\Bigr)^{1/4},
 \qquad
 \beta_{\mathrm{BBB}} = \frac{1}{1+e^{-8(\bar d - 0.5)}}
 $$
@@ -1607,12 +1626,21 @@ therefore comparable across knobs with different units.
 ### 10.5 Bottom line
 
 The numerics are trustworthy on the real geometry: mass-conservative to round-off,
-unconditionally stable, dt-converged, with `kill_fraction` grid-converged and
-`penetration_index` requiring $\Delta x \lesssim 12$ µm. **The limiting uncertainty is
-not the solver** — it is the reconstruction gates (endothelial typing threshold, KDE
-bandwidth), the single-anchor calibration α, the heuristic terms flagged throughout
-(§2.7, §2.8, §3.2, §6.2), and the placeholder per-cell sensitivity. Error bars should
-be built from those, not from the mesh.
+unconditionally stable and dt-converged. **The grid-convergence claim that used to
+sit in this paragraph is WITHDRAWN** — there is no $\Delta x$ at which this pipeline
+has been shown to be grid-converged; the GBM ladder is non-monotone and both
+power-law fits are flagged DEGENERATE (`results/grid_convergence_gbm.md`), and
+`penetration_index` is retired regardless (§ `results/delivery_metrics.md`).
+
+**The limiting uncertainty is not the solver** — it is, in rough order: the
+**falsified diffusivity law of §2.5** (the largest known structural error, and the
+only one that changes what a *ranking* means), the reconstruction gates
+(endothelial typing threshold, vessel bandwidth), the single-anchor calibration α,
+the heuristic terms flagged throughout (§2.7, §2.8, §3.2, §6.2), the unresolved
+mesh term, and the placeholder per-cell sensitivity. Error bars built from the
+earlier version of this list — which omitted §2.1–§2.5 entirely — **cannot contain
+the truth for a similar-mass compound series**, because the transport spread there
+is zero by construction.
 
 ---
 

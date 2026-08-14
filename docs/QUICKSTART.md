@@ -108,11 +108,25 @@ temozolomide          194       606  0.125    278.0    0.472   7.48e+04  0.0210
 ```
 
 The tissue section is reconstructed **once** and reused for every drug, so
-every difference in the table is attributable to that drug's own physics
-(structure-derived diffusivity, real GDSC/literature IC50, BBB penetrance,
-perivascular-sink transport calibrated once on doxorubicin) on identical
-tissue — the same methodology `experiments/real_drug_panel.py` uses, just
-wrapped in a CLI.
+every difference in the table is attributable to that drug's own parameters
+(diffusivity, real GDSC/literature IC50, BBB penetrance, perivascular-sink
+transport calibrated once on doxorubicin) on identical tissue — the same
+methodology `experiments/real_drug_panel.py` uses, just wrapped in a CLI.
+
+> **The `D_eff` column is a function of molecular weight and nothing else, and
+> that model is FALSIFIED.** `logP`, hydrogen-bond donors, TPSA and charge are
+> computed by the molecular layer and discarded before transport. Against 71
+> compounds measured in one cell line the measurement spans **29.7×** where this
+> engine spans **2.4×** (R² = 0.028), and at *identical* molecular weight the
+> engine is flat by construction — **exactly 1.00×** — against a measured 3.7×.
+> Note the spread in the column above: three drugs inside 1.5×. **Do not read a
+> ranking over similar-mass analogues as a transport result** — for such a series
+> the delivery term carries no compound-specific information. Ranking compounds
+> that differ substantially in mass is the supported case.
+> → [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md),
+> [`../results/two_route_transport.md`](../results/two_route_transport.md)
+> (the two-route fix reaches R² = 0.725 blind, but is **default-OFF and wired
+> into nothing**, so no number here benefits from it).
 
 Drop `--drugs` and it compares **every** drug currently in the molecular
 library instead of a fixed list:
@@ -144,9 +158,12 @@ aborting the whole comparison — useful precisely because these libraries
 change over time.
 
 Read the honesty caveats before quoting any number from this table: it is a
-**prediction** of validated transport + potency physics on a real,
-**untreated** tissue section, not a validated clinical outcome — there is no
-paired measured drug response to check it against. See
+**prediction** on a real, **untreated** tissue section, not a validated clinical
+outcome — there is no paired measured drug response to check it against. The
+transport physics is **not** validated either: its input coefficients are
+externally testable and the engine currently misses them (see the `D_eff` box
+above, and `vivum validate`). What is defensible here is the **order**, not the
+level, and not over a similar-mass series. See
 [`results/real_drug_panel.md`](../results/real_drug_panel.md) and the
 README's "Five corrections" section for what is and is not defensible to
 quote.
@@ -197,10 +214,11 @@ FAIL         analytic adavosertib   [PMID 39820282]
                       bar       : fold error within 3x (module BAND_TIGHT); 10x reported alongside
 ```
 
-At the time of writing `--quick` covers 7 of the 13 registered anchors and ends
-on **PASS 7 / FAIL 4 / NOT TESTABLE 3 / DEFERRED 6**, exiting 1. The full run
-adds the PDE and geometry anchors and ends deeper in the red — see the failure
-list below.
+At the time of writing `--quick` covers 8 of the 16 registered anchor groups and
+ends on **PASS 7 / FAIL 6 / NOT TESTABLE 4 / DEFERRED 8** of 25 rows, exiting 1.
+The full run adds the PDE and geometry anchors and ends deeper in the red — see
+the failure list below. These counts move as anchors land; regenerate them from
+live output rather than trusting this page.
 
 **Four statuses, and the distinction between them is the point.**
 
@@ -235,12 +253,12 @@ Conflating any of those with `PASS` is exactly the error this project retracts
 results for.
 
 **Failures are the reason the command exists.** The full run currently ends on
-**PASS 13 / FAIL 15 / NOT TESTABLE 13** across 41 rows in under five minutes —
-more failures than passes, and all of it printed rather than buried:
+**PASS 13 / FAIL 18 / NOT TESTABLE 19** across 50 rows — more failures than
+passes, and all of it printed rather than buried:
 
 ```
 ====================================================================================================
-FAILURES (15) -- the model misses these MEASURED values
+FAILURES (18) -- the model misses these MEASURED values
 ====================================================================================================
 
   FAIL  breast-transvascular / 5-fluorouracil   [PMID 9205062]
@@ -258,11 +276,19 @@ FAILURES (15) -- the model misses these MEASURED values
         physics   : transvascular_exchange=False — one-way leak, S = PS*Cp
 ```
 
-The 15 span every layer: the two breast microdialysis anchors, two of six
+The 18 span every layer: the two breast microdialysis anchors, two of six
 glioma partition drugs, the `bbb_penetrance` rank ordering, the GIST imatinib
-falsification, three of the breast 3-D:2-D kill ratios, all four GBM
-vascular-morphometry anchors, breast microvessel density against Weidner, and
-section cellularity against measured H&E nuclear counts.
+falsification, the two MCL transport-coefficient rows, **one** of the breast
+3-D:2-D kill ratios (docetaxel), all four GBM vascular-morphometry anchors,
+breast microvessel density against Weidner, and section cellularity against
+measured H&E nuclear counts.
+
+The breast 3-D:2-D panel is **3 PASS / 1 FAIL / 6 NOT TESTABLE** — only four of
+ten drugs are testable at all. Two earlier counts, "5 PASS / 1 FAIL" and "3 PASS
+/ 3 FAIL", were **both wrong**: the second scored two drugs against **zero-width**
+bands that no prediction can land inside. A single-study band is now NOT TESTABLE
+in both the tool and the document generator.
+→ [`../results/zero_width_bands.md`](../results/zero_width_bands.md)
 
 `vivum validate` **exits non-zero if any anchor fails**, so it drops straight
 into CI:
@@ -272,7 +298,8 @@ vivum validate --quick || echo "an external anchor regressed"
 ```
 
 Note that `--quick` is a *weaker* gate than the full run, not a faster
-equivalent: it scores 11 rows and none of them touch the solver.
+equivalent: **13 of the 13 rows it scores never invoke the transport PDE**, so a
+green `--quick` is not evidence about the solver.
 
 #### Every row names the physics it ran under
 

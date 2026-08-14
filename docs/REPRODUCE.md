@@ -374,8 +374,8 @@ back** — their docstrings advertise `python -m …` commands that are currentl
 | module | state |
 |---|---|
 | `validation.cellstate_validation` | `run()`/`make_figure()` exist; no `write_report`, no `__main__` |
-| `validation.ranking_robustness` | only `run_ranking_mc()`; no writer, no `__main__`. **Until it lands, report cisplatin (0.241) vs doxorubicin (0.231) as a TIE** — they differ by ~4%, inside plausible parameter uncertainty |
-| `validation.vessel_network_impact` | declares `vessel_network_impact.{md,png}`; no `__main__` yet |
+| `validation.ranking_robustness` | **RUNNABLE — this row previously said "no `__main__`" and instructed readers to report cisplatin vs doxorubicin as a TIE. Both are superseded.** It landed, it has a `__main__`, and the measurement *contradicted* that prior: P(cisplatin = rank 1) = 0.9277 under the report's declared priors. Read `results/ranking_robustness.md` — and its §8, which concludes the reportable output for the top of the panel is a **SET, not a winner** |
+| `validation.vessel_network_impact` | **RUNNABLE** — has `__main__`; `results/vessel_network_impact.{md,png}` exist. (Previously listed here as having no `__main__`; that was wrong.) |
 | *(hypoxia vs VEGFA/HIF1A)* | `marker_panels` points at `validation/hypoxia_validation.py`, which does not exist |
 | `validation.pk_reality` | `__main__` only **prints**. `results/pk_reality.md` has **no producer** — re-running will not refresh it, and the on-disk copy is stale |
 
@@ -493,13 +493,18 @@ concentration and no microenvironment) and `moncayo_explant.{md,png}`.
    Xenium panels** and its methylation is not measurable from these transcripts at
    all. The reconstruction default is uniform 1.0 for *every* drug — the only fair
    cross-drug mode, since a determinant-mode comparison quietly advantages TMZ.
-5. **The vascular field is a smooth 40 µm KDE, not vessels — every vessel-relative
-   spatial claim is confounded.** Fitted penetration length is 26–28 µm for all
-   five drugs against a source-null of 23.7 µm; the exposure profile has a flat
-   floor at ~12% of peak; "perivascular regions get more drug" is circular. The
-   discrete replacement (`reconstruct.vessel_network`) is built and self-tested but
-   **dormant**. `therapeutic_coverage` survives because it is computed over the
-   fixed set of real measured cells, not over vessel-relative geometry.
+5. **This correction is itself SUPERSEDED — read it as history.** It used to say
+   the vascular field is a smooth 40 µm KDE, that fitted penetration length is
+   26–28 µm against a source-null of 23.7 µm, that the exposure profile has a
+   flat floor at ~12 % of peak, and that the discrete replacement is "built and
+   self-tested but dormant". **All four are now wrong.** `_DEFAULT_VASCULAR_MODE
+   = "discrete"` (`reconstruct/real_fields.py:179`) — segmented vessels are the
+   shipped default, not a blur. The flat floor was re-diagnosed as diffusion
+   physics rather than a KDE artefact, and the length degeneracy was traced to
+   the tissue mask (`docs/VERIFICATION_METHODOLOGY.md`). What survives: **neither
+   vascular mode is grid-converged at dx = 12 µm**, and `therapeutic_coverage` is
+   robust because it is computed over the fixed set of real measured cells, not
+   over vessel-relative geometry.
 
 ### Reproducibility notes
 
@@ -529,7 +534,7 @@ concentration and no microenvironment) and `moncayo_explant.{md,png}`.
 | `WARN: only N/3 GSE194329 Visium sections cached` | the cross-tissue stage needs GBM1/2/3; fetch them in §2b |
 | `WARN: N/3 required data_cache/hunt/ caches present` | the `external` stage will fail; see `DATA_INVENTORY.md` Tier B, or skip that stage |
 | Ivy GAP loader raises "extract gene_expression_matrix.zip into data_cache/ivygap/" | run the `unzip` in §2a |
-| `python -m tmesim.validation.<name>` exits silently, writes nothing | the module has no `__main__` — see §3, "Steps the harness deliberately does NOT run". Currently `cellstate_validation`, `ranking_robustness`, `vessel_network_impact` |
+| `python -m tmesim.validation.<name>` exits silently, writes nothing | the module has no `__main__` — see §3, "Steps the harness deliberately does NOT run". Currently only `cellstate_validation` (`ranking_robustness` and `vessel_network_impact` have both landed and are runnable) |
 | `results/pk_reality.md` never updates | expected — no producer exists in the current `pk_reality.py`; the file is stale |
 | `NotOpenSSLWarning` from urllib3 | harmless; system LibreSSL vs urllib3 v2 |
 | RDKit `SMILES Parse Error: ANTIBODY:bevacizumab` | expected — bevacizumab is an antibody with no SMILES; it falls back to a tabulated descriptor row |

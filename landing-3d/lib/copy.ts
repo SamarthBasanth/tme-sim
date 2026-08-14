@@ -20,6 +20,18 @@
  *    transvascular delivery law changes the top-1 GBM pick. Say the narrow
  *    version; the broad one was tested and is false.
  *    See results/transvascular_exchange_revalidation.md.
+ * 1b. THE DIFFUSIVITY LAW IS FALSIFIED, AND THE COPY MUST NOT IMPLY THAT A
+ *    COMPOUND'S STRUCTURE DRIVES ITS TRANSPORT. The only molecular input to
+ *    D_eff is molecular weight; logP, HBD, HBA, TPSA and charge are computed
+ *    and discarded. Against 71 compounds measured in one cell line the
+ *    measurement spans 29.7x where the engine spans 2.4x (R^2 = 0.028), and at
+ *    identical MW the engine is exactly 1.00x against a measured 3.7x. So
+ *    "descriptors -> transport" is the one phrase on this page that was
+ *    measured and refuted: say molecular WEIGHT, and say that similar-mass
+ *    analogues are the case this does not resolve. The two-route fix reaches
+ *    R^2 = 0.725 blind but is DEFAULT-OFF and wired into nothing, so it must
+ *    not be described as something the product does.
+ *    See results/diffusivity_falsification.md, results/two_route_transport.md.
  * 2. THE SPATIAL SPREAD MUST CARRY ITS HONEST NULL. The 2.0x is real and
  *    reproducible, but a well-mixed model's 1.0 is not the comparator that
  *    bounds it: a null that preserves the macrophages' own clustering
@@ -62,7 +74,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "03",
     eyebrow: "Delivery or potency",
     headline: "Which one killed the compound?",
-    body: "A compound compiles from its own structure: descriptors to Stokes-Einstein diffusivity to hindered transport through crowded ECM, with potency from measured GDSC2 screens. Each run then decomposes survival cell by cell — not how many lived, but why each one did. A molecule that never arrives and a molecule that arrives too weak look identical in a survival curve and need opposite fixes.",
+    body: "A compound compiles from its own structure: molecular weight to a Stokes-Einstein radius to hindered transport in crowded ECM, with potency from measured GDSC2 screens. Weight is the only property reaching transport, so similar-mass analogues cannot be separated. Each run then decomposes survival cell by cell: a molecule that never arrives and one that arrives too weak look identical in a survival curve, and need opposite fixes.",
     align: "right",
   },
   {
@@ -76,7 +88,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "05",
     eyebrow: "Stated limits",
     headline: "Every run ships its own caveats.",
-    body: "Ranking compounds on the same tissue is far more robust than any absolute number, and it is the output to trust. It is not unconditionally invariant, and we can tell you exactly where it breaks: correcting the transvascular delivery law re-weights the panel by permeability and changes the top pick on glioblastoma. That is written up, not buried. The spatial spread needs single-cell resolved tissue — on spot data the immune positions are synthesized rather than measured, so we do not report it there. Absolute kill fraction is not defensible at all, and every run says so in its own caveats panel. Vivum does not predict patient response, and its null results are published.",
+    body: "Ranking compounds on the same tissue is far more robust than any absolute number, and it is the output to trust. It is not unconditionally invariant, and we can tell you exactly where it breaks: correcting the transvascular delivery law re-weights the panel by permeability and changes the top pick on glioblastoma. Rank a set of similar-mass analogues and the transport term tells you nothing at all — diffusivity here comes from molecular weight alone, and we published the measurement that refutes it rather than waiting for a customer to find it. That is written up, not buried. The spatial spread needs single-cell resolved tissue — on spot data the immune positions are synthesized rather than measured, so we do not report it there. Absolute kill fraction is not defensible at all, and every run says so in its own caveats panel. Vivum does not predict patient response, and its null results are published.",
     align: "right",
   },
   {

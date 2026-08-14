@@ -22,8 +22,8 @@ Building the microenvironment from **real** data is fully achievable now from op
 - Place real cell populations at real coordinates; build real vascular network, ECM density, and an oxygen field inferred from real perfusion/hypoxia signal.
 - Whole-niche assembler including margin/normal/necrotic regions.
 
-### L3 — Simulation (keep the validated physics, extend to the niche)
-- Real physics engine (convection-diffusion-reaction transport, oxygen, interstitial pressure, Hill kill) — already validated on real penetration data; keep.
+### L3 — Simulation (keep the physics engine, extend to the niche)
+- Real physics engine (convection-diffusion-reaction transport, oxygen, interstitial pressure, Hill kill) — keep. **Not "already validated": that phrasing stood here and is retracted.** The solver's input coefficients are externally testable and the engine currently misses them — the MW-only diffusivity law is falsified against 71 measured compounds, and the multicellular-layer `D_eff` and hindrance anchors both FAIL. What is calibrated is one penetration anchor (α, one doxorubicin measurement).
 - Extend response to niche cell types (immune/stromal modulation) mechanistically, parameterized from real biology only.
 
 ### L4 — Validation (rigorous, real)

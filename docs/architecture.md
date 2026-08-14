@@ -198,11 +198,12 @@ Barrier integrity and the discrete-vessel replacement:
 - **`vessel_network.segment_vessels(...)` / `discrete_vascular_field(...)` /
   `link_distance_sweep(...)` / `segmentation_report(...)`** — the discrete
   segmented vessel network intended to replace the KDE (`LINK_DISTANCE_UM = 20.0`,
-  `VESSEL_RADIUS_UM = 7.5`, both PMID-cited). **Built and self-tested
-  (`python -m tmesim.reconstruct.vessel_network`) but DORMANT** — nothing imports
-  it, and `treatment.drugs.delivery_source` still consumes the KDE from
-  `real_fields.vascular_density_from_cells`. Wiring it in is the highest-value
-  structural fix outstanding.
+  `VESSEL_RADIUS_UM = 7.5`, both PMID-cited). **This is the SHIPPED DEFAULT** —
+  `real_fields.py:179` sets `_DEFAULT_VASCULAR_MODE = "discrete"`. This entry
+  previously read "built and self-tested but DORMANT — nothing imports it, and
+  `delivery_source` still consumes the KDE"; that has been false since commit
+  `ceb96c0` and the wiring is done. Neither vascular mode is grid-converged at
+  dx = 12 µm.
 
 Niche regions:
 
@@ -283,11 +284,12 @@ All are runnable as `python -m tmesim.validation.<name>`.
 | `gbm_tmz_exvivo` | GSE232173 — glioma + temozolomide + measured ex-vivo ATP viability (Ntafoulis 2023, PMID 37620410) | runnable → `results/gbm_tmz_exvivo.{md,png}` |
 | `moncayo_explant` | HGSOC explants: 376,736-pixel MALDI-MSI drug map + 114 GeoMx ROIs | runnable |
 | `cellstate_validation` | oxygen-banded cell states vs measured per-cell MKI67/TOP2A | **INCOMPLETE** — `run()`/`make_figure()` exist, no `write_report`, no `__main__` |
-| `ranking_robustness` | is the top-1 drug call decision-grade under parameter uncertainty? | **INCOMPLETE** — only `run_ranking_mc()`; no writer, no `__main__` |
-| `vessel_network_impact` | what changes if the KDE source is swapped for the discrete vessel network (§7.5a) | **INCOMPLETE** — declares `vessel_network_impact.{md,png}`, no `__main__` yet |
+| `ranking_robustness` | is the top-1 drug call decision-grade under parameter uncertainty? | **RUNNABLE** — has `__main__`; `results/ranking_robustness.md` + `.png` + `ranking_robustness_mc.npz` all exist. (Previously listed here as INCOMPLETE; that was wrong.) |
+| `vessel_network_impact` | what changes if the KDE source is swapped for the discrete vessel network (§7.5a) | **RUNNABLE** — has `__main__`; `results/vessel_network_impact.{md,png}` exist. (Previously listed here as INCOMPLETE; that was wrong.) |
 | *(hypoxia vs VEGFA/HIF1A)* | simulated oxygen vs the IO panel's measured VEGFA/HIF1A | **NOT WRITTEN** — `marker_panels` already carries `HYPOXIA_RESPONSE_GENES` and points at a `validation/hypoxia_validation.py` that does not exist |
 
-> **Two traps.** (1) The INCOMPLETE modules above have docstrings advertising
+> **Two traps.** (1) The INCOMPLETE modules above — now only `cellstate_validation`
+> and the unwritten hypoxia module — have docstrings advertising
 > `python -m tmesim.validation.<name>` and output files. Those commands are
 > **no-ops** — they exit without writing. Do not put them in a harness expecting
 > output. Check for an `if __name__ == "__main__":` block before believing a
@@ -586,8 +588,11 @@ It is not free: methotrexate (TPSA 210, 5 HBD) and cefazolin (TPSA 156) carry
 disqualifying descriptors too and get *worse* against their measured pooled
 values — which pool contrast-enhancing tissue, where the barrier is disrupted.
 Against the intact-barrier subset the vetoed scores are much closer, which is
-what the additive leak in (b) supplies. A structure-only score still cannot see
-active efflux or carrier-mediated uptake.
+what the additive leak in (b) supplies. The `bbb_penetrance` score itself is
+structure-only and does not see active efflux or carrier-mediated uptake — but
+note that efflux **is** implemented elsewhere in the layer
+(`tmesim/molecular/efflux.py`, opt-in, default-OFF), so this is a property of
+*this score*, not a missing capability of the model.
 
 ---
 
@@ -640,8 +645,21 @@ bands.
   (|E_pen| ≈ 0.52) and KDE bandwidth (|E_kill| ≈ 0.44) move the prediction more than
   the solver does. The mesh is not the bottleneck once dx ≲ 12 µm.
 - **`bbb_penetrance` is a structure-only ordering**, not a partition ratio — only
-  partially concordant with measured brain:plasma ratios (Spearman 0.50), because
-  there is no efflux or carrier transport in the model.
+  partially concordant with measured brain:plasma ratios (Spearman 0.50). It does
+  not consume the efflux or carrier terms; note that efflux (`molecular/efflux.py`)
+  and ion trapping (`molecular/ion_trapping.py`) **are** implemented and opt-in,
+  default-OFF, so the gap is that this score does not read them, not that they
+  are absent from the codebase.
+- **The tissue diffusivity law is FALSIFIED.** `D_eff` is a function of molecular
+  weight and the ECM fraction only — `logP`, HBD, HBA, TPSA and charge are
+  computed and discarded. Against 71 compounds measured in one cell line the
+  measurement spans 29.7× where the engine spans 2.4× (R² = 0.028), and at
+  identical MW the engine is flat by construction (exactly 1.00×) against a
+  measured 3.7×. **A ranking over similar-mass analogues therefore carries no
+  compound-specific transport information.** A two-route fix reaches R² = 0.725
+  blind and unfitted but is merged, wired into nothing and default-OFF.
+  → [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md),
+  [`../results/two_route_transport.md`](../results/two_route_transport.md)
 - **Systemic PK: averaged by default, time-resolved on request.** By default a
   single time-averaged sustained plasma level drives the transport solve; it
   preserves total delivered drug and relative ranking, but it makes any two

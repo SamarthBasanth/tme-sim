@@ -383,8 +383,11 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged }) {
           ? (d.reason
             || 'Compiled from a SMILES you supplied. Every transport parameter '
              + 'except molecular weight and TPSA is a prediction. Its absolute '
-             + 'kill, AUC and penetration depth are NOT defensible — rank it '
-             + 'against other compounds on this section instead.')
+             + 'kill, AUC and penetration depth are NOT defensible. Compare it '
+             + 'against other compounds on this section and read the ordering — '
+             + 'noting that diffusivity comes from molecular weight alone, which '
+             + 'has been measured against 71 compounds and refuted (R^2 = 0.028), '
+             + 'so similar-mass analogues cannot be separated on transport.')
           : '',
       }, label + suffix));
     }

@@ -80,6 +80,11 @@ export function describe(kind) {
  */
 export const STANDING_LIMITS = [
   'ABSOLUTE KILL IS NOT DEFENSIBLE on any panel that cannot measure hypoxia. On such a section no state route clears the bar and kill moves by up to 0.3252 absolute (1.77x) purely with the choice of route. The cross-drug RANKING is invariant across routes and is the defensible output; the LEVEL is not.',
+  // The line above makes the ranking the product. This one names the case where
+  // the ranking is MEASURED to be wrong, so it has to sit immediately after it.
+  // Phrased with "MUST NOT" deliberately: CV_HARD in inspect.js counts that as a
+  // hard stop, and this is one. Numbers: results/diffusivity_falsification.md.
+  'TRANSPORT IS A FUNCTION OF MOLECULAR WEIGHT ALONE, AND THAT MODEL IS FALSIFIED. logP, hydrogen-bond donors, TPSA and charge are computed and then discarded before D_eff. Against 71 compounds measured by one method in one cell line (Pruijn 2008), the measurement spans 29.7x where this engine spans 2.4x, at R^2 = 0.028 -- and at IDENTICAL molecular weight the engine is flat by construction, exactly 1.00x, where the measurement spans 3.7x. A ranking over a congeneric or similar-mass series MUST NOT be read as a transport result: for such a series the delivery column carries no compound-specific information and the order is potency plus tissue geometry. Ranking compounds that differ substantially in mass is the supported case. The two-route fix (R^2 = 0.725 blind) is merged, wired into nothing, and DEFAULT-OFF.',
   'sensitivity_mode=uniform sets every cell to 1.0. Every kill number it produces is a NO-RESISTANCE UPPER BOUND, not an expected response. It is comparable across drugs precisely because it is the same assumption for all of them.',
   'NOTHING IN THIS PROJECT HAS BEEN VALIDATED AGAINST A PATIENT OUTCOME. These sections carry no treatment-response label, so every number here is a prediction of the physical model that has never been scored. NOT FOR CLINICAL USE.',
 ];

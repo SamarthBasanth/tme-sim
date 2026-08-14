@@ -2,6 +2,31 @@
 
 *Last run live: 2026-07-26. Author artifact: `tmesim/data/spatial_ingest.py`.*
 
+> ## ⚠ ARCHIVED RECORD — DO NOT QUOTE ANY NUMBER FROM THIS FILE
+>
+> This is a historical snapshot of a **superseded** pipeline, kept for the record.
+> Every quantitative claim below predates corrections that have since landed, and
+> at least four are now known-wrong:
+>
+> * `bbb=0.558` for temozolomide is the **retracted arithmetic-mean** value; the
+>   shipped geometric-mean veto (`molecular/permeability.py`) returns **0.1254**.
+> * `penetration index 0.298` quotes a **RETIRED** metric — `penetration_index` is
+>   a scale-invariant shape statistic that reports the section's vascular geometry,
+>   not the drug's delivery (`results/delivery_metrics.md` §4). Use
+>   `therapeutic_coverage` at 1× IC50.
+> * `predicted kill fraction 0.354` is an **absolute kill**, which is not a
+>   defensible output under any configuration, and is quoted here with no interval
+>   (the propagated interval spans ~30×).
+> * The reconstruction path described (`build_vascular_network`,
+>   `build_tissue_fields`, `assemble_microenvironment`,
+>   `segmentation._sensitivity_from_tumor`) is classified **legacy, not on the real
+>   path** by `docs/architecture.md`, and the `ENDOTHELIAL 952` call comes from the
+>   relative-enrichment argmax that was the project's defect #1.
+>
+> For the current state read [`../README.md`](../README.md),
+> [`../results/CLAIM_INVENTORY.md`](../results/CLAIM_INVENTORY.md) and
+> `vivum validate`.
+
 This document is the HONEST record of running the tmesim
 reconstruct -> sim loop on a **real spatial-transcriptomics** GBM sample instead
 of synthetic geometry. It states exactly what downloaded, what ran, and — the

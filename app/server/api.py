@@ -684,7 +684,12 @@ def validate_spec(spec: Dict) -> Dict:
                         "see stereochemistry. Its kill_fraction, mean_tumor_auc "
                         "and penetration_length_um are NOT defensible as "
                         "absolute numbers. Run it alongside other compounds on "
-                        "this same section and read the RANKING."
+                        "this same section and read the RANKING -- but note that "
+                        "the transport ranking itself is FALSIFIED for analogues "
+                        "of similar molecular weight: diffusivity here is a "
+                        "function of MW alone, and against 71 measured compounds "
+                        "(results/diffusivity_falsification.md) it spans 2.4x "
+                        "where the measurement spans 29.7x, at R^2 = 0.028."
                     )
         warnings.append(
             "drug is null: this is a reconstruction-only run. kill_fraction, "

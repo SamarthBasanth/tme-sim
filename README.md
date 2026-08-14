@@ -21,6 +21,34 @@ compounds on *one* tissue section.** Everything absolute has been tested against
 external measurement and essentially all of it has failed. Both halves of that
 sentence are documented below, with a pointer to the measurement behind each.
 
+> ### Read this before you rank a compound series
+>
+> The shipped transport model derives a compound's tissue diffusivity from
+> **molecular weight alone**, and that model is **FALSIFIED**. Scored blind
+> against 71 compounds measured by one method in one cell line
+> (Pruijn 2008, doi:10.1071/CH08240), the measurement spans **29.7×** where the
+> engine spans **2.4×**, at **R² = 0.028**. At *identical* molecular weight the
+> engine is flat **by construction — exactly 1.00×** — where the measurement
+> spans **3.7×** (four compounds at 263 Da) and **3.8×** (four at 305 Da).
+>
+> **So: a series of similar-mass analogues is the one comparison this product is
+> measured to get wrong.** Vivum cannot separate such compounds on transport, and
+> a ranking over them is carrying no transport information — only potency.
+> Ranking compounds that differ substantially in mass *and* in the properties
+> below is the supported case.
+> → [`results/diffusivity_falsification.md`](results/diffusivity_falsification.md)
+>
+> This is not unfixed for want of physics. A two-route model (paracellular +
+> transcellular, from the hydrogen-bond-donor and logP₇.₄ terms the engine
+> currently computes and discards) reaches **R² = 0.725, Spearman +0.842**, blind
+> and unfitted, on those same 71 compounds, and orders 24 of 31 exact-MW pairs
+> correctly against the MW-only model's 0 of 31. It is **merged, wired into
+> nothing, and default-OFF**: `DrugParams.diffusivity` is bit-identical to the
+> pre-merge value and no shipped code path calls it, so **nothing you can run
+> today benefits from it**. The recommendation of its own write-up is *"MERGE the
+> physics, do NOT flip the default"* — flipping it is a re-validation exercise.
+> → [`results/two_route_transport.md`](results/two_route_transport.md)
+
 > ### What Vivum does not do
 >
 > * It does **not** predict clinical response or patient outcome. No open dataset
@@ -206,18 +234,19 @@ numerics: `dx = 12` sits at the maximum of `F_state` over the whole grid ladder,
 biasing all three ratios high by +1.2 / +2.4 / +2.7 %
 ([`results/grid_convergence_gbm.md`](results/grid_convergence_gbm.md)).
 
-**The breast kill panel's tally is currently under reconciliation — do not quote
-either figure.** [`results/kill_calibration_breast.md`](results/kill_calibration_breast.md)
-§3 reports **5 PASS / 1 FAIL** of six testable drugs, reaching that count by
-falling back to a broad cross-tumour band for two drugs whose own literature is a
-single row with no spread. The shipped `vivum validate` does not fall back and
-therefore prints **3 PASS / 3 FAIL**, scoring 5-fluorouracil and paclitaxel
-against zero-width bands. Neither bar is obviously wrong; they are different bars.
-A zero-width band on a continuous quantity is the mirror image of the defect for
-which the GBM IFP row was declared NOT TESTABLE — a bar nothing can pass, versus a
-bar nothing can fail. Reconciliation is in progress and will be recorded in
-`results/zero_width_bands.md`; until it lands, read both sources and quote
-neither count as settled.
+**The breast kill panel is 3 PASS / 1 FAIL / 6 NOT TESTABLE — settled, and
+only four of ten drugs are testable at all.** This reconciles two earlier counts
+that were **both wrong**. `kill_calibration_breast.md` §3 published **5 PASS /
+1 FAIL** by falling back to a broad cross-tumour band for two drugs whose own
+literature is a single row with no spread; the shipped `vivum validate` did not
+fall back and printed **3 PASS / 3 FAIL**, scoring 5-fluorouracil and paclitaxel
+against **zero-width** bands (`0.1636–0.1636`, `0.0412–0.0412`) that no
+prediction can land inside — a bar nothing can fail versus a bar nothing can
+pass, the mirror image of the defect for which the GBM IFP row was declared NOT
+TESTABLE. A single-study band is now **NOT TESTABLE** in both paths, which can no
+longer disagree. Live `vivum validate --only breast-kill-3d2d` prints
+`PASS 3 FAIL 1 NOT TESTABLE 6 (of 10 rows)`. Docetaxel is the one FAIL.
+→ [`results/zero_width_bands.md`](results/zero_width_bands.md)
 
 **Docetaxel on breast is the one verdict that is a function of the grid.** Its
 ratio 0.1484 sits **1.5 % outside** its band ceiling of 0.1463 — a margin smaller
@@ -285,6 +314,7 @@ measurement. These are listed so nobody has to rediscover them.
 | IFP, GBM | 0.462 mmHg | 2.0 ± 2.5 mmHg | 4.3× low, but registered **NOT TESTABLE** — a model outputting zero would pass | [`ifp_validation.md`](results/ifp_validation.md) §4.1 |
 | Oxygen `supply` constant | 0.05 | ≈194–251 s⁻¹ (PMID 31423930) | **~4,570× low** on GBM (2,160× on breast), partly cancelled by a consumption sink **112–166× low** | [`oxygen_supply_calibration.md`](results/oxygen_supply_calibration.md) §3.3, §5 |
 | Effective diffusivity, multicellular layer | 287.3 µm²/s | 74–130 µm²/s | FAIL | [`anchor_registration.md`](results/anchor_registration.md) §1 |
+| **Tissue diffusivity `D_eff` as a *law*, 71 compounds** | 2.4× spread, R² = 0.028 | 29.7× spread (Pruijn 2008, doi:10.1071/CH08240) | **FALSIFIED** — and exactly **1.00×** at identical MW where measurement gives **3.7×**/**3.8×**. This is the row that bears on ranking a compound series | [`diffusivity_falsification.md`](results/diffusivity_falsification.md) |
 | Hindrance `D_free/D_eff` | 1.77× → **6.61×** after a cellular-exclusion correction | 12× (PMID 9806526) | **1.8× short** even after the correction | [`cellular_exclusion.md`](results/cellular_exclusion.md) §4.1 |
 | Breast Kp, 5-fluorouracil | 7.7956 | 0.61 ± 0.11 (PMID 9205062) | **12.8× high** | [`breast_kp_validation.md`](results/breast_kp_validation.md) |
 | Breast Kp, methotrexate | 0.0571 | 0.60 ± 0.20 (PMID 9679959) | **10.5× low** — opposite direction | [`breast_kp_validation.md`](results/breast_kp_validation.md) |
@@ -313,10 +343,11 @@ Refinement makes IFP *worse*, not better: breast IFP falls monotonically
 **PASS 7 · FAIL 6 · NOT TESTABLE 4 · DEFERRED 8** of 25 rows, and prints its own
 disclosure: ***13 of the 13 scored rows never invoke the transport PDE.*** The full
 run does reach the solver — 12 PDE-scoped scored rows — but every PASS among them
-is a 3-D:2-D ratio conditional on the one fitted constant α, and the full tally is
-in flux while the breast zero-width-band question above is settled. The last
-recorded full run is in
-[`results/anchor_registration.md`](results/anchor_registration.md) §0.
+is a 3-D:2-D ratio conditional on the one fitted constant α. The full-run tally
+after the zero-width-band fix is **PASS 13 · FAIL 18 · NOT TESTABLE 19** of 50
+rows (it was FAIL 20 / NOT TESTABLE 17 before; two rows moved FAIL → NOT
+TESTABLE and **none moved to PASS**).
+→ [`results/zero_width_bands.md`](results/zero_width_bands.md) §5.
 Roughly **18 distinct FAIL rows** exist across `results/`; they are enumerated in
 [`results/CLAIM_INVENTORY.md`](results/CLAIM_INVENTORY.md) §1e. Docetaxel is one
 falsification among many — this project's honesty record is better than "one
@@ -356,9 +387,12 @@ classifier ([`heldout_patient.md`](results/heldout_patient.md) §2).
 Vivum is a research instrument whose defensible output is the **relative
 comparison of compounds on one tissue section**, with essentially **no external
 validation of the transport physics itself**. The narrow claim has been attacked
-from several directions and held. The broad claim — that the transport physics is
-validated, or that any absolute number it produces is trustworthy — has been
-tested and is false.
+from several directions and held — with one measured exception that a user must
+know before running anything: **the diffusivity law is falsified, so a ranking
+over similar-mass analogues carries no transport information** (see the box at
+the top of this page). The broad claim — that the transport physics is validated,
+or that any absolute number it produces is trustworthy — has been tested and is
+false.
 
 The sharpest available statement of that gap is
 [`results/external_anchor_survey.md`](results/external_anchor_survey.md) §5, and
@@ -379,8 +413,11 @@ are separate, and the checking modules are allowed to fail loudly. Every
 retraction on this page was found that way, not by the test suite, which was green
 throughout.
 
-**What would most improve this, in order:** (0) reconcile `vivum validate` with
-`kill_calibration_breast.md`; (1) a **second section of the same tumour type** —
+**What would most improve this, in order:** (0) resolve the falsified
+diffusivity law — the physics that fixes it is already merged and measured
+(R² 0.028 → 0.725, blind), so this is a re-validation exercise and not a
+research one, and it is the only item on this list that changes what a *ranking*
+means; (1) a **second section of the same tumour type** —
 almost every defensible claim above is *n* = 1 in tissue, and this is the cheapest
 large improvement available; (2) any external anchor that scores the solver on the
 strength of a solve **and passes** — there are three such anchors and all three

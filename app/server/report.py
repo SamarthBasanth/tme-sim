@@ -158,6 +158,49 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
         "body": law["caveat"],
     })
 
+    # Limit 2c. The two limits above condition the ranking on things that are
+    # uncertain. This one names the case where the ranking is measured to be
+    # WRONG, and it has to sit with them rather than in the numerics block at
+    # the bottom: a reader who is ranking a congeneric series is the reader most
+    # likely to stop after limit 2, and that reader is the one this concerns.
+    # The engine's only molecular input to diffusivity is molecular weight, so
+    # at matched MW its transport prediction is flat BY CONSTRUCTION and the
+    # ordering it produces over such a series is potency alone wearing a
+    # transport label. Scored blind, unfitted, on 71 compounds.
+    limits.append({
+        "id": "diffusivity_mw_only_falsified",
+        "severity": "critical",
+        "applies": True,
+        "title": ("Transport is a function of MOLECULAR WEIGHT ALONE, and that "
+                  "model is FALSIFIED — similar-mass analogues cannot be "
+                  "separated"),
+        "source": ("results/diffusivity_falsification.md; "
+                   "results/two_route_transport.md (Pruijn 2008, "
+                   "doi:10.1071/CH08240)"),
+        "body": (
+            "The D_eff handed to the transport solve is derived from molecular "
+            "weight and the tissue ECM fraction and NOTHING ELSE: logP, "
+            "hydrogen-bond donors and acceptors, TPSA and formal charge are all "
+            "computed by the molecular layer and DISCARDED before the transport "
+            "calculation. Scored blind and unfitted against 71 compounds "
+            "measured by one method in one cell line, the measurement spans "
+            "29.7x where this engine spans 2.4x, at R^2 = 0.028. At IDENTICAL "
+            "molecular weight the engine is flat BY CONSTRUCTION -- exactly "
+            "1.00x -- where the measurement spans 3.7x (four compounds at 263 "
+            "Da) and 3.8x (four at 305 Da). CONSEQUENCE FOR THIS PAGE: if the "
+            "drugs ranked below are a congeneric or similar-mass series, their "
+            "delivery column carries essentially no compound-specific transport "
+            "information and the order you are reading is potency plus tissue "
+            "geometry, not transport. Across drugs that differ substantially in "
+            "mass the delivery term does discriminate, and that is the "
+            "supported case. A two-route model using the discarded descriptors "
+            "reaches R^2 = 0.725 blind on the same 71 compounds and orders 24 "
+            "of 31 exact-MW pairs correctly against this model's 0 of 31, but "
+            "it is MERGED, WIRED INTO NOTHING and DEFAULT-OFF -- no number on "
+            "this page benefits from it."
+        ),
+    })
+
     # 3 -------------------------------------------------------------------- #
     if genes_known and not hypoxia_on_panel:
         applies, body = True, (
