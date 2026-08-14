@@ -1,0 +1,19 @@
+{
+  "alpha": 148.60815765445545,
+  "alpha_expected": 148.60815765445545,
+  "oxygen_supply": 0.05,
+  "oxygen_consumption": 0.02,
+  "hypoxia_threshold": 0.2,
+  "default_vascular_mode": "discrete",
+  "default_geometry": "binary",
+  "vessel_radius_um": 7.5,
+  "link_distance_um": 20.0,
+  "dx_um_heldout_patient": 12.0,
+  "dx_um_mgmt_scalar": 12.0,
+  "dx_um_ok": true,
+  "alpha_ok": true,
+  "supply_ok": true,
+  "default_geometry_ok": true,
+  "default_mode_ok": true,
+  "all_ok": true
+}

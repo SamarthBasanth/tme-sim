@@ -606,7 +606,23 @@ DX_FINE: Tuple[float, ...] = (6.0, 5.0, 4.0)
 def _tissue_arm(micro, supply: float, consumption: float, *,
                 painting: str, closure: bool, beta_cap: Optional[float] = None
                 ) -> Dict:
-    """One (section, oxygen configuration, painting, closure) measurement."""
+    """One (section, oxygen configuration, painting, closure) measurement.
+
+    ``painting`` selects the vascular field the closure is measured on:
+
+    ``'binary'``   the SHIPPED field (``geometry='binary'``), exactly 0 or 1.
+    ``'subgrid'``  the per-vessel-OBJECT fractional-area field
+                   (``geometry='subgrid'``, ``results/vessel_geometry_fix.md``).
+                   This is what §5 of ``results/subgrid_closure.md`` used.
+    ``'area'``     the AREA-CONSERVING rasterisation of the SHIPPED discs
+                   (``geometry='area'``, ``results/vessel_source_conservation.md``)
+                   — same objects, same radius, same per-endothelial-cell
+                   weighting as ``'binary'``; only the measurement of the disc
+                   changes. This is the promotion candidate, and it is a
+                   DIFFERENT continuous field from ``'subgrid'``: it deposits
+                   ~744k um^2 against ~347k. Added by
+                   ``results/area_conservation_regeneration.md``.
+    """
     import dataclasses
 
     from tmesim.cells.agents import update_cell_states
@@ -619,10 +635,18 @@ def _tissue_arm(micro, supply: float, consumption: float, *,
                               consumption=consumption)
     if painting == "binary":
         vasc = np.asarray(micro.fields.vascular_density, dtype=np.float64)
-    else:
+    elif painting == "area":
+        # radius_mode is IGNORED by geometry='area' (it paints the shipped discs
+        # at radius_um), so this is the production call with one keyword changed.
+        vasc = vascular_density_from_cells(
+            micro.domain, micro.cells, mode="discrete", geometry="area",
+            radius_um=VESSEL_R)
+    elif painting == "subgrid":
         vasc = vascular_density_from_cells(
             micro.domain, micro.cells, mode="discrete", geometry="subgrid",
             radius_mode="constant", radius_um=VESSEL_R)
+    else:
+        raise ValueError(f"unknown painting {painting!r}")
     work = Microenvironment(
         domain=micro.domain,
         fields=dataclasses.replace(micro.fields, vascular_density=vasc),

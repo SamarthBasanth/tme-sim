@@ -28,6 +28,24 @@
 > **3.72 %** fine-rung `F_state` span are therefore **not** perivascular
 > under-resolution and **no closure of the oxygen solve can touch them.**
 
+> ### CONDITIONAL ON A DEFAULT THAT IS UNDER REVIEW — read §5.0
+>
+> **One claim in this file is not a property of the closure but of a default
+> someone is proposing to move.** §5.0's control — *"on the shipped field the
+> closure is an exact no-op"* — holds **only because
+> `discrete_vascular_field`'s default is `geometry='binary'`, a field that is
+> exactly 0 or 1, so `beta == 1` identically.**
+> `results/vessel_source_conservation.md` §10 proposes promoting the
+> area-conserving continuous painting (`geometry='area'`) to the default. **Under
+> that promotion the no-op is void**: 99.92 % of source cells become partial and
+> the closure moves `F_state` by up to **−0.2264** at the published
+> `dx = 12 µm`. It was re-measured rather than extrapolated —
+> **`results/area_conservation_regeneration.md` §4**, which also carries the
+> corrected verdict. **Everything else in this file — §1–§4, §5.1–§5.4 on the
+> `'subgrid'` field, and §6's three findings — is unaffected**, and the
+> conclusion *"the closure does not transfer to tissue and stays off"* is
+> strengthened, not weakened, by the re-run.
+
 **Status: a feasibility study. Nothing shipped was changed.** `OxygenConfig`
 defaults (`supply = 0.05`, `consumption = 0.02`, `hypoxia_threshold = 0.2`),
 `physics/oxygen.py`, and `real_fields._DEFAULT_VASCULAR_MODE` /
@@ -429,9 +447,41 @@ four decimals**, exactly as §1.4 predicts. `beta == 1` everywhere because the
 field is exactly 0 or 1. **The shipped painting destroys the sub-grid geometry
 before the solve and no closure of the solve can recover it.**
 
+> #### THE NO-OP IS A PROPERTY OF THE BINARY PAINTING, NOT OF THIS ENGINE
+>
+> **Read this before quoting the paragraph above.** "The closure is an exact
+> no-op on the shipped field" is true **only for as long as
+> `discrete_vascular_field`'s default is `geometry='binary'`.** It is not a
+> statement about the solver, the closure or the tissue; it is a statement about
+> a field that happens to be exactly 0 or 1. The reason is now measured rather
+> than argued: on the binary field at `dx = 12 um` there are **exactly 0** cells
+> with `0 < v < 1`, so `beta = 1` on every cell in the domain by construction.
+>
+> **`results/vessel_source_conservation.md` proposes making the default
+> continuous** (`geometry='area'`, area-conserving, currently opt-in and
+> default-off). **If that promotion happens, this control is void and the
+> closure stops being default-safe in the sense this section claims.** On the
+> `geometry='area'` field at the same `dx = 12 um`, **16,228 cells — 99.92 % of
+> all source cells — are partial**, `beta` runs to **144.0** against a validated
+> maximum of **5.677**, and `binary | closed`'s no-op becomes an
+> `F_state` move of **−0.1043 / −0.2264 / −0.0980** on shipped / joint-lo /
+> joint-hi. It was re-measured on that field rather than assumed: the numbers,
+> the full ladder and the corrected verdict are in
+> **`results/area_conservation_regeneration.md` §4**, and §5.1–§5.4 below are
+> reproduced there in shape but not in magnitude.
+>
+> **Nothing in `tmesim/` changed to make this true or false.** The closure
+> remains default-off and unimported; what changes is that its *safety* was
+> resting on a default someone else is proposing to move.
+
 Everything below therefore runs on the opt-in fractional-area field
 (`geometry="subgrid"`, `radius_mode="constant"`, `radius_um = 7.5`), **raw versus
-closed on the same field**, so the comparison isolates the closure.
+closed on the same field**, so the comparison isolates the closure. Note that
+`'subgrid'` is **not** the same continuous field as the `'area'` promotion
+candidate — it paints one footprint per vessel *object* at a data-derived radius
+and deposits ~347k µm² against ~744k — which is why the re-run in
+`results/area_conservation_regeneration.md` §4 was necessary and could not be
+inferred from this section.
 
 ### 5.1 The result
 
@@ -598,6 +648,24 @@ small `v` — exactly where §5.2 shows the failure lives. That is a derivation,
 a model, and it is testable by the same falsification this file used. **Nothing
 in this report argues for adopting the current closure, and it stays off.**
 
+**4. ADDED AFTER THE FACT — the third finding is now unconditional, and the
+first control is now conditional.** When this file was written, the closure was
+harmless-by-default: §5.0 showed it was an exact no-op on the shipped binary
+field, so "it stays off" and "it would do nothing anyway" were both true. Only
+the first is still true. Re-measured on `geometry='area'` — the area-conserving
+continuous painting `results/vessel_source_conservation.md` §10 proposes
+promoting to the default — the closure is **not** a no-op: **99.92 %** of source
+cells become partial (against **0** on the binary field), `beta` reaches
+**144.0** against its validated maximum of **5.677**, and `F_state` at the
+published `dx = 12 µm` moves by **−0.1043 / −0.2264 / −0.0980** on shipped /
+joint-lo / joint-hi. **The shape of §5's failure reproduces on the new field and
+its magnitude is larger**, so finding 3 holds on both continuous fields this
+project has and is no longer specific to `'subgrid'`. The full ladder, the
+capped-`beta` diagnosis and the corrected recommendation are in
+**`results/area_conservation_regeneration.md` §4**. **The operational
+consequence: "default-off" is now the only thing keeping this closure harmless,
+and it must not be promoted alongside the source fix.**
+
 ---
 
 ## 7. Provenance, controls, and what this does NOT establish
@@ -609,11 +677,15 @@ in this report argues for adopting the current closure, and it stays off.**
   **new module, `tmesim/physics/subgrid.py`, that nothing else in `tmesim/`
   imports** — verified by grep — and `solve_oxygen_subgrid(..., enabled=False)`
   is a bit-identical passthrough. Everything is left unstaged.
-* **`pytest`**: the suite was re-run after the coordinator reverted an unrelated
-  `tmesim/molecular/` change (measured-vs-computed logP, which had drifted
-  `alpha` from 148.60815765445545 to 68.637 and broken six tests including two
-  bitwise PK reference pins). The new module was independently confirmed not to
-  be the cause: with `subgrid.py` moved aside, the same tests still failed.
+* **`pytest`**: **878 passed, 3 failed** after the coordinator reverted an
+  unrelated `tmesim/molecular/` change (measured-vs-computed logP, which had
+  drifted `alpha` from 148.60815765445545 to 68.637 and broken six tests
+  including two bitwise PK reference pins). All 3 residual failures are logP
+  provenance tests in `tests/test_byo_compound.py`, and **none of them is
+  attributable to this work**: that file passes **80/80 in isolation both with
+  and without `tmesim/physics/subgrid.py` present**, and nothing imports the new
+  module (verified by grep across `tmesim/`, `tests/` and `app/`). Three other
+  agents were live on the repository during these runs.
 * **One section, one tumour type.** Every tissue number is `xenium_gbm`.
 * **The controlled problem is 1-D Cartesian.** That is the whole of §5.2 and it
   is a limitation of the closure, not only of the test.
@@ -651,3 +723,16 @@ Each stage checkpoints to `results/sweep/subgrid_<stage>.json`; `transfer`
 additionally writes `subgrid_transfer_partial.json` after every rung and is
 restart-safe. `identity` is the stage that decides the closure's form and it
 runs in 0.1 s with no tissue.
+
+**The §5.0 no-op control on the promotion candidate's field** (`geometry='area'`,
+which `_tissue_arm(painting='area')` now supports) is re-measured by a separate
+driver, because it is a statement about a *default* rather than about this
+closure:
+
+```
+./.venv/bin/python -u -m experiments.area_conservation_regeneration --stage closure
+```
+
+That writes `results/sweep/areagen_closure.json` (and a per-rung
+`areagen_closure_partial.json`) and is reported in
+`results/area_conservation_regeneration.md` §4.
