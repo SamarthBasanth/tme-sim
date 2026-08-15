@@ -1,14 +1,24 @@
 # Build and smoke-test the Studio image on a real linux/amd64 machine.
 #
-# WHY THIS EXISTS. docs/DEPLOYMENT.md 1c states, honestly, that no image has
-# ever been built from the Dockerfile: Docker is not installed in the
-# environment this project is developed in. Four real defects (a missing
-# .dockerignore, a CMD binding the container's own loopback, undeclared
-# rdkit/h5py deps, an unflushed stdout hiding the auto-generated API key) were
-# found by static audit alone -- but a list of things "still unverified, and
-# needing one real build to settle" remains at the end of that section. This
-# workflow is that one real build. Everything it asserts is an item from that
-# list; when it goes green, that paragraph can shrink.
+# WHY THIS EXISTS -- AND WHAT IS LEFT FOR IT TO SETTLE.
+#
+# Four real defects (a missing .dockerignore, a CMD binding the container's own
+# loopback, undeclared rdkit/h5py deps, an unflushed stdout hiding the
+# auto-generated API key) were found by static audit before any image existed.
+# Since then the image HAS been built and run -- but only on linux/arm64, and
+# docs/DEPLOYMENT.md 1c now says so with the numbers.
+#
+# So the list this workflow exists to close has shrunk to essentially ONE item,
+# and it is the one an arm64 build physically cannot answer: do manylinux
+# **cp311 x86_64** wheels exist and install for scipy / scikit-image /
+# imagecodecs / h5py / rdkit, and do THOSE wheels want shared libraries
+# python:3.11-slim does not carry? Same version pins, different wheels. Until
+# this job is green on linux/amd64 that question is open, not "probably fine".
+#
+# The rest of the steps below are now regression tests rather than first
+# measurements: they assert on amd64 the behaviours that were measured on
+# arm64, so a platform-specific divergence shows up as a named failure instead
+# of as a surprise in production.
 #
 # It NEVER pushes. There are no registry credentials in this repo and none
 # should be added -- the image is built, loaded into the runner's local daemon,
@@ -94,18 +104,37 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Settles item 8 (final image size), and also tells us whether
-      # .dockerignore is doing its job in gross terms -- the pre-.dockerignore
-      # context alone was ~6.5 GB of tissue data, run history and a macOS
-      # virtualenv, so a multi-gigabyte image here would be a red flag even
-      # before the per-directory assertions below.
+      # Reports the final image size, and also tells us whether .dockerignore is
+      # doing its job in gross terms -- the pre-.dockerignore context alone was
+      # ~6.5 GB of tissue data, run history and a macOS virtualenv, so a
+      # multi-gigabyte image here would be a red flag even before the
+      # per-directory assertions below.
+      #
+      # DO NOT TRUST `docker image inspect --format '{{.Size}}'` ON ITS OWN.
+      # Measured on a containerd-snapshotter daemon: it reported 300,307,441
+      # bytes (~300 MB) for an image that `docker images` and `docker system df`
+      # BOTH called 1.38 GB -- an under-report of roughly 4.6x, because on that
+      # graph driver the field is the compressed content size, not the on-disk
+      # size. This step is the one place CI quotes a size, so it prints both and
+      # flags a disagreement rather than silently publishing whichever number
+      # the runner's driver happens to produce. The runner uses a different
+      # graph driver (overlay2), where the two normally agree -- which is
+      # exactly why a divergence here is worth seeing rather than assuming.
+      #
+      # Nothing GATES on the number. It is a report; treat a surprising value as
+      # a question about the measurement first and about the image second.
       - name: Image size
         run: |
           set -euo pipefail
           bytes=$(docker image inspect "$IMAGE" --format '{{.Size}}')
           mb=$((bytes / 1000000))
-          echo "image size: ${mb} MB (${bytes} bytes)"
-          echo "### Image size: ${mb} MB" >> "$GITHUB_STEP_SUMMARY"
+          # `docker images` is the cross-check. Its column is human-formatted
+          # ("1.38GB"), so this is a sanity comparison, not arithmetic.
+          human=$(docker images --format '{{.Size}}' "$IMAGE" | head -1)
+          echo "image size: ${mb} MB (${bytes} bytes, from image inspect .Size)"
+          echo "docker images reports: ${human}"
+          echo "### Image size: ${mb} MB (inspect) / ${human} (docker images)" >> "$GITHUB_STEP_SUMMARY"
+          echo "If those two disagree by more than rounding, believe 'docker images' -- see this step's comment."
           # `|| true`: head can SIGPIPE the producer, and pipefail would turn a
           # cosmetic layer listing into a build failure.
           docker image history "$IMAGE" --format 'table {{.CreatedBy}}\t{{.Size}}' --no-trunc | head -30 || true
@@ -120,12 +149,22 @@ jobs:
       # them as mount points, AFTER `COPY . .`) but must be EMPTY. Emptiness,
       # not absence, is the real test: if .dockerignore vanished, the mkdir
       # would silently succeed over 5.3 GB of copied tissue data.
+      #
+      # `.claude` and `app/compounds` are on the list because the FIRST real
+      # build of this image (which this workflow had not yet run) shipped
+      # 161 MB under /app/.claude: .claude/worktrees/<id>/ is a whole second
+      # worktree of this repo, and `results/` does not match
+      # .claude/worktrees/x/results/. It carried 113 MB of results/fprof --
+      # a Chrome profile with Default/Cookies and Default/Login Data -- past
+      # every other rule in .dockerignore. A per-path assertion only catches
+      # what it names, so name it.
       - name: Assert .dockerignore kept excluded paths out of the image
         run: |
           docker run --rm --entrypoint sh "$IMAGE" -c '
             fail=0
             for p in .venv landing-3d results archive marketing docs .git \
-                     .export-drive supp.zip app/projects app/reports app/uploads; do
+                     .export-drive supp.zip app/projects app/reports app/uploads \
+                     app/compounds .claude; do
               if [ -e "/app/$p" ]; then
                 echo "FAIL  present but should be excluded: /app/$p"
                 fail=1
@@ -152,6 +191,82 @@ jobs:
               else echo "FAIL  missing from image: /app/$p"; fail=1; fi
             done
             exit $fail
+          '
+
+      # The image ran as root (uid=0) until it was measured, which inverted the
+      # one control docs/DEPLOYMENT.md 2 names for POST /api/sections/scan --
+      # a route that takes an arbitrary filesystem path, is deliberately not
+      # confined to a root, and whose API key makes it authenticated, not safe.
+      # 2's mitigation is "run the server as a user that cannot read anything
+      # you would mind a tester listing"; as root it could read all of it.
+      #
+      # A `USER` line is one word and deleting it has no other symptom, so
+      # assert it. The write-path half matters just as much: everything this
+      # app writes lands in <repo>/app/<something> at 0700, created on demand,
+      # so a USER without the matching chown produces an image that starts
+      # cleanly and then fails at the first run. Both halves, or neither.
+      - name: Assert the server does not run as root
+        run: |
+          docker run --rm --entrypoint sh "$IMAGE" -c '
+            fail=0
+            echo "container uid: $(id -u) ($(id -un))"
+            if [ "$(id -u)" = "0" ]; then
+              echo "FAIL  the image runs as root -- see docs/DEPLOYMENT.md 2."
+              echo "Do NOT fix this by deleting this step: the control it protects is the only one POST /api/sections/scan has."
+              fail=1
+            else
+              echo "ok    not root"
+            fi
+            # ...and the source tree must NOT be writable. A running server
+            # rewriting its own code or its static front end is not something
+            # this deployment should be able to do.
+            if touch /app/.ci-should-fail 2>/dev/null; then
+              echo "FAIL  /app is writable by the server user"
+              rm -f /app/.ci-should-fail
+              fail=1
+            else
+              echo "ok    /app is not writable by the server user"
+            fi
+            exit $fail
+          '
+
+      # The other half of the USER change, and the half that fails at RUNTIME
+      # rather than at start-up if it is got wrong. Everything this app writes
+      # lands in <repo>/app/<something>, created on demand at 0700 by
+      # private_makedirs -- so a USER without the matching chown produces an
+      # image that boots cleanly, answers /api/health, and then fails at the
+      # first run with a permission error. Exercised through the application's
+      # OWN directory helpers, so this follows the real code path instead of a
+      # guess about which directories it uses.
+      - name: Assert the non-root user can still write every runtime tree
+        run: |
+          docker run --rm --entrypoint python "$IMAGE" -c '
+          import os
+          from app.server.cache import runs_dir
+          from app.server.report import reports_dir
+          from app.server.projects import projects_dir
+          from app.server.compounds import compounds_dir
+          from tmesim.protocol.resolve import uploads_dir
+          bad = []
+          for name, fn in (("runs", runs_dir), ("reports", reports_dir),
+                           ("projects", projects_dir),
+                           ("compounds", compounds_dir),
+                           ("uploads", uploads_dir)):
+              try:
+                  d = fn()
+                  probe = os.path.join(d, ".ci-writeprobe")
+                  with open(probe, "w") as fh:
+                      fh.write("x")
+                  os.remove(probe)
+                  print("ok    %-9s %s (mode %s, uid %d)"
+                        % (name, d, oct(os.stat(d).st_mode)[-4:], os.stat(d).st_uid))
+              except Exception as exc:
+                  print("FAIL ", name, type(exc).__name__, exc)
+                  bad.append(name)
+          if bad:
+              print("The USER in the Dockerfile does not own the trees it has to write:", bad)
+              print("See the chown next to it, and docs/DEPLOYMENT.md 1c.")
+          raise SystemExit(1 if bad else 0)
           '
 
       # Settles item 3. The Dockerfile installs only libgomp1 and says so

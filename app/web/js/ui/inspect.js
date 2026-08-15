@@ -433,9 +433,13 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
         provEl.appendChild(h('dd', {
           title: pv.sensitivity_note,
           style: {
-            fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-micro)',
+            // The sensitivity note is where "COMPARABLE across drugs ...
+            // absolute kills are upper bounds" is stated — the product's own
+            // thesis about which of its outputs is defensible. It is prose
+            // stating a limit, so it takes the disclosure floor.
+            fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-disclosure)',
             whiteSpace: 'normal', textAlign: 'left', justifyContent: 'flex-start',
-            lineHeight: '1.35', padding: '3px 0',
+            lineHeight: 'var(--lh-body)', padding: '3px 0',
           },
         }, pv.sensitivity_note));
       }

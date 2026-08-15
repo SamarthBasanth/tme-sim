@@ -84,13 +84,30 @@ async function rawFetch(method, path, { body, binary, signal, timeoutMs } = {}) 
       ? { 'content-type': 'application/json', accept: binary ? 'application/octet-stream' : 'application/json' }
       : { accept: binary ? 'application/octet-stream' : 'application/json' };
     if (api.apiKey) headers['x-api-key'] = api.apiKey;
-    const res = await fetch(api.base + path, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal: ctrl.signal,
-      cache: 'no-store',
-    });
+    // A network failure leaves `fetch` throwing a bare TypeError with no
+    // status and no path — the one error shape that escapes this module
+    // unlabelled. ui/toast.js classifies a failure by asking whether it is an
+    // ApiError (transport) or something of ours, so an unwrapped TypeError
+    // arrives there indistinguishable from a client-side bug and loses its
+    // "the server did not answer" remedy. Wrap it, keeping `status: 0`, which
+    // is the value call() already assumed for it — so retry and stub-fallback
+    // behaviour below is byte-for-byte unchanged. An abort is NOT wrapped: it
+    // is a different failure (we stopped waiting; the server may not have
+    // stopped working) and callers match it on `name === 'AbortError'`.
+    let res;
+    try {
+      res = await fetch(api.base + path, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: ctrl.signal,
+        cache: 'no-store',
+      });
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw e;
+      throw new ApiError((e && e.message) || 'the network request did not complete',
+        { status: 0, path, cause: e });
+    }
     api.lastLatencyMs = performance.now() - t0;
     if (!res.ok) {
       let payload = null, text = '';

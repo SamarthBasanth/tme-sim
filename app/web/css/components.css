@@ -503,7 +503,9 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   row-gap: var(--sp-1);
   padding: var(--sp-4) var(--sp-5) var(--sp-4) var(--sp-3);
   overflow-wrap: anywhere;
-  font-size: var(--fs-xs);
+  /* Named, not --fs-xs, so that a future type pass has to read the rule in
+     tokens.css before it can shrink a caveat. */
+  font-size: var(--fs-disclosure);
   line-height: var(--lh-body);
   color: var(--fg-1);
   border-left: 2px solid var(--warn);
@@ -545,9 +547,17 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   font-variant-numeric: tabular-nums;
 }
 .caveat .cv-subj { min-width: 0; overflow-wrap: anywhere; }
+/* The citation: where the evidence for this caveat lives. It was --fs-micro,
+   which made it the smallest AND the quietest thing in the panel — the one
+   line pointing at the file you would go and check was set in the size
+   reserved for unit suffixes. This product's claim about itself is that its
+   limits are published, legible and CHECKABLE; this line is the checkable
+   half, so it holds the disclosure floor like the prose it belongs to. It
+   keeps --fg-2 and the mono face: it is a path, subordinate to the sentence
+   above it, but subordinate is not the same as unreadable. */
 .caveat .cv-ref {
   font-family: var(--font-mono);
-  font-size: var(--fs-micro);
+  font-size: var(--fs-disclosure);
   color: var(--fg-2);
   overflow-wrap: anywhere;
 }
@@ -1110,12 +1120,69 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
    readable thing on screen. `anywhere` breaks a word ONLY when it cannot fit
    on a line of its own, which is exactly the machine-token case and never the
    prose case. */
+/* --fs-disclosure, not --fs-micro. The paragraph above already says it: "every
+   toast() detail the Studio raises is prose". It is also, routinely, the
+   load-bearing half — "Nothing has been scored against it: read its capability
+   report before you read any number it produces" is a toast detail, and so is
+   the server's verbatim reason inside a notifyError() card. Prose stating a
+   limit takes the floor; see tokens.css --fs-disclosure. */
 .toast .toast-body code {
-  font-size: var(--fs-micro);
+  font-size: var(--fs-disclosure);
   color: var(--fg-2);
   overflow-wrap: anywhere;
 }
 .toast .x { align-self: start; }
+
+/* --- the error card ------------------------------------------------------
+   ui/toast.js's notifyError() builds four parts, and the whole point of the
+   styling is that part 2 (OUR advice) and part 3 (the SERVER's sentence) can
+   never be mistaken for each other — only the second is evidence. Same
+   separation, same reason, as ui/tissue.js's showRefusal().
+
+   Nothing here clamps a height or hides overflow: an error card grows to fit
+   its reason. A reason behind a "show more" is a reason that does not get
+   read, and these cards are already dismiss-only, so they cost nothing when
+   there is no failure. */
+.toast .toast-detail { display: flex; flex-direction: column; gap: var(--sp-4); }
+.toast .toast-remedy {
+  color: var(--fg-1);
+  line-height: var(--lh-body);
+}
+/* The server's own words: boxed, monospaced, and captioned, so the boundary
+   between what was found and what we suggest is a visible edge rather than a
+   paragraph break the reader has to infer. */
+.toast .toast-said {
+  border: 1px solid var(--line-1);
+  background: var(--bg-void);
+  padding: var(--sp-3);
+}
+.toast .toast-said-lbl {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  /* --fg-2, not --fg-3. --fg-3 is the disabled/placeholder role, and this
+     caption is the load-bearing half of the box: it is what tells the reader
+     whether the sentence under it is the server's finding or this Studio's
+     own. A caption that reads as disabled is a caption that gets skipped. */
+  color: var(--fg-2);
+  margin-bottom: var(--sp-2);
+}
+.toast .toast-said code {
+  display: block;
+  color: var(--fg-1);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+/* The route and status. Last, dim, monospace — it is the line you quote in a
+   bug report, and per docs/UI_ARCHITECTURE.md §5 it is the only place an
+   endpoint path is allowed to appear in operator-facing text. */
+.toast .toast-tech {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--fg-3);
+  overflow-wrap: anywhere;
+}
 
 /* ======================================================= misc ========== */
 .badge-code {
@@ -1404,10 +1471,14 @@ html[data-mode="stub"] .scalebar .txt::after {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
 }
-.gate-card .inp:focus {
-  outline: none;
-  border-color: var(--accent);
-}
+/* Border-colour only. It must NOT re-declare `outline: none` here: this
+   selector is (0,3,0) and the global `:focus-visible` ring in base.css is
+   (0,1,0), so an `outline: none` on this line wins and strips the focus ring
+   from the one screen in the application that is keyboard-only by
+   construction — the operator cannot get past this card without typing into
+   this field, and the accent border alone is a 1 px colour swap. The accent
+   border stays as a second channel; the ring comes from base.css. */
+.gate-card .inp:focus { border-color: var(--accent); }
 .gate-error {
   margin-top: var(--sp-4);
   color: var(--crit);

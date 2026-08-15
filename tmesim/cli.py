@@ -54,7 +54,15 @@ Subcommands
     in the Studio. See :mod:`tmesim.data.ingest` and
     ``results/bring_your_own_tissue.md``.
 ``acquire``
-    Best-effort live download of open glioblastoma datasets into a cache dir.
+    Best-effort live download of open glioblastoma datasets into a cache dir:
+    four tabular sources (potency, expression, niche context) plus — this is the
+    part that decides whether anything is runnable — one or more *spatial tissue
+    sections*. ``--sections`` selects them, ``--list`` prints the plan without
+    downloading. See :mod:`tmesim.data.section_catalog`.
+``sections``
+    What tissue sections exist, which are runnable right now, and for each one
+    that is not, **the exact command that fixes it**. This is the command to run
+    when anything says a section is unavailable.
 ``studio``
     Launch the Codon Studio web backend (thin delegate to
     ``python -m app.server``; needs the optional ``pip install -e '.[app]'``
@@ -747,6 +755,26 @@ def _print_scorecard(result: dict) -> None:
         print("!! QUICK MODE. Only the analytic anchors ran. Anchors needing real")
         print("!! tissue are DEFERRED below -- DEFERRED IS NOT A PASS, and some of")
         print("!! them FAIL in the full run. A green --quick is not a green suite.")
+
+    # A first-time user reads a non-zero exit as "my install is broken". It is
+    # not: these rows fail on a clean checkout, on every machine, by design.
+    # Say so BEFORE the wall of failing rows rather than after it.
+    n_fail = result["counts"].get(SC.FAIL, 0)
+    if n_fail:
+        print()
+        print(_v_rule("!"))
+        print(f"!! {n_fail} anchor(s) below FAIL, and this command will EXIT 1. "
+              "THAT IS THE")
+        print("!! DESIGNED OUTCOME OF A CORRECT INSTALL. These are PUBLISHED "
+              "LIMITATIONS of")
+        print("!! the model -- each one is written up in results/ and named in "
+              "README.md's")
+        print("!! 'What has failed' section. Nothing about your machine, your "
+              "data or your")
+        print("!! install produced them, and a build that reported them as "
+              "passing would be")
+        print("!! the broken one. Do not treat exit 1 here as a setup problem.")
+        print(_v_rule("!"))
     print()
 
     # One block per row rather than a fixed-width table: every field here
@@ -786,6 +814,8 @@ def _print_scorecard(result: dict) -> None:
     print(_v_rule("="))
     if fails:
         print(f"FAILURES ({len(fails)}) -- the model misses these MEASURED values")
+        print("Published limitations, not install problems. Each is written up "
+              "in results/.")
         print(_v_rule("="))
         for r in fails:
             print(f"\n  FAIL  {r['group']} / {r['label']}   [PMID "
@@ -835,6 +865,14 @@ def _print_scorecard(result: dict) -> None:
     if c[SC.FAIL]:
         print(f"VERDICT   {c[SC.FAIL]} anchor(s) FAIL against measured data. "
               f"Exiting 1.")
+        print("          Exit 1 is the CORRECT result on a clean install: these "
+              "anchors are")
+        print("          published limitations of the model, not symptoms of a "
+              "bad setup.")
+        print("          `codon validate --list` is the registry, with what was "
+              "deliberately")
+        print("          left out and why. To gate CI on a SUBSET, use "
+              "`--only <key,key>`.")
     else:
         print("VERDICT   no scored anchor fails. Read the NO VERDICT block "
               "before calling this validated.")
@@ -908,21 +946,123 @@ def cmd_validate(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------- #
 # acquire
 # --------------------------------------------------------------------------- #
+#: The four non-spatial sources :func:`tmesim.data.acquire.acquire_all` always
+#: attempts, and — the part that used to be invisible — what they are FOR.
+_TABULAR_SOURCES = (
+    ("tcga_gbm_clinical", "TCGA-GBM clinical records (GDC REST API)"),
+    ("tcga_gbm_expression", "open STAR gene-count files for those same patients"),
+    ("ivy_gap", "Ivy GAP anatomic-structure RNA-seq atlas"),
+    ("gdsc_glioma", "GDSC2 glioma cell-line dose-response (drug potency)"),
+)
+
+
+def _acquire_print_plan(section_ids, out_dir: str) -> None:
+    """State, BEFORE downloading, exactly what this run will and will not do.
+
+    The failure this replaces: ``acquire`` fetched four tabular sources, said
+    ``4/4 ok``, and left every tissue section unavailable, with nothing in the
+    output connecting those two facts. A user ran the command the README
+    recommends, waited, and was returned to the start.
+    """
+    from tmesim.data import section_catalog as SC
+
+    print(f"[acquire] plan for {out_dir!r}:")
+    print("[acquire]   4 tabular sources — potency, expression, niche context:")
+    for name, what in _TABULAR_SOURCES:
+        print(f"[acquire]       {name:22s} {what}")
+    print("[acquire]     NONE of those four makes a tissue section runnable. "
+          "They are")
+    print("[acquire]     inputs to a drug, not the tissue a drug is simulated ON.")
+
+    if section_ids:
+        total = SC.total_auto_bytes(section_ids)
+        print(f"[acquire]   {len(section_ids)} spatial tissue section(s) — "
+              f"this is what makes")
+        print("[acquire]   `codon reconstruct` / `simulate` / the Studio work:")
+        for sid in section_ids:
+            rec = SC.SECTION_RECIPES.get(sid, {})
+            print(f"[acquire]       {sid:22s} {rec.get('label', '?')}  "
+                  f"({SC.human_bytes(rec.get('bytes'))})")
+        print(f"[acquire]     total to download: ~{SC.human_bytes(total)} "
+              "(already-present files are skipped)")
+    else:
+        print("[acquire]   NO spatial section (--sections none). This run will "
+              "not make")
+        print("[acquire]   any section runnable. Drop --sections to fetch "
+              f"{SC.DEFAULT_SECTION}.")
+
+    not_fetched = [s for s in SC.SECTION_RECIPES if s not in section_ids]
+    if not_fetched:
+        print("[acquire]   NOT fetched by this run: " + ", ".join(not_fetched))
+        print("[acquire]     `codon sections` prints the exact command for each.")
+    print()
+
+
+def _acquire_print_next_steps(out_dir: str) -> None:
+    """Where the user actually is now, and the one command to run next."""
+    from tmesim.data import section_catalog as SC
+
+    try:
+        st = SC.all_section_status()
+    except Exception as exc:  # noqa: BLE001 - a summary must never be the crash
+        print(f"[acquire] could not check section availability: {exc}")
+        return
+    avail = [s for s in st if s["available"]]
+    print()
+    print(f"=== built-in tissue sections: {len(avail)} of {len(st)} runnable ===")
+    for s in st:
+        mark = "OK " if s["available"] else "-- "
+        print(f"  {mark}{s['id']:22s} {s['label']}")
+        if not s["available"] and s["reason"]:
+            print(f"       {s['reason']}")
+    if avail:
+        pick = (SC.DEFAULT_SECTION
+                if any(s["id"] == SC.DEFAULT_SECTION for s in avail)
+                else avail[0]["id"])
+        print()
+        print("[acquire] you can run a simulation now:")
+        print(f"[acquire]   {SC.run_command(pick)}")
+    else:
+        print()
+        print("[acquire] NO section is runnable yet — nothing can be simulated.")
+    print("[acquire] what to do about the unavailable ones: codon sections")
+    if os.path.abspath(out_dir) != os.path.abspath("data_cache"):
+        print(f"[acquire] NOTE: you downloaded into {out_dir!r}, but the "
+              "loaders read ./data_cache/. The")
+        print("[acquire] availability list above is about ./data_cache/, "
+              "not about your --out directory.")
+
+
 def cmd_acquire(args: argparse.Namespace) -> int:
     """Lazily import and run the best-effort real-data acquisition."""
     try:
         from tmesim.data.acquire import acquire_all
+        from tmesim.data import section_catalog as SC
     except Exception as exc:
         print(f"[acquire] data-acquisition module unavailable: {exc}")
         print("[acquire] nothing downloaded. (This step is optional.)")
         return 0  # optional module missing is not a hard failure
 
+    section_ids, unknown = SC.resolve_section_arg(args.sections)
+    if unknown:
+        print(f"[acquire] unknown section id(s): {', '.join(unknown)}")
+        print(f"[acquire] known: {', '.join(SC.SECTION_RECIPES)} "
+              "(or 'all' / 'none')")
+        return 2
+
+    if args.list_plan:
+        _acquire_print_plan(section_ids, args.out)
+        print("[acquire] --list: nothing was downloaded.")
+        return 0
+
     out_dir = args.out
     os.makedirs(out_dir, exist_ok=True)
+    _acquire_print_plan(section_ids, out_dir)
     print(f"[acquire] attempting live download into {out_dir!r} "
           f"(timeout={args.timeout}s) ...")
     try:
-        status = acquire_all(cache_dir=out_dir, timeout=args.timeout)
+        status = acquire_all(cache_dir=out_dir, timeout=args.timeout,
+                             sections=section_ids)
     except Exception as exc:
         print(f"[acquire] acquisition failed cleanly: {exc}")
         return 0
@@ -934,17 +1074,109 @@ def cmd_acquire(args: argparse.Namespace) -> int:
                 st = info.get("status", "?")
                 note = info.get("note", "")
                 path = info.get("path", "")
-                line = f"  {source:20s} : {st}"
+                line = f"  {source:22s} : {st}"
                 if path:
                     line += f"  -> {path}"
                 if note:
                     line += f"  ({note})"
                 print(line)
             else:
-                print(f"  {source:20s} : {info}")
+                print(f"  {source:22s} : {info}")
     else:
         print(f"  {status}")
+
+    _acquire_print_next_steps(out_dir)
     return 0
+
+
+# --------------------------------------------------------------------------- #
+# sections — what is runnable, and what to do about what is not
+# --------------------------------------------------------------------------- #
+def cmd_sections(args: argparse.Namespace) -> int:
+    """List every built-in section with its availability AND its remedy.
+
+    The point of this command is the remedy. ``GET /api/sections`` and the
+    reconstruct error path both say *what is wrong* ("cache directory
+    data_cache/xenium_gbm does not exist"); a name of a missing directory is not
+    an instruction. Every unavailable row here carries the literal command that
+    fixes it — one ``codon acquire --sections`` line where the data is a plain
+    HTTP GET, and the actual shell block where it is not.
+
+    Exits 0 when at least one section is runnable, 1 when none is, so a setup
+    script can gate on it.
+    """
+    from tmesim.data import section_catalog as SC
+
+    wanted = args.section_ids or list(SC.SECTION_RECIPES)
+    unknown = [s for s in wanted if s not in SC.SECTION_RECIPES]
+    if unknown:
+        print(f"[sections] unknown section id(s): {', '.join(unknown)}")
+        print(f"[sections] known: {', '.join(SC.SECTION_RECIPES)}")
+        return 2
+
+    rows = [SC.section_status(sid) for sid in wanted]
+    n_avail = sum(1 for r in rows if r["available"])
+
+    if args.json:
+        import json
+
+        detail = []
+        for r in rows:
+            rec = SC.SECTION_RECIPES[r["id"]]
+            detail.append({**r,
+                           "platform": rec["platform"],
+                           "bytes": rec.get("bytes"),
+                           "verified": rec.get("verified")})
+        print(json.dumps({"available": n_avail, "total": len(rows),
+                          "sections": detail}, indent=2))
+        return 0 if n_avail else 1
+
+    print()
+    print(f"=== built-in tissue sections: {n_avail} of {len(rows)} runnable ===")
+    print("A section is a directory of measured tissue under data_cache/, "
+          "registered by")
+    print("PATH — nothing is uploaded anywhere, and nothing here is "
+          "identifiable patient data.")
+    for r in rows:
+        rec = SC.SECTION_RECIPES[r["id"]]
+        print()
+        print(f"  [{'RUNNABLE   ' if r['available'] else 'UNAVAILABLE'}] "
+              f"{r['id']}  —  {r['label']}")
+        print(f"      platform  : {rec['platform']}")
+        print(f"      directory : {rec['cache_dir']}")
+        print(f"      size      : {SC.human_bytes(rec.get('bytes'))}"
+              f"   ({'auto-fetchable' if rec['mode'] == SC.AUTO else 'manual'})")
+        if rec.get("note"):
+            print(f"      note      : {rec['note']}")
+        if args.verbose and rec.get("verified"):
+            print(f"      verified  : {rec['verified']}")
+        if r["available"]:
+            continue
+        if r["reason"]:
+            print(f"      why not   : {r['reason']}")
+        print("      TO FIX IT:")
+        for ln in r["remedy"]:
+            print(f"        {ln}")
+
+    print()
+    if n_avail:
+        pick = (SC.DEFAULT_SECTION
+                if any(r["id"] == SC.DEFAULT_SECTION and r["available"]
+                       for r in rows)
+                else next(r["id"] for r in rows if r["available"]))
+        print("[sections] at least one section is runnable. Try:")
+        print(f"[sections]   {SC.run_command(pick)}")
+    else:
+        print("[sections] nothing is runnable yet. The shortest path to a first "
+              "result:")
+        print(f"[sections]   codon acquire --sections {SC.DEFAULT_SECTION}"
+              f"   ({SC.human_bytes(SC.total_auto_bytes([SC.DEFAULT_SECTION]))})")
+        print(f"[sections]   {SC.run_command(SC.DEFAULT_SECTION)}")
+    print("[sections] sections YOU registered are listed separately: "
+          "codon ingest --list")
+    print("[sections] your own tissue is a first-class option too: "
+          "codon ingest <dir> --register")
+    return 0 if n_avail else 1
 
 
 # --------------------------------------------------------------------------- #
@@ -1296,7 +1528,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(
         dest="command",
         metavar="{reconstruct,simulate,compare-drugs,validate,ingest,"
-                 "molecules,molecular-run,acquire,studio}")
+                 "molecules,molecular-run,acquire,sections,studio}")
     sub.required = True
 
     # reconstruct
@@ -1457,12 +1689,44 @@ def build_parser() -> argparse.ArgumentParser:
 
     # acquire
     p_acq = sub.add_parser(
-        "acquire", help="best-effort live download of open GBM datasets",
+        "acquire",
+        help="best-effort live download of open GBM datasets, including the "
+             "spatial tissue section a first simulation needs",
+        description="Downloads four TABULAR sources (TCGA clinical, TCGA "
+                    "expression, Ivy GAP, GDSC2 potency) and, by default, the "
+                    "SPATIAL SECTION that makes reconstruct/simulate work. The "
+                    "tabular four on their own leave every section unavailable "
+                    "— run with --list to see the plan before downloading.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p_acq.add_argument("--out", default="data_cache", help="cache directory")
     p_acq.add_argument("--timeout", type=int, default=60,
                        help="per-source download timeout (seconds)")
+    p_acq.add_argument("--sections", default=None, metavar="IDS",
+                       help="comma-separated spatial sections to fetch, or "
+                            "'all' (every auto-fetchable one) or 'none'. "
+                            "Default: the smallest runnable section "
+                            "(xenium_319). `codon sections` lists them")
+    p_acq.add_argument("--list", dest="list_plan", action="store_true",
+                       help="print what this run WOULD download, then exit "
+                            "without downloading anything")
     p_acq.set_defaults(func=cmd_acquire)
+
+    # sections
+    p_sec = sub.add_parser(
+        "sections",
+        help="which tissue sections are runnable, and the exact command to fix "
+             "each one that is not",
+        description="Every built-in section, whether it is loadable right now, "
+                    "and for each unavailable one the literal command that "
+                    "makes it available. Exits 1 if no section is runnable.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p_sec.add_argument("section_ids", nargs="*", metavar="ID",
+                       help="restrict to these section ids (default: all)")
+    p_sec.add_argument("--json", action="store_true",
+                       help="machine-readable output")
+    p_sec.add_argument("--verbose", action="store_true",
+                       help="also print how each recipe's URLs were verified")
+    p_sec.set_defaults(func=cmd_sections)
 
     # molecules
     p_mols = sub.add_parser(
@@ -1491,6 +1755,23 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _is_missing_data_refusal(exc: BaseException) -> bool:
+    """Is this the loaders' deliberate "I have no data for that" refusal?
+
+    ``IngestError`` is imported lazily: this predicate runs inside the
+    top-level handler, where an import failure would replace a useful error
+    with a confusing one.
+    """
+    if isinstance(exc, FileNotFoundError):
+        return True
+    try:
+        from tmesim.data.ingest import IngestError
+
+        return isinstance(exc, IngestError)
+    except Exception:  # noqa: BLE001 - fall back to the generic path
+        return False
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry point. Returns a process exit code."""
     parser = build_parser()
@@ -1503,6 +1784,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("\n[tmesim] interrupted.", file=sys.stderr)
         return 130
     except Exception as exc:  # pragma: no cover - top-level guard
+        # A missing-data refusal is not a crash. IngestError is raised on
+        # purpose, with a sentence written for the person reading it; wrapping
+        # that sentence in twenty lines of our own stack frames buries the one
+        # part of the output that tells them what to do. Everything else still
+        # gets a full traceback, because everything else is a real bug.
+        if _is_missing_data_refusal(exc):
+            print(f"[{args.command}] REFUSED: {exc}", file=sys.stderr)
+            print(f"[{args.command}] this is a missing-data refusal, not a "
+                  "crash — nothing was computed and no synthetic data was "
+                  "substituted.", file=sys.stderr)
+            print(f"[{args.command}] `codon sections` lists every section and "
+                  "the exact command that makes each one runnable.",
+                  file=sys.stderr)
+            return 1
         print(f"[tmesim] command '{args.command}' failed: "
               f"{type(exc).__name__}: {exc}", file=sys.stderr)
         import traceback

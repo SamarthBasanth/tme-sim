@@ -312,6 +312,10 @@ def load(
         raise IngestError(
             f"Missing cached cells file: {os.path.join(path, _CELLS_FILE)}. "
             f"No Xenium cell/matrix/panel files were found under {path!r}. "
+            "TO FIX IT: run `codon sections` — it lists every section, whether "
+            "it is runnable, and the exact command for each one that is not. "
+            "For the default GBM section that command is `codon acquire "
+            "--sections xenium_319` (16.6 MB). "
             "This loader is shared by every Xenium section (GBM, breast, ...); "
             "for the GBM section see docs/real_data/singlecell_spatial.md, and "
             "pass the right --sample / sample= for a different section (e.g. "

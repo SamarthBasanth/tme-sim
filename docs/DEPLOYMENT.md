@@ -188,11 +188,46 @@ docker run -p 8000:8000 \
   codon-studio --host 0.0.0.0
 ```
 
-**Honesty note on this section specifically.** Docker is still not installed
-in the environment this was written in, so **no image has ever been built
-from this `Dockerfile` and no container has ever been run.** What *has* been
-verified, by reproducing the Dockerfile's steps outside a container in
-throwaway Python 3.11 virtualenvs:
+**Honesty note on this section specifically.** This section was written before
+Docker was installed in the environment it was written in, and said for a long
+time that no image had ever been built from this `Dockerfile`. **One has now
+been built and run.** On `linux/arm64`, measured rather than reasoned about:
+
+* `docker build` **completes**: 4 m 40 s cold, 3.9 s when the dependency layer
+  is cached. (A rebuild that also re-copies the source tree costs more than the
+  cached-layer figure — the build that added the non-root `USER` below took
+  2 m 39 s with the dependency layer still cached.)
+* The final image is **1.38 GB** — it was 1.67 GB before the `.dockerignore`
+  fix below landed — of which `/app` is **10 MB**. Both figures are from
+  `docker images` / `docker system df`; see the note on `docker image inspect`
+  at the end of this list before quoting a size from anywhere else.
+* **All 18 native dependencies import inside `python:3.11-slim` with only
+  `libgomp1`.** In particular rdkit needs **no** `libXrender`/`libXext` there,
+  which the Dockerfile's own comment had flagged as a historical risk.
+* `/api/health` answers **200 about 2 s after `docker run`**, through a
+  published port — so the `CMD` really does bind an address `-p` can reach.
+  `docker stop -t 30` **exits 0 immediately**: PID 1 handles SIGTERM, there is
+  no 30 s wait and no SIGKILL.
+* A real end-to-end run completed **in-container in 4 s on 40,887 cells**.
+* With **no cache mounted**, `/api/sections` reports **7 sections, 0
+  available**, each with a reason, and the server still boots. Mounting
+  `data_cache` read-only makes **all 7 available**.
+* The server runs as **`codon`, uid 10001, not root** (see the `USER` note
+  further down). All five 0700 runtime trees are created and written by that
+  user, a read-only `data_cache` bind mount stays readable, and a named volume
+  on `/app/app/runs` inherits the ownership and is writable with no host-side
+  `chown`.
+
+One measurement tool to distrust: `docker image inspect --format '{{.Size}}'`
+reported **300,307,441 bytes for the image `docker images` and `docker system
+df` both call 1.38 GB** — an under-report of roughly 4.6×, on a
+containerd-snapshotter daemon where that field is the compressed content size
+rather than the on-disk size. CI reads that field. Do not quote a size from it
+without checking it against `docker images` on the same daemon.
+
+What *had* been verified earlier, by reproducing the Dockerfile's steps outside
+a container in throwaway Python 3.11 virtualenvs, and which the build above is
+consistent with:
 
 * The dependency layer resolves and installs. `pip install -e '.[app]'` from
   `pyproject.toml` plus a stub `tmesim/__init__.py` succeeds on Python 3.11
@@ -241,16 +276,22 @@ audit at all:
    healthy while 401ing every request with a key nobody can read. Fixed with
    `ENV PYTHONUNBUFFERED=1`.
 
-**Still unverified, and needing one real build to settle:** that
-`docker build` completes at all (build context, `apt-get`, pip as root); that
-linux `manylinux` wheels exist and install for `scipy`/`scikit-image`/
-`imagecodecs`/`h5py`/`rdkit` on cp311 (every wheel tested here was
-macOS/arm64); whether those wheels need shared libraries absent from
-`python:3.11-slim` (the `libgomp1` line is precautionary, not measured, and
-rdkit has historically wanted `libXrender`/`libXext` on slim images); that
-`-p 8000:8000` actually reaches the app; bind-mount ownership and SELinux
-relabeling; BuildKit cache reuse; PID-1 signal handling on `docker stop`; and
-final image size.
+**Still genuinely unverified — and the architecture is the reason.** Every
+number above was measured on **`linux/arm64`**. The open question is whether
+`manylinux` **cp311 x86_64** wheels exist and install for `scipy` /
+`scikit-image` / `imagecodecs` / `h5py` / `rdkit`, and whether *those* wheels
+want shared libraries this image does not carry. An arm64 build cannot answer
+it: it resolves a different set of wheels from the same version pins. **Only a
+CI run on `linux/amd64` settles it** — that is what
+`.github/workflows/docker.yml` is for, and until it has gone green on that
+platform this remains open, not "probably fine".
+
+Three smaller things the local build also did not exercise: **SELinux
+relabeling** of bind mounts (there is no SELinux on the machine this was built
+on, so a `:z`/`:Z` suffix may be needed on RHEL/Fedora hosts), **BuildKit cache
+reuse** (the local build used the legacy builder; CI uses BuildKit with a
+`type=gha` cache), and any **host bind mount over a writable path**, which
+interacts with the non-root `USER` — see the ownership note below.
 
 One thing a build will **not** settle: this repo's bit-exact reference tests
 were generated on macOS/arm64. On linux/amd64 they may differ for BLAS/SIMD
@@ -297,6 +338,106 @@ docker run -p 127.0.0.1:8000:8000 \
   -v codon_runs:/app/app/runs \
   codon-studio
 ```
+
+**The container runs as `codon`, uid 10001 — not root.** It used to run as
+root, which was the exact opposite of the control §2 names for
+`POST /api/sections/scan`: that route takes an arbitrary filesystem path, is
+not confined to a root, and the API key makes it *authenticated, not safe*, so
+§2's mitigation is "run the server as a user that cannot read anything you
+would mind a tester listing". As root it could read all of it. Measured
+before/after, with a valid key, against a `0700` root-owned directory holding
+a valid Xenium bundle:
+
+| | `scan {"path": "/root/probe"}` |
+|---|---|
+| root image | `platform: xenium`, `confidence: 1.0`, `ingestable: true`, and the absolute path of every file inside it |
+| uid 10001 | `platform: unknown`, `confidence: 0.0`, `ingestable: false`, `"/root/probe is not a directory and does not exist"` |
+
+Read what that table does and does not say. **The route is still unconfined and
+still answers `200`** — `scan {"path": "/etc"}` returns `200` under both,
+because `/etc` is world-readable and a non-root user can list it perfectly
+well. What changed is the *set of files the process can reach*, not the
+route's behaviour. §2's deferred `path`-root restriction is still deferred, and
+the key is still equivalent to read access as uid 10001 on that host.
+
+**What this costs you, and it is only the one thing:** a **host directory**
+bind-mounted over a writable path arrives with the *host's* ownership, and uid
+10001 almost certainly does not own it.
+
+* **Use a named volume, and there is nothing to do** — `-v
+  codon_runs:/app/app/runs`, as in the example above. Docker seeds a new named
+  volume from the image's directory, ownership included, so it comes up owned
+  by uid 10001 and writable with no host-side step. **Verified in a real
+  container**: a full run wrote its history into exactly that mount. This is
+  the recommended shape, and it is the reason the `chown` in the `Dockerfile`
+  is worth having.
+* **A host bind mount over `app/runs/`** (or `app/projects/`, `app/reports/`,
+  `app/compounds/`, `app/uploads/`) **will fail without a host-side step.**
+  Measured, mounting an ordinary host directory:
+
+  ```
+  /app/app/runs is owned by uid 0 inside the container; the server runs as 10001
+  touch: cannot touch '/app/app/runs/probe': Permission denied
+  ```
+
+  On a Linux daemon, where host and container uids are the same numbers, the
+  fix is `sudo chown -R 10001:10001 <that directory>` on the host before
+  mounting it. **That fix was not verified here** — it could not be: this was
+  measured on a VM-backed daemon (colima/Lima on macOS), where the mount is
+  translated and the host directory showed up as `uid 0` regardless of who owns
+  it on the host, so no host-side `chown` can produce uid 10001 through it.
+  **On that kind of daemon, use a named volume; a host bind mount over a
+  writable path is not a workable shape.** If you need a host bind mount on a
+  Linux daemon, do the `chown` and check it before you rely on it:
+
+  ```bash
+  docker run --rm -v "$PWD/runs:/app/app/runs" --entrypoint sh codon-studio \
+    -c 'touch /app/app/runs/.probe && echo WRITABLE || echo NOT-WRITABLE'
+  ```
+
+**`docker run --user "$(id -u):$(id -g)"` is not a drop-in substitute for that
+`chown`** — this was tried and measured, and it fails:
+
+```
+PermissionError: [Errno 13] Permission denied: '/app/app/runs/.probe'
+PermissionError: [Errno 13] Permission denied: '/app/app/reports'
+```
+
+`/app/app` is owned by uid 10001, and four of the five runtime trees do not
+exist in the image at all — they are created on first use, *inside* that
+directory. An arbitrary overriding uid can neither write the existing ones nor
+create the missing ones. Override the user only if you are prepared to mount
+every one of the five writable paths from the host with ownership to match —
+which is strictly more work than the named volume.
+
+`data_cache/` is unaffected: it is mounted **read-only** in every example here,
+and a read-only mount only needs to be *readable*, which an ordinary
+`0644`-inside-`0755` host cache is. Verified: with `-v
+$(pwd)/data_cache:/app/data_cache:ro` the non-root container reports all 7
+sections available.
+
+**Check the host port is free before you publish onto it, because Docker may
+not tell you.** Measured: with a plain `python -m http.server` already holding
+`127.0.0.1:8305`, `docker run -d -p 127.0.0.1:8305:8000 codon-studio` **exited
+0, the container stayed `running`, and every request to that port reached the
+*host* process instead.** `/api/health` answered — with the host process's
+JSON. Nothing in `docker ps`, `docker logs` or the response says the container
+is not the thing you are talking to; you can spend a long time reading a stale
+server's data and calling it a Codon bug.
+
+That was measured on a VM-backed daemon (colima/Lima on macOS), where the
+published port is forwarded by a host-side proxy rather than bound by the
+daemon; a daemon that binds the port itself will usually refuse with `bind:
+address already in use` instead. Do not assume which kind you have. The
+pre-check costs one command and is correct on both:
+
+```bash
+lsof -nP -iTCP:8000 -sTCP:LISTEN     # must print nothing before you publish :8000
+```
+
+Empty output means the port is free. Anything else — an old `codon studio`, a
+previous container, an unrelated dev server — take the other port, or stop that
+process first.
 
 ---
 
@@ -394,6 +535,14 @@ If the thing in front of Codon does not check who the caller is, Codon must.
   read access on the host, and hand it out on that basis. The controls that do
   exist are the ones in §0: run the server as a user that cannot read anything you
   would mind a tester listing.
+
+  **The Docker image now does that for you** — it runs as `codon`, uid 10001,
+  after a spell of running as root, i.e. of doing the precise opposite of the
+  sentence above. §1c has the measured before/after and the one thing it costs
+  (a `chown` on host bind mounts over writable paths). Running `codon studio`
+  directly still runs as **whoever you are**, so on that path the sentence is
+  still advice you have to take yourself: don't run it as root, and don't run
+  it as the account that can read the rest of the department's data.
 * **Rate limiting / abuse protection.** None. A reverse proxy is also the
   right place for this if you need it.
 * **Horizontal scaling.** `app/server/cache.py`'s reconstruction cache and
@@ -443,8 +592,24 @@ rewrites `Host`), and leave `TMESIM_STUDIO_EXPOSE_TRACEBACKS` unset.
 
 ## 4. Environment variables
 
-Five, all read at process start. There is no config file; these are the whole
-surface, and only the first four are security-relevant.
+Five. There is no config file; these are the whole surface, and only the first
+four are security-relevant.
+
+**Four of the five are read once, at process start, and need a restart to
+change.** `TMESIM_STUDIO_API_KEY`, `TMESIM_STUDIO_ALLOWED_HOSTS` and
+`TMESIM_STUDIO_ALLOWED_ORIGINS` are read while the app is being built — each
+decides whether a middleware is installed at all, so there is nothing left to
+re-read afterwards — and `TMESIM_RECON_CACHE_SIZE` is read at import, when the
+cache object is constructed.
+
+**`TMESIM_STUDIO_EXPOSE_TRACEBACKS` is the exception: it is read per request**,
+inside the `GET /api/runs/{id}/traceback` handler
+(`app/server/api.py`). Practically that means the value in force is whatever is
+in the *live process's* environment at the moment the route is called, not
+whatever was set when it started — so a debugging session that mutates the
+process environment takes effect immediately, and, less comfortably, so would
+anything else that mutates it. It also means there is no restart-shaped moment
+at which an operator gets to notice that traces are being served.
 
 `codon studio` / `python -m app.server` writes two of them into its own
 environment (`TMESIM_STUDIO_API_KEY`, `TMESIM_STUDIO_ALLOWED_HOSTS`), and in both
@@ -483,9 +648,11 @@ defence in depth against DNS rebinding — a hostile domain that resolves to
 **not** the fix for a Host-header auth bypass; that is fixed at the gate itself.
 
 * **Unset:** the middleware is not installed and there is no host validation at
-  all — *except* that on a **loopback** bind `codon studio` fills it in with
+  all — *except* that on an **IPv4 loopback** bind `codon studio` fills it in with
   `localhost,127.0.0.1` before the app is built, so the default local workflow is
-  covered without you doing anything. On a **non-loopback** bind it is left unset
+  covered without you doing anything. **`--host ::1` is deliberately excluded
+  from that fill-in and therefore gets no validation** — see the sharp edge at
+  the end of this entry. On a **non-loopback** bind it is left unset
   on purpose: the code does not know the hostname your deployment answers to, and
   guessing wrong would refuse every request. **A proxied or `--host 0.0.0.0`
   deployment therefore gets no host validation until you set this.**
@@ -497,13 +664,45 @@ defence in depth against DNS rebinding — a hostile domain that resolves to
   matching everything — same effect, but worth knowing.
 * **Must set it when:** you bind non-loopback or sit behind a proxy. Use the
   hostname the *browser* sends, which is the one the proxy forwards.
-* **Sharp edge, and it is a real one:** Starlette does `host.split(":")[0]` on the
-  header, so a **bracketed IPv6 literal can never be allowlisted** — `[::1]:8000`
-  splits to `[`. Verified live: `codon studio --host ::1` (a loopback host, so it
-  gets the automatic `localhost,127.0.0.1` allowlist) makes every browser request
-  to `http://[::1]:8000/` fail with `400 Invalid host header`. **Use `127.0.0.1`,
-  not `::1`.** If you must run IPv6, set this variable to a name (not a literal)
-  and reach the server by that name.
+* **Sharp edge, and it is a real one: an IPv6 loopback bind gets no host
+  validation at all.** `codon studio --host ::1` is *excluded* from the
+  automatic loopback fill-in above, deliberately, so `TrustedHostMiddleware` is
+  never installed on it. The server works — `http://[::1]:<port>/` returns
+  **200** — but it has **no DNS-rebinding protection**, unlike the IPv4
+  loopback default. Measured, same build, same request:
+
+  | bind | `Host: evil.example.com` |
+  |---|---|
+  | `--host 127.0.0.1` | **400** `Invalid host header` |
+  | `--host ::1` | **200** |
+
+  **Why it is excluded rather than fixed here.** Starlette matches on
+  `host.split(":")[0]` to strip the port. That is right for a name or an IPv4
+  literal and wrong for an IPv6 one: a browser sends `Host: [::1]:8000`, which
+  splits to `[`. No allowlist entry can ever equal `[`, so installing the
+  middleware on an `::1` bind would reject **100 % of its own traffic** with
+  `400 Invalid host header` — a supported flag broken by its own protection.
+  (That is not hypothetical: it is what this paragraph used to describe as
+  verified behaviour, before the exclusion landed.) A middleware that cannot
+  express the bind buys no safety and costs the whole server, so IPv6 loopback
+  gets the same treatment as a non-loopback bind: unset, and yours to set.
+
+  **So on `::1`, set it yourself, and set it to a NAME:** a literal still cannot
+  match, for the same `split(":")` reason.
+
+  ```bash
+  TMESIM_STUDIO_ALLOWED_HOSTS=localhost codon studio --host ::1   # reach it at http://localhost:8000/
+  ```
+
+  Measured on that command: `http://localhost:<port>/` → **200**,
+  `Host: evil.example.com` → **400** (the protection is now on), and
+  `http://[::1]:<port>/` → **400**. That last one is the price, not a bug —
+  turning the check on is exactly what stops the bracketed literal working.
+  Reach it by the name from then on.
+
+  If you don't need IPv6, **`--host 127.0.0.1` is the safer default** — not
+  because `::1` is broken, but because it is the one that comes with the
+  rebinding check already on.
 
 ### `TMESIM_STUDIO_ALLOWED_ORIGINS`
 
@@ -553,6 +752,39 @@ memory dial on the process — raise it on a machine with headroom and a team
 switching between sections, lower it to `1` on a small container. Equivalent to
 `--cache-size`, which sets this variable before the cache is imported. Read once,
 at import; changing it needs a restart. Not a security control.
+
+* **Valid values are integers `>= 1`.** Whitespace is stripped, so `" 8 "` is 8.
+* **Unset:** `4`, silently. That is the documented default, not a mistake.
+* **Anything else — empty, non-numeric, `0`, negative —** is refused with a
+  diagnostic on **stderr** naming the variable, the value it was given and the
+  valid range, and the process **continues on the default `4`**. The server's
+  own `recon cache maxsize=` banner line then shows the value that really took
+  effect, so the two never disagree.
+
+  ```
+  [codon] TMESIM_RECON_CACHE_SIZE='' is not usable: it is empty. Valid values are
+  integers >= 1 (each entry holds a full cell population and several float64
+  grids; 1 is the minimum, 4 is the default). Continuing with 4. ...
+  ```
+
+  Both halves of that were defects until recently, in opposite directions.
+  **Empty or non-numeric killed the process at import** with a bare
+  `ValueError: invalid literal for int() with base 10: ''` and a traceback
+  pointing at `app/server/cache.py` — no mention of the variable or of what
+  would have been acceptable. `-e TMESIM_RECON_CACHE_SIZE=` on a `docker run`
+  is enough to produce it, and in Docker that is a **restart loop** whose only
+  symptom is a stack trace from a cache module. Meanwhile **`0` and `-1` were
+  accepted silently** and are not capacities at all: the eviction loop drops
+  the entry it has just inserted, so every run rebuilds a reconstruction that
+  costs 1 s to ~90 s while `/api/health` reports a perfectly healthy
+  `maxsize=0`.
+* **Why it diagnoses and continues rather than exiting.** This is the one
+  variable here where continuing is clearly right: it changes no result, no
+  protocol number and no access decision — only how much work the process
+  re-uses. Exiting would also convert a cosmetic misconfiguration into an
+  unimportable package for the CLI and the test suite, which import the same
+  module. A variable whose bad value *could* change a result or open access
+  should exit instead; this one cannot.
 
 *(One further variable, `TMESIM_PROTOCOL_MAX_WINDOW_S`, is read by the engine
 rather than the server — it caps how long a transport solve may cover, default

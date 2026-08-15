@@ -33,8 +33,14 @@ git clone <this-repo> tme-sim
 cd tme-sim
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install --upgrade pip          # PEP 660: pip >= 21.3, and macOS 14 ships 21.2.4
 pip install -c constraints.txt -e .
 ```
+
+Without the pip upgrade, `-e .` fails on the system Python with
+`ERROR: File "setup.py" or "setup.cfg" not found` — there is no `setup.py` here,
+so an editable install needs PEP 660 support. Measured on a clean clone,
+2026-08-15.
 
 That installs numpy, scipy, matplotlib, pandas, scikit-image, networkx,
 scikit-learn, requests and tifffile (see `pyproject.toml`).
@@ -141,6 +147,7 @@ The harness preflight reports which extras are present, so you find out in
 ```bash
 python -m tmesim.cli --help
 python -m tmesim.cli molecules                                  # ~0.5 s, no data needed
+python -m tmesim.cli sections                                   # 0 of 7 runnable on a clone
 python -m tmesim.validation.delivery_metrics --selftest         # ~3 s, no data needed
 ```
 
@@ -165,8 +172,17 @@ acquisition. Three classes of input:
 | class | how | size | needed for |
 |---|---|---:|---|
 | **AUTO** | `python -m tmesim.cli acquire` | ~90 MB | GDSC2 potency, Ivy GAP niches, TCGA background |
+| **AUTO (sections)** | `acquire --sections xenium_319` (default) / `--sections all` | 16.6 MB / 304 MB | the tissue itself — reconstruct, simulate, Studio |
 | **MANUAL** | `curl` recipes below | ~830 MB | Everything else in the core pipeline |
 | **HUNT** | `data_cache/hunt/` | 5.3 GB | The external-validation stage only |
+
+**The distinction that decides whether anything runs at all:** the four tabular
+AUTO sources parameterise *drugs*. A tissue *section* is what a drug is
+simulated on, and it lives in its own cache directory. Fetching all four tabular
+sources and no section leaves every section unavailable — which is exactly what
+`acquire` used to do, silently. `python -m tmesim.cli sections` is the
+authoritative list of which sections are runnable right now and, for each one
+that is not, the literal command that fixes it.
 
 **The complete record — every accession, licence, byte count and re-download
 command, including all 38 `data_cache/hunt/` directories — is
@@ -176,11 +192,14 @@ command, including all 38 `data_cache/hunt/` directories — is
 
 ```bash
 python -m tmesim.cli acquire                   # writes into ./data_cache/
-python -m tmesim.cli acquire --out data_cache --timeout 90
+python -m tmesim.cli acquire --list            # print the plan, download nothing
+python -m tmesim.cli acquire --sections all    # + every auto-fetchable section
+python -m tmesim.cli acquire --sections none   # tabular sources only
 ```
 
-Best-effort live download; it never crashes, it reports per-source status.
-**Measured: 17 s, 4/4 sources OK.** It fetches:
+Best-effort live download; it never crashes, it reports per-source status, and
+it ends by printing how many sections are runnable and what to run next. It
+fetches:
 
 | source | what | lands in |
 |---|---|---|
@@ -188,6 +207,17 @@ Best-effort live download; it never crashes, it reports per-source status.
 | `tcga_gbm_expression` | 8 open STAR gene-count files | `data_cache/tcga_expression/` |
 | `ivy_gap` | Ivy GAP gene-expression matrix zip (270 RNA-seq samples) | `data_cache/ivy_gap/gene_expression_matrix.zip` |
 | `gdsc_glioma` | 12,001 glioma (GBM/LGG) GDSC2 dose-response rows | `data_cache/gdsc_glioma_dose_response.csv` |
+| `section:xenium_319` | the 319-panel Xenium GBM section, 3 files, 16,598,845 B | `data_cache/xenium_gbm/` |
+
+**Measured 2026-08-15 on a clean clone (macOS, CPython 3.9.6): 1 m 50 s (5/5
+sources OK) and 3 m 52 s (4/5 — the Ivy GAP host returned HTTP 504, which
+`acquire` reported and stepped over). Both runs left 1 of 7 sections
+runnable and a first simulation ran afterwards.** The
+previous claim in this file — "17 s" — did not survive re-measurement, and a
+third cold-start run measured 3 m 40 s, so read this as *minutes, dominated by
+the GDC endpoints*, not as a number to plan around. Re-run `acquire` freely: every file
+already on disk at its expected byte count is skipped, so a repeat run is cheap
+and a partial failure resumes at file granularity.
 
 The Ivy GAP zip must then be **extracted** where the loader looks — the harness
 does this for you, or by hand:
@@ -213,10 +243,15 @@ done
 
 ### 2b. Manual — the big open files
 
-All open (no login, no DUA) but too large for the best-effort acquire step.
+All open (no login, no DUA). Everything in this subsection can also be fetched
+by hand, and the two Xenium sections no longer need to be: `acquire --sections
+all` downloads them from these exact URLs with these exact byte counts. The
+commands are kept here because they are the ground truth the fetcher is built
+from, and because a `curl` needs neither the package installed nor the venv
+active.
 
 **Xenium GBM, 319-gene brain panel** — 40,887 cells, the primary tissue for every
-headline result. ~17 MB.
+headline result. ~17 MB. **Auto: `acquire --sections xenium_319` (the default).**
 
 ```bash
 mkdir -p data_cache/xenium_gbm
@@ -228,6 +263,7 @@ curl -L -o data_cache/xenium_gbm/Xenium_GBM_gene_panel.json            "${BASE}_
 
 **Xenium GBM, 480-gene Immuno-Oncology panel** — 816,769 cells (20× more), 11.5 ×
 10.8 mm. ~288 MB. Optional: the harness warns and skips its step if absent.
+**Auto: `acquire --sections xenium_io`.**
 
 ```bash
 mkdir -p data_cache/xenium_gbm_io

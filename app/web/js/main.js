@@ -281,6 +281,15 @@ async function boot() {
   const done = store.get().runs.find((r) => r.status === 'done' && r.spec && r.spec.kind !== 'protocol');
   if (done) openRun(done.run_id);
 
+  // AFTER the auto-open, deliberately. A run still in flight has no geometry
+  // and no metrics yet, so opening the last completed one first gives the
+  // operator something real to look at while they wait; re-attaching second
+  // then leaves the top bar naming the run that is actually happening rather
+  // than the one on screen — which is the contradiction paintRunChip exists to
+  // prevent, and whose tooltip already says the metrics belong to the previous
+  // run.
+  reattachLiveRun();
+
   if (viewer) viewer.start();
 
   const openTour = () => {
@@ -1105,6 +1114,75 @@ async function selectField(name) {
   }
 }
 
+/**
+ * Point the Setup rail's job monitor at a run and own what happens when it
+ * settles.
+ *
+ * Extracted from submitRun because it is no longer only submit that needs it:
+ * `boot()` re-attaches to a run that was already in flight when the page
+ * loaded (see reattachLiveRun), and a re-attached job must finish EXACTLY the
+ * way a submitted one does — same refresh, same openRun, same failure toast.
+ * Two copies of this callback would drift, and the branch that would drift
+ * unnoticed is the failure branch, which is the one nobody exercises twice.
+ */
+function trackRun(id) {
+  specPanel.track(id, async (doneId, status) => {
+    await refreshRuns();
+    if (status === 'done') openRun(doneId);
+    else if (status === 'failed') {
+      // `openRun` is what normally repaints the header chip, and it is not
+      // called on this branch — so paint it here or the header is left
+      // reading `running` on a run that has failed.
+      paintRunChip('failed');
+      const r = await api.getRun(doneId).catch(() => null);
+      toast('err', `Run ${doneId} failed`, (r && r.error) || 'no error message returned', 0);
+      if (r) { store.set({ activeRun: r }); inspect.renderRun(r); }
+    } else {
+      paintRunChip(status);
+      toast('warn', `Run ${doneId} ${status}`, '', 4000);
+    }
+  });
+}
+
+/**
+ * Pick up a run that was still in flight when this page loaded, and re-attach
+ * the job monitor to it.
+ *
+ * WHY: the job lives in the SERVER process, not in this tab — `POST /api/runs`
+ * returns an id and the work continues whether or not a browser is watching.
+ * The monitor did not know that. It was armed only by submitRun, so a reload,
+ * a closed laptop lid, or a second tab left the operator with `Active job:
+ * idle`, a disabled Cancel button and no progress, while the reconstruction
+ * carried on invisibly. On a run measured in minutes — which is the normal
+ * case, and the exact case where someone walks away — the product looked like
+ * it had lost their work.
+ *
+ * No client-side bookkeeping is used to find it. The server's own run list is
+ * the authority, so this also recovers a run submitted from a DIFFERENT tab or
+ * before a browser crash, which a stored id would not. Protocol (TPL) runs are
+ * excluded for the same reason the auto-open below excludes them: they are not
+ * a single RunSpec reconstruction and this monitor is not their read-out.
+ *
+ * @returns {object|null} the run it attached to, if any.
+ */
+function reattachLiveRun() {
+  const live = store.get().runs.find((r) => (r.status === 'queued' || r.status === 'running')
+    && r.spec && r.spec.kind !== 'protocol');
+  if (!live) return null;
+  history.setActive(live.run_id);
+  store.set({ activeRunId: live.run_id });
+  $('#hdr-run').textContent = live.run_id;
+  paintRunChip(live.status, NaN);
+  trackRun(live.run_id);
+  toast('info', `Still running: ${live.run_id}`,
+    'This run was already in flight when the page loaded, so the job monitor '
+    + 'in the Setup rail has picked it back up. It is running in the server '
+    + 'process, not in this tab — that is why closing the tab did not stop it. '
+    + 'The metrics on the right belong to the last completed run until this one '
+    + 'finishes.', 14000);
+  return live;
+}
+
 async function submitRun(spec) {
   if (!spec) return;
   specPanel.setSubmitting(true);
@@ -1120,22 +1198,7 @@ async function submitRun(spec) {
     // Say `queued` NOW rather than leaving the previous run's chip standing
     // until the first poll returns. See paintRunChip.
     paintRunChip('queued', 0);
-    specPanel.track(id, async (doneId, status) => {
-      await refreshRuns();
-      if (status === 'done') openRun(doneId);
-      else if (status === 'failed') {
-        // `openRun` is what normally repaints the header chip, and it is not
-        // called on this branch — so paint it here or the header is left
-        // reading `running` on a run that has failed.
-        paintRunChip('failed');
-        const r = await api.getRun(doneId).catch(() => null);
-        toast('err', `Run ${doneId} failed`, (r && r.error) || 'no error message returned', 0);
-        if (r) { store.set({ activeRun: r }); inspect.renderRun(r); }
-      } else {
-        paintRunChip(status);
-        toast('warn', `Run ${doneId} ${status}`, '', 4000);
-      }
-    });
+    trackRun(id);
   } catch (err) {
     notifyError('POST /api/runs failed', err);
   } finally {

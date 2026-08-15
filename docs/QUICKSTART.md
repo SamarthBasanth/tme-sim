@@ -23,12 +23,26 @@ git clone <this-repo> tme-sim
 cd tme-sim
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install --upgrade pip          # not optional — see below
 pip install -e .
 ```
 
 That installs the core simulator (numpy, scipy, matplotlib, pandas,
 scikit-image, networkx, scikit-learn, requests, tifffile, imagecodecs) and
 registers a `codon` command on your `PATH`.
+
+**Why the `pip install --upgrade pip` line is there.** `pyproject.toml` has no
+`setup.py`, so an editable install needs PEP 660 support, which arrived in pip
+21.3. macOS 14's system Python 3.9.6 ships pip 21.2.4, and on that pip the line
+above fails with:
+
+```
+ERROR: File "setup.py" or "setup.cfg" not found. Directory cannot be installed
+in editable mode ... (A "pyproject.toml" file was found, but editable mode
+currently requires a setuptools-based build.)
+```
+
+Measured on a clean clone, 2026-08-15. The upgrade takes about a second.
 
 **If you want Studio** (the local web UI for exploring a reconstruction
 interactively), install the additive `app` extra instead:
@@ -61,7 +75,7 @@ codon --help
 
 ```
 usage: codon [-h] [--seed SEED]
-             {reconstruct,simulate,compare-drugs,validate,ingest,molecules,molecular-run,acquire,studio}
+             {reconstruct,simulate,compare-drugs,validate,ingest,molecules,molecular-run,acquire,sections,studio}
              ...
 ```
 
@@ -70,13 +84,79 @@ it as a module instead of the installed script.)
 
 ---
 
+## 1b. Get the tissue (a clone has none)
+
+`data_cache/` is gitignored. **A fresh clone contains no tissue at all**, so
+every section reads `UNAVAILABLE` and `reconstruct` refuses with a named
+missing directory. Confirm that for yourself, then fix it:
+
+```bash
+codon sections                 # 0 of 7 runnable on a clone, with the fix for each
+codon acquire                  # fetches the tabular sources + the xenium_319 section
+```
+
+`acquire` downloads two different kinds of thing, and conflating them is what
+used to make a first run dead-end:
+
+| kind | what | makes a section runnable? |
+|---|---|---|
+| 4 **tabular** sources | TCGA-GBM clinical, TCGA-GBM expression, Ivy GAP, GDSC2 glioma potency | **no** — these parameterise *drugs* |
+| 1 **spatial section** | `xenium_319`: 10x Xenium GBM, 40,887 measured cells, 16.6 MB, 3 files | **yes** — this is the tissue |
+
+Useful variants:
+
+```bash
+codon acquire --list                 # print the plan, download nothing
+codon acquire --sections all         # + the 480-panel IO section (287.6 MB)
+codon acquire --sections none        # tabular sources only (the pre-2026-08 behaviour)
+codon sections --verbose             # + how each recipe's URLs were verified
+```
+
+The Visium sections and `gse324268` are **not** auto-fetchable — they need
+extraction, a format conversion or a companion dataset (the Darmanis
+deconvolution reference), so no one-liner would be truthful about them.
+`codon sections` prints the literal shell block for each, and
+[`REPRODUCE.md`](REPRODUCE.md) §2b carries the same commands.
+
+**The whole path, measured end to end on a clean clone** (macOS 14, CPython
+3.9.6, `pip` cache warm, 2026-08-15):
+
+| step | wall clock |
+|---|---:|
+| `git clone` (from a local path) | 2 s |
+| `python3 -m venv .venv` | 1 s |
+| `pip install --upgrade pip` | 1 s |
+| `pip install -e .` | 13 s |
+| `codon sections` → 0 of 7 runnable, exit 1 | 9 s |
+| `codon acquire` → 4 of 5 sources ok, 1 of 7 sections runnable | 3 m 52 s |
+| `codon simulate --source xenium --dx 30 --drug temozolomide` | 35 s |
+| **clone → first completed simulation** | **4 m 53 s** |
+
+`acquire` dominates that, and its time is dominated by the GDC endpoints: three
+timed runs of the same command on the same day took **1 m 50 s, 3 m 40 s and
+3 m 52 s**. Treat it as minutes, not as a number to plan around. The `pip` steps
+were measured with a warm pip cache; a first-ever install downloads wheels and
+takes longer.
+
+In the run tabulated above the Ivy GAP host returned **HTTP 504** and that
+source failed. `acquire` reported it as `failed` on its own line and carried on,
+the section still landed, and the simulation still ran — a tabular source going
+down does not cost you your first result. That is the intended behaviour, not a
+lucky escape.
+
+If you have your own de-identified export, you do not need any of this: register
+it by path with `codon ingest /path/to/export --register` and select it the same
+way. Nothing is uploaded anywhere — the directory is read where it lies.
+
+---
+
 ## 2. First example: the CLI
 
 ### 2a. Reconstruct a real tumor section and see basic stats
 
-The repository ships an already-cached open **10x Xenium glioblastoma**
-section (40,887 real, measured cells — no synthetic data anywhere in this
-path). Reconstruct it and print a report:
+`codon acquire` has now cached the open **10x Xenium glioblastoma** section
+(40,887 real, measured cells — no synthetic data anywhere in this path).
+Reconstruct it and print a report:
 
 ```bash
 codon reconstruct --source xenium --dx 30
@@ -188,6 +268,13 @@ descriptor-derived partition coefficients, literature-table comparisons — whic
 need no tissue section and finish in a few seconds. Drop it to run the full
 suite, which reconstructs real sections from `data_cache/` and solves the
 transport PDE (minutes, and it is the only mode that tests the solver at all).
+
+**This command exits 1, and that is the correct result.** Anchors that FAIL are
+published limitations of the model — they fail identically on a clean clone, on
+every machine — and the scorecard prints a block saying exactly that before the
+failing rows. An exit code of 1 here means the scorecard ran and reported
+honestly; it is not a broken install, and a run in which those rows passed would
+be the thing to distrust.
 
 ```
 NOT TESTABLE analytic doxorubicin   [PMID 16361566]
@@ -559,16 +646,22 @@ micro = reconstruct_real(
 
 ## 4. Known friction points (read before filing an issue)
 
-* **Data is pre-cached, not auto-downloaded on first use.** The Xenium /
-  Visium sections these examples run on already live under `data_cache/` in
-  this checkout. `codon acquire` best-effort downloads the *smaller* open
-  datasets; the large single-cell caches (Xenium GBM/breast, Visium, HGCC)
-  are too big for that command and are fetched with the explicit `curl`
-  commands in [`docs/REPRODUCE.md`](REPRODUCE.md) §2b. If you `git clone`
-  this repository without its data cache, `reconstruct` / `simulate` /
-  `compare-drugs` will raise a clear file-not-found error naming the missing
-  path rather than silently substituting synthetic data — there is no
-  synthetic fallback anywhere in this codebase.
+* **A clone has no data, and nothing downloads itself on first use.**
+  `data_cache/` is gitignored, so a fresh clone has zero runnable sections.
+  `codon acquire` (§1b) fetches the tabular sources *and* the `xenium_319`
+  section, which is the one every example here uses; `--sections all` adds the
+  other auto-fetchable section. The Visium sections, `gse324268`, the breast
+  section and HGCC are **not** auto-fetchable and `codon sections` prints the
+  exact commands for each. Until then, `reconstruct` / `simulate` /
+  `compare-drugs` raise a clear file-not-found error naming the missing path
+  rather than silently substituting synthetic data — there is no synthetic
+  fallback anywhere in this codebase.
+* **`codon validate` exits 1 on a healthy install.** Several external anchors
+  FAIL against measured data on every machine, deliberately; they are this
+  project's published limitations, not a symptom of a bad setup, and the
+  command prints a block saying so above the failing rows. Do not "fix" it.
+  `codon validate --list` is the registry of what is scored and what was
+  deliberately left out.
 * **`--sample` is a cache directory path, not a dataset name**, and its
   default depends on `--source`: for `xenium` it is the 319-gene GBM section;
   for `visium` it is `10x_parent_gbm`. Passing `--library breast` to

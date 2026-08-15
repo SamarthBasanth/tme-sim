@@ -85,9 +85,27 @@ external-validation readers. Python ≥ 3.9; pin with
 `pip install -c constraints.txt -e .` if you intend to reproduce a number rather
 than merely run the code.
 
+**A fresh clone has no data.** `data_cache/` is gitignored, so on a clone every
+tissue section is unavailable and `reconstruct` refuses. One command fixes that:
+
+```bash
+codon sections                  # what tissue exists, what is runnable, how to fix what is not
+codon acquire                   # 4 tabular sources + the xenium_319 tissue section
+codon simulate --source xenium --dx 30 --drug temozolomide   # first result
+```
+
+`codon acquire` fetches two different kinds of thing and the difference matters:
+four **tabular** sources (TCGA clinical, TCGA expression, Ivy GAP, GDSC2 potency)
+that parameterise *drugs*, and one **spatial tissue section** — the thing a drug
+is simulated *on*. Only the second makes `reconstruct`, `simulate` and the Studio
+work. `codon acquire --list` prints the plan without downloading; `--sections
+all` adds the larger auto-fetchable sections; `--sections none` is the old
+tabular-only behaviour. Sections that need extraction, a conversion or a
+companion dataset are **not** auto-fetched, and `codon sections` prints the exact
+shell block for each one rather than pointing at a document.
+
 ```bash
 codon --help                    # every subcommand
-codon acquire                   # auto-downloadable open datasets (~90 MB, measured 17 s)
 codon molecules                 # library drugs + structure-derived descriptors, no data
 codon reconstruct --source xenium --dx 12          # real GBM niche, 40,887 cells
 codon simulate --source xenium --dx 12 --drug temozolomide
@@ -101,15 +119,24 @@ codon validate                  # full scorecard, real tissue + PDE solves (~15-
 codon validate --list           # the anchor registry, plus what was deliberately left out
 ```
 
+**`codon validate` exits 1 on a correct install, and that is the point.** Several
+anchors FAIL against measured data; they are the *published limitations* listed
+under *What has failed* below, they fail identically on every machine, and a
+build that reported them as passing would be the broken one. Read exit 1 here as
+"the scorecard ran", not "the install is wrong". The command says so in its own
+output.
+
 **Pass `--dx 12` explicitly.** `compare-drugs` still defaults to `--dx 30`, and
 values quoted at dx = 30 are superseded — a coarse grid cannot resolve the
 perivascular boundary layer. dx = 12 is the production resolution, and it is
 **not** a converged one either; see *What is retracted*.
 
-The Xenium, Visium, GSE84465 and HGCC caches are open but too large for
-`acquire`; the exact `curl` commands are in
-[`docs/REPRODUCE.md`](docs/REPRODUCE.md) §2b and the complete byte-level record is
-[`docs/DATA_INVENTORY.md`](docs/DATA_INVENTORY.md).
+The two Xenium sections are fetched by `codon acquire` (`--sections all`). The
+Visium sections, GSE84465 and HGCC are **not**: they need extraction, a
+conversion or a companion dataset, so no single command is honest about them.
+`codon sections` prints the literal shell block for each; the same commands are
+in [`docs/REPRODUCE.md`](docs/REPRODUCE.md) §2b and the complete byte-level
+record is [`docs/DATA_INVENTORY.md`](docs/DATA_INVENTORY.md).
 
 **Studio** — the browser UI (reconstruct, compare, protocol editor, caveats
 panel):

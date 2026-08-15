@@ -153,7 +153,18 @@ def main(argv=None) -> int:
     # Printing the page here is how a first user finds out it exists.
     print(f"  your tissue http://{args.host}:{args.port}/ingest")
     if api_key:
-        label = "generated (not persisted -- save it now)" if generated else "set via --api-key"
+        # Name the source that actually won. There are three, and this line is
+        # exactly where an operator looks to work out which: it used to print
+        # "set via --api-key" for a key that came from the environment, which
+        # is the one situation where the answer is not obvious (an exported
+        # TMESIM_STUDIO_API_KEY and an --api-key flag can disagree, and the
+        # flag wins) and the one place the banner could have said so.
+        if generated:
+            label = "generated (not persisted -- save it now)"
+        elif args.api_key is not None:
+            label = "set via --api-key"
+        else:
+            label = "set via TMESIM_STUDIO_API_KEY"
         print(f"  api key     {api_key}  [{label}]")
         print(f"              every request needs header: X-API-Key: {api_key}")
     else:

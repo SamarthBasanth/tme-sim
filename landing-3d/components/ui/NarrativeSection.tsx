@@ -31,7 +31,33 @@ const NarrativeSection = forwardRef<HTMLDivElement, NarrativeSectionProps>(
       <div
         ref={ref}
         className={`narrative-section narrative-section--${align} ${className}`}
-        style={{ opacity: initialOpacity }}
+        /*
+         * `visibility` is set here, not only in the scroll loop, because the
+         * scroll loop does not run until the page is scrolled.
+         *
+         * ScrollExperience writes `visibility: hidden` on any beat below 0.02
+         * opacity, and its comment explains why: `pointer-events: none` hides a
+         * section from the mouse but NOT from the tab order, so a keyboard user
+         * tabs into a fully transparent beat and the focus ring appears around
+         * nothing. That fix lives in ScrollTrigger's `onUpdate`, which fires on
+         * a progress CHANGE — so at progress 0, on first load, it has never
+         * fired, and every beat is still `visibility: visible` at opacity 0.
+         *
+         * Measured on the loaded page at scroll 0: Tab reached the hero's "Open
+         * the Studio" (correct), then beat 06's "Open the Studio" at y = 572 and
+         * its email link at y = 637 — both invisible, both on screen, both
+         * ringed. The bug the loop fixes was therefore live for exactly as long
+         * as a visitor had not yet scrolled, which is the entire window in which
+         * a keyboard user first presses Tab.
+         *
+         * Deriving it from `initialOpacity` keeps the two in agreement by
+         * construction, and the loop overwrites it from the first frame of
+         * scroll onward.
+         */
+        style={{
+          opacity: initialOpacity,
+          visibility: initialOpacity > 0.02 ? "visible" : "hidden",
+        }}
       >
         <span className="narrative-section__kicker">{kicker}</span>
         <div className="narrative-section__body">{children}</div>

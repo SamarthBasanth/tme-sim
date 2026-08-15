@@ -257,7 +257,12 @@ export function createTissuePanel({ onRegistered }) {
       + 'sample is and what it cannot support before anything is run. '),
       h('p.dim', {
         style: {
-          margin: '0 0 var(--sp-4)', fontSize: 'var(--fs-micro)',
+          // --fs-disclosure, not --fs-micro. This paragraph carries the
+          // security-relevant fact about WHOSE DISK IS READ, and rule 3 at the
+          // top of this file makes it a stated claim rather than something to
+          // be inferred. A stated claim set in the unit-suffix size is a
+          // claim that reads as a footnote. See tokens.css --fs-disclosure.
+          margin: '0 0 var(--sp-4)', fontSize: 'var(--fs-disclosure)',
           lineHeight: 'var(--lh-body)',
         },
       },
@@ -292,7 +297,11 @@ export function createTissuePanel({ onRegistered }) {
         style: {
           margin: '0', paddingLeft: '1.1em', display: 'flex',
           flexDirection: 'column', gap: 'var(--sp-2)',
-          fontSize: 'var(--fs-micro)', lineHeight: 'var(--lh-body)',
+          // "What is refused, and where the bounds are" IS the published-limits
+          // surface of this panel — the list a first-time user reads to find
+          // out whether their sample can be loaded at all. It is the last
+          // thing that should be set smaller than the app's body prose.
+          fontSize: 'var(--fs-disclosure)', lineHeight: 'var(--lh-body)',
           color: 'var(--fg-2)',
         },
       },
@@ -396,7 +405,7 @@ export function createTissuePanel({ onRegistered }) {
     outEl.appendChild(h('pre.mono', {
       style: {
         margin: '0 var(--sp-5) var(--sp-5)', padding: 'var(--sp-3)',
-        fontSize: 'var(--fs-micro)', lineHeight: '1.45', color: 'var(--fg-1)',
+        fontSize: 'var(--fs-disclosure)', lineHeight: '1.45', color: 'var(--fg-1)',
         background: 'var(--bg-void)', border: '1px solid var(--line-1)',
         whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', overflowX: 'auto',
       },
@@ -404,7 +413,7 @@ export function createTissuePanel({ onRegistered }) {
     outEl.appendChild(h('div.dim', {
       style: {
         padding: '0 var(--sp-5) var(--sp-5)',
-        fontSize: 'var(--fs-micro)', lineHeight: 'var(--lh-body)',
+        fontSize: 'var(--fs-disclosure)', lineHeight: 'var(--lh-body)',
       },
     },
     'This is a refusal, not a crash. Codon stops on a sample it cannot honestly '
@@ -521,7 +530,7 @@ export function createTissuePanel({ onRegistered }) {
         style: {
           margin: '0 var(--sp-5) var(--sp-5)', padding: 'var(--sp-3)',
           overflowX: 'auto',
-          fontSize: 'var(--fs-micro)', lineHeight: '1.45', color: 'var(--fg-1)',
+          fontSize: 'var(--fs-disclosure)', lineHeight: '1.45', color: 'var(--fg-1)',
           background: 'var(--bg-void)', border: '1px solid var(--line-1)',
           whiteSpace: 'pre',
         },

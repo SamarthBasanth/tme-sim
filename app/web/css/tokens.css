@@ -77,6 +77,41 @@
   --fs-lg:   15px;     /* metric values */
   --fs-xl:   19px;     /* headline metric */
 
+  /* --- the disclosure floor ----------------------------------------------
+     NOT a seventh size. It is an ALIAS of --fs-xs that names a RULE, and it
+     exists so that setting a limit smaller than the app's body prose has to
+     be a deliberate act against a named thing rather than an inline
+     `font-size: var(--fs-micro)` nobody notices.
+
+     THE RULE: ANY ELEMENT CARRYING A SENTENCE is set at --fs-disclosure or
+     larger. Not "any element carrying a limit" — that phrasing was tried and
+     it does not survive contact with an editor, because whether a given
+     sentence is load-bearing is a judgement call and the judgement is made by
+     whoever is currently trying to make something fit. Prose is a property of
+     the text; load-bearing is an opinion about it. The rule is on the
+     property.
+
+     --fs-micro keeps everything it is actually for: provenance chips, unit
+     suffixes, column heads, timestamps, numeric read-outs — labels and machine
+     tokens of a few characters, read as marks rather than sentences.
+
+     WHY THIS VALUE AND NOT A BIGGER ONE. Measured across the whole visible
+     app: the caveat rail carries ~12,000 characters of prose at --fs-xs, and
+     ALL other prose in the product totals ~4,500 characters, of which the
+     larger part is also --fs-xs. So a caveat is already set at the app's
+     largest prose size, in the app's body face, with a 700-weight subject
+     line, a 2-3 px severity rule, a stop glyph, a tinted fill, open by
+     default and not collapsible. Small print is print set SMALLER than what
+     surrounds it; this is set at or above everything around it. Promoting
+     only caveats to --fs-md or --fs-lg would buy letterform size and pay for
+     it in a longer scroll through a 347 px rail that is already ~2,200 px
+     tall — and an unfinished disclosure is far more often one the reader
+     scrolled past than one they could not resolve.
+
+     If that trade is ever revisited, revisit it HERE, once, and every
+     disclosure surface moves together. That is the point of the name. */
+  --fs-disclosure: var(--fs-xs);
+
   --lh-tight: 1.2;
   --lh-body:  1.35;
 

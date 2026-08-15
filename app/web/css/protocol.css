@@ -352,11 +352,15 @@
 }
 .ptpl-item:hover { background: var(--bg-2); }
 .ptpl-item .t { font-size: var(--fs-sm); color: var(--fg-0); }
+/* The one-line description of each starter program — the sentence a first-time
+   user reads to choose one, and one of them states the product's own thesis
+   ("The ranking is the defensible output"). A sentence, so it takes the
+   disclosure floor; see tokens.css --fs-disclosure. */
 .ptpl-item .n {
   grid-column: 1 / -1;
-  font-size: var(--fs-micro);
+  font-size: var(--fs-disclosure);
   color: var(--fg-2);
-  line-height: 1.35;
+  line-height: var(--lh-body);
 }
 .ptpl-item .r {
   font-family: var(--font-mono);
@@ -384,7 +388,7 @@
 }
 .pdrop:hover, .pdrop.over { border-color: var(--accent); background: var(--accent-bg); color: var(--fg-1); }
 .pdrop:focus-visible { outline-offset: -3px; }
-.pdrop .fmt { font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--fg-3); }
+.pdrop .fmt { font-family: var(--font-mono); font-size: var(--fs-disclosure); color: var(--fg-3); }
 
 /* provenance chips beyond the shell's three — the DrugParams taxonomy */
 .chip.supplied { color: var(--accent); background: var(--accent-bg); }

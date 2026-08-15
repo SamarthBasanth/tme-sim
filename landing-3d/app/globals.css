@@ -60,6 +60,212 @@
     Menlo, Consolas, "Courier New", monospace;
 }
 
+/* ---------------------------------------------------------------------------
+ * FALLBACK METRICS FOR THE TWO ATKINSON FACES.
+ *
+ * These two @font-face rules never draw a glyph of their own. Each one wraps a
+ * face that is already on the reader's machine and rescales it -- `size-adjust`
+ * for the em, `ascent-override` / `descent-override` to put the baseline back
+ * where the real face puts it -- so that the type shown BEFORE the woff2 lands
+ * occupies the same box as the type shown after, and the swap moves nothing.
+ *
+ * `next/font/google` does this automatically for families it has precalculated
+ * metrics for. It has none for Atkinson Hyperlegible Next or Atkinson
+ * Hyperlegible Mono (both 2025 releases), and said so at every build. See the
+ * comment above the font loaders in app/layout.tsx for that half.
+ *
+ * WHY IT MATTERS MORE HERE THAN ON A NORMAL PAGE. `.ledger__row` sets a sans
+ * label against a mono verdict on ONE shared baseline, and both instrument
+ * panels pair a sans <dt> with a mono <dd> the same way. That pairing is the
+ * whole reason both text roles were taken from one superfamily. A first-paint
+ * reflow lands squarely on it, and it lands on the six rows of beat 05, which
+ * are the page's registered limits.
+ *
+ * HOW THE NUMBERS WERE OBTAINED -- MEASURED, NOT GUESSED. Both faces were
+ * rendered in the browser and probed for the metrics the layout engine
+ * actually uses: TextMetrics.fontBoundingBox{Ascent,Descent} for the box, a
+ * `line-height: normal` probe for the line gap, and the mean advance over the
+ * 43-character frequency-weighted string @next/font itself uses for
+ * size-adjust (see next/dist/compiled/@next/font/dist/local/
+ * get-fallback-metrics-from-font-file.js). Per em, at 1000px:
+ *
+ *   Atkinson Hyperlegible Next   ascent 0.984  descent 0.316  avg width 0.45337
+ *   Atkinson Hyperlegible Mono   ascent 0.984  descent 0.316  advance   0.63199
+ *   Arial                        ascent 0.905  descent 0.212  avg width 0.45630
+ *   Courier New                  ascent 0.833  descent 0.300  advance   0.60010
+ *
+ * Both faces report `line-height: normal` at 1.300 em, and each pair below
+ * reproduces that exactly: (ascent-override + descent-override) x size-adjust
+ * = 1.300 for both. That is the arithmetic check on these values.
+ *
+ * THE SANS IS 99.07% AND NOT THE 99.36% THAT ARITHMETIC GIVES, AND THE
+ * DIFFERENCE IS WORTH RECORDING BECAUSE IT IS AT THE NOISE FLOOR. 99.36 is the
+ * ratio for a generic frequency-weighted string; re-measured against THIS
+ * page's own paragraphs the fallback came out 0.29% wide, so it is corrected
+ * to the value the real copy asks for. Measured both ways with the woff2
+ * delayed 15s, worst vertical shift anywhere on the page:
+ *
+ *              1512x950 cinematic / reduced        390x844 cinematic / reduced
+ *   99.36%          13.8px  /  27.3px                    0px  /  0px
+ *   99.07%             0px  /     0px                 13.8px  /  13.8px
+ *
+ * It is a trade, not a win: matching a MEAN advance cannot make every string
+ * wrap identically, so tuning it moves which single paragraph gains a line
+ * rather than removing the phenomenon. 99.07 is kept because it halves the
+ * worst case (27.3 -> 13.8px) and because it is the number this page's text
+ * actually measured. Do not treat either value as exact — a copy edit of a few
+ * words can flip which paragraph rewraps, and that is a property of the
+ * technique, not a regression.
+ *
+ * WHY THE MONO IS ANCHORED TO COURIER NEW AND NOT TO ARIAL. Next only ever
+ * anchors to Arial or Times New Roman, which is fine for a proportional face:
+ * matching the MEAN advance makes an average-frequency sentence come out the
+ * right length. It is the wrong instrument for this page's mono role, which
+ * carries every measured quantity -- "FAIL · 41x LOW", "1.08-1.21x, NOT 2.0x",
+ * "40,887" are not average-frequency strings. Anchoring one monospace to
+ * another instead makes size-adjust an exact advance ratio (0.63199 / 0.60010),
+ * so EVERY string matches, not just the average one, and the verdict column
+ * keeps its width through the swap.
+ *
+ * PLATFORM CAVEAT, STATED RATHER THAN HIDDEN. The metrics above were measured
+ * in Chromium on macOS. Arial and Courier New are present on macOS and
+ * Windows; on Linux, fontconfig aliases both to metric-compatible substitutes
+ * (Liberation Sans / Liberation Mono), which is why those are named explicitly
+ * in `src`. Where none of them exists -- Android, most obviously -- `local()`
+ * finds nothing, the rule contributes no face, and the stack simply falls
+ * through to the system fonts in `--font-sans` / `--font-mono` below, which is
+ * exactly the behaviour before this block existed. This is an improvement on
+ * the common case, not a guarantee on every device, and it is not written up
+ * as one.
+ *
+ * No weight or style descriptor, matching what Next generates for `Archivo
+ * Fallback`: one face per family covering the whole range, with the browser
+ * synthesising bold and italic for the fraction of a second it is visible.
+ * ------------------------------------------------------------------------- */
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Next Fallback";
+  src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo");
+  size-adjust: 99.07%;
+  ascent-override: 99.32%;
+  descent-override: 31.9%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono Fallback";
+  src:
+    local("Courier New"), local("Liberation Mono"), local("Nimbus Mono PS"),
+    local("DejaVu Sans Mono"), local("Menlo");
+  size-adjust: 105.31%;
+  ascent-override: 93.43%;
+  descent-override: 30.01%;
+  line-gap-override: 0%;
+}
+
+/* ---------------------------------------------------------------------------
+ * FALLBACK METRICS FOR THE DISPLAY FACE — FOUR FACES, BECAUSE ARCHIVO IS USED
+ * AT FOUR WIDTHS AND A WIDTH-VARIABLE FACE CANNOT HAVE ONE FALLBACK.
+ *
+ * Next DOES have metrics for Archivo, and generated a fallback from them. That
+ * fallback was measurably wrong here, and the reason is the width axis: the
+ * table stores one set of numbers for the default width, while this page never
+ * sets Archivo at its default width. Headings run at `font-stretch: 80%` — that
+ * is deliberate and load-bearing (see the note in :root above) — so the real
+ * face is about 18% narrower than the fallback Next computed for it. Measured
+ * before this block, at 1512x950 with the woff2 delayed, the reduced-motion
+ * headings jumped 55px in width on swap, gained a line, and pushed every beat
+ * below them down 41.9px. That was the largest first-paint shift left on the
+ * page after the two Atkinson faces were fixed.
+ *
+ * A single @font-face cannot answer this, because `size-adjust` is a constant
+ * and the requested width is not. But CSS font matching selects WITHIN a family
+ * by `font-stretch`, so the family is declared four times, each face covering
+ * the band around one of the four widths this stylesheet actually asks for:
+ *
+ *     80%  headings          .narrative-section h1/h2, reduced-motion h1/h2
+ *     88%  the CODON mark    .site-header__mark
+ *     92%  ledger labels     .ledger__label
+ *     ~100% nothing today    kept so a future width degrades sensibly
+ *
+ * Every `var(--font-display)` declaration in this file sets an explicit
+ * font-stretch (audited: five declarations, five stretch values, no default),
+ * which is what makes the partition complete rather than hopeful.
+ *
+ * THE NUMBERS BELOW ARE CALIBRATED, NOT DERIVED, AND THE FIRST ATTEMPT IS
+ * RECORDED BECAUSE IT FAILED FOR AN INSTRUCTIVE REASON. Per em, mean advance
+ * over the same 43-character string:
+ *
+ *     Archivo 80%/650  0.39847     Arial 400         0.45630
+ *     Archivo 88%/600  0.42308     Arial 600/650     0.49368  (real Arial Bold)
+ *     Archivo 92%/600  0.43842
+ *     Archivo 100%/400 0.45077
+ *
+ * Dividing those gives 80.71 / 85.70 / 88.81 / 98.79%, and three of the four
+ * were wrong on the page. `local("Arial")` names ONE face — Arial Regular — so
+ * a heading requested at weight 650 against this family is rendered with
+ * SYNTHETIC bold, whose advances are not Arial Bold's. Shipped at the derived
+ * values the headings still moved 36.8px on swap.
+ *
+ * So each face was then measured through the fallback family itself, at the
+ * real weight, the real width, the real tracking and the page's own strings,
+ * and its size-adjust divided by the observed fallback/real width ratio. That
+ * one correction took the four roles to within ~1% (h2 1.0006, h1 1.0075,
+ * ledger label 0.9998, wordmark 0.9888) and took the measured heading shift
+ * from 55px to 0.
+ *
+ * Archivo's ascent and descent are invariant along the width axis — verified,
+ * `line-height: normal` measures 1.088 em at all four widths — so each face
+ * takes the same 0.878 / 0.210 divided by its own size-adjust, and each
+ * reproduces 1.088 em exactly. That is the arithmetic check on the four pairs
+ * below, and it still holds after the calibration.
+ *
+ * These replace Next's generated `Archivo Fallback`; `adjustFontFallback:
+ * false` in app/layout.tsx is what turns that one off. Do not re-enable it —
+ * the two mechanisms would both claim the fallback slot and the one that won
+ * would depend on stylesheet order.
+ * ------------------------------------------------------------------------- */
+
+@font-face {
+  font-family: "Archivo Width Fallback";
+  font-stretch: 62% 84%;
+  src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo");
+  size-adjust: 86.52%;
+  ascent-override: 101.48%;
+  descent-override: 24.27%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Archivo Width Fallback";
+  font-stretch: 85% 90%;
+  src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo");
+  size-adjust: 89.04%;
+  ascent-override: 98.61%;
+  descent-override: 23.58%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Archivo Width Fallback";
+  font-stretch: 91% 96%;
+  src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo");
+  size-adjust: 97.02%;
+  ascent-override: 90.5%;
+  descent-override: 21.64%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Archivo Width Fallback";
+  font-stretch: 97% 125%;
+  src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo");
+  size-adjust: 98.79%;
+  ascent-override: 88.88%;
+  descent-override: 21.26%;
+  line-gap-override: 0%;
+}
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--ink);
@@ -1076,17 +1282,96 @@ body::after {
   overflow: hidden;
 }
 
+/*
+ * LEFT-SET, NOT CENTRED, AND LIT FROM THE LEFT.
+ *
+ * Two defects were fixed together here because they had one cause.
+ *
+ * (1) This block carried NO SCRIM AT ALL, and it was the worst contrast on the
+ *     site. The cinematic hero carries three layers for exactly this problem
+ *     (a directional edge scrim on the section, a blurred vignette behind the
+ *     text block, and an opaque plateau for centred beats). None of them
+ *     followed the copy across, because this is a different element that
+ *     merely looks similar. Screenshotted at 1512x950 under
+ *     prefers-reduced-motion, the kicker was effectively invisible and the
+ *     body paragraph — the sentence where the page first claims the section is
+ *     real — read as grey noise on noise.
+ *
+ * (2) It was CENTRED while the cinematic hero is left-set (SECTION_COPY[0]
+ *     .align === "left"), and that is what put it there. In the scrolled
+ *     experience `heroOffsetAmount` slides the section right so the opening
+ *     copy has its own ground; the static camera does no such thing, so
+ *     centring the copy laid it over the densest part of 40,887 additively
+ *     blended cells and left nowhere clean to put it.
+ *
+ * Answering (2) is what makes (1) cheap. A central veil wide enough to protect
+ * centred copy covers the whole frame the tissue occupies — which is the
+ * failure already recorded above `.narrative-section--center::before`, where
+ * an over-wide ellipse switched the page's own hero asset off. Left-setting
+ * the copy means the guarantee can be a directional falloff instead: the same
+ * device, the same numbers and the same reasoning as
+ * `.narrative-section--left::before`, so the text is on the plateau and the
+ * specimen keeps the bright two thirds of the frame it is the subject of.
+ *
+ * The composition now also matches the beat below it, which is left-set, and
+ * matches the cinematic hero — one less way for the two experiences to drift.
+ */
 .reduced-motion-experience__hero-copy {
   position: absolute;
   inset: 0;
   z-index: 10;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  text-align: center;
+  text-align: left;
   gap: 1.3rem;
-  padding: 0 1.5rem;
+  padding: 0 clamp(1.5rem, 6vw, 6rem);
+}
+
+.reduced-motion-experience__hero-copy::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    rgba(4, 5, 7, 0.93) 0%,
+    rgba(4, 5, 7, 0.91) 30%,
+    rgba(4, 5, 7, 0.55) 44%,
+    rgba(4, 5, 7, 0) 56%
+  );
+}
+
+/* Narrow frames get the same guarantee the pinned experience's beats get at
+   this width, and for the same reason: the copy column is full-bleed here, so
+   a falloff that ends at 56% protects a little over half of every line. See
+   the block above `.narrative-section--left::before` inside the 820px query. */
+@media (max-width: 820px) {
+  .reduced-motion-experience__hero-copy::before {
+    background: linear-gradient(
+      to right,
+      rgba(4, 5, 7, 0.95) 0%,
+      rgba(4, 5, 7, 0.93) 40%,
+      rgba(4, 5, 7, 0.84) 100%
+    );
+  }
+}
+
+/*
+ * The hero's specimen caption, in flow beneath the stage rather than inside
+ * it — see the comment where it is mounted in ReducedMotionExperience.tsx.
+ * Padding matches `.reduced-motion-section` so it sits on the same left edge
+ * as the first beat below it and reads as belonging to the tissue above.
+ */
+.reduced-motion-experience__specimen {
+  padding: 0 clamp(1.5rem, 6vw, 6rem);
+  max-width: 40rem;
+}
+
+.reduced-motion-experience__specimen .specimen {
+  margin-top: 1.75rem;
 }
 
 /*
@@ -1151,10 +1436,25 @@ body::after {
   margin: 0;
 }
 
+/*
+ * Block right, TEXT LEFT — the same correction `.narrative-section--right`
+ * already carries, applied here because this fallback never received it and
+ * the two experiences are required not to drift.
+ *
+ * The argument is recorded in full above `.narrative-section--right`: a
+ * ragged left edge is fine for a headline and a readability failure for a
+ * paragraph, and beats 03 and 05 are the two longest blocks on the page.
+ * Screenshotted at 1512x950 under prefers-reduced-motion, beat 03 was setting
+ * nine lines of the transport-limit paragraph right-aligned, so the reader
+ * most likely to have asked for less motion — and plausibly for other
+ * accessibility reasons — was handed the least legible version of the copy
+ * this product most needs read. The composition is unchanged: the block still
+ * sits opposite the previous beat.
+ */
 .reduced-motion-section--right {
   margin-left: auto;
-  text-align: right;
-  align-items: flex-end;
+  text-align: left;
+  align-items: flex-start;
 }
 
 .reduced-motion-section--center {
@@ -1174,6 +1474,171 @@ body::after {
   max-width: 22rem;
 }
 
+/*
+ * The argument column. Below the paired breakpoint this is a no-op wrapper
+ * that reproduces exactly what the section's own flex column did — same
+ * direction, same 1rem rhythm — so nothing about the narrow layout changes.
+ */
+.reduced-motion-section__argument {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+/* =====================================================================
+ * THE FALLBACK'S DESKTOP LAYOUT: ARGUMENT AND EVIDENCE, SIDE BY SIDE.
+ *
+ * WHAT WAS WRONG. At desktop widths this experience was a column of 40rem
+ * blocks alternating left and right with nothing in the opposite column —
+ * measured at 1512x950, each beat occupied 640px of a 1512px frame and the
+ * other 872px was empty. It was coherent, and it read as the cinematic page
+ * with the animation subtracted, which is the one thing this page cannot
+ * afford: the argument here is that a system's limits are legible and
+ * finishable, so the version served to a visitor who asked their OS for less
+ * motion has to look composed rather than reduced.
+ *
+ * WHY THE EMPTY COLUMN EXISTED, WHICH IS ALSO WHY IT IS SAFE TO FILL. The
+ * alternation is inherited from the cinematic experience, where the opposite
+ * side is not empty at all — it is the tissue. `.narrative-section--left` /
+ * `--right` set the copy against one edge precisely so the specimen keeps the
+ * other. This fallback renders the specimen ONCE, in the hero, and then never
+ * again. So from beat 02 down, the composition was alternating against
+ * nothing. It was not a layout that had been designed and then emptied; it was
+ * a layout whose subject had been removed.
+ *
+ * WHAT GOES THERE INSTEAD. Not decoration, and nothing invented: every beat
+ * that alternates already owns an instrument. 02 and 05 carry ledgers (four
+ * and six registered rows), 03 carries the mechanism decomposition and 04 the
+ * exposure readout. Those were stacked UNDER the paragraph, which is the
+ * correct answer on a phone and a waste of a desktop frame. Putting the
+ * evidence beside the claim it supports is how a spec sheet is actually read,
+ * it is the register this page already uses everywhere else, and it means the
+ * second column is filled by the page's own content rather than by furniture.
+ *
+ * THE ALTERNATION SURVIVES — only what it alternates changes. A `--right` beat
+ * still sets its copy against the right, and now puts its instrument on the
+ * left rather than putting nothing there. The rhythm down the page is
+ * unchanged; both halves of it are now occupied.
+ *
+ * NO MOTION WAS ADDED. This is a static grid: no scroll driver, no transform,
+ * no sticky, no parallax, nothing that responds to scrolling. The only thing
+ * that changes over time in this experience remains the existing
+ * IntersectionObserver opacity fade, which is untouched.
+ *
+ * NO DISCLOSURE WAS SHRUNK; THE LEDGERS GOT WIDER. Measured at 1512x950
+ * before this block, the ledger rendered 459px wide (inside a 640px block with
+ * 91px of padding either side — its own 34rem cap never bound). Measured after,
+ * it renders 544px: the cap binds for the first time, and beat 05's six rows
+ * set on 85px MORE width, not less. The row count, the row content, the state
+ * column and the type sizes are all untouched — verified by asserting the ten
+ * verdict strings and the 4/6 row counts at every width.
+ *
+ * THE BREAKPOINT IS 1200px BECAUSE THAT IS WHERE BOTH COLUMNS ARE STILL REAL.
+ * Measured at 1280x900 each column is 525px, still wider than the 459px the
+ * ledger has had all along, and about 66 characters for the prose; at 1200 it
+ * is ~492px. Below that the two columns would start taking width from each
+ * other, so the layout stays exactly as it was — a single column, in the order
+ * a phone reads it. Verified unchanged at 1024x800 and 390x844: nothing
+ * between 820px and 1200px moves at all.
+ * ===================================================================== */
+
+@media (min-width: 1200px) {
+  .reduced-motion-section--paired {
+    display: grid;
+    /*
+     * Both tracks are capped at the SAME 34rem the copy is set to rather than
+     * being fr units, and the leftover goes to the gutter. Equal fr tracks were
+     * tried first and measured wrong: at 1512x950 they made each column 627px
+     * while the ledger's own cap holds it at 544, so the evidence stopped 83px
+     * short of the right margin and the block read as unfinished. Capped tracks
+     * plus `space-between` put both blocks ON the page's margins, which is what
+     * makes the two halves read as facing each other.
+     *
+     * Below ~1360px the caps stop binding and the tracks share the space
+     * equally, so the layout degrades by narrowing, never by overflowing.
+     */
+    grid-template-columns: minmax(0, 34rem) minmax(0, 34rem);
+    justify-content: space-between;
+    column-gap: clamp(3rem, 6vw, 7rem);
+    align-items: start;
+    /*
+     * NO container centring below 1664px, deliberately. The section spans the
+     * frame and its own padding sets the left edge, which is the same
+     * `clamp(1.5rem, 6vw, 6rem)` the hero copy and the specimen caption use --
+     * so the first beat's eyebrow lands on exactly the same vertical as the
+     * hero's. An earlier version capped this at 84rem and centred it; measured
+     * at 1512, that put the beats at x=175 against the hero's x=91, and the
+     * page lost its left edge.
+     *
+     * 104rem is the two 34rem tracks plus the two 6rem paddings plus the
+     * widest gutter this composition should ever open (it is a border-box, so
+     * the padding counts inside it) — i.e. it engages only above a 1664px
+     * frame, and it is anchored LEFT rather than centred so that even there the
+     * beats keep the hero's left edge and the surplus falls on the right, where
+     * a margin belongs. Centring it would trade the void this whole block
+     * exists to remove for a smaller void on both sides.
+     */
+    max-width: 104rem;
+    margin-left: 0;
+    margin-right: auto;
+  }
+
+  .reduced-motion-section--paired .reduced-motion-section__argument {
+    grid-row: 1;
+    grid-column: 1;
+    /* Same measure the cinematic beats are set to (`.narrative-section__body`),
+       so the two experiences set the same paragraph to the same width. */
+    max-width: 34rem;
+  }
+
+  .reduced-motion-section--paired .reduced-motion-section__evidence {
+    grid-row: 1;
+    grid-column: 2;
+    min-width: 0;
+    /* Against the OUTER margin, mirroring the copy opposite it. The ledgers
+       fill their track and would sit there anyway; this is for beats 03 and 04,
+       whose panels are narrower than the track and would otherwise float in the
+       middle of the page with margin on both sides. */
+    justify-self: end;
+  }
+
+  .reduced-motion-section--paired.reduced-motion-section--right
+    .reduced-motion-section__argument {
+    grid-column: 2;
+  }
+
+  .reduced-motion-section--paired.reduced-motion-section--right
+    .reduced-motion-section__evidence {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  /* The instrument is no longer a follow-on to the paragraph, so it drops the
+     gap that separated them when they were stacked and starts level with the
+     eyebrow — the ledger caption and the beat's eyebrow are the same kind of
+     mono label, and lining them up is what makes the two columns read as one
+     spread. */
+  /* Scoped through `__evidence` for specificity, not for tidiness: the
+     `.reduced-motion-section .ledger` rule that sets 0.75rem is declared later
+     in this file, so an equally specific selector here would lose to it. A grid
+     item is its own formatting context, so that margin does not collapse and
+     showed up as a measured 12px step between the eyebrow and the ledger
+     caption. */
+  .reduced-motion-section--paired .reduced-motion-section__evidence .ledger,
+  .reduced-motion-section--paired .reduced-motion-section__metric {
+    margin-top: 0;
+  }
+
+  /* The panels were sized to float over a 3D scene at 19-21rem. In a column of
+     their own they can hold the width the ledgers hold, which stops beats 03
+     and 04 reading as the thin ones. */
+  .reduced-motion-section--paired .reduced-motion-section__metric .metric-overlay,
+  .reduced-motion-section--paired .reduced-motion-section__metric .attribution {
+    max-width: 26rem;
+  }
+}
+
 /* --------------------------------------------------------------------- */
 /* Responsive tuning                                                      */
 /* --------------------------------------------------------------------- */
@@ -1183,6 +1648,91 @@ body::after {
   .narrative-section--right .narrative-section__body,
   .narrative-section--center .narrative-section__body {
     max-width: 100%;
+  }
+
+  /*
+   * THE DIRECTIONAL SCRIM IS THE WRONG DEVICE AT THIS WIDTH, AND IT WAS
+   * FAILING MEASURABLY.
+   *
+   * Above, the copy column goes FULL-BLEED at this breakpoint — that is the
+   * rule immediately preceding this one. But the scrim it sits on is a
+   * side-lit falloff that reaches zero at 56% of the frame, because it was
+   * composed for the desktop layout where the copy really does occupy one
+   * half and the specimen the other. On a phone there is no other half: the
+   * text runs the full width and the last ~44% of every line is set on
+   * unprotected point cloud.
+   *
+   * Screenshotted at 390x844, this was not marginal and it hit the worst
+   * possible lines. Beat 03 (--right, so the LEFT is bare) lost "scored blind
+   * against 71 measured compounds ... it recovers only about a quarter of
+   * their measured spread" — the clause lib/copy.ts requires to travel in the
+   * same sentence as the claim. Beat 04 (--left, so the RIGHT is bare) lost
+   * "1.08-1.21x — smaller, and measured", the number that beat exists to
+   * state. Beat 02 lost the PMID on the 41x FAIL row, and beat 05 lost the
+   * verdict "1.08-1.21x, NOT 2.0x" on the spatial-spread row.
+   *
+   * Every one of those is a disclosure, and an unreadable disclosure is the
+   * same failure as a truncated one. So at this width the scrim keeps its
+   * direction as a CUE and stops using it as a budget: it still reads brighter
+   * on the side the specimen is composed toward, but it never falls below a
+   * level that guarantees the text. Above 820px nothing changes — the desktop
+   * falloff is untouched, because there the composition is real.
+   */
+  .narrative-section--left::before {
+    background: linear-gradient(
+      to right,
+      rgba(4, 5, 7, 0.95) 0%,
+      rgba(4, 5, 7, 0.93) 40%,
+      rgba(4, 5, 7, 0.84) 100%
+    );
+  }
+
+  .narrative-section--right::before {
+    background: linear-gradient(
+      to left,
+      rgba(4, 5, 7, 0.95) 0%,
+      rgba(4, 5, 7, 0.93) 40%,
+      rgba(4, 5, 7, 0.84) 100%
+    );
+  }
+
+  /*
+   * The hero is the one --left beat that does not need the full floor, and
+   * charging it the full floor costs more than it buys.
+   *
+   * `heroOffsetAmount` slides the section right through the whole of beat 01
+   * (aspect-corrected, so it does this at 390px too) precisely so the opening
+   * copy has its own ground. The tissue is therefore already OUT from under
+   * the text here — and the 0.84 floor above lands squarely on the part of the
+   * frame it was moved to. Screenshotted at 390x844, the two together turned
+   * the specimen into a smudge on the one beat whose claim is that the section
+   * behind the text is real.
+   *
+   * So the hero keeps a floor, because its lines still run near full-bleed and
+   * the specimen caption is the lowest-contrast block on the page, but a much
+   * lighter one. It is the composition, not the veil, doing the work here —
+   * which is the right order, and is why this exemption is safe when the same
+   * relaxation on beats 02-05 would not be.
+   */
+  .narrative-section--hero::before {
+    background: linear-gradient(
+      to right,
+      rgba(4, 5, 7, 0.94) 0%,
+      rgba(4, 5, 7, 0.9) 34%,
+      rgba(4, 5, 7, 0.66) 62%,
+      rgba(4, 5, 7, 0.55) 100%
+    );
+  }
+
+  /* The centred beat has no side to be lit from, so it takes the same
+     guarantee as a plain, slightly graded veil. */
+  .narrative-section--center::before {
+    background: radial-gradient(
+      ellipse 120% 90% at center,
+      rgba(4, 5, 7, 0.94) 0%,
+      rgba(4, 5, 7, 0.9) 55%,
+      rgba(4, 5, 7, 0.84) 100%
+    );
   }
 
   /* Both panels go full-bleed on narrow screens; at this width there is no

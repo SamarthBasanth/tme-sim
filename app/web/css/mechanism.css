@@ -98,11 +98,17 @@
 .mechleg .m-p { color: var(--fg-2); min-width: 42px; text-align: right; }
 
 .mechleg .m-sep { height: 1px; background: var(--line-1); margin: var(--sp-2) 0; }
+/* This block is where the breakdown says what it does NOT explain: the
+   joint-limited caveat ("raising the dose alone would not have killed them"),
+   the UNATTRIBUTED count that is deliberately not reassigned to the nearest
+   bucket, and the bit-exact reconciliation against kill_fraction. All three
+   are limits on how the numbers above may be read, so this takes the
+   disclosure floor. */
 .mechleg .m-note {
-  font-size: var(--fs-micro);
+  font-size: var(--fs-disclosure);
   color: var(--fg-2);
   margin-top: var(--sp-2);
-  line-height: 1.4;
+  line-height: var(--lh-body);
 }
 .mechleg .m-note b { color: var(--fg-1); font-weight: 600; }
 .mechleg .m-bad { color: var(--crit); }
@@ -171,11 +177,18 @@
   font-weight: 600;
 }
 .scrub .s-read .s-zero { color: var(--warn); }
+/* The scrubber's metadata line is not a caption. docs/UI_ARCHITECTURE.md §2.3
+   names it as ONE OF THE THREE independent disclosures that stop the opening
+   frame being mistaken for t = 0 — "the scrubber's metadata line states the
+   default in words and names the control that returns to t = 0" — and it also
+   carries the static-source note ("the drug never clears") and the frame
+   budget the payload was reduced to. Three limits, so it holds the disclosure
+   floor rather than the unit-suffix size it was set in. */
 .scrub .s-meta {
   grid-column: 1 / -1;
-  font-size: var(--fs-micro);
+  font-size: var(--fs-disclosure);
   color: var(--fg-2);
-  line-height: 1.4;
+  line-height: var(--lh-body);
 }
 .scrub .s-meta .warn { color: var(--warn); }
 .scrub .s-meta .s-open { color: var(--fg-1); }

@@ -71,13 +71,69 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -c constraints.txt -e '.[app]'
 
 COPY . .
+
+# SECURITY: this image ran as root (uid=0) until it was measured, which is the
+# exact opposite of the control docs/DEPLOYMENT.md 2 names for the one route
+# this application deliberately does not confine. `POST /api/sections/scan`
+# takes an arbitrary filesystem path and reports on any directory the SERVER
+# PROCESS can read; there is no allowlisted root, and the API key makes it
+# authenticated, not safe. The documented mitigation is therefore "run the
+# server as a user that cannot read anything you would mind a tester listing"
+# -- and as root, `scan {"path":"/etc"}` and `scan {"path":"/root"}` both
+# answered 200 with a valid key. A non-root uid is the Docker half of that
+# advice; it does not confine the path, it shrinks what the path can reach.
+#
+# The uid is pinned (10001, not "whatever useradd picks next") because it is
+# part of the runtime contract: a HOST directory bind-mounted over a writable
+# path keeps the HOST's ownership, so an operator who wants to persist
+# app/runs/ that way needs a number to chown to. See docs/DEPLOYMENT.md 1c.
+#
+# Deliberately placed AFTER the dependency layer rather than next to apt-get:
+# above `RUN pip install` it would invalidate the one layer worth caching (a
+# ~4-minute reinstall of the whole scipy/rdkit stack) for a line that never
+# changes. Here it costs a fraction of a second per source-code rebuild.
+#
+# HOME is pinned because Docker resolves it from /etc/passwd for USER but not
+# every runtime that consumes an OCI image does, and matplotlib writes a font
+# cache into HOME on first import.
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin codon
+ENV HOME=/home/codon
+
 # data_cache/ and app/runs/ are gitignored (real tissue data, run history) --
 # create empty mount points so the app starts cleanly even with nothing
 # mounted yet (it will just report those sections as unavailable, honestly,
 # rather than fail to boot).
-RUN mkdir -p data_cache app/runs
+#
+# The chown is what makes USER below actually work, and it is deliberately
+# narrow. Everything this application writes resolves to <repo>/app/<something>
+# (app/server/cache.py runs_dir + private_makedirs, report.py, projects.py,
+# compounds.py, tmesim/protocol/resolve.py uploads_dir) -- app/runs/,
+# app/projects/, app/reports/, app/compounds/ and app/uploads/, all created on
+# demand at 0700. So /app/app must be writable BY THE DIRECTORY, not just by
+# its contents: four of those five do not exist in the image at all and are
+# mkdir'd on first use. They are not pre-created here on purpose -- the CI
+# workflow asserts they are ABSENT, because their presence is how a
+# .dockerignore regression that bakes the operator's unpublished SMILES into a
+# layer would show up.
+#
+# data_cache/ is chowned for `docker exec <container> codon acquire`, which
+# downloads into it. A read-only bind mount over it ignores this ownership
+# (the host's wins), which is the documented and recommended shape.
+#
+# /app itself stays root-owned and read-only to the app: the source tree, the
+# static front end and site-packages are not things a running server should be
+# able to rewrite.
+RUN mkdir -p data_cache app/runs \
+    && chown -R codon:codon /app/data_cache /app/app
 
 EXPOSE 8000
+
+# Everything above this line runs as root (apt, pip, COPY). Everything the
+# SERVER does runs as codon. Verified in a real container, not assumed: the
+# five 0700 runtime trees are created and written, a read-only data_cache
+# bind mount is readable, and a named volume on /app/app/runs inherits this
+# ownership so it is writable with no host-side chown.
+USER codon
 
 ENTRYPOINT ["python", "-m", "app.server"]
 # 0.0.0.0 = "this container's interface", NOT "exposed to the world". The real

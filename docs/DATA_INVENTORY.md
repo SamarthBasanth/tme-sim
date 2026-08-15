@@ -18,8 +18,8 @@ Three acquisition classes are used throughout:
 
 | Class | Meaning |
 |---|---|
-| **AUTO** | `python -m tmesim.cli acquire` fetches it. Measured: **17 s**, 4/4 sources OK. |
-| **MANUAL** | Open, no login, no DUA — but too large for `acquire`. A `curl` recipe is given below. |
+| **AUTO** | `python -m tmesim.cli acquire` fetches it. Includes the `xenium_319` tissue section since 2026-08-15 (`--sections`); the four tabular sources alone leave every section unavailable. Measured on a clean clone 2026-08-15: **1 m 50 s and 3 m 52 s on two runs**, 5/5 sources OK — the earlier "17 s" in this row did not survive re-measurement and timing is dominated by the GDC endpoints, so treat it as minutes, not seconds. |
+| **MANUAL** | Open, no login, no DUA — but not a copy-paste-and-go: too large, or needing extraction, a format conversion, or a companion dataset. A `curl` recipe is given below, and `python -m tmesim.cli sections` prints the same commands per section. |
 | **SCRIPTED** | Needs a harvest script or an API walk. The script, endpoint or accession list is given. |
 
 ---

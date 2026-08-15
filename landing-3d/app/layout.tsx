@@ -81,6 +81,46 @@ import "./globals.css";
  *
  * All three are variable fonts, so `weight: "variable"` ships one file per
  * family across the whole weight range rather than a static instance per step.
+ *
+ * ---------------------------------------------------------------------------
+ * FALLBACK METRICS, AND WHY TWO OF THESE THREE CARRY THEM BY HAND.
+ *
+ * `next/font/google` normally emits a second, metric-matched @font-face -- a
+ * local system face squeezed by `size-adjust` with `ascent-override` /
+ * `descent-override` on top -- so the fallback shown before the woff2 lands
+ * occupies the SAME BOX as the real face and the swap moves nothing. It reads
+ * those numbers out of a precalculated table
+ * (next/dist/server/capsize-font-metrics.json). That table has `archivo` and
+ * the ORIGINAL `atkinsonHyperlegible`, and it does not have the two 2025
+ * faces this page actually uses, so the build printed:
+ *
+ *   Failed to find font override values for font `Atkinson Hyperlegible Mono`
+ *   Failed to find font override values for font `Atkinson Hyperlegible Next`
+ *   -- Skipping generating a fallback font.
+ *
+ * With `display: "swap"` and no override metrics that is a real reflow on
+ * first paint, and it lands on the one thing this page's typography exists to
+ * guarantee: .ledger__row sets a sans label and a mono verdict on one shared
+ * baseline, and both instrument panels pair a sans <dt> against a mono <dd>
+ * the same way. Measured before the fix, on the fallback face, the whole
+ * reduced-motion page reflowed by up to 52px vertically and the ledger's
+ * mono verdicts changed width by 5.6px.
+ *
+ * So the overrides are supplied by hand, in app/globals.css, from metrics
+ * MEASURED off the loaded faces rather than guessed -- see the block there for
+ * the numbers, the method and the platform caveat. `adjustFontFallback: false`
+ * is what stops Next from trying and failing; it is not a way of silencing the
+ * warning. If those @font-face rules are ever deleted, turn this back on (it
+ * still will not work for these families) and re-measure.
+ */
+/*
+ * Archivo is the one of the three Next DOES have metrics for, and its
+ * generated fallback was still wrong -- because the table stores one width and
+ * this page never uses the default width. Headings are set at `font-stretch:
+ * 80%`, so the fallback Next computed was ~18% too wide and the headings
+ * visibly reflowed on swap. The replacement is four stretch-partitioned faces
+ * in globals.css; this flag is what stops Next generating a fifth that would
+ * compete with them.
  */
 const archivo = Archivo({
   subsets: ["latin"],
@@ -88,6 +128,8 @@ const archivo = Archivo({
   axes: ["wdth"],
   variable: "--font-archivo",
   display: "swap",
+  adjustFontFallback: false,
+  fallback: ["Archivo Width Fallback"],
 });
 
 const atkinson = Atkinson_Hyperlegible_Next({
@@ -96,6 +138,8 @@ const atkinson = Atkinson_Hyperlegible_Next({
   style: ["normal", "italic"],
   variable: "--font-atkinson",
   display: "swap",
+  adjustFontFallback: false,
+  fallback: ["Atkinson Hyperlegible Next Fallback"],
 });
 
 const atkinsonMono = Atkinson_Hyperlegible_Mono({
@@ -103,6 +147,8 @@ const atkinsonMono = Atkinson_Hyperlegible_Mono({
   weight: "variable",
   variable: "--font-atkinson-mono",
   display: "swap",
+  adjustFontFallback: false,
+  fallback: ["Atkinson Hyperlegible Mono Fallback"],
 });
 
 /*

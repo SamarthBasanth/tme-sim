@@ -253,6 +253,24 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     'aria-label': 'Job log tail',
   }, '');
 
+  // Where the job actually lives. A reconstruction is minutes, not seconds,
+  // which makes "can I go and do something else" the first question an
+  // operator has and the one this panel never answered: it showed a progress
+  // bar and said nothing about whose process was making it move. It is the
+  // SERVER's — POST /api/runs returns an id and the work continues with no
+  // browser attached — and main.js::reattachLiveRun now picks a run back up on
+  // load, so this states a behaviour the product has rather than a
+  // reassurance. The cancel clause is the same cooperative-cancellation fact
+  // cancelTracked() already explains when you press the button; it is worth
+  // knowing BEFORE you press it.
+  const jobNote = h('div.dim', {
+    style: { fontSize: 'var(--fs-disclosure)', lineHeight: 'var(--lh-body)' },
+  },
+  'The run executes in the Codon server process, not in this tab. Closing the '
+  + 'tab or reloading does not stop it, and this panel picks up a run that is '
+  + 'still in flight when the page loads. Cancel is what stops one, and it '
+  + 'takes effect at the next stage boundary rather than instantly.');
+
   const jobEl = h('div.stack.tight',
     h('div.frow', jobId, jobStatus, h('span.grow'), cancelBtn),
     jobProgress,
@@ -261,6 +279,7 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       jobPct, h('span.unit', '%'),
       h('span.dim', '·'), jobElapsed),
     logEl,
+    jobNote,
   );
 
   /* -------------------------------------------------------------- root -- */
@@ -648,7 +667,16 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       const more = h('button.diag-more', {
         type: 'button', hidden: true,
         title: 'Scroll the diagnostics. Nothing is hidden — every warning is in the list above.',
-        onclick: () => scroll.scrollBy({ top: scroll.clientHeight - 20, behavior: 'smooth' }),
+        // `scroll-behavior: auto !important` in base.css's reduced-motion
+        // block does NOT govern a scriptive smooth scroll — a `behavior`
+        // passed to scrollBy wins over the CSS property, so this was the one
+        // animation in the Studio that ignored the setting entirely. It is
+        // also the only JS-driven motion in app/web, which is why the check is
+        // made here rather than wrapped in a helper.
+        onclick: () => scroll.scrollBy({
+          top: scroll.clientHeight - 20,
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        }),
       }, h('span.g', '▾'), h('span.t', ''));
       diagList.appendChild(more);
 
@@ -819,9 +847,26 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
         return;
       }
     } catch (err) {
+      // A failed poll is a failure to ASK, not a failure of the run — the job
+      // is in the server process and keeps going. Two things this used to get
+      // wrong, both in the alarming direction:
+      //
+      //  * the chip read `poll error`, which names our machinery rather than
+      //    what happened to the operator;
+      //  * the raw message REPLACED the log tail, so a momentary blip wiped
+      //    the only record of what the run had done and left `no such run
+      //    'r_00079'` sitting where the progress log had been — a sentence
+      //    that reads as "your run is gone" about a run that is fine.
+      //
+      // The log tail is now left alone and the state is annotated instead.
+      // Polling continues on the same interval: the next tick repairs it.
       jobStatus.className = 'chip st-failed';
-      jobStatus.textContent = 'poll error';
-      logEl.textContent = String(err && err.message);
+      jobStatus.textContent = 'status unavailable';
+      jobStatus.title = 'The last status request did not get an answer, so the '
+        + 'numbers above are from the previous one. This says nothing about the '
+        + 'run itself — it is executing in the server process and is unaffected. '
+        + 'The next poll retries.\n\n'
+        + String((err && err.message) || err);
     }
     pollTimer = setTimeout(poll, 900);
   }

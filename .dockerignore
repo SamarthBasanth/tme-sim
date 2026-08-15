@@ -57,3 +57,23 @@ docs/
 .DS_Store
 .idea/
 .vscode/
+
+# --- agent worktrees: a SECOND COPY of the repo that defeats every rule above
+#
+# MEASURED, not theoretical. The first real `docker build` of this Dockerfile
+# put 161 MB under /app/.claude, because .claude/worktrees/<agent-id>/ is a
+# complete git worktree of this repository and none of the patterns above match
+# a path with that prefix. `results/` excludes results/ -- it does NOT exclude
+# .claude/worktrees/x/results/. So the image contained:
+#
+#   151 MB  .claude/worktrees/*/results/         (excluded at top level)
+#   113 MB  .claude/worktrees/*/results/fprof/   a CHROME BROWSER PROFILE,
+#           including Default/Cookies, Default/Login Data, Default/Login Data
+#           For Account, Default/Web Data and Default/History -- the operator's
+#           saved credentials, baked into a layer, and layers get pushed
+#     plus  docs/, marketing/, landing-3d/, archive/, app/runs/ and a .git
+#
+# i.e. every claim the rest of this file exists to make was false by way of the
+# duplicate. A worktree that happened to hold data_cache/ or app/compounds/
+# would have shipped those the same way. Exclude the whole directory.
+.claude/

@@ -68,7 +68,7 @@ class TestArgparsePlumbing:
                    if hasattr(a, "choices"))
         assert set(sub.choices) == {
             "reconstruct", "simulate", "compare-drugs", "validate", "ingest",
-            "molecules", "molecular-run", "acquire", "studio",
+            "molecules", "molecular-run", "acquire", "sections", "studio",
         }
 
     @pytest.mark.parametrize("args", [
@@ -81,6 +81,7 @@ class TestArgparsePlumbing:
         ["molecules", "--help"],
         ["molecular-run", "--help"],
         ["acquire", "--help"],
+        ["sections", "--help"],
         ["studio", "--help"],
     ])
     def test_help_exits_cleanly(self, args, capsys):
@@ -329,3 +330,143 @@ class TestStudioDelegatesToAppServer:
         assert rc == 1
         out = capsys.readouterr().out
         assert "pip install -e '.[app]'" in out
+
+
+# --------------------------------------------------------------------------- #
+# acquire / sections — the first-run contract
+#
+# The failure these lock down: `codon acquire` used to fetch four TABULAR
+# sources, report 4/4 ok, and leave every tissue section unavailable, with
+# nothing in its output connecting those two facts. A user ran the command the
+# README recommends and was returned to the start. Every assertion here is
+# about SAYING SO; none of them touches the network.
+# --------------------------------------------------------------------------- #
+class TestAcquirePlanAndSections:
+    def test_acquire_list_downloads_nothing_and_names_the_split(self, capsys):
+        rc = cli.main(["acquire", "--list"])
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "nothing was downloaded" in out
+        # the tabular sources are named, AND disclaimed
+        for source, _what in cli._TABULAR_SOURCES:
+            assert source in out
+        assert "NONE of those four makes a tissue section runnable" in out
+        # the section that does make one runnable is named, with its size
+        assert "xenium_319" in out
+        assert "16.6 MB" in out
+
+    def test_acquire_list_sections_none_says_nothing_will_be_runnable(self, capsys):
+        rc = cli.main(["acquire", "--list", "--sections", "none"])
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "NO spatial section" in out
+        assert "will not make" in out
+
+    def test_acquire_rejects_an_unknown_section_by_name(self, capsys):
+        rc = cli.main(["acquire", "--sections", "not_a_section"])
+        out = capsys.readouterr().out
+        assert rc == 2
+        assert "unknown section id(s): not_a_section" in out
+        assert "xenium_319" in out  # tells you what IS known
+
+    def test_every_unavailable_section_carries_an_action(self, capsys):
+        """The point of `codon sections`: a remedy, not just a diagnosis."""
+        from tmesim.data import section_catalog as SC
+
+        rc = cli.main(["sections"])
+        out = capsys.readouterr().out
+        # rc is 1 only when NOTHING is runnable; both are legitimate here, since
+        # this repo's data_cache may or may not be populated on a given machine.
+        assert rc in (0, 1)
+        for sid, rec in SC.SECTION_RECIPES.items():
+            assert sid in out
+            if f"[UNAVAILABLE] {sid}" not in out:
+                continue
+            assert "TO FIX IT:" in out
+            if rec["mode"] == SC.AUTO:
+                assert f"codon acquire --sections {sid}" in out
+            else:
+                assert "NOT auto-fetchable" in out
+
+    def test_sections_json_is_machine_readable(self, capsys):
+        rc = cli.main(["sections", "xenium_319", "--json"])
+        doc = json.loads(capsys.readouterr().out)
+        assert rc in (0, 1)
+        assert doc["total"] == 1
+        sec = doc["sections"][0]
+        assert sec["id"] == "xenium_319"
+        assert isinstance(sec["available"], bool)
+        assert sec["verified"]  # every recipe records HOW it was verified
+
+    def test_unknown_section_id_is_refused_not_ignored(self, capsys):
+        rc = cli.main(["sections", "nope"])
+        assert rc == 2
+        assert "unknown section id(s): nope" in capsys.readouterr().out
+
+
+class TestSectionCatalog:
+    def test_ids_match_the_studio_registry_when_it_is_importable(self):
+        """The catalog must not drift from ``app/server/cache.py``'s SECTIONS.
+
+        A remedy for a section id the Studio does not have is a remedy nobody
+        can use, and a Studio section with no catalog entry is exactly the dead
+        end this module exists to remove.
+        """
+        cache = pytest.importorskip("app.server.cache")
+        from tmesim.data import section_catalog as SC
+
+        assert list(SC.SECTION_RECIPES) == list(cache.SECTIONS)
+
+    def test_recipes_agree_with_the_registry_on_where_the_data_lives(self):
+        cache = pytest.importorskip("app.server.cache")
+        from tmesim.data import section_catalog as SC
+
+        for sid, rec in SC.SECTION_RECIPES.items():
+            assert rec["cache_dir"] == cache.SECTIONS[sid]["cache_dir"]
+            assert rec["platform"] == cache.SECTIONS[sid]["source"]
+            assert SC._SAMPLE_ARG[sid] == cache.SECTIONS[sid]["sample"]
+
+    def test_auto_recipes_declare_a_byte_count_for_every_file(self):
+        """Byte counts are the only integrity check on a streamed download."""
+        from tmesim.data import section_catalog as SC
+
+        for sid in SC.auto_section_ids():
+            rec = SC.SECTION_RECIPES[sid]
+            assert rec["files"]
+            assert rec["bytes"] == sum(n for _u, _b, n in rec["files"])
+            for url, basename, n in rec["files"]:
+                assert url.startswith("https://")
+                assert n > 0 and basename
+
+    def test_manual_recipes_carry_commands_not_a_document_reference(self):
+        from tmesim.data import section_catalog as SC
+
+        for sid in SC.manual_section_ids():
+            remedy = "\n".join(SC.remedy_for(sid))
+            assert "curl" in remedy or "codon ingest" in remedy
+
+    def test_resolve_section_arg(self):
+        from tmesim.data import section_catalog as SC
+
+        assert SC.resolve_section_arg(None) == ([SC.DEFAULT_SECTION], [])
+        assert SC.resolve_section_arg("none") == ([], [])
+        assert SC.resolve_section_arg("all") == (SC.auto_section_ids(), [])
+        assert SC.resolve_section_arg("xenium_319,nope") == (["xenium_319"],
+                                                             ["nope"])
+
+    def test_fetch_section_refuses_a_manual_section_without_touching_the_network(
+        self, tmp_path
+    ):
+        from tmesim.data import section_catalog as SC
+
+        out = SC.fetch_section("visium_gbm1", cache_root=str(tmp_path))
+        assert out["status"] == "skipped"
+        assert "codon sections" in out["note"]
+        assert not list(tmp_path.iterdir())
+
+    def test_human_bytes_never_invents_a_number(self):
+        from tmesim.data import section_catalog as SC
+
+        assert SC.human_bytes(None) == "unknown size"
+        assert SC.human_bytes(0) == "unknown size"
+        assert SC.human_bytes(16_598_845) == "16.6 MB"

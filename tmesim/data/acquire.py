@@ -6,6 +6,14 @@ explicit ``requests`` timeouts and a single retry: a failed or partial download
 must NEVER crash the pipeline — callers degrade gracefully and simply
 back to synthetic data if nothing usable landed on disk.
 
+**What the four tabular sources below do NOT do: make a tissue section
+runnable.** They supply per-drug potency, background expression and niche
+context. Every one of them can succeed and ``codon reconstruct`` will still
+refuse, because reconstruction needs *spatial* tissue, which lives in a section
+cache directory and is fetched by :mod:`tmesim.data.section_catalog` — see
+``sections=`` on :func:`acquire_all`. That split used to be silent and it was
+the single worst thing about a first run.
+
 Sources attempted (all verified live against their current URLs/APIs before this
 module was written — see ``docs/data_acquisition_plan.md``):
 
@@ -334,13 +342,23 @@ _SOURCES = [
 ]
 
 
-def acquire_all(cache_dir: str = "data_cache", timeout: int = 60) -> Dict[str, Dict]:
+def acquire_all(cache_dir: str = "data_cache", timeout: int = 60,
+                sections: Optional[List[str]] = None) -> Dict[str, Dict]:
     """Best-effort download of every open glioblastoma source into ``cache_dir``.
 
     Returns a status dict::
 
         {source_name: {"status": "ok"|"failed"|"skipped",
                        "path": <str|None>, "note": <str>, "n_records": <int>}}
+
+    ``sections`` names spatial tissue sections from
+    :data:`tmesim.data.section_catalog.SECTION_RECIPES` to fetch *in addition*
+    to the four tabular sources. They are keyed in the result as
+    ``"section:<id>"`` so a caller can tell the two apart, because they answer
+    different questions: a tabular source parameterises a drug, a section is the
+    thing a drug is simulated ON. Default ``None`` fetches no section, which is
+    the historical behaviour of this function; ``codon acquire`` passes the
+    default section explicitly.
 
     Never raises: any per-source exception is caught and recorded as ``failed``.
     """
@@ -358,10 +376,29 @@ def acquire_all(cache_dir: str = "data_cache", timeout: int = 60) -> Dict[str, D
                 "n_records": 0,
             }
         _log(f"  -> {status[name]['status']}: {status[name]['note']}")
+
+    for section_id in (sections or []):
+        key = f"section:{section_id}"
+        _log(f"acquiring spatial section {section_id} ...")
+        try:
+            from . import section_catalog as SC
+
+            status[key] = SC.fetch_section(section_id, cache_root=cache_dir,
+                                           timeout=timeout, log=_log)
+        except Exception as exc:  # noqa: BLE001 - final safety net
+            status[key] = {
+                "status": "failed",
+                "path": None,
+                "note": f"unhandled error: {exc}",
+                "n_records": 0,
+            }
+        _log(f"  -> {status[key]['status']}: {status[key]['note']}")
     return status
 
 
 if __name__ == "__main__":
-    st = acquire_all()
+    from .section_catalog import DEFAULT_SECTION
+
+    st = acquire_all(sections=[DEFAULT_SECTION])
     print("\n=== acquire_all status ===")
     print(json.dumps(st, indent=2))

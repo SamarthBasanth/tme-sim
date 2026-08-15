@@ -215,8 +215,20 @@ export function createWelcomeOverlay({ onGoToProtocol } = {}) {
     document.removeEventListener('keydown', onKey);
   }
   function onKey(ev) {
-    if (ev.key === 'Escape') close();
-    else if (ev.key === 'ArrowRight') next();
+    if (ev.key === 'Escape') { close(); return; }
+    // Arrow keys advance the tour ONLY when the operator is not typing. This
+    // listener is on `document`, and the tour is deliberately non-modal (see
+    // the module comment) — so the rest of the Studio stays live underneath
+    // it, including the RunSpec editor and every form field. Without this
+    // guard, moving the caret with ArrowLeft inside the JSON editor stepped
+    // the tour backwards, which reads as the tour fighting the user for the
+    // keyboard. Escape is exempt: closing the tour is what Escape should do
+    // from anywhere, and the fields that care already stopPropagation on it.
+    const t = ev.target;
+    const typing = t && (t.isContentEditable
+      || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''));
+    if (typing || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (ev.key === 'ArrowRight') next();
     else if (ev.key === 'ArrowLeft') back();
   }
   function reposition() {
@@ -260,8 +272,16 @@ export function createWelcomeOverlay({ onGoToProtocol } = {}) {
   const nextBtn = h('button.btn.primary', { type: 'button', onclick: next }, 'Next');
   const skipBtn = h('button.btn.ghost', { type: 'button', onclick: close }, 'Skip tour');
 
-  const card = h('div.tour-popover.notice',
-    h('div.tour-head', titleEl, closeX),
+  // `role="dialog"` with aria-modal FALSE, which is the honest description:
+  // this popover deliberately does not block the app behind it (that is the
+  // whole point of anchoring it to real controls), so claiming modality would
+  // tell a screen reader the rest of the page is inert when it is not.
+  // `aria-labelledby` points at the step title, so each step announces itself.
+  titleEl.id = 'tour-title';
+  const card = h('div.tour-popover.notice', {
+    role: 'dialog', 'aria-modal': 'false', 'aria-labelledby': 'tour-title',
+  },
+  h('div.tour-head', titleEl, closeX),
     bodyEl,
     dotsEl,
     h('div.btn-row', { style: { marginTop: 'var(--sp-5)', justifyContent: 'space-between' } },
@@ -274,6 +294,12 @@ export function createWelcomeOverlay({ onGoToProtocol } = {}) {
   document.addEventListener('keydown', onKey);
   window.addEventListener('resize', reposition);
   render();
+  // Land the keyboard on the tour once, at creation — not on every render,
+  // which would yank focus back on each step and make Back/Next unusable from
+  // the keyboard. Without this a keyboard user arriving at a first run had to
+  // tab past the entire application (445 focusable elements were counted on
+  // this workstation) before reaching `Next` or `Skip tour`.
+  queueMicrotask(() => nextBtn.focus());
 
   return { node: card, close };
 }

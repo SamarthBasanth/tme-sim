@@ -35,6 +35,11 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
+# Imported unconditionally on purpose: section_catalog is numpy-free and
+# app-free precisely so this module can depend on it without dragging the
+# engine into the server's import path.
+from tmesim.data.section_catalog import remedy_for
+
 __all__ = [
     "SECTIONS",
     "all_sections",
@@ -46,6 +51,8 @@ __all__ = [
     "ReconKey",
     "ReconstructionCache",
     "RECON_CACHE",
+    "RECON_CACHE_SIZE_DEFAULT",
+    "recon_cache_size",
     "build_reconstruction",
     "get_section",
     "list_sections",
@@ -735,6 +742,17 @@ def describe_section(section_id: str) -> Dict:
         "accession": rec.get("accession"),
         "has_outcome_label": rec.get("has_outcome_label", False),
         "reason": reason,
+        # A reason without a remedy is a dead end, and this is the exact screen
+        # where a new user hits one: a fresh clone has no ``data_cache/``, so
+        # the picker is seven sections that all say "unavailable" and name a
+        # doc rather than an action. ``remedy_for`` returns the literal command
+        # that fixes THIS section (or the shell block, where the data is not a
+        # plain GET), ``[]`` when it does not know, and never raises -- so a
+        # section the catalog has not heard of degrades to today's behaviour
+        # instead of breaking enumeration. The catalog is asserted against
+        # SECTIONS in tests/test_cli.py, so drift fails the suite rather than
+        # silently producing a remedy that points at the wrong place.
+        "remedy": remedy_for(section_id) if not available else [],
         "n_spots": None,
         "n_genes": None,
     }
@@ -1226,7 +1244,88 @@ class ReconstructionCache:
             self._key_locks.clear()
 
 
+#: LRU capacity used when ``TMESIM_RECON_CACHE_SIZE`` is unset or unusable.
+RECON_CACHE_SIZE_DEFAULT = 4
+
+
+def recon_cache_size(raw: Optional[str] = None,
+                     default: int = RECON_CACHE_SIZE_DEFAULT) -> int:
+    """``TMESIM_RECON_CACHE_SIZE`` as a usable LRU capacity.
+
+    This used to be ``int(os.environ.get("TMESIM_RECON_CACHE_SIZE", "4"))``
+    inline, which is three separate defects for a variable an operator sets by
+    hand:
+
+    * ``TMESIM_RECON_CACHE_SIZE=`` (an ``-e VAR=`` with no value, or a shell
+      variable that expanded to nothing) and any non-numeric string killed the
+      PROCESS AT IMPORT with a bare ``ValueError: invalid literal for int()
+      with base 10: ''`` and a traceback naming this module -- no mention of
+      the variable, the value or what would have been acceptable. In Docker
+      that is a restart loop whose only symptom is a stack trace from a cache
+      module, for a dial that is documented as "not a security control".
+    * ``0`` and ``-1`` were accepted silently and are not capacities at all:
+      ``get_or_build``'s eviction loop (``while len(self._entries) >
+      self.maxsize``) drops the entry it has just inserted, so every run
+      rebuilds a reconstruction that costs 1 s to ~90 s. A cache that is
+      configured off while reporting ``maxsize=0`` is worse than one that
+      refuses the setting.
+
+    So: unset is the documented default and says nothing, a usable value is
+    used verbatim, and anything else comes back as a DIAGNOSTIC on stderr
+    naming the variable, the offending value and the valid range -- this
+    project's "a failure a user caused comes back as a diagnostic, never a
+    silent default" applied to a variable that previously did the opposite in
+    both directions at once.
+
+    It diagnoses and continues on the documented default rather than exiting,
+    deliberately:
+
+    * this module is imported by the CLI, the test suite and every library
+      caller, not only by the server, so a hard exit turns a cosmetic
+      misconfiguration into an unimportable package;
+    * the failure is contained. ``maxsize`` decides how much memory the
+      process spends re-using work. It changes no result, no protocol number
+      and no access decision (``docs/DEPLOYMENT.md`` §4: "Not a security
+      control"), so continuing cannot make anything wrong -- only slower;
+    * the operator is told, unmissably and before the server's own
+      ``recon cache maxsize=`` banner line, which then shows the value that
+      really took effect.
+
+    A variable whose bad value COULD change a result or open access should
+    exit instead; this one cannot.
+    """
+    if raw is None:
+        raw = os.environ.get("TMESIM_RECON_CACHE_SIZE")
+    if raw is None:
+        return default  # unset -> the documented default. Not a user error.
+
+    text = str(raw).strip()
+    if text == "":
+        problem = "it is empty"
+    else:
+        try:
+            value = int(text)
+        except ValueError:
+            problem = f"{text!r} is not an integer"
+        else:
+            if value >= 1:
+                return value
+            problem = (
+                f"{value} is below the minimum of 1; a cache that cannot hold "
+                "one entry evicts every reconstruction the moment it is built"
+            )
+
+    print(
+        f"[codon] TMESIM_RECON_CACHE_SIZE={raw!r} is not usable: {problem}. "
+        f"Valid values are integers >= 1 (each entry holds a full cell "
+        f"population and several float64 grids; 1 is the minimum, {default} "
+        f"is the default). Continuing with {default}. Set --cache-size or "
+        f"TMESIM_RECON_CACHE_SIZE to an integer >= 1 to choose it yourself.",
+        file=sys.stderr,
+    )
+    sys.stderr.flush()
+    return default
+
+
 #: Process-wide cache used by the job worker and by ``/api/validate``.
-RECON_CACHE = ReconstructionCache(
-    maxsize=int(os.environ.get("TMESIM_RECON_CACHE_SIZE", "4"))
-)
+RECON_CACHE = ReconstructionCache(maxsize=recon_cache_size())
