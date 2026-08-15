@@ -34,7 +34,7 @@ function markSeen() {
  * shows, centered, rather than anchoring to nothing. */
 const STEPS = [
   {
-    title: 'Welcome to Vivum',
+    title: 'Welcome to Codon',
     selector: null,
     body: () => [
       h('p',
@@ -42,6 +42,19 @@ const STEPS = [
         'tumor tissue section — the cell viewer, the mechanism breakdown, ' +
         'and every metric are computed, not illustrative. This tour is ' +
         `${STEPS.length} short steps and points at the real controls as it goes; skip it any time.`),
+      // The tour was the one first-run surface in the Studio that stated no
+      // limit at all — it introduced a computed tumour response to someone who
+      // had never seen the product and handed them straight to Submit run. The
+      // claim below is the project's own standing limit (see
+      // ui/provenance.js::STANDING_LIMITS) and it belongs in the first thing a
+      // new user reads, not only in the panel they reach afterwards.
+      h('p',
+        h('b', 'Nothing here is a clinical or treatment-planning tool. '),
+        'No number in this Studio has been validated against a patient ' +
+        'outcome: these sections carry no treatment-response label, so every ' +
+        'result is a prediction of the physical model that has never been ' +
+        'scored against one. The ranking across compounds is the defensible ' +
+        'output; the absolute numbers are not. NOT FOR CLINICAL USE.'),
     ],
   },
   {
@@ -49,17 +62,56 @@ const STEPS = [
     selector: '#f-section',
     side: 'bottom',
     body: () => [
+      /*
+       * DO NOT PUT A SECTION COUNT BACK IN THIS SENTENCE.
+       *
+       * It said "38 real sections across 13 patients ... spanning
+       * glioblastoma and breast cancer". That was true on the machine it was
+       * written on and false on a fresh install, which is the only machine
+       * whose reader is being addressed here. Two independent reasons:
+       *
+       *   (1) `app/runs/` is gitignored, so the ingest registry does not ship.
+       *       A clean checkout has SEVEN built-in sections -- all glioblastoma
+       *       (Xenium 319-panel, Xenium IO 480-panel, GSE324268, and four
+       *       Visium). There is no built-in breast section. The other 31 and
+       *       the breast tissue were locally ingested by the developer.
+       *   (2) The count is now user-mutable: the "Your tissue" panel changes
+       *       it, so any literal is stale the moment a field tester ingests.
+       *
+       * A first-run tour is the one surface a new user cannot check against
+       * anything else, so a wrong number here is caught immediately and costs
+       * the trust every other disclosure depends on. Describe the KIND of
+       * thing in the list and let the list speak for its own length.
+       */
       h('p',
-        'This ', h('b', 'SECTION'), ' dropdown is not one fixed demo tumor — ' +
-        'it currently lists ',
-        h('b', '38 real sections across 13 patients'),
-        ', spanning glioblastoma (multiple assays, 12 patients) and breast ' +
-        'cancer. Switching sections loads genuinely different measured ' +
-        'tissue, not a re-skin of the same one.'),
+        'This ', h('b', 'SECTION'), ' dropdown is not one fixed demo tumor. ' +
+        'It lists the built-in specimens this project ships measured evidence ' +
+        'for — real glioblastoma tissue across two assay families, Xenium and ' +
+        'Visium — alongside any section you ingest yourself. Switching ' +
+        'sections loads genuinely different measured tissue, not a re-skin of ' +
+        'the same one.'),
     ],
   },
   {
-    title: '2 · Configure and run',
+    title: '2 · Or bring your own tissue',
+    selector: '#sect-tissue',
+    side: 'right',
+    body: () => [
+      h('p',
+        'The list is not the limit. ', h('b', 'Your tissue'),
+        ' takes a 10x Xenium, Space Ranger (Visium) or MEX export from a ' +
+        'directory on the machine running this server — nothing is uploaded ' +
+        'from the browser — and tells you what that specimen can and ' +
+        'cannot support before anything is run.'),
+      h('p',
+        'Two things it will say to you, and both are load-bearing: a section ' +
+        'you ingest is ', h('b', 'not validated'), ' — the built-in specimens ' +
+        'are the ones this project ships measured evidence for — and Codon ' +
+        'may be pointed at ', h('b', 'de-identified tissue only'), '.'),
+    ],
+  },
+  {
+    title: '3 · Configure and run',
     selector: '#btn-submit-run',
     side: 'top',
     body: () => [
@@ -71,7 +123,7 @@ const STEPS = [
     ],
   },
   {
-    title: '3 · Read the CAVEATS panel',
+    title: '4 · Read the CAVEATS panel',
     selector: '.caveats',
     side: 'left',
     body: () => [
@@ -83,7 +135,7 @@ const STEPS = [
     ],
   },
   {
-    title: '4 · Script it — MATLAB-style',
+    title: '5 · Script it — MATLAB-style',
     selector: '#btn-protocol',
     side: 'bottom',
     body: () => [

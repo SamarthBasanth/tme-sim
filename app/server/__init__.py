@@ -1,4 +1,4 @@
-"""tmesim Studio backend — the local application server.
+"""Codon Studio backend — the local application server.
 
 Serves the frozen ``API_CONTRACT.md`` v1 interface over FastAPI and drives the
 REAL simulation engine underneath it. Run it with::

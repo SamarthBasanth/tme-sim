@@ -363,7 +363,12 @@ export function createReportsPanel({ store, getSection }) {
       btnNew),
     h('div.panel-body.rp-body',
       h('div.rp-lead',
-        h('b', 'One specimen in, one ranked drug panel out.'),
+        // The headline is read before the mitigation that follows it, so it
+        // states the deliverable as what it is: a hypothesis to test at the
+        // bench. "One ranked drug panel out" described the same document as a
+        // finished selection, which is the closest thing in this Studio to a
+        // treatment-planning claim and is not one this project makes.
+        h('b', 'One specimen in, one ranked hypothesis to test in the lab.'),
         ' Each drug is simulated twice on the same cached reconstruction — the real run, and a resistance-off counterfactual — so the O',
         h('sub', '2'),
         '-resistance term of the attribution is measured, not asserted. The document carries its own limits: ',

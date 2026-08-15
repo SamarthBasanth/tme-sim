@@ -20,8 +20,50 @@
     "why_the_new_values_are_right_and_not_merely_different": "The old values encode a diffusivity law whose only solute input was molecular weight. That law was scored blind against 71 compounds measured by one method in one cell line (Pruijn 2008, doi:10.1071/CH08240) and REFUTED: R^2 = 0.022, 2.3x of a measured 29.7x spread, and flat BY CONSTRUCTION at matched molecular weight where the measurement moves 3.7-3.8x (results/diffusivity_falsification.md). The law now in force scores R^2 = 0.718 on the same 71 compounds, blind and unfitted, with 99 % of compounds within 3x of measurement and a geometric bias of 1.03x, and it brings the engine's dimensionless multicellular-layer hindrance factor inside its measured band for the first time (1.77-fold -> 10.33-fold against a measured 12-fold, PMID 9806526) -- a scorecard verdict that moved FAIL -> PASS. These cases are now running a transport coefficient that has been tested against external measurement and largely agrees with it, rather than one that had been tested and did not. THE NEW VALUES ARE STILL NOT CORRECT ABSOLUTE PREDICTIONS and nothing here should be read as claiming they are; see the entry below.",
     "predicted_and_observed_failure_pattern": "Only a case whose drug comes from the molecular COMPILE can move. Observed exactly: real_xenium_dx80_tmz_3dose and production_xenium_dx12_tmz_3dose (both use calibrated_drugparams('temozolomide')) moved and were regenerated; default_1dose, weak_1dose, weak_3dose, weak_10dose_noconv and solver_flat all use hand-built DrugParams literals with no compile in the path and are byte-for-byte unchanged; and test_production_dx12_ifp_solve_matches_stored_reference_bitwise, which solves the pressure field and has no drug in it at all, passed untouched. Within the two cases that moved, plasma_mean -- a pure-PK quantity with no spatial dependence and no diffusivity in it -- is BIT-IDENTICAL, which is the positive control on the mechanism.",
     "the_magnitudes_are_a_finding_not_a_footnote": "These are not ULP-level movements like the 2026-08-12 re-pin. kill_fraction goes 0.023980 -> 0.066227 at dx = 12 (2.76x) and 0.026373 -> 0.139384 at dx = 80 (5.29x); auc_sum rises by the same order. THE DIRECTION IS THE SURPRISE AND IT IS WORTH UNDERSTANDING: diffusivity FELL 6.6x, yet exposure ROSE. The reason is that the Primeau anchor pins the RATIO D/k, so the fitted loss rate k = clearance + alpha*binding fell with D (alpha 148.61 -> 22.22). A weaker sink leaves far more drug in tissue even though it spreads more slowly. results/cellular_exclusion.md sec. 6 predicted exactly this: the p99-normalised ratio the breast panel scores is immune to a common-mode exposure change -- and 0 of 12 of those verdicts moved -- while threshold statistics such as kill fraction and IC50 coverage are NOT. Anyone quoting an absolute kill_fraction from a run predating 2026-08-13 is quoting a number that has moved by 3-5x, and absolute kill fraction was already documented as a non-defensible output for independent reasons."
+   },
+   {
+    "date": "2026-08-14",
+    "key_holding_superseded_values": "_superseded_2026-08-14_binary_vessel_painting",
+    "cause": "THE AREA-CONSERVING VESSEL PAINTING BECAME THE SHIPPING DEFAULT (results/area_conservation_promotion.md). reconstruct.vessel_network.discrete_vascular_field's geometry default moved 'binary' -> 'area'. The binary painting asked each grid cell a YES/NO question -- 'is your centre within 7.5 um of an endothelial cell?' -- and deposited a whole dx^2 cell of vessel whenever the answer was yes. That is a COUNT dressed as a field, and it carries a dx^2 factor, so the total painted vessel area was a function of the mesh: 4.7312 %, non-monotone, over dx = 30...5 um on the real GBM section. It is the same defect physics.oxygen._tumor_density already fixed on the oxygen SINK by dividing a count by the grid-cell area. geometry='area' paints the SAME discs at the SAME radius around the SAME endothelial cells and gives each cell the covered-area FRACTION, conserving the painted total exactly (742,713.0 um^2 at every rung, span 6.3e-14 %). vascular_density_from_cells routes every reconstruction through this call, so both REAL-TISSUE cases had to move.",
+    "why_the_new_values_are_right_and_not_merely_different": "The transport integrals are LINEAR in the source total, so they must move by exactly the source total's change -- and they do, to three decimal places, which is what makes this a re-pin rather than a regression. At the PRODUCTION grid dx = 12 um the tissue-integrated source goes 5199.0000 -> 5157.7292, a change of -0.7938 %; mean_auc (-0.794 %), auc_sum (-0.794 %) and final_c_sum (-0.794 %) all move by that identical factor. At dx = 80 um the source goes 104.0000 -> 113.9567, +9.5738 %, and mean_auc, auc_sum and final_c_sum all move +9.574 %. The sign differs between the two grids because the binary total is a different number at every rung -- at dx = 80 a 7.5 um disc is 1/36 of a grid cell so the vote misses most vessels, while dx = 12 happens to sit near the TOP of the quantisation lottery (748,656 um^2 against a ladder mean of 741,882). The new values are the SAME model these cases were always meant to run, with the mesh-dependent factor removed from the source.",
+    "predicted_and_observed_failure_pattern": "The vessel painting reaches a result ONLY through a reconstruction built by reconstruct.real_fields.vascular_density_from_cells, so it can bite ONLY on cases built from real tissue. Observed exactly: real_xenium_dx80_tmz_3dose and production_xenium_dx12_tmz_3dose moved; default_1dose, weak_1dose, weak_3dose, weak_10dose_noconv (hand-built synthetic microenvironments) and solver_flat (raw solver, no reconstruction at all) are byte-for-byte unchanged and were NOT regenerated. plasma_mean -- a pure-PK quantity with no spatial dependence -- is bit-identical in BOTH moved cases, which is the control that says the PK layer was not disturbed.",
+    "what_moved_non_proportionally_and_why": "kill_fraction moves -3.361 % at dx = 12 and +19.614 % at dx = 80 rather than tracking the source change, because kill is a saturating Hill function of exposure, not a linear one. penetration_index rises +1.639 % at dx = 12 because the area painting spreads the same source over 3.1x the tissue support (0.0268 -> 0.0838 of tissue), so the exposure field is less peaked. The IFP solve moves in two directions at once and both are expected: peak and mean pressure RISE (+4.110 %, +4.079 %) while the peak Darcy speed FALLS (-6.891 %), because a smoother source builds a slightly higher, flatter plateau with gentler gradients, and v = -K grad p reads the gradient. That speed drop is also why tests/test_app_server.py::test_cfl_is_flagged_once_a_speed_has_been_measured needed re-pinning.",
+    "verdicts_did_not_move": "Re-solved live on the post-two-route engine (alpha = 22.223477711172563), both arms in one process off one reconstruction: ZERO of the nine published 3-D:2-D verdicts flip, worst ratio move -2.603 % (GBM cisplatin). The project's only falsification (breast docetaxel FAIL) and the flagship (GBM temozolomide PASS) both survive. Raw: results/sweep/acprom_ratios_dx12.json.",
+    "constants_not_touched": "OxygenConfig.supply = 0.05, consumption = 0.02, hypoxia_threshold = 0.2, the 0.2/0.4 band edges, VESSEL_RADIUS_UM = 7.5, LINK_DISTANCE_UM = 20.0, DX_UM = 12.0 and physics/subgrid.py's default-off are all unchanged. In particular supply was NOT re-tuned to absorb the -0.794 %: that would recreate the compensating-error structure results/oxygen_supply_calibration.md documents, and calibrate_alpha() still returns 22.223477711172563 bit-exactly."
    }
   ]
+ },
+ "_superseded_2026-08-14_binary_vessel_painting": {
+  "_what": "The values these two REAL-TISSUE cases produced under the BINARY vessel painting, i.e. every static-source reference that depended on the vessel source rasterisation, as they stood before results/area_conservation_promotion.md promoted discrete_vascular_field(geometry='area') to the default on 2026-08-14. Kept so the promotion's effect on the shipped transport path stays auditable and so nobody can regenerate this file to hide a regression.",
+  "_model": "discrete_vascular_field(..., geometry='binary'): a grid cell is 1.0 iff its CENTRE lies within VESSEL_RADIUS_UM = 7.5 um of an endothelial cell, depositing a whole dx^2 cell of vessel per centre-in-disc vote.",
+  "real_xenium_dx80_tmz_3dose": {
+   "auc_sum": "0x1.9877324c58352p+35",
+   "final_c_sum": "0x1.44e269b80049fp+20",
+   "kill_fraction": "0x1.1d75193e39e20p-3",
+   "mean_auc": "0x1.80f80e6b0f64ap+23",
+   "plasma_mean": "0x1.98dcaae19894cp+5"
+  },
+  "production_xenium_dx12_tmz_3dose": {
+   "ifp_max_in_tissue_mmhg": "0x1.9dd9bc33de2edp+3",
+   "ifp_mean_in_tissue_mmhg": "0x1.06efbb02a3549p-3",
+   "ifp_speed_max_um_s": "0x1.eb58d01c946bfp-2",
+   "kill_fraction": "0x1.0f44291c82e70p-4",
+   "mean_auc": "0x1.812200ca15bfdp+17",
+   "plasma_mean": "0x1.7f40dc5588c39p+5",
+   "penetration_index": "0x1.b357840efb234p-2",
+   "auc_sum": "0x1.1ca757c15caf3p+35",
+   "final_c_sum": "0x1.1a26ca17785f3p+25",
+   "viable_history": [
+    "0x1.0000000000000p+0",
+    "0x1.fa7edc4399feep-1",
+    "0x1.f34ade8010837p-1",
+    "0x1.ebdfd5572b0bfp-1",
+    "0x1.e41cb9f27f345p-1",
+    "0x1.dd304aff86e6fp-1"
+   ],
+   "_note": "PRODUCTION-GRID pin, added 2026-08-12 alongside the tumour-sigma units fix. The real Xenium GBM section at dx = 12 um -- the grid every shipped result and the landing asset are computed on -- previously had NO bitwise pin. Convection is ON, so this exercises the Darcy velocity path that the units fix touches. These values were generated BEFORE the fix and verified identical AFTER it, so the entry pins the claim that dx = 12 is the exact fixed point of the change.",
+   "_config": "reconstruct_real(source='xenium', sample='data_cache/xenium_gbm', dx_um=12.0, oxygen_mode='pde', state_mode='oxygen'); drug = apply_barrier_to_drugparams(calibrated_drugparams('temozolomide'), library.get_molecule('temozolomide')); PKConfig(plasma_peak=50.0, half_life=4h, n_doses=3, dose_interval=4h); PDEConfig(dt=10.0, total_time=1800.0, convection=True, save_every=30); seed=0"
+  }
  },
  "_superseded_2026-08-13_mw_only_diffusivity": {
   "_what": "The values these two cases produced under the MOLECULAR-WEIGHT-ONLY diffusivity model, i.e. every static-source reference published before results/two_route_promotion.md. Kept verbatim. Reproduce them exactly by passing two_route=False to compile_drug.build_profile, which is asserted bitwise in tests/test_two_route.py::TestShippingDefault::test_the_superseded_value_is_still_exactly_recoverable.",
@@ -187,29 +229,29 @@
   "penetration_index": "0x1.d09c9014c213ap-1"
  },
  "real_xenium_dx80_tmz_3dose": {
-  "auc_sum": "0x1.9877324c58352p+35",
-  "final_c_sum": "0x1.44e269b80049fp+20",
-  "kill_fraction": "0x1.1d75193e39e20p-3",
-  "mean_auc": "0x1.80f80e6b0f64ap+23",
+  "auc_sum": "0x1.bf9237a122014p+35",
+  "final_c_sum": "0x1.63fcf4931b7acp+20",
+  "kill_fraction": "0x1.5572b0be97754p-3",
+  "mean_auc": "0x1.a5d3339acf1d2p+23",
   "plasma_mean": "0x1.98dcaae19894cp+5"
  },
  "production_xenium_dx12_tmz_3dose": {
-  "ifp_max_in_tissue_mmhg": "0x1.9dd9bc33de2edp+3",
-  "ifp_mean_in_tissue_mmhg": "0x1.06efbb02a3549p-3",
-  "ifp_speed_max_um_s": "0x1.eb58d01c946bfp-2",
-  "kill_fraction": "0x1.0f44291c82e70p-4",
-  "mean_auc": "0x1.812200ca15bfdp+17",
+  "ifp_max_in_tissue_mmhg": "0x1.aedc2cfba96ccp+3",
+  "ifp_mean_in_tissue_mmhg": "0x1.11a99dcfb4539p-3",
+  "ifp_speed_max_um_s": "0x1.c97ce53fabce0p-2",
+  "kill_fraction": "0x1.062645ec79f50p-4",
+  "mean_auc": "0x1.7e135777f0ad4p+17",
   "plasma_mean": "0x1.7f40dc5588c39p+5",
-  "penetration_index": "0x1.b357840efb234p-2",
-  "auc_sum": "0x1.1ca757c15caf3p+35",
-  "final_c_sum": "0x1.1a26ca17785f3p+25",
+  "penetration_index": "0x1.ba7a935b0b8dfp-2",
+  "auc_sum": "0x1.1a64dfa7fffccp+35",
+  "final_c_sum": "0x1.17e967b74bd3dp+25",
   "viable_history": [
    "0x1.0000000000000p+0",
-   "0x1.fa7edc4399feep-1",
-   "0x1.f34ade8010837p-1",
-   "0x1.ebdfd5572b0bfp-1",
-   "0x1.e41cb9f27f345p-1",
-   "0x1.dd304aff86e6fp-1"
+   "0x1.fabb68ccb260fp-1",
+   "0x1.f376e79df3b37p-1",
+   "0x1.ec2ce54b78a00p-1",
+   "0x1.e4fe68abab8a8p-1",
+   "0x1.de27fe47a4d52p-1"
   ],
   "_note": "PRODUCTION-GRID pin, added 2026-08-12 alongside the tumour-sigma units fix. The real Xenium GBM section at dx = 12 um -- the grid every shipped result and the landing asset are computed on -- previously had NO bitwise pin. Convection is ON, so this exercises the Darcy velocity path that the units fix touches. These values were generated BEFORE the fix and verified identical AFTER it, so the entry pins the claim that dx = 12 is the exact fixed point of the change.",
   "_config": "reconstruct_real(source='xenium', sample='data_cache/xenium_gbm', dx_um=12.0, oxygen_mode='pde', state_mode='oxygen'); drug = apply_barrier_to_drugparams(calibrated_drugparams('temozolomide'), library.get_molecule('temozolomide')); PKConfig(plasma_peak=50.0, half_life=4h, n_doses=3, dose_interval=4h); PDEConfig(dt=10.0, total_time=1800.0, convection=True, save_every=30); seed=0"

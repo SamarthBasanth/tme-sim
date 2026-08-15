@@ -1,0 +1,27 @@
+{
+  "dx_um": 12.0,
+  "arms": {
+    "binary": {
+      "n_partial_cells": 0,
+      "n_source_cells": 5199,
+      "partial_frac_of_source": 0.0
+    },
+    "area": {
+      "n_partial_cells": 16228,
+      "frac_source_cells_partial": 0.9991995566775445,
+      "v_median": 0.25,
+      "v_p01": 0.006944444444444444,
+      "v_frac_below_0p1": 0.26897954153315257,
+      "beta_median": 3.4285714285714284,
+      "beta_p75": 9.0,
+      "beta_p90": 28.799999999999997,
+      "beta_max": 144.0,
+      "beta_validated_max": 5.677,
+      "frac_partial_beyond_validated": 0.35765343850135567,
+      "source_mass_frac_beyond_validated": 0.08706323977094788,
+      "median_rel_dev_from_inv_v": 0.0,
+      "n_source_cells": 16241,
+      "partial_frac_of_source": 0.9991995566775445
+    }
+  }
+}

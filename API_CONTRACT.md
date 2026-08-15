@@ -12,8 +12,9 @@ Run: `./.venv/bin/python -m app.server` → serves the UI at `http://127.0.0.1:8
 
 ## Design constraints (both sides)
 
-This is diagnostic imaging software. Reference points are HALO, Visiopharm, Paige, Sectra —
-**not** consumer web. Concretely:
+The **visual** reference is diagnostic-imaging software — HALO, Visiopharm, Paige, Sectra —
+**not** consumer web. That is a statement about layout and density and nothing else: Codon is
+a research tool, not a diagnostic product. Concretely:
 
 - **Square corners** (≤2px radius). No pills, no large rounded cards.
 - **Dense information.** Small type, tight leading, high data-ink ratio. A clinician's
@@ -320,7 +321,7 @@ never guessed at.
 
 ```jsonc
 // ScanResult (register: false — the default, a read-only scan)
-{ "detection": { "path": "/data/Patient_042", "platform": "xenium",
+{ "detection": { "path": "/data/study7_s042", "platform": "xenium",
                  "layout": "xenium_bundle_extracted", "confidence": 1.0,
                  "issues": [], "notes": ["…"], "contained_samples": [],
                  "ingestable": true },
@@ -356,12 +357,17 @@ with a missing cache.
 `platform: "mex"` samples register as `runnable: false`: they are ingestable and their
 capability report is real, but `reconstruct_real` accepts `xenium` or `visium` only.
 
-> `path` is a **server-side filesystem path**. The server binds to `127.0.0.1` and is a
-> local workstation tool; do not expose this route on a shared host.
+> `path` is a **server-side filesystem path** — nothing is uploaded, the bytes are read
+> where they lie — and this route reads **any path the server process can read**. The
+> server binds to `127.0.0.1` by default; do not expose this route without the API-key gate
+> and a reverse proxy in front (`docs/DEPLOYMENT.md` §1b, §3). Note also that a registered
+> path is echoed back to every client as `cache_dir` on `GET /api/sections`, so the path,
+> the `section_id` and the `label` must all be study codes rather than anything that
+> identifies a person (`docs/DEPLOYMENT.md` §0) — hence the naming in the examples here.
 
 ```jsonc
 // CapabilityReport — what this specimen can and cannot support, BEFORE a run
-{ "sample_id": "patient_042", "platform": "xenium", "n_genes": 319,
+{ "sample_id": "study7_s042", "platform": "xenium", "n_genes": 319,
   "detection_rates_measured": true,
   "panel": { "selected_map": "brain_319", "selected_coverage": 1.0, "fits": true,
              "coverage": { "brain_319": 1.0, "io_480": 0.5 }, "verdict": "…" },

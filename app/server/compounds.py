@@ -40,7 +40,7 @@ from tmesim.molecular.byo import (  # noqa: F401 - CompoundRefused is re-exporte
     compile_user_compound,
 )
 
-from .cache import repo_root
+from .cache import PRIVATE_FILE_MODE, own_only, private_makedirs, repo_root
 
 __all__ = [
     "CompoundError",
@@ -77,10 +77,13 @@ class CompoundError(Exception):
 
 
 def compounds_dir() -> str:
-    """Absolute path to ``app/compounds/`` (created on demand)."""
-    path = os.path.join(repo_root(), "app", "compounds")
-    os.makedirs(path, exist_ok=True)
-    return path
+    """Absolute path to ``app/compounds/`` (created on demand).
+
+    SECURITY: owner-only. This tree holds unpublished SMILES -- with the
+    default umask it would land 0644 in a 0755 directory, readable by every
+    local account on the machine.
+    """
+    return private_makedirs(os.path.join(repo_root(), "app", "compounds"))
 
 
 def compound_id(name: str) -> str:
@@ -180,7 +183,7 @@ class CompoundStore:
 
     def __init__(self, root: Optional[str] = None):
         self.root = root or compounds_dir()
-        os.makedirs(self.root, exist_ok=True)
+        private_makedirs(self.root)
         self._lock = threading.RLock()
         #: (id, name, smiles, ic50, alpha) -> compiled document. In-process only;
         #: see compile_stored for why this must never reach disk.
@@ -212,10 +215,13 @@ class CompoundStore:
 
     def _write(self, doc: Dict) -> Dict:
         d = self._dir(doc["id"])
-        os.makedirs(d, exist_ok=True)
+        private_makedirs(d)
         tmp = os.path.join(d, "compound.json.tmp")
         with open(tmp, "w") as fh:
             json.dump(doc, fh, indent=1, sort_keys=False)
+        # chmod the temp file BEFORE the rename, so the SMILES are never
+        # world-readable even for the width of the os.replace.
+        own_only(tmp, PRIVATE_FILE_MODE)
         os.replace(tmp, os.path.join(d, "compound.json"))
         return doc
 

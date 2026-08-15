@@ -35,6 +35,8 @@ import threading
 from collections import OrderedDict
 from typing import Dict, List, Optional
 
+from .cache import redact_exception as _internal
+
 __all__ = [
     "STORE_FILE",
     "ingested_sections",
@@ -139,10 +141,22 @@ def ingested_sections() -> "OrderedDict[str, Dict]":
 
 
 def scan(path: str, measure_detection_rates: bool = False) -> Dict:
-    """``ingest.scan_report`` — detection plus a capability report, no side effects."""
+    """``ingest.scan_report`` — detection plus a capability report, no side effects.
+
+    This is the HTTP boundary, so an UNEXPECTED exception's text is replaced
+    here with a stable sentence and a log reference. ``scan_report`` keeps the
+    raw text for ``codon ingest``, where an operator is at the console, and
+    flags it as internal; every deliberate refusal (the detection issues, the
+    capability report, ``IngestError``) is unflagged and passes through
+    verbatim so this surface can never disagree with the CLI.
+    """
     from tmesim.data.ingest import scan_report
 
-    return scan_report(path, measure_detection_rates=measure_detection_rates)
+    out = scan_report(path, measure_detection_rates=measure_detection_rates)
+    if out.pop("error_is_internal", False):
+        out["error"] = _internal(RuntimeError(out.get("error") or "unknown"),
+                                 "this sample could not be read")
+    return out
 
 
 def register(
@@ -195,9 +209,11 @@ def register(
         return {"ok": False, "section_id": sid, "section": None,
                 "capability": None, "capability_text": None, "error": str(exc)}
     except Exception as exc:  # noqa: BLE001 - report, never 500
+        # UNEXPECTED, as opposed to the IngestError branch above, which is a
+        # deliberate refusal and is returned verbatim.
         return {"ok": False, "section_id": sid, "section": None,
                 "capability": None, "capability_text": None,
-                "error": f"{type(exc).__name__}: {exc}"}
+                "error": _internal(exc, "this sample could not be ingested")}
 
     ex, ey = record.extent_um
     rec: Dict = {

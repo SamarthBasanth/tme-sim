@@ -38,10 +38,13 @@ export default function TransportOverlay({ children }: { children?: ReactNode })
   const groupRef = useRef<THREE.Group>(null);
   const offsetSmoothed = useRef(0);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
+    // Same aspect the tissue and the camera read, so the three stay in
+    // lockstep at every viewport shape rather than only at the authored one.
+    const aspect = state.size.width / Math.max(state.size.height, 1);
     offsetSmoothed.current = damp(
       offsetSmoothed.current,
-      sectionOffsetAmount(progressRef.current),
+      sectionOffsetAmount(progressRef.current, aspect),
       3.2,
       delta,
     );

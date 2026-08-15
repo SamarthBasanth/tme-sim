@@ -25,8 +25,11 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 import time
+import traceback
+import uuid
 from collections import OrderedDict
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -49,6 +52,7 @@ __all__ = [
     "section_genes",
     "state_route_support",
     "repo_root",
+    "redact_exception",
     "runs_dir",
 ]
 
@@ -63,11 +67,71 @@ def repo_root() -> str:
     return os.path.abspath(os.path.join(_HERE, "..", ".."))
 
 
+# --------------------------------------------------------------------------- #
+# SECURITY: owner-only modes for everything this app writes
+#
+# The runtime trees hold unpublished SMILES (app/compounds/), patient tissue
+# reconstructions and specimen identifiers (app/runs/, app/uploads/), and the
+# operator's project state. Written with the default umask they land 0644 in
+# 0755 directories -- readable by every local account on the machine. These
+# helpers make them owner-only, and repair the mode of trees that predate this.
+# --------------------------------------------------------------------------- #
+PRIVATE_DIR_MODE = 0o700
+PRIVATE_FILE_MODE = 0o600
+
+
+def own_only(path: str, mode: int) -> None:
+    """Best-effort ``chmod``. A store on a filesystem with no POSIX modes (a
+    Windows share, some FUSE mounts) must not break storage outright."""
+    try:
+        os.chmod(path, mode)
+    except OSError:
+        pass
+
+
+def redact_exception(exc: BaseException, context: str) -> str:
+    """Log the real failure server-side; return a stable, path-free sentence.
+
+    SECURITY / product: three places in this backend answered an *unexpected*
+    exception with ``f"{type(exc).__name__}: {exc}"`` straight into an HTTP
+    response body. That is not user-facing English, it names an internal
+    exception class, and — for anything that is not wrapping the caller's own
+    input — the message can carry server-side absolute paths the user never
+    supplied. ``list_sections`` is the clear case: it wraps the whole section
+    registry, so a missing ``data_cache/`` download or a filesystem error
+    surfaces a path from this machine on a route every client hits on load.
+
+    This is deliberately NOT a way to make failures quieter. The full detail,
+    including the traceback, goes to stderr under a short reference, and the
+    same reference is handed to the caller, so a field tester who hits an
+    unexpected error can quote it and the operator can find it exactly.
+
+    It applies ONLY to unexpected exceptions. The product's *deliberate*
+    refusals -- ``IngestError``, the capability report, every validation
+    sentence -- are informative on purpose, are rendered verbatim so the UI
+    can never disagree with the CLI, and must pass through untouched.
+    """
+    ref = uuid.uuid4().hex[:8]
+    print(f"[codon:{ref}] {context}: {type(exc).__name__}: {exc}",
+          file=sys.stderr)
+    traceback.print_exc(file=sys.stderr)
+    sys.stderr.flush()
+    return (f"{context}. This is an unexpected internal failure, not a "
+            f"problem with what you asked for. The server logged the details "
+            f"under reference {ref} — quote it to whoever runs this server.")
+
+
+def private_makedirs(path: str) -> str:
+    """``os.makedirs`` owner-only. ``mode=`` applies only to directories that
+    are actually created, so chmod as well to tighten a pre-existing tree."""
+    os.makedirs(path, mode=PRIVATE_DIR_MODE, exist_ok=True)
+    own_only(path, PRIVATE_DIR_MODE)
+    return path
+
+
 def runs_dir() -> str:
     """Absolute path to ``app/runs/`` (created on demand)."""
-    path = os.path.join(repo_root(), "app", "runs")
-    os.makedirs(path, exist_ok=True)
-    return path
+    return private_makedirs(os.path.join(repo_root(), "app", "runs"))
 
 
 def _abs(*parts: str) -> str:
@@ -733,7 +797,8 @@ def list_sections() -> List[Dict]:
                 "id": sid, "label": rec["label"], "n_cells": None,
                 "extent_um": None, "panel": rec.get("panel"),
                 "available": False,
-                "reason": f"enumeration failed: {type(exc).__name__}: {exc}",
+                "reason": redact_exception(
+                    exc, f"section {sid!r} could not be enumerated"),
                 "source": rec["source"], "sample": rec["sample"],
             })
     return out

@@ -130,6 +130,73 @@ the breast panel scores is immune to that common-mode change — 0 of 12 of thos
 verdicts moved — but threshold statistics such as kill fraction are not. Full
 write-up: ``results/two_route_promotion.md``; superseded values under
 ``_superseded_2026-08-13_mw_only_diffusivity``.
+
+The 2026-08-14 re-pin — the area-conserving vessel painting became the default
+------------------------------------------------------------------------------
+**Cause.** ``reconstruct.vessel_network.discrete_vascular_field``'s ``geometry``
+default moved ``'binary' -> 'area'``
+(``results/area_conservation_promotion.md``). The binary painting asked each grid
+cell a YES/NO question — *"is your centre within 7.5 µm of an endothelial
+cell?"* — and deposited a whole ``dx²`` cell of vessel per yes. That is a COUNT
+dressed as a field: it carries a ``dx²`` factor, so the total painted vessel area
+was a function of the mesh, spanning **4.7312 %** non-monotonically over
+``dx = 30…5 µm``. It is the same defect ``physics.oxygen._tumor_density`` already
+fixed on the oxygen SINK by dividing a count by the grid-cell area.
+``geometry='area'`` paints the same discs at the same radius around the same
+endothelial cells and gives each cell the covered-area FRACTION, conserving the
+total exactly — 742,713.0 µm² at every rung, span 6.3e-14 %.
+
+**Why the new values are right rather than merely different — and this one is
+checkable arithmetic rather than a judgement.** The transport integrals are
+LINEAR in the source total, so they must move by exactly the source total's
+change. They do:
+
+===================  ==========================  ====================
+grid                 tissue-integrated source    ``mean_auc`` / ``auc_sum`` / ``final_c_sum``
+===================  ==========================  ====================
+``dx = 12 µm``       5199.0000 → 5157.7292       all three **−0.794 %**
+                     (**−0.7938 %**)
+``dx = 80 µm``       104.0000 → 113.9567         all three **+9.574 %**
+                     (**+9.5738 %**)
+===================  ==========================  ====================
+
+Three independent integrals reproducing the source change to three decimals, on
+two grids, with opposite signs, is not something a regression does. The signs
+differ because the binary total is a *different number at every rung*: at
+``dx = 80 µm`` a 7.5 µm disc is 1/36 of a grid cell so the centre-vote misses
+most vessels, whereas ``dx = 12 µm`` happens to sit near the TOP of the
+quantisation lottery (748,656 µm² against a ladder mean of 741,882).
+
+**What moved, and why that is the predicted result.** The painting reaches a
+result only through a reconstruction built by
+``real_fields.vascular_density_from_cells``, so only REAL-TISSUE cases can move.
+Exactly those did: ``real_xenium_dx80_tmz_3dose`` and
+``production_xenium_dx12_tmz_3dose`` were regenerated, including this time the
+IFP pin — which was untouched by the 2026-08-13 re-pin because it has no drug in
+it, and moves now because it reads ``fields.vascular_density`` directly.
+``default_1dose``, ``weak_1dose``, ``weak_3dose``, ``weak_10dose_noconv``
+(hand-built synthetic microenvironments) and ``solver_flat`` (raw solver, no
+reconstruction at all) are byte-for-byte unchanged. ``plasma_mean`` is
+BIT-IDENTICAL in both moved cases — the positive control again.
+
+**What moved non-proportionally, named so it is not mistaken for drift.**
+``kill_fraction`` moves −3.361 % at ``dx = 12`` and +19.614 % at ``dx = 80``
+because kill is a saturating Hill function of exposure, not a linear one.
+``penetration_index`` rises +1.639 % at ``dx = 12`` because the area painting
+spreads the same source over **3.1x** the tissue support (0.0268 → 0.0838), so
+the exposure field is less peaked. The IFP solve moves in two directions at once
+and both are expected: peak and mean pressure RISE (+4.110 %, +4.079 %) while the
+peak Darcy speed FALLS (−6.891 %), because a smoother source builds a slightly
+higher, flatter plateau with gentler gradients and ``v = -K grad p`` reads the
+gradient. That speed drop is what re-pinned
+``test_app_server.py::test_cfl_is_flagged_once_a_speed_has_been_measured``.
+
+**No verdict moved.** Re-solved live on the post-two-route engine, both arms in
+one process: zero of the nine published 3-D:2-D verdicts flip, worst ratio move
+−2.603 %. ``OxygenConfig.supply`` was NOT re-tuned to absorb the −0.794 %, and
+``calibrate_alpha()`` still returns 22.223477711172563 bit-exactly. Full
+write-up: ``results/area_conservation_promotion.md``; superseded values under
+``_superseded_2026-08-14_binary_vessel_painting``.
 """
 from __future__ import annotations
 

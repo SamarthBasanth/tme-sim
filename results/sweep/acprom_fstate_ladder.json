@@ -1,0 +1,370 @@
+{
+  "rows": [
+    {
+      "dx_um": 30.0,
+      "grid": [
+        170,
+        271
+      ],
+      "binary": {
+        "f_state": 0.504115571980514,
+        "quiescent_frac": 0.9917688560389719,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.008231143961028054,
+        "mean_o2": 0.33635856975449263,
+        "source_sum": 793.0,
+        "source_area_um2": 713700.0
+      },
+      "area": {
+        "f_state": 0.54239459096254,
+        "quiescent_frac": 0.9152108180749202,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.0847891819250798,
+        "mean_o2": 0.3473598367034014,
+        "source_sum": 825.2366666666667,
+        "source_area_um2": 742713.0
+      },
+      "area_matched": {
+        "f_state": 0.5123677137577692,
+        "quiescent_frac": 0.9752645724844616,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.024735427515538384,
+        "mean_o2": 0.33851331125606204,
+        "source_sum": 793.0,
+        "source_area_um2": 713700.0000000001
+      }
+    },
+    {
+      "dx_um": 24.0,
+      "grid": [
+        213,
+        338
+      ],
+      "binary": {
+        "f_state": 0.5392239207122459,
+        "quiescent_frac": 0.9215521585755081,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.07844784142449185,
+        "mean_o2": 0.3474738047758426,
+        "source_sum": 1300.0,
+        "source_area_um2": 748800.0
+      },
+      "area": {
+        "f_state": 0.5424575844112213,
+        "quiescent_frac": 0.9150848311775576,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08491516882244246,
+        "mean_o2": 0.347337152502983,
+        "source_sum": 1289.4322916666665,
+        "source_area_um2": 742712.9999999999
+      },
+      "area_matched": {
+        "f_state": 0.5473500755921384,
+        "quiescent_frac": 0.9052998488157231,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09470015118427684,
+        "mean_o2": 0.3491618475711076,
+        "source_sum": 1300.0,
+        "source_area_um2": 748800.0
+      }
+    },
+    {
+      "dx_um": 18.0,
+      "grid": [
+        283,
+        451
+      ],
+      "binary": {
+        "f_state": 0.5401478246262389,
+        "quiescent_frac": 0.9197043507475222,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08029564925247774,
+        "mean_o2": 0.3481736251283784,
+        "source_sum": 2304.0,
+        "source_area_um2": 746496.0
+      },
+      "area": {
+        "f_state": 0.5422476062489501,
+        "quiescent_frac": 0.9155047875020997,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08449521249790022,
+        "mean_o2": 0.3473081790061388,
+        "source_sum": 2292.3240740740744,
+        "source_area_um2": 742712.9999999999
+      },
+      "area_matched": {
+        "f_state": 0.5454812699479255,
+        "quiescent_frac": 0.9090374601041492,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09096253989585083,
+        "mean_o2": 0.3484432647879859,
+        "source_sum": 2304.0,
+        "source_area_um2": 746495.9999999998
+      }
+    },
+    {
+      "dx_um": 16.0,
+      "grid": [
+        318,
+        507
+      ],
+      "binary": {
+        "f_state": 0.5333235343524273,
+        "quiescent_frac": 0.9333529312951453,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.06664706870485469,
+        "mean_o2": 0.3477841129275725,
+        "source_sum": 2913.0,
+        "source_area_um2": 745728.0
+      },
+      "area": {
+        "f_state": 0.5421006215353603,
+        "quiescent_frac": 0.9157987569292794,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08420124307072065,
+        "mean_o2": 0.3472970500040988,
+        "source_sum": 2901.22265625,
+        "source_area_um2": 742713.0
+      },
+      "area_matched": {
+        "f_state": 0.5448933310935663,
+        "quiescent_frac": 0.9102133378128675,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08978666218713253,
+        "mean_o2": 0.3482017204228915,
+        "source_sum": 2913.0000000000005,
+        "source_area_um2": 745728.0000000001
+      }
+    },
+    {
+      "dx_um": 12.0,
+      "grid": [
+        424,
+        675
+      ],
+      "binary": {
+        "f_state": 0.5502057785990258,
+        "quiescent_frac": 0.8995884428019486,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.10041155719805141,
+        "mean_o2": 0.34862776586515865,
+        "source_sum": 5199.0,
+        "source_area_um2": 748656.0
+      },
+      "area": {
+        "f_state": 0.5421636149840416,
+        "quiescent_frac": 0.9156727700319167,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08432722996808333,
+        "mean_o2": 0.34728122077493817,
+        "source_sum": 5157.729166666667,
+        "source_area_um2": 742712.9999999999
+      },
+      "area_matched": {
+        "f_state": 0.5471190996136401,
+        "quiescent_frac": 0.9057618007727196,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09423819922728036,
+        "mean_o2": 0.3490574007133154,
+        "source_sum": 5198.999999999998,
+        "source_area_um2": 748655.9999999998
+      }
+    },
+    {
+      "dx_um": 10.0,
+      "grid": [
+        508,
+        810
+      ],
+      "binary": {
+        "f_state": 0.5304888291617672,
+        "quiescent_frac": 0.9390223416764657,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.06097765832353435,
+        "mean_o2": 0.3461460301042975,
+        "source_sum": 7392.0,
+        "source_area_um2": 739200.0
+      },
+      "area": {
+        "f_state": 0.5419746346379977,
+        "quiescent_frac": 0.9160507307240047,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.0839492692759953,
+        "mean_o2": 0.3472693398531531,
+        "source_sum": 7427.13,
+        "source_area_um2": 742712.9999999998
+      },
+      "area_matched": {
+        "f_state": 0.5386569796741139,
+        "quiescent_frac": 0.9226860406517722,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.07731395934822778,
+        "mean_o2": 0.3462118140884347,
+        "source_sum": 7392.000000000003,
+        "source_area_um2": 739200.0000000001
+      }
+    },
+    {
+      "dx_um": 8.0,
+      "grid": [
+        635,
+        1012
+      ],
+      "binary": {
+        "f_state": 0.5488199227280363,
+        "quiescent_frac": 0.9023601545439275,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09763984545607257,
+        "mean_o2": 0.34824485820140866,
+        "source_sum": 11669.0,
+        "source_area_um2": 746816.0
+      },
+      "area": {
+        "f_state": 0.5419536368217706,
+        "quiescent_frac": 0.9160927263564589,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08390727364354107,
+        "mean_o2": 0.34725994499419216,
+        "source_sum": 11604.890625,
+        "source_area_um2": 742713.0
+      },
+      "area_matched": {
+        "f_state": 0.5453552830505627,
+        "quiescent_frac": 0.9092894338988745,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.09071056610112549,
+        "mean_o2": 0.34831001746831697,
+        "source_sum": 11669.0,
+        "source_area_um2": 746816.0000000006
+      }
+    },
+    {
+      "dx_um": 7.0,
+      "grid": [
+        725,
+        1157
+      ],
+      "binary": {
+        "f_state": 0.5406727700319167,
+        "quiescent_frac": 0.9186544599361667,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08134554006383336,
+        "mean_o2": 0.34689689094832576,
+        "source_sum": 15133.0,
+        "source_area_um2": 741517.0
+      },
+      "area": {
+        "f_state": 0.5419326390055434,
+        "quiescent_frac": 0.9161347219889131,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08386527801108684,
+        "mean_o2": 0.34725435861727677,
+        "source_sum": 15157.408163265312,
+        "source_area_um2": 742713.0000000002
+      },
+      "area_matched": {
+        "f_state": 0.5407147656643709,
+        "quiescent_frac": 0.9185704686712582,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08142953132874181,
+        "mean_o2": 0.34689475484687043,
+        "source_sum": 15132.999999999996,
+        "source_area_um2": 741516.9999999995
+      }
+    },
+    {
+      "dx_um": 6.0,
+      "grid": [
+        846,
+        1349
+      ],
+      "binary": {
+        "f_state": 0.5390139425499748,
+        "quiescent_frac": 0.9219721149000504,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.07802788509994961,
+        "mean_o2": 0.3476118438596761,
+        "source_sum": 20664.0,
+        "source_area_um2": 743904.0
+      },
+      "area": {
+        "f_state": 0.5419746346379977,
+        "quiescent_frac": 0.9160507307240047,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.0839492692759953,
+        "mean_o2": 0.34724903670928353,
+        "source_sum": 20630.916666666664,
+        "source_area_um2": 742713.0
+      },
+      "area_matched": {
+        "f_state": 0.542793549470855,
+        "quiescent_frac": 0.91441290105829,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08558709894171006,
+        "mean_o2": 0.34749021774050165,
+        "source_sum": 20664.0,
+        "source_area_um2": 743904.0000000002
+      }
+    },
+    {
+      "dx_um": 5.0,
+      "grid": [
+        1015,
+        1619
+      ],
+      "binary": {
+        "f_state": 0.5435074752225768,
+        "quiescent_frac": 0.9129850495548463,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.0870149504451537,
+        "mean_o2": 0.3475722508302159,
+        "source_sum": 29760.0,
+        "source_area_um2": 744000.0
+      },
+      "area": {
+        "f_state": 0.5419116411893163,
+        "quiescent_frac": 0.9161767176213674,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08382328237863262,
+        "mean_o2": 0.3472428801362463,
+        "source_sum": 29708.52,
+        "source_area_um2": 742713.0000000002
+      },
+      "area_matched": {
+        "f_state": 0.5426675625734924,
+        "quiescent_frac": 0.9146648748530153,
+        "hypoxic_frac": 0.0,
+        "viable_frac": 0.08533512514698471,
+        "mean_o2": 0.34746166187826455,
+        "source_sum": 29760.000000000004,
+        "source_area_um2": 744000.0000000001
+      }
+    }
+  ],
+  "summary": {
+    "binary": {
+      "f_state_span": 0.04609020661851171,
+      "mean_o2_span": 0.012269196110666014,
+      "source_area_span_pct": 4.731212536985344,
+      "f_state_at_production": 0.5502057785990258,
+      "drift_removed_pct": 0.0
+    },
+    "area": {
+      "f_state_span": 0.000545943221904932,
+      "mean_o2_span": 0.00011695656715510205,
+      "source_area_span_pct": 6.269733898662596e-14,
+      "f_state_at_production": 0.5421636149840416,
+      "drift_removed_pct": 98.81548974943051
+    },
+    "area_matched": {
+      "f_state_span": 0.0349823618343692,
+      "mean_o2_span": 0.010648536315045531,
+      "source_area_span_pct": 4.731212536985328,
+      "f_state_at_production": 0.5471190996136401,
+      "drift_removed_pct": 24.100227790432903
+    }
+  },
+  "published_binary_f_state_span": 0.04609,
+  "published_area_f_state_span": 0.000546,
+  "published_area_drift_removed_pct": 98.82
+}

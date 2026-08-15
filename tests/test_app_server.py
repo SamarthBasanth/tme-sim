@@ -1,4 +1,4 @@
-"""Tests for the tmesim Studio backend (``app/server/``).
+"""Tests for the Codon Studio backend (``app/server/``).
 
 Four things are checked, in rising order of what they would cost if they broke:
 
@@ -22,6 +22,7 @@ well under a minute.
 """
 from __future__ import annotations
 
+import json
 import os
 import struct
 import sys
@@ -40,6 +41,7 @@ pytest.importorskip("httpx", reason="starlette's TestClient needs httpx")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.server import cache as cache_mod  # noqa: E402
+from app.server.cache import repo_root  # noqa: E402
 from app.server.api import create_app, default_spec, validate_spec  # noqa: E402
 from app.server.jobs import PDE_DT_S, PDE_SAVE_EVERY, SIM_SEED, JobManager  # noqa: E402
 from app.server.payloads import (  # noqa: E402
@@ -264,6 +266,48 @@ class TestStaticEndpoints:
         assert cache_mod._STATE_MODE_DEFAULT == STATE_MODE_DEFAULT
 
 
+class TestIngestPage:
+    """``GET /ingest`` -- the server-rendered bring-your-own-tissue form.
+
+    ``results/first_user_readiness.md`` found the ingest path fully working
+    through the API and the CLI but exposed NOWHERE a user could click, so a
+    researcher who would not hand-POST JSON could not load their own sample.
+    This page is that surface, served from the backend so it needs no front-end
+    build. These tests pin the two things that make it useful: it is reachable,
+    and it drives the real endpoint rather than a parallel implementation.
+    """
+
+    def test_page_is_served(self, client):
+        r = client.get("/ingest")
+        assert r.status_code == 200
+        assert "text/html" in r.headers["content-type"]
+
+    def test_page_drives_the_real_scan_endpoint(self, client):
+        body = client.get("/ingest").text
+        # The whole point: one fetch, to the endpoint curl would have used.
+        assert "/api/sections/scan" in body
+        assert body.count("fetch(") == 1
+        # Carries its own assets -- no external host, and no dependency on
+        # app/web/ having been built.
+        assert "http://" not in body and "https://" not in body
+        assert "<script" in body and "src=" not in body
+
+    def test_page_offers_the_api_key_a_remote_deployment_needs(self, client):
+        # Non-loopback deployments always have a key (see __main__), and /api/*
+        # is gated while this page is not -- so it must be able to send one.
+        assert "X-API-Key" in client.get("/ingest").text
+
+    def test_scan_answers_a_bad_directory_instead_of_500ing(self, client, tmp_path):
+        empty = tmp_path / "not_a_sample"
+        empty.mkdir()
+        r = client.post("/api/sections/scan", json={"path": str(empty)})
+        assert r.status_code == 200
+        assert r.json()["error"], "an unusable directory must come back with a reason"
+
+    def test_scan_requires_a_path(self, client):
+        assert client.post("/api/sections/scan", json={}).status_code == 400
+
+
 class TestValidate:
     def test_unknown_section_and_drug_are_actionable(self):
         v = validate_spec(_spec(section="not_a_section", drug="aspirin"))
@@ -364,19 +408,50 @@ class TestValidate:
     @requires_section
     def test_cfl_is_flagged_once_a_speed_has_been_measured(self, client):
         """After a real run the peak Darcy speed is known for that key, so a dx
-        below ``dt * max|v|`` must be a hard error naming the numbers."""
+        below ``dt * max|v|`` must be a hard error naming the numbers.
+
+        RE-PINNED 2026-08-14 — ``results/area_conservation_promotion.md``.
+
+        This test used to derive both probe meshes from THIS key's own speed. It
+        therefore passed only when no *other* cached mesh for the section carried
+        more than twice this key's speed — because when the probe dx is not
+        itself a cached key, ``validate_spec`` falls back to tier 2 and uses the
+        **maximum** speed recorded for the section at ANY mesh
+        (``_cfl_check``, and ``solve_ifp`` reads the vascular field, not the
+        mesh). ``app/runs/_cfl_speeds.json`` is git-ignored machine-local state
+        that accumulates across sessions and already held a ``dx = 12 um`` key at
+        0.6336 um/s against this ``dx = 30 um`` key's 0.2762, so the margin was
+        1.09x and the test was one small change away from red on any developer
+        machine with a finer mesh cached.
+
+        The vessel-source promotion (``geometry='binary'`` -> ``'area'``) lowered
+        the peak Darcy speed — the same source total spread over 3x the support
+        gives a smoother pressure field — and tipped it over. **The promotion
+        exposed the fragility; it did not create it.**
+
+        The fix derives the probe meshes from the speed the CFL rule will
+        ACTUALLY use, so the test pins the rule rather than the contents of a
+        developer's cache directory. **No assertion was removed or weakened** —
+        the error case, its message, and the safe case are all still asserted.
+        """
         _run(client, _spec())  # measures and records the speed
         speed = cache_mod.RECON_CACHE.known_speed(
             cache_mod.make_key(SECTION, DX_UM, "discrete", "pde"))
         assert speed and speed > 0
 
-        # dx small enough that dt*max|v|/dx > 1 for this exact key.
-        bad_dx = 0.5 * speed * PDE_DT_S
+        # The speed tier 2 will quote for a dx that is not itself a cached key.
+        recorded = cache_mod.RECON_CACHE.speeds_for_section(SECTION, "discrete")
+        ref_speed = max(recorded.values())
+        assert ref_speed >= speed, (
+            "this key's own speed must be among those recorded for the section")
+
+        # dx small enough that dt*max|v|/dx > 1 for the speed actually quoted.
+        bad_dx = 0.5 * ref_speed * PDE_DT_S
         v = validate_spec(_spec(dx_um=bad_dx))
         assert not v["ok"]
         assert any("CFL" in e and "dt*max|v|/dx" in e for e in v["errors"])
         # And the safe dx is honoured.
-        assert validate_spec(_spec(dx_um=2.0 * speed * PDE_DT_S))["ok"]
+        assert validate_spec(_spec(dx_um=2.0 * ref_speed * PDE_DT_S))["ok"]
 
     def test_post_runs_rejects_an_invalid_spec_without_enqueueing(self, client):
         before = len(client.get("/api/runs").json())
@@ -746,6 +821,272 @@ class TestApiKeyAuth:
         finally:
             manager.shutdown()
 
+    # -- GHSA-86qp-5c8j-p5mr: Host-header path poisoning ------------------- #
+    #
+    # starlette builds request.url by concatenating the client-supplied Host
+    # header with the path and re-parsing it, so a "/" inside the Host value
+    # terminates the authority and the remainder lands in url.path:
+    #
+    #     Host: x/../   ->   request.url.path == "/..//api/compounds"
+    #
+    # The gate used to test `request.url.path.startswith("/api/")`, which is
+    # then False, while the ROUTER still dispatches on scope["path"], which is
+    # unchanged. Gate skipped, endpoint runs, compound library returned with no
+    # key. Verified live against starlette 0.49.3 before the fix.
+    @pytest.mark.parametrize("host", [
+        "x/../",                 # bare poisoned authority
+        "testserver/../",        # ditto, using the host TestClient really uses
+        "testserver:80/../",     # survives TrustedHostMiddleware's ":" split
+        "x/..%2f",
+        "x/y/",
+    ])
+    def test_a_poisoned_host_header_does_not_bypass_the_key(
+            self, monkeypatch, tmp_path, host):
+        client, manager = self._make_client(monkeypatch, "secret-123", tmp_path)
+        try:
+            with client:
+                res = client.get("/api/sections", headers={"Host": host})
+                assert res.status_code == 401, (
+                    f"Host: {host!r} reached the endpoint without a key "
+                    f"(status {res.status_code})")
+        finally:
+            manager.shutdown()
+
+    def test_a_poisoned_host_header_does_not_bypass_the_key_on_a_mutation(
+            self, monkeypatch, tmp_path):
+        """DELETE matters more than GET: the bypass reached the destructive
+        routes too. A 401 here, never a 404/200 from the endpoint itself."""
+        client, manager = self._make_client(monkeypatch, "secret-123", tmp_path)
+        try:
+            with client:
+                res = client.delete("/api/compounds/nope",
+                                    headers={"Host": "x/../"})
+                assert res.status_code == 401
+        finally:
+            manager.shutdown()
+
+    def test_the_gate_uses_the_same_path_the_router_dispatches_on(
+            self, monkeypatch, tmp_path):
+        """The invariant behind the fix. A gate and a router that derive the
+        path differently can always be made to disagree; deriving it the same
+        way is what makes that impossible, so assert it structurally."""
+        import inspect
+
+        from app.server import api as api_mod
+
+        src = inspect.getsource(api_mod.create_app)
+        assert "get_route_path(request.scope)" in src
+        gate = src.split("_require_api_key", 1)[1].split("jobs =", 1)[0]
+        # Comments in the gate explain WHY url.path is banned, so strip them
+        # before looking for actual uses of it.
+        code = "\n".join(line for line in gate.splitlines()
+                         if not line.lstrip().startswith("#"))
+        assert "request.url.path" not in code, (
+            "the auth gate must never make a decision on request.url.path -- "
+            "the Host header can poison it (GHSA-86qp-5c8j-p5mr)")
+
+    def test_a_non_get_route_outside_api_still_needs_the_key(
+            self, monkeypatch, tmp_path):
+        """Fail closed. Static assets are read-only, so anything that is not a
+        plain GET/HEAD is authenticated regardless of its path -- a future
+        state-changing route added outside /api/ is covered by default."""
+        client, manager = self._make_client(monkeypatch, "secret-123", tmp_path)
+        try:
+            with client:
+                assert client.post("/some/new/route").status_code == 401
+        finally:
+            manager.shutdown()
+
+
+class TestCorsIsNotWildcard:
+    """C2: `allow_origins=["*"]` meant any page the operator browsed could
+    read AND delete their compound library through 127.0.0.1 -- a browser is a
+    local process, so binding to loopback is no defence at all."""
+
+    def _make_client(self, monkeypatch, tmp_path, origins=None):
+        monkeypatch.delenv("TMESIM_STUDIO_API_KEY", raising=False)
+        if origins is None:
+            monkeypatch.delenv("TMESIM_STUDIO_ALLOWED_ORIGINS", raising=False)
+        else:
+            monkeypatch.setenv("TMESIM_STUDIO_ALLOWED_ORIGINS", origins)
+        manager = JobManager(root=str(tmp_path))
+        return TestClient(create_app(manager)), manager
+
+    def test_no_cross_origin_grant_by_default(self, monkeypatch, tmp_path):
+        client, manager = self._make_client(monkeypatch, tmp_path)
+        try:
+            with client:
+                res = client.get("/api/sections",
+                                 headers={"Origin": "https://evil.example"})
+                assert "access-control-allow-origin" not in res.headers
+        finally:
+            manager.shutdown()
+
+    def test_preflight_does_not_approve_delete_from_any_origin(
+            self, monkeypatch, tmp_path):
+        client, manager = self._make_client(monkeypatch, tmp_path)
+        try:
+            with client:
+                res = client.options(
+                    "/api/compounds/anything",
+                    headers={"Origin": "https://evil.example",
+                             "Access-Control-Request-Method": "DELETE"})
+                assert res.headers.get("access-control-allow-origin") is None
+        finally:
+            manager.shutdown()
+
+    def test_an_allowlisted_origin_is_granted_exactly_itself(
+            self, monkeypatch, tmp_path):
+        client, manager = self._make_client(
+            monkeypatch, tmp_path, origins="http://localhost:5173")
+        try:
+            with client:
+                res = client.get("/api/sections",
+                                 headers={"Origin": "http://localhost:5173"})
+                assert res.headers["access-control-allow-origin"] == \
+                    "http://localhost:5173"
+                other = client.get("/api/sections",
+                                   headers={"Origin": "https://evil.example"})
+                assert other.headers.get("access-control-allow-origin") is None
+        finally:
+            manager.shutdown()
+
+    def test_a_wildcard_in_the_env_var_is_ignored_not_honoured(
+            self, monkeypatch, tmp_path):
+        """An operator reaching for the old behaviour must not get it back by
+        writing `*` in the env var."""
+        client, manager = self._make_client(monkeypatch, tmp_path, origins="*")
+        try:
+            with client:
+                res = client.get("/api/sections",
+                                 headers={"Origin": "https://evil.example"})
+                assert res.headers.get("access-control-allow-origin") is None
+        finally:
+            manager.shutdown()
+
+
+class TestTracebacksAreNotServedByDefault:
+    """H4: traceback.format_exc() always carries absolute host paths -- the
+    repo root and the operator's OS username."""
+
+    def _failed_job(self, manager):
+        job = manager.submit({"section": "x", "dx_um": 12.0})
+        job.status = "failed"
+        job.error = "ValueError: boom"
+        job.traceback = (f'Traceback (most recent call last):\n'
+                         f'  File "{repo_root()}/tmesim/x.py", line 1\n'
+                         f'ValueError: boom\n')
+        return job
+
+    def test_traceback_is_withheld_and_the_typed_error_is_not(
+            self, monkeypatch, tmp_path):
+        monkeypatch.delenv("TMESIM_STUDIO_API_KEY", raising=False)
+        monkeypatch.delenv("TMESIM_STUDIO_EXPOSE_TRACEBACKS", raising=False)
+        manager = JobManager(root=str(tmp_path), start_worker=False)
+        try:
+            job = self._failed_job(manager)
+            with TestClient(create_app(manager)) as client:
+                res = client.get(f"/api/runs/{job.run_id}/traceback")
+                assert res.status_code == 200
+                body = res.json()
+                assert body["traceback"] is None
+                assert body["error"] == "ValueError: boom"
+                assert "TMESIM_STUDIO_EXPOSE_TRACEBACKS" in \
+                    body["traceback_withheld"]
+                assert repo_root() not in res.text
+        finally:
+            manager.shutdown()
+
+    def test_opt_in_serves_the_stack_with_the_repo_root_scrubbed(
+            self, monkeypatch, tmp_path):
+        monkeypatch.delenv("TMESIM_STUDIO_API_KEY", raising=False)
+        monkeypatch.setenv("TMESIM_STUDIO_EXPOSE_TRACEBACKS", "1")
+        manager = JobManager(root=str(tmp_path), start_worker=False)
+        try:
+            job = self._failed_job(manager)
+            with TestClient(create_app(manager)) as client:
+                res = client.get(f"/api/runs/{job.run_id}/traceback")
+                assert "ValueError: boom" in res.json()["traceback"]
+                assert "<repo>/tmesim/x.py" in res.json()["traceback"]
+                assert repo_root() not in res.text
+        finally:
+            manager.shutdown()
+
+
+class TestGridSizeIsBounded:
+    """H5: grid memory scales as 1/dx^2 and dx_um was bounded only by
+    `must be > 0`. Everything else was a WARNING, and warnings do not block --
+    `ok = not errors`, and POST /api/runs only refuses when ok is False. One
+    JSON POST could ask for ~20 GB."""
+
+    @pytest.mark.parametrize("dx", [0.001, 0.01, 0.1, 0.49])
+    def test_a_dx_below_the_floor_is_an_error_not_a_warning(self, dx):
+        spec = dict(default_spec())
+        spec["dx_um"] = dx
+        verdict = validate_spec(spec)
+        assert verdict["ok"] is False
+        assert any("dx_um" in e for e in verdict["errors"])
+
+    def test_a_grid_above_the_ceiling_is_refused_by_post_runs(self, client):
+        spec = dict(default_spec())
+        spec["dx_um"] = 0.5          # legal dx, but ~1.6e8 voxels on this section
+        res = client.post("/api/runs", json=spec)
+        assert res.status_code == 400
+        assert "ceiling" in json.dumps(res.json())
+
+    def test_the_default_spec_is_still_accepted(self, client):
+        res = client.post("/api/validate", json=default_spec())
+        assert res.json()["ok"] is True
+
+
+class TestUnexpectedExceptionsDoNotLeakInternals:
+    """Three routes answered an unexpected exception with
+    ``f"{type(exc).__name__}: {exc}"`` straight into the response body. For
+    the ingest routes that wrapped the caller's own path; for
+    ``list_sections`` -- which every client hits on load -- it wrapped the
+    whole section registry, so a missing ``data_cache/`` download surfaced a
+    SERVER-side absolute path the user never supplied."""
+
+    def test_enumeration_failure_gives_a_reference_not_a_path(self,
+                                                              monkeypatch):
+        boom = FileNotFoundError(
+            f"{repo_root()}/data_cache/xenium_gbm/cells.csv.gz is missing")
+
+        def explode(sid):
+            raise boom
+
+        monkeypatch.setattr(cache_mod, "describe_section", explode)
+        rows = cache_mod.list_sections()
+        assert rows, "list_sections must still enumerate, never raise"
+        for row in rows:
+            assert row["available"] is False
+            reason = row["reason"]
+            assert repo_root() not in reason
+            assert "FileNotFoundError" not in reason
+            # ...but the operator can still find the real failure.
+            assert "reference" in reason
+
+    def test_the_real_detail_goes_to_stderr(self, monkeypatch, capsys):
+        def explode(sid):
+            raise FileNotFoundError(f"{repo_root()}/data_cache/gone")
+
+        monkeypatch.setattr(cache_mod, "describe_section", explode)
+        reason = cache_mod.list_sections()[0]["reason"]
+        err = capsys.readouterr().err
+        ref = reason.split("reference ")[1].split()[0].rstrip(".,")
+        assert f"[codon:{ref}]" in err
+        assert "FileNotFoundError" in err
+        assert repo_root() in err
+
+    def test_a_deliberate_refusal_is_never_redacted(self, tmp_path):
+        """The distinction that matters. The UI renders these verbatim so it
+        can never disagree with the CLI about a sample's limits."""
+        from app.server import ingest_registry
+
+        out = ingest_registry.scan(str(tmp_path))
+        assert "no recognised layout" in out["error"]
+        assert "reference" not in out["error"]
+
 
 class TestAutoGeneratedApiKey:
     """app/server/__main__.py's decision of whether to require an API key,
@@ -753,6 +1094,27 @@ class TestAutoGeneratedApiKey:
     real socket bind) -- distinct from tests/test_cli.py's TestStudioDelegates
     -To-AppServer, which only checks argv construction and mocks main() itself
     away entirely."""
+
+    @pytest.fixture(autouse=True)
+    def _isolate_env_main_writes(self):
+        """``main()`` WRITES into ``os.environ``. Several tests here call it
+        without monkeypatch having recorded the variables first, and
+        ``monkeypatch.delenv(raising=False)`` records nothing when the
+        variable is absent -- so main()'s value survived the test and leaked
+        into every app built by every later module. Caught live:
+        TMESIM_STUDIO_ALLOWED_HOSTS leaking made TrustedHostMiddleware 400
+        every TestClient request in test_ingest/test_projects/test_protocol.
+        """
+        names = ("TMESIM_STUDIO_API_KEY", "TMESIM_STUDIO_ALLOWED_HOSTS")
+        saved = {n: os.environ.get(n) for n in names}
+        try:
+            yield
+        finally:
+            for n, v in saved.items():
+                if v is None:
+                    os.environ.pop(n, None)
+                else:
+                    os.environ[n] = v
 
     def _run_main(self, monkeypatch, argv):
         import app.server.__main__ as server_main
@@ -765,15 +1127,96 @@ class TestAutoGeneratedApiKey:
         fake_uvicorn = types.ModuleType("uvicorn")
         fake_uvicorn.run = lambda *a, **k: None
         monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
-        monkeypatch.delenv("TMESIM_STUDIO_API_KEY", raising=False)
+        # main() WRITES these into os.environ. A bare delenv(raising=False)
+        # records nothing when the variable is absent, so monkeypatch's undo
+        # would leave main()'s value behind for the rest of the session --
+        # which leaked TMESIM_STUDIO_ALLOWED_HOSTS into every app built by
+        # every later test module and 400'd them all. setenv first so the
+        # restore is always recorded.
+        for var in ("TMESIM_STUDIO_API_KEY", "TMESIM_STUDIO_ALLOWED_HOSTS"):
+            monkeypatch.setenv(var, os.environ.get(var, ""))
+            monkeypatch.delenv(var, raising=False)
         rc = server_main.main(argv)
         return rc, os.environ.get("TMESIM_STUDIO_API_KEY", "")
+
+    def test_loopback_bind_pins_the_host_header_to_the_loopback_names(
+            self, monkeypatch):
+        """DNS rebinding: a hostile domain that resolves to 127.0.0.1 becomes
+        same-origin with this server, which no CORS policy can stop. On the
+        default loopback bind the only legitimate Host values are known."""
+        self._run_main(monkeypatch, ["--host", "127.0.0.1"])
+        assert os.environ["TMESIM_STUDIO_ALLOWED_HOSTS"] == "localhost,127.0.0.1"
+
+    def test_a_non_loopback_bind_does_not_guess_the_operators_hostname(
+            self, monkeypatch):
+        """We do not know what name a remote deployment is reached by, and
+        refusing it would break the deployment outright. Left to the operator."""
+        self._run_main(monkeypatch, ["--host", "0.0.0.0"])
+        assert os.environ.get("TMESIM_STUDIO_ALLOWED_HOSTS", "") == ""
+
+    def test_an_explicit_allowed_hosts_is_never_clobbered(self, monkeypatch):
+        """A Docker ENV / systemd / shell export wins, exactly as it already
+        does for TMESIM_STUDIO_API_KEY."""
+        import sys
+        import types
+
+        import app.server.__main__ as server_main
+
+        fake_uvicorn = types.ModuleType("uvicorn")
+        fake_uvicorn.run = lambda *a, **k: None
+        monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
+        monkeypatch.setenv("TMESIM_STUDIO_API_KEY", "")
+        monkeypatch.setenv("TMESIM_STUDIO_ALLOWED_HOSTS", "studio.internal")
+        assert server_main.main(["--host", "127.0.0.1"]) == 0
+        assert os.environ["TMESIM_STUDIO_ALLOWED_HOSTS"] == "studio.internal"
 
     def test_loopback_host_sets_no_key_by_default(self, monkeypatch, capsys):
         rc, key = self._run_main(monkeypatch, ["--host", "127.0.0.1"])
         assert rc == 0
         assert key == ""
-        assert "api key" not in capsys.readouterr().out
+        out = capsys.readouterr().out
+        # The DEFAULT is unchanged: loopback still comes up with no key and
+        # still serves. What changed is that it now says so -- this used to
+        # assert the string "api key" was absent entirely, i.e. that the
+        # banner was silent about it, which was the defect (see
+        # _no_auth_warning). The real invariant is that no SECRET is printed,
+        # because there is none to print.
+        assert "X-API-Key:" not in out
+        assert "generated" not in out
+        assert "  api key     NONE" in out
+
+    def test_loopback_with_no_key_warns_that_a_tunnel_defeats_the_bind(
+            self, monkeypatch, capsys):
+        """The auto-generate rule reads the bind address, and a loopback
+        service behind an ngrok/Cloudflare tunnel or a reverse proxy is
+        world-reachable with `is_loopback` still true -- so no key is
+        generated and nothing used to be said. Making that loud is the whole
+        fix; the default deliberately did NOT change."""
+        import app.server.__main__ as server_main
+
+        rc, key = self._run_main(monkeypatch, ["--host", "127.0.0.1"])
+        assert rc == 0
+        assert key == ""
+        out = capsys.readouterr().out
+        assert server_main._no_auth_warning("127.0.0.1") in out
+        assert "UNAUTHENTICATED" in out
+        # names the failure mode, the exposed primitive, and the fix
+        assert "tunnel" in out
+        assert "reverse proxy" in out
+        assert "/api/sections/scan" in out
+        assert "TMESIM_STUDIO_API_KEY" in out
+
+    def test_the_no_key_warning_is_absent_once_a_key_is_in_force(
+            self, monkeypatch, capsys):
+        """It must be a signal, not banner noise: an operator who has done the
+        right thing never sees it."""
+        rc, key = self._run_main(
+            monkeypatch, ["--host", "127.0.0.1", "--api-key", "a-real-secret"])
+        assert rc == 0
+        assert key == "a-real-secret"
+        out = capsys.readouterr().out
+        assert "UNAUTHENTICATED" not in out
+        assert "NO API KEY" not in out
 
     def test_nonloopback_host_autogenerates_a_key(self, monkeypatch, capsys):
         rc, key = self._run_main(monkeypatch, ["--host", "0.0.0.0"])

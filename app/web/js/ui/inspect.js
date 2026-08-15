@@ -304,8 +304,16 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   const tallyEl = h('span.cv-tally');
   const reportEl = h('dl.kv');
   const errorEl = h('div.hidden');
+  const headRunEl = h('span.mono.strong', {
+    style: { marginLeft: 'var(--sp-3)', flex: '0 0 auto' },
+  }, NULL_GLYPH);
 
   function renderRun(run) {
+    headRunEl.textContent = (run && run.run_id) || NULL_GLYPH;
+    headRunEl.title = run
+      ? `Every number in this rail was produced by ${run.run_id}.`
+      : 'No run is loaded.';
+
     /* metrics */
     clear(metricsEl);
     if (!run) {
@@ -651,10 +659,15 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     { id: 'measure', label: 'Measure' },
   ], railBody);
 
+  // The rail head names the run it is interpreting. It used to say only
+  // "active run", which is true and useless the moment a second run is in
+  // flight: the top bar names the run you just submitted, this rail shows the
+  // one before it, and nothing on screen said which numbers belonged to which.
   const root = h('div.rail.rail-right',
     h('div.panel-head', h('h2', 'Read'), h('span.grow'),
       h('span.hint', { title: 'This rail interprets the active run. It never changes what will be run — that is the Setup rail on the left.' },
-        'active run')),
+        'showing'),
+      headRunEl),
     nav.el,
     railBody,
   );

@@ -46,8 +46,11 @@ import time
 from typing import Dict, List, Optional, Sequence
 
 from .cache import (
+    PRIVATE_FILE_MODE,
     describe_section,
     lookup_section,
+    own_only,
+    private_makedirs,
     repo_root,
     section_genes,
     state_route_support,
@@ -89,9 +92,7 @@ TERMINAL = ("done", "failed", "cancelled")
 
 def reports_dir() -> str:
     """Absolute path to ``app/reports/`` (created on demand)."""
-    path = os.path.join(repo_root(), "app", "reports")
-    os.makedirs(path, exist_ok=True)
-    return path
+    return private_makedirs(os.path.join(repo_root(), "app", "reports"))
 
 
 # --------------------------------------------------------------------------- #
@@ -801,7 +802,7 @@ class ReportManager:
         # production default lands on ``app/reports/`` next to ``app/runs/``.
         self.root = root or os.path.join(
             os.path.dirname(os.path.abspath(jobs.root)), "reports")
-        os.makedirs(self.root, exist_ok=True)
+        private_makedirs(self.root)
         self._reports: "Dict[str, Report]" = {}
         self._order: List[str] = []
         self._counter = 0
@@ -849,16 +850,18 @@ class ReportManager:
 
     def _persist(self, rep: Report) -> None:
         d = self._dir(rep.report_id)
-        os.makedirs(d, exist_ok=True)
+        private_makedirs(d)
         doc = rep.full_view(self.progress(rep))
         tmp = os.path.join(d, "report.json.tmp")
         with open(tmp, "w") as fh:
             json.dump(jsonable(doc), fh, indent=1)
+        own_only(tmp, PRIVATE_FILE_MODE)
         os.replace(tmp, os.path.join(d, "report.json"))
         if rep.status == "done":
             tmp = os.path.join(d, "report.html.tmp")
             with open(tmp, "w") as fh:
                 fh.write(render_html(doc))
+            own_only(tmp, PRIVATE_FILE_MODE)
             os.replace(tmp, os.path.join(d, "report.html"))
 
     def html_path(self, report_id: str) -> str:
@@ -1902,11 +1905,18 @@ def render_html(doc: Dict) -> str:
     warn_items = "".join(f"<li>{_esc(c)}</li>" for c in (doc.get("warnings") or []))
 
     sp = check.get("spearman_total_vs_kill")
+
+    # Section 05 renders micro["patient_id"] under the label "specimen id". The
+    # divergence is deliberate: the field name is load-bearing across the engine
+    # and the API payloads and renaming it is a data-model change, but a field
+    # labelled "patient id" on a rendered page invites a user to type one, and
+    # this tool is scoped to de-identified tissue (docs/DEPLOYMENT.md §0). If the
+    # field is ever renamed, the label here is already correct.
     body = f"""
 <div class="doc">
 <header class="hd">
-  <div class="kicker">tmesim · virtual therapy panel</div>
-  <h1>Virtual therapy panel — {_esc(section.get('label') or doc.get('section'))}</h1>
+  <div class="kicker">tmesim · simulated compound ranking</div>
+  <h1>Simulated compound ranking — {_esc(section.get('label') or doc.get('section'))}</h1>
   <div class="sub">A ranked, mechanistically attributed drug panel simulated on
     one measured specimen. Every number below is a prediction; the sections are
     ordered so that the limits on it are read first.</div>
@@ -1980,7 +1990,7 @@ is powerful.</p>
 <section class="sec">
 <h2><span class="sn">05</span><span class="st">Specimen</span></h2>
 <dl class="kv">
-  <dt>patient / sample id</dt><dd>{_esc(micro.get('patient_id'))}</dd>
+  <dt>specimen id</dt><dd>{_esc(micro.get('patient_id'))}</dd>
   <dt>source</dt><dd>{_esc(micro.get('source'))}</dd>
   <dt>cells</dt><dd>{_esc(micro.get('n_cells'))} measured
     ({_esc(micro.get('n_tumor'))} TUMOR)</dd>
@@ -2042,7 +2052,13 @@ is powerful.</p>
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         '<meta name="color-scheme" content="dark light">\n'
         '<meta name="robots" content="noindex">\n'
-        f"<title>tmesim therapy report {_esc(doc.get('report_id'))} — "
+        # Matches the <h1> ("Simulated compound ranking"). It read "tmesim
+        # therapy report" until 2026-08-15 — two renames stale, and naming a
+        # deliverable a "therapy report" is the implication this product does
+        # not make. NOT FOR CLINICAL USE stays IN the title on purpose: this
+        # document travels off a USB stick, and the browser tab is the one part
+        # of it that survives a screenshot of the window frame.
+        f"<title>Codon simulated compound ranking {_esc(doc.get('report_id'))} — "
         f"{_esc(doc.get('section'))} — NOT FOR CLINICAL USE</title>\n"
         f"<style>\n{_tokens_css()}\n{_DOC_CSS}\n{_print_css()}\n</style>\n"
         "</head><body>\n" + body + "\n</body></html>\n"

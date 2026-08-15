@@ -17,7 +17,7 @@ import { makeSplitter } from './ui/splitter.js';
 import { toast, notifyError } from './ui/toast.js';
 import { fieldMeta } from './fields.js';
 import { setSynthetic, setActiveRun } from './ui/provenance.js';
-import { num, int, auto, bytes, NULL_GLYPH } from './util/fmt.js';
+import { num, int, auto, bytes, dur, NULL_GLYPH } from './util/fmt.js';
 import { ensureAuthenticated } from './ui/apikey.js';
 import { shouldShowWelcome, createWelcomeOverlay } from './ui/welcome.js';
 
@@ -141,6 +141,10 @@ async function boot() {
     // panel that lists drugs is refetched — patching only the picker would
     // leave the reports panel offering a compound that no longer exists.
     onDrugsChanged: () => refreshDrugs(),
+    // Ingesting or removing a section changes the section catalogue the same
+    // way: the picker, the projects panel and the protocol validator all read
+    // it, so it is refetched once here rather than patched in three places.
+    onSectionsChanged: (sectionId) => refreshSections(sectionId),
   });
   inspect = createInspectPanel({
     viewer: viewer || stubViewer(),
@@ -153,6 +157,15 @@ async function boot() {
     distanceEl: tools ? tools.distanceEl : null,
     mechanismEl: mechLegend ? mechLegend.node : null,
   });
+  // The tracked job's poll payload is already in the store (spec.js `poll`);
+  // this is the only subscriber, and it exists so the top bar tells the truth
+  // about the run it names for as long as that run is in flight.
+  store.on('status', (s) => {
+    const st = store.get();
+    if (!s || !st.trackedRunId || st.trackedRunId !== st.activeRunId) return;
+    paintRunChip(s.status, s.elapsed_s);
+  });
+
   history = createHistoryPanel({ onOpen: openRun, onRefresh: refreshRuns });
   // Additive: the reports panel mounts as a third dock column and brings its
   // own stylesheet, so nothing above it has to change.
@@ -254,6 +267,7 @@ async function boot() {
   }
 
   specPanel.refreshCompounds();
+  specPanel.refreshTissue();
 
   await refreshRuns();
 
@@ -770,6 +784,32 @@ async function refreshDrugs() {
   }
 }
 
+/**
+ * Refetch GET /api/sections after the operator ingested or removed one of their
+ * own.
+ *
+ * `selectId` is passed ONLY on a successful ingest, and moving the selection is
+ * then the point: the operator just deliberately loaded that specimen, and
+ * landing on it is what makes the picker's not-validated line appear against
+ * the section they are about to run. On a REMOVAL it is null and the selection
+ * is left alone — repainting a list must not silently move a run onto a
+ * different specimen.
+ */
+async function refreshSections(selectId) {
+  try {
+    const sections = await api.getSections();
+    store.set({ sections });
+    specPanel.setSections(sections);
+    const spec = store.get().spec;
+    const target = selectId && sections.some((s) => s.id === selectId && s.available)
+      ? selectId : null;
+    if (spec) specPanel.loadSpec(target ? { ...spec, section: target } : spec);
+    if (target) paintSectionHeader(target);
+  } catch (err) {
+    notifyError('GET /api/sections failed after a tissue change', err);
+  }
+}
+
 async function refreshRuns() {
   try {
     const runs = await api.listRuns();
@@ -785,6 +825,42 @@ async function refreshRuns() {
   } catch (err) {
     const el = $('#sb-msg');
     if (el) el.textContent = 'GET /api/runs failed: ' + (err.message || err);
+  }
+}
+
+/**
+ * Paint the top bar's run status chip.
+ *
+ * The top bar is the one readout that is never scrolled away, and for the whole
+ * of a run it stated the opposite of the truth. `submitRun` set `#hdr-run` to
+ * the new id and nothing touched the chip, which was still the *previous*
+ * run's — so from the moment Submit was pressed until the job finished, the
+ * header read `RUN r_00077  DONE` while the run history two panels below read
+ * `r_00077  RUNNING`. Measured on a 36 s reconstruction: the contradiction was
+ * on screen for its entire duration. Worse than merely wrong, it was wrong in
+ * the reassuring direction, and the metrics beside it belonged to the previous
+ * run, so a user who trusted it would have read the last run's numbers as this
+ * one's.
+ *
+ * `elapsed` is appended while a job is in flight so the header also answers
+ * "how long has this been going", which previously required scrolling the
+ * Setup rail down to the Active job section.
+ */
+function paintRunChip(status, elapsedS) {
+  const st = $('#hdr-run-status');
+  if (!st) return;
+  while (st.firstChild) st.removeChild(st.firstChild);
+  if (!status) return;
+  const live = status === 'queued' || status === 'running';
+  st.appendChild(h('span.chip.st-' + status, {
+    title: live
+      ? 'This run is still on the queue. The metrics on the right belong to the '
+        + 'last completed run, not to this one, until it finishes.'
+      : '',
+  }, status));
+  if (live && Number.isFinite(elapsedS)) {
+    st.appendChild(h('span.mono.dim', { style: { marginLeft: 'var(--sp-3)' } },
+      dur(elapsedS)));
   }
 }
 
@@ -805,9 +881,7 @@ async function openRun(id) {
   // the ROI tables do not hold a RunResult. Park it where they can reach it.
   setActiveRun(run);
   inspect.renderRun(run);
-  const st = $('#hdr-run-status');
-  while (st.firstChild) st.removeChild(st.firstChild);
-  st.appendChild(h('span.chip.st-' + run.status, run.status));
+  paintRunChip(run.status);
   if (run.status === 'failed' && run.error) {
     toast('err', `Run ${id} failed`, String(run.error), 0);
   }
@@ -1043,14 +1117,22 @@ async function submitRun(spec) {
     history.setActive(id);
     store.set({ activeRunId: id });
     $('#hdr-run').textContent = id;
+    // Say `queued` NOW rather than leaving the previous run's chip standing
+    // until the first poll returns. See paintRunChip.
+    paintRunChip('queued', 0);
     specPanel.track(id, async (doneId, status) => {
       await refreshRuns();
       if (status === 'done') openRun(doneId);
       else if (status === 'failed') {
+        // `openRun` is what normally repaints the header chip, and it is not
+        // called on this branch — so paint it here or the header is left
+        // reading `running` on a run that has failed.
+        paintRunChip('failed');
         const r = await api.getRun(doneId).catch(() => null);
         toast('err', `Run ${doneId} failed`, (r && r.error) || 'no error message returned', 0);
         if (r) { store.set({ activeRun: r }); inspect.renderRun(r); }
       } else {
+        paintRunChip(status);
         toast('warn', `Run ${doneId} ${status}`, '', 4000);
       }
     });

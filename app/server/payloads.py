@@ -1,4 +1,4 @@
-"""Binary wire payloads for the tmesim Studio API (API_CONTRACT.md v1).
+"""Binary wire payloads for the Codon Studio API (API_CONTRACT.md v1).
 
 Two formats, both **little-endian**, both laid out so the front end can slice a
 single ``ArrayBuffer`` into typed arrays with zero parsing and hand them straight

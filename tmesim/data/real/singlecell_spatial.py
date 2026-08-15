@@ -272,10 +272,12 @@ def load(
 
     Raises
     ------
-    FileNotFoundError
+    tmesim.data.ingest.IngestError
         If the cache is missing. Download the three files listed in
         ``XENIUM_GBM_FILES`` into ``path`` first
-        (see ``docs/real_data/singlecell_spatial.md``).
+        (see ``docs/real_data/singlecell_spatial.md``). This was a bare
+        ``FileNotFoundError`` until 2026-08-15; see the comment in the body for
+        why the class is what keeps the message readable in the Studio.
     """
     # Resolve the three components. The repo-canonical basenames
     # (Xenium_GBM_*) are tried FIRST, so every existing cache resolves to
@@ -283,13 +285,31 @@ def load(
     # stock 10x bundle (cells.csv.gz / cell_feature_matrix[.tar.gz] /
     # gene_panel.json) resolves too. Imported lazily: tmesim.data.ingest imports
     # this module.
-    from ..ingest import resolve_xenium_files
+    # IngestError, not FileNotFoundError, and the difference is load-bearing at
+    # the HTTP boundary rather than here.
+    #
+    # The Studio deliberately renders the server's refusal VERBATIM, so that the
+    # UI can never disagree with `codon ingest` about what a specimen supports.
+    # To do that safely it distinguishes two kinds of exception: a DELIBERATE,
+    # informative refusal (IngestError -- passed through word for word) and an
+    # UNEXPECTED internal failure (anything else -- replaced with a stable
+    # sentence plus a log reference, so an internal path cannot reach a browser).
+    #
+    # The three messages below are hand-written diagnostics that tell an operator
+    # exactly which file is missing and where the cache normally lives. As bare
+    # FileNotFoundErrors they were classified as unexpected and flattened away --
+    # the redaction did its job, on the wrong sentence. Raising IngestError puts
+    # them on the pass-through side where they belong.
+    #
+    # Do NOT put an internal path into an IngestError: everything in one is a
+    # promise to the user. These quote `path`, which is the user's own input.
+    from ..ingest import IngestError, resolve_xenium_files
 
     found = resolve_xenium_files(path)
 
     cells_path = found.get("cells")
     if cells_path is None:
-        raise FileNotFoundError(
+        raise IngestError(
             f"Missing cached cells file: {os.path.join(path, _CELLS_FILE)}. "
             f"No Xenium cell/matrix/panel files were found under {path!r}. "
             "This loader is shared by every Xenium section (GBM, breast, ...); "
@@ -304,7 +324,7 @@ def load(
     if matrix_dir is None:
         tar_path = found.get("matrix_tar")
         if tar_path is None:
-            raise FileNotFoundError(
+            raise IngestError(
                 f"Missing matrix (neither extracted dir "
                 f"{os.path.join(path, _MATRIX_DIR)} nor tar "
                 f"{os.path.join(path, _MATRIX_TAR)}). "
@@ -314,7 +334,7 @@ def load(
             tf.extractall(path)
         matrix_dir = resolve_xenium_files(path).get("matrix_dir")
         if matrix_dir is None:
-            raise FileNotFoundError(
+            raise IngestError(
                 f"{tar_path} extracted into {path} but no MEX triple "
                 "(matrix.mtx.gz + features.tsv.gz + barcodes.tsv.gz) appeared."
             )

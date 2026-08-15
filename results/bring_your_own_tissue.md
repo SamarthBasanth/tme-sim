@@ -41,16 +41,16 @@ without writing code.
 
 ```bash
 # Read-only: what is this directory, and what can it NOT support?
-vivum ingest /data/PatientX_Xenium
+vivum ingest /data/study7_s042_xenium
 
 # Same, but load the matrix and measure real detection rates
-vivum ingest /data/PatientX_Xenium --deep
+vivum ingest /data/study7_s042_xenium --deep
 
 # Make it selectable in the Studio and the other subcommands
-vivum ingest /data/PatientX_Xenium --register --id patient_x
+vivum ingest /data/study7_s042_xenium --register --id study7_s042
 
 vivum ingest --list
-vivum ingest --remove patient_x
+vivum ingest --remove study7_s042
 ```
 
 The default is read-only and registers nothing. `--json` emits pure JSON on

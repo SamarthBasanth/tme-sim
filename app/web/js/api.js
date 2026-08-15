@@ -2,6 +2,8 @@
 //
 // Routes consumed (all of API_CONTRACT.md v1):
 //   GET    /api/sections
+//   POST   /api/sections/scan                 (bring your own tissue)
+//   DELETE /api/sections/{id}                 (remove an ingested section)
 //   GET    /api/drugs
 //   GET    /api/defaults
 //   POST   /api/runs
@@ -72,9 +74,9 @@ function setStub(on, why) {
   if (api.onModeChange) api.onModeChange(api);
 }
 
-async function rawFetch(method, path, { body, binary, signal } = {}) {
+async function rawFetch(method, path, { body, binary, signal, timeoutMs } = {}) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || TIMEOUT_MS);
   if (signal) signal.addEventListener('abort', () => ctrl.abort(), { once: true });
   const t0 = performance.now();
   try {
@@ -126,6 +128,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** One call with exactly one retry on network / 5xx, then mock fallback. */
 async function call(method, path, opts = {}) {
+  // `noFallback` opts a route OUT of both the retry and the mock: one attempt,
+  // and every failure propagates. Used by the ingest routes, where a retry
+  // would restart a minutes-long synchronous read the server is still doing,
+  // and where degrading to js/mock.js would answer a question about the
+  // operator's own tissue with a seeded PRNG.
+  if (opts.noFallback) return rawFetch(method, path, opts);
   if (api.stub) return fromMock(method, path, opts);
 
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -472,5 +480,23 @@ export const compareProject = (id, metric = 'kill_fraction') =>
 
 export const getCapability = (sectionId) =>
   call('GET', `/api/sections/${encodeURIComponent(sectionId)}/capability`);
+
+/* --- bring your own tissue ---------------------------------------------- */
+// One SYNCHRONOUS endpoint, not a job: `POST /api/sections/scan` does the whole
+// detect / ingest / validate / capability-report pass inside the request, so
+// there is no run id to poll and the browser holds the connection open for the
+// duration. A full ingest of a large section is minutes, which is why the caller
+// passes its own `timeoutMs` — the module default of 30 s would abort a request
+// the server is still working on and leave the operator thinking it failed.
+//
+// A bad directory is an ANSWER, not an error: the endpoint returns 200 with
+// `error` populated. Only a malformed BODY is a 4xx. Neither is retried, and
+// neither is ever answered from js/mock.js (see `noFallback`).
+export const postSectionScan = (body, { timeoutMs } = {}) =>
+  call('POST', '/api/sections/scan', { body, timeoutMs, noFallback: true });
+
+/** Remove an INGESTED section. Built-in sections are refused with a 400. */
+export const deleteSection = (sectionId) =>
+  call('DELETE', `/api/sections/${encodeURIComponent(sectionId)}`, { noFallback: true });
 
 export { mock };

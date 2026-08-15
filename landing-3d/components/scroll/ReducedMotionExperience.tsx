@@ -76,13 +76,21 @@ export default function ReducedMotionExperience({ isMobile }: { isMobile: boolea
               <MetricOverlay initiallyHidden={false} />
             </div>
           )}
+          {/* Mirrors the cinematic experience's closing beat exactly: the
+              primary action is the software, email is the quiet secondary
+              route. The two experiences must offer the same door. */}
           {i === SECTION_COPY.length - 2 && (
-            <a
-              className="cta-button cta-button--primary"
-              href="mailto:samarthbasanth@gmail.com?subject=Vivum%20demo%20request"
-            >
-              Request a Demo
-            </a>
+            <div className="cta-row">
+              <a className="cta-button cta-button--primary" href={STUDIO_URL}>
+                Open the Studio
+              </a>
+              <a
+                className="cta-link"
+                href="mailto:samarthbasanth@gmail.com?subject=Codon%20enquiry"
+              >
+                or email us about your tissue
+              </a>
+            </div>
           )}
         </section>
       ))}

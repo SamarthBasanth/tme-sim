@@ -17,6 +17,10 @@ app/runs/
 app/projects/
 app/reports/
 app/uploads/
+# app/compounds/ holds the operator's UNPUBLISHED SMILES. Dockerfile is
+# `COPY . .`, so without this line every image built on a workstation ships
+# that operator's compound series inside a layer -- and layers get pushed.
+app/compounds/
 
 # --- host-specific / wrong-platform ---
 .venv/

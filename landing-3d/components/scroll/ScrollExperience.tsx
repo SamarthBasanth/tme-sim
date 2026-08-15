@@ -16,7 +16,9 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import {
   SECTION_COUNT,
+  activeSectionIndex,
   attributionPanelOpacity,
+  heroCopyOpacity,
   metricPanelOpacity,
   sectionVisual,
 } from "@/lib/timeline";
@@ -24,6 +26,7 @@ import { SECTION_COPY } from "@/lib/copy";
 import { STUDIO_URL } from "@/lib/env";
 import SpecimenCaption from "@/components/ui/SpecimenCaption";
 import SectionLedger from "@/components/ui/SectionLedger";
+import ScrollCue from "@/components/ui/ScrollCue";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -47,6 +50,8 @@ function Experience() {
   const metricElRef = useRef<HTMLDivElement>(null);
   const attributionElRef = useRef<HTMLDivElement>(null);
   const railFillRef = useRef<HTMLDivElement>(null);
+  const railTicksRef = useRef<HTMLOListElement>(null);
+  const scrollCueRef = useRef<HTMLDivElement>(null);
   const lenisRef = useRef<Lenis | null>(null);
 
   useLenis(reducedMotion, (lenis) => {
@@ -94,6 +99,19 @@ function Experience() {
             el.style.transform = `translate3d(0, ${translateY}px, 0)`;
             el.style.filter = blurPx > 0.05 ? `blur(${blurPx}px)` : "";
             el.style.pointerEvents = opacity > 0.4 ? "auto" : "none";
+            /*
+             * `pointer-events: none` hides a section from the mouse but NOT
+             * from the tab order, so tabbing through this page walked into
+             * "Request a Demo" while beat 06 was fully transparent — the focus
+             * ring added below then appeared around nothing. `visibility`
+             * removes it from the tab order and the accessibility tree.
+             *
+             * The threshold is 0.02, not the 0.4 used for pointer-events: at
+             * 0.4 a section would blink out while it was still plainly on
+             * screen. At 0.02 the section is already indistinguishable from
+             * absent, so this only ever fires where the eye agrees.
+             */
+            el.style.visibility = opacity > 0.02 ? "visible" : "hidden";
           });
 
           // Both instrument panels are driven the same way and with the same
@@ -109,8 +127,26 @@ function Experience() {
             el.style.pointerEvents = opacity > 0.4 ? "auto" : "none";
           }
 
+          // Dies with the hero copy it belongs to, on that copy's own curve.
+          if (scrollCueRef.current) {
+            const cue = heroCopyOpacity(p);
+            scrollCueRef.current.style.opacity = String(cue);
+            scrollCueRef.current.style.visibility = cue > 0.02 ? "visible" : "hidden";
+          }
+
           if (railFillRef.current) {
             railFillRef.current.style.transform = `scaleY(${p})`;
+          }
+
+          // Which beat the rail should mark as current. Written as an
+          // attribute rather than a class toggle over children so the DOM
+          // write is a single string compare per frame; the CSS below selects
+          // the matching tick.
+          if (railTicksRef.current) {
+            const active = String(activeSectionIndex(p));
+            if (railTicksRef.current.dataset.active !== active) {
+              railTicksRef.current.dataset.active = active;
+            }
           }
         },
       });
@@ -220,18 +256,38 @@ function Experience() {
             <h2>{SECTION_COPY[5].headline}</h2>
             <p>{SECTION_COPY[5].body}</p>
             {SECTION_COPY[5].ledger ? <SectionLedger {...SECTION_COPY[5].ledger} /> : null}
-            <a className="cta-button cta-button--primary" href="mailto:samarthbasanth@gmail.com?subject=Vivum%20demo%20request">
-              Request a Demo
-            </a>
+            {/*
+              * The page ends by handing over the software, not by asking for an
+              * introduction. This was `mailto:` — the closing beat of a page
+              * whose whole argument is "run it and check the numbers yourself"
+              * terminated in a contact form, which puts a human gate in front
+              * of the one thing a visitor can verify unaided. Same STUDIO_URL
+              * the hero opens, so the first and last frames offer the same
+              * door.
+              *
+              * Email survives as the secondary route, deliberately quieter:
+              * someone who wants to talk rather than run software still has a
+              * way through, and it is a text link rather than a second pill so
+              * it cannot compete with the primary action.
+              */}
+            <div className="cta-row">
+              <a className="cta-button cta-button--primary" href={STUDIO_URL}>
+                Open the Studio
+              </a>
+              <a className="cta-link" href="mailto:samarthbasanth@gmail.com?subject=Codon%20enquiry">
+                or email us about your tissue
+              </a>
+            </div>
           </NarrativeSection>
         </div>
 
         {/* Section 03's copy is set on the right, so its readout sits left —
             mirroring the metric panel one beat later, which sits right
             opposite left-set copy. */}
+        <ScrollCue ref={scrollCueRef} />
         <AttributionOverlay ref={attributionElRef} />
         <MetricOverlay ref={metricElRef} />
-        <ProgressRail fillRef={railFillRef} labels={SECTION_COPY.map((s) => s.eyebrow)} />
+        <ProgressRail fillRef={railFillRef} ticksRef={railTicksRef} count={SECTION_COUNT} />
       </div>
     </div>
   );

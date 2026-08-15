@@ -71,6 +71,7 @@ from __future__ import annotations
 
 import math
 import os
+import secrets
 import threading
 from contextlib import asynccontextmanager, contextmanager
 from typing import Dict, List, Optional
@@ -78,6 +79,8 @@ from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.routing import get_route_path
 
 from .cache import (
     OXYGEN_MODES,
@@ -131,6 +134,21 @@ DX_PENETRATION_CONVERGED_UM = DX_PENETRATION_LADDER_COARSE_UM
 #: Above this the grid is big enough that a run is measured in minutes; the UI
 #: gets a warning rather than a refusal, because it is a cost, not an error.
 _LARGE_GRID_CELLS = 1_500_000
+
+#: SECURITY / capacity: hard REFUSAL ceiling on the grid, ~27x the warning
+#: threshold. Grid size scales as 1/dx^2, and dx_um used to be bounded only by
+#: "must be > 0" -- everything above that was a warning, and warnings do not
+#: block (``validate_spec`` returns ``ok = not errors``). On a 5000 x 5000 um
+#: section, dx_um = 0.1 asks for 2.5e9 voxels: one float64 field is 20 GB, and
+#: several fields are allocated per solve. One POST could OOM the box.
+#: 40 M voxels is ~320 MB per float64 field: expensive but survivable, and far
+#: beyond any dx a real section needs.
+_MAX_GRID_CELLS = 40_000_000
+
+#: Hard floor on dx_um for the case where the section extent is unknown and
+#: the voxel ceiling above cannot be evaluated. 0.5 um is well below a cell
+#: diameter, so no legitimate tissue-scale run is refused by it.
+MIN_DX_UM = 0.5
 
 
 # --------------------------------------------------------------------------- #
@@ -592,6 +610,14 @@ def validate_spec(spec: Dict) -> Dict:
             if dx <= 0:
                 errors.append(f"dx_um: must be > 0, got {dx}")
                 dx = None
+            elif dx < MIN_DX_UM:
+                # A REFUSAL, not a warning: memory scales as 1/dx^2 and a
+                # warning does not block the run (see _MAX_GRID_CELLS).
+                errors.append(
+                    f"dx_um: must be >= {MIN_DX_UM:g} um, got {dx:g}. Grid "
+                    "memory scales as 1/dx^2, and no tissue-scale question "
+                    "needs a mesh finer than half a micrometre.")
+                dx = None
             elif dx > DX_KILL_LADDER_COARSE_UM:
                 warnings.append(
                     f"dx_um = {dx:g} um is coarser than every rung this repo "
@@ -627,7 +653,18 @@ def validate_spec(spec: Dict) -> Dict:
                     and section_row.get("extent_um") and dx > 0):
                 ex, ey = section_row["extent_um"]
                 n_cells_grid = (ex / dx) * (ey / dx)
-                if n_cells_grid > _LARGE_GRID_CELLS:
+                if n_cells_grid > _MAX_GRID_CELLS:
+                    # An ERROR, not a warning. `ok = not errors`, and
+                    # POST /api/runs only refuses when ok is False, so a
+                    # warning here would have let the allocation proceed.
+                    errors.append(
+                        f"dx_um = {dx:g} um on this section gives a grid of "
+                        f"~{n_cells_grid:,.0f} voxels, above the "
+                        f"{_MAX_GRID_CELLS:,} ceiling — one float64 field "
+                        f"alone would be {n_cells_grid * 8 / 1e9:,.1f} GB. "
+                        "Use a coarser dx_um."
+                    )
+                elif n_cells_grid > _LARGE_GRID_CELLS:
                     warnings.append(
                         f"dx_um = {dx:g} um on this section gives a grid of "
                         f"~{n_cells_grid:,.0f} voxels; the reconstruction and "
@@ -1389,19 +1426,49 @@ def create_app(manager: Optional[JobManager] = None,
         yield
 
     app = FastAPI(
-        title="tmesim Studio API",
+        title="Codon Studio API",
         version="1",
         description=__doc__,
         lifespan=lifespan,
     )
-    # Bound to 127.0.0.1 by __main__; permissive CORS so the front end can be
-    # served from a different dev port without a proxy.
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # SECURITY: no cross-origin grant by default. The front end is served
+    # same-origin from this very app (see _mount_web), so it needs none.
+    # `allow_origins=["*"]` used to be here, and it meant any web page the
+    # operator happened to visit could read AND delete their whole compound
+    # library through 127.0.0.1 -- binding to loopback is no defence, because
+    # a browser is a local process. Set TMESIM_STUDIO_ALLOWED_ORIGINS to a
+    # comma-separated list of explicit origins (e.g. "http://localhost:5173")
+    # only for the split dev-port workflow. "*" is rejected on purpose.
+    _allowed_origins = [
+        o.strip() for o in
+        os.environ.get("TMESIM_STUDIO_ALLOWED_ORIGINS", "").split(",")
+        if o.strip() and o.strip() != "*"
+    ]
+    if _allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=_allowed_origins,
+            allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+            allow_headers=["content-type", "x-api-key"],
+        )
+
+    # SECURITY (defence in depth, NOT the fix for the Host-header auth bypass
+    # -- that is fixed at the gate itself, below). Validating the Host header
+    # blocks DNS rebinding: a hostile name that resolves to 127.0.0.1 makes a
+    # hostile page same-origin with this server, which no CORS policy can
+    # stop. Off unless TMESIM_STUDIO_ALLOWED_HOSTS is set; __main__.py sets a
+    # loopback allowlist for the default local bind. Note starlette's
+    # implementation splits the Host header on ":" and takes [0], so a
+    # bracketed IPv6 literal cannot be allowlisted, and a value like
+    # "127.0.0.1:8000/../" passes it -- which is exactly why it is not
+    # load-bearing here.
+    _allowed_hosts = [
+        h.strip() for h in
+        os.environ.get("TMESIM_STUDIO_ALLOWED_HOSTS", "").split(",")
+        if h.strip()
+    ]
+    if _allowed_hosts and "*" not in _allowed_hosts:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=_allowed_hosts)
 
     # Optional shared-secret gate on every /api/* route, OFF by default (empty
     # env var) so the local single-user workflow this app was built for is
@@ -1414,8 +1481,30 @@ def create_app(manager: Optional[JobManager] = None,
     if api_key:
         @app.middleware("http")
         async def _require_api_key(request: Request, call_next):
-            if request.url.path.startswith("/api/") and request.method != "OPTIONS":
-                if request.headers.get("x-api-key", "") != api_key:
+            # SECURITY: decide on the SAME path string the router dispatches
+            # on -- starlette.routing.Route.matches() calls get_route_path()
+            # too, so the gate and the dispatch physically cannot disagree.
+            # `request.url.path` must never be used here: starlette builds
+            # request.url by concatenating the client-supplied Host header
+            # with the path and re-parsing, so `Host: x/../` (or
+            # `Host: 127.0.0.1:8000/../`, which passes host validation)
+            # yields url.path='/..//api/compounds' -- the prefix test fails,
+            # the gate is skipped, and the router still runs the endpoint.
+            # That is GHSA-86qp-5c8j-p5mr and it was live here.
+            route_path = get_route_path(request.scope)
+            # Fail closed: anything that is not a plain read of a static
+            # asset needs the key, so a future non-/api route that mutates
+            # state is authenticated by default rather than exposed by
+            # default. OPTIONS stays exempt -- a CORS preflight cannot carry
+            # the header.
+            needs_key = (
+                route_path.startswith("/api/")
+                or request.method not in ("GET", "HEAD", "OPTIONS")
+            )
+            if needs_key and request.method != "OPTIONS":
+                # constant-time: a `!=` on a secret leaks its prefix by timing
+                if not secrets.compare_digest(
+                        request.headers.get("x-api-key", ""), api_key):
                     return JSONResponse(
                         {"detail": "missing or incorrect X-API-Key header"},
                         status_code=401,
@@ -1494,6 +1583,32 @@ def create_app(manager: Optional[JobManager] = None,
         if not out["ok"]:
             raise HTTPException(status_code=400, detail=out["error"])
         return jsonable(out)
+
+    @app.get("/ingest", response_class=HTMLResponse, include_in_schema=False)
+    def ingest_page() -> str:
+        """Server-rendered form over ``POST /api/sections/scan``.
+
+        **Why this exists.** ``results/first_user_readiness.md`` found that
+        bring-your-own-tissue works end to end through the API and the CLI but
+        appears NOWHERE in ``app/web/`` — the Studio's section picker is a
+        read-only list from ``GET /api/sections``. So a researcher who will not
+        hand-POST JSON cannot load their own sample, which is the entire value
+        proposition. This page closes that with no front-end change: it is one
+        self-contained document served from the backend, and it calls the same
+        endpoint ``curl`` would.
+
+        It adds NO capability and NO new trust boundary — every request it makes
+        is one ``POST /api/sections/scan`` that any client could already make,
+        under the same ``X-API-Key`` gate. It renders ``capability_text``
+        verbatim (the exact report ``codon ingest`` prints) rather than
+        re-deriving a summary, so this surface can never disagree with the CLI
+        about what a sample can support.
+
+        This is a stopgap, not the destination: the Studio picker itself should
+        learn to ingest. Registered sections appear in ``GET /api/sections``
+        immediately, so a Studio reload picks them up.
+        """
+        return _INGEST_PAGE
 
     @app.get("/api/drugs")
     def get_drugs() -> List[Dict]:
@@ -1611,9 +1726,32 @@ def create_app(manager: Optional[JobManager] = None,
 
     @app.get("/api/runs/{run_id}/traceback")
     def get_run_traceback(run_id: str) -> Dict:
+        """The failure stack for a ``failed`` run — opt-in, and path-scrubbed.
+
+        SECURITY: ``traceback.format_exc()`` always carries absolute host
+        paths, so serving it disclosed the repo root, the operator's OS
+        username and the internal module layout to any client. The typed
+        diagnosis (``job.error``) is what the product promises and is always
+        returned; the stack itself needs
+        ``TMESIM_STUDIO_EXPOSE_TRACEBACKS=1``, and even then the repo root is
+        replaced with ``<repo>``. The unscrubbed stack is always on the
+        server's stderr for whoever is at the console.
+        """
         job = _require(jobs, run_id)
-        return {"run_id": run_id, "status": job.status, "error": job.error,
-                "traceback": job.traceback}
+        out = {"run_id": run_id, "status": job.status, "error": job.error,
+               "traceback": None}
+        if os.environ.get("TMESIM_STUDIO_EXPOSE_TRACEBACKS", "") != "1":
+            out["traceback_withheld"] = (
+                "stack traces are not served by default because they contain "
+                "absolute host paths. Set TMESIM_STUDIO_EXPOSE_TRACEBACKS=1 "
+                "on the server to enable, or read the server's stderr. The "
+                "typed error is in `error`.")
+            return out
+        tb = job.traceback
+        if tb:
+            tb = tb.replace(repo_root(), "<repo>")
+        out["traceback"] = tb
+        return out
 
     @app.delete("/api/runs/{run_id}")
     def delete_run(run_id: str) -> Dict:
@@ -1979,8 +2117,183 @@ def _binary(jobs: JobManager, run_id: str, payload: str, label: str):
     })
 
 
+#: The bring-your-own-tissue page served at ``GET /ingest``. Self-contained on
+#: purpose: it is served by the backend and must work whether or not
+#: ``app/web/`` has been built, so it carries its own CSS and script and pulls
+#: in nothing external. The only endpoint it touches is
+#: ``POST /api/sections/scan``.
+_INGEST_PAGE = """<!doctype html><meta charset="utf-8">
+<title>Codon Studio &mdash; bring your own tissue</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+ body{background:#101214;color:#d8dadd;font:13px/1.6 ui-monospace,Menlo,monospace;
+      margin:0;padding:32px}
+ h1{font-size:15px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+    margin:0 0 6px;color:#f0f2f4}
+ .sub{color:#8b9199;margin:0 0 20px;max-width:76ch}
+ .b{border:1px solid #2a2e33;padding:16px;max-width:76ch;margin:0 0 16px}
+ label{display:block;margin:10px 0 3px;color:#9aa1a9}
+ input[type=text]{width:100%;box-sizing:border-box;background:#0a0c0e;
+   border:1px solid #2a2e33;color:#d8dadd;padding:7px 8px;font:inherit}
+ .row{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+ button{background:#1b2733;border:1px solid #33506e;color:#cfe2f6;padding:7px 14px;
+   font:inherit;cursor:pointer}
+ button:hover:not([disabled]){background:#22344a}
+ button[disabled]{opacity:.5;cursor:default}
+ .chk{color:#9aa1a9;font-size:12px}
+ pre{background:#0a0c0e;border:1px solid #2a2e33;padding:12px;overflow-x:auto;
+   white-space:pre;margin:0}
+ .err{border-color:#6e3333;color:#f0b8b8}
+ .ok{color:#9ad7a0}
+ code{color:#7fb6e8} a{color:#7fb6e8}
+ .note{color:#8b9199;font-size:12px;max-width:76ch}
+</style>
+<h1>Bring your own tissue</h1>
+<p class="sub">Point this at a directory holding a 10x Xenium or Visium export
+(or a bare MEX triple plus a coordinates table) and it will tell you what the
+sample <em>is</em> and what it <strong>cannot</strong> support. Registering adds
+it to the section list, so it becomes selectable in Studio after a reload.
+Same endpoint as <code>POST /api/sections/scan</code> and the same report
+<code>codon ingest</code> prints &mdash; this page just saves you the
+<code>curl</code>.</p>
+
+<div class="b">
+ <label for="path">Sample directory (absolute path on the machine running this
+ server)</label>
+ <input type="text" id="path" spellcheck="false"
+        placeholder="/data/xenium_run_2026_08/output-XETG00001">
+
+ <label for="sid">Section id (optional &mdash; defaults to the directory name)</label>
+ <input type="text" id="sid" spellcheck="false">
+
+ <label for="label">Label shown in the picker (optional)</label>
+ <input type="text" id="label" spellcheck="false">
+
+ <label for="key">X-API-Key (only if this server was started with one)</label>
+ <input type="text" id="key" spellcheck="false" autocomplete="off">
+
+ <div class="row">
+  <button id="scan">Scan &mdash; read only</button>
+  <button id="reg">Scan + register</button>
+  <label class="chk"><input type="checkbox" id="deep"> measure detection rates
+   (full ingest &mdash; slower, but turns &ldquo;the gene is on the panel&rdquo;
+   into a measured firing rate)</label>
+ </div>
+</div>
+
+<div id="out"></div>
+<p class="note">Registering never shadows a built-in section, and a directory
+that is not ingestable is answered with a reason rather than a broken section.
+Remove an ingested section with
+<code>DELETE /api/sections/&lt;id&gt;</code>.</p>
+
+<script>
+(function () {
+  var out = document.getElementById("out");
+  var els = ["path", "sid", "label", "key", "deep", "scan", "reg"]
+    .reduce(function (a, k) { a[k] = document.getElementById(k); return a; }, {});
+
+  function esc(s) {
+    return String(s).replace(/[&<>]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c];
+    });
+  }
+  function box(cls, html) { return '<div class="b ' + cls + '">' + html + "</div>"; }
+  function show(html) { out.innerHTML = html; }
+
+  function render(res, registered) {
+    var html = "";
+    if (res.error) {
+      html += box("err", "<strong>Not ingested.</strong> " + esc(res.error));
+    } else if (registered && res.ok) {
+      html += box("", '<span class="ok">Registered as <code>' +
+        esc(res.section_id) + "</code>.</span> Reload Studio and it will be in " +
+        "the section picker." +
+        (res.section && res.section.runnable === false
+          ? " <strong>Inspectable only:</strong> the reconstruction pipeline " +
+            "has no route for this platform."
+          : ""));
+    }
+    var det = res.detection || (res.section ? {
+      platform: res.section.platform, layout: res.section.layout,
+      confidence: res.section.detect_confidence,
+      issues: res.section.detect_issues
+    } : null);
+    if (det) {
+      var bits = [];
+      if (det.platform) bits.push("platform " + esc(det.platform));
+      if (det.layout) bits.push("layout " + esc(det.layout));
+      if (det.confidence !== undefined && det.confidence !== null) {
+        bits.push("confidence " + esc(det.confidence));
+      }
+      if (bits.length) html += box("", bits.join(" &middot; "));
+      var iss = det.issues || det.detect_issues;
+      if (iss && iss.length) {
+        html += box("err", "<strong>Issues</strong><pre>" +
+          esc(iss.join("\\n")) + "</pre>");
+      }
+    }
+    if (res.capability_text) {
+      html += "<pre>" + esc(res.capability_text) + "</pre>";
+    }
+    if (!html) {
+      html = box("", "The server returned no capability report:<pre>" +
+        esc(JSON.stringify(res, null, 1)) + "</pre>");
+    }
+    show(html);
+  }
+
+  function go(registered) {
+    var path = els.path.value.trim();
+    if (!path) { show(box("err", "Enter a sample directory path.")); return; }
+    var body = {
+      path: path,
+      measure_detection_rates: !!els.deep.checked,
+      register: !!registered
+    };
+    if (els.sid.value.trim()) body.section_id = els.sid.value.trim();
+    if (els.label.value.trim()) body.label = els.label.value.trim();
+    var headers = { "Content-Type": "application/json" };
+    if (els.key.value.trim()) headers["X-API-Key"] = els.key.value.trim();
+
+    els.scan.disabled = els.reg.disabled = true;
+    show(box("", (registered ? "Ingesting" : "Scanning") + " &hellip; " +
+      (body.measure_detection_rates || registered
+        ? "a full ingest of a large section can take a minute."
+        : "this reads filenames and the panel only.")));
+
+    fetch("/api/sections/scan", {
+      method: "POST", headers: headers, body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.json().then(function (j) { return { status: r.status, body: j }; });
+    }).then(function (r) {
+      if (r.status === 401) {
+        show(box("err", "401 &mdash; this server is running with an API key. " +
+          "Paste it into the X-API-Key field above."));
+        return;
+      }
+      if (r.status >= 400) {
+        show(box("err", esc(r.status + " " +
+          (r.body && r.body.detail ? JSON.stringify(r.body.detail) : ""))));
+        return;
+      }
+      render(r.body, registered);
+    }).catch(function (e) {
+      show(box("err", "Request failed: " + esc(e)));
+    }).then(function () {
+      els.scan.disabled = els.reg.disabled = false;
+    });
+  }
+
+  els.scan.addEventListener("click", function () { go(false); });
+  els.reg.addEventListener("click", function () { go(true); });
+})();
+</script>
+"""
+
+
 _PLACEHOLDER = """<!doctype html><meta charset="utf-8">
-<title>tmesim Studio</title>
+<title>Codon Studio</title>
 <style>
  body{background:#101214;color:#d8dadd;font:13px/1.5 ui-monospace,Menlo,monospace;
       margin:0;padding:32px}
@@ -1989,7 +2302,7 @@ _PLACEHOLDER = """<!doctype html><meta charset="utf-8">
  code{color:#7fb6e8} a{color:#7fb6e8} li{margin:2px 0}
  .b{border:1px solid #2a2e33;padding:14px 16px;max-width:760px}
 </style>
-<h1>tmesim Studio &mdash; backend up, front end not built</h1>
+<h1>Codon Studio &mdash; backend up, front end not built</h1>
 <div class="b">
 <p>The API is serving. <code>app/web/index.html</code> does not exist yet, so this
 placeholder is shown instead.</p>
@@ -2000,6 +2313,7 @@ placeholder is shown instead.</p>
  <li><a href="/api/defaults">/api/defaults</a></li>
  <li><a href="/api/runs">/api/runs</a></li>
  <li><a href="/api/health">/api/health</a></li>
+ <li><a href="/ingest">/ingest</a> &mdash; load YOUR OWN 10x export</li>
  <li><a href="/docs">/docs</a> &mdash; interactive OpenAPI</li>
 </ul>
 </div>

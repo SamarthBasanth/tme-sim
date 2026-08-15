@@ -37,6 +37,7 @@
 import { h, clear } from '../util/dom.js';
 import * as api from '../api.js';
 import { notifyError, toast } from './toast.js';
+import { confirmable } from './confirm.js';
 import { chip } from './provenance.js';
 import { caveatNode } from './inspect.js';
 import { num, sci } from '../util/fmt.js';
@@ -391,16 +392,49 @@ export function createCompoundPanel({ onChanged }) {
         title: rec.smiles,
         style: { maxWidth: '14ch', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
       }, rec.smiles || ''),
-      h('button.btn.ghost.sm', {
-        title: 'DELETE /api/compounds/' + rec.id,
-        onclick: async () => {
+      // Two-step, and then undoable. This row holds a SMILES the operator
+      // typed and that may exist nowhere else — an unpublished series member
+      // is not a cache entry. `confirmable` makes the first click a question;
+      // the undo below makes even the answered question reversible, because
+      // everything needed to rebuild the record (name, structure, potency,
+      // note) is in `rec` and POST /api/compounds is idempotent in effect.
+      confirmable(h('button.btn.ghost.sm', {
+        title: 'Delete this compound. DELETE /api/compounds/' + rec.id,
+        'aria-label': `Remove compound ${rec.name}`,
+      }, 'remove'), {
+        confirmLabel: `delete ${rec.name}?`,
+        armedTitle: `This removes ${rec.name} and its SMILES from the store and `
+          + 'from the drug picker. Press again to confirm; Escape cancels.',
+        onConfirm: async () => {
           try {
             await api.deleteCompound(rec.id);
             await refreshStored();
             if (onChanged) onChanged(null);
+            const t = toast('warn', `${rec.name} removed`,
+              'Its SMILES is no longer in the store or the drug picker. '
+              + 'Runs already made with it are untouched.', 12000);
+            t.querySelector('.toast-body').appendChild(
+              h('button.btn.sm', {
+                style: { marginTop: 'var(--sp-3)' },
+                title: 'Re-compile and re-store this compound from the record just deleted',
+                onclick: async () => {
+                  t.remove();
+                  try {
+                    await api.postCompound({
+                      name: rec.name,
+                      smiles: rec.smiles,
+                      ic50_uM: rec.ic50_uM ?? null,
+                      ...(rec.note ? { note: rec.note } : {}),
+                    });
+                    await refreshStored();
+                    if (onChanged) onChanged(null);
+                    toast('ok', `${rec.name} restored`, '', 4000);
+                  } catch (err) { notifyError('Undo failed — POST /api/compounds', err); }
+                },
+              }, 'undo'));
           } catch (err) { notifyError('DELETE /api/compounds failed', err); }
         },
-      }, 'remove'),
+      }),
       ));
     }
   }

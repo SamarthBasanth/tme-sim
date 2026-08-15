@@ -46,6 +46,25 @@
   color: var(--accent);
 }
 
+/* Armed — a destructive control that has been clicked once and is now asking
+   (js/ui/confirm.js). It must not look like the resting state of anything
+   else on screen, so it takes the crit hue outright rather than a tint, and
+   `width: auto` releases `.btn.icon`'s fixed square so the question fits. The
+   ghost variants have no border at rest; the armed one does, because "this
+   button changed" is the whole signal. */
+.btn.armed,
+.btn.ghost.armed,
+.btn.icon.armed {
+  width: auto;
+  padding: 0 var(--sp-4);
+  background: var(--crit-bg);
+  border-color: var(--crit);
+  color: var(--crit);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.btn.armed:hover:not(:disabled) { background: var(--crit); color: var(--bg-0); }
+
 .btn-row { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; }
 .btn-row.tight { gap: 0; }
 .btn-row.tight .btn { border-radius: 0; margin-left: -1px; }
@@ -1079,7 +1098,23 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
    and rendered one character per line down the side of the toast. */
 .toast .toast-body { padding: 5px 0 6px 0; line-height: 1.4; color: var(--fg-1); min-width: 0; }
 .toast .toast-body b { display: block; color: var(--fg-0); font-weight: 600; margin-bottom: 1px; }
-.toast .toast-body code { font-size: var(--fs-micro); color: var(--fg-2); word-break: break-all; }
+/* `overflow-wrap: anywhere`, NOT `word-break: break-all`. This slot carries two
+   kinds of string: an unspaced machine token (a run id, a URL, a traceback
+   line) that must be allowed to break mid-token rather than overflow a 380px
+   fixed-position card, and — far more often — an English sentence, because
+   every toast() detail the Studio raises is prose. `break-all` does not tell
+   them apart: it breaks at whatever character lands on the edge, so the notice
+   confirming a compiled compound rendered as "its absolute kill, AUC and pene
+   tration are still not defensible out puts — rank it, do not qu ote it."
+   That is the one toast whose entire job is to be read, and it was the least
+   readable thing on screen. `anywhere` breaks a word ONLY when it cannot fit
+   on a line of its own, which is exactly the machine-token case and never the
+   prose case. */
+.toast .toast-body code {
+  font-size: var(--fs-micro);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
 .toast .x { align-self: start; }
 
 /* ======================================================= misc ========== */

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   Vivum — cinematic scroll experience
+   Codon — cinematic scroll experience
    Palette: black / charcoal / off-white, one cool accent (cyan) for interface
    furniture, plus the drug-concentration ramp for anything that depicts a
    quantity. That ramp is viridis, taken from the product's own table
@@ -25,29 +25,39 @@
   --conc-high: #d8e219;
 
   /*
-   * IBM Plex, self-hosted via next/font/google (see app/layout.tsx for the
-   * full rationale and for why the "no network dependency" constraint that
-   * previously pinned this to system Helvetica does not apply to that API).
+   * Archivo + Atkinson Hyperlegible Next + Atkinson Hyperlegible Mono,
+   * self-hosted via next/font/google. app/layout.tsx carries the full
+   * argument for the three faces, including why the "no network dependency"
+   * constraint that once pinned this to system Helvetica does not apply to
+   * that API, and why IBM Plex was left.
    *
-   * Three roles, one superfamily. --font-display is CONDENSED: the width
-   * contrast against the regular body face is what carries hierarchy here,
-   * not size alone. Every measured quantity, label and caption goes through
-   * --font-mono, which is the rule this page already had and is worth
-   * keeping strictly — a number set in the text face reads as a claim, a
-   * number set in mono reads as a reading.
+   * THE RULE THESE THREE EXIST TO SERVE, UNCHANGED AND NOT NEGOTIABLE:
+   * every prose sentence is set in --font-sans and EVERY MEASURED QUANTITY,
+   * label and caption is set in --font-mono. A number in the text face reads
+   * as a claim; a number in mono reads as a reading. --font-display is the
+   * voice and never carries data.
    *
-   * The system stacks are retained as fallbacks so a font failure degrades
-   * to the previous design rather than to Times.
+   * --font-display is a WIDTH-VARIABLE face and is always set with an
+   * explicit `font-stretch` below. That is what replaces the fixed condensed
+   * cut the page used before: the hierarchy here is carried by width contrast
+   * against the body face, not by size alone, and .scroll-pin clips at
+   * overflow:hidden, so display width is a fitting constraint rather than a
+   * preference. Do not drop the font-stretch declarations — without them the
+   * headings render at 100% width, gain a line, and push a ledger row out of
+   * the pinned viewport.
+   *
+   * The system stacks are retained as fallbacks so a font failure degrades to
+   * something readable rather than to Times.
    */
   --font-sans:
-    var(--font-plex-sans), "Helvetica Neue", "Nimbus Sans", Arimo,
+    var(--font-atkinson), "Helvetica Neue", "Nimbus Sans", Arimo,
     "Liberation Sans", Arial, sans-serif;
   --font-display:
-    var(--font-plex-condensed), var(--font-plex-sans), "Helvetica Neue",
+    var(--font-archivo), var(--font-atkinson), "Helvetica Neue",
     "Nimbus Sans", Arial, sans-serif;
   --font-mono:
-    var(--font-plex-mono), "SF Mono", "Roboto Mono", "DejaVu Sans Mono", Menlo,
-    Consolas, "Courier New", monospace;
+    var(--font-atkinson-mono), "SF Mono", "Roboto Mono", "DejaVu Sans Mono",
+    Menlo, Consolas, "Courier New", monospace;
 }
 
 @theme inline {
@@ -139,7 +149,13 @@ body::after {
 .site-header__mark {
   font-family: var(--font-display);
   font-size: 0.95rem;
-  letter-spacing: 0.34em;
+  /* Archivo's caps are wider and more open than the condensed cut this
+     replaced, so the nameplate reaches the same optical width on less
+     tracking. Held at 88% rather than the headings' narrower setting: a
+     five-letter mark has no fitting problem to solve and reads better
+     slightly more open than the copy it sits above. */
+  font-stretch: 88%;
+  letter-spacing: 0.28em;
   font-weight: 600;
   color: var(--ink);
 }
@@ -254,14 +270,31 @@ body::after {
   );
 }
 
-/* Centered sections have no edge to fall off from, so they keep a radial
-   falloff — widened well past the text so it does not read as a disc. */
+/*
+ * Centered sections have no edge to fall off from, so they keep a radial
+ * falloff — widened well past the text so it does not read as a disc.
+ *
+ * IT USED TO BE `ellipse 78% 72%` AT 0.93 / 0.88 / 0.5, AND IT ENDED THE PAGE
+ * ON BLACK. There is exactly one centered beat in the scroll experience — 06,
+ * "Run it on your own tissue." — and an ellipse that wide, held at 0.88 out to
+ * 40%, covered the whole frame the tissue occupies at that camera pose. So the
+ * closing beat, whose subject is the tissue, was screenshotted as a barely
+ * perceptible grey ghost: the last thing a visitor sees was the page's own
+ * hero asset switched off.
+ *
+ * The ellipse is tightened and its shoulders dropped so the outer fifth of the
+ * frame is released back to the specimen. Legibility does not depend on this
+ * layer: `.narrative-section--center .narrative-section__body::before` below
+ * carries a genuinely opaque 0.94 plateau under the words themselves, which is
+ * the guarantee, and it is untouched. This one is atmosphere, and it was
+ * costing more than it bought.
+ */
 .narrative-section--center::before {
   background: radial-gradient(
-    ellipse 78% 72% at center,
-    rgba(4, 5, 7, 0.93) 0%,
-    rgba(4, 5, 7, 0.88) 40%,
-    rgba(4, 5, 7, 0.5) 68%,
+    ellipse 60% 62% at center,
+    rgba(4, 5, 7, 0.9) 0%,
+    rgba(4, 5, 7, 0.76) 42%,
+    rgba(4, 5, 7, 0.32) 74%,
     rgba(4, 5, 7, 0) 100%
   );
 }
@@ -377,39 +410,54 @@ body::after {
  */
 .narrative-section__kicker {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 500;
-  letter-spacing: 0.2em;
+  /* Atkinson Mono is a wide monospace with generous sidebearings, so it
+     arrives pre-tracked. The 0.2em this carried under the previous mono set
+     the kicker nearly half the column wide at 390px; 0.13em reproduces the
+     old optical spacing on the new face. */
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: rgba(127, 209, 224, 0.78);
 }
 
 /*
- * Headings run on the CONDENSED face at weight 600. Condensed lets the
- * display size go up without the line count going up with it, which is what
- * keeps a three-line headline from crowding the tissue behind it. Tracking
- * is near-neutral rather than the tight negative the old neo-grotesque
- * needed -- Plex Condensed is already narrow, and pulling it tighter closes
- * the counters and turns a headline into a grey block.
+ * Headings run on the display face, narrowed on its width axis to 80% and set
+ * at 650. Narrowing lets the display size go up without the line count going
+ * up with it, which is what keeps a three-line headline from crowding the
+ * tissue behind it -- and, more importantly, keeps beats 02 and 05 inside a
+ * viewport that clips silently.
+ *
+ * 650, not the 600 the previous condensed cut used: at 80% width the stems
+ * thin visibly, and 600 read grey against a lit specimen rather than
+ * authoritative. 700 was tested and closes the counters at the small end of
+ * the clamp.
+ *
+ * Sizes came DOWN slightly from the previous face. Archivo's x-height is
+ * appreciably larger for the same em, so the old values rendered optically
+ * bigger, not equal -- this is the re-tune, not a shrink. Leading is opened
+ * for the same reason: a large x-height narrows the visual channel between
+ * lines, so 1.02 on the old face is crowding on this one.
  */
 .narrative-section h1,
 .narrative-section h2 {
   font-family: var(--font-display);
-  font-weight: 600;
+  font-stretch: 80%;
+  font-weight: 650;
   margin: 0;
   text-wrap: balance;
 }
 
 .narrative-section h1 {
-  font-size: clamp(2.4rem, 6.6vw, 5.2rem);
-  line-height: 1.02;
-  letter-spacing: -0.005em;
+  font-size: clamp(2.3rem, 6.1vw, 4.8rem);
+  line-height: 1.06;
+  letter-spacing: -0.012em;
 }
 
 .narrative-section h2 {
-  font-size: clamp(1.9rem, 4.6vw, 3.5rem);
-  line-height: 1.06;
-  letter-spacing: -0.004em;
+  font-size: clamp(1.82rem, 4.3vw, 3.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
 }
 
 /*
@@ -417,9 +465,21 @@ body::after {
  * disabled rather than secondary, and these paragraphs carry the argument.
  * Kept below full --ink so the headline still leads.
  */
+/*
+ * 0.62 alpha was too faint for running text on this ground -- it read as
+ * disabled rather than secondary, and these paragraphs carry the argument.
+ * Kept below full --ink so the headline still leads.
+ *
+ * Sized down from the previous face and leaded up. Atkinson Hyperlegible Next
+ * carries a very large x-height and open apertures -- that is the point of it
+ * -- so at the old 1.12rem it set both optically larger and measurably wider,
+ * adding lines to exactly the two beats that have no room for them. The pair
+ * of changes is one adjustment: smaller em, more leading, same apparent size,
+ * fewer lines.
+ */
 .narrative-section p {
-  font-size: clamp(0.98rem, 1.4vw, 1.12rem);
-  line-height: 1.62;
+  font-size: clamp(0.92rem, 1.28vw, 1.04rem);
+  line-height: 1.66;
   color: rgba(243, 245, 246, 0.76);
   margin: 0;
   max-width: 34rem;
@@ -445,9 +505,9 @@ body::after {
   background: transparent;
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 0.9rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.005em;
   cursor: pointer;
   text-decoration: none;
   transition: border-color 0.25s ease, background-color 0.25s ease, color 0.25s ease;
@@ -469,6 +529,88 @@ body::after {
   border-color: var(--accent);
   color: #0a0b0d;
 }
+
+/*
+ * KEYBOARD FOCUS. There was no `:focus-visible` rule anywhere in this file, so
+ * the only two interactive elements on the page — both `<a>` — fell back to the
+ * user agent ring. On a near-black ground that is a coin-flip depending on the
+ * browser, and it is the one state on this page a mouse user never sees and so
+ * nobody had looked at.
+ *
+ * Drawn as an outline rather than a box-shadow so it cannot be clipped by an
+ * ancestor, and offset outward so it reads as a ring around the pill rather
+ * than a second border inside it. It uses the accent already in the palette;
+ * no new hue. `:focus:not(:focus-visible)` clears the UA ring for pointer
+ * activation, which is the whole point of the distinction.
+ */
+.cta-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-color: var(--accent-dim);
+}
+
+.cta-button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/*
+ * The closing beat's action pair. One pill (the Studio) and one text link
+ * (email), never two pills: a page that ends by handing over software has ONE
+ * primary action, and a second filled or outlined button beside it would make
+ * the visitor choose rather than proceed.
+ *
+ * STACKED, NOT SIDE BY SIDE. Measured on the rendered page: set as a row, the
+ * pill and the link centre as a GROUP, which puts the pill's own centre about
+ * 120px left of the axis the headline and paragraph are centred on. On the one
+ * centre-aligned beat in the page that misalignment is the first thing the eye
+ * catches. Stacking puts the primary action on the same axis as the copy above
+ * it and states the hierarchy down the page rather than across it.
+ */
+.cta-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 0.4rem;
+}
+
+.cta-row .cta-button {
+  margin-top: 0;
+}
+
+/*
+ * The secondary route. Sans, not mono -- it is a sentence, not a reading --
+ * and set in --ink-dim so it is plainly subordinate to the pill without being
+ * hidden. The underline is an offset border rather than text-decoration so it
+ * does not collide with Atkinson's descenders, which are long by design.
+ */
+.cta-link {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--ink-dim);
+  text-decoration: none;
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 1px;
+  transition: color 0.25s ease, border-color 0.25s ease;
+}
+
+.cta-link:hover {
+  color: var(--ink);
+  border-bottom-color: var(--accent-dim);
+}
+
+.cta-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+  color: var(--ink);
+}
+
+.cta-link:focus:not(:focus-visible) {
+  outline: none;
+}
+
 
 /* --------------------------------------------------------------------- */
 /* Metric overlay                                                         */
@@ -504,25 +646,33 @@ body::after {
   width: min(21rem, 84vw);
 }
 
+/*
+ * Every uppercase mono label in this file lost roughly a third of its
+ * tracking in the typeface change, and the panel headers lost the most. The
+ * new mono is wide by design -- open apertures are how it keeps 0 apart from
+ * O -- so it arrives with the spacing the old tracking was adding by hand.
+ * Left at 0.1em these two headers overran a 19rem panel and wrapped the tag
+ * onto its own line.
+ */
 .attribution__header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.6rem;
   font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.1em;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-dim);
   margin-bottom: 0.9rem;
 }
 
 .attribution__tag {
-  padding: 0.15rem 0.5rem;
+  padding: 0.15rem 0.45rem;
   border-radius: 999px;
   border: 1px solid var(--hairline);
   color: var(--ink-faint);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.03em;
   white-space: nowrap;
 }
 
@@ -572,7 +722,7 @@ body::after {
   display: flex;
   align-items: baseline;
   gap: 0.45rem;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: var(--ink-dim);
 }
 
@@ -586,8 +736,8 @@ body::after {
 
 .attribution__sub {
   font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
+  font-size: 0.58rem;
+  letter-spacing: 0.01em;
   color: var(--ink-faint);
 }
 
@@ -595,14 +745,14 @@ body::after {
   margin: 0;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   color: var(--ink);
 }
 
 .attribution__footnote {
   margin: 0.9rem 0 0;
-  font-size: 0.68rem;
-  line-height: 1.4;
+  font-size: 0.65rem;
+  line-height: 1.45;
   color: var(--ink-faint);
   font-style: italic;
 }
@@ -611,20 +761,22 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.6rem;
   font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.1em;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-faint);
   margin-bottom: 0.75rem;
 }
 
 .metric-overlay__tag {
-  padding: 0.15rem 0.5rem;
+  padding: 0.15rem 0.45rem;
   border-radius: 999px;
   border: 1px solid var(--hairline);
   color: var(--ink-dim);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
 }
 
 .metric-overlay__grid {
@@ -642,7 +794,7 @@ body::after {
 }
 
 .metric-overlay__row dt {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: var(--ink-dim);
 }
 
@@ -653,7 +805,7 @@ body::after {
   gap: 0.5rem;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   color: var(--ink);
 }
 
@@ -706,7 +858,7 @@ body::after {
 }
 
 .metric-overlay__refs dt {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   color: var(--ink-faint);
 }
 
@@ -714,14 +866,14 @@ body::after {
   margin: 0;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 0.7rem;
+  font-size: 0.67rem;
   color: var(--ink-dim);
 }
 
 .metric-overlay__footnote {
   margin: 0.85rem 0 0;
-  font-size: 0.68rem;
-  line-height: 1.4;
+  font-size: 0.65rem;
+  line-height: 1.45;
   color: var(--ink-faint);
   font-style: italic;
 }
@@ -779,6 +931,31 @@ body::after {
   border-radius: 50%;
   background: var(--bg);
   border: 1px solid var(--ink-faint);
+  transition: background-color 0.35s ease, border-color 0.35s ease,
+    box-shadow 0.35s ease;
+}
+
+/*
+ * The current beat. `data-active` is the beat index written by
+ * ScrollExperience's onUpdate; the six rules below are written out rather
+ * than generated because CSS cannot compare an attribute to nth-child, and
+ * six is the number of beats this page has — SECTION_COUNT, and it is
+ * asserted in lib/timeline.
+ *
+ * The marker is a fill and a soft halo, not a size change: the ticks sit
+ * against a 1px track and growing one would visibly shove the hairline. It
+ * is the accent already used for the fill bar and the kickers, so the rail
+ * still reads as one object.
+ */
+.progress-rail__ticks[data-active="0"] .progress-rail__tick:nth-child(1),
+.progress-rail__ticks[data-active="1"] .progress-rail__tick:nth-child(2),
+.progress-rail__ticks[data-active="2"] .progress-rail__tick:nth-child(3),
+.progress-rail__ticks[data-active="3"] .progress-rail__tick:nth-child(4),
+.progress-rail__ticks[data-active="4"] .progress-rail__tick:nth-child(5),
+.progress-rail__ticks[data-active="5"] .progress-rail__tick:nth-child(6) {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(127, 209, 224, 0.14);
 }
 
 @media (max-width: 900px) {
@@ -815,15 +992,15 @@ body::after {
 
 .annotation-label__title {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
   color: var(--ink);
 }
 
 .annotation-label__detail {
   font-family: var(--font-mono);
-  font-size: 0.64rem;
+  font-size: 0.6rem;
   color: rgba(243, 245, 246, 0.72);
 }
 
@@ -873,8 +1050,8 @@ body::after {
 
 .scene-loader__label {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.06em;
+  font-size: 0.64rem;
+  letter-spacing: 0.03em;
   color: var(--ink-faint);
 }
 
@@ -912,19 +1089,34 @@ body::after {
   padding: 0 1.5rem;
 }
 
+/*
+ * The fallback's headings now run on the DISPLAY face, as the pinned
+ * experience's do.
+ *
+ * They did not before -- these selectors never set a family, so they inherited
+ * the body sans and the fallback quietly shipped a two-role page while the
+ * cinematic one shipped three. That was survivable when both faces came from
+ * one superfamily and merely looked underpowered; with a display face chosen
+ * for a different job it would read as an unstyled page. Same face, same width
+ * axis, same weight as .narrative-section h1/h2 -- the reduced-motion visitor
+ * gets the identical typographic hierarchy, only without the motion.
+ */
 .reduced-motion-experience__hero-copy h1 {
-  font-size: clamp(2rem, 7vw, 3.4rem);
-  line-height: 1.06;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-stretch: 80%;
+  font-size: clamp(2rem, 6.6vw, 3.3rem);
+  line-height: 1.08;
+  font-weight: 650;
+  letter-spacing: -0.012em;
   margin: 0;
-  max-width: 22ch;
+  max-width: 24ch;
 }
 
 .reduced-motion-experience__hero-copy p {
   max-width: 34rem;
   color: var(--ink-dim);
-  line-height: 1.55;
+  font-size: clamp(0.92rem, 1.28vw, 1.04rem);
+  line-height: 1.62;
   margin: 0;
 }
 
@@ -943,16 +1135,19 @@ body::after {
 }
 
 .reduced-motion-section h2 {
-  font-size: clamp(1.6rem, 4.4vw, 2.4rem);
-  line-height: 1.1;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-family: var(--font-display);
+  font-stretch: 80%;
+  font-size: clamp(1.55rem, 4.2vw, 2.3rem);
+  line-height: 1.14;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   margin: 0;
 }
 
 .reduced-motion-section p {
   color: var(--ink-dim);
-  line-height: 1.6;
+  font-size: clamp(0.92rem, 1.28vw, 1.04rem);
+  line-height: 1.64;
   margin: 0;
 }
 
@@ -1080,8 +1275,8 @@ body::after {
 }
 
 .specimen__id {
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  font-size: 0.66rem;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--accent);
 }
@@ -1102,16 +1297,19 @@ body::after {
 }
 
 .specimen__facts dt {
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-faint);
 }
 
 .specimen__facts dd {
   margin: 0;
-  font-size: 0.9rem;
-  /* tabular-nums so the counts line up and read as measurements */
+  font-size: 0.84rem;
+  /* tabular-nums so the counts line up and read as measurements. Redundant on
+     a monospace, where every glyph already carries the same advance width, but
+     kept as the explicit statement of intent: if this block is ever moved to a
+     proportional face the columns must still align. */
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
@@ -1123,7 +1321,7 @@ body::after {
   margin: 1.05rem 0 0;
   padding: 0;
   list-style: none;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   color: var(--ink-dim);
 }
 
@@ -1149,7 +1347,7 @@ body::after {
 .specimen__note {
   /* overrides .narrative-section p, which is sized for body copy */
   margin: 1.05rem 0 0;
-  font-size: 0.66rem !important;
+  font-size: 0.63rem !important;
   line-height: 1.5;
   color: var(--ink-faint);
   max-width: 30rem;
@@ -1187,9 +1385,9 @@ body::after {
  */
 .ledger .ledger__caption {
   font-family: var(--font-mono);
-  font-size: 0.62rem;
-  line-height: 1.4;
-  letter-spacing: 0.12em;
+  font-size: 0.58rem;
+  line-height: 1.45;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--accent);
   margin: 0 0 0.15rem;
@@ -1217,23 +1415,39 @@ body::after {
   border-top: 1px solid var(--hairline);
 }
 
+/* The label is the one place the display face appears at text size. It is set
+   nearer to normal width than the headings -- at 80% a 16px label reads as a
+   caption rather than as the name of a registered quantity. */
 .ledger__label {
   font-family: var(--font-display);
-  font-size: 0.98rem;
+  font-stretch: 92%;
+  font-size: 0.95rem;
   font-weight: 600;
-  letter-spacing: 0.004em;
+  letter-spacing: 0.002em;
   color: var(--ink);
 }
 
-/* Mono, right-set, tabular: the column of verdicts is meant to be readable
-   straight down without reading any of the prose. */
+/*
+ * Mono, right-set, tabular: the column of verdicts is meant to be readable
+ * straight down without reading any of the prose.
+ *
+ * STILL NO COLOUR, AND THAT IS THE POINT. Severity is carried by mono,
+ * uppercase and a hairline rule and by nothing else. A red/amber/green chip
+ * would render a registered limit as an exception to a working product, and on
+ * this page the limits ARE the product surface. The typeface change re-tuned
+ * the size and tracking of this column and touched nothing else about it.
+ *
+ * `white-space: nowrap` matters more on this face than the last: the longest
+ * verdict is "1.08-1.21x, NOT 2.0x", and a wide mono breaking it across two
+ * lines would put a number on a line of its own where it reads as a heading.
+ */
 .ledger__state {
   margin: 0;
   grid-column: 2;
   justify-self: end;
   font-family: var(--font-mono);
-  font-size: 0.63rem;
-  letter-spacing: 0.11em;
+  font-size: 0.585rem;
+  letter-spacing: 0.055em;
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1243,8 +1457,8 @@ body::after {
 .ledger__detail {
   grid-column: 1 / -1;
   margin: 0.3rem 0 0;
-  font-size: 0.78rem;
-  line-height: 1.5;
+  font-size: 0.745rem;
+  line-height: 1.52;
   color: var(--ink-dim);
   text-wrap: pretty;
 }
@@ -1309,12 +1523,12 @@ body::after {
   }
 
   .ledger__label {
-    font-size: 0.88rem;
+    font-size: 0.85rem;
   }
 
   .ledger__detail {
-    font-size: 0.68rem;
-    line-height: 1.3;
+    font-size: 0.655rem;
+    line-height: 1.32;
     margin-top: 0.16rem;
   }
 
@@ -1328,8 +1542,8 @@ body::after {
    */
   .narrative-layer > .narrative-section:nth-child(2) h2,
   .narrative-layer > .narrative-section:nth-child(5) h2 {
-    font-size: 1.55rem;
-    line-height: 1.14;
+    font-size: 1.5rem;
+    line-height: 1.18;
   }
 
   .narrative-layer > .narrative-section:nth-child(2) .narrative-section__body,
@@ -1342,13 +1556,13 @@ body::after {
      yields size to them at this width. */
   .narrative-layer > .narrative-section:nth-child(2) > .narrative-section__body > p,
   .narrative-layer > .narrative-section:nth-child(5) > .narrative-section__body > p {
-    font-size: 0.88rem;
-    line-height: 1.48;
+    font-size: 0.85rem;
+    line-height: 1.5;
   }
 
   /* Every beat clears the fixed header band. Sections are absolutely
      positioned and vertically centred, so without this the taller ones
-     centre their kicker underneath the VIVUM mark — measured, beat 03's
+     centre their kicker underneath the CODON mark — measured, beat 03's
      kicker sat at y = 59 against a header occupying the top ~62px. */
   .narrative-section {
     padding-top: 4.5rem;
@@ -1365,5 +1579,96 @@ body::after {
     justify-self: start;
     margin-top: 0.16rem;
     color: var(--ink-dim);
+  }
+}
+
+/* --------------------------------------------------------------------- */
+/* Scroll cue (hero only — see components/ui/ScrollCue.tsx)               */
+/* --------------------------------------------------------------------- */
+
+.scroll-cue {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(1rem, 2.4vh, 1.9rem);
+  transform: translateX(-50%);
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+.scroll-cue__label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.26em;
+  text-indent: 0.26em; /* centres text that carries trailing letter-spacing */
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/*
+ * The line is the motion, and it is the ONLY looping animation on the page.
+ * A 1px rule that fills downward and resets: it states the axis (down) and
+ * the fact that something responds, without a chevron or a bounce, both of
+ * which belong to a louder page than this one.
+ */
+.scroll-cue__line {
+  position: relative;
+  display: block;
+  width: 1px;
+  height: 34px;
+  background: var(--hairline);
+  overflow: hidden;
+}
+
+.scroll-cue__line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(127, 209, 224, 0) 0%,
+    var(--accent-dim) 55%,
+    rgba(127, 209, 224, 0) 100%
+  );
+  transform: translateY(-100%);
+  animation: scroll-cue-travel 2.6s cubic-bezier(0.6, 0, 0.35, 1) infinite;
+}
+
+@keyframes scroll-cue-travel {
+  0% {
+    transform: translateY(-100%);
+  }
+  60%,
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+/* The specimen caption runs much closer to the bottom edge on a phone, so
+   the cue tucks in tighter and loses the rule rather than crowding it. */
+@media (max-width: 820px) {
+  .scroll-cue {
+    bottom: 0.6rem;
+    gap: 0.3rem;
+  }
+
+  .scroll-cue__line {
+    height: 20px;
+  }
+}
+
+/* Reduced motion gets the cue but not the loop: the axis is still worth
+   stating, and a page whose fallback exists to stop things moving must not
+   add a permanent animation to it. (The fallback experience does not mount
+   this at all — this rule is the belt to that braces.) */
+@media (prefers-reduced-motion: reduce) {
+  .scroll-cue__line::after {
+    animation: none;
+    transform: translateY(0);
+    opacity: 0.5;
   }
 }

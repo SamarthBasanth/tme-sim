@@ -3,13 +3,47 @@
  * prefers-reduced-motion fallback so the two never drift out of sync.
  *
  * Positioning guardrails (these are product constraints, not style
- * preferences). Vivum is a mechanistic drug-transport simulator for
+ * preferences). Codon is a mechanistic drug-transport simulator for
  * research users. Copy here must NOT claim or imply: clinical response or
  * patient outcome prediction, any diagnostic / treatment-planning /
  * surgical use, AI or machine learning of any kind, "digital twin", or
  * personalised medicine for an individual patient. Absolute kill fraction
  * is not a defensible output. Every number that appears below must be
  * traceable to a real run or a real dataset count.
+ *
+ * DATA PROVENANCE, AND WHOSE PROPERTY A PRIVACY CLAIM IS ABOUT. Copy here
+ * must not invite, imply or accommodate identifiable patient data: Codon is
+ * scoped to de-identified tissue (docs/DEPLOYMENT.md §0), and there is no
+ * tissue upload to describe — sections are registered by directory path, so
+ * the exposed surface is the path, id and label, and the label becomes the
+ * <h1> of every exported report. Never write "upload".
+ *
+ * The rule that the rest of this paragraph exists to enforce: ANY
+ * data-locality or privacy claim must be traceable to a verified property of
+ * THE SOFTWARE, never to the customer's network. Ours is the only one of the
+ * two we can inspect, and a promise about a perimeter we cannot see is not a
+ * promise, it is a guess printed in the imperative.
+ *
+ * The claim that failed this test, kept here so it cannot drift back: beat 06
+ * read "proprietary tissue and compound data never cross your firewall". That
+ * is a statement about the customer's perimeter, and it was false in a
+ * specific way — the API shipped wildcard CORS with no default auth, so any
+ * page the operator browsed could read the compound library, and the data did
+ * have a path out. Note that the failure was not caught by reading the
+ * sentence; it was caught by auditing the software the sentence described.
+ *
+ * What is sayable instead, because it was checked rather than assumed: the
+ * solve runs as a single local process and sends no tissue or compound data
+ * anywhere (`app/server/` imports no HTTP client, no socket library and no
+ * analytics or crash-reporting SDK; this landing page self-hosts its fonts
+ * and makes zero third-party requests at runtime). Do NOT upgrade this to the
+ * broader "makes no outbound network requests" — that is FALSE of the package
+ * as a whole and falsifiable by grep: tmesim/data/{acquire,spatial_ingest}.py
+ * and tmesim/data/real/mgmt_spatial.py fetch public reference datasets from
+ * GDC, 10x, Sanger, the Allen Institute and NCBI GEO. Those are deliberate,
+ * operator-invoked downloads of public data that carry nothing of the
+ * customer's, which is exactly why the honest claim is about what the
+ * software SENDS and not about how many sockets it opens.
  *
  * Two guardrails narrowed by measurement, both of which read as weaker than
  * the obvious marketing line and must not drift back to it:
@@ -103,7 +137,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "01",
     eyebrow: "Real measured tissue",
     headline: "See Where the Drug Actually Goes.",
-    body: "The section behind this text is a real one. Vivum rebuilds tumor architecture from spatial transcriptomics, then runs transport physics on the result to work out where a drug actually reaches.",
+    body: "The section behind this text is a real one. Codon rebuilds tumor architecture from spatial transcriptomics, then runs transport physics on the result to work out where a drug actually reaches.",
     align: "left",
   },
   {
@@ -251,7 +285,13 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "06",
     eyebrow: "Get started",
     headline: "Run it on your own tissue.",
-    body: "Vivum runs inside your own infrastructure; proprietary tissue and compound data never cross your firewall. Bring a section and a candidate series, and get back a ranking, a per-cell mechanism attribution of what killed each compound, and the list above attached to both — the same list, on your tissue, with your numbers in it.",
+    // The previous sentence promised "proprietary tissue and compound data
+    // never cross your firewall". That described the CUSTOMER'S PERIMETER,
+    // which is not ours to make promises about, and it was concretely false
+    // while the API shipped wildcard CORS with no default auth. What replaces
+    // it claims only verified properties of the SOFTWARE. See the data
+    // provenance guardrail at the head of this file before editing this line.
+    body: "Codon runs where your tissue already is: the solve is a single process on your own machine, and it sends no tissue or compound data anywhere. De-identified tissue only. Bring a section and a candidate series, and get back a ranking, a per-cell mechanism attribution of what killed each compound, and the list above attached to both — the same list, on your tissue, with your numbers in it.",
     align: "center",
   },
 ] as const;

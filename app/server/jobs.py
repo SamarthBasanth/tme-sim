@@ -31,6 +31,7 @@ import json
 import math
 import os
 import queue
+import sys
 import threading
 import time
 import traceback
@@ -40,9 +41,12 @@ from typing import Callable, Deque, Dict, List, Optional
 import numpy as np
 
 from .cache import (
+    PRIVATE_FILE_MODE,
     RECON_CACHE,
     ReconstructionCache,
     make_key,
+    own_only,
+    private_makedirs,
     runs_dir,
     state_route_support,
 )
@@ -518,8 +522,14 @@ def execute_run(spec: Dict, ctx: _Ctx,
             f"um^2/s  bbb={dp.bbb_penetrance:.4f}  binding={dp.binding:.4g}")
 
     if compound_doc is not None:
-        ctx.log(f"{drug_name} is a USER-COMPILED compound from SMILES "
-                f"{compound_doc.get('smiles')!r}; "
+        # SECURITY: never put the SMILES in the job log. The log is returned
+        # to HTTP clients as `log_tail` on GET /api/runs/{id}/status and is
+        # persisted world-readable in app/runs/*/result.json; the structure is
+        # the operator's unpublished IP. The identity is enough to read the
+        # log; the structure is one GET /api/compounds away for whoever is
+        # actually entitled to it.
+        ctx.log(f"{drug_name} is a USER-COMPILED compound "
+                f"(SMILES withheld from this log); "
                 f"{compound_doc.get('predicted_field_count')} of "
                 f"{len(compound_doc.get('fields', []))} compiled fields are "
                 "predictions, not measurements")
@@ -1111,7 +1121,7 @@ class JobManager:
                  cache: ReconstructionCache = RECON_CACHE,
                  start_worker: bool = True):
         self.root = root or runs_dir()
-        os.makedirs(self.root, exist_ok=True)
+        private_makedirs(self.root)
         self.cache = cache
         self._jobs: "Dict[str, Job]" = {}
         self._order: List[str] = []          # submission order, oldest first
@@ -1197,11 +1207,12 @@ class JobManager:
         the writes before it announces ``done`` — see the note there.
         """
         d = self._dir(job.run_id)
-        os.makedirs(d, exist_ok=True)
+        private_makedirs(d)
         for name, blob in (payloads or {}).items():
             tmp = os.path.join(d, name + ".bin.tmp")
             with open(tmp, "wb") as fh:
                 fh.write(blob)
+            own_only(tmp, PRIVATE_FILE_MODE)
             os.replace(tmp, os.path.join(d, name + ".bin"))
         doc = job.result_view()
         if status is not None:
@@ -1212,6 +1223,7 @@ class JobManager:
         tmp = os.path.join(d, "result.json.tmp")
         with open(tmp, "w") as fh:
             json.dump(jsonable(doc), fh, indent=1)
+        own_only(tmp, PRIVATE_FILE_MODE)
         os.replace(tmp, os.path.join(d, "result.json"))
 
     def payload_path(self, run_id: str, name: str) -> str:
@@ -1327,6 +1339,14 @@ class JobManager:
             job.traceback = traceback.format_exc()
             job.status = "failed"
             job.log(f"FAILED: {job.error}")
-            for line in job.traceback.rstrip().splitlines()[-12:]:
-                job.log(line)
+            # SECURITY: the stack does NOT go into the job log. log_tail is
+            # returned by GET /api/runs/{id}/status and persisted into
+            # app/runs/*/result.json, and traceback.format_exc() always
+            # carries absolute host paths -- the repo root, the operator's
+            # username, the internal module layout. `job.error` is the typed
+            # diagnosis the product promises; the stack stays server-side, on
+            # stdout for whoever is at the console, and behind the opt-in
+            # GET /api/runs/{id}/traceback for whoever is debugging.
+            print(f"[run {job.run_id}] FAILED\n{job.traceback}",
+                  file=sys.stderr, flush=True)
             self._persist(job, None)

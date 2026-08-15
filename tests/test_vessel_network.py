@@ -102,10 +102,21 @@ def test_link_distance_controls_merging():
 
 
 def test_discrete_field_is_exactly_zero_away_from_vessels():
-    """THE load-bearing property: no Gaussian tail, no floor."""
+    """THE load-bearing property: no Gaussian tail, no floor.
+
+    RE-PINNED 2026-08-14 (``results/area_conservation_promotion.md``). The
+    ``geometry`` default moved ``'binary'`` -> ``'area'``, so this test now names
+    the binary painting explicitly. **No assertion was removed**: every binary
+    property this test pinned is still pinned, on the same field, reached by name
+    instead of by default. The no-floor property is the reason this test exists
+    and it is NOT specific to the binary painting, so it is additionally asserted
+    on the new default at the bottom -- the promotion widens this test rather
+    than narrowing it.
+    """
     domain, cells = _population()
     v = segment_vessels(cells, domain, link_distance_um=LINK_DISTANCE_UM)
-    f = discrete_vascular_field(domain, v, radius_um=VESSEL_RADIUS_UM)
+    f = discrete_vascular_field(domain, v, radius_um=VESSEL_RADIUS_UM,
+                                geometry="binary")
 
     assert f.min() == 0.0
     assert set(np.unique(f)) <= {0.0, 1.0}, "'unit' amplitude must be binary"
@@ -122,8 +133,26 @@ def test_discrete_field_is_exactly_zero_away_from_vessels():
     assert np.all(f[d > VESSEL_RADIUS_UM] == 0.0), "source leaks beyond the radius"
 
     # Larger radius => strictly more source, and the field stays binary.
-    big = discrete_vascular_field(domain, v, radius_um=30.0)
+    big = discrete_vascular_field(domain, v, radius_um=30.0, geometry="binary")
     assert (big > 0).sum() > (f > 0).sum()
+
+    # THE SAME NO-FLOOR PROPERTY ON THE FIELD THAT NOW SHIPS. The default is the
+    # area-conserving painting, which is continuous in [0, 1] -- so it CANNOT be
+    # asserted binary -- but "exactly zero away from a vessel" is the property
+    # this test is named for and it must survive the promotion. The reach is one
+    # half-diagonal larger because a cell is nonzero when ANY part of it is
+    # covered, not only when its centre is: that is what a finite-volume
+    # representation of a sub-grid object means.
+    shipped = discrete_vascular_field(domain, v, radius_um=VESSEL_RADIUS_UM)
+    assert not np.array_equal(shipped, f), (
+        "the default must no longer be the binary painting")
+    assert shipped.min() == 0.0
+    assert shipped.max() <= 1.0
+    assert np.any((shipped > 0.0) & (shipped < 1.0)), (
+        "the shipped painting must carry PARTIAL area weights")
+    assert shipped[~np.asarray(domain.tissue_mask, dtype=bool)].sum() == 0.0
+    reach = VESSEL_RADIUS_UM + domain.dx * np.sqrt(2.0) / 2.0
+    assert np.all(shipped[d > reach] == 0.0), "source leaks beyond the radius"
 
 
 def test_match_total_to_preserves_the_integral():
@@ -324,7 +353,11 @@ def test_subgrid_paints_vessels_smaller_than_a_grid_cell():
     # the lattice phase happens to give, it is wrong by an order of magnitude.
     # (Here it awards 0 — none of the 16 vessels contains a grid-cell centre, so
     # the whole vasculature disappears from the source field.)
-    binary = discrete_vascular_field(domain, v, radius_um=VESSEL_RADIUS_UM)
+    # RE-PINNED 2026-08-14: named explicitly now that the default is 'area'
+    # (``results/area_conservation_promotion.md``). The claim under test is about
+    # the LEGACY binary painting, so it must ask for it rather than inherit it.
+    binary = discrete_vascular_field(domain, v, radius_um=VESSEL_RADIUS_UM,
+                                     geometry="binary")
     binary_area = float((binary > 0).sum()) * cell_area
     assert set(np.unique(binary)) <= {0.0, 1.0}
     assert binary_area % cell_area == 0.0, "binary painting is quantised to cells"
@@ -435,19 +468,50 @@ def test_footprint_is_one_per_vessel_object_not_one_per_endothelial_cell():
     assert per_nucleus[1] == pytest.approx(per_nucleus[0], rel=0.5)
 
 
-def test_subgrid_field_is_opt_in_and_default_is_unchanged():
-    """The corrected geometry must not silently move any published result."""
+def test_subgrid_field_is_opt_in_and_default_is_area_not_subgrid():
+    """``'subgrid'`` must STILL be opt-in, and the default must be ``'area'``.
+
+    RE-PINNED AND INVERTED 2026-08-14
+    (``results/area_conservation_promotion.md``). This test used to assert
+    ``default == binary``. That is now false BY DESIGN: the area-conserving
+    painting was promoted to the default after being landed opt-in
+    (``results/vessel_source_conservation.md``) and blast-radius tested
+    (``results/area_conservation_regeneration.md``), and re-verified on the
+    post-two-route engine, where zero of the nine published verdicts moved.
+
+    **The assertion is inverted, not deleted**, following the precedent of
+    ``test_compile_drug_does_not_import_two_route`` in the two-route promotion:
+    it now pins that the default is the area painting and is NOT the binary one,
+    so an unannounced flip BACK would fire here just as loudly as the flip
+    forward did. The claim this test was really written to protect --
+    ``'subgrid'`` is a different geometric object and must never be reached by
+    accident -- is untouched and still checked below.
+    """
     domain, cells = _population()
     v = segment_vessels(cells, domain, link_distance_um=LINK_DISTANCE_UM)
     default = discrete_vascular_field(domain, v)
     binary = discrete_vascular_field(domain, v, geometry="binary")
-    np.testing.assert_array_equal(default, binary)
-    assert set(np.unique(default)) <= {0.0, 1.0}
+    area = discrete_vascular_field(domain, v, geometry="area")
+    np.testing.assert_array_equal(default, area)
+    assert not np.array_equal(default, binary), (
+        "the default is 'area' since results/area_conservation_promotion.md; if "
+        "this fires, the default was flipped back to 'binary' without a re-run")
+    # The historical field is still reachable, still binary, still bit-identical.
+    assert set(np.unique(binary)) <= {0.0, 1.0}
+    assert np.any((default > 0.0) & (default < 1.0)), (
+        "the shipped painting carries partial area weights")
 
     sub = discrete_vascular_field(domain, v, geometry="subgrid")
     assert sub.min() == 0.0 and sub.max() <= 1.0
     assert np.any((sub > 0.0) & (sub < 1.0)), "sub-grid field must be fractional"
     assert not np.array_equal(sub, binary)
+    # ...and, the point of the whole test, 'subgrid' is STILL not the default.
+    # It paints one footprint per vessel OBJECT and deposits ~347k um^2 against
+    # ~744k; results/delivery_source_geometry.md rejected it after it flipped
+    # three of seven scored verdicts. 'area' is a different thing entirely.
+    assert not np.array_equal(sub, default), (
+        "'subgrid' must never become the default; it is a different geometric "
+        "object, not a rasterisation fix")
     assert sub[~np.asarray(domain.tissue_mask, dtype=bool)].sum() == 0.0
 
     with pytest.raises(ValueError):

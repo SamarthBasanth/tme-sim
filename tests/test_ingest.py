@@ -933,7 +933,7 @@ def test_registering_a_synthetic_export_never_shadows_a_builtin(
 
 
 # --------------------------------------------------------------------------- #
-# CLI: `vivum ingest`
+# CLI: `codon ingest`
 # --------------------------------------------------------------------------- #
 def _run_cli(argv, monkeypatch, tmp_path):
     """Run the CLI against an ISOLATED section store."""

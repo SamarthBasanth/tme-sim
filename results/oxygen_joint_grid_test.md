@@ -1,5 +1,50 @@
 # The jointly calibrated oxygen configuration is grid-labile — **more** so than the shipped one, not less
 
+> # ⚠️ STALE AS OF 2026-08-14 — §1's LADDERS WERE MEASURED ON A SOURCE THAT NO LONGER SHIPS
+>
+> **This banner is the only edit made to this file.** No number below it has been
+> changed, re-run or corrected. Read §1 as a measurement of the *binary* vessel
+> painting, which is no longer the default.
+>
+> **What changed.** `results/area_conservation_promotion.md` promoted
+> `reconstruct.vessel_network.discrete_vascular_field(geometry='area')` to the
+> shipping default. Every `F_state` and mean-O₂ ladder in this file was solved on
+> the **binary** painting, whose total painted vessel area is a function of the
+> mesh (4.7312 % span over `dx = 30…5 µm`). The source that ships now conserves
+> that total exactly.
+>
+> **How stale, measured — `results/area_conservation_regeneration.md` §3.2:**
+>
+> | configuration | `F_state` grid span, **binary** (what §1 reports) | `F_state` grid span, **area** (what ships) | `dx = 12 µm` value moves by |
+> |---|---:|---:|---:|
+> | shipped (`supply = 0.05`) | 0.04609 | **0.00044** (−99.0 %) | −0.0080 |
+> | joint-lo | 0.15746 | **0.07418** (−52.9 %) | **+0.0863** |
+> | joint-hi | 0.05418 | **0.08271** (**+52.7 %, WORSE**) | **+0.0533** |
+>
+> **The finding this file must not be read as contradicting, and the one it must
+> not be read as supporting.** Its headline — *the jointly calibrated
+> configuration is more grid-labile than the shipped one* — **survives**: joint-lo
+> and joint-hi still span far more than shipped under either painting. But the
+> area painting is **not uniformly an improvement**: it removes 99.0 % of the grid
+> span on the configuration that ships and **increases it by 52.7 % on joint-hi**.
+> Any claim that `geometry='area'` "fixes the grid dependence" is a claim about
+> **the shipped constants specifically** and does not generalise to these
+> hypothetical ones.
+>
+> **Why this is bookkeeping rather than science.** *Neither jointly calibrated
+> configuration ships*, and **no published verdict is scored under either of
+> them** — all nine run at `supply = 0.05`. The promotion moved **zero** of the
+> nine verdicts. What is stale here is this file's numbers, not its conclusion.
+>
+> **What was NOT regenerated:** everything in this file. §1's ladders have
+> post-promotion values only for `F_state` and mean O₂, only at
+> `dx = 30/18/12/8/6/5`, and only in
+> `results/area_conservation_regeneration.md` §3.2. This file's band-change
+> counts, its per-cell grid-σ statistics (§2–3), its mechanism section (§4) and
+> its cisplatin verdict ladder (§5) have **no** post-promotion counterpart.
+> Regenerating them needs `experiments/oxygen_joint_grid_test.py` re-run under
+> `geometry='area'` and that has not been done.
+
 > **One-line answer.** `results/oxygen_supply_calibration.md` §6.3 left one question open: it
 > achieved `F_state` span exactly 0.0000 by correcting `supply` alone, admitted that span was
 > degenerate (100 % of cells in one band), and stated that **"the jointly calibrated

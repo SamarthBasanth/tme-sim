@@ -1,4 +1,4 @@
-# tmesim Studio — information architecture
+# Codon Studio — information architecture
 
 Status: normative for `app/web/`. Written before the consolidation pass, and
 kept as the rule the front end is measured against afterwards.
@@ -25,6 +25,15 @@ acquires a **predictable place**, and that place is derived from one sentence.
   these in view at a time.
 - The **primary verb** is *run a therapy and read the mechanism*. Its output is
   a `RunResult`: metrics, per-cell mechanism attribution, provenance, caveats.
+
+"Run a therapy" is a simulation, and the sentence is about layout, not about
+what the product is licensed to do. The specimen is a de-identified tissue
+section; the run is a model prediction that has been scored against no patient
+outcome. Nothing this UI displays is for clinical use — that constraint is
+carried in the product by `provenance.js`'s standing limits and the reports'
+NOT FOR CLINICAL USE banner, and it is repeated here so a reader who arrives at
+the sentence first does not read it as a clinical workflow. See
+[`DEPLOYMENT.md` §0](DEPLOYMENT.md) for what a field tester may load.
 
 Everything else in the application — run history, projects, the protocol
 editor, therapy reports, the mechanism legend, the render diagnostics — is
@@ -74,7 +83,7 @@ except for the workspace launchers.
 
 | Group | Content |
 |---|---|
-| identity | `tmesim Studio`, version |
+| identity | `Codon Studio`, version |
 | specimen | active section id + its one-line description |
 | run | active run id + status chip |
 | scale | cell count |

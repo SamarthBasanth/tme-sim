@@ -35,6 +35,7 @@ from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException, Request
 
+from .cache import PRIVATE_DIR_MODE, PRIVATE_FILE_MODE, own_only
 from .jobs import JobManager, jsonable
 from .protocol_wire import (
     NO_RUN_ID_REASON,
@@ -58,7 +59,19 @@ _ALLOWED_UPLOAD_EXT = (".smi", ".smiles", ".mol", ".sdf", ".json", ".yaml", ".ym
 #: larger is not a drug definition.
 _MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 
+#: SECURITY: hard ceiling on the RAW request body for every protocol route,
+#: enforced by :func:`_capped_body` before a byte is buffered. Larger than
+#: ``_MAX_UPLOAD_BYTES`` because a multipart envelope carries headers and a
+#: boundary around the 2 MB payload; small enough that the parser's transient
+#: copies stay bounded. There is no reverse proxy in deployment mode 1a, so
+#: this is the only body limit in the product.
+_MAX_BODY_BYTES = 4 * 1024 * 1024
+
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
+
+#: RFC 2046 §5.1.1: 1-70 characters from this set, not ending in a space.
+_BOUNDARY_RE = re.compile(r"^[0-9A-Za-z'()+_,\-./:=?]([0-9A-Za-z'()+_,\-./:=? ]{0,68}"
+                          r"[0-9A-Za-z'()+_,\-./:=?])?$")
 
 
 # --------------------------------------------------------------------------- #
@@ -340,7 +353,10 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
                 "reason": ("structures are .smi/.mol/.sdf; parameter files are "
                            ".json/.yaml")})
 
-        if body.get("content_base64") is not None:
+        if body.get("content_bytes") is not None:
+            # multipart: already raw bytes, never base64 round-tripped
+            data = bytes(body["content_bytes"])
+        elif body.get("content_base64") is not None:
             try:
                 data = base64.b64decode(str(body["content_base64"]),
                                         validate=True)
@@ -360,10 +376,13 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
                            f"{_MAX_UPLOAD_BYTES} B limit",
                 "reason": "a drug definition is kilobytes; this is not one"})
 
-        target = os.path.join(uploads_dir(), name)
+        updir = uploads_dir()
+        own_only(updir, PRIVATE_DIR_MODE)
+        target = os.path.join(updir, name)
         tmp = target + ".tmp"
         with open(tmp, "wb") as fh:
             fh.write(data)
+        own_only(tmp, PRIVATE_FILE_MODE)
         os.replace(tmp, target)
 
         rel = os.path.join("uploads", name)
@@ -402,6 +421,44 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
 # --------------------------------------------------------------------------- #
 # Body helpers
 # --------------------------------------------------------------------------- #
+async def _capped_body(request: Request) -> bytes:
+    """Read the request body, refusing anything over :data:`_MAX_BODY_BYTES`
+    **before** it is buffered.
+
+    This used to be a bare ``await request.body()``, with the
+    ``_MAX_UPLOAD_BYTES`` check only afterwards -- by which point the body had
+    already been buffered, split, base64-encoded and decoded, roughly 5.7x the
+    request size resident. A ~500 MB POST cost ~2.8 GB and a handful of them
+    OOM'd the process, unauthenticated, with no rate limit. A limit that fires
+    after the allocation is not a limit.
+
+    Content-Length is checked first because it lets us refuse without reading
+    a byte, but it is client-supplied and may be absent or a lie, so the
+    stream is counted as it arrives and aborted the moment it crosses.
+    """
+    declared = request.headers.get("content-length")
+    if declared is not None and declared.isdigit() and int(declared) > _MAX_BODY_BYTES:
+        raise HTTPException(status_code=413, detail={
+            "message": f"request body is {int(declared)} B, above the "
+                       f"{_MAX_BODY_BYTES} B limit",
+            "reason": "a protocol script or a drug definition is kilobytes"})
+    chunks: List[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > _MAX_BODY_BYTES:
+            raise HTTPException(status_code=413, detail={
+                "message": f"request body exceeds the {_MAX_BODY_BYTES} B limit",
+                "reason": "a protocol script or a drug definition is kilobytes"})
+        chunks.append(chunk)
+    raw = b"".join(chunks)
+    # Populate starlette's own body cache so anything downstream that calls
+    # request.body()/stream() again sees the same bytes rather than an empty
+    # or already-consumed stream -- request.body() would have set this.
+    request._body = raw
+    return raw
+
+
 async def _body(request: Request) -> Dict:
     """Parse the request body as JSON, multipart, or raw text.
 
@@ -410,8 +467,11 @@ async def _body(request: Request) -> Dict:
     contract says must not be added ("it must run from a clean checkout with
     only the existing venv plus fastapi"). One file part is all these routes
     ever receive, so the ~20 lines below are cheaper than a dependency.
+
+    SECURITY: the body is capped BEFORE it is buffered -- see
+    :func:`_capped_body`.
     """
-    raw = await request.body()
+    raw = await _capped_body(request)
     if not raw:
         return {}
     ctype = request.headers.get("content-type") or ""
@@ -438,12 +498,24 @@ async def _source(request: Request) -> str:
 
 
 def _parse_multipart(raw: bytes, content_type: str) -> Dict:
-    """Extract the first file part of a multipart body -> ``{filename, content_base64}``."""
+    """Extract the first file part of a multipart body -> ``{filename, content_bytes}``.
+
+    Returns the payload as raw ``bytes``. It used to be base64-encoded here
+    and immediately decoded again by the caller, which added 2.66x to the peak
+    allocation for no benefit.
+    """
     marker = "boundary="
     if marker not in content_type:
         return {"_multipart_error": "multipart body with no boundary in the "
                                     "Content-Type header"}
     boundary = content_type.split(marker, 1)[1].split(";")[0].strip().strip('"')
+    # SECURITY: RFC 2046 caps a boundary at 70 characters from a fixed set.
+    # Unvalidated, `boundary=` (empty) made `sep` == b"--", which split the
+    # body on every "--" in it -- 4.2 million fragment objects out of an 8 MB
+    # body, ~35 MB of peak allocation, from one request.
+    if not _BOUNDARY_RE.match(boundary):
+        return {"_multipart_error": "malformed multipart boundary (RFC 2046: "
+                                    "1-70 characters from the boundary charset)"}
     sep = b"--" + boundary.encode()
     for part in raw.split(sep):
         if b"\r\n\r\n" not in part:
@@ -458,8 +530,7 @@ def _parse_multipart(raw: bytes, content_type: str) -> Dict:
         # one: a loop would eat a trailing blank line that is part of the file.
         if payload.endswith(b"\r\n"):
             payload = payload[:-2]
-        return {"filename": filename,
-                "content_base64": base64.b64encode(payload).decode()}
+        return {"filename": filename, "content_bytes": payload}
     return {"_multipart_error": "multipart body carried no file part "
                                 "(expected a part with a filename)"}
 

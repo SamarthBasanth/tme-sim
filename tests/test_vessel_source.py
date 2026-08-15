@@ -17,9 +17,12 @@ tests guard the three things that make it a fix rather than a change:
    radius, so the absolute value is the true disc area and overlaps are not
    double-counted (``test_area_geometry_measures_the_true_disc_area``,
    ``test_area_geometry_takes_the_union_not_the_sum``);
-3. it is OPT-IN -- the ``'binary'`` default is bit-identical to the historical
-   field and nothing routes through the new branch by accident
-   (``test_binary_default_is_untouched``).
+3. it is THE DEFAULT, deliberately and not silently -- promoted 2026-08-14 by
+   ``results/area_conservation_promotion.md`` after being landed opt-in, blast-
+   radius tested, and re-verified on the post-two-route engine (zero of nine
+   published verdicts moved, worst ratio move -2.603 %). The historical binary
+   painting is still reachable by name and still bit-identical
+   (``test_area_painting_is_the_default_and_binary_is_reachable_by_name``).
 
 Everything runs on a small synthetic population: no data download, no PDE solve.
 """
@@ -95,13 +98,19 @@ def _painted_area(field: np.ndarray, dx: float) -> float:
 def test_binary_painting_does_not_conserve_painted_area():
     """The DEFECT, pinned. If this ever stops failing to conserve, the premise of
     ``results/vessel_source_conservation.md`` has changed and the report is stale.
+
+    RE-PINNED 2026-08-14: names ``geometry='binary'`` explicitly now that the
+    default is ``'area'`` (``results/area_conservation_promotion.md``). Without
+    the keyword this test silently became a test of the FIX and would have
+    reported the defect as cured. The assertion is unchanged.
     """
     cells = _cells()
     areas = []
     for dx in DX_LADDER:
         dom = _domain(dx)
         v = segment_vessels(cells, dom, link_distance_um=LINK_DISTANCE_UM)
-        areas.append(_painted_area(discrete_vascular_field(dom, v), dx))
+        areas.append(_painted_area(
+            discrete_vascular_field(dom, v, geometry="binary"), dx))
     span = (max(areas) - min(areas)) / float(np.mean(areas))
     assert span > 0.02, (
         "the binary centre-in-disc painting is expected NOT to conserve the "
@@ -241,26 +250,67 @@ def test_subpixel_pitch_refines_towards_the_exact_area():
 # --------------------------------------------------------------------------- #
 # 3. It is OPT-IN -- nothing shipped moves
 # --------------------------------------------------------------------------- #
-def test_binary_default_is_untouched():
-    """The shipped painting must remain binary, and must remain the default.
+def test_area_painting_is_the_default_and_binary_is_reachable_by_name():
+    """The shipped painting is the AREA-CONSERVING one, and that is deliberate.
 
-    ``vascular_density_from_cells`` (hence every reconstruction and every
-    published result) routes through ``discrete_vascular_field``, so a silent
-    flip of this default would silently move all of them.
+    INVERTED 2026-08-14 — ``results/area_conservation_promotion.md``.
+
+    THIS TEST WAS ``test_binary_default_is_untouched`` AND IT DID ITS JOB. Its
+    docstring said that ``vascular_density_from_cells`` — hence every
+    reconstruction and every published result — routes through this default, "so
+    a silent flip of this default would silently move all of them". It existed to
+    make sure the flip could not happen quietly, and when the flip was made it
+    fired. **The flip is no longer silent: it is evidenced, measured and
+    reported, so the guard is inverted rather than deleted**, exactly as the
+    two-route promotion inverted ``test_compile_drug_does_not_import_two_route``.
+
+    WHY THE NEW DEFAULT IS RIGHT, not merely different. The binary painting is a
+    centre-in-disc vote that deposits a whole ``dx^2`` grid cell per vote, so the
+    total painted vessel area is a function of the mesh: **4.7312 %** span,
+    non-monotone, over ``dx = 30…5 µm`` on the real GBM section — the same
+    ``dx^2``-count defect ``physics.oxygen._tumor_density`` already fixed on the
+    oxygen SINK. ``'area'`` paints the same discs at the same radius around the
+    same endothelial cells and conserves the total **exactly** (742,713.0 µm² at
+    every rung, span 6.3e-14 %), removing **98.82 %** of the ``F_state`` grid
+    drift (0.046090 → 0.000546). Re-verified on the post-two-route engine
+    (``alpha = 22.223477711172563``): **zero of nine published verdicts moved**,
+    worst ratio move −2.603 %.
+
+    WHAT IT COST, so this is not read as free: the production source total moves
+    **−0.794 %** and production ``F_state`` moves 0.5502 → 0.5422.
+
+    **Every assertion below is still an assertion about the binary field.** It is
+    reached by name instead of by default, and the default is now pinned to
+    ``'area'`` — so a flip BACK would fire here just as loudly.
     """
     cells = _cells()
     dom = _domain(12.0)
     v = segment_vessels(cells, dom, link_distance_um=LINK_DISTANCE_UM)
     default = discrete_vascular_field(dom, v)
-    explicit = discrete_vascular_field(dom, v, geometry="binary")
-    assert np.array_equal(default, explicit)
-    assert set(np.unique(default)) <= {0.0, 1.0}
-    # and the production entry point still lands on it
+    binary = discrete_vascular_field(dom, v, geometry="binary")
+    area = discrete_vascular_field(dom, v, geometry="area")
+
+    # THE NEW CONTRACT: the default IS the area painting.
+    assert np.array_equal(default, area)
+    assert np.any((default > 0.0) & (default < 1.0)), (
+        "the shipped field must carry PARTIAL area weights; a 0/1 field means "
+        "the default was flipped back to 'binary'")
+
+    # THE OLD CONTRACT, PRESERVED: the binary painting still exists, is still
+    # bit-identical to what it always was, and is still exactly 0 or 1.
+    assert set(np.unique(binary)) <= {0.0, 1.0}
+    assert not np.array_equal(default, binary), (
+        "default must no longer be 'binary' — see "
+        "results/area_conservation_promotion.md")
+
+    # and the production entry point lands on the new default, which is the
+    # whole reason the flip is consequential enough to need a report
     prod = vascular_density_from_cells(dom, cells)
     assert np.array_equal(prod, default)
-    # the new branch must be reachable ONLY by asking for it
-    assert not np.array_equal(
-        discrete_vascular_field(dom, v, geometry="area"), default)
+    assert not np.array_equal(prod, binary)
+
+    # the historical branch must be reachable ONLY by asking for it
+    assert not np.array_equal(binary, default)
 
 
 def test_match_total_to_restores_the_shipped_total_exactly():
@@ -273,7 +323,11 @@ def test_match_total_to_restores_the_shipped_total_exactly():
     cells = _cells()
     dom = _domain(12.0)
     v = segment_vessels(cells, dom, link_distance_um=LINK_DISTANCE_UM)
-    binary = discrete_vascular_field(dom, v)
+    # RE-PINNED 2026-08-14: named explicitly now that the default is 'area'
+    # (``results/area_conservation_promotion.md``). Passing the default here
+    # would have matched the area field to ITSELF, making the test vacuous —
+    # ``matched == binary`` was exactly the failure it reported.
+    binary = discrete_vascular_field(dom, v, geometry="binary")
     matched = discrete_vascular_field(dom, v, geometry="area",
                                       match_total_to=binary)
     tissue = np.asarray(dom.tissue_mask, dtype=bool)

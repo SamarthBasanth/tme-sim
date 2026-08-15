@@ -153,10 +153,16 @@ export default function GLTFTumor({
     };
   }, [cloned]);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     const p = progressRef.current;
+    const aspect = state.size.width / Math.max(state.size.height, 1);
     sepSmoothed.current = damp(sepSmoothed.current, separationAmount(p), 3.2, delta);
-    offsetSmoothed.current = damp(offsetSmoothed.current, sectionOffsetAmount(p), 3.2, delta);
+    offsetSmoothed.current = damp(
+      offsetSmoothed.current,
+      sectionOffsetAmount(p, aspect),
+      3.2,
+      delta,
+    );
     const sep = sepSmoothed.current;
 
     if (regions.core) regions.core.position.set(0, -0.4 * sep, 0);

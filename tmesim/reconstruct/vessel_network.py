@@ -38,24 +38,45 @@ What it does
    a documented vessel radius of a segmented vessel and **exactly zero** elsewhere.
    No Gaussian tail, no floor.
 
-THE RASTERISATION DEFECT, AND THE OPT-IN FIX (``geometry='area'``)
-------------------------------------------------------------------
-The shipped ``geometry='binary'`` painting is a *centre-in-disc vote*: a grid cell
-is 1.0 iff its centre lies within ``VESSEL_RADIUS_UM`` of an endothelial cell, and
-it then deposits a whole grid cell of vessel — area ``dx^2``. That makes the TOTAL
-painted vessel area a function of the mesh (**4.73 %** span, non-monotone, over
-``dx = 30…5 µm`` on the real GBM section), which is precisely the ``dx^2``-count
-defect ``physics.oxygen._tumor_density`` already fixed on the oxygen SINK by
-converting a count into an areal density. ``results/fstate_mechanism.md``
-attributes ~100 % of the ``F_state`` grid drift (``cov/var = +1.057``) to it.
+THE RASTERISATION DEFECT, AND THE FIX THAT IS NOW THE DEFAULT (``geometry='area'``)
+-----------------------------------------------------------------------------------
+The historical ``geometry='binary'`` painting is a *centre-in-disc vote*: a grid
+cell is 1.0 iff its centre lies within ``VESSEL_RADIUS_UM`` of an endothelial
+cell, and it then deposits a whole grid cell of vessel — area ``dx^2``. That makes
+the TOTAL painted vessel area a function of the mesh (**4.7312 %** span,
+non-monotone, over ``dx = 30…5 µm`` on the real GBM section), which is precisely
+the ``dx^2``-count defect ``physics.oxygen._tumor_density`` already fixed on the
+oxygen SINK by converting a count into an areal density.
+``results/fstate_mechanism.md`` attributes ~100 % of the ``F_state`` grid drift
+(``cov/var = +1.057``) to it.
 
 ``geometry='area'`` is the same fix applied to the source: the same discs, the
 same radius, the same endothelial cells, but each grid cell carries the covered
 AREA FRACTION rather than a binary token (:func:`_area_coverage_field`). Painted
-area is then identical at every rung of the production ladder and the ``F_state``
-drift falls from 0.04609 to 0.000546. It is **OPT-IN and default-off** because it
-moves the production source total by −0.794 %, which is a deliberate
-recalibration and not a silent one. See ``results/vessel_source_conservation.md``.
+area is then **742,713.0 µm² at every rung** (span 6.3e-14 %, exact rather than
+convergent) and the ``F_state`` grid drift falls from **0.046090 to 0.000546**,
+98.82 % of it removed.
+
+**IT IS THE DEFAULT AS OF ``results/area_conservation_promotion.md``.** It was
+landed opt-in first (``results/vessel_source_conservation.md``), measured for
+blast radius second (``results/area_conservation_regeneration.md``), and promoted
+third, on its own, after the two-route transport flip had landed and settled, so
+that the two consequential changes could be attributed separately. The promotion
+moves the production source total by **−0.794 %** (748,656 → 742,713 µm² at
+``dx = 12 µm``); that change is deliberate, is reported, and must **not** be
+absorbed by re-tuning ``OxygenConfig.supply``. Zero of the nine published
+verdicts moved, re-solved live on the post-two-route engine.
+
+``geometry='binary'`` is retained, unchanged and bit-identical, as the control
+arm every two-arm comparison in ``results/`` is scored against. **Anything that
+needs the historical field must now ask for it by name** — passing no
+``geometry=`` no longer gets it.
+
+**ONE CONSEQUENCE, NAMED HERE BECAUSE IT IS EASY TO MISS.** The shipped source
+field is now CONTINUOUS in [0, 1] rather than exactly 0 or 1. That voids the
+"exact no-op" guarantee :mod:`tmesim.physics.subgrid` used to enjoy on the
+shipped field, and makes that module's default-off status load-bearing rather
+than merely tidy. See the "STRUCTURAL PRECONDITION" section of its docstring.
 
 Both operate on the CORE interface only (``Domain`` + ``CellPopulation``), exactly
 like ``reconstruct.real_fields``. Nothing in ``core`` / ``physics`` /
@@ -685,21 +706,30 @@ def discrete_vascular_field(
     radius_um: float = VESSEL_RADIUS_UM,
     amplitude: str = "unit",
     match_total_to: Optional[np.ndarray] = None,
-    geometry: str = "binary",
+    geometry: str = "area",
     radius_mode: str = "data",
     subpixel_pitch_um: float = SOURCE_SUBPIXEL_PITCH_UM,
 ) -> np.ndarray:
     """Source field (ny, nx) that is nonzero ONLY within ``radius_um`` of a
     segmented vessel, and EXACTLY zero everywhere else.
 
-    A grid cell is "vessel" when its **centre** lies within ``radius_um`` of any
-    endothelial cell belonging to a segmented vessel object. The result is then
-    masked to ``domain.tissue_mask``. There is no Gaussian tail and therefore no
-    far-field floor: ``field[d > radius_um] == 0.0`` exactly.
+    Each grid cell carries the **fraction of its own area** covered by the union
+    of ``radius_um`` discs drawn around the endothelial cells of the segmented
+    vessel objects (``geometry='area'``, the default). The result is then masked
+    to ``domain.tissue_mask``. There is no Gaussian tail and therefore no
+    far-field floor: ``field[d > radius_um + dx/sqrt(2)] == 0.0`` exactly.
 
-    ``geometry='subgrid'`` — the FIXED geometry
-    -------------------------------------------
-    **ADDITIVE AND OPT-IN; the default is bit-identical to the historical field.**
+    ``geometry='binary'`` — the HISTORICAL painting, retained as the control
+    ------------------------------------------------------------------------
+    A grid cell is 1.0 iff its **centre** lies within ``radius_um`` of an
+    endothelial cell, and 0.0 otherwise. This was the default until
+    ``results/area_conservation_promotion.md``; the code is byte-for-byte the
+    same and it remains reachable by name, because every two-arm result in
+    ``results/`` is scored against it. It is **not** the default any more, and it
+    does not conserve the painted vessel area under ``dx`` — see below.
+
+    ``geometry='subgrid'`` — a DIFFERENT geometric object, still opt-in
+    -------------------------------------------------------------------
     With ``geometry='subgrid'`` the field is instead the fractional area coverage
     of :func:`reconstruct.vessel_geometry.subgrid_coverage_field`: one footprint
     per segmented **vessel object** (not per endothelial cell), at a radius derived
@@ -708,17 +738,15 @@ def discrete_vascular_field(
     ``[0, 1]`` continuously rather than binary. ``radius_um`` is ignored unless
     ``radius_mode='constant'``. See ``results/vessel_geometry_fix.md``.
 
-    The default is left at ``'binary'`` because ``vascular_density_from_cells``
-    (and therefore every reconstruction and every result already published against
-    it) routes through this function; flipping it is a deliberate re-run, not a
-    silent one.
+    ``'subgrid'`` is **not** the default and has never been: it was rejected for
+    the delivery source by ``results/delivery_source_geometry.md`` after flipping
+    three of seven scored verdicts.
 
-    ``geometry='area'`` — the AREA-CONSERVING painting of the SAME discs
+    ``geometry='area'`` — the AREA-CONSERVING painting, and THE DEFAULT
     -------------------------------------------------------------------
-    **ADDITIVE AND OPT-IN; the default is bit-identical to the historical field.**
     ``'binary'`` deposits a whole grid cell of vessel (area ``dx^2``) whenever a
     grid-cell centre lands inside a disc, so the TOTAL painted vessel area is a
-    function of the mesh: it spans **4.73 %**, non-monotonically, over
+    function of the mesh: it spans **4.7312 %**, non-monotonically, over
     ``dx = 30…5 µm`` on the real GBM section. ``'area'`` paints the same discs, at
     the same ``radius_um``, around the same endothelial cells — it changes only
     *how the disc is measured*, replacing the centre-in-disc YES/NO with the grid
@@ -726,6 +754,25 @@ def discrete_vascular_field(
     continuous in ``[0, 1]``. This is the direct counterpart of the areal-density
     fix ``physics.oxygen._tumor_density`` already applies to the oxygen SINK, and
     which the SOURCE never received; see ``results/vessel_source_conservation.md``.
+
+    **What the promotion cost, stated rather than buried**
+    (``results/area_conservation_promotion.md``):
+
+    * the production source total moves **−0.794 %** (748,656 → 742,713 µm² at
+      ``dx = 12 µm``). This is unavoidable: the binary total is a *different
+      number at every rung*, so "conserve the shipped total" is not a well-posed
+      constraint, and the ``match_total_to`` arm that does conserve it recovers
+      only **24.10 %** of the drift because the total IS the defect;
+    * production ``F_state`` moves **0.5502 → 0.5422** on the GBM section;
+    * the painted **support** is NOT conserved and cannot be — a cell containing
+      any part of a vessel is nonzero, so the support goes 0.0268 → 0.0838 of
+      tissue at ``dx = 12 µm`` and 0.0256 → 0.2105 at ``dx = 30 µm``. The
+      *integral* is conserved, not the *placement*, so distance-resolved
+      perivascular claims still need ``dx <= 8 µm``
+      (``results/vessel_promotion.md``);
+    * **the remaining 1.18 % of the drift is not reachable by refining this.**
+      The drift is a PRODUCT (field movement × band-edge gain); this removes
+      99.05 % of the forcing and **0 %** of the gain.
 
     ``'area'`` is NOT the same thing as ``'subgrid'``. ``'subgrid'`` paints one
     footprint per segmented vessel OBJECT at a data-derived radius, which is a
@@ -738,8 +785,11 @@ def discrete_vascular_field(
 
     Normalisation — what the numbers MEAN
     -------------------------------------
-    ``amplitude='unit'`` (default) sets the field to **1.0 inside a vessel and 0.0
-    outside**. This is a **relative** field, in exactly the same sense the existing
+    ``amplitude='unit'`` (default) sets the reference amplitude of a **fully
+    vessel-occupied** grid cell to 1.0 and of vessel-free tissue to 0.0; under the
+    default ``geometry='area'`` a partly-occupied cell carries its covered-area
+    fraction in between, and under ``geometry='binary'`` the field is exactly 0 or
+    1. This is a **relative** field, in exactly the same sense the existing
     max-normalised KDE is relative, but with a cleaner referent: 1.0 means *"a
     perfused vessel wall leaking at the reference rate"*, whereas 1.0 in the KDE
     means *"the densest endothelial-KDE spot anywhere in this particular section"*.

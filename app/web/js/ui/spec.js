@@ -16,6 +16,7 @@ import * as api from '../api.js';
 import { toast, notifyError } from './toast.js';
 import { railGroup, railNav } from './rail.js';
 import { createCompoundPanel } from './compound.js';
+import { createTissuePanel, NOT_VALIDATED, NOT_RUNNABLE } from './tissue.js';
 import { dur, num } from '../util/fmt.js';
 
 const MODES = {
@@ -44,7 +45,7 @@ function normDiag(d) {
   return { path, message };
 }
 
-export function createSpecPanel({ store, onSubmit, onDrugsChanged }) {
+export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsChanged }) {
   let editorFocused = false;
   let syncing = false;
   const fieldEls = new Map();
@@ -56,6 +57,17 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged }) {
   // panel stale.
   const compoundPanel = createCompoundPanel({
     onChanged: () => { if (onDrugsChanged) onDrugsChanged(); },
+  });
+
+  // Bring your own tissue. Owned by ./tissue.js, mounted beside the compound
+  // compiler. Ingesting or removing a section changes the section CATALOGUE,
+  // not just this picker (the projects panel and the protocol validator both
+  // hold their own copy), so the shell is asked to refetch rather than this
+  // panel patching its own <select> and leaving the others stale.
+  const tissuePanel = createTissuePanel({
+    onRegistered: (sectionId) => {
+      if (onSectionsChanged) onSectionsChanged(sectionId || null);
+    },
   });
 
   /* ------------------------------------------------------------- form -- */
@@ -265,10 +277,13 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged }) {
       h('details.sect', { open: true },
         h('summary', 'Specimen, therapy, model', h('span.hint', 'form')),
         h('div.sect-body', formEl)),
-      // The compound compiler sits directly under the form that picks a drug,
-      // because that is the moment an operator discovers the library does not
-      // contain their molecule. It stays collapsed by default: it is a
-      // deliberate act, not part of the ordinary path.
+      // Both BYO panels sit directly under the form that picks a section and a
+      // drug, because that is the moment an operator discovers the list does
+      // not contain their specimen or their molecule. Tissue first: it is the
+      // outer of the two choices — a compound is compared ON a section. Both
+      // stay collapsed by default; each is a deliberate act, not part of the
+      // ordinary path.
+      tissuePanel.el,
       compoundPanel.el,
       h('details.sect', { open: true },
         h('summary', 'Source', h('span.hint', 'JSON · two-way sync')),
@@ -317,6 +332,8 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged }) {
   function sectionTitle(s) {
     const lines = [];
     if (s.panel) lines.push(s.panel);
+    if (s.ingested) lines.push(NOT_VALIDATED);
+    if (s.runnable === false) lines.push(NOT_RUNNABLE);
     if (!s.available && s.reason) lines.push(s.reason);
     for (const c of s.caveats || []) {
       lines.push(`[${c.status}] ${c.capability}: ${c.reason}`);
@@ -331,26 +348,51 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged }) {
       // runs, but something it could otherwise report is refused on it.
       const blocking = s.n_caveats_blocking || 0;
       const mark = s.available && blocking ? `  [${blocking} refused]` : '';
+      // An ingested section is marked IN THE OPTION, not only in the panel that
+      // ingested it: this picker is where it gets chosen, and by then that panel
+      // may be closed — or the section may have been ingested by the CLI in
+      // another session entirely. The distinction the mark carries is the one
+      // that matters: a built-in specimen is what this repo's evidence was
+      // measured from, and this one is not.
+      const own = s.ingested ? '  [ingested — not validated]' : '';
+      // `runnable: false` is a MEX bundle: it ingested, it is inspectable, and
+      // the reconstruction pipeline has no route for it (ingest_registry.py).
+      // This picker chooses what will be SUBMITTED, so such a section is not
+      // offered here at all — the alternative is a run that is guaranteed to
+      // fail after the operator has waited for it.
+      const noRun = s.runnable === false ? '  [no run route — inspect only]' : '';
       sectionSel.appendChild(h('option', {
         value: s.id,
-        disabled: !s.available,
+        disabled: !s.available || s.runnable === false,
         title: sectionTitle(s),
-      }, `${s.label}${s.available ? '' : '  [unavailable]'}${mark}`));
+      }, `${s.label}${s.available ? '' : '  [unavailable]'}${own}${noRun}${mark}`));
     }
     sections_ = sections;
     paintSectionCaveats();
   }
 
   // The picker's own caveat line, repainted whenever the selection changes.
-  // Silent on a section with nothing refused, so it stays meaningful.
+  // Silent on a built-in section with nothing refused, so it stays meaningful.
   function paintSectionCaveats() {
     if (!sectionCaveats) return;
     clear(sectionCaveats);
     const s = (sections_ || []).find((x) => x.id === sectionSel.value);
     const blocking = (s && s.caveats ? s.caveats : []).filter(
       (c) => c.status === 'NO');
-    if (!blocking.length) { sectionCaveats.style.display = 'none'; return; }
+    // An ingested section says so HERE, at the moment of selection, in full and
+    // in the same type as every other refusal in this block. It leads, because
+    // it qualifies everything under it: the capability caveats below say what
+    // this specimen cannot support, and this line says that nothing it CAN
+    // support has been checked against a measurement.
+    const ingested = !!(s && s.ingested);
+    if (!blocking.length && !ingested) { sectionCaveats.style.display = 'none'; return; }
     sectionCaveats.style.display = '';
+    if (ingested) {
+      sectionCaveats.appendChild(h('div.hint', { title: NOT_VALIDATED },
+        h('b', 'This specimen was ingested here, not shipped with Codon. '),
+        NOT_VALIDATED.replace(/^INGESTED — NOT VALIDATED\.\s*/, '')));
+    }
+    if (!blocking.length) return;
     sectionCaveats.appendChild(h('div.hint',
       `This section cannot support ${blocking.length} readout` +
       `${blocking.length === 1 ? '' : 's'}:`));
@@ -811,6 +853,8 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged }) {
     setSections, setDrugs, loadSpec, track, validate: () => runValidate(true),
     /** Repaint the operator's own compound list (GET /api/compounds). */
     refreshCompounds: () => compoundPanel.refresh(),
+    /** Repaint the ingested-section list (GET /api/sections, `ingested` rows). */
+    refreshTissue: () => tissuePanel.refresh(),
     get trackedId() { return tracked; },
     focusEditor: () => ta.focus(),
     setSubmitting(on) {

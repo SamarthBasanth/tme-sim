@@ -1,4 +1,4 @@
-# Vivum (tmesim) Studio -- self-hosting image.
+# Codon (tmesim) Studio -- self-hosting image.
 #
 # Ships the simulator + Studio web UI. Does NOT ship any data cache: real
 # tissue data (data_cache/) is gitignored and not baked into this image, in
@@ -12,16 +12,16 @@
 # would be false. Do not delete it.)
 #
 # Build:
-#   docker build -t vivum-studio .
+#   docker build -t codon-studio .
 # Run (local-only): bind the PUBLISHED port to the host loopback. Inside the
 # container the server must still listen on 0.0.0.0 -- a socket bound to the
 # container's own 127.0.0.1 is unreachable from a published port, since -p
 # forwards into the container's network namespace.
-#   docker run -p 127.0.0.1:8000:8000 -v $(pwd)/data_cache:/app/data_cache vivum-studio
+#   docker run -p 127.0.0.1:8000:8000 -v $(pwd)/data_cache:/app/data_cache codon-studio
 # Run (network-exposed, auth required -- see docs/DEPLOYMENT.md):
 #   docker run -p 8000:8000 -v $(pwd)/data_cache:/app/data_cache \
 #     -e TMESIM_STUDIO_API_KEY=<your-key> \
-#     vivum-studio
+#     codon-studio
 #
 # NOTE the default CMD listens on 0.0.0.0, which app/server/__main__.py treats
 # as non-loopback: with no TMESIM_STUDIO_API_KEY set it AUTO-GENERATES a key

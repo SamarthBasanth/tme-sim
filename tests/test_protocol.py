@@ -1000,6 +1000,74 @@ class TestEditorWire:
         assert r.status_code == 400
 
 
+class TestUploadBodyLimits:
+    """H3. The parser buffers, splits, and copies; measured at ~5.7x the
+    request size. The 2 MB upload cap used to be checked only AFTER all of
+    that, so a ~500 MB POST cost ~2.8 GB before anything refused it, on an
+    unauthenticated route with no rate limit. The cap has to bind before the
+    allocation to be a cap."""
+
+    @pytest.fixture(scope="class")
+    def client(self):
+        from fastapi.testclient import TestClient
+
+        from app.server.api import create_app
+        from app.server.jobs import JobManager
+
+        manager = JobManager(root=tempfile.mkdtemp(prefix="tpl-cap-"),
+                             start_worker=False)
+        with TestClient(create_app(manager)) as c:
+            yield c
+
+    def test_an_oversized_body_is_refused_before_it_is_buffered(self, client):
+        from app.server.protocol_api import _MAX_BODY_BYTES
+
+        big = b"x" * (_MAX_BODY_BYTES + 1)
+        r = client.post("/api/protocol/upload", content=big,
+                        headers={"content-type": "text/plain"})
+        assert r.status_code == 413
+        assert "limit" in json.dumps(r.json())
+
+    def test_an_oversized_multipart_upload_is_refused(self, client):
+        from app.server.protocol_api import _MAX_BODY_BYTES
+
+        body = (b'--BND\r\nContent-Disposition: form-data; name="file"; '
+                b'filename="huge.smi"\r\n\r\n'
+                + b"C" * (_MAX_BODY_BYTES + 1) + b"\r\n--BND--\r\n")
+        r = client.post("/api/protocol/upload", content=body,
+                        headers={"content-type":
+                                 "multipart/form-data; boundary=BND"})
+        assert r.status_code == 413
+
+    def test_an_empty_boundary_is_refused_rather_than_split_on(self, client):
+        """`boundary=` made `sep` == b"--", splitting the body on every "--"
+        in it: 4.2 million fragment objects out of 8 MB. RFC 2046 requires
+        1-70 characters from a fixed charset."""
+        body = b"-" * 4096
+        r = client.post("/api/protocol/upload", content=body,
+                        headers={"content-type":
+                                 "multipart/form-data; boundary="})
+        assert r.status_code == 400
+        assert "boundary" in json.dumps(r.json())
+
+    @pytest.mark.parametrize("boundary", ["a" * 71, "bad\\boundary", "b<ad>"])
+    def test_a_malformed_boundary_is_refused(self, client, boundary):
+        r = client.post("/api/protocol/upload", content=b"--x--\r\n",
+                        headers={"content-type":
+                                 f"multipart/form-data; boundary={boundary}"})
+        assert r.status_code == 400
+
+    def test_a_legitimate_upload_is_unaffected(self, client):
+        body = (b'--BND\r\nContent-Disposition: form-data; name="file"; '
+                b'filename="tpl_cap.smi"\r\n\r\n'
+                + TMZ_SMILES.encode() + b" temozolomide\n\r\n--BND--\r\n")
+        r = client.post("/api/protocol/upload", content=body,
+                        headers={"content-type":
+                                 "multipart/form-data; boundary=BND"})
+        assert r.status_code == 200
+        assert r.json()["file"]["name"] == "tpl_cap.smi"
+
+
 # --------------------------------------------------------------------------- #
 class TestExecution:
     """One real end-to-end sweep. Short window, coarse grid, 2 points.

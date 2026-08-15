@@ -32,7 +32,15 @@ export default function CameraRig() {
 
   useFrame((state, delta) => {
     const { camera } = state;
-    const pose = getCameraPose(progressRef.current);
+    /*
+     * The pose is aspect-corrected, not raw. `fov` in three.js is vertical, so
+     * a portrait viewport sees a fraction of the horizontal extent the
+     * keyframes were composed against — see the aspect block in lib/timeline.
+     * Read from `state.size` each frame rather than captured once, so a
+     * rotation or a resize recomposes rather than staying wrong until reload.
+     */
+    const aspect = state.size.width / Math.max(state.size.height, 1);
+    const pose = getCameraPose(progressRef.current, aspect);
     const lambda = 4.2;
 
     smoothedPos.current = damp3(smoothedPos.current, pose.position, lambda, delta);

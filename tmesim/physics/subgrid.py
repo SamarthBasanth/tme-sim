@@ -6,6 +6,11 @@ passthrough to :func:`tmesim.physics.oxygen.solve_oxygen`. It exists so
 ``experiments/subgrid_closure.py`` can measure a closure rather than assert one,
 and so anyone who wants to re-measure it can import one auditable function.
 
+**THAT DEFAULT IS NOW LOAD-BEARING. READ "THE ONE STRUCTURAL PRECONDITION"
+BELOW BEFORE CHANGING IT** -- on the vascular field that has shipped since
+2026-08-14 this closure is no longer a no-op, and enabling it inflates the
+``F_state`` grid span 325-fold.
+
 THE PROBLEM
 -----------
 ``results/oxygen_joint_grid_test.md`` §4 established that with the jointly
@@ -74,19 +79,53 @@ spacing, and the two rate constants. Every one is already a per-cell quantity th
 engine holds. There is no fitted coefficient, no training set and no lookup
 table.
 
-THE ONE STRUCTURAL PRECONDITION -- READ THIS BEFORE USING IT
--------------------------------------------------------------
+=============================================================================
+DO NOT FLIP ``solve_oxygen_subgrid(enabled=...)`` TO ``True``. THE DEFAULT IS
+LOAD-BEARING, AND IT HAS BEEN LOAD-BEARING ONLY SINCE 2026-08-14.
+=============================================================================
 ``beta == 1`` identically whenever ``v == 0`` or ``v == 1``: a cell that is
-entirely vessel or entirely tissue has no sub-cell structure to close over. The
-**shipped** vascular field is
+entirely vessel or entirely tissue has no sub-cell structure to close over.
+
+**UNTIL 2026-08-14 THIS MODULE WAS SAFE FOR TWO INDEPENDENT REASONS. IT IS NOW
+SAFE FOR ONE.** The shipped vascular field used to be
 ``reconstruct.real_fields._DEFAULT_VASCULAR_MODE = "discrete"`` with
-``geometry="binary"``, which is **exactly 1.0 or exactly 0.0 everywhere**. On
-that field this closure is an exact no-op by construction. It requires the
-fractional-area field
-(``vessel_network.discrete_vascular_field(..., geometry="subgrid")``, itself
-opt-in and default-off, from ``results/vessel_geometry_fix.md``). The binary
-painting discards the sub-grid geometry BEFORE the solve, so no sub-grid closure
-of the solve can recover it.
+``geometry="binary"``, i.e. **exactly 1.0 or exactly 0.0 everywhere** -- there
+was not one partial cell anywhere in it at any resolution, so this closure was an
+exact no-op *by construction* as well as being off by default. Anyone who flipped
+``enabled=True`` got a bit-identical answer and no harm was done.
+
+``results/area_conservation_promotion.md`` promoted
+``discrete_vascular_field(geometry='area')`` to the default. **The shipped field
+is now CONTINUOUS in [0, 1] and the no-op guarantee is GONE.** Measured on the
+real GBM section at the production ``dx = 12 um``: **16,228 of 16,241 source
+cells (99.92 %) are partial**, ``beta`` reaches **144.0** against a validated
+maximum of **5.677** (``experiments/subgrid_closure.BETA_VALIDATED_MAX``), and
+**35.77 %** of partial cells sit beyond that validated maximum.
+
+**WHAT HAPPENS IF YOU ENABLE IT ANYWAY**, measured in
+``results/area_conservation_regeneration.md`` §4.2 on exactly the field that now
+ships: the ``F_state`` grid span over ``dx = 30...8 um`` goes **0.000441 ->
+0.143203, a 325-fold degradation**, and mean tumour O2 at ``dx = 12 um`` moves
+**-41.1 %**. The baseline it destroys is NOT degenerate (HYPOXIC 0.0000 /
+QUIESCENT 0.9157 / VIABLE 0.0843, i.e. a live VIABLE population and real dynamic
+range), which is what makes this the first un-caveated demonstration that the
+closure actively destroys grid-independence on real tissue. **Enabling this
+module would destroy considerably more grid-independence than the source
+promotion buys** -- the promotion removes 98.82 % of a 0.046090 span; the closure
+would re-create a span three times larger than the original defect.
+
+The closure is not *wrong*: on the controlled 1-D problem with an exact ``beta``
+it reproduces the exact cell averages to machine precision. It is wrong **here**,
+for the reasons in KNOWN FAILURE MODES below (1-D Cartesian local problem against
+a disc; source weighting only; one vessel per cell), and the ``geometry='area'``
+field violates its assumptions harder than any field it was validated on.
+
+**Anyone changing this default owes a re-run of
+``experiments/subgrid_closure.py`` and
+``experiments/area_conservation_regeneration.py --stage closure`` on the
+then-current default field, and a written justification. "It does nothing
+anyway" was true until 2026-08-14 and is no longer a valid reason to be relaxed
+about it.**
 
 KNOWN FAILURE MODES (measured in ``results/subgrid_closure.md`` §3-§4)
 ----------------------------------------------------------------------
@@ -133,7 +172,8 @@ def source_reweight(
     ----------
     vascular_fraction : ndarray
         Vessel AREA FRACTION per cell, in [0, 1]. **A binary field gives
-        ``beta == 1`` everywhere** -- see the module docstring.
+        ``beta == 1`` everywhere; the field that ships is no longer binary** --
+        see the module docstring.
     dx : float
         Grid spacing (um).
     supply : float
@@ -203,12 +243,22 @@ def solve_oxygen_subgrid(
     ``enabled=False`` (the default) forwards to the unmodified shipped
     :func:`tmesim.physics.oxygen.solve_oxygen` and is bit-identical to it.
 
+    **``enabled=True`` IS NOT A SAFE DEFAULT AND MUST NOT BECOME ONE.** Since
+    ``results/area_conservation_promotion.md`` the shipped vascular field is the
+    CONTINUOUS ``geometry='area'`` painting, on which 99.92 % of source cells are
+    partial and ``beta`` reaches 144.0 against a validated maximum of 5.677.
+    Enabling the closure on it inflates the ``F_state`` grid span from 0.000441
+    to 0.143203 (``results/area_conservation_regeneration.md`` §4.2). Before this
+    promotion the shipped field was binary and this flag was harmless because
+    ``beta == 1`` everywhere; **that is no longer true.** See the module
+    docstring's "STRUCTURAL PRECONDITION" section.
+
     ``vascular_fraction`` overrides ``micro.fields.vascular_density`` for the
     closure's ``v`` ONLY (the source term itself still uses the field on the
     microenvironment), so a binary source field can be closed against a
     fractional-area geometry without changing the source. When it is ``None``
-    the field's own values are used, and on the shipped binary field that makes
-    the closure an exact no-op.
+    the field's own values are used -- which, on the field that now ships, is a
+    live closure and not a no-op.
     """
     from .oxygen import solve_oxygen
 

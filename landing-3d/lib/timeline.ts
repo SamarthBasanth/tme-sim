@@ -69,7 +69,23 @@ export interface CameraKeyframe {
 
 export const CAMERA_KEYFRAMES: readonly CameraKeyframe[] = [
   { position: [0, 0.05, 4.4], lookAt: [0, 0, 0], fov: 32 }, // hero
-  { position: [1.7, 0.7, 6.3], lookAt: [0, -0.05, 0], fov: 36 }, // transport physics establishes
+  /*
+   * Beat 02 USED TO BE THE FARTHEST AND WIDEST POSE ON THE PATH — [1.7, 0.7,
+   * 6.3] at fov 36 — on the one beat whose headline is "The shape is solved."
+   * Measured at 1512x950 the section then spanned about 40% of the frame
+   * width, and the left 56% of that frame is under the copy's directional
+   * scrim, so the beat that argues the field has a solved SHAPE was showing
+   * the smallest, dimmest view of that shape on the whole page. It is now the
+   * closest pose of the first half instead: the section fills roughly 59% of
+   * the frame, and the iso-contours (whose lobe sits in the section's
+   * lower-left, where this tissue's vasculature is densest) are legible while
+   * their own copy is still on screen.
+   *
+   * The lateral offset comes down with it. At z=6.3 an x of 1.7 was a modest
+   * angle; at z=5.0 the same number would swing the section hard across frame,
+   * and the pose is a truck-and-rotate (lookAt is near origin), not a pan.
+   */
+  { position: [0.95, 0.5, 5.0], lookAt: [0, -0.05, 0], fov: 31 }, // transport physics establishes
   { position: [-2.4, 0.3, 4.2], lookAt: [0, 0, 0], fov: 33 }, // delivery or potency
   { position: [0.35, 1.2, 3.0], lookAt: [0, 0.1, 0], fov: 29 }, // spatial attribution
   { position: [2.6, 1.0, 3.3], lookAt: [0.15, 0, 0], fov: 31 }, // stated limits
@@ -77,24 +93,71 @@ export const CAMERA_KEYFRAMES: readonly CameraKeyframe[] = [
   { position: [0, 0.15, 5.3], lookAt: [1.05, 0, 0], fov: 27 }, // cta rests
 ] as const;
 
-export const getCameraPose = (progress: number): CameraKeyframe => {
+// ---------------------------------------------------------------------------
+// Aspect correction.
+//
+// THE KEYFRAMES ABOVE ARE AUTHORED FOR ONE FRAME SHAPE and were catastrophic
+// outside it. A three.js perspective camera's `fov` is VERTICAL, so the
+// horizontal extent it sees is fov * aspect: at 1512x950 (aspect 1.59) the
+// hero pose sees 4.01 world units across, and at 390x844 (aspect 0.46) the
+// same numbers see 1.17 — less than half the width of the 2.6-unit section.
+// Measured at 390px, four of the six beats showed no tissue at all: beat 02
+// was an empty black frame with a few cells clipped to the right margin, and
+// the hero — whose entire claim is "the section behind this text is a real
+// one" — had the section pushed off the right edge by `heroOffsetAmount`,
+// which is a desktop-sized shift applied to a phone-sized frustum.
+//
+// So the composition is re-derived rather than re-authored. One factor `k`,
+// damped with an exponent so portrait does not overcorrect into a fisheye,
+// (a) widens the vertical fov until the horizontal coverage is comparable and
+// (b) divides every LATERAL offset — camera x and the section's own x slide —
+// by the same amount, because a lateral offset only means anything relative
+// to how wide the frame is. Vertical offsets are left alone: portrait has
+// vertical room to spare, and damping them would flatten the one genuinely
+// expressive move on the path (the elevated look-down at beat 04).
+//
+// At the reference aspect this is EXACTLY the identity (the clamp floor is 1),
+// so every value verified at 1512x950 is untouched.
+// ---------------------------------------------------------------------------
+
+/** The frame shape the keyframes above were composed against (1512x950). */
+export const REFERENCE_ASPECT = 1.59;
+
+/**
+ * How much narrower than the authored frame this viewport is, damped.
+ * 1.0 at or above the reference aspect; ~2.16 at 390x844.
+ */
+export const framingFactor = (aspect: number): number =>
+  Math.pow(clamp(REFERENCE_ASPECT / Math.max(aspect, 0.25), 1, 4), 0.62);
+
+const RAD = Math.PI / 180;
+
+/** Vertical fov, in degrees, that preserves `fov`'s coverage widened by `k`. */
+const widenFov = (fov: number, k: number): number =>
+  k === 1 ? fov : (2 * Math.atan(Math.tan((fov * RAD) / 2) * k)) / RAD;
+
+export const getCameraPose = (
+  progress: number,
+  aspect: number = REFERENCE_ASPECT,
+): CameraKeyframe => {
   const scaled = clamp(progress) * SECTION_COUNT;
   const i = Math.min(Math.floor(scaled), SECTION_COUNT - 1);
   const t = smoothstep(scaled - i);
   const a = CAMERA_KEYFRAMES[i];
   const b = CAMERA_KEYFRAMES[i + 1];
+  const k = framingFactor(aspect);
   return {
     position: [
-      lerp(a.position[0], b.position[0], t),
+      lerp(a.position[0], b.position[0], t) / k,
       lerp(a.position[1], b.position[1], t),
       lerp(a.position[2], b.position[2], t),
     ],
     lookAt: [
-      lerp(a.lookAt[0], b.lookAt[0], t),
+      lerp(a.lookAt[0], b.lookAt[0], t) / k,
       lerp(a.lookAt[1], b.lookAt[1], t),
       lerp(a.lookAt[2], b.lookAt[2], t),
     ],
-    fov: lerp(a.fov, b.fov, t),
+    fov: widenFov(lerp(a.fov, b.fov, t), k),
   };
 };
 
@@ -121,14 +184,38 @@ export const heroCopyOpacity = (p: number): number =>
 // Scene 2 — Transport physics
 // ---------------------------------------------------------------------------
 
-/** Iso-level contour overlay (see FieldContours.tsx). */
+/**
+ * Iso-level contour overlay (see FieldContours.tsx).
+ *
+ * THE CONTOURS USED TO PEAK A BEAT LATE, which is the same editorial error
+ * documented (and fixed) for `fieldLabelOpacity` below — it was simply missed
+ * on the overlay those labels point at. The curve read
+ * `[[1/6, 0], [2/6, 0.34], [4/6, 0.26], ...]`: maximum at p = 1/3, which is
+ * the BOUNDARY between beats 02 and 03, and beat 02's own copy is already
+ * fully gone by then (see sectionVisual: fade = 0.32 of the segment). So the
+ * solved pressure field reached full strength exactly as the paragraph
+ * describing it disappeared, and then held near-maximum across the whole of
+ * beat 03 and beat 04, where it belongs to nothing. Screenshotted at p=0.25
+ * the contours were invisible; at p=0.42, under beat 03's headline about
+ * compound structure, they were the brightest thing on screen.
+ *
+ * Now it rises with beat 02's copy, peaks at p ≈ 0.27 (the beat's own centre,
+ * where the headline and ledger are at full opacity), and is down to a
+ * residual before beat 03's copy rises at p ≈ 0.34. The residual is
+ * deliberate and not zero: the field is genuinely still solved underneath the
+ * later beats, and ConcentrationField — which paints the SAME viridis ramp
+ * for a different quantity — takes over at 3/6, so the contours must be well
+ * clear of it by then or the two read as one overlay.
+ */
 export const fieldContourOpacity = (p: number): number =>
   sampleCurve(p, [
     [1 / 6, 0],
-    [2 / 6, 0.34],
-    [4 / 6, 0.26],
-    [5 / 6, 0.1],
-    [1, 0.04],
+    [1 / 6 + (1 / 6) * 0.38, 0.4],
+    [1 / 6 + (1 / 6) * 0.72, 0.4],
+    [2 / 6, 0.14],
+    [4 / 6, 0.1],
+    [5 / 6, 0.06],
+    [1, 0.03],
   ]);
 
 /*
@@ -311,6 +398,31 @@ export const heroOffsetAmount = (p: number): number =>
   ]);
 
 /**
+ * BEAT 02 composition offset — the section slides right so the solved
+ * iso-contours are not sitting under the copy that describes them.
+ *
+ * The contour set is in the section's LOWER-LEFT, because that is where this
+ * tissue's vasculature is densest (see the anchor comment in SceneCanvas), and
+ * beat 02's copy is left-set. Measured at 1512x950 with the beat's own camera
+ * pose, the contour lobe projects to about 50% of frame width — inside the
+ * directional scrim, which is still at ~0.28 there. So the one beat that
+ * argues the field has a solved SHAPE was drawing that shape behind its own
+ * text scrim. Half a unit to the right clears it (the scrim reaches 0 at 56%)
+ * without pushing the section's right edge out of frame.
+ *
+ * Returns to 0 by 2/6: beat 03 composes the other way round — copy right,
+ * tissue left — and a rightward shift held into it would push the tissue
+ * toward the text rather than away from it.
+ */
+export const transportOffsetAmount = (p: number): number =>
+  sampleCurve(p, [
+    [1 / 6, 0],
+    [1 / 6 + (1 / 6) * 0.35, 0.44],
+    [2 / 6 - (1 / 6) * 0.18, 0.44],
+    [2 / 6, 0],
+  ]);
+
+/**
  * The section's total x offset, in the units its consumers multiply by 1.15.
  *
  * Exists so the tissue and everything positioned in ITS coordinates
@@ -318,9 +430,22 @@ export const heroOffsetAmount = (p: number): number =>
  * themselves — that is exactly how the overlays previously drifted out of
  * lockstep with the model. Add any future offset term here, not at a call
  * site.
+ *
+ * `aspect` divides the total by the same `framingFactor` the camera path uses
+ * (see the aspect-correction block above). Both terms here are lateral
+ * COMPOSITION offsets — "slide the section out from under the copy", "slide it
+ * aside for the CTA" — expressed in world units against a wide frame. Fed
+ * unchanged into a portrait frustum a third that width, 0.78 stopped meaning
+ * "clear of the text" and started meaning "off the right edge of the screen",
+ * which is exactly what it measured at 390px. Identity at the reference
+ * aspect.
  */
-export const sectionOffsetAmount = (p: number): number =>
-  finalOffsetAmount(p) + heroOffsetAmount(p);
+export const sectionOffsetAmount = (
+  p: number,
+  aspect: number = REFERENCE_ASPECT,
+): number =>
+  (finalOffsetAmount(p) + heroOffsetAmount(p) + transportOffsetAmount(p)) /
+  framingFactor(aspect);
 
 export const ctaCopyOpacity = (p: number): number =>
   sampleCurve(p, [

@@ -37,3 +37,20 @@ results/immune_sink_impact_cache.pkl
 
 # Agent worktrees and session scratch — never part of the repo.
 .claude/
+
+# Browser profiles used for headless UI verification. NEVER commit one.
+#
+# This is here because it already happened: `results/fprof/` -- a full Chrome
+# profile, 523 files and 110 MB including Cookies, Login Data, Web Data and
+# History -- was committed in 8d703d3 and pushed. It is referenced by no code.
+# A profile directory is not an artifact; it is a credential store that happens
+# to live in a folder, and a headless run will silently create one wherever it
+# is pointed. Point it at the scratchpad, never inside the repo.
+#
+# NOTE: this pattern stops FUTURE commits only. Git keeps tracking files it
+# already tracks, so `results/fprof/` remains in the working tree and in
+# history until it is explicitly removed -- see results/security_audit.md (C3).
+results/fprof/
+results/*profile/
+*/Default/Login Data
+*/Default/Cookies

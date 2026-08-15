@@ -1,4 +1,4 @@
-"""Tests for ``vivum validate`` — the external-anchor scorecard.
+"""Tests for ``codon validate`` — the external-anchor scorecard.
 
 Deliberately **fast and data-free**: not one test here touches ``data_cache/``
 or runs a PDE. The real anchors are exercised by running the command; what is
@@ -702,7 +702,7 @@ class TestPhysicsProvenance:
 # --------------------------------------------------------------------------- #
 #
 # The defect these guard against, recorded in results/zero_width_bands.md:
-# ``vivum validate`` scored the breast kill panel 3 PASS / 3 FAIL while
+# ``codon validate`` scored the breast kill panel 3 PASS / 3 FAIL while
 # results/kill_calibration_breast.md published 5 PASS / 1 FAIL, because the
 # scorecard and the report generator each decided SEPARATELY which band a drug
 # is scored against. Two of the scorecard's FAILs were rendered against
@@ -796,7 +796,7 @@ class TestBreastKillPanelCannotDiverge:
 
     Data-free: a synthetic ``res`` is fed to the real
     ``build_ratio_section``, and the verdict the DOCUMENT would print is
-    compared cell-for-cell with the status ``vivum validate`` assigns. No
+    compared cell-for-cell with the status ``codon validate`` assigns. No
     tissue, no PDE, no data_cache.
     """
 

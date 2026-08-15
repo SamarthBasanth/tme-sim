@@ -1,12 +1,13 @@
-"""Tests for ``tmesim.cli`` — the ``vivum`` console script / ``python -m
+"""Tests for ``tmesim.cli`` — the ``codon`` console script / ``python -m
 tmesim.cli`` entry point.
 
 Two kinds of coverage:
 
 1. **Argparse plumbing** — every subcommand is registered, ``--help`` works
-   for each without crashing, and ``vivum`` is what the tool calls itself now
+   for each without crashing, and ``codon`` is what the tool calls itself now
    that it is a real installed command (``pyproject.toml``'s
-   ``[project.scripts]``).
+   ``[project.scripts]``). The pre-rename ``vivum`` name stays registered as an
+   alias so the commands quoted in ``results/*.md`` still run.
 2. **``compare-drugs`` end-to-end** — reconstructs the real (open, cached)
    Xenium GBM section at a coarse grid and compares two real drugs on it,
    checking the printed table and the optional CSV output. Uses the same
@@ -23,6 +24,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import pathlib
 
 import pytest
 
@@ -85,13 +87,29 @@ class TestArgparsePlumbing:
         with pytest.raises(SystemExit) as exc:
             cli.build_parser().parse_args(args)
         # argparse exits 0 for --help, 2 for a genuinely missing subcommand
-        # (bare `vivum` with no args, since the subparser is required).
+        # (bare `codon` with no args, since the subparser is required).
         assert exc.value.code in (0, 2)
 
-    def test_prog_name_is_vivum(self):
+    def test_prog_name_is_codon(self):
         # cosmetic, but this is the name pyproject.toml registers as the
         # console script, and the QUICKSTART examples assume it.
-        assert cli.build_parser().prog == "vivum"
+        assert cli.build_parser().prog == "codon"
+
+    def test_both_console_scripts_point_at_the_cli(self):
+        """`codon` is the name; `vivum` is kept as a working alias.
+
+        The rename happened after ~200 dated files in ``results/`` had already
+        quoted `vivum ...` commands as their reproduce instructions. Dropping
+        the old entry point would break every one of them, so both names are
+        registered and both resolve to the same ``main``.
+        """
+        import re
+        root = pathlib.Path(__file__).resolve().parents[1]
+        text = (root / "pyproject.toml").read_text(encoding="utf-8")
+        block = text.split("[project.scripts]", 1)[1].split("\n[", 1)[0]
+        entries = dict(re.findall(r'^(\w+)\s*=\s*"([^"]+)"', block, re.M))
+        assert entries.get("codon") == "tmesim.cli:main"
+        assert entries.get("vivum") == "tmesim.cli:main"
 
     def test_compare_drugs_defaults(self):
         parser = cli.build_parser()

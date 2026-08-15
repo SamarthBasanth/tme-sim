@@ -63,13 +63,13 @@ jobs:
     name: build + smoke-test image (linux/amd64)
     runs-on: ubuntu-latest
     env:
-      IMAGE: vivum-studio:ci
+      IMAGE: codon-studio:ci
       # A fixed key for the explicit-key container. Not a secret: it only ever
       # exists inside this ephemeral runner, and the whole point is that the
       # gate rejects requests that lack it.
       SMOKE_KEY: ci-smoke-key-not-a-secret
-      SMOKE_CONTAINER: vivum-smoke
-      AUTOKEY_CONTAINER: vivum-autokey
+      SMOKE_CONTAINER: codon-smoke
+      AUTOKEY_CONTAINER: codon-autokey
 
     steps:
       - uses: actions/checkout@v4

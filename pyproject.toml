@@ -83,11 +83,16 @@ dependencies = [
 
 [project.scripts]
 # `pip install -e .` registers this as a real command, e.g.:
-#   vivum reconstruct --source xenium --dx 12
-#   vivum compare-drugs --drugs temozolomide,cisplatin,doxorubicin
-#   vivum studio
+#   codon reconstruct --source xenium --dx 12
+#   codon compare-drugs --drugs temozolomide,cisplatin,doxorubicin
+#   codon studio
 # Equivalent to `python -m tmesim.cli ...` (tmesim/cli.py); see that module's
 # docstring and docs/QUICKSTART.md for the full command list.
+codon = "tmesim.cli:main"
+# Pre-rename alias. The product was called Vivum until the Codon rename, and
+# every command in the dated `results/*.md` record is written as `vivum ...`.
+# Same entry point, so those commands still reproduce; `--help` prints the new
+# name. Keep it until the historical record no longer needs to be runnable.
 vivum = "tmesim.cli:main"
 
 [project.optional-dependencies]

@@ -1,6 +1,6 @@
 # Quickstart
 
-A fast, copy-pasteable path to your first result with **Vivum** (package name
+A fast, copy-pasteable path to your first result with **Codon** (package name
 `tmesim`) — the glioblastoma + breast-cancer tumor-microenvironment
 drug-transport simulator. Every command and every code snippet on this page was
 actually run against this repository before being written down; none of it is
@@ -28,7 +28,7 @@ pip install -e .
 
 That installs the core simulator (numpy, scipy, matplotlib, pandas,
 scikit-image, networkx, scikit-learn, requests, tifffile, imagecodecs) and
-registers a `vivum` command on your `PATH`.
+registers a `codon` command on your `PATH`.
 
 **If you want Studio** (the local web UI for exploring a reconstruction
 interactively), install the additive `app` extra instead:
@@ -56,12 +56,12 @@ any other data-driven research CLI.
 Confirm the install:
 
 ```bash
-vivum --help
+codon --help
 ```
 
 ```
-usage: vivum [-h] [--seed SEED]
-             {reconstruct,simulate,compare-drugs,validate,molecules,molecular-run,acquire,studio}
+usage: codon [-h] [--seed SEED]
+             {reconstruct,simulate,compare-drugs,validate,ingest,molecules,molecular-run,acquire,studio}
              ...
 ```
 
@@ -79,7 +79,7 @@ section (40,887 real, measured cells — no synthetic data anywhere in this
 path). Reconstruct it and print a report:
 
 ```bash
-vivum reconstruct --source xenium --dx 30
+codon reconstruct --source xenium --dx 30
 ```
 
 This prints cell-type fractions, mean vascular/ECM/oxygen density, the grid
@@ -94,7 +94,7 @@ for why).
 ### 2b. Compare several drugs on that same section
 
 ```bash
-vivum compare-drugs --dx 30 --drugs temozolomide,cisplatin,doxorubicin --csv results/my_comparison.csv
+codon compare-drugs --dx 30 --drugs temozolomide,cisplatin,doxorubicin --csv results/my_comparison.csv
 ```
 
 ```
@@ -136,7 +136,7 @@ Drop `--drugs` and it compares **every** drug currently in the molecular
 library instead of a fixed list:
 
 ```bash
-vivum compare-drugs --dx 30
+codon compare-drugs --dx 30
 ```
 
 (this runs one simulation per library drug on the same reconstructed section
@@ -153,7 +153,7 @@ added drug is comparable with no CLI change. For breast tissue, pass
 Janesick et al. 2023 breast Xenium section instead:
 
 ```bash
-vivum compare-drugs --library breast --dx 30
+codon compare-drugs --library breast --dx 30
 ```
 
 A drug that fails to compile or simulate (for instance, one whose potency
@@ -166,7 +166,7 @@ Read the honesty caveats before quoting any number from this table: it is a
 outcome — there is no paired measured drug response to check it against. The
 transport physics is **not** validated either: its input coefficients are
 externally testable and the engine currently misses them (see the `D_eff` box
-above, and `vivum validate`). What is defensible here is the **order**, not the
+above, and `codon validate`). What is defensible here is the **order**, not the
 level, and not over a similar-mass series. See
 [`results/real_drug_panel.md`](../results/real_drug_panel.md) and the
 README's "Five corrections" section for what is and is not defensible to
@@ -175,7 +175,7 @@ quote.
 ### 2c. Ask how the model currently scores against reality
 
 ```bash
-vivum validate --quick
+codon validate --quick
 ```
 
 This runs the **external-anchor suite**: every place in this repository where a
@@ -294,11 +294,11 @@ bands that no prediction can land inside. A single-study band is now NOT TESTABL
 in both the tool and the document generator.
 → [`../results/zero_width_bands.md`](../results/zero_width_bands.md)
 
-`vivum validate` **exits non-zero if any anchor fails**, so it drops straight
+`codon validate` **exits non-zero if any anchor fails**, so it drops straight
 into CI:
 
 ```bash
-vivum validate --quick || echo "an external anchor regressed"
+codon validate --quick || echo "an external anchor regressed"
 ```
 
 Note that `--quick` is a *weaker* gate than the full run, not a faster
@@ -367,7 +367,7 @@ Three more things worth knowing before you quote a row:
   dimensionless-to-rate conversion — see
   [`results/transvascular_exchange_revalidation.md`](../results/transvascular_exchange_revalidation.md)
   §6.2).
-* **The omissions are auditable too.** `vivum validate --list` prints the
+* **The omissions are auditable too.** `codon validate --list` prints the
   registry *and* the validations that were inventoried and deliberately left
   out, with the reason for each (ablations that would double-count the same six
   measurements; real-vs-real corroboration with no model in the loop; the
@@ -376,11 +376,11 @@ Three more things worth knowing before you quote a row:
 Useful options:
 
 ```bash
-vivum validate --list                          # what is checked, and what is not
-vivum validate --quick --json                  # machine-readable, for CI
-vivum validate --only breast-transvascular     # one anchor
-vivum validate --only vascular-morphometry,breast-vascular-morphometry  # several
-vivum validate --only breast-transvascular --exchange   # with the opt-in delivery law
+codon validate --list                          # what is checked, and what is not
+codon validate --quick --json                  # machine-readable, for CI
+codon validate --only breast-transvascular     # one anchor
+codon validate --only vascular-morphometry,breast-vascular-morphometry  # several
+codon validate --only breast-transvascular --exchange   # with the opt-in delivery law
 ```
 
 `--json` emits the whole scorecard — every row's predicted/measured values,
@@ -394,21 +394,39 @@ no CLI change.
 Needs the `app` extra installed (`pip install -e '.[app]'` above):
 
 ```bash
-vivum studio
+codon studio
 ```
 
 ```
-tmesim Studio backend
+Codon Studio backend
   repo        /path/to/tme-sim
   run history /path/to/tme-sim/app/server/.runs
   recon cache maxsize=4
   serving     http://127.0.0.1:8000
+  your tissue http://127.0.0.1:8000/ingest
 ```
 
-Then open `http://127.0.0.1:8000` in a browser. `vivum studio --port 8080` to
-use a different port; `vivum studio --help` for the full option list. This is
+Then open `http://127.0.0.1:8000` in a browser. `codon studio --port 8080` to
+use a different port; `codon studio --help` for the full option list. This is
 a thin delegate to the existing `python -m app.server` entry point — nothing
 about the server itself changed.
+
+**To load YOUR OWN tissue, open `/ingest`.** Studio's section picker currently
+lists only the sections this project prepared; `/ingest` is a page served by the
+backend that takes the path to your own 10x export, prints the same capability
+report `codon ingest` does — including what your panel *cannot* support — and
+registers the sample so it appears in the picker on reload. It is the same
+`POST /api/sections/scan` endpoint, without the `curl` — and `codon ingest
+<dir> --register` does the same thing from the command line.
+[`results/rebrand_backend.md`](../results/rebrand_backend.md) §5 lists the
+front-end work that would fold this into the picker itself.
+
+**De-identified tissue only.** Codon is not built for identifiable patient data
+and must not be used with it. The sample is read from a directory on the
+server's own machine and never uploaded, but the absolute path, the section id
+and the label are all served by `GET /api/sections` and shown in the picker, so
+identifiers hidden in a directory name leak just as readily as ones in a column.
+[`DEPLOYMENT.md` §0](DEPLOYMENT.md) lists the four places to check first.
 
 ### 2e. TPL — a small scripting language for defining and sweeping experiments
 
@@ -543,7 +561,7 @@ micro = reconstruct_real(
 
 * **Data is pre-cached, not auto-downloaded on first use.** The Xenium /
   Visium sections these examples run on already live under `data_cache/` in
-  this checkout. `vivum acquire` best-effort downloads the *smaller* open
+  this checkout. `codon acquire` best-effort downloads the *smaller* open
   datasets; the large single-cell caches (Xenium GBM/breast, Visium, HGCC)
   are too big for that command and are fetched with the explicit `curl`
   commands in [`docs/REPRODUCE.md`](REPRODUCE.md) §2b. If you `git clone`
@@ -556,10 +574,10 @@ micro = reconstruct_real(
   for `visium` it is `10x_parent_gbm`. Passing `--library breast` to
   `compare-drugs` without `--sample` now resolves the breast Xenium cache
   automatically; every other command needs `--sample <path>` spelled out for
-  a non-default section (see `vivum reconstruct --help`).
+  a non-default section (see `codon reconstruct --help`).
 * **The molecular drug libraries are moving targets.** `GBM_DRUGS` and
-  `BREAST_DRUGS` are both under active extension. `vivum molecules` and
-  `vivum compare-drugs` (no `--drugs`) always read the current list rather
+  `BREAST_DRUGS` are both under active extension. `codon molecules` and
+  `codon compare-drugs` (no `--drugs`) always read the current list rather
   than a value baked into this document — trust the command's own output over
   any specific drug name mentioned here.
 * **Absolute kill fractions are predictions, not validated outcomes.** Every
@@ -575,7 +593,7 @@ micro = reconstruct_real(
 
 | Question | File |
 |---|---|
-| How does the model score against measured reality, right now? | `vivum validate` (§2c), then [`results/SESSION_AUDIT.md`](../results/SESSION_AUDIT.md) |
+| How does the model score against measured reality, right now? | `codon validate` (§2c), then [`results/SESSION_AUDIT.md`](../results/SESSION_AUDIT.md) |
 | What is the current state, honestly? | [`results/SESSION_AUDIT.md`](../results/SESSION_AUDIT.md) |
 | How do I regenerate every published result from scratch? | [`docs/REPRODUCE.md`](REPRODUCE.md) |
 | Where did every byte of data come from? | [`docs/DATA_INVENTORY.md`](DATA_INVENTORY.md) |

@@ -1,17 +1,20 @@
 # tmesim Studio
 
-A local diagnostic-imaging application over the tmesim engine: reconstruct one
-real glioblastoma section, simulate a drug on it, and inspect the result at
-single-cell resolution. `app/server/` is the backend; `app/web/` is the front
-end. Both sides implement the frozen [`API_CONTRACT.md`](../API_CONTRACT.md) v1.
+A local research application over the tmesim engine, built to diagnostic-imaging
+UI conventions: reconstruct one real glioblastoma section, simulate a drug on
+it, and inspect the result at single-cell resolution. `app/server/` is the
+backend; `app/web/` is the front end. Both sides implement the frozen
+[`API_CONTRACT.md`](../API_CONTRACT.md) v1.
 
 ```
 ./.venv/bin/python -m pip install -e '.[app]'      # fastapi + uvicorn + httpx
 ./.venv/bin/python -m app.server                   # http://127.0.0.1:8000
 ```
 
-Binds to `127.0.0.1` only. This is a workstation tool that serves patient tissue
-reconstructions; pass `--host` explicitly if you really mean to expose it.
+Binds to `127.0.0.1` only. This is a workstation tool that serves
+reconstructions of de-identified tissue sections; it is not built for
+identifiable patient data ([`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) §0).
+Pass `--host` explicitly if you really mean to expose it.
 
 **Not for clinical use.** Every number the API returns is a prediction of a
 physical model, on tissue that carries no treatment-outcome label. Nothing here

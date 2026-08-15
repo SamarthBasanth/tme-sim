@@ -1,14 +1,17 @@
-"""Command-line interface for **tmesim** / **Vivum** — the glioblastoma +
+"""Command-line interface for **tmesim** / **Codon** — the glioblastoma +
 breast-cancer tumor-microenvironment drug-response simulator (REAL data only).
 
-Installed as the ``vivum`` console script (``pip install -e .``), or run as a
+Installed as the ``codon`` console script (``pip install -e .``), or run as a
 module directly — both are equivalent::
 
-    vivum reconstruct --source xenium --dx 12
+    codon reconstruct --source xenium --dx 12
     python -m tmesim.cli reconstruct --source xenium --dx 12
 
-    vivum compare-drugs --drugs temozolomide,cisplatin,doxorubicin
-    vivum studio
+    codon compare-drugs --drugs temozolomide,cisplatin,doxorubicin
+    codon studio
+
+The pre-rename name ``vivum`` is still registered as an alias console script and
+runs exactly the same entry point, so older copy-pasted commands keep working.
 
 See ``docs/QUICKSTART.md`` for a full copy-pasteable walkthrough (install,
 first run, and the underlying Python API for notebook use).
@@ -43,7 +46,7 @@ Subcommands
     real tissue and takes minutes. **Exits non-zero if any anchor FAILS**, so it
     is usable as a CI gate. See :mod:`tmesim.validation.scorecard`.
 ``ingest``
-    Point Vivum at YOUR OWN raw 10x Xenium / Visium export directory. Detects
+    Point Codon at YOUR OWN raw 10x Xenium / Visium export directory. Detects
     the platform, validates the bytes, and reports what the section IS (cells,
     extent, panel) and what it CANNOT support — a missing endothelial marker
     means no oxygen or delivery result at all, and on spot data the per-cell
@@ -53,7 +56,7 @@ Subcommands
 ``acquire``
     Best-effort live download of open glioblastoma datasets into a cache dir.
 ``studio``
-    Launch the tmesim Studio web backend (thin delegate to
+    Launch the Codon Studio web backend (thin delegate to
     ``python -m app.server``; needs the optional ``pip install -e '.[app]'``
     extra).
 
@@ -67,10 +70,10 @@ Design notes
 * The commands use a *reduced* ``PDEConfig.total_time`` so the CLI finishes
   quickly; the full-fidelity window lives in the library defaults.
 * The repository root is put on ``sys.path`` unconditionally at startup (see
-  ``_ensure_repo_root_on_path``) so ``vivum studio`` can find the ``app``
+  ``_ensure_repo_root_on_path``) so ``codon studio`` can find the ``app``
   package regardless of the caller's current working directory. Commands that
   read or write real data (``data_cache/``, ``results/``) still resolve those
-  paths relative to the current working directory, so run ``vivum`` from the
+  paths relative to the current working directory, so run ``codon`` from the
   repository root (exactly as ``python -m tmesim.cli`` already required).
 """
 from __future__ import annotations
@@ -559,7 +562,7 @@ def _comparison_provenance(*, args, sample, library, alpha, window_s, report,
             "been validated against a treatment outcome. Do not use it to "
             "select, rank, exclude or dose any therapy for any patient."
         ),
-        "generator": "tmesim.cli cmd_compare_drugs (vivum compare-drugs)",
+        "generator": "tmesim.cli cmd_compare_drugs (codon compare-drugs)",
         "section_source": (report or {}).get("source", args.source),
         "sample_path": sample,
         "patient_id": (report or {}).get("patient_id"),
@@ -656,7 +659,7 @@ def _provenance_comment_lines(prov: dict) -> List[str]:
 # studio
 # --------------------------------------------------------------------------- #
 def cmd_studio(args: argparse.Namespace) -> int:
-    """Launch the tmesim Studio web backend.
+    """Launch the Codon Studio web backend.
 
     Thin delegate to ``app.server.__main__`` (the existing, already-working
     Studio entry point, normally run as ``python -m app.server``) — nothing
@@ -672,7 +675,7 @@ def cmd_studio(args: argparse.Namespace) -> int:
         print("[studio] the Studio web backend needs the optional 'app' extra "
               f"(fastapi / uvicorn / httpx), which is not installed ({exc}).")
         print("[studio] install it with:  pip install -e '.[app]'")
-        print("[studio] then re-run:      vivum studio")
+        print("[studio] then re-run:      codon studio")
         return 1
 
     argv: List[str] = ["--host", args.host, "--port", str(args.port),
@@ -713,7 +716,7 @@ def _print_scorecard(result: dict) -> None:
 
     print()
     print(_v_rule("="))
-    print("VIVUM EXTERNAL-ANCHOR SCORECARD"
+    print("CODON EXTERNAL-ANCHOR SCORECARD"
           f"    mode={mode}    "
           f"{result['seconds']:.1f}s")
     print(_v_rule("="))
@@ -842,7 +845,7 @@ def _print_anchor_list() -> None:
     """``--list``: the registry and the deliberate omissions, no computation."""
     from tmesim.validation import scorecard as SC
 
-    print("\nRegistered external anchors (vivum validate):\n")
+    print("\nRegistered external anchors (codon validate):\n")
     print(f"{'KEY':28s} {'TIER':6s} {'SCOPE':9s} {'TISSUE':8s} EST")
     print(_v_rule("-", 92))
     for g in SC.build_registry():
@@ -1013,7 +1016,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
             return 0
         if not sections:
             print("[ingest] no ingested sections. "
-                  "Add one with: vivum ingest <dir> --register")
+                  "Add one with: codon ingest <dir> --register")
             return 0
         print(f"=== ingested sections ({len(sections)}) ===")
         for sid, rec in sections.items():
@@ -1073,7 +1076,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
             print("[ingest] NOTE: this section is INSPECT-ONLY — "
                   "reconstruct_real has no route for its platform.")
         else:
-            print(f"[ingest] run it:  vivum compare-drugs --source "
+            print(f"[ingest] run it:  codon compare-drugs --source "
                   f"{sec.get('platform')} --sample {sec.get('sample')}")
         print("[ingest] the Studio picks up sections registered by another "
               "process on RESTART, not live.")
@@ -1281,8 +1284,8 @@ def _add_real_source_args(p: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     """Construct the top-level argument parser with all subcommands."""
     parser = argparse.ArgumentParser(
-        prog="vivum",
-        description="Vivum (tmesim) — glioblastoma + breast-cancer tumor-"
+        prog="codon",
+        description="Codon (tmesim) — glioblastoma + breast-cancer tumor-"
                     "microenvironment drug-response simulator (REAL data "
                     "only). Also runnable as `python -m tmesim.cli`.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -1388,12 +1391,12 @@ def build_parser() -> argparse.ArgumentParser:
     # studio
     p_studio = sub.add_parser(
         "studio",
-        help="launch the tmesim Studio web backend (needs the 'app' extra)",
-        description="Launch the tmesim Studio web backend — a thin delegate "
+        help="launch the Codon Studio web backend (needs the 'app' extra)",
+        description="Launch the Codon Studio web backend — a thin delegate "
                     "to 'python -m app.server'. Needs 'pip install -e .[app]'.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p_studio.add_argument("--host", default="127.0.0.1",
-                          help="bind address (local diagnostic workstation "
+                          help="bind address (local research workstation "
                                "app, not a network service — pass explicitly "
                                "to expose it beyond localhost)")
     p_studio.add_argument("--port", type=int, default=8000, help="bind port")

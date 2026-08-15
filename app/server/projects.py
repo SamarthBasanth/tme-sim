@@ -61,8 +61,11 @@ import time
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from .cache import (
+    PRIVATE_FILE_MODE,
     all_sections,
     describe_section,
+    own_only,
+    private_makedirs,
     repo_root,
     state_route_support,
 )
@@ -104,9 +107,7 @@ class ProjectError(Exception):
 # --------------------------------------------------------------------------- #
 def projects_dir() -> str:
     """Absolute path to ``app/projects/`` (created on demand)."""
-    path = os.path.join(repo_root(), "app", "projects")
-    os.makedirs(path, exist_ok=True)
-    return path
+    return private_makedirs(os.path.join(repo_root(), "app", "projects"))
 
 
 # --------------------------------------------------------------------------- #
@@ -299,7 +300,7 @@ class ProjectStore:
 
     def __init__(self, root: Optional[str] = None):
         self.root = root or projects_dir()
-        os.makedirs(self.root, exist_ok=True)
+        private_makedirs(self.root)
         self._lock = threading.RLock()
 
     # -- paths -------------------------------------------------------------- #
@@ -332,10 +333,11 @@ class ProjectStore:
     def _write(self, doc: Dict) -> Dict:
         doc["updated_at"] = time.time()
         d = self._dir(doc["id"])
-        os.makedirs(d, exist_ok=True)
+        private_makedirs(d)
         tmp = os.path.join(d, "project.json.tmp")
         with open(tmp, "w") as fh:
             json.dump(doc, fh, indent=1, sort_keys=False)
+        own_only(tmp, PRIVATE_FILE_MODE)
         os.replace(tmp, os.path.join(d, "project.json"))
         return doc
 

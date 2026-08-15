@@ -32,6 +32,7 @@ import { chip } from './provenance.js';
 import { auto, num, int, pct, sci, ts, NULL_GLYPH } from '../util/fmt.js';
 import * as api from '../api.js';
 import { toast, notifyError } from './toast.js';
+import { confirmable } from './confirm.js';
 
 const METRIC_LABEL = {
   kill_fraction: 'Kill fraction',
@@ -224,8 +225,13 @@ export function createProjectsPanel({ store }) {
 
     if (!projects.length) {
       railEl.appendChild(h('div.caveat.info', h('span',
-        'No projects yet. A project groups runs by PATIENT so a therapy panel ' +
-        'on one specimen can be compared against the same panel on another.')));
+        // "by PATIENT" until 2026-08-15. Codon is scoped to de-identified
+        // tissue (docs/DEPLOYMENT.md §0), and the grouping key is the specimen
+        // anyway — a string the operator chose, which must not be a patient
+        // identifier. A UI that names the unit "patient" invites one.
+        'No projects yet. A project groups runs by SPECIMEN so a compound ' +
+        'panel on one specimen can be compared against the same panel on ' +
+        'another.')));
     }
     for (const p of projects) {
       const on = project && p.id === project.id;
@@ -238,11 +244,17 @@ export function createProjectsPanel({ store }) {
         h('div.proj-item-top',
           h('span.mono.strong', p.id),
           h('span.grow', p.name || NULL_GLYPH),
-          h('button.btn.ghost.sm.danger', {
+          // Two-step: the `×` sits inside a row whose whole surface is a click
+          // target for SELECTING the project, so a mis-aimed selection click
+          // used to delete the study instead. See js/ui/confirm.js.
+          confirmable(h('button.btn.ghost.sm.danger', {
             title: 'Delete this project. Runs are NOT deleted.',
             'aria-label': `Delete project ${p.id}`,
-            onclick: async (e) => {
-              e.stopPropagation();
+          }, '×'), {
+            confirmLabel: `delete ${p.id}?`,
+            armedTitle: `Deletes the study ${p.id} and its specimen list. Its `
+              + 'runs stay in app/runs/. Press again to confirm; Escape cancels.',
+            onConfirm: async () => {
               const out = await guard(`DELETE /api/projects/${p.id}`,
                 () => api.deleteProject(p.id));
               if (!out) return;
@@ -251,7 +263,7 @@ export function createProjectsPanel({ store }) {
               if (project && project.id === p.id) project = null;
               await reload();
             },
-          }, '×')),
+          })),
         h('div.proj-item-sub.mono',
           `${int(p.n_specimens)} specimen${p.n_specimens === 1 ? '' : 's'} · `,
           `${int(p.n_runs)} run${p.n_runs === 1 ? '' : 's'} · `,
@@ -316,10 +328,15 @@ export function createProjectsPanel({ store }) {
         h('span.mono.strong', sp.id),
         h('span.grow', sp.label || NULL_GLYPH),
         capChip,
-        h('button.btn.ghost.sm.danger', {
+        confirmable(h('button.btn.ghost.sm.danger', {
           title: 'Remove this specimen. Its runs are NOT deleted.',
           'aria-label': `Remove specimen ${sp.id}`,
-          onclick: async () => {
+        }, '×'), {
+          confirmLabel: `remove ${sp.id}?`,
+          armedTitle: `Removes ${sp.id} from this study, with the run `
+            + 'associations it carries. Its runs stay in app/runs/. Press again '
+            + 'to confirm; Escape cancels.',
+          onConfirm: async () => {
             const out = await guard('DELETE specimen',
               () => api.deleteSpecimen(project.id, sp.id));
             if (!out) return;
@@ -327,7 +344,7 @@ export function createProjectsPanel({ store }) {
               `${(out.runs_retained || []).length} run(s) retained in app/runs/.`, 4000);
             await select(project.id);
           },
-        }, '×')),
+        })),
       h('div.proj-item-sub.mono',
         `${sp.section} · ${cap.panel || NULL_GLYPH} · ${int(cap.n_cells)} cells`),
       cap.hypoxia_present && cap.hypoxia_present.length

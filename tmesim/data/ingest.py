@@ -1818,8 +1818,19 @@ def scan_report(path: str, measure_detection_rates: bool = False) -> Dict:
     if measure_detection_rates:
         try:
             rec = ingest(path, sample_id=sid, detection=det)
+        except IngestError as exc:
+            # A DELIBERATE refusal. Informative on purpose, rendered verbatim
+            # by both the CLI and the Studio so the two can never disagree
+            # about a sample's limits. Never redacted.
+            out["error"] = str(exc)
+            return out
         except Exception as exc:  # noqa: BLE001 - the failure IS the answer
+            # UNEXPECTED. The full detail is kept here because `codon ingest`
+            # prints it to an operator sitting at the console; the HTTP layer
+            # (app/server/ingest_registry.scan) replaces it for the browser,
+            # keyed off this flag. See cache.redact_exception.
             out["error"] = f"{type(exc).__name__}: {exc}"
+            out["error_is_internal"] = True
             return out
         out["capability"] = rec.capability
         out["sample"] = rec.summary()
