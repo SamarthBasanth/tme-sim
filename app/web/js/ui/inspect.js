@@ -419,9 +419,16 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       }
       if (pv.sensitivity_note) {
         provEl.appendChild(h('dt', 'sensitivity'));
+        // Sans: this is the one value in the block that is a paragraph rather
+        // than a quantity, and in the mono face it was three lines of code-
+        // coloured text hanging off a right-aligned key/value list.
         provEl.appendChild(h('dd', {
           title: pv.sensitivity_note,
-          style: { fontSize: 'var(--fs-micro)', whiteSpace: 'normal', textAlign: 'left', justifyContent: 'flex-start', lineHeight: '1.35', padding: '3px 0' },
+          style: {
+            fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-micro)',
+            whiteSpace: 'normal', textAlign: 'left', justifyContent: 'flex-start',
+            lineHeight: '1.35', padding: '3px 0',
+          },
         }, pv.sensitivity_note));
       }
     }

@@ -126,8 +126,32 @@ select.inp {
 }
 .fgrid > .lbl { justify-self: start; align-self: center; }
 .fgrid .span2 { grid-column: 1 / -1; }
-.fgrid .with-unit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--sp-3); }
+/* The unit gets a floor width so the CONTROL edges line up down the form.
+   With an `auto` unit track every row was as wide as 197 px minus its own
+   suffix, so `um`, `uM`, `s` and `n` gave the setup form four different input
+   right-edges in eleven rows — the selects ended at 307, GRID DX at 283,
+   HALF LIFE at 292, DOSES at 297. Nothing in an instrument reads as one
+   object while its controls end in four places. The floor is set by the
+   widest suffix actually used in a `.with-unit` row (`um`/`uM`); anything
+   longer still grows the track rather than clipping. */
+.fgrid .with-unit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16px, auto);
+  align-items: center;
+  gap: var(--sp-3);
+}
 .fgrid .with-unit .unit { margin: 0; }
+/* A segmented control in a form fills its row. `.seg` is inline-flex, so in a
+   stretched grid cell the bordered container ran the full 197 px while its
+   buttons stayed at their content width — leaving a bordered, panel-coloured
+   empty cell after the last option that reads as a fifth, disabled choice.
+   `SENSITIVITY: uniform | determinant | ▯` was the worst of them: two real
+   modes and a 115 px void that looks like a third. Filling also puts the
+   control's right edge on the same 307 px as every select and input above it.
+   Deliberately scoped to `.fgrid` — the stage toolbar's segs are packed
+   against their neighbours and must stay at content width. */
+.fgrid .seg { display: flex; }
+.fgrid .seg > button { flex: 1 1 0; min-width: 0; padding: 0 var(--sp-2); }
 .frow { display: flex; align-items: center; gap: var(--sp-4); }
 
 /* What the SELECTED section cannot support, stated at the point of choosing it
@@ -246,6 +270,13 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .chip.st-done      { color: var(--ok);    background: var(--ok-bg); }
 .chip.st-failed    { color: var(--crit);  background: var(--crit-bg); }
 .chip.st-cancelled { color: var(--fg-3);  background: var(--bg-3); }
+/* A chip whose text carries two verdicts. `valid · 5 warn` is green because
+   the spec parses; the warning count inside it is not green news, and inside
+   an ok-coloured box it was reading as part of the reassurance. The chip's own
+   border and fill stay ok — the spec IS valid — and only the count takes the
+   warn hue. See runValidate() in js/ui/spec.js. */
+.chip .sep    { color: var(--fg-3); margin: 0 1px; }
+.chip .n-warn { color: var(--warn); font-weight: 700; }
 
 /* ============================================================ tables ==== */
 .tblwrap { overflow: auto; max-width: 100%; min-height: 0; }
@@ -363,19 +394,48 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   color: var(--fg-0);
 }
 .metric.lead .m-val { font-size: var(--fs-xl); }
+/* The meta row carries two different kinds of thing and used to run them
+   together on one wrapping flex line, chip first: four identical ASSUMED
+   boxes stacked down the LEFT edge, each leading a line like a bullet, with
+   the sentence they qualify trailing behind. A column of four identical
+   amber rectangles is not four readings of provenance, it is a texture — the
+   chips were the second-loudest thing in the panel and said nothing.
+   Two columns instead, and they inherit the axis the metric already has:
+
+     left   what this quantity IS      prose, sans, --fg-2
+     right  how sure we are of it      the chip, under the number it qualifies
+
+   So the panel reads as two clean columns — names and description down the
+   left, values and their provenance down the right — and a chip that differs
+   from the one above it is now visible in peripheral vision instead of
+   requiring four comparisons. Nothing is smaller and nothing is dropped; the
+   chip is simply next to the number it is about. */
 .metric .m-meta {
   grid-column: 1 / -1;
   min-width: 0;
-  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--sp-3);
   font-size: var(--fs-micro);
   color: var(--fg-2);
   padding-top: 2px;
   line-height: 1.35;
 }
+/* Column 2 by rule, not by DOM order: the chip stays FIRST in the source so
+   assistive tech reads the provenance before the description, while the eye
+   gets it aligned under the value. */
+.metric .m-meta > .chip { grid-column: 2; grid-row: 1; justify-self: end; }
+/* Sans. This is a sentence about a method — "Hill kill on per-cell drug AUC"
+   — not a measured quantity, and the house rule is that the mono face means
+   "this is a number". Four such sentences set in mono under four mono values
+   made the whole panel read as one block of machine output, which is exactly
+   the reading that stops anyone noticing the numbers. */
 .metric .m-src {
-  font-family: var(--font-mono);
+  grid-column: 1;
+  grid-row: 1;
+  font-family: var(--font-ui);
   min-width: 0;
-  flex: 1 1 auto;
   overflow-wrap: anywhere;
 }
 
@@ -486,8 +546,21 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 
 .caveat.info { border-left-color: var(--info); background: var(--info-bg); }
 .caveat.info::before { content: "i"; color: var(--info); }
-.caveat.crit { border-left-color: var(--crit); background: var(--crit-bg); }
-.caveat.crit::before { content: "\00d7"; color: var(--crit); }
+/* crit is a hard stop in the CRITICAL hue, so it takes the same filled-square
+   stop mark and the same 3 px rule as sev-2 — severity is read off the weight,
+   the hue says which kind.
+   It used to be set in "\00d7". A red multiplication sign in the top-left
+   corner of a tinted, rounded, alert-shaped box is the universal close button,
+   and the box wearing it is the delivery-law callout: the one disclosure on
+   this screen that is never dismissible. An operator reaching to clear it and
+   finding it inert learns the wrong thing about how much of this panel is
+   optional. No dismiss glyph appears anywhere in the severity scale now. */
+.caveat.crit {
+  border-left-color: var(--crit);
+  border-left-width: 3px;
+  background: var(--crit-bg);
+}
+.caveat.crit::before { content: "\25A0"; color: var(--crit); }
 /* Standing limits: true of the project, not of the open run. Same weight as a
    run caveat on purpose — they are not footnotes — but visually a separate
    block so it is clear they did not come out of this run. */
@@ -720,7 +793,14 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   overflow-wrap: anywhere;
   white-space: normal;
   font-size: var(--fs-xs);
-  font-family: var(--font-mono);
+  /* Sans, for the same reason the caveat list is sans: a diagnostic here is
+     four sentences of English about why a run is qualified, and the string is
+     verbatim the same text that reads perfectly well in the Caveats rail
+     opposite. Set in 10.5 px mono inside a bordered box it was the least
+     legible element in the Studio — the same disclosure, well designed in one
+     rail and unreadable in the other. The parts of it that ARE machine tokens
+     (the spec path, the line number) keep the mono face; see .d-path/.d-ln. */
+  font-family: var(--font-ui);
   line-height: var(--lh-body);
   border-bottom: 1px solid var(--line-0);
   text-align: left;
@@ -736,8 +816,21 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 }
 .diag.err  { border-left-color: var(--crit); }
 .diag.warn { border-left-color: var(--warn); }
-.diag::before { content: "\00d7"; font-weight: 700; text-align: center; color: var(--crit); }
+/* Same stop mark as .caveat.crit, and for the sharper version of the same
+   reason: a .diag is a BUTTON (it jumps to its line), so a "\00d7" sitting at
+   its left edge did not merely look like a close affordance, it looked like a
+   close affordance on a clickable row. Clicking it scrolled the editor. */
+.diag::before { content: "\25A0"; font-weight: 700; text-align: center; color: var(--crit); }
 .diag.warn::before { content: "!"; color: var(--warn); }
+/* The two fragments of a diagnostic that are machine tokens rather than
+   prose, so they keep the mono face while the message does not. */
+.diag .d-path { font-family: var(--font-mono); color: var(--fg-0); }
+.diag .d-ln {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-3);
+  white-space: nowrap;
+}
 .diag:hover { background: var(--bg-3); }
 .diag.err:hover  { background: var(--crit-bg); border-left-width: 4px; }
 .diag.warn:hover { background: var(--warn-bg); border-left-width: 4px; }
@@ -767,6 +860,33 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
   font-size: var(--fs-xs);
   color: var(--fg-0);
 }
+/* The cells-are-oversize disclosure (js/ui/overlays.js). Its own row, ruled
+   off from the measurement above it, with the warn hue on the mark and the
+   words left at --fg-1 — the same split the diagnostics list uses, and for
+   the same reason: hue on a whole sentence stops meaning "warning" and starts
+   meaning "paragraph". Sans, because it is a sentence and not a quantity;
+   `2.0` inside it is still a number and still mono. */
+.scalebar .sb-note {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: var(--sp-3);
+  align-items: baseline;
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+}
+.scalebar .sb-note.hidden { display: none; }
+.scalebar .sb-mark {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--warn);
+  text-align: center;
+}
+.scalebar .sb-txt { font-variant-numeric: tabular-nums; }
 
 /* field legend */
 .legend { padding: var(--sp-3) var(--sp-4); min-width: 158px; }
@@ -826,8 +946,23 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .legend .l-enc {
   font-family: var(--font-mono);
   font-size: var(--fs-micro);
-  color: var(--fg-2);
+  /* fg-1, not fg-2. This is the only line on the card that says what the
+     ABSENCE of colour means — that bare background is a measured zero and not
+     missing data — and it was set at the same weight as the grid dimensions
+     directly above it, as the last of three metadata lines. It is not
+     metadata about the image; it is how to read the image. */
+  color: var(--fg-1);
   margin-top: 1px;
+}
+/* Ruled off from the provenance line above, so the card reads as two blocks:
+   where these pixels came from, then how to read them. Applies to the
+   escalated .l-win form too — same statement, louder, when a narrowed window
+   makes "invisible" cover clamped data as well as zero. */
+.legend .l-enc,
+.legend .l-win {
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line-1);
 }
 
 /* hover read-out */

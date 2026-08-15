@@ -522,8 +522,28 @@
   display: flex;
   gap: 0;
   padding: 0;
-  background: var(--bg-1);
+  /* One step below the panel it indexes. The strip used to share --bg-1 with
+     the group headers under it, which put a row of group names and a row of
+     group names on the same plane in the same colour — the reason the strip
+     could be mistaken for the panel's own tab row in the first place. */
+  background: var(--bg-0);
   border-bottom: 1px solid var(--line-2);
+}
+/* "go to" — the strip's verb, see railNav() in js/ui/rail.js. Non-interactive
+   and styled so it can never be mistaken for a fourth destination. */
+.rail-nav .rn-lbl {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  height: var(--h-head);
+  padding: 0 var(--sp-4) 0 var(--sp-5);
+  border-right: 1px solid var(--line-1);
+  color: var(--fg-3);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+  user-select: none;
 }
 .rail-nav button {
   flex: 1 1 0;

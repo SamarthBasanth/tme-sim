@@ -11,7 +11,7 @@
 // Validation is remote, not local: the backend owns the rules. The local
 // mock implements the same rules only so the panel is exercisable offline.
 
-import { h, clear, fill, debounce } from '../util/dom.js';
+import { h, clear, fill, append, debounce } from '../util/dom.js';
 import * as api from '../api.js';
 import { toast, notifyError } from './toast.js';
 import { railGroup, railNav } from './rail.js';
@@ -577,11 +577,19 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged }) {
     const add = (d, kind) => {
       const line = d.line !== undefined ? d.line : lineOfPath(d.path);
       if (kind === 'err' && line) errLines.add(line);
+      // Three fragments, not one string. The spec path and the line number are
+      // machine tokens and keep the mono face; the message is a sentence of
+      // English and takes the sans face, the same way the identical text does
+      // in the Caveats rail. Nothing is added, removed or reworded — the same
+      // characters in the same order, told apart by what they are.
       frag.appendChild(h('button.diag.' + kind, {
         type: 'button',
         onclick: () => focusLine(line),
         title: line ? `jump to line ${line}` : 'no source line',
-      }, h('span', `${d.path ? d.path + ': ' : ''}${d.message}${line ? `  (ln ${line})` : ''}`)));
+      }, h('span',
+        d.path ? h('span.d-path', d.path + ': ') : null,
+        d.message,
+        line ? h('span.d-ln', `  (ln ${line})`) : null)));
     };
     for (const e of errors) add(e, 'err');
     for (const w of warnings) add(w, 'warn');
@@ -655,9 +663,21 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged }) {
       store.set({ validation: { ok, errors, warnings }, validating: false });
       renderDiags(errors, warnings);
       okBadge.className = 'chip st-' + (ok ? 'done' : 'failed');
-      okBadge.textContent = ok
-        ? (warnings.length ? `valid · ${warnings.length} warn` : 'valid')
-        : `${errors.length} error${errors.length === 1 ? '' : 's'}`;
+      // `valid · 5 warn` used to be one string inside one green chip, so the
+      // ok hue — the loudest "nothing to see here" signal the palette has —
+      // was carrying a warning count that on this section includes a hard
+      // stop. Same words, same chip, same order; the half that is a warning
+      // count is now in the warning colour. The verdict is unchanged: the
+      // spec IS valid, and it DOES carry five warnings.
+      clear(okBadge);
+      if (!ok) {
+        okBadge.textContent = `${errors.length} error${errors.length === 1 ? '' : 's'}`;
+      } else if (warnings.length) {
+        append(okBadge, ['valid', h('span.sep', '·'),
+          h('span.n-warn', `${warnings.length} warn`)]);
+      } else {
+        okBadge.textContent = 'valid';
+      }
       submitBtn.disabled = !ok;
     } catch (err) {
       store.set({ validating: false });

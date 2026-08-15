@@ -15,9 +15,17 @@ const CHAN_VARS = ['--ch-tumor', '--ch-stromal', '--ch-immune', '--ch-endothelia
 
 export function createOverlays(viewer) {
   /* ------------------------------------------------------- scale bar --- */
-  const barEl = h('div.bar');
+  const barEl = h('div.bar', { 'aria-hidden': 'true' });
   const barTxt = h('div.txt', '—');
-  const scalebar = h('div.ov.ov-scalebar.ov-card.scalebar', { 'aria-hidden': 'true' }, barEl, barTxt);
+  // The oversize disclosure gets its own row. It used to be appended to the
+  // ruler's caption after a "·" — `1 mm · cells 2.0x scale` — in the ruler's
+  // own mono face at the ruler's own weight, where it read as a second unit of
+  // the measurement rather than as what it is: a statement that the DOTS in
+  // the frame are not the size they claim and that apparent density is
+  // inflated by roughly the square of it. Same words, same card, one line
+  // down, marked as an assertion about the image. Nothing is shortened.
+  const barNote = h('div.sb-note.hidden', h('span.sb-mark', '!'), h('span.sb-txt', ''));
+  const scalebar = h('div.ov.ov-scalebar.ov-card.scalebar', barEl, barTxt, barNote);
 
   function updateScalebar() {
     const zoom = viewer.cam.zoom;            // css px per um
@@ -37,7 +45,9 @@ export function createOverlays(viewer) {
     // pixel. Say so on the same element rather than letting the bar imply that
     // everything in the frame is to scale. See MIN_POINT_CSS_PX in gl/viewer.js.
     const over = viewer.pointOversize;
-    barTxt.textContent = over > 1.1 ? `${len} · cells ${num(over, 1)}× scale` : len;
+    barTxt.textContent = len;
+    barNote.classList.toggle('hidden', !(over > 1.1));
+    if (over > 1.1) barNote.querySelector('.sb-txt').textContent = `cells drawn ${num(over, 1)}× scale`;
     scalebar.title = over > 1.1
       ? `Scale bar is exact. Cells are ${num(over, 1)}× life size: a ${num(viewer.cellDiamUm, 0)} um `
         + `cell is ${num(viewer.trueDiamCssPx, 2)} px at this zoom, below the 1.75 px legibility `

@@ -64,7 +64,19 @@ export function railNav(groups, scroller) {
     },
   }, g.label));
 
-  const el = h('nav.rail-nav', { 'aria-label': 'Section groups' }, btns);
+  // The strip names its own verb. Without the label it is a row of group names
+  // with the current one underlined in the accent — which is, to the letter,
+  // the selected-tab idiom, and it was read as one: it says "RESULT is open,
+  // VIEW and MEASURE are behind it" about a rail where all three are on the
+  // same scroll and nothing is behind anything. Worse, the sticky group header
+  // 24 px below it is the OTHER answer to "where am I", and the two can differ
+  // on screen at the same instant (the navigator marks COMMIT at the bottom of
+  // the rail while DEFINE's header is still stuck to the top of it) — two
+  // orientation devices, adjacent, disagreeing, one of them lying about how
+  // much of the panel exists. Two words fix it: this is where you can GO, and
+  // the sticky header below is where you ARE.
+  const el = h('nav.rail-nav', { 'aria-label': 'Section groups' },
+    h('span.rn-lbl', { 'aria-hidden': 'true' }, 'go to'), btns);
 
   /** Mark the last group whose header has reached the top of the rail body. */
   function sync() {
