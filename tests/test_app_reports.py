@@ -429,20 +429,28 @@ class TestRenderedDocument:
         It may NOT name it as settled: limit 2b on the same page says the
         ordering is law-dependent, and the delivery law is precisely what
         overturns this pick (cisplatin -> vincristine)."""
-        hero = html[html.index('<div class="ch">'):html.index("2 &middot;")] \
-            if "2 &middot;" in html else html
+        # The hero is one element, so slice the element rather than guessing at
+        # its end from the numbering of the section that follows it — the old
+        # heuristic ended the slice at the first "2 &middot;" on the page, which
+        # a numbered limits ledger silently moved above the hero.
+        hero = html[html.index('<div class="hero">'):]
+        hero = hero[:hero.index("</section>")]
         # the ranking headline is still there — it is the claim
-        assert "Top of this ranking" in html
-        assert "cisplatin" in html
+        assert "Top of this ranking" in hero
+        assert "cisplatin" in hero
         # ...and it now states the law it is conditional on, in the hero itself
-        assert "S = PS*Cp" in html or "S = PS*(Cp - C)" in html
-        assert "LAW-DEPENDENT" in html
-        assert "vincristine" in html
-        assert "SET, not a\n     winner" in html or "SET, not a winner" in html
+        assert "S = PS*Cp" in hero or "S = PS*(Cp - C)" in hero
+        assert "LAW-DEPENDENT" in hero
+        assert "vincristine" in hero
+        assert "SET, not a\n         winner" in hero or "SET, not a winner" in hero
         # the pre-existing honest lines are NOT weakened
-        assert "This is a model output, not a recommendation" in html
-        assert "ORDER is the claim" in html
+        assert "This is a model output, not a recommendation" in hero
+        assert "ORDER is the claim" in hero
         assert "UPPER BOUND" in hero
+        # the condition is not a footnote to the pick: both halves are in the
+        # hero, and the law limit it cites is reachable from it on this page
+        assert 'href="#lim-transvascular_delivery_law"' in hero
+        assert 'id="lim-transvascular_delivery_law"' in html
 
     def test_the_hero_names_the_law_stored_with_the_document(self):
         """Not a constant: the law that produced THIS document."""

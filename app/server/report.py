@@ -1047,69 +1047,217 @@ def _tokens_css() -> str:
         )
 
 
+#: The light palette the printed document uses, as a last resort. The real
+#: source is the product's own ``tokens.css`` — see :func:`_print_tokens`.
+_FALLBACK_LIGHT = """
+  color-scheme: light;
+  --bg-0: hsl(0 0% 100%); --bg-1: hsl(210 24% 97%); --bg-2: hsl(0 0% 100%);
+  --bg-3: hsl(210 22% 94%); --bg-4: hsl(210 20% 88%);
+  --line-0: hsl(210 18% 91%); --line-1: hsl(210 16% 83%);
+  --line-2: hsl(210 14% 68%);
+  --fg-0: hsl(213 28% 13%); --fg-1: hsl(213 13% 33%);
+  --fg-2: hsl(213 10% 47%); --fg-3: hsl(213 9% 63%);
+  --accent: hsl(197 88% 30%); --accent-bg: hsl(197 78% 40% / 0.12);
+  --ok: hsl(150 66% 26%); --warn: hsl(30 92% 32%);
+  --warn-bg: hsl(34 92% 46% / 0.16); --crit: hsl(356 70% 43%);
+  --crit-bg: hsl(356 70% 48% / 0.12); --info: hsl(214 52% 38%);
+  --info-bg: hsl(214 52% 44% / 0.12);
+"""
+
+
+def _print_tokens() -> str:
+    """The product's LIGHT token values, lifted for the printed page.
+
+    A researcher prints this. The screen document is the Studio's instrument
+    surface and is dark on purpose — but a dark ground on paper is either a
+    solid black page of toner or, with backgrounds off (the browser default),
+    near-white text on white and therefore nothing at all. So print re-declares
+    the SAME token names with light values and every component follows, because
+    every component is styled through the tokens rather than around them.
+
+    The values are not retyped here: they are cut out of the ``tokens.css`` that
+    :func:`_tokens_css` has already inlined, which is the same reason that
+    function exists. A token the product re-picks is re-picked on paper too, and
+    the two cannot drift.
+    """
+    css = _tokens_css()
+    key = ':root[data-theme="light"]'
+    i = css.find(key)
+    if i < 0:
+        return _FALLBACK_LIGHT
+    open_at = css.find("{", i)
+    if open_at < 0:
+        return _FALLBACK_LIGHT
+    depth, j = 0, open_at
+    while j < len(css):
+        if css[j] == "{":
+            depth += 1
+        elif css[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return css[open_at + 1:j]
+        j += 1
+    return _FALLBACK_LIGHT
+
+
 _DOC_CSS = """
 /* ---- report document ---------------------------------------------------
    Same rules as the Studio: square corners (<=2px), mono tabular numerics,
    one accent, semantic colour reserved for state. Nothing in this stylesheet
    references anything off this page - no stylesheet import, no resource
    reference, no webfont, no image, no script. Every graphic is a styled
-   element, and the whole document is one file. */
+   element, and the whole document is one file.
+
+   The document's one structural device is a MARGIN RAIL. Section numbers,
+   limit severities and field labels sit in it; prose sits beside it at a
+   readable measure; tables and code break out across both columns. That single
+   grid does four jobs: severity becomes scannable vertically without reading,
+   prose stops running 180 characters wide, the section numbering the hero
+   cross-references becomes visible, and the printed page gets a real gutter. */
+:root {
+  --rail: 132px;          /* the margin rail */
+  --gut: 20px;            /* rail to content */
+  --measure: 76ch;        /* running prose never exceeds this */
+  --fs-2xl: 25px;         /* section 2's pick name */
+  --fs-3xl: 33px;         /* document title */
+}
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg-0); color: var(--fg-1);
-  font-family: var(--font-ui); font-size: var(--fs-sm); line-height: 1.45;
+  font-family: var(--font-ui); font-size: var(--fs-md); line-height: 1.55;
 }
-.doc { max-width: 1180px; margin: 0 auto; padding: 0 18px 56px; }
+.doc { max-width: 1240px; margin: 0 auto; padding: 0 24px 64px; }
 .mono, .num, code, pre, td.num, th.num {
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
 }
-h1, h2, h3 { color: var(--fg-0); font-weight: 600; margin: 0; }
-h1 { font-size: var(--fs-xl); letter-spacing: 0.01em; }
-h2 {
-  font-size: var(--fs-md); text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--fg-2); border-bottom: 1px solid var(--line-2);
-  padding-bottom: 5px; margin: 30px 0 12px;
-}
+h1, h2, h3 { color: var(--fg-0); font-weight: 600; margin: 0;
+  text-wrap: balance; }
+h1 { font-size: var(--fs-3xl); line-height: 1.15; letter-spacing: -0.012em; }
 h3 { font-size: var(--fs-md); margin: 18px 0 6px; }
-p { margin: 6px 0; }
+p { margin: 0 0 9px; max-width: var(--measure); }
 a { color: var(--accent); }
+a:focus-visible, [tabindex]:focus-visible {
+  outline: var(--focus-w, 2px) solid var(--focus, currentColor);
+  outline-offset: var(--focus-off, 1px);
+}
 b, strong { color: var(--fg-0); font-weight: 600; }
+.lead { font-size: var(--fs-lg); line-height: 1.5; color: var(--fg-1);
+  max-width: var(--measure); }
+
+/* ---- the rail ---------------------------------------------------------- */
+.sec { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr);
+  column-gap: var(--gut); margin: 40px 0 0; }
+.sec > * { grid-column: 2; }
+.sec > .full, .sec > h2, .sec > .ledger, .sec > .census { grid-column: 1 / -1; }
+h2 {
+  display: grid; grid-template-columns: var(--rail) minmax(0, 1fr);
+  column-gap: var(--gut); align-items: baseline;
+  border-bottom: 1px solid var(--line-2); padding-bottom: 6px;
+  margin: 0 0 16px;
+}
+h2 .sn { font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--fg-3); letter-spacing: 0.06em; }
+h2 .st { font-size: var(--fs-lg); color: var(--fg-0); font-weight: 600;
+  letter-spacing: -0.004em; }
+/* An eyebrow in the rail, aligned with the section number above it. */
+.railed { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr);
+  column-gap: var(--gut); }
+.eyebrow { font-family: var(--font-mono); font-size: var(--fs-micro);
+  text-transform: uppercase; letter-spacing: 0.09em; color: var(--fg-3); }
 
 /* ---- the banner. Top and bottom, unmissable, never a footnote. --------- */
 .nfcu {
   border: 2px solid var(--crit); background: var(--crit-bg);
-  padding: 11px 14px; margin: 16px 0; border-radius: var(--radius);
+  padding: 13px 16px; margin: 20px 0; border-radius: var(--radius);
+  display: grid; grid-template-columns: var(--rail) minmax(0, 1fr);
+  column-gap: var(--gut); align-items: start;
 }
 .nfcu .t {
   font-family: var(--font-mono); font-size: var(--fs-md); font-weight: 700;
-  letter-spacing: 0.16em; color: var(--crit); display: block; margin-bottom: 5px;
+  line-height: 1.25; letter-spacing: 0.08em; color: var(--crit); display: block;
 }
-.nfcu .b { color: var(--fg-0); }
+/* Wider than the running measure on purpose: this is a stamp, not prose, and
+   it should read as two or three emphatic lines rather than a narrow column. */
+.nfcu .b { color: var(--fg-0); max-width: 96ch; }
 
-header.hd { padding: 20px 0 0; border-bottom: 1px solid var(--line-1); }
-.hd .sub { color: var(--fg-2); font-size: var(--fs-xs); margin-top: 4px; }
-.meta {
-  display: flex; flex-wrap: wrap; gap: 3px 20px; padding: 9px 0 14px;
-  font-size: var(--fs-xs);
-}
-.meta .k { color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.06em;
-  margin-right: 5px; }
-.meta .v { color: var(--fg-0); font-family: var(--font-mono); }
+/* ---- masthead ---------------------------------------------------------- */
+header.hd { padding: 34px 0 0; }
+.hd .kicker { font-family: var(--font-mono); font-size: var(--fs-xs);
+  text-transform: uppercase; letter-spacing: 0.16em; color: var(--accent);
+  margin-bottom: 10px; }
+.hd .sub { color: var(--fg-2); font-size: var(--fs-md); margin-top: 8px;
+  max-width: var(--measure); }
+/* Three named groups, not one flat dump: what the SPECIMEN is, how the RUN was
+   configured, and what identifies the DOCUMENT. A reader auditing a number
+   needs to know which of those three a field belongs to. */
+.metagrid { display: grid; gap: 0; margin: 24px 0 0;
+  border-top: 1px solid var(--line-2); }
+.metagrid .grp { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr);
+  column-gap: var(--gut); padding: 11px 0; border-bottom: 1px solid var(--line-0); }
+.metagrid .gl { font-family: var(--font-mono); font-size: var(--fs-micro);
+  text-transform: uppercase; letter-spacing: 0.09em; color: var(--fg-3);
+  padding-top: 2px; }
+.metagrid .gv { display: flex; flex-wrap: wrap; gap: 4px 28px; }
+.meta .k { color: var(--fg-3); font-size: var(--fs-micro); text-transform: uppercase;
+  letter-spacing: 0.06em; margin-right: 6px; }
+.meta .v { color: var(--fg-0); font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums; font-size: var(--fs-sm); }
 
-/* ---- limits ------------------------------------------------------------ */
+/* ---- limits ------------------------------------------------------------
+   Severity is stated as a WORD in the rail as well as a colour, so it survives
+   greyscale printing and colour-vision deficiency. The wall of near-identical
+   red the old rendering produced is broken by that word plus the census above:
+   a reader can count the criticals before reading any of them. */
+/* The ledger's own columns are sized so its titles land on exactly the same
+   axis as the section titles and the limit titles below it. One rail, one
+   alignment, all the way down the page. */
+.ledger { width: 100%; border-collapse: collapse; margin: 0 0 22px;
+  table-layout: fixed; }
+.ledger td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--line-0);
+  vertical-align: baseline; }
+.ledger .lsev { font-family: var(--font-mono); font-size: var(--fs-micro);
+  letter-spacing: 0.09em; white-space: nowrap;
+  width: calc(var(--rail) + var(--gut) - 30px); }
+.ledger .lnum { font-family: var(--font-mono); font-size: var(--fs-micro);
+  color: var(--fg-3); width: 30px; text-align: right; }
+.ledger a { color: var(--fg-1); text-decoration: none; }
+.ledger a:hover { color: var(--fg-0); text-decoration: underline; }
+.sev-critical { color: var(--crit); }
+.sev-warn { color: var(--warn); }
+.sev-info { color: var(--info); }
+.census { font-family: var(--font-mono); font-size: var(--fs-sm);
+  color: var(--fg-2); margin: 0 0 12px; }
+.census b { font-variant-numeric: tabular-nums; }
+
+/* Spans the section grid so the severity word in its rail sits on the SAME
+   axis as the section number above it, and stops at the measure so the tinted
+   panel is the width of its own text rather than of the viewport. */
 .limit {
+  --lpad: 21px;                 /* 3px severity rule + 18px padding */
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: calc(var(--rail) - var(--lpad)) minmax(0, 1fr);
+  column-gap: var(--gut);
   border-left: 3px solid var(--line-2); background: var(--bg-1);
-  padding: 8px 12px; margin: 0 0 3px;
+  padding: 13px 18px 15px; margin: 0 0 4px;
+  max-width: calc(var(--rail) + var(--gut) + var(--measure) + 18px);
 }
 .limit.critical { border-left-color: var(--crit); background: var(--crit-bg); }
 .limit.warn { border-left-color: var(--warn); background: var(--warn-bg); }
 .limit.info { border-left-color: var(--info); background: var(--info-bg); }
-.limit .lt { color: var(--fg-0); font-weight: 600; display: block; }
-.limit .lb { margin-top: 3px; }
+.limit .lm { font-family: var(--font-mono); font-size: var(--fs-micro);
+  letter-spacing: 0.09em; line-height: 1.6; }
+.limit .lm .lid { display: block; color: var(--fg-3); letter-spacing: 0.02em;
+  margin-top: 3px; font-size: var(--fs-sm); }
+.limit .lt { color: var(--fg-0); font-weight: 600; display: block;
+  font-size: var(--fs-lg); line-height: 1.35; max-width: var(--measure);
+  text-wrap: balance; }
+.limit .lb { margin-top: 6px; max-width: var(--measure); }
 .limit .ls {
-  display: block; margin-top: 4px; font-family: var(--font-mono);
-  font-size: var(--fs-micro); color: var(--fg-3);
+  display: block; margin-top: 8px; font-family: var(--font-mono);
+  font-size: var(--fs-micro); color: var(--fg-3); max-width: var(--measure);
+  word-break: break-word;
 }
 .limit.na { opacity: 0.72; }
 .limit.na .lt::after {
@@ -1122,63 +1270,171 @@ header.hd { padding: 20px 0 0; border-bottom: 1px solid var(--line-1); }
   display: inline-block; font-family: var(--font-mono);
   font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: 0.06em;
   padding: 1px 5px; border: 1px solid var(--line-2); border-radius: var(--radius);
-  color: var(--fg-2); white-space: nowrap;
+  color: var(--fg-2); white-space: nowrap; line-height: 1.5;
 }
 .chip.measured { color: var(--ok); border-color: var(--ok); }
 .chip.assumed { color: var(--warn); border-color: var(--warn); }
 .chip.computed { color: var(--info); border-color: var(--info); }
 .chip.crit { color: var(--crit); border-color: var(--crit); }
 .chip.accent { color: var(--accent); border-color: var(--accent); }
+/* The key for those chips, stated once where they first appear. A colour a
+   reader has to infer is a colour that is not carrying information. */
+.key { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0 0 12px;
+  font-size: var(--fs-sm); color: var(--fg-2); align-items: baseline; }
+.key > span { display: flex; gap: 7px; align-items: baseline; }
 
 /* ---- tables ------------------------------------------------------------ */
-.tblwrap { overflow-x: auto; max-width: 100%; margin: 8px 0; }
+.tblwrap { overflow-x: auto; max-width: 100%; margin: 10px 0 14px; }
 table.tbl { border-collapse: collapse; width: 100%; font-size: var(--fs-sm); }
 table.tbl th {
   text-align: left; font-weight: 600; color: var(--fg-2);
   font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: 0.06em;
-  border-bottom: 1px solid var(--line-2); padding: 5px 8px; white-space: nowrap;
+  border-bottom: 1px solid var(--line-2); padding: 6px 9px; white-space: nowrap;
+  vertical-align: bottom;
 }
+/* The column-group row. It is the answer to "which of these did the model
+   COMPUTE and which was it GIVEN?", encoded in the table's own structure
+   instead of left to the reader to work out drug by drug. */
+table.tbl tr.grp th { border-bottom: 0; padding-bottom: 2px; color: var(--fg-3);
+  letter-spacing: 0.09em; font-weight: 400; }
+table.tbl tr.grp th.g { border-bottom: 1px solid var(--line-1); color: var(--fg-2); }
 table.tbl td {
-  padding: 4px 8px; border-bottom: 1px solid var(--line-0);
-  vertical-align: top;
+  padding: 6px 9px; border-bottom: 1px solid var(--line-0);
+  vertical-align: baseline;
 }
 table.tbl td.num, table.tbl th.num { text-align: right; }
 table.tbl tbody tr:nth-child(even) td { background: var(--bg-1); }
 table.tbl tbody tr.top td { background: var(--accent-bg); }
+table.tbl tbody tr.top td.rank { color: var(--accent); }
 table.tbl td .u { color: var(--fg-3); font-size: var(--fs-micro); margin-left: 3px; }
 .rank { font-family: var(--font-mono); color: var(--fg-2); }
-.drug { color: var(--fg-0); font-weight: 600; }
+.drug { color: var(--fg-0); font-weight: 600; white-space: nowrap; }
 
-/* ---- attribution bars (inline, no images) ------------------------------ */
-.bar { position: relative; height: 9px; background: var(--bg-3); min-width: 96px; }
+/* ---- bars (inline, no images) ------------------------------------------
+   `display: inline-block` is load-bearing, not cosmetic. As a plain inline box
+   this element's height, min-width and background were all ignored, its
+   absolutely-positioned children inherited a zero-size containing block, and
+   every bar in the attribution table rendered 0x0 -- the document's only
+   quantitative graphic, invisible in every report ever exported. */
+.bar { position: relative; display: inline-block; vertical-align: middle;
+  height: 9px; width: 128px; background: var(--bg-3); }
 .bar > i { position: absolute; top: 0; bottom: 0; display: block; }
 .bar > i.pos { background: var(--accent); }
-.bar > i.neg { background: var(--fg-3); }
+/* fg-2, not fg-3: a negative attribution term is DATA, not a disabled state,
+   and fg-3 is the placeholder neutral — it all but vanished on paper. */
+.bar > i.neg { background: var(--fg-2); }
 .bar > u { position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1px;
   background: var(--line-2); }
+/* The ranking's own magnitude bar: unsigned, zero-anchored, one direction. */
+.mag { position: relative; display: inline-block; vertical-align: middle;
+  height: 9px; width: 108px; background: var(--bg-3); }
+.mag > i { position: absolute; top: 0; bottom: 0; left: 0; display: block;
+  background: var(--accent-dim, var(--fg-3)); }
+tr.top .mag > i { background: var(--accent); }
 
 /* ---- misc -------------------------------------------------------------- */
 pre.code {
-  background: var(--bg-1); border: 1px solid var(--line-1); padding: 9px 11px;
-  overflow-x: auto; font-size: var(--fs-xs); color: var(--fg-1); margin: 8px 0;
+  background: var(--bg-1); border: 1px solid var(--line-1); padding: 11px 13px;
+  overflow-x: auto; font-size: var(--fs-xs); line-height: 1.5;
+  color: var(--fg-1); margin: 10px 0 14px;
 }
-.kv { display: grid; grid-template-columns: auto 1fr; gap: 0 12px;
-  font-size: var(--fs-xs); margin: 5px 0; }
+.kv { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 0 16px;
+  font-size: var(--fs-xs); margin: 8px 0 0; }
 .kv dt { color: var(--fg-3); font-size: var(--fs-micro); text-transform: uppercase;
-  letter-spacing: 0.06em; padding: 2px 0; border-bottom: 1px solid var(--line-0); }
+  letter-spacing: 0.06em; padding: 4px 0; border-bottom: 1px solid var(--line-0); }
 .kv dd { margin: 0; color: var(--fg-0); font-family: var(--font-mono);
-  padding: 2px 0; border-bottom: 1px solid var(--line-0); word-break: break-word; }
-.card { border: 1px solid var(--line-1); background: var(--bg-1); padding: 10px 12px;
-  margin: 8px 0; }
+  line-height: 1.5; padding: 4px 0; border-bottom: 1px solid var(--line-0);
+  word-break: break-word; }
+.card { border: 1px solid var(--line-1); background: var(--bg-1);
+  padding: 14px 16px; margin: 0 0 10px; }
 .card .ch { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
-  border-bottom: 1px solid var(--line-1); padding-bottom: 5px; margin-bottom: 6px; }
-.card .ch .n { color: var(--fg-0); font-weight: 600; font-size: var(--fs-md); }
-ul.pts { margin: 5px 0; padding-left: 17px; }
-ul.pts li { margin: 3px 0; }
-.foot { margin-top: 22px; padding-top: 10px; border-top: 1px solid var(--line-1);
-  color: var(--fg-3); font-size: var(--fs-micro); font-family: var(--font-mono); }
+  border-bottom: 1px solid var(--line-1); padding-bottom: 8px; margin-bottom: 10px; }
+.card .ch .n { color: var(--fg-0); font-weight: 600; font-size: var(--fs-lg); }
+ul.pts { margin: 0 0 9px; padding-left: 18px; max-width: var(--measure); }
+ul.pts li { margin: 0 0 6px; }
+ul.pts.wide, ul.pts.wide li { max-width: none; }
+.foot { margin-top: 30px; padding-top: 12px; border-top: 1px solid var(--line-1);
+  color: var(--fg-3); font-size: var(--fs-micro); font-family: var(--font-mono);
+  line-height: 1.7; }
 .hl { color: var(--fg-0); }
+
+/* ---- the hero ----------------------------------------------------------
+   Two halves, and the second is not a footnote to the first: the pick, then
+   the condition the pick is only true under. They are given the same visual
+   weight class deliberately -- a reader who takes the name and stops has taken
+   half a sentence. */
+.hero { border: 1px solid var(--line-2); background: var(--bg-1);
+  padding: 0; margin: 0 0 18px; }
+.hero .pick { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr);
+  column-gap: var(--gut); padding: 18px 18px 16px;
+  border-bottom: 1px solid var(--line-1); }
+.hero .pn { font-size: var(--fs-2xl); line-height: 1.15; color: var(--fg-0);
+  font-weight: 600; letter-spacing: -0.012em; }
+.hero .pn .under { display: block; font-size: var(--fs-sm); font-weight: 400;
+  color: var(--fg-2); font-family: var(--font-mono); letter-spacing: 0;
+  margin-top: 6px; }
+.hero .pchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.hero .pfacts { font-family: var(--font-mono); font-size: var(--fs-sm);
+  color: var(--fg-1); margin-top: 10px; }
+.hero .cond { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr);
+  column-gap: var(--gut); padding: 16px 18px; }
+.hero .cond + .cond { border-top: 1px solid var(--line-0); }
+.hero .cond p:last-child { margin-bottom: 0; }
+.hero .cl { font-family: var(--font-mono); font-size: var(--fs-micro);
+  text-transform: uppercase; letter-spacing: 0.09em; color: var(--crit);
+  line-height: 1.6; }
+.hero .cl.q { color: var(--fg-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
 """
+
+
+#: Everything in the printed page that is NOT a colour. The colours arrive by
+#: re-declaring the tokens, so there is no second palette to keep in step.
+_PRINT_RULES = """
+  @page { margin: 14mm 12mm; }
+  body { font-size: 9.5pt; line-height: 1.45; }
+  .doc { max-width: none; padding: 0; }
+  :root { --rail: 108px; --gut: 14px; --measure: 92ch; }
+  h1 { font-size: 21pt; }
+  h2 .st { font-size: 12pt; }
+  .hd .kicker { color: var(--fg-2); }
+  .sec { margin-top: 22px; }
+  h2 { break-after: avoid; page-break-after: avoid; }
+  .limit, .card, .hero, .nfcu, tr, .metagrid .grp {
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  thead { display: table-header-group; }
+  .tblwrap { overflow-x: visible; }
+  table.tbl { font-size: 8pt; }
+  table.tbl tbody tr:nth-child(even) td { background: transparent; }
+  table.tbl tbody tr.top td { background: var(--accent-bg); }
+  /* Backgrounds are the browser's to honour or drop. Severity must survive
+     either way, so it is carried by a rule and a word as well as by a wash. */
+  .limit { border: 1px solid var(--line-1); border-left-width: 4px; }
+  .nfcu { border-width: 2px; }
+  .foot { break-inside: avoid; page-break-inside: avoid; }
+"""
+
+
+def _print_css() -> str:
+    """The paper stylesheet.
+
+    Re-declares the SAME token names with the product's own light values, so
+    every rule in :data:`_DOC_CSS` follows onto paper without one
+    print-specific colour being invented. Then it stops the page breaking
+    through a limit, a drug card or a table header — a caveat split across a
+    page fold is a caveat half its readers will not finish.
+    """
+    return ("@media print {\n"
+            '  :root, :root[data-theme="dark"] {'
+            f"{_print_tokens()}\n"
+            "    --bg-0: hsl(0 0% 100%);\n"
+            "  }\n"
+            f"{_PRINT_RULES}"
+            "}\n")
 
 
 def _esc(v) -> str:
@@ -1247,18 +1503,76 @@ def _md_bold(text: str) -> str:
                    for i, p in enumerate(parts))
 
 
+#: The severity words as the document prints them. Same three values
+#: ``build_limits`` assigns — spelled out, because a colour alone does not
+#: survive a greyscale printer or a red-green reader.
+_SEV_WORD = {"critical": "CRITICAL", "warn": "WARNING", "info": "NOTE"}
+
+
+def _limit_anchor(lim: Dict) -> str:
+    """A stable in-page anchor for one limit. Never an external reference."""
+    return "lim-" + _esc(lim.get("id") or "unknown")
+
+
+def _limits_census(limits: Sequence[Dict]) -> str:
+    """How conditioned this document is, as a count, before the reading starts.
+
+    Twelve dense paragraphs all washed the same red is not a severity scale, it
+    is a wall — and a wall is skimmed. The count is stated first so the weight
+    of the block registers even on a reader who then skims it.
+    """
+    n = {"critical": 0, "warn": 0, "info": 0}
+    for lim in limits:
+        sev = lim.get("severity") or "info"
+        n[sev] = n.get(sev, 0) + 1
+    parts = [f'<b class="sev-{k}">{n[k]} {_SEV_WORD[k]}</b>'
+             for k in ("critical", "warn", "info") if n.get(k)]
+    return (f'<p class="census">{len(limits)} limits travel with this report — '
+            + " &middot; ".join(parts) + ". None of them is optional.</p>")
+
+
+def _limits_ledger(limits: Sequence[Dict]) -> str:
+    """An index of the limits, above their full text.
+
+    Two jobs. It lets a reader see the shape of the objection list before
+    reading 4,000 words of it, and it gives every limit a name the rest of the
+    document can point AT — the hero's condition cites the delivery-law limit,
+    and until now that cross-reference resolved to nothing on the page.
+    """
+    rows = []
+    for i, lim in enumerate(limits, start=1):
+        sev = lim.get("severity") or "info"
+        na = "" if lim.get("applies", True) else \
+            ' <span class="eyebrow">does not apply</span>'
+        rows.append(
+            f'<tr><td class="lnum">{i}</td>'
+            f'<td class="lsev sev-{_esc(sev)}">{_SEV_WORD.get(sev, sev.upper())}</td>'
+            f'<td><a href="#{_limit_anchor(lim)}">{_esc(lim.get("title"))}</a>'
+            f'{na}</td></tr>'
+        )
+    return (f'<table class="ledger"><tbody>{"".join(rows)}</tbody></table>')
+
+
 def _limits_html(limits: Sequence[Dict]) -> str:
     out = []
-    for lim in limits:
-        cls = lim.get("severity") or "info"
+    for i, lim in enumerate(limits, start=1):
+        sev = lim.get("severity") or "info"
+        cls = sev
         if not lim.get("applies", True):
             cls += " na"
-        src = (f'<span class="ls">{_esc(lim["source"])}</span>'
-               if lim.get("source") else "")
+        # The identifier belongs on the full-measure source line, not in the
+        # rail: the longest of them is 29 characters and no rail narrow enough
+        # to be a rail can set it without breaking it mid-word.
+        src_bits = [f'limit id <b class="hl">{_esc(lim.get("id"))}</b>']
+        if lim.get("source"):
+            src_bits.append(_esc(lim["source"]))
+        src = f'<span class="ls">{" &middot; ".join(src_bits)}</span>'
         out.append(
-            f'<div class="limit {cls}">'
-            f'<span class="lt">{_esc(lim.get("title"))}</span>'
-            f'<div class="lb">{_esc(lim.get("body"))}</div>{src}</div>'
+            f'<div class="limit {cls}" id="{_limit_anchor(lim)}">'
+            f'<div class="lm sev-{_esc(sev)}">{_SEV_WORD.get(sev, sev.upper())}'
+            f'<span class="lid">{i}</span></div>'
+            f'<div><span class="lt">{_esc(lim.get("title"))}</span>'
+            f'<div class="lb">{_esc(lim.get("body"))}</div>{src}</div></div>'
         )
     return "\n".join(out)
 
@@ -1287,42 +1601,80 @@ def _ranking_table(rows: Sequence[Dict]) -> str:
     dose, it knows the drug's IC50, and on the same panel its separation
     (across-drug spread / grid drift) is 67.7 against 15.2 for the index.
     """
+    # The column-group row answers, structurally, the question a reader of a
+    # simulation output has to be able to answer before trusting any cell: which
+    # of these did the model PRODUCE, and which was it HANDED? Left to prose it
+    # is answered nowhere; left to the reader it is answered wrongly.
+    group = (
+        "<tr class='grp'><th colspan='2'></th>"
+        "<th class='g' colspan='4'>computed by this run</th>"
+        "<th class='g' colspan='5'>inputs it was given</th>"
+        "<th class='g'>attribution</th></tr>"
+    )
     head = (
         "<tr><th class='num'>#</th><th>drug</th><th class='num'>predicted kill</th>"
-        "<th class='num'>tumour-cell AUC</th><th class='num'>IC50</th>"
+        "<th>ranked by kill</th>"
+        "<th class='num'>tumour-cell AUC</th>"
+        "<th class='num'>coverage @1x IC50</th>"
+        "<th class='num'>IC50</th>"
         "<th>IC50 source</th><th class='num'>BBB</th><th class='num'>D_eff</th>"
-        "<th class='num'>L</th><th class='num'>coverage @1x IC50</th>"
+        "<th class='num'>L</th>"
         "<th>dominant driver</th></tr>"
     )
+    kills = [k for k in (_num(r.get("kill"), 0.0) for r in rows) if k > 0]
+    top_kill = max(kills) if kills else 0.0
     body = []
     for r in rows:
         prov = r.get("provenance") or {}
         ic50 = prov.get("ic50") or {}
         kind = ic50.get("provenance_kind") or "assumed"
+        k = _num(r.get("kill"), 0.0)
+        frac = (max(0.0, k) / top_kill * 100.0) if top_kill > 0 else 0.0
         body.append(
             "<tr class='{cls}'>"
             "<td class='num rank'>{rank}</td>"
             "<td class='drug'>{name}</td>"
             "<td class='num'><b>{kill}</b></td>"
+            "<td><span class='mag'><i style='width:{frac:.2f}%'></i></span></td>"
             "<td class='num'>{auc}<span class='u'>uM.s</span></td>"
+            "<td class='num'>{cov}</td>"
             "<td class='num'>{ic}<span class='u'>uM</span></td>"
             "<td><span class='chip {kind}'>{kind}</span> {src}</td>"
             "<td class='num'>{bbb}</td>"
             "<td class='num'>{deff}<span class='u'>um2/s</span></td>"
             "<td class='num'>{L}<span class='u'>um</span></td>"
-            "<td class='num'>{cov}</td>"
             "<td>{dom}</td></tr>".format(
                 cls="top" if r.get("rank") == 1 else "",
                 rank=r.get("rank"), name=_esc(r.get("name")),
-                kill=_fmt(r.get("kill")), auc=_sig(r.get("tumor_auc")),
+                kill=_fmt(r.get("kill")), frac=frac,
+                auc=_sig(r.get("tumor_auc")),
                 ic=_sig(r.get("ic50")), kind=_esc(kind),
                 src=_esc(ic50.get("source")), bbb=_fmt(r.get("bbb"), 3),
                 deff=_fmt(r.get("d_eff"), 0), L=_fmt(r.get("L_um"), 0),
                 cov=_fmt(r.get("coverage_1x"), 4), dom=_esc(r.get("dominant")),
             )
         )
-    return (f"<div class='tblwrap'><table class='tbl'><thead>{head}</thead>"
+    return (f"<div class='tblwrap'><table class='tbl'><thead>{group}{head}</thead>"
             f"<tbody>{''.join(body)}</tbody></table></div>")
+
+
+def _provenance_key() -> str:
+    """What the chips mean, stated where they first appear.
+
+    The document has always coloured its provenance chips green / amber / blue
+    and never once said what the three colours were. A colour a reader has to
+    infer is a colour that is carrying no information.
+    """
+    return (
+        '<div class="key">'
+        '<span><span class="chip measured">measured</span>'
+        'a number somebody observed in an experiment</span>'
+        '<span><span class="chip computed">computed</span>'
+        'a number this simulation produced</span>'
+        '<span><span class="chip assumed">assumed</span>'
+        'a number chosen, curated or defaulted — not measured on this tissue</span>'
+        "</div>"
+    )
 
 
 def _attribution_table(rows: Sequence[Dict]) -> str:
@@ -1439,30 +1791,45 @@ def render_html(doc: Dict) -> str:
     window_s = float(doc.get("window_s") or 0.0)
     best = rows[0] if rows else None
 
-    meta_items = [
-        ("report", doc.get("report_id")),
-        ("section", doc.get("section")),
-        ("panel", section.get("panel")),
-        ("assay", section.get("assay")),
-        ("accession", section.get("accession")),
-        ("cells", micro.get("n_cells")),
-        ("tumour cells", micro.get("n_tumor")),
-        ("grid", " x ".join(str(g) for g in (micro.get("grid") or []))),
-        ("dx", f"{_fmt(spec.get('dx_um'), 1)} um"),
-        ("window", _window_label(window_s)),
-        ("sensitivity mode", doc.get("sensitivity_mode")),
-        ("vascular mode", spec.get("vascular_mode")),
-        ("oxygen mode", spec.get("oxygen_mode")),
-        ("state mode", spec.get("state_mode")),
-        ("outcome label", "ABSENT" if not section.get("has_outcome_label") else "present"),
-        ("generated", time.strftime("%Y-%m-%d %H:%M:%S",
-                                    time.localtime(doc.get("finished_at")
-                                                   or time.time()))),
+    # Three named groups, not sixteen undifferentiated fields. Auditing a number
+    # on this page means knowing whether the field beside it describes the
+    # TISSUE (fixed, measured, not ours), the RUN (chosen, and every choice is a
+    # limit below), or the DOCUMENT (identity and provenance).
+    meta_groups = [
+        ("specimen", [
+            ("section", doc.get("section")),
+            ("panel", section.get("panel")),
+            ("assay", section.get("assay")),
+            ("accession", section.get("accession")),
+            ("cells", micro.get("n_cells")),
+            ("tumour cells", micro.get("n_tumor")),
+            ("outcome label",
+             "ABSENT" if not section.get("has_outcome_label") else "present"),
+        ]),
+        ("run settings", [
+            ("grid", " x ".join(str(g) for g in (micro.get("grid") or []))),
+            ("dx", f"{_fmt(spec.get('dx_um'), 1)} um"),
+            ("window", _window_label(window_s)),
+            ("sensitivity mode", doc.get("sensitivity_mode")),
+            ("vascular mode", spec.get("vascular_mode")),
+            ("oxygen mode", spec.get("oxygen_mode")),
+            ("state mode", spec.get("state_mode")),
+        ]),
+        ("document", [
+            ("report", doc.get("report_id")),
+            ("status", doc.get("status")),
+            ("generated", time.strftime("%Y-%m-%d %H:%M:%S",
+                                        time.localtime(doc.get("finished_at")
+                                                       or time.time()))),
+        ]),
     ]
     meta = "".join(
-        f'<span><span class="k">{_esc(k)}</span>'
-        f'<span class="v">{_esc(v if v not in (None, "") else "—")}</span></span>'
-        for k, v in meta_items)
+        f'<div class="grp meta"><div class="gl">{_esc(label)}</div>'
+        '<div class="gv">' + "".join(
+            f'<span><span class="k">{_esc(k)}</span>'
+            f'<span class="v">{_esc(v if v not in (None, "") else "—")}</span>'
+            "</span>" for k, v in items) + "</div></div>"
+        for label, items in meta_groups)
 
     # The hero names the top of a RANKING, which is the defensible output — but
     # it may not name it as settled while limit 2b on this same page says the
@@ -1472,41 +1839,63 @@ def render_html(doc: Dict) -> str:
     law = doc.get("delivery_law")
     if not isinstance(law, dict):
         law = delivery_law()
+    # The law limit is on this same page; the hero's condition used to cite it
+    # as "limit 2b", which named nothing a reader could find. It now links to
+    # the limit's own anchor — an in-page fragment, not an external reference.
+    law_ref = "#lim-transvascular_delivery_law"
     headline = ""
     if best:
         headline = f"""
-<div class="card">
-  <div class="ch">
-    <span class="n">Top of this ranking, under {_esc(law.get('law'))}:
-      {_esc(best.get('name'))}</span>
-    <span class="chip accent">{_fmt(best.get('kill'))}</span>
-    <span class="chip crit">UPPER BOUND</span>
-    <span class="chip crit">LAW-DEPENDENT</span>
+<div class="hero">
+  <div class="pick">
+    <div class="eyebrow">the finding</div>
+    <div>
+      <div class="pn">Top of this ranking, under {_esc(law.get('law'))}:
+        <b>{_esc(best.get('name'))}</b>
+        <span class="under">predicted kill {_fmt(best.get('kill'))} — read the
+          ORDER, not this level</span></div>
+      <div class="pchips">
+        <span class="chip crit">UPPER BOUND</span>
+        <span class="chip crit">LAW-DEPENDENT</span>
+        <span class="chip crit">NOT A RECOMMENDATION</span>
+        <span class="chip accent">{_esc(best.get('dominant'))}</span>
+      </div>
+      <div class="pfacts">L = {_fmt(best.get('L_um'), 0)} um &middot;
+        IC50 {_sig(best.get('ic50'))} uM
+        ({_esc(((best.get('provenance') or {}).get('ic50') or {}).get('source'))})
+        &middot; tumour-cell exposure {_sig(best.get('tumor_auc'))} uM.s</div>
+    </div>
   </div>
-  <p>Dominant driver <b>{_esc(best.get('dominant'))}</b> ·
-     L = {_fmt(best.get('L_um'), 0)} um ·
-     IC50 {_sig(best.get('ic50'))} uM
-     ({_esc(((best.get('provenance') or {}).get('ic50') or {}).get('source'))}) ·
-     tumour-cell exposure {_sig(best.get('tumor_auc'))} uM.s.</p>
-  <p><b>This is a model output, not a recommendation.</b> It has never been
-     checked against a measured response for this tissue or any other. The
-     ORDER is the claim; the LEVEL is not. Treat it as a hypothesis to test in
-     the lab, nothing more.</p>
-  <p><b>And the order carries a condition — read this line with the name
-     above.</b> Every delivery number here was produced under
-     <span class="mono">{_esc(law.get('law'))}</span>; under the alternative
-     source term <span class="mono">{_esc(law.get('alternative_law'))}</span>
-     the panel is re-weighted by permeability (which spans 47x across this drug
-     list) and <b>the top-1 GBM pick changes, cisplatin &rarr; vincristine</b>,
-     swapping 4 of 45 pairs (limit 2b above;
-     results/transvascular_exchange_revalidation.md §4.1). Independently of the
-     law, results/ranking_robustness.md §8 concludes that until an ex-vivo
-     potency readout exists on this patient's own cells, <b>"the reportable
-     output of this pipeline for the top of the panel is a SET, not a
-     winner"</b> — P(cisplatin = rank 1) is 0.931 under that report's declared
-     priors and falls to 0.587 in its stress scenario. So: this is the top of
-     the ranking one law and one set of priors produced, not this specimen's
-     drug.</p>
+  <div class="cond">
+    <div class="cl">what it is not</div>
+    <div>
+      <p><b>This is a model output, not a recommendation.</b> It has never been
+         checked against a measured response for this tissue or any other. The
+         ORDER is the claim; the LEVEL is not. Treat it as a hypothesis to test
+         in the lab, nothing more.</p>
+    </div>
+  </div>
+  <div class="cond">
+    <div class="cl">the condition on the order</div>
+    <div>
+      <p><b>The order carries a condition — read this with the name above.</b>
+         Every delivery number here was produced under
+         <span class="mono">{_esc(law.get('law'))}</span>; under the alternative
+         source term <span class="mono">{_esc(law.get('alternative_law'))}</span>
+         the panel is re-weighted by permeability (which spans 47x across this
+         drug list) and <b>the top-1 GBM pick changes, cisplatin &rarr;
+         vincristine</b>, swapping 4 of 45 pairs (<a href="{law_ref}">see the
+         delivery-law limit above</a>;
+         results/transvascular_exchange_revalidation.md §4.1).</p>
+      <p>Independently of the law, results/ranking_robustness.md §8 concludes
+         that until an ex-vivo potency readout exists on this patient's own
+         cells, <b>"the reportable output of this pipeline for the top of the
+         panel is a SET, not a winner"</b> — P(cisplatin = rank 1) is 0.931
+         under that report's declared priors and falls to 0.587 in its stress
+         scenario. So: this is the top of the ranking one law and one set of
+         priors produced, not this specimen's drug.</p>
+    </div>
+  </div>
 </div>"""
 
     caveat_items = "".join(f"<li>{_esc(c)}</li>" for c in (doc.get("caveats") or []))
@@ -1516,28 +1905,37 @@ def render_html(doc: Dict) -> str:
     body = f"""
 <div class="doc">
 <header class="hd">
+  <div class="kicker">tmesim · virtual therapy panel</div>
   <h1>Virtual therapy panel — {_esc(section.get('label') or doc.get('section'))}</h1>
-  <div class="sub">Ranked, mechanistically attributed drug panel simulated on one
-    measured specimen. Report {_esc(doc.get('report_id'))}, status
-    {_esc(doc.get('status'))}.</div>
-  <div class="meta">{meta}</div>
+  <div class="sub">A ranked, mechanistically attributed drug panel simulated on
+    one measured specimen. Every number below is a prediction; the sections are
+    ordered so that the limits on it are read first.</div>
+  <div class="metagrid">{meta}</div>
 </header>
 
 {_banner('top')}
 
-<h2>1 · Limits — read these before any number on this page</h2>
+<section class="sec">
+<h2><span class="sn">01</span><span class="st">Limits — read these before any number on this page</span></h2>
+{_limits_census(limits)}
+{_limits_ledger(limits)}
 {_limits_html(limits)}
+</section>
 
-<h2>2 · Ranked panel</h2>
-{headline}
-{_ranking_table(rows)}
+<section class="sec">
+<h2><span class="sn">02</span><span class="st">Ranked panel</span></h2>
+<div class="full">{headline}</div>
+{_provenance_key()}
+<div class="full">{_ranking_table(rows)}</div>
 <p>All {len(rows)} drugs were simulated on the <b>same</b> reconstruction, with
 the same {_window_label(window_s)} exposure window, the same seed
 ({_esc(((rows[0].get('provenance') if rows else {}) or {}).get('seed'))}) and the
 same compilation pipeline (<span class="mono">calibrate_alpha &rarr;
 calibrated_drugparams &rarr; apply_barrier_to_drugparams</span>), so every
 difference is attributable to that drug's own physics and potency on identical
-tissue. Ranked by predicted kill fraction.</p>
+tissue. Ranked by predicted kill fraction; the bar is that kill as a fraction of
+the top row's, and like every level on this page it is the centre of a wide
+interval.</p>
 <p><b>On the delivery column.</b>
 <span class="mono">coverage @1x IC50</span> is
 <span class="mono">therapeutic_coverage</span> — the fraction of this section's
@@ -1553,15 +1951,17 @@ holds the HIGHEST penetration index of the GBM panel while ranking LAST.
 Coverage is not exempt from anything else on this page: it is a delivery number
 like the others, so it is produced under the delivery law named above and it
 carries the same mesh term as everything else.</p>
+</section>
 
-<h2>3 · Why each drug ranks where it does</h2>
+<section class="sec">
+<h2><span class="sn">03</span><span class="st">Why each drug ranks where it does</span></h2>
 <p>Each drug's standing is decomposed into three <b>exactly additive log10
 terms</b> ("decades"), each centred on the panel mean so <span class="mono">+</span>
 reads as an advantage over the panel and <span class="mono">−</span> as a penalty.
 Nothing is asserted: the O2-resistance term comes from a real counterfactual
 simulation, which is why every drug here was simulated twice.</p>
-<pre class="code">{_esc(attribution.get('method'))}</pre>
-{_attribution_table(rows)}
+<div class="full"><pre class="code">{_esc(attribution.get('method'))}</pre>
+{_attribution_table(rows)}</div>
 <p><b>Is the attribution itself faithful?</b> Spearman rank correlation across
 the panel between the net attribution and the simulated kill:
 <span class="mono hl">rho = {_fmt(sp, 3)}</span> &rarr;
@@ -1570,11 +1970,15 @@ the panel between the net attribution and the simulated kill:
 {_fmt(check.get('spearman_potency_vs_kill'), 3)}. With only {len(rows)} drugs a
 single rho is a weak statistic — it is reported to be checkable, not because it
 is powerful.</p>
+</section>
 
-<h2>4 · Per-drug reading and provenance</h2>
-{_drug_cards(rows, window_s)}
+<section class="sec">
+<h2><span class="sn">04</span><span class="st">Per-drug reading and provenance</span></h2>
+<div class="full">{_drug_cards(rows, window_s)}</div>
+</section>
 
-<h2>5 · Specimen</h2>
+<section class="sec">
+<h2><span class="sn">05</span><span class="st">Specimen</span></h2>
 <dl class="kv">
   <dt>patient / sample id</dt><dd>{_esc(micro.get('patient_id'))}</dd>
   <dt>source</dt><dd>{_esc(micro.get('source'))}</dd>
@@ -1590,12 +1994,16 @@ is powerful.</p>
     measured={_esc((micro.get('cell_state') or {}).get('is_measured'))}</dd>
   <dt>outcome label</dt><dd>ABSENT — untreated resection, nothing to score against</dd>
 </dl>
+</section>
 
-<h2>6 · Caveats carried by the individual runs</h2>
+<section class="sec">
+<h2><span class="sn">06</span><span class="st">Caveats carried by the individual runs</span></h2>
 <ul class="pts">{caveat_items or '<li>none reported</li>'}</ul>
 {('<h3>Spec warnings at submission</h3><ul class="pts">' + warn_items + '</ul>') if warn_items else ''}
+</section>
 
-<h2>7 · What would have to be true for this to be trustworthy</h2>
+<section class="sec">
+<h2><span class="sn">07</span><span class="st">What would have to be true for this to be trustworthy</span></h2>
 <ul class="pts">
   <li><b>A tissue with a paired, measured drug response.</b> Everything here is
     unfalsifiable until a tumour with a known outcome runs through the identical
@@ -1613,6 +2021,7 @@ is powerful.</p>
     proliferation are measurable on the section itself, the absolute kill has no
     defensible level under any state route.</li>
 </ul>
+</section>
 
 {_banner('bottom')}
 
@@ -1635,6 +2044,6 @@ is powerful.</p>
         '<meta name="robots" content="noindex">\n'
         f"<title>tmesim therapy report {_esc(doc.get('report_id'))} — "
         f"{_esc(doc.get('section'))} — NOT FOR CLINICAL USE</title>\n"
-        f"<style>\n{_tokens_css()}\n{_DOC_CSS}\n</style>\n"
+        f"<style>\n{_tokens_css()}\n{_DOC_CSS}\n{_print_css()}\n</style>\n"
         "</head><body>\n" + body + "\n</body></html>\n"
     )
