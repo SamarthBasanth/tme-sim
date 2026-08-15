@@ -79,7 +79,7 @@ export default function ReducedMotionExperience({ isMobile }: { isMobile: boolea
           {i === SECTION_COPY.length - 2 && (
             <a
               className="cta-button cta-button--primary"
-              href="mailto:hello@example.com?subject=Demo%20request"
+              href="mailto:samarthbasanth@gmail.com?subject=Vivum%20demo%20request"
             >
               Request a Demo
             </a>
