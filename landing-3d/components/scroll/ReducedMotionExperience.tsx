@@ -5,6 +5,7 @@ import SceneCanvas from "@/components/canvas/SceneCanvas";
 import MetricOverlay from "@/components/ui/MetricOverlay";
 import AttributionOverlay from "@/components/ui/AttributionOverlay";
 import { SECTION_COPY } from "@/lib/copy";
+import SectionLedger from "@/components/ui/SectionLedger";
 import { STUDIO_URL } from "@/lib/env";
 
 /**
@@ -64,6 +65,7 @@ export default function ReducedMotionExperience({ isMobile }: { isMobile: boolea
           </span>
           <h2>{section.headline}</h2>
           <p>{section.body}</p>
+          {section.ledger ? <SectionLedger {...section.ledger} /> : null}
           {i === 2 && (
             <div className="reduced-motion-section__metric">
               <AttributionOverlay initiallyHidden={false} />

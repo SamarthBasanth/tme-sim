@@ -131,8 +131,31 @@ export const fieldContourOpacity = (p: number): number =>
     [1, 0.04],
   ]);
 
+/*
+ * THE CALLOUT MUST DIE WITH ITS OWN BEAT. This window used to be
+ * `trapezoid(p, 1/6 + 0.02, 2/6 - 0.05, 2/6 + 0.05, 3/6 - 0.02)`, which held
+ * the "Interstitial pressure" label at FULL opacity from p = 0.383 to 0.480
+ * — i.e. through the middle of beat 03, half a beat after the beat it
+ * describes. Beat 02's own copy is gone by p = 0.333 (see sectionVisual:
+ * segment [1/6, 2/6], fade = 0.32 of the segment), so the label reached full
+ * strength exactly as the text it belonged to disappeared, and was still lit
+ * over beat 03's headline.
+ *
+ * That was not only wrong editorially, it was the cause of a measured text
+ * collision at BOTH viewport sizes: the label is a camera projection of a
+ * world-space anchor, and over this window it sweeps into the copy column
+ * (desktop: right edge reaches x = 1051 against beat 03's body at x = 877;
+ * mobile: the copy is full-bleed, so any mid-viewport label overlaps it).
+ * Earlier passes missed it because it is a TRANSIENT — at each beat's settled
+ * peak-opacity position the two are apart, and the overlap only exists while
+ * one is rising and the other falling.
+ *
+ * The window is now inside beat 02: it rises with the copy and is fully out
+ * by p = 1/3, before beat 03's copy begins to rise at p ≈ 0.34. Verified by
+ * sweeping 61 scroll positions at 1512x950 and 390x844.
+ */
 export const fieldLabelOpacity = (p: number): number =>
-  trapezoid(p, 1 / 6 + 0.02, 2 / 6 - 0.05, 2 / 6 + 0.05, 3 / 6 - 0.02);
+  trapezoid(p, 1 / 6 + 0.015, 1 / 6 + 0.055, 2 / 6 - 0.045, 2 / 6 - 0.004);
 
 function trapezoid(t: number, r0: number, r1: number, f0: number, f1: number) {
   return sampleCurve(t, [

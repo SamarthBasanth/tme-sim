@@ -23,6 +23,7 @@ import {
 import { SECTION_COPY } from "@/lib/copy";
 import { STUDIO_URL } from "@/lib/env";
 import SpecimenCaption from "@/components/ui/SpecimenCaption";
+import SectionLedger from "@/components/ui/SectionLedger";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -169,6 +170,7 @@ function Experience() {
           >
             <h2>{SECTION_COPY[1].headline}</h2>
             <p>{SECTION_COPY[1].body}</p>
+            {SECTION_COPY[1].ledger ? <SectionLedger {...SECTION_COPY[1].ledger} /> : null}
           </NarrativeSection>
 
           <NarrativeSection
@@ -180,6 +182,7 @@ function Experience() {
           >
             <h2>{SECTION_COPY[2].headline}</h2>
             <p>{SECTION_COPY[2].body}</p>
+            {SECTION_COPY[2].ledger ? <SectionLedger {...SECTION_COPY[2].ledger} /> : null}
           </NarrativeSection>
 
           <NarrativeSection
@@ -191,6 +194,7 @@ function Experience() {
           >
             <h2>{SECTION_COPY[3].headline}</h2>
             <p>{SECTION_COPY[3].body}</p>
+            {SECTION_COPY[3].ledger ? <SectionLedger {...SECTION_COPY[3].ledger} /> : null}
           </NarrativeSection>
 
           <NarrativeSection
@@ -202,6 +206,7 @@ function Experience() {
           >
             <h2>{SECTION_COPY[4].headline}</h2>
             <p>{SECTION_COPY[4].body}</p>
+            {SECTION_COPY[4].ledger ? <SectionLedger {...SECTION_COPY[4].ledger} /> : null}
           </NarrativeSection>
 
           <NarrativeSection
@@ -214,6 +219,7 @@ function Experience() {
           >
             <h2>{SECTION_COPY[5].headline}</h2>
             <p>{SECTION_COPY[5].body}</p>
+            {SECTION_COPY[5].ledger ? <SectionLedger {...SECTION_COPY[5].ledger} /> : null}
             <a className="cta-button cta-button--primary" href="mailto:hello@example.com?subject=Demo%20request">
               Request a Demo
             </a>

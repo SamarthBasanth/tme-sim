@@ -57,12 +57,45 @@
  *    measured. See results/immune_sink_impact.md.
  */
 
+/**
+ * One row of an in-flow instrument ledger: a named quantity, the STATE the
+ * project is registered as holding on it, and the measurement that put it
+ * there.
+ *
+ * This shape exists because two beats needed the same device and were both
+ * expressing it as prose. `state` is deliberately a short mono string rather
+ * than an enum with a colour: the page encodes limit severity typographically
+ * (mono, uppercase, hairline rule) and NOT with a red/amber/green vocabulary,
+ * because a caveat rendered as a warning chip reads as an exception to a
+ * working product, and here the caveats ARE the product surface. No new hue
+ * enters the palette for this.
+ */
+export interface LedgerRow {
+  label: string;
+  /** Short registered verdict, e.g. "SOLVED", "NOT CALIBRATED". */
+  state: string;
+  detail: string;
+}
+
+export interface SectionLedger {
+  caption: string;
+  rows: readonly LedgerRow[];
+}
+
 export interface SectionCopy {
   kicker: string;
   eyebrow: string;
   headline: string;
   body: string;
   align: "left" | "right" | "center";
+  /**
+   * Optional structured readout rendered under `body`, in flow, in both the
+   * cinematic and reduced-motion experiences. In flow rather than floating:
+   * the two floating panels already collide with narrative text at some
+   * scroll positions (see globals.css), and a disclosure that can be covered
+   * is not a disclosure.
+   */
+  ledger?: SectionLedger;
 }
 
 export const SECTION_COPY: readonly SectionCopy[] = [
@@ -76,15 +109,75 @@ export const SECTION_COPY: readonly SectionCopy[] = [
   {
     kicker: "02",
     eyebrow: "Transport physics",
-    headline: "Then run physics on it.",
-    body: "Convection, diffusion and reaction, solved on that geometry. Interstitial fluid pressure builds where vessels leak and drainage fails, and pushes back against the drug coming in. Oxygen and hypoxia solve on the same grid. Response follows Hill kinetics from the concentration each cell actually sees.",
+    headline: "The shape is solved. The scale is not.",
+    body: "Convection, diffusion and reaction, solved on that geometry. Interstitial pressure builds where vessels leak and drainage fails and pushes back against the drug coming in; oxygen and hypoxia solve on the same grid, and response follows Hill kinetics from the concentration each cell sees. What that buys is the shape of the field, not its magnitude — and the difference is measured, not asserted.",
     align: "left",
+    /*
+     * This beat used to be a four-item feature list with no number in it, and
+     * its only instrumentation was a floating callout that named the quantity
+     * and nothing else. Every value below is from results/ifp_validation.md,
+     * which registers three rows against wick-in-needle measurements.
+     *
+     * The 41x FAIL is quoted WITH the under-resolution row, because that row
+     * was registered specifically so the other two "cannot be quoted without
+     * it" (ifp_validation.md:375). Do not drop it to shorten this block.
+     *
+     * The GBM row is NOT TESTABLE, not a pass: the published intracranial
+     * value (2.0 +/- 2.5 mmHg SD, PMID 9062403) is statistically
+     * indistinguishable from the same group's normal-tissue value, so it
+     * cannot separate this engine from one with no tumour in it. That is a
+     * far more useful thing to say than "validated on GBM", and it is the
+     * only thing the anchor supports.
+     */
+    ledger: {
+      caption: "Interstitial pressure · registered against wick-in-needle",
+      rows: [
+        {
+          label: "Field shape",
+          state: "SOLVED",
+          detail:
+            "On the measured geometry, not a template: where pressure rises, and the gradient it puts against incoming drug.",
+        },
+        {
+          label: "Absolute scale",
+          state: "FAIL · 41× LOW",
+          detail:
+            "Against primary breast carcinoma at 15 ± 9 mmHg (PMID 1423283) — the one IFP anchor that discriminates, and the engine fails it.",
+        },
+        {
+          label: "Grid resolution",
+          state: "UNDER-RESOLVED",
+          detail:
+            "Refining the grid moves the solve further from the measurement, not closer. Registered so the two rows above are never quoted alone.",
+        },
+        {
+          label: "Glioblastoma",
+          state: "NOT TESTABLE",
+          detail:
+            "The published intracranial value is statistically indistinguishable from normal brain, so it cannot separate this engine from one with no tumour in it.",
+        },
+      ],
+    },
   },
   {
     kicker: "03",
     eyebrow: "Delivery or potency",
     headline: "Which one killed the compound?",
-    body: "A compound compiles from its own structure: molecular weight to a Stokes-Einstein radius to hindered transport in crowded ECM, with potency from measured GDSC2 screens. Weight is the only property reaching transport, so similar-mass analogues cannot be separated. Each run then decomposes survival cell by cell: a molecule that never arrives and one that arrives too weak look identical in a survival curve, and need opposite fixes.",
+    /*
+     * The middle sentence was REPLACED on 2026-08-14 and the previous version
+     * is named here so it cannot come back by accident. It read: "Weight is
+     * the only property reaching transport, so similar-mass analogues cannot
+     * be separated." That was true of the model this page shipped when the
+     * sentence was written, and it is now false — see the 1b guardrail above
+     * and results/two_route_promotion.md.
+     *
+     * The replacement is deliberately NOT the triumphant form. "Structure
+     * reaches transport" is sayable; "transport is solved" is not. The
+     * quarter-of-the-spread limit travels in the SAME sentence as the claim,
+     * because that is the clause a reader skips if it is moved to a footnote,
+     * and beat 05 repeating it is not a reason to drop it here.
+     */
+    body: "A compound compiles from its own structure: two routes through the cell layer, paracellular and transcellular, fed by lipophilicity and hydrogen-bond donors as well as mass, with potency from measured GDSC2 screens. Structure reaches transport now — scored blind against 71 measured compounds — but it recovers only about a quarter of their measured spread, so close analogues are under-separated rather than resolved. Each run then decomposes survival cell by cell: a molecule that never arrives and one that arrives too weak look identical in a survival curve, and need opposite fixes.",
     align: "right",
   },
   {
@@ -97,15 +190,68 @@ export const SECTION_COPY: readonly SectionCopy[] = [
   {
     kicker: "05",
     eyebrow: "Stated limits",
-    headline: "Every run ships its own caveats.",
-    body: "Ranking compounds on the same tissue is far more robust than any absolute number, and it is the output to trust. It is not unconditionally invariant, and we can tell you exactly where it breaks: correcting the transvascular delivery law re-weights the panel by permeability and changes the top pick on glioblastoma. Rank a set of similar-mass analogues and the transport term separates them only weakly — diffusivity here comes from a two-route model that consumes logP and hydrogen-bond donors, scores R² = 0.718 blind against 71 measured compounds, and still recovers only about a quarter of the measured spread from a single cell line. Its predecessor used molecular weight alone and told you nothing at all; we published the measurement that refuted it rather than waiting for a customer to find it, and we published what replaced it on the same terms. That is written up, not buried. The spatial spread needs single-cell resolved tissue — on spot data the immune positions are synthesized rather than measured, so we do not report it there. Absolute kill fraction is not defensible at all, and every run says so in its own caveats panel. Vivum does not predict patient response, and its null results are published.",
+    headline: "The limits ship with it.",
+    /*
+     * THIS BEAT WAS A 1,180-CHARACTER PARAGRAPH AND IS NOW A LEDGER. Nothing
+     * was cut. Every clause of the paragraph is below as its own row with its
+     * own number; the restructure exists because a page whose argument is
+     * "we publish what breaks" was burying five distinct limits in one block
+     * of prose, where the fifth is unreachable. A limit a reader does not
+     * finish is not a disclosure.
+     *
+     * If a future pass shortens this, shorten the DETAIL text. Do not remove
+     * a row: each one is a separate registered result, and dropping any of
+     * them re-opens a claim the project has already measured shut.
+     */
+    body: "Ranking compounds on the same tissue is the output to trust — far more robust than any absolute number, and still not unconditionally invariant. Here is where it breaks.",
     align: "right",
+    ledger: {
+      caption: "Carried by every run · none of this is buried",
+      rows: [
+        {
+          label: "Ranking on one tissue",
+          state: "CONDITIONAL",
+          detail:
+            "Invariant to cell-state route, oxygen route, alpha and grid — not to drug-specific transport. Correcting the delivery law changes the top pick on glioblastoma.",
+        },
+        {
+          label: "Close analogues",
+          state: "UNDER-SEPARATED",
+          detail:
+            "Two-route transport (logP + hydrogen-bond donors) scores R² = 0.718 blind on 71 measured compounds, but recovers only ~24% of their spread, from one cell line — under-separating a congeneric series ~4-fold. Its predecessor scored 0.022; we published that refutation, then its replacement.",
+        },
+        {
+          label: "Spatial spread",
+          state: "1.08–1.21×, NOT 2.0×",
+          detail:
+            "A well-mixed model's 1.0 is not what bounds the raw 2.0×. A null preserving the macrophages' own clustering returns ~1.7, and tissue-edge distance alone — no immune input — reproduces 82% of it.",
+        },
+        {
+          label: "Spot platforms",
+          state: "NOT REPORTED",
+          detail:
+            "The spread needs measured cell positions. Spot data estimates them, so the number computes but cannot be attributed — which is the entire claim.",
+        },
+        {
+          label: "Absolute kill fraction",
+          state: "NOT DEFENSIBLE",
+          detail:
+            "Not on any grid, not on any tissue. It is not an output, and it is not on this page.",
+        },
+        {
+          label: "Patient response",
+          state: "OUT OF SCOPE",
+          detail:
+            "Not predicted. Not for diagnostic or treatment-planning use. Null results published alongside positive ones.",
+        },
+      ],
+    },
   },
   {
     kicker: "06",
     eyebrow: "Get started",
     headline: "Run it on your own tissue.",
-    body: "Vivum runs inside your own infrastructure. Proprietary tissue and compound data never cross your firewall. Bring a section and a candidate series, and get back a ranking, a per-cell mechanism attribution, and the caveats that come with them.",
+    body: "Vivum runs inside your own infrastructure; proprietary tissue and compound data never cross your firewall. Bring a section and a candidate series, and get back a ranking, a per-cell mechanism attribution of what killed each compound, and the list above attached to both — the same list, on your tissue, with your numbers in it.",
     align: "center",
   },
 ] as const;

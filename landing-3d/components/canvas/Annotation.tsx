@@ -16,6 +16,23 @@ interface AnnotationProps {
   /** Pure function of global scroll progress -> 0..1 visibility. */
   getOpacity: (progress: number) => number;
   align?: "left" | "right";
+  /**
+   * Render the reticle ONLY — no leader line, no HTML label.
+   *
+   * Exists for narrow viewports. The label is a projection of a world-space
+   * point, so its screen position sweeps as the camera moves and cannot be
+   * kept out of a copy column that runs full-bleed; measured at 390px it
+   * overlapped beat 02's body text at every scroll position where both were
+   * visible. Rather than hand-tune a 3D offset against a moving projection,
+   * the label is dropped where there is no room for it and the beat's own
+   * in-flow ledger carries the words — which it does far better, naming the
+   * quantity AND its three registered verdicts instead of two lines of chip.
+   *
+   * The reticle survives because it is the part that still works without
+   * space: it marks the anchor on the tissue. The leader line does not,
+   * because a line routed to a label that is not there points at nothing.
+   */
+  reticleOnly?: boolean;
 }
 
 /**
@@ -36,6 +53,7 @@ export default function Annotation({
   detail,
   getOpacity,
   align = "right",
+  reticleOnly = false,
 }: AnnotationProps) {
   const progressRef = useScrollProgressRef();
   const groupOpacity = useRef(0);
@@ -84,24 +102,28 @@ export default function Annotation({
           side={THREE.DoubleSide}
         />
       </mesh>
-      <Line
-        ref={lineRef}
-        points={[anchor, elbow, labelPoint]}
-        color="#bdeaf7"
-        lineWidth={1.25}
-        transparent
-        opacity={0}
-      />
-      <Html position={labelPoint} center={false} zIndexRange={[10, 0]} sprite={false}>
-        <div
-          ref={htmlWrapRef}
-          className={`annotation-label ${align === "left" ? "annotation-label--left" : ""}`}
-          style={{ opacity: 0 }}
-        >
-          <span className="annotation-label__title">{label}</span>
-          {detail ? <span className="annotation-label__detail">{detail}</span> : null}
-        </div>
-      </Html>
+      {!reticleOnly && (
+        <>
+          <Line
+            ref={lineRef}
+            points={[anchor, elbow, labelPoint]}
+            color="#bdeaf7"
+            lineWidth={1.25}
+            transparent
+            opacity={0}
+          />
+          <Html position={labelPoint} center={false} zIndexRange={[10, 0]} sprite={false}>
+            <div
+              ref={htmlWrapRef}
+              className={`annotation-label ${align === "left" ? "annotation-label--left" : ""}`}
+              style={{ opacity: 0 }}
+            >
+              <span className="annotation-label__title">{label}</span>
+              {detail ? <span className="annotation-label__detail">{detail}</span> : null}
+            </div>
+          </Html>
+        </>
+      )}
     </>
   );
 }

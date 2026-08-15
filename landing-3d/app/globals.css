@@ -1029,6 +1029,27 @@ body::after {
 /* --------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
+  /*
+   * The fallback is the ONLY experience where content is in normal document
+   * flow, so it is the only one where text actually travels underneath the
+   * fixed header. The cinematic experience pins its sections, so nothing ever
+   * passes under the mark there and the soft scrim is enough.
+   *
+   * Measured by sweeping 61 scroll positions at 390x844: the mark overlapped
+   * running text at 34 distinct positions, and the gradient scrim left that
+   * text half-legible rather than clearly behind something. A solid ground
+   * plus a hairline reads as a deliberate bar, which is what it has to be
+   * once it is covering prose.
+   */
+  .site-header {
+    background: var(--bg);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .site-header::before {
+    display: none;
+  }
+
   html {
     scroll-behavior: auto;
   }
@@ -1137,4 +1158,212 @@ body::after {
 @media (max-width: 640px) {
   .specimen__facts { gap: 0.6rem 1.4rem; }
   .specimen__legend { gap: 0.3rem 0.8rem; }
+}
+
+/* --------------------------------------------------------------------- */
+/* Section ledger — the in-flow instrument readout used by beats 02 and    */
+/* 05. See components/ui/SectionLedger.tsx for why it is in flow and why   */
+/* the state column carries no colour.                                     */
+/*                                                                         */
+/* Register is borrowed wholesale from .specimen: mono, hairline rules, no  */
+/* card, no radius, no shadow. These rows are figure captions, not chips.   */
+/* --------------------------------------------------------------------- */
+
+.ledger {
+  margin-top: 0.35rem;
+  width: 100%;
+  max-width: 34rem;
+  /* A spec sheet is read left to right regardless of which side of the
+     frame the beat is composed on. --right already flips its body back to
+     left-set; this makes that explicit so the ledger cannot inherit a
+     right-set or centred alignment from a future beat. */
+  text-align: left;
+}
+
+/*
+ * Specificity note: this is a <p>, so it competes with `.narrative-section p`
+ * (0,1,1) and `.reduced-motion-section p` (0,1,1). `.ledger .ledger__caption`
+ * is (0,2,0) and wins in both experiences without !important.
+ */
+.ledger .ledger__caption {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 0.15rem;
+  max-width: none;
+}
+
+.ledger__rows {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * Two columns on one baseline (name, verdict), with the evidence spanning
+ * both beneath. The rule sits on the TOP of each row so the caption is
+ * separated from the first row by the same hairline as every other join,
+ * and the block ends on text rather than on a trailing rule.
+ */
+.ledger__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  column-gap: 1rem;
+  padding: 0.5rem 0 0.55rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.ledger__label {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 600;
+  letter-spacing: 0.004em;
+  color: var(--ink);
+}
+
+/* Mono, right-set, tabular: the column of verdicts is meant to be readable
+   straight down without reading any of the prose. */
+.ledger__state {
+  margin: 0;
+  grid-column: 2;
+  justify-self: end;
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.ledger__detail {
+  grid-column: 1 / -1;
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  text-wrap: pretty;
+}
+
+/* The reduced-motion fallback sets its own paragraph colour/leading; the
+   ledger keeps its own so the two experiences render it identically. */
+.reduced-motion-section .ledger {
+  margin-top: 0.75rem;
+}
+
+/*
+ * Beats 02 and 05 carry ledgers and are therefore the two tallest blocks on
+ * the page. `.narrative-section` centres its content vertically, which is
+ * right for a paragraph and wrong for a block that approaches the viewport
+ * height: centring tall content grows it toward BOTH edges at once, and
+ * `.scroll-pin` clips at `overflow: hidden`, so the failure mode is a
+ * silently truncated disclosure — the worst outcome available on this page.
+ *
+ * Top-aligning them makes the overflow direction single and predictable, and
+ * the top padding clears the fixed site header. This is also the defect class
+ * behind the regression recorded in results/ship_readiness.md §3.4, where a
+ * longer string grew a centred block UPWARD into a readout: with
+ * `flex-start`, copy length can no longer move the top edge at all.
+ *
+ * nth-child for the same reason the readout reservations below use it: which
+ * beats are tall is a fact about the authored sequence, not about the
+ * component.
+ */
+.narrative-layer > .narrative-section:nth-child(2),
+.narrative-layer > .narrative-section:nth-child(5) {
+  justify-content: flex-start;
+  padding-top: 6.5rem;
+  padding-bottom: 2rem;
+}
+
+@media (max-width: 820px) {
+  /*
+   * Headroom is not cosmetic here. `sectionVisual` translates a beat by
+   * (1 - opacity) * 26px as it fades, so a block that merely FITS at peak
+   * opacity is clipped by up to 26px while it is arriving — and `.scroll-pin`
+   * clips silently. Measured, beat 05 must land at a bottom edge of roughly
+   * 805px or less in an 844px viewport to survive its own transition.
+   */
+  .narrative-layer > .narrative-section:nth-child(2),
+  .narrative-layer > .narrative-section:nth-child(5) {
+    padding-top: 4.75rem;
+    padding-bottom: 0.5rem;
+  }
+
+  /*
+   * Narrow columns wrap the evidence text to many more lines, so the ledger
+   * is the block that decides whether these beats fit inside the pinned
+   * viewport. Tighten it rather than dropping a row: every row is a separate
+   * registered result, and `.scroll-pin` clips, so a row that does not fit
+   * does not degrade — it disappears.
+   *
+   * Measured at 390x844: before this block beat 05 ran to 977px against an
+   * 844px viewport and beat 02 to 803px. Both now fit with margin.
+   */
+  .ledger__row {
+    padding: 0.22rem 0 0.24rem;
+  }
+
+  .ledger__label {
+    font-size: 0.88rem;
+  }
+
+  .ledger__detail {
+    font-size: 0.68rem;
+    line-height: 1.3;
+    margin-top: 0.16rem;
+  }
+
+  /*
+   * The two ledger beats lead with DATA, not with a headline, so at 390px
+   * they give some display size back to the rows. This is a considered
+   * inversion of the page's type scale for exactly two beats: on a screen
+   * this narrow, a 30px headline above six registered verdicts is spending
+   * the scarce resource on the least load-bearing element. Everywhere else
+   * the scale is untouched.
+   */
+  .narrative-layer > .narrative-section:nth-child(2) h2,
+  .narrative-layer > .narrative-section:nth-child(5) h2 {
+    font-size: 1.55rem;
+    line-height: 1.14;
+  }
+
+  .narrative-layer > .narrative-section:nth-child(2) .narrative-section__body,
+  .narrative-layer > .narrative-section:nth-child(5) .narrative-section__body {
+    gap: 0.85rem;
+  }
+
+  /* Same reasoning as the headline above: on these two beats the lead
+     paragraph is an introduction to the rows, not the argument itself, so it
+     yields size to them at this width. */
+  .narrative-layer > .narrative-section:nth-child(2) > .narrative-section__body > p,
+  .narrative-layer > .narrative-section:nth-child(5) > .narrative-section__body > p {
+    font-size: 0.88rem;
+    line-height: 1.48;
+  }
+
+  /* Every beat clears the fixed header band. Sections are absolutely
+     positioned and vertically centred, so without this the taller ones
+     centre their kicker underneath the VIVUM mark — measured, beat 03's
+     kicker sat at y = 59 against a header occupying the top ~62px. */
+  .narrative-section {
+    padding-top: 4.5rem;
+  }
+
+  /* The verdict no longer fits on the label's line at this width; it drops
+     under the label and sets left, keeping the column readable downward. */
+  .ledger__row {
+    grid-template-columns: 1fr;
+  }
+
+  .ledger__state {
+    grid-column: 1;
+    justify-self: start;
+    margin-top: 0.16rem;
+    color: var(--ink-dim);
+  }
 }

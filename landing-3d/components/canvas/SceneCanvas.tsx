@@ -216,6 +216,14 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
                       : "Solved · relative, uncalibrated · 250 µm mean"
                   }
                   getOpacity={fieldLabelOpacity}
+                  /* At 390px the copy column is full-bleed and beat 02 now
+                     carries a four-row ledger, so there is no band left for a
+                     floating callout — measured, the label overlapped the body
+                     text at every scroll position where both were visible. The
+                     ledger names the quantity and its three registered
+                     verdicts, so the chip is redundant there rather than lost.
+                     See Annotation's `reticleOnly` prop. */
+                  reticleOnly={isMobile}
                 />
               </FieldContours>
                 <ConcentrationField />
