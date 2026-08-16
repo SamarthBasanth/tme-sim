@@ -6,6 +6,24 @@
 >
 > **Priority 1** of the access plan — this is the decisive experiment
 > (`results/ranking_robustness.md` §8).
+>
+> ### ⚠️ CLAIM CORRECTION, 2026-08-16 — read before sending
+>
+> **Until this edit, the honest-position paragraph of this draft asserted, flat, that
+> "the reconstruction agrees across two independent spatial platforms at Pearson 0.997."
+> That claim is RETRACTED** (`results/revalidation.md` §4; `results/reconstruction_fidelity.md`
+> carries the retraction banner). After a classifier-arity fix the 4-vector Pearson is
+> **0.980**, the non-tumour subvector collapses **0.945 → 0.016**, and cross-platform rank
+> agreement falls from ρ = 1.00 to **ρ = 0.40**. The paragraph now states the retraction
+> instead. The delivery-axis sentence has also been scoped: those rows never invoke the
+> transport solver, and the draft previously let them read as validation of the solved field.
+>
+> **Action required by the sender, which this file cannot settle:** the repository's own
+> record says nothing here has been sent, and `docs/outreach/README.md` says the same. If
+> that is correct, this edit is sufficient and nothing further is owed. **If any version of
+> this text did go out to Dr Lamfers or anyone at Erasmus MC, a correction is owed to that
+> person directly** — editing this file does not change what a recipient believes. Establish
+> which it is before doing anything else with this draft.
 
 ---
 
@@ -85,12 +103,29 @@ repository disagreed with the prose. The corrected reading stays modest — at �
 within-section, it is the best of four weak predictors rather than a validated oxygen field, and
 its diffusion length remains 2–5× the published value because the consumption term has never been
 fitted to a measured tension. What survives is the
-delivery axis: scored against 125 human glioma tissue samples across 42 patients plus 27
-PMID-anchored regional PK measurements, the model predicts tumour:plasma partition to about a
-**2× geometric-mean fold error**, with 6/6 drugs inside 10×, and reproduces the measured
-BBB-penetrant vs BBB-excluded separation (3.65× predicted, 4.66× measured) from molecular
-structure alone. The reconstruction agrees across two independent spatial platforms at
-Pearson 0.997.
+delivery axis, and I want to be exact about its scope: scored against 125 human glioma tissue
+samples across 42 patients plus 27 PMID-anchored regional PK measurements, the model predicts
+tumour:plasma partition to about a **2× geometric-mean fold error**, with 6/6 drugs inside 10×,
+and reproduces the measured BBB-penetrant vs BBB-excluded separation (3.65× predicted, 4.66×
+measured) from molecular structure alone. That is a **structure-only permeability coefficient**
+being scored — those rows do not invoke the transport solver, and I should not be read as saying
+the solved concentration field is validated. Of the checks that do compare a solved field to an
+external measurement there are three, and all three fail. The regional axis fails too: the model
+predicts an enhancing-vs-non-enhancing fold change of exactly 1.000 for every drug.
+
+**A retraction I am stating up front rather than letting you find it.**
+I previously reported that the reconstruction agrees across two independent spatial platforms
+(Xenium marker gating vs Visium NNLS deconvolution) at Pearson 0.997. **That number is retracted
+and should not be relied on.** A classifier-arity bug was inflating classes defined by few
+markers; fixing it moved the 4-vector Pearson to 0.980, and — the check the original verdict
+actually rested on — collapsed the non-tumour subvector from **0.945 to 0.016**, which is
+indistinguishable from no agreement. Rank agreement between the two platforms fell from an exact
+match to ρ = 0.40. Reverting the classifier reproduces the old numbers exactly, which is how I
+know the 0.997 was agreement between a *biased* estimator and another estimator rather than a
+real cross-platform result. Cross-platform composition concordance is an open question in this
+project, not evidence for anything. More broadly: every reconstruction-level external check I
+have made has since been retracted or failed to replicate on a held-out section, while the
+transport-level checks have held. That asymmetry is the honest summary of where this stands.
 
 **What I cannot do, and why I am writing.** The response half has never been tested. I ran a
 systematic sweep of 164 datasets, and there is no open dataset anywhere — in any tumour type —

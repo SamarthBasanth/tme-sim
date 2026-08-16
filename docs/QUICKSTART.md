@@ -167,9 +167,11 @@ size, and the per-cell drug-sensitivity assumption in force (documented
 inline — reconstructing tissue is drug-agnostic, so this is always "uniform
 1.0" at this stage), and saves a figure to `results/reconstruct_xenium.png`.
 `--dx` is the grid spacing in µm; smaller is slower but higher-resolution —
-30 µm finishes in a few seconds, the grid-converged production value used
-throughout `results/` is 12 µm (see the README's "Five corrections" section
-for why).
+30 µm finishes in a few seconds, the production value used throughout `results/`
+is 12 µm. **Do not read that as "converged"** — the claim *"dx = 12 µm is
+grid-converged"* is retracted (README "What is retracted";
+`results/grid_convergence_gbm.md` §0, `results/grid_convergence_breast.md`).
+Neither panel is in an asymptotic regime; 12 µm is a production choice.
 
 ### 2b. Compare several drugs on that same section
 
@@ -593,7 +595,8 @@ from tmesim.core import SimConfig
 from tmesim.sim.engine import simulate_response
 
 # 1. Reconstruct a real tumor section (coarse grid here for a fast demo;
-#    drop dx_um, or set it to 12.0, for the grid-converged production value).
+#    drop dx_um, or set it to 12.0, for the production value — production, NOT
+#    converged; see the retraction note above and results/grid_convergence_gbm.md).
 micro = reconstruct_real(source="xenium", dx_um=80.0)
 report = reconstruction_report(micro)
 print("cells:", report["n_cells"], "tumor:", report["n_tumor"], "grid:", report["grid"])

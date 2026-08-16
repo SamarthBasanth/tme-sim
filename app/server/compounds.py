@@ -40,7 +40,13 @@ from tmesim.molecular.byo import (  # noqa: F401 - CompoundRefused is re-exporte
     compile_user_compound,
 )
 
-from .cache import PRIVATE_FILE_MODE, own_only, private_makedirs, repo_root
+from .cache import (
+    PRIVATE_FILE_MODE,
+    own_only,
+    private_makedirs,
+    redact_exception,
+    repo_root,
+)
 
 __all__ = [
     "CompoundError",
@@ -152,7 +158,8 @@ def compile_preview(name: str, smiles: str, ic50_uM=None) -> Dict:
         alpha = calibrated_alpha()
         alpha_error = None
     except Exception as exc:  # noqa: BLE001
-        alpha, alpha_error = None, f"{type(exc).__name__}: {exc}"
+        alpha, alpha_error = None, redact_exception(
+            exc, "the alpha calibration could not be computed", brief=True)
 
     compiled: CompiledCompound = compile_user_compound(
         name, smiles, ic50_uM=ic50_uM, alpha=alpha,
@@ -205,8 +212,10 @@ class CompoundStore:
             return None
         except Exception as exc:  # noqa: BLE001 - a corrupt file is reported
             raise CompoundError(
-                f"compound {cid!r} is on disk but unreadable: "
-                f"{type(exc).__name__}: {exc}", status=500)
+                redact_exception(
+                    exc,
+                    f"compound {cid!r} is on disk but could not be read"),
+                status=500)
         if not isinstance(doc, dict) or "smiles" not in doc:
             raise CompoundError(
                 f"compound {cid!r} is not a compound document", status=500)
@@ -278,7 +287,9 @@ class CompoundStore:
             try:
                 alpha = calibrated_alpha()
             except Exception as exc:  # noqa: BLE001
-                alpha_error = f"{type(exc).__name__}: {exc}"
+                alpha_error = redact_exception(
+                    exc, "the alpha calibration could not be computed",
+                    brief=True)
 
             compiled = compile_user_compound(
                 name, smiles, ic50_uM=ic50_uM, alpha=alpha,

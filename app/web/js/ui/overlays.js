@@ -221,21 +221,41 @@ export function createOverlays(viewer) {
   // NOT `.interactive`: the notice spans the full width of the top strip at
   // z-index 3 and contains nothing clickable, so pointer-events:auto only
   // meant it swallowed drags that started in that band.
+  // Two notices, one slot. The default is the first-run orientation; the other
+  // is set by whoever CLEARED the stage, because an empty stage that used to
+  // hold a picture has to say why it is empty — "No geometry loaded" over a
+  // stage that was full of cells a second ago reads as a bug, and the operator
+  // goes looking for the cells rather than reading the reason the run gave.
+  // Both are prose at the same size: the reason is not a footnote.
+  const emptyHead = h('h3', 'No geometry loaded');
+  const emptyDefault = h('p',
+    'Submit a RunSpec, or open a completed run from the history dock, to load its cell geometry over ',
+    h('code.badge-code', 'GET /api/runs/{id}/geometry'), '.');
+  const emptyWhy = h('p.hidden');
+  const emptyKeys = h('p.notice-keys',
+    h('kbd', 'wheel'), ' zoom · ', h('kbd', 'drag'), ' pan · ',
+    h('kbd', 'click'), ' pin a cell · ', h('kbd', 'F'), ' fit · ',
+    h('kbd', '?'), ' all keys');
   const empty = h('div.ov.ov-empty',
-    h('div.notice',
-      h('h3', 'No geometry loaded'),
-      h('p', 'Submit a RunSpec, or open a completed run from the history dock, to load its cell geometry over ',
-        h('code.badge-code', 'GET /api/runs/{id}/geometry'), '.'),
-      h('p.notice-keys',
-        h('kbd', 'wheel'), ' zoom · ', h('kbd', 'drag'), ' pan · ',
-        h('kbd', 'click'), ' pin a cell · ', h('kbd', 'F'), ' fit · ',
-        h('kbd', '?'), ' all keys'),
-    ));
+    h('div.notice', emptyHead, emptyDefault, emptyWhy, emptyKeys));
 
   return {
     nodes: [empty, scalebar, legend, readout],
     updateScalebar, updateLegend, updateReadout, refreshWindow, setFieldFrame,
-    setEmpty(on) { empty.classList.toggle('hidden', !on); },
+    /**
+     * @param {boolean} on
+     * @param {{head: string, body: string}|null} [why] why the stage is empty.
+     *   Omitted (or null) restores the orientation notice — a caller that
+     *   clears the stage without a reason gets the default, never a stale
+     *   reason from the last time it was cleared.
+     */
+    setEmpty(on, why) {
+      empty.classList.toggle('hidden', !on);
+      emptyHead.textContent = (why && why.head) || 'No geometry loaded';
+      emptyWhy.textContent = (why && why.body) || '';
+      emptyWhy.classList.toggle('hidden', !(why && why.body));
+      emptyDefault.classList.toggle('hidden', !!(why && why.body));
+    },
     refreshRamp() {
       legRamp.style.backgroundImage = gradientCss(viewer.rampName, 24, viewer.fieldAlphaRamp);
     },

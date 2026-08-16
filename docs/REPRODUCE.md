@@ -410,7 +410,7 @@ back** — their docstrings advertise `python -m …` commands that are currentl
 | module | state |
 |---|---|
 | `validation.cellstate_validation` | `run()`/`make_figure()` exist; no `write_report`, no `__main__` |
-| `validation.ranking_robustness` | **RUNNABLE — this row previously said "no `__main__`" and instructed readers to report cisplatin vs doxorubicin as a TIE. Both are superseded.** It landed, it has a `__main__`, and the measurement *contradicted* that prior: P(cisplatin = rank 1) = 0.9277 under the report's declared priors. Read `results/ranking_robustness.md` — and its §8, which concludes the reportable output for the top of the panel is a **SET, not a winner** |
+| `validation.ranking_robustness` | **RUNNABLE — this row previously said "no `__main__`" and instructed readers to report cisplatin vs doxorubicin as a TIE. Both are superseded.** It landed, it has a `__main__`, and the measurement *contradicted* that prior: P(cisplatin = rank 1) = 0.9277 under the report's declared priors. **That in turn has been overturned** — those priors are all **common-mode**, and a **drug-specific** transport parameter breaks it: correcting the delivery law drops P(cisplatin rank 1) to **0.3965** and changes the top-1 GBM pick to vincristine (`results/transvascular_exchange_revalidation.md` §4.1). Read `results/ranking_robustness.md` — and its §8, which concludes the reportable output for the top of the panel is a **SET, not a winner** |
 | `validation.vessel_network_impact` | **RUNNABLE** — has `__main__`; `results/vessel_network_impact.{md,png}` exist. (Previously listed here as having no `__main__`; that was wrong.) |
 | *(hypoxia vs VEGFA/HIF1A)* | `marker_panels` points at `validation/hypoxia_validation.py`, which does not exist |
 | `validation.pk_reality` | `__main__` only **prints**. `results/pk_reality.md` has **no producer** — re-running will not refresh it, and the on-disk copy is stale |
@@ -465,6 +465,27 @@ Wall-clock on an Apple Silicon laptop, single process, warm data cache.
 `reconstruction_fidelity.md`. On the 319-panel Xenium section at dx = 12 µm expect
 exactly:
 
+> ### ⚠️ STALE BLOCK — the composition line below is PRE-CLASSIFIER-FIX, and the concordance claim under it is RETRACTED
+>
+> **The `TUMOR 0.7380 …` line is the *old* classifier's output and the shipped code no
+> longer produces it.** The classifier-arity fix (`4ad221f`, `results/classifier_fix.md`)
+> replaced the `mean_z` aggregation, which systematically over-scored classes defined by
+> few markers. Two independent files agree on what the current defaults produce on this
+> section — `results/revalidation.md` §4a and `results/heldout_patient.md` §1:
+>
+> | | pre-fix (printed below) | current defaults |
+> |---|---:|---:|
+> | TUMOR | 0.7380 | **0.5824** |
+> | STROMAL | 0.0792 | **0.1178** |
+> | IMMUNE | 0.0854 | **0.1948** |
+> | ENDOTHELIAL | 0.0974 | **0.1050** |
+> | mean vascular density | 0.0840 | **0.0268** (discrete source, `results/heldout_patient.md` §1) |
+> | mean oxygen (tissue) | 0.5755 | **0.3520** (`results/heldout_patient.md` §1) |
+>
+> `n_cells`, `grid`, `extent_um` and the mask settings are unchanged. The block is left
+> verbatim rather than rewritten because no run was performed for this edit; treat the
+> right-hand column as the expectation and the block as a historical print.
+
 ```
 n_cells 40887   grid (424, 675)   extent_um (8100.0, 5088.0)
 TUMOR 0.7380  STROMAL 0.0792  IMMUNE 0.0854  ENDOTHELIAL 0.0974  NECROTIC 0.0000
@@ -472,14 +493,36 @@ mean_vascular_density 0.0840   mean_ecm_density 0.0759   mean_oxygen 0.5755
 tissue_mask_mode geometric   tissue_disc_radius_um 30.0   tissue_coverage_fraction 0.6770
 ```
 
-and cross-platform concordance vs the Visium NNLS deconvolution at Pearson ≈ 0.997
-(endothelial 9.74% vs 9.77%).
+**Do not expect — and do not quote — cross-platform concordance at Pearson ≈ 0.997.**
+That claim is **RETRACTED** (`results/revalidation.md` §4; `results/reconstruction_fidelity.md`
+carries the retraction banner). Under current defaults the Xenium-vs-Visium 4-vector Pearson
+is **0.980**, the **non-tumour subvector collapses 0.945 → 0.016** — statistically
+indistinguishable from no agreement — composition rank agreement falls from an exact match
+(ρ = 1.00) to **ρ = 0.40**, and mean absolute composition difference worsens **4.44% → 12.21%**.
+Reverting the classifier alone reproduces the old numbers to four decimal places, which is how
+the project knows the 0.997 was agreement between a *biased* estimator and another estimator
+rather than a real cross-platform result. **Cross-platform composition concordance is an OPEN
+question in this project, not evidence.** The endothelial column is the one that barely moved
+(9.74% → 10.50% against Visium's 9.77%); the other three moved by 4–11 percentage points.
 
-On the 480-panel IO section at dx = 12 µm expect `n_cells 816769`,
-`extent_um (11472.0, 10860.0)`, TUMOR 0.7909 / STROMAL 0.0998 / IMMUNE 0.0674 /
-**ENDOTHELIAL 0.0418**. That endothelial fraction is *not* comparable to the
-319-panel's 9.7% — the IO panel has no PECAM1 and gates on VWF/FLT1/PLVAP
-instead. Only the 9.7% figure is the one corroborated against volume-EM (8.0%).
+On the 480-panel IO section at dx = 12 µm expect `n_cells 816769` and
+`extent_um (11472.0, 10860.0)`. **The composition figures this paragraph used to
+give — TUMOR 0.7909 / STROMAL 0.0998 / IMMUNE 0.0674 / ENDOTHELIAL 0.0418 — are
+also pre-classifier-fix.** `results/heldout_patient.md` §1 reports the current
+defaults on this section as TUMOR **66.18%** / STROMAL **15.37%** / IMMUNE **11.39%** /
+ENDOTHELIAL **7.07%**. The two panels' endothelial gates are still *not* directly
+comparable — the IO panel has no PECAM1 and gates on VWF/FLT1/PLVAP instead — so
+every composition difference between the sections is jointly a difference in biology
+and a difference in what is measurable.
+
+Against the one external anchor the reconstruction has (human cortex volume EM,
+**8.0%** endothelial, PMID 38723085), **both** sections now land close: 10.50% on the
+319-panel development section and 7.07% on the 480-panel held-out section, which
+`results/heldout_patient.md` scores as **REPLICATES**. Read that as a property of
+those sections and those marker gates, not as a validated property of the classifier —
+the owning file says so explicitly, and the endothelial fraction only replicates after
+two rounds of correcting the *comparison methodology itself*
+(`results/reconstruction_validation_roadmap.md` §5).
 
 **Flagship + panel** — `real_simulation.png`, `real_drug_panel.{md,png}`,
 `delivery_metrics.{md,png}`.

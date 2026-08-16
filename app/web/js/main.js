@@ -14,7 +14,7 @@ import { createMechanismLegend, createTimelapseScrubber, fmtTime as fmtClock } f
 import { createWindowLevel } from './ui/wl.js';
 import { createTools, TOOLS } from './ui/tools.js';
 import { makeSplitter } from './ui/splitter.js';
-import { toast, notifyError } from './ui/toast.js';
+import { toast, notifyError, notifyRunFailed } from './ui/toast.js';
 import { fieldMeta } from './fields.js';
 import { setSynthetic, setActiveRun } from './ui/provenance.js';
 import { num, int, auto, bytes, dur, NULL_GLYPH } from './util/fmt.js';
@@ -891,25 +891,132 @@ async function openRun(id) {
   setActiveRun(run);
   inspect.renderRun(run);
   paintRunChip(run.status);
-  if (run.status === 'failed' && run.error) {
-    toast('err', `Run ${id} failed`, String(run.error), 0);
+  // No `&& run.error` guard. A failed run with no message is still a failed
+  // run, and notifyRunFailed() has a card for exactly that case — the guard
+  // meant the one failure that says least about itself announced itself least.
+  if (run.status === 'failed') {
+    notifyRunFailed(id, run.error);
   }
   paintSectionHeader(run.spec && run.spec.section);
 
   if (!viewer) return;
   if (run.status !== 'done') {
-    viewer.clearGeometry();
-    if (mechLegend) mechLegend.set(null);
-    if (scrubber) scrubber.clear();
-    syncColourControl();
-    overlays.setEmpty(true);
-    $('#hdr-cells').textContent = NULL_GLYPH;
+    clearResultSurfaces(run);
     return;
   }
   await loadGeometry(id);
   await loadMechanism(id, run);
   await loadTimelapse(id, run);
   if (store.get().fieldName) await selectField(store.get().fieldName);
+}
+
+/**
+ * Take down everything on screen that was DERIVED FROM A RUN, because the run
+ * now in the header did not produce it.
+ *
+ * WHY THIS EXISTS, AND WHY IT IS ONE FUNCTION
+ * -------------------------------------------
+ * paintRunChip's comment above already names this defect in its earlier form:
+ * "the metrics beside it belonged to the previous run, so a user who trusted
+ * it would have read the last run's numbers as this one's." That was fixed for
+ * the CHIP. It was not fixed for the stage. A run submitted from the Setup
+ * rail and watched to failure left the header reading `r_00085 FAILED` over a
+ * full stage — the previous run's cells, its mechanism attribution at "11.2%
+ * killed", its drug-concentration ramp labelled 0 → 571.1 uM, its time-lapse
+ * scrubber at frame 19/19 — none of it produced by r_00085, all of it sitting
+ * in the position where r_00085's answer belongs. A screenshot of that travels
+ * without the FAILED chip attached to the number, which is the whole failure
+ * mode this product exists to not have: the engine is fine and the surface
+ * lies.
+ *
+ * Two paths reached that state and disagreed. `openRun` cleared some of it;
+ * `trackRun`'s failure branch cleared none of it. Neither cleared all of it —
+ * openRun left the field texture, the field legend with its ticks, the frame
+ * stamp, the window/level histogram, the ROI and profile read-outs and the
+ * status line, every one of them a number belonging to a run that is not this
+ * one. So the two paths do not merely agree now; they agree on a list that was
+ * rebuilt from what is actually on screen. A run's terminal state looks the
+ * same whether you watched it fail or opened it an hour later.
+ *
+ * NOT cleared: `store.fieldName`. That is the operator's CHOICE of overlay,
+ * not a value produced by a run — openRun's done path re-selects it, which is
+ * how opening a completed run keeps showing the field you were looking at. The
+ * DATA behind it is dropped here; only the request survives.
+ */
+function clearResultSurfaces(run) {
+  // The time-lapse first: it owns the field texture while it is playing, and a
+  // paused scrubber left holding a frame would put it straight back.
+  timelapseField = false;
+  if (scrubber) scrubber.clear();
+  if (overlays) overlays.setFieldFrame(null);
+
+  if (viewer) {
+    viewer.clearGeometry();        // also clears the mechanism labels
+    viewer.setField(null);
+    if (viewer.colorMode === 1) viewer.setColorMode(0);
+  }
+  store.set({ field: null });
+
+  // The hover/pin card names a CELL INDEX in a geometry that no longer exists
+  // — "ENDOTHELIAL #13915 · 23 cells in radius", a per-cell composition read
+  // off the previous run's tissue. It survived the first version of this
+  // function and was caught only by looking at the screenshot.
+  clearPin();
+  if (wl) wl.setBrush(null);
+
+  if (mechLegend) mechLegend.set(null);
+  if (overlays) overlays.updateLegend(null, null);
+  if (inspect) inspect.setFieldInfo(null, null);
+  if (wl) { wl.setField(null, null); wl.setRoiHist(null); }
+  // Annotations, not just their numbers: a ROI outline drawn on the previous
+  // run's tissue is a claim about geometry that is no longer loaded.
+  if (tools) tools.clearAll();
+  syncColourControl();
+
+  $('#hdr-cells').textContent = NULL_GLYPH;
+  const msg = $('#sb-msg');
+  if (msg && run) {
+    msg.textContent = `run ${run.run_id} ${run.status} · stage cleared: `
+      + 'no geometry, no field, no attribution';
+  }
+  if (overlays) overlays.setEmpty(true, noResultNotice(run));
+}
+
+/**
+ * What the emptied stage says about itself.
+ *
+ * Blank is better than stale; blank with a reason is better than blank. Every
+ * word here is either ours (procedural) or the run's own `status`, which the
+ * server sent. The failure's REASON is not restated — it is the server's
+ * sentence, it is long, and it is already rendered in full in two places that
+ * are not a canvas overlay. This says where to read it.
+ */
+function noResultNotice(run) {
+  const id = (run && run.run_id) || 'This run';
+  const st = (run && run.status) || '';
+  if (st === 'failed') {
+    return {
+      head: 'This run produced nothing to draw',
+      body: `${id} failed. Anything that was on this stage was produced by a `
+        + 'different run, so it has been cleared rather than left standing '
+        + 'under this one’s name. What the server said about the failure is '
+        + 'in Result → Metrics, on the right.',
+    };
+  }
+  if (st === 'cancelled') {
+    return {
+      head: 'This run was stopped before it produced anything',
+      body: `${id} was cancelled. Anything that was on this stage was produced `
+        + 'by a different run, so it has been cleared rather than left '
+        + 'standing under this one’s name.',
+    };
+  }
+  return {
+    head: 'This run has not produced anything yet',
+    body: `${id} is ${st || 'not finished'}. The stage is empty on purpose: `
+      + 'the cells and fields that were here belong to a different run, and '
+      + 'this one has produced nothing to replace them with.',
+  };
 }
 
 /* ------------------------------------------------- mechanism attribution -- */
@@ -1130,13 +1237,18 @@ function trackRun(id) {
     await refreshRuns();
     if (status === 'done') openRun(doneId);
     else if (status === 'failed') {
-      // `openRun` is what normally repaints the header chip, and it is not
-      // called on this branch — so paint it here or the header is left
-      // reading `running` on a run that has failed.
+      // Paint the chip BEFORE handing over, because openRun's own GET can
+      // fail: a run that has failed must not be left reading `running`
+      // because the request that would have said so failed too.
       paintRunChip('failed');
-      const r = await api.getRun(doneId).catch(() => null);
-      toast('err', `Run ${doneId} failed`, (r && r.error) || 'no error message returned', 0);
-      if (r) { store.set({ activeRun: r }); inspect.renderRun(r); }
+      // Then the SAME path a user takes when they open the run later. This
+      // branch used to be a reimplementation of a subset of openRun — fetch,
+      // toast, re-render the inspector — and the part it did not reimplement
+      // was the part that takes the previous run's cells, fields and
+      // attribution off the screen. So a failure you watched happen and a
+      // failure you opened afterwards did not look alike, and the one you
+      // watched was the one that lied. See clearResultSurfaces.
+      await openRun(doneId);
     } else {
       paintRunChip(status);
       toast('warn', `Run ${doneId} ${status}`, '', 4000);

@@ -490,6 +490,29 @@ The result, from 36 tissue draws × 256 IC50 draws = 9,216 complete re-rankings:
 The bar passed one claim and failed another in the same report. That is the evidence that it was a
 bar and not a rationalisation.
 
+> **⚠️ That verdict has since been overturned, and the overturning is part of the lesson.**
+> The bullet *"the top-1 call is decision-grade"* is quoted above as it stood, because the
+> point of this section is the pre-declaration, not the answer. **It is no longer the
+> project's position.** Correcting the transvascular delivery law — a **drug-specific**
+> transport parameter rather than the common-mode ones the ranking had previously been
+> stress-tested against — changes the **top-1 GBM pick (cisplatin → vincristine)**, changes
+> the top-3 set, swaps 4 of 45 pairs (two across gaps of 40.5 % and 35.6 % of the leader's
+> kill, against a Bernoulli sd of ~0.003), and drops **P(cisplatin rank 1) from 0.9277 to
+> 0.3965** — destroying the same pre-declared bar it had met
+> (`results/transvascular_exchange_revalidation.md` §4.1). Independently, a source-geometry
+> change swaps cisplatin↔temozolomide at rank 1 in both raw and dose-matched arms
+> (`results/delivery_source_geometry.md` §5.2). `results/CLAIM_INVENTORY.md` §1g now lists
+> **"the top-1 drug call is not decision-grade"** as a *defensible* claim, and
+> `results/ranking_robustness.md` §8's conclusion stands: *"the reportable output of this
+> pipeline for the top of the panel is a SET, not a winner."*
+>
+> **The methodological moral, restated:** a pre-declared bar tells you whether a result
+> cleared it *under the perturbations you swept*. This one swept common-mode perturbations
+> (α, the exposure unit, the cell-state route, the oxygen route) and correctly reported
+> invariance to them. It could not see a perturbation that re-weights drugs *differentially*,
+> and no amount of pre-declaration substitutes for asking which class of perturbation the
+> sweep actually covered.
+
 The pre-declaration also constrained an earlier judgement in the opposite direction. `SESSION_AUDIT.md`
 §6 item 7 recorded, before the Monte Carlo existed, that cisplatin (0.241) and doxorubicin (0.231)
 differed by ~4% and that "the top-1 call is **probably not** decision-grade and should be reported as

@@ -1549,9 +1549,13 @@ treatment at the tissue interface leaks nothing, and the field never goes negati
 | 12 | 424×675 | 0.1934 | 0.0287 | 0.0757 | 0.0093 |
 | 10 | 508×810 | 0.1869 | 0.0335 | 0.0760 | 0.0035 |
 
-* **`kill_fraction` is grid-converged**, plateauing at $\approx 0.076$ and moving
-  only 0.0035 relative between the two finest grids. This is the actual prediction and
-  it is not a mesh artifact.
+* **`kill_fraction` plateaus** at $\approx 0.076$ on this ladder, moving only 0.0035
+  relative between the two finest grids. **This bullet used to read "`kill_fraction`
+  is grid-converged"; that wording is withdrawn** — see §10.5 of this document, and
+  `results/grid_convergence_gbm.md` §0, where the GBM ladder is **non-monotone**
+  (observed orders 0.96 and −3.33, both power-law fits flagged DEGENERATE). A plateau
+  on one ladder is not convergence. What the table above does support is that the
+  prediction is not a *coarse*-mesh artifact.
 * **`penetration_index` converges more slowly and is over-estimated on coarse grids.**
   The reason is physical: the calibrated doxorubicin penetration length is
   $L \approx 45$ µm, so any grid with $\Delta x \gtrsim 45$ µm **cannot resolve the

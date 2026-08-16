@@ -320,7 +320,18 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       metricsEl.appendChild(h('div.dim', { style: { fontSize: 'var(--fs-xs)', padding: '4px 0' } },
         'No run selected. Metrics appear once a run reaches status=done.'));
     } else if (run.status === 'failed') {
-      metricsEl.appendChild(h('div.caveat.crit', h('span', run.error || 'Run failed; the backend returned no error message.')));
+      // NOT the error text again. `errorEl` sits immediately above this block
+      // (see railBody) and already carries `run.error` verbatim, so printing it
+      // here rendered the same red sentence twice, stacked, in one panel — an
+      // operator reading two identical failures had to compare them character
+      // by character to find out they were one. This slot answers the question
+      // the panel is asking, which is where the metrics went.
+      metricsEl.appendChild(h('div.caveat.crit', h('span', run.error
+        ? 'This run failed, so it produced no metrics. The server’s reason is '
+          + 'directly above.'
+        : 'This run failed, so it produced no metrics — and the server sent no '
+          + 'reason with it. The failure is recorded on the console of the '
+          + 'process running Codon.')));
     } else if (!run.metrics) {
       metricsEl.appendChild(h('div.dim', { style: { fontSize: 'var(--fs-xs)', padding: '4px 0' } },
         `Run ${run.run_id} is ${run.status}; no metrics yet.`));

@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, type ReactNode } from "react";
-import { useGLTF } from "@react-three/drei";
+import { preloadTumorGLTF } from "./tumorGLTF";
 import ProceduralTumor from "./ProceduralTumor";
 import GLTFTumor from "./GLTFTumor";
 import { TUMOR_MODEL_URL, useModelAvailability } from "@/hooks/useModelAvailability";
@@ -28,7 +28,7 @@ interface TumorModelProps {
  *
  * The moment a real GLB is placed at `public/models/tumor.glb`, this
  * component swaps to `GLTFTumor` automatically (via a HEAD-request
- * availability check) with no code changes required. `useGLTF.preload` is
+ * availability check) with no code changes required. `preloadTumorGLTF` is
  * called eagerly so the swap has no loading pop-in.
  */
 export default function TumorModel({
@@ -41,7 +41,7 @@ export default function TumorModel({
   const modelAvailable = useModelAvailability();
 
   useEffect(() => {
-    if (modelAvailable) useGLTF.preload(TUMOR_MODEL_URL);
+    if (modelAvailable) preloadTumorGLTF(TUMOR_MODEL_URL);
   }, [modelAvailable]);
 
   const procedural = (

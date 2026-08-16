@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useTumorGLTF } from "./tumorGLTF";
 import * as THREE from "three";
 import { useScrollProgressRef } from "@/components/scroll/ScrollProgressContext";
 import { sectionOffsetAmount, separationAmount } from "@/lib/timeline";
@@ -10,9 +10,11 @@ import { damp } from "@/lib/scrollMath";
 
 /**
  * Real-asset path for a scan-derived `/models/tumor.glb`. Loaded with
- * `useGLTF` (suspends the nearest `<Suspense>`, i.e. the Loader in
- * SceneCanvas). Preloaded from TumorModel.tsx once the file is known to
- * exist so there is no pop-in when this component mounts.
+ * `useTumorGLTF` (suspends the nearest `<Suspense>`, i.e. the Loader in
+ * SceneCanvas) -- see `tumorGLTF.ts` for why that rather than drei's
+ * `useGLTF`: every decoder it can reach for is served from this origin.
+ * Preloaded from TumorModel.tsx once the file is known to exist so there is
+ * no pop-in when this component mounts.
  *
  * Segmentation is opt-in: if the authored GLB contains child objects named
  * "core", "edema", and "margin"/"tissue" (case-insensitive, as separate
@@ -32,7 +34,7 @@ export default function GLTFTumor({
   url: string;
   reducedMotion?: boolean;
 }) {
-  const { scene } = useGLTF(url);
+  const { scene } = useTumorGLTF(url);
   const progressRef = useScrollProgressRef();
 
   const cloned = useMemo(() => scene.clone(true), [scene]);

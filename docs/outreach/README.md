@@ -20,10 +20,20 @@
    page) and is recorded with its source in `docs/DATA_ACCESS_PLAN.md`. Addresses rot, people
    move, and one of the lab websites referenced is currently down. Check.
 3. **Re-read the honest-position paragraph in each draft and confirm it is still true.** It
-   states: 11 defects found and fixed; delivery validated in human glioma to ~2× geometric-mean
-   error; two components falsified; response prediction unvalidatable with open data; research
-   prototype, not clinically validated. If any of that has changed, update the draft — do not
-   let an outdated claim go out over your name.
+   states: 11 defects found and fixed; a structure-only permeability coefficient **scored** in
+   human glioma to ~2× geometric-mean error (**not** "delivery validated" — those rows never
+   invoke the transport solver, and the three checks that do compare a solved field to an
+   external measurement all fail); two components falsified; response prediction unvalidatable
+   with open data; research prototype, not clinically validated. If any of that has changed,
+   update the draft — do not let an outdated claim go out over your name.
+
+   > **This step has already failed once, on 2026-08-16.** `02_erasmus_lamfers.md` was still
+   > asserting *"the reconstruction agrees across two independent spatial platforms at
+   > Pearson 0.997"* after that number had been retracted in `results/revalidation.md` — the
+   > non-tumour subvector had collapsed **0.945 → 0.016**. The draft is corrected and carries
+   > a correction banner. **The word to police in these drafts is "validated."** This project's
+   > documented failure mode is that the engine stays sound while the claim surfaces drift, and
+   > an outreach letter is the surface where drift reaches a named external person.
 4. **Decide the commercial question before you send.** Erasmus MC's biobank regulation routes
    any commercial involvement through their TTO rather than the standard non-commercial MTA
    (§8.3.3). If this project has or may have a commercial dimension, say so in the first email.

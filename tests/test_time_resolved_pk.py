@@ -201,7 +201,10 @@ write-up: ``results/area_conservation_promotion.md``; superseded values under
 from __future__ import annotations
 
 import json
+import math
 import os
+import platform
+import sys
 
 import numpy as np
 import pytest
@@ -249,6 +252,33 @@ _REFERENCE_CASES = [
      PDEConfig(dt=10.0, total_time=3600.0 * 4, convection=False, save_every=100)),
 ]
 
+#: The three pinned cases whose PDE configuration is not in ``_REFERENCE_CASES``.
+#: Hoisted here, rather than left inline in their tests, so that EVERY pinned
+#: configuration is enumerable in one place — the cross-platform bound below is
+#: derived from the longest time integration among them, and a case pinned with
+#: a longer horizon or a finer dt must raise that bound rather than silently
+#: leave it too strict.
+_SOLVER_FLAT_PDE = PDEConfig(dt=10.0, total_time=1800.0, convection=False,
+                             save_every=30)
+_REAL_TISSUE_PDE = PDEConfig(dt=10.0, total_time=3600.0 * 12, convection=True,
+                             save_every=100)
+#: The exact production configuration: the same reconstruction call the landing
+#: asset and every shipped result use. ``dt`` must stay at 10 s — at dx = 12 um
+#: the advection CFL limit on this section is ~18.9 s, so dt = 20 raises.
+_DX12_PDE = PDEConfig(dt=10.0, total_time=1800.0, convection=True, save_every=30)
+
+_PINNED_PDE_CONFIGS = ([pde for _, _, _, pde in _REFERENCE_CASES]
+                       + [_SOLVER_FLAT_PDE, _REAL_TISSUE_PDE, _DX12_PDE])
+
+
+def _integration_steps(pde: PDEConfig) -> int:
+    """Number of sequential time steps a case accumulates over.
+
+    This is the ``n`` the cross-platform bound is derived from, so it is
+    computed from the configuration rather than written down.
+    """
+    return int(round(float(pde.total_time) / float(pde.dt)))
+
 
 @pytest.fixture(scope="module")
 def reference():
@@ -259,6 +289,341 @@ def reference():
 def _hex(x: str) -> float:
     """Reference values are stored as IEEE-754 hex so the comparison is exact."""
     return float.fromhex(x)
+
+
+# --------------------------------------------------------------------------- #
+# HOW A STORED REFERENCE IS COMPARED — two contracts, and which platform gets
+# which. READ THIS BEFORE CONCLUDING THAT THE TOLERANCE BELOW HIDES A BUG.
+# --------------------------------------------------------------------------- #
+#: True on the machine every value in ``tests/data/static_source_reference.json``
+#: was generated on: macOS / arm64, the reference environment named in the header
+#: of ``constraints.txt``. Nothing else is inspected here — version drift is what
+#: ``constraints.txt`` exists to remove, and a wrong-version run is meant to be a
+#: loud failure under either contract, not a silently tolerated one.
+_ON_REFERENCE_PLATFORM = (sys.platform == "darwin"
+                          and platform.machine() == "arm64")
+
+# WHY THERE ARE TWO CONTRACTS AT ALL.
+#
+# Bitwise equality is the RIGHT contract on the machine the reference was made on:
+# it pins a change of one ULP, and the module docstring's 2026-08-12 entry is a
+# case where a real physics fix moved these transport sums by only 1-3 ULP. Give
+# that up and you give up the only guard that catches that class of change.
+#
+# Bitwise equality is an UNSATISFIABLE contract anywhere else, and not for a
+# reason anyone can fix. Floating-point addition is not associative, so a
+# different vectorised reduction width, a different BLAS thread count or an FMA
+# contraction the other compiler did not emit changes the last few ULPs of every
+# reduction. There is no bug to find and no version to pin: the numbers are
+# physically the same result computed in a different order. So off the reference
+# platform this module asserts a TIGHT RELATIVE BOUND instead, and the rest of
+# this comment is how that bound was chosen.
+#
+# X — THE OBSERVED CROSS-PLATFORM NOISE. Measured on the platform this check
+# actually runs on, and corroborated on a second one. All at the constraints.txt
+# versions (numpy 2.0.2 / scipy 1.13.1):
+#
+#   * PRIMARY -- the linux/amd64 GitHub runner, run 31963874951, the first run
+#     under this contract and the first that reached EVERY field. All 59 field
+#     comparisons: 33 exactly equal, worst **2.1488e-14** (96.8 ULP), on
+#     ``solver_flat.mean_hist[6]``. That is 89.3x inside the bound.
+#   * CORROBORATING -- a qemu-emulated linux/amd64 container (python:3.11-slim,
+#     the same install line the workflow uses): 25 of 59 differ, worst
+#     **1.941e-14**, on ``solver_flat.mean_hist[6]``. Same field.
+#   * HISTORICAL -- the same runner before this contract existed, run
+#     31932705658: worst 8.662e-15, but over only FIVE field observations. The
+#     old assert-chain short-circuited at the first mismatching field, so it
+#     measured ``mean_auc`` four times and ``auc_sum`` once and NOTHING else.
+#     Anyone setting a bound from those five numbers would have been fitting it
+#     to whichever field happened to be asserted first. That is why
+#     :class:`_ReferenceCheck` no longer short-circuits.
+#
+# THE TWO PLATFORMS AGREE ON THE SHAPE, WHICH IS THE REAL EVIDENCE. They agree on
+# no VALUE at all -- the emulated run reproduces none of the runner's numbers
+# bitwise, so it is a third platform rather than a stand-in for it. But both put
+# ``solver_flat.mean_hist[6]`` first and ``solver_flat.final_c_sum`` second, and
+# on both the ``mean_hist`` deviations rise monotonically with checkpoint index
+# (runner: [4] 1.512e-14 < [5] 1.845e-14 < [6] 2.149e-14). Growth with the number
+# of accumulated steps, on the densest reduction, on two unrelated architectures,
+# is what the reordering model predicts and is much stronger evidence that the
+# model is the right one than either magnitude on its own.
+#
+# Everything below the bound is measurement; the bound itself is not fitted to it.
+#
+# Y — THE BOUND, and why it is not "1e-12 because that looks safe". These
+# quantities are time integrals: a sequential accumulation over ``n`` steps of
+# strictly non-negative terms (concentrations), finished by a pairwise spatial
+# reduction whose contribution is only ``O(log2 N)`` ULP. For a non-negative sum
+# the classical worst-case round-off is ``(n-1)u`` with ``u = 2**-53``, so two
+# different orderings of the same sum can differ by at most ``2(n-1)u``. The
+# bound is that expression at the longest ``n`` this module pins -- today the
+# 12 h window at ``dt = 10 s`` of
+# ``test_real_tissue_static_path_matches_stored_reference_bitwise``, n = 4320:
+#
+#     _XPLATFORM_RTOL = 2 * 4320 * DBL_EPSILON = 1.918e-12
+#
+# with nothing rounded and nothing added. It is the worst case ARITHMETIC allows
+# for the largest sum here, not a multiple of what was measured; it happens to
+# sit 89.3x above the worst deviation the runner has ever produced, which is the
+# cross-check rather than the derivation.
+#
+# ``n`` IS DERIVED, NOT WRITTEN DOWN. It is ``max`` over ``_PINNED_PDE_CONFIGS``,
+# which enumerates every configuration this module pins a reference for, so a
+# case added with a longer horizon or a finer dt raises the bound with it. Left
+# as a literal, the bound would silently become too STRICT the day someone pins a
+# longer integration -- it would then fail on a platform difference the theory
+# permits, and the next person would widen it by hand without knowing why. And
+# because a case could still be compared without going through that registry,
+# :meth:`_ReferenceCheck.assert_matches` refuses outright to judge a case that
+# integrates for longer than the bound was derived for.
+#
+# It is deliberately not a PER-CASE bound, which would be tighter (``solver_flat``
+# integrates 180 steps -> 8.0e-14). Two reasons: the reordering model covers the
+# final summation, not per-step FMA contraction inside the stencil or a library
+# taking a different internal path, and the tightest per-case bound would leave
+# ~4x margin over an observation we could only make under emulation. A single
+# bound at the longest ``n`` is the conservative reading of the same theory.
+#
+# The argument depends on the solver not AMPLIFYING round-off, which it does not:
+# explicit diffusion plus first-order decay at a CFL-stable ``dt`` is a
+# contractive operator, so a perturbation introduced at step k decays by step n
+# instead of growing. On an amplifying (chaotic, or unstably stepped) system this
+# derivation would be invalid and no fixed relative bound would be defensible.
+#
+# Z — WHAT A REAL CHANGE LOOKS LIKE, and the honest limit of this bound. The two
+# most recent deliberate changes to these very integrals, both recorded in the
+# module docstring with their write-ups, moved them by **-0.794 %** (2026-08-14,
+# dx = 12) and **+9.574 %** (2026-08-14, dx = 80); the 2026-08-13 two-route
+# promotion moved ``kill_fraction`` by 2.76x and 5.29x. The smallest of those,
+# 7.94e-3, is 4.1e9 times the bound. Anything of that kind fails here loudly.
+#
+# But the 2026-08-12 tumour-sigma fix moved the same sums by 1-3 ULP, i.e. by
+# ~2e-16 to 7e-16 relative -- BELOW the cross-platform noise floor measured above.
+# No tolerance can separate a change that size from a change of reduction order,
+# so off the reference platform that class of change is undetectable by anyone, at
+# any bound. That is a real hole and it is why the bitwise contract stays exactly
+# as it was on macOS/arm64: the tolerant contract is a second, weaker instrument
+# for a platform the strict one cannot run on, not a replacement for it.
+#
+# MOST OF THESE FIELDS DO NOT MOVE AT ALL, WHICH IS THE POINT. The natural
+# reading of "bitwise was replaced by a tolerance off the reference platform" is
+# "the numbers do not really agree across architectures". They mostly do. On the
+# runner, 33 of the 59 compared fields -- 56 % -- are EXACTLY equal to the
+# macOS/arm64 reference:
+#
+#   kill_fraction     4 observations, all bit-identical
+#   plasma_mean       4 observations, all bit-identical
+#   viable_history   24 observations, all bit-identical
+#   mean_hist[0]      1 observation,     bit-identical
+#
+# ``kill_fraction`` and ``viable_history`` are counts over a fixed cell
+# population (multiples of 1/n_cells) and ``plasma_mean`` is a pure-PK scalar
+# with no spatial reduction, so none of them carries a long accumulation. The
+# fields that DO move are exactly the long accumulations the model says should.
+# The tolerance is not papering over broad disagreement; it accommodates one
+# specific, understood, bounded mechanism.
+#
+# Because the quantised ones are quantised, if one ever does move it moves by a
+# whole quantum -- >= 1/300 = 3.3e-3 for the selftest micro, nine orders of
+# magnitude above the bound -- so a genuine threshold flip fails this check
+# rather than hiding inside it. That is the desired behaviour: a cell crossing
+# the kill threshold because of a last-ULP difference is benign, but it is worth
+# a human look, not a silent pass.
+#
+# THE INTERNAL CONTROL, and it is better than the cross-platform one. Within a
+# single array, in a single run on a single machine, ``solver_flat.mean_hist``
+# goes (all x1e-15, runner 31963874951):
+#
+#   [0] 0.00   [1] 4.41   [2] 8.01   [3] 11.65   [4] 15.12   [5] 18.45   [6] 21.49
+#
+# ``mean_hist[0]`` is BIT-IDENTICAL while ``mean_hist[6]`` is the noisiest field
+# on the machine. Same array, same code path, same run, same platform: the only
+# variable is how many time steps have been accumulated (these are 30 steps
+# apart). The cross-platform agreement on WHICH field is noisiest is good
+# evidence; this is better, because it removes the platform as a variable
+# entirely and shows the deviation being CREATED by accumulation.
+#
+# The growth is near-linear, not a random walk -- successive increments are
+# 4.41, 3.60, 3.65, 3.47, 3.33, 3.04 -- which says the reduction-order
+# difference is systematic and adds coherently at every step rather than
+# cancelling. That is why the bound's ``n`` is linear rather than ``sqrt(n)``.
+#
+# WHY THE MEASURED HEADROOM IS NOT THE WORST CASE -- read this before quoting
+# 89x. 96.8 ULP over 180 steps is 0.538 ULP per step, against the 2 ULP per step
+# the bound assumes: the worst case is not attained, but it is the right order,
+# missed by a factor of ~4. The comfortable headroom is however partly an
+# artifact of WHICH case CI can run. ``solver_flat`` integrates 180 steps; the
+# bound is derived for 4320. Extrapolating the measured per-step rate to that
+# case predicts ~5.2e-13, which is 27 % of the bound -- headroom ~3.7x, not 89x.
+# That case (``test_real_tissue_static_path_...``) is deselected in CI because it
+# needs data_cache/, so it has never been measured off the reference platform.
+# If it ever is, expect ~5e-13 and do not read it as a regression.
+
+#: The longest sequential time integration among the pinned cases. Derived from
+#: the configurations themselves (today: the real-tissue case, 12 h at
+#: ``dt = 10 s``, n = 4320) so that pinning a longer one raises the bound too.
+_LONGEST_TIME_INTEGRATION_STEPS = max(_integration_steps(p)
+                                      for p in _PINNED_PDE_CONFIGS)
+
+#: 2 * n * u -- see the derivation above. == 1.9185e-12 at n = 4320.
+_XPLATFORM_RTOL = (2.0 * _LONGEST_TIME_INTEGRATION_STEPS
+                   * sys.float_info.epsilon)
+
+
+def _relative_deviation(got: float, want: float) -> float:
+    """``|got - want| / |want|``, with the degenerate cases spelled out.
+
+    0.0 for an exact match (including ``0.0 == -0.0``, which the bitwise
+    contract accepts too), and ``inf`` for a mismatch against a zero reference
+    or for a non-finite result — both of which must fail under either contract
+    rather than divide their way to a small-looking number.
+    """
+    if got == want:
+        return 0.0
+    if want == 0.0 or not (math.isfinite(got) and math.isfinite(want)):
+        return math.inf
+    return abs(got - want) / abs(want)
+
+
+def _record_deviations(case: str, rows) -> None:
+    """Append this case's per-field deviations to ``$CODON_REFERENCE_DEVIATIONS``.
+
+    The linux/amd64 job in ``.github/workflows/docker.yml`` is a MEASUREMENT of
+    cross-platform float reproducibility, so it should produce the measurement
+    when it PASSES, not only when it fails — otherwise the only way to learn the
+    size of the divergence is to keep the job red, which is how it stayed red.
+
+    Best-effort by construction: no failure in here may change whether a test
+    passes. Unset variable, unwritable path, anything — the measurement is lost,
+    the assertions are not.
+    """
+    path = os.environ.get("CODON_REFERENCE_DEVIATIONS")
+    if not path:
+        return
+    try:
+        with open(path, "a") as fh:
+            for name, got, want, rel in rows:
+                fh.write(json.dumps({
+                    "case": case, "field": name, "rel": rel,
+                    "got": float(got).hex(), "want": float(want).hex(),
+                }) + "\n")
+    except Exception:  # pragma: no cover - diagnostics must never fail a test
+        pass
+
+
+# DOES MY NEW BITWISE ASSERTION NEED THIS? Usually not. There are two kinds of
+# bitwise assertion in this suite and only one of them has a platform problem:
+#
+#   1. Bitwise against a value computed HERE AND NOW -- two code paths, one
+#      process, one machine. `assert a.tobytes() == b.tobytes()` where both
+#      sides were just computed. This is platform-INDEPENDENT: whatever
+#      reduction order the machine picks, it picks the same one twice, so the
+#      assertion is satisfiable everywhere and must stay bitwise. Widening one
+#      of these to a tolerance would destroy it for nothing.
+#      Examples that correctly do NOT use `_ReferenceCheck`:
+#      ``test_immune_sink.py`` (sink OFF must reproduce the engine byte for
+#      byte) and ``test_mgmt_scalar.py::test_omitting_mgmt_is_bit_identical_to_
+#      previous_behaviour`` (mgmt=None must not perturb one bit).
+#
+#   2. Bitwise against a value STORED FROM ANOTHER MACHINE -- a literal in
+#      ``tests/data/``, generated once on macOS/arm64. This is satisfiable ONLY
+#      on the machine that generated it, for the reasons above. It needs
+#      `_ReferenceCheck`.
+#
+# The whole of category 2 in the linux/amd64 job's selected module set is the
+# five tests in this file -- checked, not assumed. If you add a sixth, it goes
+# through `_ReferenceCheck` and its PDEConfig goes in `_PINNED_PDE_CONFIGS`.
+class _ReferenceCheck:
+    """Every field of one stored-reference case, compared and reported together.
+
+    WHY A COLLECTOR RATHER THAN A CHAIN OF BARE ``assert``\\ s. A chain
+    short-circuits at the first mismatching field, so a run on a non-reference
+    platform reports ONE number and hides every other field's deviation. That is
+    not a hypothetical: run 31932705658 of the linux/amd64 job reported
+    ``mean_auc`` for four cases and ``auc_sum`` for the solver, and told us
+    nothing about ``penetration_index``, ``final_c_sum`` or ``viable_history``
+    on that platform, because the tests died before reaching them — which is
+    exactly the information needed to set the bound below. This compares every
+    field first and names all the offenders in one failure.
+    """
+
+    def __init__(self, case: str, steps: int) -> None:
+        #: ``steps`` is how many sequential time steps this case accumulates
+        #: over — the ``n`` the bound is derived from. Required, not optional,
+        #: so that pinning a new case forces its author to state it and the
+        #: staleness check in :meth:`assert_matches` can do its job. 0 for a
+        #: steady-state solve with no time integration at all.
+        self.case = case
+        self.steps = int(steps)
+        self.rows = []  # (field, got, want, relative deviation)
+
+    def field(self, name: str, got, want_hex: str) -> None:
+        got = float(got)
+        want = _hex(want_hex)
+        self.rows.append((name, got, want, _relative_deviation(got, want)))
+
+    def sequence(self, name: str, got_seq, want_hexes) -> None:
+        """A whole history, element by element. Length is part of the contract:
+        the list equality this replaces would also have failed on a short one."""
+        got_seq = [float(v) for v in got_seq]
+        assert len(got_seq) == len(want_hexes), (
+            f"{self.case}: {name} has {len(got_seq)} entries, the stored "
+            f"reference has {len(want_hexes)} — that is a shape change, not a "
+            f"float difference, and no tolerance applies to it"
+        )
+        for i, (g, w) in enumerate(zip(got_seq, want_hexes)):
+            self.field(f"{name}[{i}]", g, w)
+
+    def assert_matches(self) -> None:
+        # The bound is 2*n*u for the LONGEST accumulation in
+        # ``_PINNED_PDE_CONFIGS``. A case that integrates for longer than that
+        # is one the bound was not derived for, and applying it anyway would
+        # silently be too strict. Refuse rather than judge — on every platform,
+        # so it cannot lie in wait until someone runs this on linux.
+        if self.steps > _LONGEST_TIME_INTEGRATION_STEPS:
+            raise AssertionError(
+                f"{self.case}: integrates {self.steps} time steps, but "
+                f"_XPLATFORM_RTOL was derived for at most "
+                f"{_LONGEST_TIME_INTEGRATION_STEPS} — so the bound in force is "
+                "too STRICT for this case and would fail on a difference the "
+                "theory permits. Add this case's PDEConfig to "
+                "_PINNED_PDE_CONFIGS, which re-derives the bound. Do not raise "
+                "the bound by hand."
+            )
+
+        worst = max((r[3] for r in self.rows), default=0.0)
+        _record_deviations(self.case, self.rows)
+
+        if _ON_REFERENCE_PLATFORM:
+            bad = [r for r in self.rows if r[1] != r[2]]
+            contract = ("BITWISE equality — this IS the platform "
+                        "tests/data/static_source_reference.json was generated "
+                        "on, so there is no float noise to allow for")
+        else:
+            bad = [r for r in self.rows if not r[3] <= _XPLATFORM_RTOL]
+            contract = (f"relative deviation <= {_XPLATFORM_RTOL:g} — this is "
+                        "NOT the platform the reference was generated on; see "
+                        "the derivation of the bound in this module")
+        if not bad:
+            return
+
+        lines = [
+            f"{self.case}: the stored reference was not reproduced.",
+            f"  platform : {sys.platform}/{platform.machine()}",
+            f"  contract : {contract}",
+            f"  {len(bad)} of {len(self.rows)} compared fields are outside it "
+            f"(worst relative deviation across ALL fields: {worst:.6e}):",
+        ]
+        for name, got, want, rel in bad:
+            lines.append(f"    {name:22s} got {got!r}  want {want!r}  "
+                         f"rel {rel:.6e}")
+        lines.append(
+            "  A deviation far above the bound is a physics or wiring change, "
+            "not float noise: find what moved and re-pin deliberately (the "
+            "module docstring records how the last three re-pins were "
+            "justified). Do NOT widen the bound to make this green."
+        )
+        raise AssertionError("\n".join(lines))
 
 
 def _slab_micro(nx: int = 160, ny: int = 3, dx: float = 10.0):
@@ -306,6 +671,112 @@ def _matched_peak(target_mean: float, half_life: float, total_time: float,
 
 
 # --------------------------------------------------------------------------- #
+# (0) The comparison machinery itself
+# --------------------------------------------------------------------------- #
+def test_the_cross_platform_bound_is_the_derived_number():
+    """The bound is a derivation, not a literal — so assert the derivation.
+
+    Widening it now costs an argument, not a digit: this test fails, and the
+    only honest way to make it pass is to change the reasoning in the comment
+    above it. The two inequalities are the measurements that reasoning rests on:
+    the worst cross-platform deviation ever observed (2.1488e-14, on the
+    linux/amd64 GitHub runner itself, run 31963874951,
+    ``solver_flat.mean_hist[6]``) and the smallest relative change a deliberate
+    physics promotion has made to these same integrals (7.94e-3, the 2026-08-14
+    area-conserving vessel painting at dx = 12).
+    """
+    assert _LONGEST_TIME_INTEGRATION_STEPS == 4320
+    assert _XPLATFORM_RTOL == 2.0 * 4320 * 2.0 ** -52
+    assert 2.1488e-14 < _XPLATFORM_RTOL < 7.94e-3
+    # ...and 4320 is the real-tissue case's 12 h at dt = 10 s, reached through
+    # the registry rather than written down, so pinning a longer case moves it.
+    assert _LONGEST_TIME_INTEGRATION_STEPS == _integration_steps(_REAL_TISSUE_PDE)
+    assert all(_integration_steps(p) <= _LONGEST_TIME_INTEGRATION_STEPS
+               for p in _PINNED_PDE_CONFIGS)
+
+
+def test_the_deviation_log_records_every_field_even_when_the_run_passes(
+        tmp_path, monkeypatch):
+    """``.github/workflows/docker.yml`` reads this file to build the summary
+    table for its run, so its shape is a contract rather than a debug aid — and
+    the point of it is that a PASSING run still says how close to the bound the
+    platform sat."""
+    log = tmp_path / "deviations.jsonl"
+    monkeypatch.setenv("CODON_REFERENCE_DEVIATIONS", str(log))
+    monkeypatch.setattr(sys.modules[__name__], "_ON_REFERENCE_PLATFORM", False)
+
+    check = _ReferenceCheck("synthetic", steps=0)
+    check.field("exact", 1.0, float(1.0).hex())
+    check.field("one_ulp", math.nextafter(1.0, 2.0), float(1.0).hex())
+    check.assert_matches()  # passes: one ULP is inside the bound
+
+    rows = [json.loads(l) for l in log.read_text().splitlines() if l.strip()]
+    assert [r["field"] for r in rows] == ["exact", "one_ulp"]
+    assert set(rows[0]) == {"case", "field", "rel", "got", "want"}
+    assert rows[0]["rel"] == 0.0
+    assert 0.0 < rows[1]["rel"] < _XPLATFORM_RTOL
+
+
+def test_a_case_longer_than_the_bound_was_derived_for_is_refused():
+    """The staleness guard: a case that integrates longer than the bound's ``n``
+    must not be judged by that bound, on any platform.
+
+    Without this, adding a longer-horizon pin would leave the bound silently too
+    STRICT — the failure mode where a guard drifts out from under its own
+    justification and the next person widens it by hand.
+    """
+    check = _ReferenceCheck("synthetic_longer_than_the_bound",
+                            steps=_LONGEST_TIME_INTEGRATION_STEPS + 1)
+    check.field("exact", 1.0, float(1.0).hex())
+    with pytest.raises(AssertionError, match="derived for at most"):
+        check.assert_matches()
+
+
+def test_both_reference_contracts_are_enforced_and_name_every_bad_field(
+        monkeypatch):
+    """One ULP must fail on the reference platform and pass off it; a deviation
+    far above the bound must fail on both; and the failure must name EVERY bad
+    field, which is the property the old assert-chain did not have."""
+    mod = sys.modules[__name__]
+    one = float(1.0).hex()
+    # The instrument must not measure ITSELF: these deliberately-wrong values
+    # would otherwise be appended to the deviation log and would then dominate
+    # the "worst deviation this run" line in CI's summary, which is exactly the
+    # number a reader trusts.
+    monkeypatch.delenv("CODON_REFERENCE_DEVIATIONS", raising=False)
+
+    def build():
+        check = _ReferenceCheck("synthetic", steps=0)
+        check.field("exact", 1.0, one)
+        check.field("one_ulp", math.nextafter(1.0, 2.0), one)
+        check.field("ten_x_bound", 1.0 + 10.0 * _XPLATFORM_RTOL, one)
+        check.field("way_off", 2.0, one)
+        return check
+
+    monkeypatch.setattr(mod, "_ON_REFERENCE_PLATFORM", True)
+    with pytest.raises(AssertionError) as bitwise:
+        build().assert_matches()
+    for field in ("one_ulp", "ten_x_bound", "way_off"):
+        assert field in str(bitwise.value)
+    assert "3 of 4" in str(bitwise.value)
+
+    monkeypatch.setattr(mod, "_ON_REFERENCE_PLATFORM", False)
+    with pytest.raises(AssertionError) as tolerant:
+        build().assert_matches()
+    # one ULP is exactly what the tolerant contract exists to absorb
+    assert "one_ulp" not in str(tolerant.value)
+    assert "ten_x_bound" in str(tolerant.value)
+    assert "way_off" in str(tolerant.value)
+    assert "2 of 4" in str(tolerant.value)
+
+    # A shape change is not a float difference and no tolerance applies to it.
+    for on_reference in (True, False):
+        monkeypatch.setattr(mod, "_ON_REFERENCE_PLATFORM", on_reference)
+        with pytest.raises(AssertionError, match="shape change"):
+            _ReferenceCheck("synthetic", steps=0).sequence("h", [1.0, 2.0], [one])
+
+
+# --------------------------------------------------------------------------- #
 # (1-3) Backward compatibility — BIT-identical, not approximately equal
 # --------------------------------------------------------------------------- #
 def test_time_resolved_defaults_to_off():
@@ -320,7 +791,8 @@ def test_time_resolved_defaults_to_off():
 def test_static_path_matches_stored_reference_bitwise(reference, label, drug,
                                                       pk, pde):
     """The default (``time_resolved=False``) engine path reproduces values
-    captured BEFORE the time-resolved source was added, bit for bit."""
+    captured BEFORE the time-resolved source was added — bit for bit on the
+    reference platform, within ``_XPLATFORM_RTOL`` anywhere else."""
     micro = _build_selftest_micro()
     kw = dict(pk=pk, pde=pde, seed=0)
     if drug is not None:
@@ -328,16 +800,18 @@ def test_static_path_matches_stored_reference_bitwise(reference, label, drug,
     res = simulate_response(micro, SimConfig(**kw))
     ref = reference[label]
 
-    assert float(res.kill_fraction) == _hex(ref["kill_fraction"])
-    assert float(res.extras["mean_auc"]) == _hex(ref["mean_auc"])
-    assert float(res.extras["plasma_mean"]) == _hex(ref["plasma_mean"])
-    assert float(res.extras["penetration_index"]) == _hex(ref["penetration_index"])
-    assert float(np.asarray(res.transport.auc).sum()) == _hex(ref["auc_sum"])
-    assert (float(np.asarray(res.transport.final_concentration).sum())
-            == _hex(ref["final_c_sum"]))
-    assert [float(v) for v in res.viable_history] == [
-        _hex(v) for v in ref["viable_history"]
-    ]
+    check = _ReferenceCheck(label, _integration_steps(pde))
+    check.field("kill_fraction", res.kill_fraction, ref["kill_fraction"])
+    check.field("mean_auc", res.extras["mean_auc"], ref["mean_auc"])
+    check.field("plasma_mean", res.extras["plasma_mean"], ref["plasma_mean"])
+    check.field("penetration_index", res.extras["penetration_index"],
+                ref["penetration_index"])
+    check.field("auc_sum", np.asarray(res.transport.auc).sum(), ref["auc_sum"])
+    check.field("final_c_sum",
+                np.asarray(res.transport.final_concentration).sum(),
+                ref["final_c_sum"])
+    check.sequence("viable_history", res.viable_history, ref["viable_history"])
+    check.assert_matches()
 
 
 def test_static_solver_matches_stored_reference_bitwise(reference,
@@ -345,19 +819,23 @@ def test_static_solver_matches_stored_reference_bitwise(reference,
     """Same pin one level down, on the raw solver."""
     micro = flat_micro_factory(ny=40, nx=40, dx=15.0, ecm_value=0.3)
     drug = DrugParams(name="tmz", diffusivity=300.0, clearance=3e-4, binding=1e-4)
-    pde = PDEConfig(dt=10.0, total_time=1800.0, convection=False, save_every=30)
+    pde = _SOLVER_FLAT_PDE
     source = micro.domain.zeros()
     source[::12, ::12] = 1.0
 
     res = simulate_drug_transport(micro, drug, source, pde)
     ref = reference["solver_flat"]
-    assert float(res.auc.sum()) == _hex(ref["auc_sum"])
-    assert float(res.auc.max()) == _hex(ref["auc_max"])
-    assert float(res.final_concentration.sum()) == _hex(ref["final_c_sum"])
-    assert float(res.penetration_index) == _hex(ref["penetration_index"])
-    assert [float(v) for v in res.mean_concentration_history] == [
-        _hex(v) for v in ref["mean_hist"]
-    ]
+
+    check = _ReferenceCheck("solver_flat",
+                            _integration_steps(_SOLVER_FLAT_PDE))
+    check.field("auc_sum", res.auc.sum(), ref["auc_sum"])
+    check.field("auc_max", res.auc.max(), ref["auc_max"])
+    check.field("final_c_sum", res.final_concentration.sum(), ref["final_c_sum"])
+    check.field("penetration_index", res.penetration_index,
+                ref["penetration_index"])
+    check.sequence("mean_hist", res.mean_concentration_history,
+                   ref["mean_hist"])
+    check.assert_matches()
 
 
 def test_real_tissue_static_path_matches_stored_reference_bitwise(reference,
@@ -366,25 +844,32 @@ def test_real_tissue_static_path_matches_stored_reference_bitwise(reference,
     """And on the REAL Xenium section, through the whole engine."""
     pk = PKConfig(plasma_peak=50.0, half_life=3600.0 * 4, n_doses=3,
                   dose_interval=3600.0 * 4)
-    pde = PDEConfig(dt=10.0, total_time=3600.0 * 12, convection=True,
-                    save_every=100)
+    pde = _REAL_TISSUE_PDE
     res = simulate_response(real_micro, SimConfig(drug=real_drug, pk=pk, pde=pde,
                                                   seed=0))
     ref = reference["real_xenium_dx80_tmz_3dose"]
-    assert float(res.kill_fraction) == _hex(ref["kill_fraction"])
-    assert float(res.extras["mean_auc"]) == _hex(ref["mean_auc"])
-    assert float(np.asarray(res.transport.auc).sum()) == _hex(ref["auc_sum"])
-    assert (float(np.asarray(res.transport.final_concentration).sum())
-            == _hex(ref["final_c_sum"]))
+
+    check = _ReferenceCheck("real_xenium_dx80_tmz_3dose",
+                            _integration_steps(_REAL_TISSUE_PDE))
+    check.field("kill_fraction", res.kill_fraction, ref["kill_fraction"])
+    check.field("mean_auc", res.extras["mean_auc"], ref["mean_auc"])
+    check.field("auc_sum", np.asarray(res.transport.auc).sum(), ref["auc_sum"])
+    check.field("final_c_sum",
+                np.asarray(res.transport.final_concentration).sum(),
+                ref["final_c_sum"])
+    check.assert_matches()
 
 
 # --------------------------------------------------------------------------- #
 # (3b) The PRODUCTION grid — added 2026-08-12, see the module docstring
 # --------------------------------------------------------------------------- #
-#: The exact production configuration: the same reconstruction call the landing
-#: asset and every shipped result use. ``dt`` must stay at 10 s — at dx = 12 um
-#: the advection CFL limit on this section is ~18.9 s, so dt = 20 raises.
-_DX12_PDE = dict(dt=10.0, total_time=1800.0, convection=True, save_every=30)
+#: ``_DX12_PDE`` — the exact production configuration — now lives with the other
+#: pinned PDE configurations at the top of this module, because the
+#: cross-platform bound is derived from all of them at once.
+#:
+#: The cached section the dx = 12 pins read. Named so the fixture's skip guard
+#: and the fixture's own reconstruct call can never disagree about the path.
+_DX12_SAMPLE = "data_cache/xenium_gbm"
 
 
 @pytest.fixture(scope="module")
@@ -394,10 +879,25 @@ def production_micro_dx12():
     Identical arguments to ``experiments/export_landing_asset.py``, so this pins
     the configuration the shipped IFP figures are actually computed on. Costs a
     couple of seconds to assemble; module-scoped so both dx = 12 pins share it.
+
+    SKIPS, rather than errors, when the section's bytes are not cached. A
+    missing dataset is not a numerics signal: without this guard both dx = 12
+    pins ERRORED with ``IngestError`` on the cache-less linux/amd64 runner
+    (``.github/workflows/docker.yml``), a job whose entire purpose is
+    cross-platform float reproducibility. The check asks the real loader
+    (:func:`tmesim.data.ingest.resolve_xenium_files`) about the exact path this
+    fixture is about to read, so it skips only when the bytes are genuinely
+    absent -- an ingest failure on a cache that IS present still errors.
     """
+    from tmesim.data.ingest import resolve_xenium_files
     from tmesim.reconstruct.real_pipeline import reconstruct_real
 
-    return reconstruct_real(source="xenium", sample="data_cache/xenium_gbm",
+    if resolve_xenium_files(_DX12_SAMPLE).get("cells") is None:
+        pytest.skip(f"no cached Xenium GBM section at {_DX12_SAMPLE!r} "
+                    "(see `codon sections`) -- the dx = 12 production pins need "
+                    "the real bytes")
+
+    return reconstruct_real(source="xenium", sample=_DX12_SAMPLE,
                             dx_um=12.0, oxygen_mode="pde", state_mode="oxygen")
 
 
@@ -417,10 +917,15 @@ def test_production_dx12_ifp_solve_matches_stored_reference_bitwise(
     mask = np.asarray(production_micro_dx12.domain.tissue_mask, dtype=bool)
     ref = reference["production_xenium_dx12_tmz_3dose"]
 
-    assert float(p[mask].max()) == _hex(ref["ifp_max_in_tissue_mmhg"])
-    assert float(p[mask].mean()) == _hex(ref["ifp_mean_in_tissue_mmhg"])
-    assert (float(np.hypot(velocity[0], velocity[1])[mask].max())
-            == _hex(ref["ifp_speed_max_um_s"]))
+    check = _ReferenceCheck("production_xenium_dx12_tmz_3dose/ifp", steps=0)
+    check.field("ifp_max_in_tissue_mmhg", p[mask].max(),
+                ref["ifp_max_in_tissue_mmhg"])
+    check.field("ifp_mean_in_tissue_mmhg", p[mask].mean(),
+                ref["ifp_mean_in_tissue_mmhg"])
+    check.field("ifp_speed_max_um_s",
+                np.hypot(velocity[0], velocity[1])[mask].max(),
+                ref["ifp_speed_max_um_s"])
+    check.assert_matches()
 
 
 def test_production_dx12_static_path_matches_stored_reference_bitwise(
@@ -442,20 +947,23 @@ def test_production_dx12_static_path_matches_stored_reference_bitwise(
                   dose_interval=3600.0 * 4)
     res = simulate_response(
         production_micro_dx12,
-        SimConfig(drug=drug, pk=pk, pde=PDEConfig(**_DX12_PDE), seed=0),
+        SimConfig(drug=drug, pk=pk, pde=_DX12_PDE, seed=0),
     )
     ref = reference["production_xenium_dx12_tmz_3dose"]
 
-    assert float(res.kill_fraction) == _hex(ref["kill_fraction"])
-    assert float(res.extras["mean_auc"]) == _hex(ref["mean_auc"])
-    assert float(res.extras["plasma_mean"]) == _hex(ref["plasma_mean"])
-    assert float(res.extras["penetration_index"]) == _hex(ref["penetration_index"])
-    assert float(np.asarray(res.transport.auc).sum()) == _hex(ref["auc_sum"])
-    assert (float(np.asarray(res.transport.final_concentration).sum())
-            == _hex(ref["final_c_sum"]))
-    assert [float(v) for v in res.viable_history] == [
-        _hex(v) for v in ref["viable_history"]
-    ]
+    check = _ReferenceCheck("production_xenium_dx12_tmz_3dose",
+                            _integration_steps(_DX12_PDE))
+    check.field("kill_fraction", res.kill_fraction, ref["kill_fraction"])
+    check.field("mean_auc", res.extras["mean_auc"], ref["mean_auc"])
+    check.field("plasma_mean", res.extras["plasma_mean"], ref["plasma_mean"])
+    check.field("penetration_index", res.extras["penetration_index"],
+                ref["penetration_index"])
+    check.field("auc_sum", np.asarray(res.transport.auc).sum(), ref["auc_sum"])
+    check.field("final_c_sum",
+                np.asarray(res.transport.final_concentration).sum(),
+                ref["final_c_sum"])
+    check.sequence("viable_history", res.viable_history, ref["viable_history"])
+    check.assert_matches()
 
 
 def test_tumor_occupancy_smoothing_is_a_physical_length():
@@ -493,7 +1001,7 @@ def test_unit_source_profile_is_bit_identical_to_none(flat_micro_factory):
     same arithmetic. This is what makes the new branch provably inert."""
     micro = flat_micro_factory(ny=40, nx=40, dx=15.0, ecm_value=0.3)
     drug = DrugParams(name="tmz", diffusivity=300.0, clearance=3e-4, binding=1e-4)
-    pde = PDEConfig(dt=10.0, total_time=1800.0, convection=False, save_every=30)
+    pde = _SOLVER_FLAT_PDE
     source = micro.domain.zeros()
     source[::12, ::12] = 1.0
     n_steps = int(round(pde.total_time / pde.dt))

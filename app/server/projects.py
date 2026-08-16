@@ -66,6 +66,7 @@ from .cache import (
     describe_section,
     own_only,
     private_makedirs,
+    redact_exception,
     repo_root,
     state_route_support,
 )
@@ -319,8 +320,9 @@ class ProjectStore:
             return None
         except Exception as exc:  # noqa: BLE001 - a corrupt file is reported
             raise ProjectError(
-                f"project {project_id!r} is on disk but unreadable: "
-                f"{type(exc).__name__}: {exc}",
+                redact_exception(
+                    exc,
+                    f"project {project_id!r} is on disk but could not be read"),
                 status=500,
             ) from exc
         if not isinstance(doc, dict):

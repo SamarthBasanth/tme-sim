@@ -1,5 +1,63 @@
 # The Real Build — Validation Summary
 
+> # ⚠️ CORRECTED 2026-08-16 — §2's CROSS-PLATFORM CONCORDANCE IS RETRACTED, AND §6's "VALIDATED" LIST IS TOO BROAD
+>
+> **This banner is the only edit made to this file.** No number below it has been
+> changed, re-run or corrected. The body is preserved as the "before" record of what
+> was claimed, which is the point of keeping it.
+>
+> **1. §2's *"Cross-platform concordance … Pearson 0.997; endothelial agrees to 0.03%
+> (9.74% vs 9.77%). Mean absolute difference 4.44%"* is RETRACTED.** The
+> classifier-arity fix (`4ad221f`, [`classifier_fix.md`](classifier_fix.md)) removed a
+> real bug in which a class defined by one marker systematically out-scored a class
+> defined by four. Re-run under current defaults
+> ([`revalidation.md`](revalidation.md) §4, §4a):
+>
+> | metric | published here | current defaults |
+> |---|---:|---:|
+> | Pearson r, 4-vector | 0.997 | **0.980** |
+> | Pearson r, **non-tumour subvector** | 0.945 | **0.016** |
+> | composition rank agreement ρ | 1.00 | **0.40** |
+> | mean absolute composition difference | 4.44% | **12.21%** |
+> | Xenium TUMOR / STROMAL / IMMUNE / ENDO | 73.80 / 7.92 / 8.54 / 9.74 | **58.24 / 11.78 / 19.48 / 10.50** |
+>
+> The non-tumour 0.016 is not "weakened" — over 3 points it is indistinguishable from
+> no relationship, and `revalidation.md` §4c calls reporting it as a weakened pass
+> dishonest. Reverting the classifier alone reproduces the published numbers to four
+> decimal places, so **the 0.997 was agreement between a biased estimator and another
+> estimator and its tightness was coincidental.** Cross-platform composition
+> concordance is an **OPEN question, not evidence.** The §2 paragraph beginning *"A
+> methodological bug was found and fixed honestly"* describes the *first* of two
+> classifier defects; the second is the one above, and it removes that paragraph's
+> "independently corroborated by the Visium deconvolution's 9.77%" conclusion.
+>
+> **2. §6's *"Validated on real data: the reconstruction is faithful and cross-platform
+> concordant"* does not stand,** for the reason above. The region-marker half of §2
+> (PECAM1 d = 1.29, VEGFA d = 1.35, CA9 d = 0.67, all at permutation p = 1e-4) **does**
+> reproduce exactly and is unaffected.
+>
+> **3. §6's *"the transport physics reproduces real measured penetration"* needs its
+> scope stated.** Those rows are `scope=analytic` and never invoke the transport PDE.
+> In `codon validate --quick`, **13 of 13 scored rows never invoke the solver**; in the
+> full run **21 of 33** do not; and of the rows where a *solved field* is compared to an
+> *external measurement* there are **three, and all three FAIL** — interstitial pressure
+> 41× low, 5-fluorouracil partition 12.8× high, methotrexate partition 10.5× low
+> ([`CLAIM_INVENTORY.md`](CLAIM_INVENTORY.md) §0, §1e).
+>
+> **4. §5's drug ranking is invariant to common-mode perturbations only.** Correcting
+> the transvascular delivery law changes the **top-1 GBM pick (cisplatin → vincristine)**,
+> changes the top-3 set, swaps 4 of 45 pairs, and drops P(cisplatin rank 1) from
+> **0.9277 to 0.3965** ([`transvascular_exchange_revalidation.md`](transvascular_exchange_revalidation.md)
+> §4.1). Every absolute kill and AUC in §5 is computed under the one-way delivery law
+> `S = PS·Cp`, which the repository documents as measurably wrong (five of eleven GBM
+> drugs predicted above plasma concentration).
+>
+> **The asymmetry this file should be read against**
+> ([`reconstruction_validation_roadmap.md`](reconstruction_validation_roadmap.md) §5):
+> *every* reconstruction-level external validation this project has made has since been
+> retracted or fails on a held-out section, while *every* physics/transport-level
+> validation has held. That is the project's actual epistemic position.
+
 **What this is:** a patient-specific glioblastoma **microenvironment** simulator built
 entirely from **real measured data**. Every synthetic element has been removed from the
 pipeline (the synthetic cohort generator and all fabricated-geometry loaders are deleted;

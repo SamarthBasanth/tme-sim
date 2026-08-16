@@ -93,6 +93,7 @@ from .cache import (
     VASCULAR_MODES,
     list_sections,
     make_key,
+    redact_exception,
     repo_root,
     section_genes,
     state_route_support,
@@ -197,7 +198,8 @@ def drug_rows(force: bool = False) -> List[Dict]:
         alpha = float(calibrate_alpha())
         alpha_error = None
     except Exception as exc:  # noqa: BLE001
-        alpha, alpha_error = None, f"{type(exc).__name__}: {exc}"
+        alpha, alpha_error = None, redact_exception(
+            exc, "calibrate_alpha() failed", brief=True)
 
     rows: List[Dict] = []
     for name in sorted(set(GBM_DRUGS) | set(_CROSS_LIBRARY_GBM_DRUGS)):
@@ -224,7 +226,8 @@ def drug_rows(force: bool = False) -> List[Dict]:
             row["is_antibody"] = bool(mol.get("is_antibody"))
             row["smiles_source"] = mol.source
         except Exception as exc:  # noqa: BLE001
-            row["reason"] = f"descriptor build failed: {type(exc).__name__}: {exc}"
+            row["reason"] = redact_exception(
+                exc, "the molecular descriptors for this drug could not be built")
 
         try:
             pot = resolve_ic50(name)
@@ -239,13 +242,11 @@ def drug_rows(force: bool = False) -> List[Dict]:
             else:
                 row["ic50_source"] = "flagged default (LOW confidence)"
         except Exception as exc:  # noqa: BLE001
-            row["reason"] = f"IC50 unresolved: {type(exc).__name__}: {exc}"
+            row["reason"] = redact_exception(
+                exc, "the IC50 for this drug could not be resolved")
 
         if alpha is None:
-            row["reason"] = (
-                f"bbb_penetrance unavailable: calibrate_alpha() failed "
-                f"({alpha_error})"
-            )
+            row["reason"] = f"bbb_penetrance unavailable: {alpha_error}"
         else:
             try:
                 dp = apply_barrier_to_drugparams(
@@ -256,8 +257,8 @@ def drug_rows(force: bool = False) -> List[Dict]:
                 # object the engine will actually consume.
                 row["ic50_uM"] = _num(dp.ic50)
             except Exception as exc:  # noqa: BLE001
-                row["reason"] = (
-                    f"compilation failed: {type(exc).__name__}: {exc}")
+                row["reason"] = redact_exception(
+                    exc, "this drug could not be compiled")
         rows.append(row)
 
     _drug_rows_cache = rows
@@ -284,7 +285,8 @@ def _user_compound_rows() -> List[Dict]:
             "name": "(user compounds unavailable)", "mw": None, "logp": None,
             "ic50_uM": None, "ic50_source": None, "bbb_penetrance": None,
             "is_user_compound": True, "unavailable": True,
-            "reason": f"compound store unreadable: {type(exc).__name__}: {exc}",
+            "reason": redact_exception(
+                exc, "the user compound store could not be read"),
         }]
     for rec in stored:
         row: Dict = {
@@ -304,8 +306,8 @@ def _user_compound_rows() -> List[Dict]:
         try:
             doc = COMPOUND_STORE.compile_stored(rec.get("id") or rec.get("name"))
         except Exception as exc:  # noqa: BLE001
-            row["reason"] = (
-                f"this compound no longer compiles: {type(exc).__name__}: {exc}")
+            row["reason"] = redact_exception(
+                exc, "this compound no longer compiles")
             rows.append(row)
             continue
         dp = doc["drug_params"]

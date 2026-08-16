@@ -141,8 +141,20 @@ Xenium path (single-cell resolution):
 - **`real_xenium.phenotype_cells(...)`** — **threshold-gated** marker typing into
   `TUMOR / STROMAL / IMMUNE / ENDOTHELIAL` (TUMOR: EGFR/SOX2/OLIG2/MKI67;
   ENDOTHELIAL: PECAM1 …). The gate replaced a marker-argmax classifier that
-  inflated ENDOTHELIAL to 20.6% via single-marker PECAM1 bias; the gated result,
-  9.7%, is corroborated independently by the Visium deconvolution's 9.77%.
+  inflated ENDOTHELIAL to 20.6% via single-marker PECAM1 bias. **The "9.7%,
+  corroborated by the Visium deconvolution's 9.77%" reading that used to sit here
+  is superseded.** A second, distinct defect — the `mean_z` aggregation's arity
+  bias, in which a class defined by one marker out-scored a class defined by four
+  — was fixed in `4ad221f` (`results/classifier_fix.md`), and the endothelial call
+  moved **9.74% → 10.50%** (`results/revalidation.md` §4a). More importantly, the
+  Visium agreement is no longer usable as corroboration: the same fix collapsed the
+  non-tumour cross-platform Pearson from **0.945 to 0.016** and composition rank
+  agreement from ρ = 1.00 to **ρ = 0.40**, so the old tightness was agreement
+  between a *biased* estimator and another estimator. The endothelial fraction's
+  real external anchor is human cortex volume EM at **8.0%** (PMID 38723085), which
+  10.50% (development section) and 7.07% (held-out section) both approach —
+  a property of those sections and gates, not a validated property of the
+  classifier (`results/heldout_patient.md` §1.1).
 - **`marker_panels.select_marker_map(genes)`** — panel-aware marker maps. The
   hardcoded map was written for the 319-gene Human Brain panel; a second cached
   section (`data_cache/xenium_gbm_io`, the 480-gene Immuno-Oncology panel) carries
@@ -266,7 +278,7 @@ All are runnable as `python -m tmesim.validation.<name>`.
 | `calibration` | fits the single α on doxorubicin's real anchor (e-fold convention); re-validates out-of-sample | `results/calibration.md` |
 | `numerical_rigor` | mass conservation, dx ladder, dt ladder, parameter elasticities on the real irregular mask | `results/numerical_rigor.md` |
 | `uncertainty` | 80-draw Latin-hypercube propagation of the reconstruction knobs + α | `results/uncertainty.{md,png}` |
-| `reconstruction_fidelity` | cross-platform composition concordance, permutation tests on niche labels, deconvolution stability, held-out pseudobulk recovery | `results/reconstruction_fidelity.md` |
+| `reconstruction_fidelity` | cross-platform composition concordance — **this check's published result is RETRACTED; see the banner at the top of its report and `results/revalidation.md` §4** — plus permutation tests on niche labels, deconvolution stability, held-out pseudobulk recovery. The permutation/marker half reproduces exactly; the composition half does not. | `results/reconstruction_fidelity.md` |
 | `vascular_validation` | reconstructed vessel geometry vs published human-GBM microvascular morphometry — **the check that found the vasculature is barely distinguishable from a random field** | `results/vascular_validation.{md,png}` |
 | `delivery_metrics` | the five **defensible** delivery metrics that retire `penetration_index`; `--selftest` runs metric known-answer checks with no simulation | `results/delivery_metrics.{md,png}` |
 | `vessel_profile` | AUC vs distance-from-vessel fits, with the SOURCE NULL control that exposed the KDE-bandwidth confound | `results/vessel_profile.{md,png}` |
@@ -284,7 +296,7 @@ All are runnable as `python -m tmesim.validation.<name>`.
 | `gbm_tmz_exvivo` | GSE232173 — glioma + temozolomide + measured ex-vivo ATP viability (Ntafoulis 2023, PMID 37620410) | runnable → `results/gbm_tmz_exvivo.{md,png}` |
 | `moncayo_explant` | HGSOC explants: 376,736-pixel MALDI-MSI drug map + 114 GeoMx ROIs | runnable |
 | `cellstate_validation` | oxygen-banded cell states vs measured per-cell MKI67/TOP2A | **INCOMPLETE** — `run()`/`make_figure()` exist, no `write_report`, no `__main__` |
-| `ranking_robustness` | is the top-1 drug call decision-grade under parameter uncertainty? | **RUNNABLE** — has `__main__`; `results/ranking_robustness.md` + `.png` + `ranking_robustness_mc.npz` all exist. (Previously listed here as INCOMPLETE; that was wrong.) |
+| `ranking_robustness` | is the top-1 drug call decision-grade under parameter uncertainty? | **RUNNABLE** — has `__main__`; `results/ranking_robustness.md` + `.png` + `ranking_robustness_mc.npz` all exist. **Its answer is now NO.** It clears its pre-declared bar under the *common-mode* priors it sweeps (P(cisplatin rank 1) = 0.931), but a **drug-specific** transport parameter destroys it: correcting the delivery law drops that to **0.3965** and changes the top-1 pick (`results/transvascular_exchange_revalidation.md` §4.1). Report a **SET, not a winner** (`results/ranking_robustness.md` §8). |
 | `vessel_network_impact` | what changes if the KDE source is swapped for the discrete vessel network (§7.5a) | **RUNNABLE** — has `__main__`; `results/vessel_network_impact.{md,png}` exist. (Previously listed here as INCOMPLETE; that was wrong.) |
 | *(hypoxia vs VEGFA/HIF1A)* | simulated oxygen vs the IO panel's measured VEGFA/HIF1A | **NOT WRITTEN** — `marker_panels` already carries `HYPOXIA_RESPONSE_GENES` and points at a `validation/hypoxia_validation.py` that does not exist |
 
@@ -482,14 +494,26 @@ spans **~122×**. Correlating it against vascular density is close to circular.
 **Consequence.** Compare drugs by **`mean_tissue_auc` / `mean_tumor_auc`** (µM·s,
 absolute) or **`therapeutic_coverage` at 1× IC50** (the fraction of tumor cells
 whose time-averaged exposure `E = AUC/T` clears the drug's own IC50 — dimensionally
-sound, grid-converged, and genuinely drug-discriminating). Both are in
+sound and genuinely drug-discriminating). **The word "grid-converged" used to appear
+in that parenthesis and is withdrawn**: `results/CLAIM_INVENTORY.md` §3 lists
+*"`therapeutic_coverage` … grid-converged (±0.03)"* as not established at dx = 12 for
+either panel. What is defensible is that `therapeutic_coverage` separates drugs far
+above its own grid drift (67.7× against `penetration_index`'s 15.2×,
+`results/delivery_metrics.md` §4), and that it is robust because it is computed over
+the fixed set of real measured cells rather than over vessel-relative geometry. Both are in
 `validation.delivery_metrics`. The earlier ranking "temozolomide penetrates best,
 doxorubicin barely reaches the tumor bulk" is **retracted**, as is the cross-tissue
 "kill spans 2% → 24%" headline that mixed a dx = 12 µm Xenium run with dx = 100 µm
 Visium runs.
 
-`kill_fraction` **is** grid-converged (plateaus by dx ≲ 20 µm; 0.0035 relative
-movement between the two finest grids).
+**`kill_fraction` was reported here as grid-converged (plateaus by dx ≲ 20 µm;
+0.0035 relative movement between the two finest grids). That is superseded.** The
+claim *"dx = 12 µm is grid-converged"* is retracted repo-wide: the GBM ladder is
+**non-monotone**, observed orders 0.96 and −3.33, GCI 5.44–6.42 %, both power-law
+fits flagged **DEGENERATE** (`results/grid_convergence_gbm.md` §0); on breast the
+ladder spread is 49.7 % and docetaxel sits −3.4 % from its Richardson limit
+(`results/grid_convergence_breast.md`). `docs/MATHEMATICAL_MODEL.md` §10.5 states it
+directly: *"there is no Δx at which this pipeline has been shown to be grid-converged."
 
 **The hypoxic fraction is grid-sensitive and only order-of-magnitude.** The same
 Visium tissue reports 100% hypoxic at dx = 100 µm and 0% at dx = 12 µm; the Xenium
@@ -624,12 +648,26 @@ bands.
 
 ## 9. Honest limitations
 
-- **The response axis is unvalidated.** Reconstruction fidelity and transport
-  physics are validated against real measurements; **predicted drug response
-  against real patient outcomes is not**. Every open spatial GBM dataset is an
+- **The response axis is unvalidated.** Predicted drug response against real
+  patient outcomes has never been tested. Every open spatial GBM dataset is an
   untreated resection with no paired response, and every open drug-response
   dataset is dissociated cells with no microenvironment. This is a data-access
   gap (HTAN + dbGaP/DUA, PDMR/organoid MTA), not an engineering gap.
+- **This bullet used to open with *"Reconstruction fidelity and transport physics
+  are validated against real measurements"*. Both halves of that were too broad.**
+  *Reconstruction*: every reconstruction-level external validation this project has
+  made has since been retracted or fails on a held-out section — cross-platform
+  composition concordance (Pearson 0.997 retracted; non-tumour subvector
+  **0.945 → 0.016**), the endothelial fraction (replicates, but only after two
+  rounds of correcting the comparison methodology itself), and the vascular area
+  fraction (`results/reconstruction_validation_roadmap.md` §5). *Transport
+  physics*: in `codon validate --quick`, **13 of 13 scored rows never invoke the
+  solver**; in the full run **21 of 33** do not; and of the rows where a solved
+  field is compared to an external measurement there are **three, and all three
+  FAIL** (`results/CLAIM_INVENTORY.md` §0, §1e). What *has* held is
+  transport/physics at the coefficient level: the doxorubicin→mitoxantrone/topotecan
+  out-of-sample penetration prediction (2/2) and the closed-form α calibration.
+  Say that; do not say "the transport physics is validated."
 - **2D.** A section is naturally 2D, but out-of-plane vascular connectivity is
   invisible: a vessel just above the plane makes a point look "far" when it is not.
   Distances are Euclidean, not geodesic around the irregular mask.

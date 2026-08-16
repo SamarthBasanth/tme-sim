@@ -59,6 +59,8 @@ __all__ = [
     "section_genes",
     "state_route_support",
     "repo_root",
+    "log_internal",
+    "PreformattedFailure",
     "redact_exception",
     "runs_dir",
 ]
@@ -96,7 +98,68 @@ def own_only(path: str, mode: int) -> None:
         pass
 
 
-def redact_exception(exc: BaseException, context: str) -> str:
+class PreformattedFailure(RuntimeError):
+    """A failure a LOWER layer already reduced to text, carried up to be logged.
+
+    Two boundaries redact something that was never an exception object by the
+    time they saw it: ``ingest_registry.scan`` and
+    ``protocol_api.execute_protocol_job`` both receive a string plus an
+    ``error_is_internal`` flag, because the engine keeps the real text for a
+    console or library caller and marks it rather than pre-formatting a
+    sentence. They still need a log record and a reference, so they wrap.
+
+    Wrapping in a bare ``RuntimeError`` made the record read
+    ``RuntimeError: FileNotFoundError: no matrix.mtx(.gz) in /Users/...`` --
+    a class name that is not the failure's class, in front of one that is.
+    This type exists to say "the text is already the whole diagnosis", so
+    :func:`log_internal` prints it unprefixed.
+    """
+
+
+def _detail(exc: BaseException) -> str:
+    """The real failure as one line: the class name, then the message.
+
+    One definition, used both by the stderr record and by the de-duplication
+    key behind ``redact_exception(stable=True)``. If those two ever computed
+    the detail differently, the key would stop matching the record it is
+    supposed to stand for and the same failure would log twice under two ids.
+    """
+    if isinstance(exc, PreformattedFailure):
+        return str(exc)
+    return f"{type(exc).__name__}: {exc}"
+
+
+def log_internal(exc: BaseException, context: str) -> str:
+    """Write the real failure to stderr under a short reference; return the
+    reference.
+
+    Split out of :func:`redact_exception` so the two are one implementation:
+    every redacted sentence in this backend is correlated with exactly one
+    stderr record, in exactly one format. A caller that needs to compose its
+    own wording still goes through here, so the log side can never drift from
+    what the browser was told to quote.
+    """
+    ref = uuid.uuid4().hex[:8]
+    print(f"[codon:{ref}] {context}: {_detail(exc)}", file=sys.stderr)
+    # Only when there IS one. Called from a boundary that was handed a string
+    # rather than from an ``except`` block, ``print_exc`` writes the literal
+    # line "NoneType: None", which reads like a second, failed diagnosis.
+    if sys.exc_info()[0] is not None:
+        traceback.print_exc(file=sys.stderr)
+    sys.stderr.flush()
+    return ref
+
+
+#: (context, detail) -> reference, for ``redact_exception(stable=True)``.
+#: Bounded and FIFO-evicted: this is a de-duplicator, not a record. The record
+#: is the stderr line, which is written once per distinct failure.
+_STABLE_REFS: "OrderedDict[Tuple[str, str], str]" = OrderedDict()
+_STABLE_REFS_MAX = 64
+_STABLE_LOCK = threading.RLock()
+
+
+def redact_exception(exc: BaseException, context: str, *,
+                     brief: bool = False, stable: bool = False) -> str:
     """Log the real failure server-side; return a stable, path-free sentence.
 
     SECURITY / product: three places in this backend answered an *unexpected*
@@ -117,12 +180,44 @@ def redact_exception(exc: BaseException, context: str) -> str:
     refusals -- ``IngestError``, the capability report, every validation
     sentence -- are informative on purpose, are rendered verbatim so the UI
     can never disagree with the CLI, and must pass through untouched.
+
+    ``brief=True`` returns a one-clause form for the handful of callers that
+    embed the redaction INSIDE a larger sentence they own (a warning on a
+    compiled compound, a per-row ``reason`` that already names the field that
+    went missing). The full three-sentence form nested inside another sentence
+    reads as boilerplate and buries the reference; the short form keeps the
+    reference, which is the part a field tester has to quote. Both forms log
+    identically -- ``brief`` changes what the caller shows, never what the
+    operator gets.
+
+    ``stable=True`` is for a surface that RE-RUNS the same failing work rather
+    than republishing one result. The script editor re-plans on every edit, so
+    a backend fault that survives a keystroke would otherwise write a fresh
+    record and hand back a fresh id several times a second: the operator would
+    get a log full of near-identical entries and the user would quote whichever
+    id happened to be on screen. Keyed on ``(context, detail)``, an identical
+    recurrence reuses the first reference and writes nothing further -- the id
+    the user quotes still resolves, and it resolves to one record. Recurrence
+    is deliberately not re-logged; the entry already says what happened.
     """
-    ref = uuid.uuid4().hex[:8]
-    print(f"[codon:{ref}] {context}: {type(exc).__name__}: {exc}",
-          file=sys.stderr)
-    traceback.print_exc(file=sys.stderr)
-    sys.stderr.flush()
+    if stable:
+        key = (context, _detail(exc))
+        with _STABLE_LOCK:
+            ref = _STABLE_REFS.get(key)
+            if ref is None:
+                ref = log_internal(exc, context)
+                _STABLE_REFS[key] = ref
+                while len(_STABLE_REFS) > _STABLE_REFS_MAX:
+                    _STABLE_REFS.popitem(last=False)
+        return _sentence(context, ref, brief)
+    return _sentence(context, log_internal(exc, context), brief)
+
+
+def _sentence(context: str, ref: str, brief: bool) -> str:
+    """The two wordings, in one place, so ``stable`` cannot grow a third."""
+    if brief:
+        return (f"{context} — an unexpected internal failure, logged under "
+                f"reference {ref}")
     return (f"{context}. This is an unexpected internal failure, not a "
             f"problem with what you asked for. The server logged the details "
             f"under reference {ref} — quote it to whoever runs this server.")
@@ -467,11 +562,13 @@ def _visium_available(rec: Dict) -> Tuple[bool, Optional[str]]:
     try:
         from tmesim.data.real import visium
     except Exception as exc:  # noqa: BLE001
-        return False, f"visium loader unimportable: {type(exc).__name__}: {exc}"
+        return False, redact_exception(
+            exc, "the Visium loader could not be imported")
     try:
         present = set(visium.list_samples(present_only=True))
     except Exception as exc:  # noqa: BLE001
-        return False, f"visium cache scan failed: {type(exc).__name__}: {exc}"
+        return False, redact_exception(
+            exc, "the Visium cache could not be scanned")
     if rec["sample"] in present:
         return True, None
     return False, (
@@ -516,9 +613,8 @@ def _visium_metadata(rec: Dict) -> Dict:
                 float(pts[:, 1].max() - pts[:, 1].min()),
             ]
     except Exception as exc:  # noqa: BLE001 - degrade to nulls, never crash
-        out["extent_um_reason"] = (
-            f"spot positions unreadable: {type(exc).__name__}: {exc}"
-        )
+        out["extent_um_reason"] = redact_exception(
+            exc, "the spot positions for this section could not be read")
     return out
 
 
@@ -546,7 +642,8 @@ def _ingested_available(rec: Dict) -> Tuple[bool, Optional[str]]:
 
         det = detect(path)
     except Exception as exc:  # noqa: BLE001
-        return False, f"re-detection failed: {type(exc).__name__}: {exc}"
+        return False, redact_exception(
+            exc, "this ingested directory could not be re-detected")
     if not det.get("ingestable"):
         return False, (
             f"{path} is no longer ingestable: "
@@ -779,9 +876,8 @@ def describe_section(section_id: str) -> Dict:
         meta = _section_metadata(rec)
     except Exception as exc:  # noqa: BLE001 - a metadata read must not 500
         out["available"] = False
-        out["reason"] = (
-            f"cache present but unreadable: {type(exc).__name__}: {exc}"
-        )
+        out["reason"] = redact_exception(
+            exc, "this section's cache is present but could not be read")
         out["n_cells_reason"] = out["reason"]
         out["extent_um_reason"] = out["reason"]
         return out

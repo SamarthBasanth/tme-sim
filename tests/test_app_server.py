@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import struct
 import sys
 import time
@@ -584,13 +585,13 @@ class TestJobLifecycle:
         again = client.delete(f"/api/runs/{second}").json()
         assert again["cancelled"] is False and "already" in again["reason"]
 
-    def test_failed_runs_surface_their_error(self, client, monkeypatch):
+    def _failed_job(self, client, monkeypatch, exc, suffix):
         import app.server.jobs as jobs_mod
 
         def boom(spec, ctx, cache=None):
-            raise RuntimeError("synthetic engine failure")
+            raise exc
 
-        manager = JobManager(root=str(client._root) + "_fail")
+        manager = JobManager(root=str(client._root) + suffix)
         monkeypatch.setattr(jobs_mod, "execute_run", boom)
         job = manager.submit(_spec())
         deadline = time.time() + 30
@@ -598,10 +599,79 @@ class TestJobLifecycle:
             if time.time() > deadline:
                 raise AssertionError("job never finished")
             time.sleep(0.05)
-        assert job.status == "failed"
-        assert "synthetic engine failure" in job.error
-        assert job.traceback
         manager.shutdown()
+        return job
+
+    def test_failed_runs_surface_their_error(self, client, monkeypatch):
+        """An UNEXPECTED failure: redacted in the served field, kept in full
+        where only an operator can reach it.
+
+        This test used to assert the engine's raw text in ``job.error``. That
+        assertion encoded a leak rather than a contract: ``job.error`` is
+        served in full by ``GET /api/runs/{id}``, and a real run can fail with
+        an exception whose message was built from an absolute host path --
+        ``visium._locate`` resolves to ``<repo>/data_cache/visium_gbm/...`` and
+        ``visium.py`` raises ``FileNotFoundError(f"no matrix.mtx(.gz) in
+        {matrix_dir}")``. The assertion is not dropped, it MOVES: the detail
+        must still exist, on the channel that is not the response body.
+        """
+        job = self._failed_job(
+            client, monkeypatch, RuntimeError("synthetic engine failure"),
+            "_fail")
+
+        assert job.status == "failed"
+        # The served field says what happened and how to have it looked up...
+        assert "synthetic engine failure" not in job.error
+        assert "RuntimeError" not in job.error
+        ref = re.search(r"reference ([0-9a-f]{8})", job.error)
+        assert ref, f"a failed run must be quotable; got {job.error!r}"
+        # ...and the detail survives behind the opt-in traceback endpoint.
+        assert job.traceback
+        assert "synthetic engine failure" in job.traceback
+        assert "RuntimeError" in job.traceback
+
+    def test_a_deliberate_refusal_reaches_the_client_word_for_word(
+            self, client, monkeypatch):
+        """The other half of the same branch, and the one that breaks quietly.
+
+        ``IngestError`` is the product's informative "no" -- it names every
+        layout the ingester accepts. Both the CLI and the Studio render it
+        verbatim, so redaction must not touch it. If this ever starts
+        returning a reference number instead, the Studio has begun disagreeing
+        with ``codon ingest``.
+        """
+        from tmesim.data.ingest import IngestError
+
+        refusal = ("no recognised layout. Expected one of: a Xenium bundle "
+                   "(cells.csv.gz + cell_feature_matrix[.tar.gz] + "
+                   "gene_panel.json), a Space Ranger output, or a MEX triple.")
+        job = self._failed_job(client, monkeypatch, IngestError(refusal),
+                               "_refused")
+
+        assert job.status == "failed"
+        assert job.error == refusal
+        assert "unexpected internal failure" not in job.error
+        assert "reference" not in job.error
+        # The traceback is still captured for whoever wants it.
+        assert job.traceback
+
+    def test_the_refusal_names_are_the_real_classes(self):
+        """``jobs.RUN_REFUSALS`` matches by NAME up the MRO, so that an error
+        path never runs a heavy import (``CompoundRefused`` lives behind
+        RDKit). A name that no longer corresponds to a real class would fail
+        open -- redacting a deliberate refusal -- so pin the names."""
+        from app.server.compounds import CompoundError
+        from app.server.jobs import RUN_REFUSALS, is_run_refusal
+        from app.server.projects import ProjectError
+        from tmesim.data.ingest import IngestError
+        from tmesim.protocol.errors import TplError
+
+        for klass in (IngestError, TplError, CompoundError, ProjectError):
+            assert klass.__name__ in RUN_REFUSALS
+            assert is_run_refusal(klass("x"))
+        assert "CompoundRefused" in RUN_REFUSALS
+        assert not is_run_refusal(RuntimeError("x"))
+        assert not is_run_refusal(FileNotFoundError("/private/path"))
 
     def test_history_survives_a_restart(self, client):
         res = _run(client, _spec())

@@ -51,6 +51,7 @@ from .cache import (
     lookup_section,
     own_only,
     private_makedirs,
+    redact_exception,
     repo_root,
     section_genes,
     state_route_support,
@@ -782,7 +783,8 @@ def _safe_section(section_id: str) -> Dict:
         return describe_section(section_id)
     except Exception as exc:  # noqa: BLE001 - a metadata read must not 500
         return {"id": section_id,
-                "reason": f"{type(exc).__name__}: {exc}"}
+                "reason": redact_exception(
+                    exc, f"section {section_id!r} could not be described")}
 
 
 class ReportManager:
@@ -1009,7 +1011,8 @@ class ReportManager:
             rep.status = "done"
         except Exception as exc:  # noqa: BLE001 - surfaced, never swallowed
             rep.status = "failed"
-            rep.error = f"assembly failed: {type(exc).__name__}: {exc}"
+            rep.error = redact_exception(
+                exc, "this report's arms finished but could not be assembled")
         rep.finished_at = time.time()
         self._persist(rep)
         return rep

@@ -241,7 +241,26 @@ export function notifyError(title, err) {
 
   const tech = techLine(String(title || ''), err);
 
-  const body = h('div.toast-detail',
+  const body = errorCard(remedy, said, saidLbl, tech,
+    'The route and status. This is the line to quote in a bug report.');
+
+  // The whole object still goes to the console, where a developer can expand
+  // it — that is where a stack belongs, and it is the reason none is rendered.
+  // eslint-disable-next-line no-console
+  console.error(title, err);
+  return toast('err', headline, body);
+}
+
+/**
+ * Parts 2–4 of the card, shared so there is exactly one of them.
+ *
+ * A second copy of this shape is how the two halves drift: the run-failure
+ * card below is a different failure axis (the request succeeded; the WORK
+ * failed) and needs its own headline and its own remedy, but it must not get
+ * its own idea of what a captioned evidence box looks like.
+ */
+function errorCard(remedy, said, saidLbl, tech, techTitle) {
+  return h('div.toast-detail',
     remedy ? h('div.toast-remedy', remedy) : null,
     said
       ? h('div.toast-said',
@@ -249,13 +268,91 @@ export function notifyError(title, err) {
         // Verbatim and IN FULL — no clamp, no inner scroller, no "show more".
         h('code', said))
       : null,
-    tech ? h('div.toast-tech', { title: 'The route and status. This is the line to quote in a bug report.' }, tech) : null,
+    tech ? h('div.toast-tech', { title: techTitle }, tech) : null,
   );
+}
 
-  // The whole object still goes to the console, where a developer can expand
-  // it — that is where a stack belongs, and it is the reason none is rendered.
+/* ------------------------------------------------------ a failed run ----- */
+
+/*
+ * A RUN that failed is not an error class in the table above, and routing it
+ * through notifyError() would have been the wrong answer twice over: there is
+ * no status to classify (`GET /api/runs/{id}` returned 200 — the request was
+ * a success, it is the WORK that failed), so every remedy in that table is
+ * either silent or false here.
+ *
+ * ONE headline and ONE remedy cover both kinds of failed run, deliberately.
+ * app/server/jobs.py puts two very different sentences in `job.error`:
+ *
+ *   - a DELIBERATE refusal (IngestError and the rest of RUN_REFUSALS) passes
+ *     through byte-identical, because it is informative on purpose and the
+ *     Studio must never disagree with the CLI about it;
+ *   - anything else is redacted to a path-free sentence carrying a reference
+ *     id, with the real exception and its stack on the server's stderr.
+ *
+ * We do not try to tell those apart here. We COULD — the redacted form always
+ * carries `reference <8 hex>` — but every remedy that acted on that guess
+ * would be asserting which kind of failure this is on the strength of a
+ * substring of someone else's sentence, and being wrong in the informative
+ * direction ("change what the reason names, then run it again") is exactly
+ * the mislabel this file exists to avoid. So the remedy below is procedural
+ * and true of both, and WHICH failure this is comes from the server's own
+ * words, verbatim, in the captioned box — which is the rule the rest of this
+ * file already runs on: only the server's sentence is evidence. The redacted
+ * form says "This is an unexpected internal failure, not a problem with what
+ * you asked for" in its own first line; a refusal names what it wanted. A
+ * reader can tell those apart because they read nothing alike.
+ */
+const RUN_FAILED_NEXT =
+  'This run produced no result, so there is nothing from it to read. The '
+  + 'server’s own account of why is below, in full — that sentence is the '
+  + 'whole of what this Studio was told. If it carries a reference id, quote '
+  + 'that id to whoever runs this server: the detail behind it is on that '
+  + 'process’s console, not in this browser.';
+
+/*
+ * The server said `failed` and gave no reason with it. The old call sites put
+ * OUR string ("no error message returned") into the box captioned with the
+ * server's name — inventing a sentence for the server is the one thing that
+ * box must never do. So there is no box at all, and the fact that nothing was
+ * said is stated as ours, where it belongs.
+ */
+const RUN_FAILED_SILENT =
+  'The server reported this run as failed and sent no reason with it, so this '
+  + 'Studio has nothing of its account to show you. The failure is recorded '
+  + 'server-side: read the console of the process running Codon.';
+
+/**
+ * Render a failed run as an answer — the same four parts as notifyError().
+ *
+ * The run id is NOT put in the headline when the server's sentence already
+ * opens with it (`run r_00080 failed. This is an unexpected internal…`),
+ * because "Run r_00080 failed" directly above that reads as a stutter and
+ * spends the headline on a word the very next line repeats. When the sentence
+ * does NOT name the run — every deliberate refusal, which is phrased about
+ * the data and not about the run — the headline keeps the id, so the card is
+ * never anonymous with several runs in flight. The dim footer carries the id
+ * unconditionally either way: that is the line to quote, alongside any
+ * reference id, to whoever runs the server.
+ *
+ * @param {string} runId
+ * @param {string} said  `job.error`, exactly as served. Never edited here.
+ */
+export function notifyRunFailed(runId, said) {
+  const id = String(runId || '');
+  const text = said == null ? '' : String(said);
+  const headline = (id && text.includes(id)) ? 'Run failed'
+    : (id ? `Run ${id} failed` : 'Run failed');
+  const body = errorCard(
+    text ? RUN_FAILED_NEXT : RUN_FAILED_SILENT,
+    text,
+    'What the server said',
+    id ? `run ${id}` : '',
+    'The run this is about. Quote it — with the reference id above, if there '
+    + 'is one — to whoever runs this server.',
+  );
   // eslint-disable-next-line no-console
-  console.error(title, err);
+  console.error(`run ${id} failed`, text);
   return toast('err', headline, body);
 }
 

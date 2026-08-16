@@ -44,8 +44,94 @@ from .units import Quantity, _fmt
 
 __all__ = [
     "DEFAULT_MAX_RUNS", "RunPlan", "Plan", "plan", "execute_plan",
-    "validate_source",
+    "validate_source", "REFUSAL_NAMES", "is_refusal",
 ]
+
+# --------------------------------------------------------------------------- #
+# Per-run failure text: whose surface is it?
+#
+# A failed cell's ``error`` is not a log line. It travels
+# ``cell["error"]`` -> ``app.server.protocol_api.execute_protocol_job`` ->
+# ``protocol_wire.sweep_snapshot`` -> ``runs[].error`` -> the sweep grid in the
+# browser. It used to be ``f"{type(exc).__name__}: {exc}"``, which names an
+# internal class and can carry an absolute host path: this executor calls the
+# same loaders ``/api/runs`` does, and ``tmesim.data.real.visium`` raises
+# ``FileNotFoundError(f"no matrix.mtx(.gz) in {matrix_dir}")`` with
+# ``matrix_dir`` resolved under the repo root.
+#
+# WHY THE FLAG IS HERE AND NOT AT THE WIRE BOUNDARY
+# -------------------------------------------------
+# Because by the boundary the exception is already a STRING, and the one thing
+# the boundary needs to know -- was this the product refusing on purpose, or
+# did something fall over? -- is carried by the exception's CLASS. A boundary
+# that redacted every failed cell would be redacting blind: it would flatten
+# ``IngestError``'s "no recognised layout. Expected one of: ..." into a
+# reference number, and the Studio would start disagreeing with what the same
+# refusal says everywhere else. Only this frame can still tell the two apart,
+# so this frame decides and says so in ``error_is_internal``; the boundary acts
+# on the flag. That is the same split ``tmesim/data/ingest.scan_report`` uses
+# with ``app.server.ingest_registry.scan``.
+#
+# The raw text stays in the returned structure on purpose. ``execute_plan`` is
+# an exported engine entry point (``from tmesim.protocol import execute_plan``)
+# and a library caller with no HTTP layer in front of them should get the real
+# failure, exactly as ``codon ingest`` does. Redacting HERE would put a server
+# concern -- reference ids, a stderr format, ``app.server.cache`` -- inside the
+# engine, and would make the engine lie to a notebook.
+# --------------------------------------------------------------------------- #
+#: Deliberate refusals: informative on purpose, rendered verbatim by every
+#: surface, never redacted. Matched by NAME up the MRO so that classifying a
+#: failure never runs an import that can itself fail (``CompoundRefused`` lives
+#: behind RDKit). Mirrored in ``app.server.jobs.RUN_REFUSALS``, which makes the
+#: same decision for a single run; the two sets are asserted equal in
+#: tests/test_response_redaction.py so they cannot drift apart.
+REFUSAL_NAMES = frozenset({
+    "IngestError",
+    "TplError",
+    "CompoundRefused",
+    "CompoundError",
+    "ProjectError",
+})
+
+
+def is_refusal(exc: BaseException) -> bool:
+    """Is this the product saying "no" on purpose, rather than falling over?"""
+    return any(klass.__name__ in REFUSAL_NAMES for klass in type(exc).__mro__)
+
+
+def internal_diagnostic(exc: BaseException, context: str) -> str:
+    """The message for a plan-time failure nobody anticipated.
+
+    WHY THIS ONE IS REDACTED HERE AND NOT BEHIND A FLAG
+    ---------------------------------------------------
+    Every other place this backend redacts, it does so at an HTTP boundary and
+    the engine keeps the raw text behind ``error_is_internal`` -- because a
+    SECOND consumer exists who should see the real failure: ``codon ingest``
+    at a console, or a library caller of :func:`execute_plan`, whose result is
+    a computation they asked for rather than a message for a screen.
+
+    A ``Diagnostic`` has no such second consumer. It exists to be displayed to
+    a human editing a script; its only production reader is the editor surface
+    (there is no ``codon protocol`` command). Giving ``Diagnostic`` a flag
+    would mean redacting at roughly a dozen call sites in
+    ``app/server/protocol_api.py`` and ``protocol_wire.py`` -- and two of those
+    (``_refusal``, ``_caveat_lines``) read ``.message`` off the object rather
+    than going through ``to_dict()``, so even a hook on the serialiser would
+    not catch them. That is a large surface, a way to get it wrong, and a
+    guard rule to maintain, all to serve a reader who does not exist.
+
+    Redacting where the exception is caught means the raw text never enters a
+    ``Diagnostic`` at all, so every one of those boundaries is covered by
+    construction. This module already imports ``app.server.cache`` on the plan
+    path (see ``_estimate_cost``), so this is the dependency direction that is
+    already in force here, not a new one.
+
+    ``stable=True``: the editor re-plans on every edit, so the same fault
+    recurs several times a second. One record, one reference.
+    """
+    from app.server.cache import redact_exception
+
+    return redact_exception(exc, context, stable=True)
 
 #: The sweep budget. A two-axis sweep is trivially a hundred PDE solves, so the
 #: planner refuses above this unless the script says `allow runs N`.
@@ -267,8 +353,11 @@ def plan(source: str, compile_drugs: bool = True, check_budget: bool = True,
                     d.line, d.col = node.line, node.col
                 diags.add(d)
         except Exception as exc:  # noqa: BLE001 - never a bare traceback
+            # TplError above is the deliberate refusal and keeps its own
+            # positioned diagnostics; this is the residue.
             diags.error(
-                f"drug {name}: compilation failed — {type(exc).__name__}: {exc}",
+                internal_diagnostic(
+                    exc, f"drug {name!r} could not be compiled"),
                 node=node, code="compile-failed")
 
     # ---- sweeps ----------------------------------------------------------- #
@@ -363,9 +452,14 @@ def plan(source: str, compile_drugs: bool = True, check_budget: bool = True,
                         diags.add(d)
                     conv = None
                 except Exception as exc:  # noqa: BLE001
+                    # As above: TplError is the deliberate refusal and is
+                    # handled in the branch before this one.
                     diags.error(
-                        f"protocol {proto_name}: dose -> PK conversion failed — "
-                        f"{exc}", node=proto.dose or proto,
+                        internal_diagnostic(
+                            exc,
+                            f"the dose in protocol {proto_name!r} could not "
+                            f"be converted to a PK schedule"),
+                        node=proto.dose or proto,
                         code="dose-conversion-failed")
                     conv = None
 
@@ -777,13 +871,32 @@ def execute_plan(p: Plan, log: Optional[Callable[[str], None]] = None,
                 if on_progress:
                     on_progress(grid)
                 raise
-            cell.update(status="failed", error=f"{type(exc).__name__}: {exc}",
-                        runtime_s=round(time.time() - t0, 3))
-            rows.append({"index": rp.index, "label": rp.label,
+            # A DELIBERATE refusal is the answer and travels verbatim; anything
+            # else is the unexpected residue, kept in full here for a library
+            # caller and flagged so the HTTP boundary can replace it.
+            refusal = is_refusal(exc)
+            text = str(exc) if refusal else f"{type(exc).__name__}: {exc}"
+            failure: Dict = {"status": "failed", "error": text,
+                             "runtime_s": round(time.time() - t0, 3)}
+            row: Dict = {"index": rp.index, "label": rp.label,
                          "axes": dict(rp.axes), "drug": rp.drug_alias,
                          "section": rp.section, "metrics": None,
-                         "error": f"{type(exc).__name__}: {exc}"})
-            _log(f"[{rp.index}] FAILED: {type(exc).__name__}: {exc}")
+                         "error": text}
+            if not refusal:
+                failure["error_is_internal"] = True
+                row["error_is_internal"] = True
+            cell.update(**failure)
+            rows.append(row)
+            # NOT the raw text when it is internal. ``log`` is
+            # ``app.server.jobs._Ctx.log`` in production, and that feeds
+            # ``log_tail``, which GET /api/runs/{id}/status returns and
+            # result.json persists -- a client surface, so the same rule
+            # applies to it as to ``error``. The redacted sentence, with the
+            # reference to quote, reaches the operator through the cell's
+            # ``error`` field once the boundary has rewritten it.
+            _log(f"[{rp.index}] FAILED: {text}" if refusal else
+                 f"[{rp.index}] FAILED: an unexpected internal error; see this "
+                 f"run's error field for the reference to quote")
         if on_progress:
             on_progress(grid)
 

@@ -35,6 +35,7 @@ import threading
 from collections import OrderedDict
 from typing import Dict, List, Optional
 
+from .cache import PreformattedFailure
 from .cache import redact_exception as _internal
 
 __all__ = [
@@ -154,8 +155,13 @@ def scan(path: str, measure_detection_rates: bool = False) -> Dict:
 
     out = scan_report(path, measure_detection_rates=measure_detection_rates)
     if out.pop("error_is_internal", False):
-        out["error"] = _internal(RuntimeError(out.get("error") or "unknown"),
-                                 "this sample could not be read")
+        # PreformattedFailure, not RuntimeError: scan_report already reduced
+        # the exception to text, so wrapping in a class that is not the
+        # failure's own would put a wrong class name in front of the right one
+        # in the log. The sentence the browser sees is unchanged.
+        out["error"] = _internal(
+            PreformattedFailure(out.get("error") or "unknown"),
+            "this sample could not be read")
     return out
 
 

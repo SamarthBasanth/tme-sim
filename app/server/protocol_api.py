@@ -35,7 +35,13 @@ from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException, Request
 
-from .cache import PRIVATE_DIR_MODE, PRIVATE_FILE_MODE, own_only
+from .cache import (
+    PRIVATE_DIR_MODE,
+    PRIVATE_FILE_MODE,
+    PreformattedFailure,
+    own_only,
+    redact_exception,
+)
 from .jobs import JobManager, jsonable
 from .protocol_wire import (
     NO_RUN_ID_REASON,
@@ -110,9 +116,37 @@ def execute_protocol_job(spec: Dict, ctx, cache=None) -> Dict:
 
     n = max(p.n_runs, 1)
     done = {"i": 0}
+    #: run index -> the sentence a failed cell shows. Memoised because
+    #: ``_progress`` fires on every completed run and the grid is re-published
+    #: each time: without this, a client polling the sweep would watch the
+    #: reference id of an already-failed run change under it, and the number
+    #: the operator finally quoted would match no record on the server.
+    _shown: Dict[int, str] = {}
+
+    def _published(cells: List[Dict]) -> List[Dict]:
+        """The client's copy of the grid (or rows): JSON-safe, and redacted.
+
+        ``jsonable`` deep-copies, so the executor's own structures keep the
+        real failure text for a library caller; only what leaves this process
+        is rewritten. The executor sets ``error_is_internal`` on exactly the
+        failures it could not classify as a deliberate refusal -- it is the
+        only frame that still has the exception CLASS to judge by, which is
+        why the flag comes from there rather than being guessed at here.
+        """
+        out = jsonable(cells)
+        for cell in out:
+            if not cell.pop("error_is_internal", False):
+                continue
+            index = cell.get("index")
+            if index not in _shown:
+                _shown[index] = redact_exception(
+                    PreformattedFailure(cell.get("error") or "unknown"),
+                    f"run {index} of this sweep failed")
+            cell["error"] = _shown[index]
+        return out
 
     def _progress(grid: List[Dict]) -> None:
-        ctx.job.protocol_grid = jsonable(grid)
+        ctx.job.protocol_grid = _published(grid)
         finished = sum(1 for c in grid if c["status"] in
                        ("done", "failed", "cancelled"))
         if finished != done["i"]:
@@ -123,7 +157,12 @@ def execute_protocol_job(spec: Dict, ctx, cache=None) -> Dict:
     ctx.stage("execute")
     result = execute_plan(p, log=ctx.log, on_progress=_progress,
                           check_cancelled=ctx.check_cancelled, cache=cache)
-    ctx.job.protocol_grid = jsonable(result["grid"])
+    # Both projections of the same failures, through the same memo, so a cell
+    # and its row quote the same reference.
+    published = dict(result,
+                     grid=_published(result["grid"]),
+                     rows=_published(result["rows"]))
+    ctx.job.protocol_grid = published["grid"]
     ctx.stage("done")
     return {
         "protocol": jsonable({
@@ -132,7 +171,7 @@ def execute_protocol_job(spec: Dict, ctx, cache=None) -> Dict:
             # GET /sweeps/{id} can serve axes / coords / caveats / assumptions
             # from a finished job without re-planning it.
             "plan": editor_plan(p.to_dict(), p),
-            **result,
+            **published,
         }),
         # Keys the generic RunResult view expects, so a protocol job is not a
         # broken-looking entry in GET /api/runs.
@@ -557,7 +596,8 @@ def _upload_drug_block(path: str, name: str, preview: Dict) -> Dict:
                 "unresolved": [d.to_dict() for d in exc.diagnostics]}
     except Exception as exc:  # noqa: BLE001
         return {"name": node.name, "source": path, "fields": {},
-                "unresolved": [_internal(exc)]}
+                "unresolved": [_internal(
+                    exc, "the backend failed while resolving this drug file")]}
     fields = {
         k: {"value": v["value"], "unit": v["unit"],
             "provenance": v["provenance"], "source": v["source"],
@@ -584,12 +624,21 @@ def _diag_only(diags: List[Dict], plan_shape: bool = False) -> Dict:
     return out
 
 
-def _internal(exc: Exception) -> Dict:
-    """An unexpected failure, rendered as a diagnostic instead of a 500."""
+def _internal(exc: Exception,
+              context: str = "the backend failed while processing this "
+                             "program") -> Dict:
+    """An unexpected failure, rendered as a diagnostic instead of a 500.
+
+    Every caller catches ``TplError`` FIRST: a rejected script is a deliberate,
+    positioned refusal and reaches the editor verbatim. This is only the
+    residue -- an exception the protocol layer did not anticipate -- so the
+    class name and message go to stderr under a reference and the editor gets
+    the reference. ``redact_exception`` already says "not a problem with what
+    you asked for", which is the sentence this diagnostic was carrying by hand.
+    """
     return {
         "severity": "error", "line": 0, "col": 0, "end_col": 0,
         "code": "internal",
-        "message": (f"{type(exc).__name__}: {exc}. This is a backend fault, "
-                    "not a mistake in the script."),
+        "message": redact_exception(exc, context),
         "hint": None,
     }

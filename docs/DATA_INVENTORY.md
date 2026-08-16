@@ -85,7 +85,7 @@ cell-resolved geometry. The canonical URL list also lives in code as
 | **Datasets** | 10x public "parent" Visium GBM section + **GEO GSE194329** samples GBM1/GBM2/GBM3 (three further primary human GBM sections) |
 | **Licence** | 10x: CC BY 4.0. GEO GSE194329: open, no DUA |
 | **Contents** | 1,775–4,764 spots each, whole transcriptome, `spatial/` positions + scalefactors |
-| **Enables** | The Visium NNLS-deconvolution half of `reconstruction_fidelity` (the independent cross-platform check that gave Pearson 0.997), `experiments/cross_tissue.py` (5 tumours at matched dx), `experiments/niche_response.py`, `patient_report --source visium` |
+| **Enables** | The Visium NNLS-deconvolution half of `reconstruction_fidelity` — **the cross-platform composition check, whose Pearson 0.997 is RETRACTED**: after the classifier-arity fix the 4-vector reads 0.980 and the non-tumour subvector collapses **0.945 → 0.016**, indistinguishable from no agreement (`results/revalidation.md` §4). Concordance here is an open question, not evidence. Also `experiments/cross_tissue.py` (5 tumours at matched dx), `experiments/niche_response.py`, `patient_report --source visium` |
 | **Loader** | `tmesim.data.real.visium.list_samples() / load_sample(id)` — ids `10x_parent_gbm`, `GBM1`, `GBM2`, `GBM3` |
 | **Provenance doc** | [`real_data/visium_gbm.md`](real_data/visium_gbm.md) |
 

@@ -188,7 +188,23 @@ def test_lambda_matches_a_live_refit_from_the_primary_bytes():
 # Visium recovery
 # --------------------------------------------------------------------------- #
 def test_visium_pseudobulk_mgmt_is_recovered_and_labelled_pseudobulk():
+    from tmesim.data.real.visium import list_samples
     from tmesim.molecular.mgmt import mgmt_from_visium_all
+
+    # A MISSING DATASET IS NOT A FINDING. data_cache/ is real tissue data, is
+    # gitignored, and is absent on every CI runner -- so without this guard the
+    # test below fails there for a reason that has nothing to do with MGMT, and
+    # pollutes a job (.github/workflows/docker.yml, the linux/amd64 reference
+    # job) whose only purpose is float reproducibility.
+    #
+    # Ask the loader, not a hardcoded path: `list_samples()` defaults to
+    # present_only=True, i.e. it already answers "whose bytes are locally
+    # cached". So this skips exactly when there is nothing to read and never
+    # when there is -- the assertion below is unchanged and still runs on every
+    # machine that has the cache.
+    if not list_samples():
+        pytest.skip("no Visium GBM section is cached in this checkout "
+                    "(see data_cache/ and `codon sections`)")
 
     table = mgmt_from_visium_all()
     assert table, "no cached Visium GBM sections found"

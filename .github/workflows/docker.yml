@@ -23,6 +23,18 @@
 # It NEVER pushes. There are no registry credentials in this repo and none
 # should be added -- the image is built, loaded into the runner's local daemon,
 # exercised, and thrown away.
+#
+# ONE SHELL HAZARD, STATED ONCE FOR THE WHOLE FILE. Nearly every `run:` here
+# uses `set -e` with `pipefail`. That combination turns ANY consumer that exits
+# before its producer finishes into a job failure -- the producer gets SIGPIPE
+# (141), pipefail promotes it to the pipeline's status, and `-e` kills the step.
+# The early-exiting consumers are `head -N`, `grep -m1`, `awk '{exit}'`, and any
+# `| head` at all. This has now bitten twice: `docker image history | head -30`
+# (guarded with `|| true`) and the auto-generated-key `awk` below, where a
+# SUCCESSFUL match failed the job. Before adding a pipeline here, ask whether
+# the right-hand side can finish early; if it can, make it read to EOF or guard
+# it. A green step that fails on success is the worst kind of red, because the
+# thing it reports is the opposite of the thing that happened.
 
 name: docker
 
@@ -460,7 +472,34 @@ jobs:
               docker logs "$AUTOKEY_CONTAINER" || true
               exit 1
             fi
-            key=$(docker logs "$AUTOKEY_CONTAINER" 2>&1 | awk '/^[[:space:]]*api key[[:space:]]/ {print $3; exit}')
+            # Capture first, THEN match -- do not pipe `docker logs` into an
+            # awk that exits early.
+            #
+            # This exact step failed with exit 141 (128+13, SIGPIPE) on run
+            # 31963589177 while the key it was looking for was sitting in the
+            # log two seconds later: `awk ... {exit}` closes the pipe on its
+            # first match, `docker logs` is still writing, and it dies of
+            # SIGPIPE. `pipefail` promotes that to the assignment's status and
+            # this step's shell runs with -e, so a SUCCESSFUL match failed the
+            # job. It is timing-dependent on how much the banner has printed,
+            # which is why it passed for months and then began flaking after
+            # the startup banner grew -- the worst shape of flake, because it
+            # gets blamed on whatever change happens to be in flight.
+            # The fix is that awk READS TO EOF. Capturing first is not enough:
+            # `printf ... | awk {exit}` SIGPIPEs the printf just as readily
+            # (verified locally -- both shapes exit 141). Any producer feeding
+            # an early-exiting consumer is the bug, so take the first match
+            # with a flag and print it at END instead of exiting on it.
+            logs=$(docker logs "$AUTOKEY_CONTAINER" 2>&1 || true)
+            # `$3 != "NONE"` because the banner's keyless form is
+            # `api key     NONE -- no authentication on any /api/ route`.
+            # Without this the loop "finds" the string NONE, breaks, and the
+            # gate check below fails with "the key printed to docker logs was
+            # rejected (HTTP 401)" -- which sends the reader hunting for an
+            # auth bug when the truth is that no key was generated at all.
+            key=$(printf '%s\n' "$logs" | awk '
+              /^[[:space:]]*api key[[:space:]]/ && $3 != "NONE" && !seen { k = $3; seen = 1 }
+              END { if (seen) print k }')
             [ -n "$key" ] && break
             sleep 2
           done
@@ -502,25 +541,46 @@ jobs:
           docker rm -f "$SMOKE_CONTAINER" "$AUTOKEY_CONTAINER" 2>/dev/null || true
 
   # ======================================================================== #
-  # 2. INFORMATIONAL ONLY -- cross-platform float reproducibility.
+  # 2. Cross-platform float reproducibility -- a GATE, and a measurement.
   # ======================================================================== #
   #
   # READ THIS BEFORE "FIXING" A RED HERE.
   #
   # This repo's bit-exact reference values were generated on macOS/arm64. On
-  # linux/amd64 they may differ for BLAS and SIMD reasons that have NOTHING to
+  # linux/amd64 they DO differ, for BLAS and SIMD reasons that have NOTHING to
   # do with the container, the Dockerfile, or a bug in the simulator -- a
-  # different vectorised reduction order changes the last few ULPs, and any
+  # different vectorised reduction order changes the last few ULPs, and a
   # tolerance-free equality assertion notices. docs/DEPLOYMENT.md 1c says
   # exactly this: "Treat a bitwise mismatch inside the image as unexplained
   # until measured, not as a container defect."
   #
-  # So: this job is `continue-on-error: true`. It is a MEASUREMENT, not a gate.
-  # A failure here is a data point about float reproducibility across
-  # architectures, and the correct response is to investigate and write down
-  # what the difference is -- NOT to widen a tolerance or edit a reference
-  # value so the red goes away. Loosening a reference to silence CI destroys
-  # the only thing those tests are for.
+  # That has now been measured, and the tests have been given the contract the
+  # measurement supports (tests/test_time_resolved_pk.py, the block headed WHY
+  # THERE ARE TWO CONTRACTS AT ALL -- read it before touching anything here):
+  #
+  #   * on macOS/arm64, the platform the references were generated on, the
+  #     comparison is still BITWISE. Nothing was weakened there.
+  #   * anywhere else -- including this job -- it is a relative bound of
+  #     2 * 4320 * DBL_EPSILON = 1.918e-12, derived as the worst case for the
+  #     longest sequential time integration pinned in that module, and 89.3x the
+  #     worst deviation this runner has ever produced (2.1488e-14, on
+  #     solver_flat.mean_hist[6], measured over all 59 fields in run
+  #     31963874951 -- the first run under this contract, and the first that
+  #     reached every field rather than dying at the first mismatch).
+  #
+  # Which means a red here is no longer a fact about IEEE-754. It is a fact
+  # about this repo, so this job is a GATE: `continue-on-error` is gone. It sat
+  # red on every run for the five bitwise assertions that cannot hold off the
+  # reference platform, and a permanently-red canary is worse than no canary --
+  # it trains every reader to ignore the one signal that would catch a real
+  # divergence.
+  #
+  # The response to a red is still to MEASURE it, never to widen the bound: a
+  # deviation above 1.9e-12 is at least 89x the worst cross-platform float noise
+  # ever recorded here and is bounded away from what IEEE-754 reassociation can
+  # produce at all, so it is a physics or wiring change and belongs in a
+  # deliberate, written-down re-pin. Loosening a reference to silence CI
+  # destroys the only thing those tests are for.
   #
   # It deliberately installs libXrender/libXext/libgomp even though the slim
   # image does not, so that a failure here is attributable to numerics and
@@ -546,16 +606,34 @@ jobs:
   # test_oxygen_proxy/test_pipeline/test_mechanism/test_app_* index into
   # sections that are not there). Running the whole suite here would report a
   # meaningless red that says nothing about floats. The module list below is
-  # the subset that genuinely runs with no cache -- 202 passed, 81 skipped,
-  # 0 failed locally -- plus a short deselect list for the individual tests in
-  # otherwise-clean modules that reach for real data without a skip guard.
+  # the subset that genuinely runs with no cache -- plus a short deselect list
+  # for the individual tests in otherwise-clean modules that reach for real data
+  # without a skip guard.
+  #
+  # Rehearsed before the first green run, on a cache-less checkout
+  # (`git ls-files`, so no data_cache/) under an EMULATED linux/amd64 container
+  # running these exact arguments: 230 passed, 87 skipped, 12 deselected,
+  # 0 failed, 0 errors. The runner then agreed: run 31963874951 is the first
+  # green one, and its own counts are in its log.
   #
   # If a deselected node id disappears (a test is renamed or removed), pytest
   # ignores the stale --deselect silently; it does not fail the job.
+  #
+  # Two tests that used to reach for absent data WITHOUT a skip guard no longer
+  # need deselecting, because they now guard themselves by asking the loader
+  # whether the bytes are there: the dx = 12 production pins (which errored with
+  # IngestError) and the Visium MGMT recovery (which failed on an empty table).
+  # A missing dataset is not a numerics signal and must not be reported by this
+  # job as if it were one.
   reference-tests-linux:
-    name: 'INFORMATIONAL: reference tests on linux/amd64'
+    name: reference tests on linux/amd64
     runs-on: ubuntu-latest
-    continue-on-error: true
+    env:
+      # Every stored-reference field's relative deviation is appended here, on
+      # PASS as well as on failure -- see the summary step at the end. An
+      # instrument that only reports when it trips never tells you how close to
+      # tripping it normally sits.
+      CODON_REFERENCE_DEVIATIONS: reference_deviations.jsonl
 
     steps:
       - uses: actions/checkout@v4
@@ -641,17 +719,78 @@ jobs:
             --deselect tests/test_time_resolved_pk.py::test_real_tissue_static_path_matches_stored_reference_bitwise \
             --deselect tests/test_time_resolved_pk.py::test_fractionation_at_matched_exposure_is_no_longer_degenerate
 
+      # THE MEASUREMENT. Runs whether the tests passed or failed (`always()`),
+      # because the interesting question on a GREEN run is "how close to the
+      # bound is this platform actually sitting?" -- and that is invisible if the
+      # numbers only appear when something breaks.
+      #
+      # The table is the human artefact; the raw JSONL is uploaded below for
+      # anything that wants the exact hex. If the file is missing the step says
+      # so rather than failing: a missing measurement must not turn a green
+      # numerics run red.
+      - name: Cross-platform deviation report
+        if: always()
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          path = os.environ.get("CODON_REFERENCE_DEVIATIONS", "")
+          print("### Cross-platform reference deviations (linux/amd64 vs the macOS/arm64 reference)\n")
+          if not path or not os.path.exists(path):
+              print("_No deviation log was written -- either no reference test ran, or the")
+              print("`CODON_REFERENCE_DEVIATIONS` env var did not reach pytest._")
+              raise SystemExit(0)
+          rows = [json.loads(l) for l in open(path) if l.strip()]
+          if not rows:
+              raise SystemExit(0)
+          # Import the bound rather than restating it: it is derived from the
+          # pinned PDE configurations, so a second copy here would go stale the
+          # first time someone pins a longer integration.
+          from tests.test_time_resolved_pk import _XPLATFORM_RTOL as bound
+          worst = max(rows, key=lambda r: r["rel"])
+          moved = [r for r in rows if r["rel"] > 0.0]
+          print(f"* fields compared: **{len(rows)}**, of which **{len(moved)}** differ from the stored reference")
+          print(f"* worst relative deviation: **{worst['rel']:.4e}** "
+                f"(`{worst['case']}.{worst['field']}`)")
+          print(f"* bound in force: **{bound:.4e}** "
+                f"-- headroom **{(bound / worst['rel']) if worst['rel'] else float('inf'):.1f}x**\n")
+          print("| case | field | relative deviation | got (hex) | reference (hex) |")
+          print("|---|---|---|---|---|")
+          for r in sorted(moved, key=lambda r: -r["rel"])[:25]:
+              print(f"| {r['case']} | `{r['field']}` | {r['rel']:.4e} | `{r['got']}` | `{r['want']}` |")
+          if len(moved) > 25:
+              print(f"\n_({len(moved) - 25} further differing fields omitted; the full log is the `reference-deviations` artifact.)_")
+          PY
+
+      - name: Upload the raw deviation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-deviations
+          path: reference_deviations.jsonl
+          if-no-files-found: ignore
+
       - name: What a red here means
         if: failure()
         run: |
           {
-            echo '### INFORMATIONAL job failed -- this is not a broken build'
+            echo '### The cross-platform reference job failed'
             echo
-            echo 'These reference values were generated on macOS/arm64. A mismatch on'
-            echo 'linux/amd64 is most likely BLAS/SIMD summation order, not a defect in'
-            echo 'the simulator or the container.'
+            echo 'This job compares stored reference values on linux/amd64. It is NOT a'
+            echo 'bitwise comparison here -- that contract only applies on macOS/arm64,'
+            echo 'the platform the references were generated on. Off that platform the'
+            echo 'contract is a relative bound of 2 * 4320 * DBL_EPSILON = 1.918e-12,'
+            echo 'derived in tests/test_time_resolved_pk.py under "WHY THERE ARE TWO'
+            echo 'CONTRACTS AT ALL".'
             echo
-            echo '**Do not fix this by loosening a tolerance or editing a reference value.**'
-            echo 'Measure the difference, write down its magnitude and cause, and decide'
-            echo 'deliberately whether the reference is platform-specific.'
+            echo 'So a red here is NOT ordinary float noise. The worst deviation this'
+            echo 'runner has ever produced on these quantities is 2.1488e-14, about'
+            echo '1/89th of the bound. Something moved by more than arithmetic can explain.'
+            echo
+            echo '**Do not fix this by widening the bound or editing a reference value.**'
+            echo 'Read the deviation table above: which fields moved, and by how much.'
+            echo 'A move of ~1e-2 is a physics change and belongs in a deliberate re-pin'
+            echo 'with a write-up (see the module docstring for the last three). A move'
+            echo 'of ~1e-12 to 1e-13 on a NEW field is the one case where the bound may'
+            echo 'genuinely be too tight -- and then the fix is to re-derive it from that'
+            echo "field's accumulation length, in the comment, not to round it up."
           } >> "$GITHUB_STEP_SUMMARY"

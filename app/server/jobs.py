@@ -47,6 +47,7 @@ from .cache import (
     make_key,
     own_only,
     private_makedirs,
+    redact_exception,
     runs_dir,
     state_route_support,
 )
@@ -67,6 +68,8 @@ __all__ = [
     "DEFAULT_TIMELAPSE_FRAMES",
     "TIMELAPSE_BUDGET_BYTES",
     "RunCancelled",
+    "RUN_REFUSALS",
+    "is_run_refusal",
     "Job",
     "JobManager",
     "execute_run",
@@ -108,6 +111,50 @@ _LOG_MAXLEN = 500
 
 class RunCancelled(Exception):
     """Raised inside the worker when a job's cancel flag is seen."""
+
+
+# --------------------------------------------------------------------------- #
+# What a failed run is allowed to tell a client
+#
+# ``job.error`` is served in full by ``GET /api/runs/{id}`` (``result_view``)
+# and persisted into ``app/runs/*/result.json``, so it is a client-facing
+# surface, not a log. It used to be ``f"{type(exc).__name__}: {exc}"`` for
+# every failure, and a run CAN fail with an exception whose message is built
+# from an absolute host path: ``tmesim.data.real.visium._locate`` resolves to
+# ``<repo>/data_cache/visium_gbm/...`` and ``visium.py`` raises
+# ``FileNotFoundError(f"no matrix.mtx(.gz) in {matrix_dir}")`` from inside a
+# run. That is a path this machine owns and the user never supplied.
+#
+# The fix is to NARROW, not to silence. The product's deliberate refusals are
+# informative on purpose and are rendered verbatim so the Studio can never
+# disagree with the CLI; they pass through untouched. Everything else is an
+# unexpected failure and gets the redacted sentence plus a reference, with the
+# real detail on stderr and in ``job.traceback`` (served only from the opt-in
+# ``GET /api/runs/{id}/traceback``).
+#
+# This is safe rather than lossy because the run path's deliberate refusals are
+# MIRRORED in ``api.py``'s validator and answered as 400s at submit, before a
+# job exists -- ``oxygen_mode='markers' is unavailable on section ...`` reaches
+# the user from ``/api/validate``, not from a failed job. The engine's own
+# copies are backstops for a spec that slipped through.
+# --------------------------------------------------------------------------- #
+#: Matched by NAME up the MRO rather than by importing the classes. Importing
+#: ``tmesim.molecular.byo`` pulls in RDKit, and an error handler is the last
+#: place to run a heavy import that can itself fail. ``executor.py`` already
+#: identifies ``RunCancelled`` this way, so this is the house idiom, and the
+#: names are asserted against the real classes in tests.
+RUN_REFUSALS = frozenset({
+    "IngestError",      # "no recognised layout. Expected one of: ..."
+    "TplError",         # a protocol rejected with a line and a column
+    "CompoundRefused",  # a SMILES the compiler will not stand behind
+    "CompoundError",    # a bad request against the compound store
+    "ProjectError",     # a bad request against the project store
+})
+
+
+def is_run_refusal(exc: BaseException) -> bool:
+    """Is this the product saying "no" on purpose, rather than falling over?"""
+    return any(klass.__name__ in RUN_REFUSALS for klass in type(exc).__mro__)
 
 
 # --------------------------------------------------------------------------- #
@@ -1335,7 +1382,9 @@ class JobManager:
             # Populate the diagnosis, then publish the state.
             job.stage = "failed"
             job.finished_at = time.time()
-            job.error = f"{type(exc).__name__}: {exc}"
+            job.error = (
+                str(exc) if is_run_refusal(exc)
+                else redact_exception(exc, f"run {job.run_id} failed"))
             job.traceback = traceback.format_exc()
             job.status = "failed"
             job.log(f"FAILED: {job.error}")
@@ -1343,10 +1392,13 @@ class JobManager:
             # returned by GET /api/runs/{id}/status and persisted into
             # app/runs/*/result.json, and traceback.format_exc() always
             # carries absolute host paths -- the repo root, the operator's
-            # username, the internal module layout. `job.error` is the typed
-            # diagnosis the product promises; the stack stays server-side, on
-            # stdout for whoever is at the console, and behind the opt-in
-            # GET /api/runs/{id}/traceback for whoever is debugging.
+            # username, the internal module layout. `job.error` is the
+            # diagnosis the product promises -- a deliberate refusal verbatim,
+            # or the redacted sentence plus the reference that finds this
+            # record. The stack stays server-side, on stderr for whoever is at
+            # the console, and behind the opt-in GET /api/runs/{id}/traceback
+            # for whoever is debugging: this change moved the detail behind a
+            # flag, it did not throw the detail away.
             print(f"[run {job.run_id}] FAILED\n{job.traceback}",
                   file=sys.stderr, flush=True)
             self._persist(job, None)

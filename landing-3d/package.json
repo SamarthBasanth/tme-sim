@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/audit-origins.mjs",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "audit:origins": "node scripts/audit-origins.mjs",
+    "audit:network": "node scripts/network-audit.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
