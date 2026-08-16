@@ -460,7 +460,34 @@ jobs:
               docker logs "$AUTOKEY_CONTAINER" || true
               exit 1
             fi
-            key=$(docker logs "$AUTOKEY_CONTAINER" 2>&1 | awk '/^[[:space:]]*api key[[:space:]]/ {print $3; exit}')
+            # Capture first, THEN match -- do not pipe `docker logs` into an
+            # awk that exits early.
+            #
+            # This exact step failed with exit 141 (128+13, SIGPIPE) on run
+            # 31963589177 while the key it was looking for was sitting in the
+            # log two seconds later: `awk ... {exit}` closes the pipe on its
+            # first match, `docker logs` is still writing, and it dies of
+            # SIGPIPE. `pipefail` promotes that to the assignment's status and
+            # this step's shell runs with -e, so a SUCCESSFUL match failed the
+            # job. It is timing-dependent on how much the banner has printed,
+            # which is why it passed for months and then began flaking after
+            # the startup banner grew -- the worst shape of flake, because it
+            # gets blamed on whatever change happens to be in flight.
+            # The fix is that awk READS TO EOF. Capturing first is not enough:
+            # `printf ... | awk {exit}` SIGPIPEs the printf just as readily
+            # (verified locally -- both shapes exit 141). Any producer feeding
+            # an early-exiting consumer is the bug, so take the first match
+            # with a flag and print it at END instead of exiting on it.
+            logs=$(docker logs "$AUTOKEY_CONTAINER" 2>&1 || true)
+            # `$3 != "NONE"` because the banner's keyless form is
+            # `api key     NONE -- no authentication on any /api/ route`.
+            # Without this the loop "finds" the string NONE, breaks, and the
+            # gate check below fails with "the key printed to docker logs was
+            # rejected (HTTP 401)" -- which sends the reader hunting for an
+            # auth bug when the truth is that no key was generated at all.
+            key=$(printf '%s\n' "$logs" | awk '
+              /^[[:space:]]*api key[[:space:]]/ && $3 != "NONE" && !seen { k = $3; seen = 1 }
+              END { if (seen) print k }')
             [ -n "$key" ] && break
             sleep 2
           done
