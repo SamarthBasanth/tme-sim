@@ -48,6 +48,22 @@ If you set the Vercel Build Command to `next build`, that guard silently stops
 running on every future deploy and nothing tells you. Leave it on the default so
 Vercel runs `npm run build`.
 
+**Running the guard on its own needs the env var, and its failure looks like a
+regression.** `npm run audit:origins` derives the Studio host's declaration from
+`NEXT_PUBLIC_STUDIO_URL`, so invoking it standalone in a shell that does not
+export one fails — with a message about an undeclared host, which reads exactly
+like the guard catching something. It is not. Either run the full
+`npm run build` (which sets nothing but is normally invoked with the variable
+present) or pass it explicitly:
+
+```
+NEXT_PUBLIC_STUDIO_URL=https://studio.example.org npm run audit:origins
+```
+
+Written down because it cost someone a confused minute, and a guard whose
+*setup* failure is indistinguishable from a *real* finding is one people learn
+to disregard.
+
 ## 3. Node version
 
 `next@16.2.12` declares `engines: { node: ">=20.9.0" }`. That range would let

@@ -1,12 +1,18 @@
 "use client";
 
-import { Suspense, useEffect, type ReactNode } from "react";
-import { preloadTumorGLTF } from "./tumorGLTF";
+import { Suspense, type ReactNode } from "react";
 import ProceduralTumor from "./ProceduralTumor";
 import GLTFTumor from "./GLTFTumor";
-import { TUMOR_MODEL_URL, useModelAvailability } from "@/hooks/useModelAvailability";
+import SceneErrorBoundary from "./SceneErrorBoundary";
+import { TUMOR_MODEL_URL } from "@/hooks/useModelAvailability";
+import type { ModelAvailability } from "@/hooks/useModelAvailability";
 
 interface TumorModelProps {
+  /**
+   * Result of the availability probe, owned by SceneCanvas so that the Loader
+   * outside the canvas can read the same answer. `null` = not yet known.
+   */
+  available: ModelAvailability;
   lowDetail?: boolean;
   reducedMotion?: boolean;
   /**
@@ -22,45 +28,58 @@ interface TumorModelProps {
 }
 
 /**
- * Entry point for the tumor mesh. No `/models/tumor.glb` has been supplied
- * yet, so by default this renders `ProceduralTumor` — a distorted-sphere /
- * metaball-style placeholder built to be visually convincing on its own.
+ * Entry point for the tumor mesh.
  *
- * The moment a real GLB is placed at `public/models/tumor.glb`, this
- * component swaps to `GLTFTumor` automatically (via a HEAD-request
- * availability check) with no code changes required. `preloadTumorGLTF` is
- * called eagerly so the swap has no loading pop-in.
+ * `public/models/tumor.glb` exists, so the path that actually ships is
+ * `GLTFTumor` and the real Xenium section. `ProceduralTumor` remains the
+ * documented drop-out: remove the GLB and the page still renders a tumour.
+ *
+ * THREE STATES, NOT TWO, AND THAT IS THE POINT.
+ *
+ *   available === null   the probe has not answered. Render NOTHING. The
+ *                        loading overlay covers this window, and mounting a
+ *                        placeholder here used to delay the real asset's
+ *                        download by ~1.75 s (see useModelAvailability).
+ *   available === false  no GLB on the server. The placeholder is the whole
+ *                        point; render it.
+ *   available === true   load the measured asset.
+ *
+ * The Suspense fallback is `null` rather than the placeholder for the same
+ * reason it is null above, plus an honesty one: the window it covers is the
+ * window the loading overlay owns, and flashing a synthetic blob underneath a
+ * hero that says the tissue is measured is not an improvement on an empty
+ * frame.
+ *
+ * `SceneErrorBoundary` is what stops a bad 660 KB binary from taking the page
+ * down with it; see that file for the measured failure it was written against.
  */
 export default function TumorModel({
+  available,
   lowDetail = false,
   reducedMotion = false,
   coreChildren,
   edemaChildren,
   marginChildren,
 }: TumorModelProps) {
-  const modelAvailable = useModelAvailability();
+  if (available === null) return null;
 
-  useEffect(() => {
-    if (modelAvailable) preloadTumorGLTF(TUMOR_MODEL_URL);
-  }, [modelAvailable]);
-
-  const procedural = (
-    <ProceduralTumor
-      lowDetail={lowDetail}
-      reducedMotion={reducedMotion}
-      coreChildren={coreChildren}
-      edemaChildren={edemaChildren}
-      marginChildren={marginChildren}
-    />
-  );
-
-  if (!modelAvailable) {
-    return procedural;
+  if (!available) {
+    return (
+      <ProceduralTumor
+        lowDetail={lowDetail}
+        reducedMotion={reducedMotion}
+        coreChildren={coreChildren}
+        edemaChildren={edemaChildren}
+        marginChildren={marginChildren}
+      />
+    );
   }
 
   return (
-    <Suspense fallback={procedural}>
-      <GLTFTumor url={TUMOR_MODEL_URL} reducedMotion={reducedMotion} />
-    </Suspense>
+    <SceneErrorBoundary label={`tissue model ${TUMOR_MODEL_URL}`} fallback={null}>
+      <Suspense fallback={null}>
+        <GLTFTumor url={TUMOR_MODEL_URL} reducedMotion={reducedMotion} />
+      </Suspense>
+    </SceneErrorBoundary>
   );
 }

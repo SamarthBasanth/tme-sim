@@ -110,6 +110,7 @@ export default function DrugFront() {
    * single ref, would animate at most one stub and freeze the rest.
    */
   const materialRefs = useRef<Array<THREE.ShaderMaterial | null>>([]);
+  const groupRef = useRef<THREE.Group>(null);
 
   useFrame((_, delta) => {
     const p = progressRef.current;
@@ -120,10 +121,24 @@ export default function DrugFront() {
       material.uniforms.uProgress.value = revealSmoothed.current;
       material.uniforms.uFade.value = fadeSmoothed.current;
     });
+
+    /*
+     * Four transparent tubes, 48 segments x 6 radial each, drawn on every
+     * frame of the entire scroll regardless of `uFade`. The fragments were
+     * cheap individually but they are `transparent` and `depthWrite: false`,
+     * so they were sorted and blended for six beats to contribute nothing for
+     * five of them. `uFade` starts at 1 and damps DOWN toward the timeline, so
+     * the gate reads the same smoothed value the shader does rather than
+     * assuming anything about which beat is current.
+     */
+    if (groupRef.current) {
+      groupRef.current.visible =
+        fadeSmoothed.current > 0.004 && revealSmoothed.current > 0.002;
+    }
   });
 
   return (
-    <group>
+    <group ref={groupRef} visible={false}>
       {geometries.map((geometry, i) => (
         <mesh key={i} geometry={geometry}>
           <shaderMaterial

@@ -57,7 +57,13 @@ export function ConcentrationSource({
     if (coreMaterialRef.current) coreMaterialRef.current.opacity = o;
     if (midMaterialRef.current) midMaterialRef.current.opacity = o * 0.7;
     if (outerMaterialRef.current) outerMaterialRef.current.opacity = o * 0.45;
-    if (billboardRef.current) billboardRef.current.scale.setScalar(pulse);
+    if (billboardRef.current) {
+      billboardRef.current.scale.setScalar(pulse);
+      // A `Billboard` re-aims itself at the camera every frame; three circles
+      // at opacity 0 were being oriented, sorted and blended for the whole
+      // scroll to draw nothing.
+      billboardRef.current.visible = o > 0.004;
+    }
   });
 
   return (
@@ -147,6 +153,7 @@ export function VesselNetwork() {
     const target = vesselOpacity(progressRef.current);
     opacitySmoothed.current = damp(opacitySmoothed.current, target, 3, delta);
     if (groupRef.current) {
+      groupRef.current.visible = opacitySmoothed.current > 0.004;
       groupRef.current.children.forEach((child) => {
         const mesh = child as THREE.Mesh;
         const material = mesh.material as THREE.MeshStandardMaterial;
@@ -156,7 +163,7 @@ export function VesselNetwork() {
   });
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} visible={false}>
       {geometries.map((geometry, i) => (
         <mesh key={i} geometry={geometry}>
           <meshStandardMaterial

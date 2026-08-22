@@ -57,6 +57,7 @@ export default function Annotation({
 }: AnnotationProps) {
   const progressRef = useScrollProgressRef();
   const groupOpacity = useRef(0);
+  const groupRef = useRef<THREE.Group>(null);
   const lineRef = useRef<Line2 | LineSegments2>(null);
   const reticleRef = useRef<THREE.Mesh>(null);
   const htmlWrapRef = useRef<HTMLDivElement>(null);
@@ -74,6 +75,15 @@ export default function Annotation({
   useFrame((_, delta) => {
     groupOpacity.current = damp(groupOpacity.current, getOpacity(progressRef.current), 5, delta);
     const o = groupOpacity.current;
+    /*
+     * Six of these are mounted, each with a `ringGeometry` and a `Line2` — and
+     * `getOpacity` is a narrow authored window, so for most of the scroll every
+     * one of them was drawing a fully transparent ring and a fully transparent
+     * fat line. Fat lines are not cheap: `Line2` is instanced quad geometry
+     * with a screen-space width computed in the vertex shader.
+     */
+    const shown = o > 0.004;
+    if (groupRef.current) groupRef.current.visible = shown;
     if (lineRef.current) {
       const material = lineRef.current.material as THREE.Material & { opacity: number; transparent: boolean };
       material.opacity = o * 0.85;
@@ -85,13 +95,22 @@ export default function Annotation({
       reticleRef.current.scale.setScalar(0.85 + o * 0.15);
     }
     if (htmlWrapRef.current) {
+      /*
+       * `display`, not just opacity. drei's <Html> does not consult its
+       * object's `visible` flag (it only handles behind-camera and, if asked,
+       * occlusion), so the label's DOM stays laid out, composited and — the
+       * part that matters — present in the accessibility tree at every scroll
+       * position, including the long stretches where it is at opacity 0. An
+       * `opacity: 0` element is still announced. This takes it out of both.
+       */
+      htmlWrapRef.current.style.display = shown ? "flex" : "none";
       htmlWrapRef.current.style.opacity = String(o);
       htmlWrapRef.current.style.transform = `translateY(${(1 - o) * 6}px)`;
     }
   });
 
   return (
-    <>
+    <group ref={groupRef} visible={false}>
       <mesh ref={reticleRef} position={anchor} rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.026, 0.036, 24]} />
         <meshBasicMaterial
@@ -116,7 +135,7 @@ export default function Annotation({
             <div
               ref={htmlWrapRef}
               className={`annotation-label ${align === "left" ? "annotation-label--left" : ""}`}
-              style={{ opacity: 0 }}
+              style={{ opacity: 0, display: "none" }}
             >
               <span className="annotation-label__title">{label}</span>
               {detail ? <span className="annotation-label__detail">{detail}</span> : null}
@@ -124,6 +143,6 @@ export default function Annotation({
           </Html>
         </>
       )}
-    </>
+    </group>
   );
 }

@@ -13,8 +13,23 @@ import { mulberry32 } from "@/lib/prng";
  * Count is halved on mobile per the spec's responsive performance
  * requirements. Pure decoration — opacity fades down (never fully to zero,
  * for continued depth) as the narrative moves past the hero.
+ *
+ * `reducedMotion` skips the per-frame work entirely rather than slowing it.
+ * Both animated quantities are constant in that mode anyway — the rotation is
+ * a function of the wall clock, which is the one thing the fallback exists to
+ * stop, and the opacity is a function of scroll progress, which is pinned at 0
+ * there because the fallback has no scroll timeline. Not subscribing at all is
+ * what lets SceneCanvas put the whole canvas on `frameloop="demand"`: a single
+ * `useFrame` anywhere in the tree is enough to keep a "static" scene
+ * recomputing forever.
  */
-export default function Particles({ count = 900 }: { count?: number }) {
+export default function Particles({
+  count = 900,
+  reducedMotion = false,
+}: {
+  count?: number;
+  reducedMotion?: boolean;
+}) {
   const progressRef = useScrollProgressRef();
   const pointsRef = useRef<THREE.Points>(null);
   const materialRef = useRef<THREE.PointsMaterial>(null);
@@ -35,6 +50,7 @@ export default function Particles({ count = 900 }: { count?: number }) {
   }, [count]);
 
   useFrame((state, delta) => {
+    if (reducedMotion) return;
     const target = particleOpacity(progressRef.current);
     opacitySmoothed.current = damp(opacitySmoothed.current, target, 2, delta);
     if (materialRef.current) materialRef.current.opacity = opacitySmoothed.current * 0.45;

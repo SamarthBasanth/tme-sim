@@ -1,10 +1,13 @@
 "use client";
 
-import { Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Preload } from "@react-three/drei";
 import * as THREE from "three";
 import CameraRig from "./CameraRig";
+import SceneErrorBoundary from "./SceneErrorBoundary";
+import { useModelAvailability } from "@/hooks/useModelAvailability";
+import { useWebGLSupport } from "@/hooks/useWebGLSupport";
 import SceneLighting from "./SceneLighting";
 import TumorModel from "./TumorModel";
 import FieldContours from "./FieldContours";
@@ -35,34 +38,138 @@ interface SceneCanvasProps {
 }
 
 /**
+ * Under `frameloop="demand"` R3F only draws when something asks it to. The
+ * static scene has no animation left to ask (see the `mode === "static"`
+ * branches in GLTFTumor and Particles), so without this the very first frame
+ * — and every frame after a Suspense boundary resolves — could be missed.
+ *
+ * No dependency array on purpose: it runs after EVERY commit inside the
+ * canvas, which is exactly the set of moments at which the scene's content
+ * can have changed. Resize is already handled by R3F itself.
+ */
+function DrawOnCommit() {
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    invalidate();
+  });
+  return null;
+}
+
+/**
  * Owns the R3F `<Canvas>` element and every render-loop performance knob:
  * DPR is capped (lower on mobile), shadows are off entirely (see
- * SceneLighting), and geometry detail is reduced on mobile. The loading
- * overlay lives outside the Canvas (plain DOM) but reads the same
- * three.js LoadingManager via drei's `useProgress`.
+ * SceneLighting), geometry detail is reduced on mobile, and under
+ * prefers-reduced-motion the render loop is switched off outright.
+ *
+ * It also owns the model-availability probe, because two different consumers
+ * need the same answer: `TumorModel` (which mesh to mount) and `Loader`
+ * (whether a download is coming at all). The overlay lives outside the Canvas
+ * as plain DOM, so the probe cannot live inside it.
  */
 export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
-  const dpr: [number, number] = isMobile ? [1, 1.5] : [1, 2];
+  const modelAvailable = useModelAvailability();
+  const isStatic = mode === "static";
+
+  /*
+   * Set when something inside the canvas tree threw through React. The
+   * narrative, the ledgers and both CTAs are plain DOM outside this component
+   * and stay fully readable, so the right response is to render no scene and
+   * get everything else out of the way -- including the loading overlay, which
+   * is `position: fixed; inset: 0` on an opaque background and would otherwise
+   * wait forever for a model that is not coming, i.e. a black page.
+   */
+  const [boundaryFailed, setBoundaryFailed] = useState(false);
+  const onSceneFailure = useCallback(() => setBoundaryFailed(true), []);
+  /*
+   * No WebGL at all is the other way this scene does not exist, and it does NOT
+   * arrive through the boundary — R3F builds its renderer asynchronously, so
+   * the failure is an unhandled rejection rather than a React error. See
+   * useWebGLSupport for the trace. Detected up front instead, which also means
+   * the dead canvas is never mounted.
+   */
+  const webglSupported = useWebGLSupport();
+
+  /*
+   * DPR CEILING, AND WHY DESKTOP IS NOT 2.
+   *
+   * Nothing drawn in this canvas has a hard edge that a second device pixel
+   * resolves: the tissue is an additively-blended point cloud, the field is a
+   * smooth viridis ramp, the contour lines are 2.4 px wide and the reticles are
+   * rings. Every piece of type on the page is DOM, at full device resolution,
+   * and is unaffected by this number.
+   *
+   * What it does cost is fill rate, quadratically. At 1512x950 on a 2x display
+   * the drawing buffer was 3024x1900 = 5.74 Mpx of mostly transparent,
+   * heavily-overdrawn geometry, redrawn every frame for the entire visit. 1.75
+   * makes it 4.40 Mpx -- 23% fewer fragments for a difference that has to be
+   * hunted for at 200% zoom on a stationary frame, on a scene that is never
+   * stationary.
+   *
+   * Kept as a RANGE rather than a fixed number: R3F clamps the real
+   * devicePixelRatio into it, so a 1x display still renders at 1x rather than
+   * being upsampled to the ceiling.
+   */
+  const dpr: [number, number] = isMobile ? [1, 1.5] : [1, 1.75];
+
+  /*
+   * No context, no canvas. Returning before the Canvas is mounted at all is
+   * what keeps three.js from constructing a renderer it cannot use — measured,
+   * that attempt logged two uncaught errors and left a dead <canvas> in the
+   * DOM. `sceneFailed` tells the overlay to stand down; everything the page
+   * actually argues is plain DOM in the layers above this component and is
+   * unaffected.
+   */
+  if (!webglSupported) {
+    return (
+      <div className="scene-canvas">
+        <Loader expectModel={modelAvailable} sceneFailed />
+      </div>
+    );
+  }
 
   return (
     <div className="scene-canvas">
-      <Canvas
-        dpr={dpr}
-        gl={{ antialias: true, powerPreference: "high-performance", alpha: false }}
-        camera={{ position: [0, 0.05, 4.4], fov: 32, near: 0.1, far: 30 }}
-        shadows={false}
-        onCreated={({ scene, gl }) => {
-          scene.background = new THREE.Color("#07080a");
-          scene.fog = new THREE.Fog("#07080a", 6, 14);
-          gl.setClearColor("#07080a", 1);
-        }}
-      >
-        <Suspense fallback={null}>
-          <SceneLighting />
-          <TumorModel
-            lowDetail={isMobile}
-            reducedMotion={mode === "static"}
-            coreChildren={
+      {/*
+        aria-hidden on the canvas CONTAINER, not on the <canvas> element, and
+        that is deliberate: drei's <Html> portals the 3D annotation labels into
+        `gl.domElement.parentNode`, so those labels are siblings of the canvas
+        inside this container. They are decorative duplicates of information the
+        beats already carry in flow — the mobile breakpoint drops them entirely
+        for exactly that reason (see Annotation's `reticleOnly`) — and unhidden
+        they were read out to assistive technology at every scroll position,
+        including while at 0% opacity. One attribute here removes the canvas and
+        those labels together. The loading overlay is OUTSIDE this container and
+        keeps its progressbar semantics.
+      */}
+      <SceneErrorBoundary label="WebGL scene" fallback={null} onFailure={onSceneFailure}>
+        <Canvas
+          aria-hidden="true"
+          dpr={dpr}
+          /*
+           * The whole point of the reduced-motion fallback is that nothing
+           * moves. A canvas that keeps compositing a full-viewport WebGL frame
+           * sixty times a second to display an unchanging image is not a
+           * reduced-motion experience, it is the same power draw with the
+           * motion hidden. On demand, R3F draws once and then stops.
+           */
+          frameloop={isStatic ? "demand" : "always"}
+          gl={{ antialias: true, powerPreference: "high-performance", alpha: false }}
+          camera={{ position: [0, 0.05, 4.4], fov: 32, near: 0.1, far: 30 }}
+          shadows={false}
+          onCreated={({ scene, gl }) => {
+            scene.background = new THREE.Color("#07080a");
+            scene.fog = new THREE.Fog("#07080a", 6, 14);
+            gl.setClearColor("#07080a", 1);
+          }}
+        >
+          {isStatic && <DrawOnCommit />}
+          <Suspense fallback={null}>
+            <SceneLighting />
+            <TumorModel
+              available={modelAvailable}
+              lowDetail={isMobile}
+                reducedMotion={isStatic}
+              coreChildren={
               mode === "scroll" && (
                 /*
                   Nested INSIDE coreGroup (see ProceduralTumor.tsx), not a
@@ -245,11 +352,12 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
             </>
           )}
 
-          {mode === "static" && <Particles count={isMobile ? 120 : 260} />}
-        </Suspense>
-        <Preload all />
-      </Canvas>
-      <Loader />
+            {isStatic && <Particles count={isMobile ? 120 : 260} reducedMotion />}
+          </Suspense>
+          <Preload all />
+        </Canvas>
+      </SceneErrorBoundary>
+      <Loader expectModel={modelAvailable} sceneFailed={boundaryFailed} />
     </div>
   );
 }

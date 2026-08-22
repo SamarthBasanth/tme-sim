@@ -101,7 +101,18 @@ export function useTumorGLTF(url: string) {
   return useLoader(GLTFLoader, url, configureLoader);
 }
 
-/** Warm the cache so the swap from the procedural placeholder has no pop-in. */
+/**
+ * Warm the cache ahead of the component that will consume it.
+ *
+ * NOT CURRENTLY CALLED, and the reason is recorded because it looked useful
+ * and was not. `TumorModel` used to call this from a `useEffect` keyed on the
+ * availability probe -- but the render that flips availability true is the
+ * same render that mounts `GLTFTumor`, and `useTumorGLTF` runs during render
+ * while effects run after commit. The load was therefore always already in
+ * flight by the time this fired, so it warmed nothing and only added a second
+ * entry point into the loader cache. Kept as the correct primitive for a
+ * future caller that genuinely runs earlier (a route prefetch, say).
+ */
 export function preloadTumorGLTF(url: string): void {
   useLoader.preload(GLTFLoader, url, configureLoader);
 }

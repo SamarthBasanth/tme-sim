@@ -176,109 +176,92 @@ function Experience() {
       <div className="scroll-pin">
         <SceneCanvas isMobile={isMobile} mode="scroll" />
 
+        {/*
+          ONE MAPPING OVER SECTION_COPY, NOT SIX HAND-WRITTEN BLOCKS.
+
+          This was six near-identical copies differing only in a literal index,
+          which meant the beat->element wiring was retyped six times and the
+          index appeared four times per beat (kicker, align, headline, body,
+          ledger) plus once more in the ref callback. The reduced-motion
+          fallback has already been bitten once by exactly this class of
+          mistake — see the "KEYED ON THE BEAT, NOT ON THE SLICE INDEX" note in
+          ReducedMotionExperience.tsx, where an off-by-one put the wrong
+          instrument under two beats. Deriving every index from one loop
+          variable removes the opportunity.
+
+          The two beats that are genuinely different stay explicitly different:
+          the hero (index 0) carries the h1, the specimen caption and
+          `initialOpacity={1}`, and the closing beat carries the action pair.
+          Both are keyed off the position rather than off a class name, so the
+          rendered output is what it was before, element for element.
+        */}
         <div className="narrative-layer">
-          <NarrativeSection
-            ref={(el) => {
-              sectionElRefs.current[0] = el;
-            }}
-            kicker={`${SECTION_COPY[0].kicker} — ${SECTION_COPY[0].eyebrow}`}
-            align={SECTION_COPY[0].align}
-            className="narrative-section--hero"
-            initialOpacity={1}
-          >
-            <h1>{SECTION_COPY[0].headline}</h1>
-            <p>{SECTION_COPY[0].body}</p>
-            <a className="cta-button" href={STUDIO_URL}>
-              Open the Studio
-            </a>
-            {/* Turns the tissue behind this text from decoration into data:
-                without a legend the measured cell types read as confetti and
-                "the section is real" lands as an assertion. */}
-            <SpecimenCaption />
-          </NarrativeSection>
-
-          <NarrativeSection
-            ref={(el) => {
-              sectionElRefs.current[1] = el;
-            }}
-            kicker={`${SECTION_COPY[1].kicker} — ${SECTION_COPY[1].eyebrow}`}
-            align={SECTION_COPY[1].align}
-          >
-            <h2>{SECTION_COPY[1].headline}</h2>
-            <p>{SECTION_COPY[1].body}</p>
-            {SECTION_COPY[1].ledger ? <SectionLedger {...SECTION_COPY[1].ledger} /> : null}
-          </NarrativeSection>
-
-          <NarrativeSection
-            ref={(el) => {
-              sectionElRefs.current[2] = el;
-            }}
-            kicker={`${SECTION_COPY[2].kicker} — ${SECTION_COPY[2].eyebrow}`}
-            align={SECTION_COPY[2].align}
-          >
-            <h2>{SECTION_COPY[2].headline}</h2>
-            <p>{SECTION_COPY[2].body}</p>
-            {SECTION_COPY[2].ledger ? <SectionLedger {...SECTION_COPY[2].ledger} /> : null}
-          </NarrativeSection>
-
-          <NarrativeSection
-            ref={(el) => {
-              sectionElRefs.current[3] = el;
-            }}
-            kicker={`${SECTION_COPY[3].kicker} — ${SECTION_COPY[3].eyebrow}`}
-            align={SECTION_COPY[3].align}
-          >
-            <h2>{SECTION_COPY[3].headline}</h2>
-            <p>{SECTION_COPY[3].body}</p>
-            {SECTION_COPY[3].ledger ? <SectionLedger {...SECTION_COPY[3].ledger} /> : null}
-          </NarrativeSection>
-
-          <NarrativeSection
-            ref={(el) => {
-              sectionElRefs.current[4] = el;
-            }}
-            kicker={`${SECTION_COPY[4].kicker} — ${SECTION_COPY[4].eyebrow}`}
-            align={SECTION_COPY[4].align}
-          >
-            <h2>{SECTION_COPY[4].headline}</h2>
-            <p>{SECTION_COPY[4].body}</p>
-            {SECTION_COPY[4].ledger ? <SectionLedger {...SECTION_COPY[4].ledger} /> : null}
-          </NarrativeSection>
-
-          <NarrativeSection
-            ref={(el) => {
-              sectionElRefs.current[5] = el;
-            }}
-            kicker={`${SECTION_COPY[5].kicker} — ${SECTION_COPY[5].eyebrow}`}
-            align={SECTION_COPY[5].align}
-            className="narrative-section--cta"
-          >
-            <h2>{SECTION_COPY[5].headline}</h2>
-            <p>{SECTION_COPY[5].body}</p>
-            {SECTION_COPY[5].ledger ? <SectionLedger {...SECTION_COPY[5].ledger} /> : null}
-            {/*
-              * The page ends by handing over the software, not by asking for an
-              * introduction. This was `mailto:` — the closing beat of a page
-              * whose whole argument is "run it and check the numbers yourself"
-              * terminated in a contact form, which puts a human gate in front
-              * of the one thing a visitor can verify unaided. Same STUDIO_URL
-              * the hero opens, so the first and last frames offer the same
-              * door.
-              *
-              * Email survives as the secondary route, deliberately quieter:
-              * someone who wants to talk rather than run software still has a
-              * way through, and it is a text link rather than a second pill so
-              * it cannot compete with the primary action.
-              */}
-            <div className="cta-row">
-              <a className="cta-button cta-button--primary" href={STUDIO_URL}>
-                Open the Studio
-              </a>
-              <a className="cta-link" href="mailto:samarthbasanth@gmail.com?subject=Codon%20enquiry">
-                or email us about your tissue
-              </a>
-            </div>
-          </NarrativeSection>
+          {SECTION_COPY.map((section, i) => {
+            const isHero = i === 0;
+            const isClosing = i === SECTION_COPY.length - 1;
+            const Heading = isHero ? "h1" : "h2";
+            return (
+              <NarrativeSection
+                key={section.kicker}
+                ref={(el) => {
+                  sectionElRefs.current[i] = el;
+                }}
+                kicker={`${section.kicker} — ${section.eyebrow}`}
+                align={section.align}
+                className={
+                  isHero
+                    ? "narrative-section--hero"
+                    : isClosing
+                      ? "narrative-section--cta"
+                      : ""
+                }
+                initialOpacity={isHero ? 1 : 0}
+              >
+                <Heading>{section.headline}</Heading>
+                <p>{section.body}</p>
+                {section.ledger ? <SectionLedger {...section.ledger} /> : null}
+                {isHero ? (
+                  <>
+                    <a className="cta-button" href={STUDIO_URL}>
+                      Open the Studio
+                    </a>
+                    {/* Turns the tissue behind this text from decoration into
+                        data: without a legend the measured cell types read as
+                        confetti and "the section is real" lands as an
+                        assertion. */}
+                    <SpecimenCaption />
+                  </>
+                ) : null}
+                {isClosing ? (
+                  /*
+                   * The page ends by handing over the software, not by asking
+                   * for an introduction. This was `mailto:` — the closing beat
+                   * of a page whose whole argument is "run it and check the
+                   * numbers yourself" terminated in a contact form, which puts
+                   * a human gate in front of the one thing a visitor can
+                   * verify unaided. Same STUDIO_URL the hero opens, so the
+                   * first and last frames offer the same door.
+                   *
+                   * Email survives as the secondary route, deliberately
+                   * quieter: someone who wants to talk rather than run software
+                   * still has a way through, and it is a text link rather than
+                   * a second pill so it cannot compete with the primary action.
+                   */
+                  <div className="cta-row">
+                    <a className="cta-button cta-button--primary" href={STUDIO_URL}>
+                      Open the Studio
+                    </a>
+                    <a
+                      className="cta-link"
+                      href="mailto:samarthbasanth@gmail.com?subject=Codon%20enquiry"
+                    >
+                      or email us about your tissue
+                    </a>
+                  </div>
+                ) : null}
+              </NarrativeSection>
+            );
+          })}
         </div>
 
         {/* Section 03's copy is set on the right, so its readout sits left —

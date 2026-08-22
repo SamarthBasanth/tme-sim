@@ -92,8 +92,17 @@ const FRAGMENT = /* glsl */ `
  * As always in this scene, the visual state is an explicit function of scroll
  * progress, so scrolling back up retracts the front instead of replaying it.
  */
+/**
+ * Below this smoothed opacity the quad contributes nothing a display can show
+ * (alpha peaks at `c * 0.42 + line * 0.75` times this, on a #07080a ground) so
+ * it is skipped entirely rather than drawn transparent. See the note on
+ * `meshRef` below for why that is worth doing here in particular.
+ */
+const VISIBLE_EPSILON = 0.004;
+
 export default function ConcentrationField() {
   const progressRef = useScrollProgressRef();
+  const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const advanceSmoothed = useRef(0);
   const opacitySmoothed = useRef(0);
@@ -118,10 +127,30 @@ export default function ConcentrationField() {
       materialRef.current.uniforms.uAdvance.value = advanceSmoothed.current;
       materialRef.current.uniforms.uOpacity.value = opacitySmoothed.current;
     }
+
+    /*
+     * THE MOST EXPENSIVE SINGLE SURFACE IN THE SCENE, AND IT WAS DRAWN FOR THE
+     * WHOLE SCROLL.
+     *
+     * This quad spans the section's full measured extent and its fragment
+     * shader is not cheap: six `exp()` source terms, a viridis lookup and an
+     * `fwidth()` derivative per pixel, all `transparent` and therefore
+     * unculled by the depth buffer. `uOpacity` is authored to be zero across
+     * most of the timeline — the field belongs to one beat — but a zero
+     * uniform does not save a single fragment. Every one of those pixels was
+     * still shaded, blended and discarded on every frame of every beat.
+     *
+     * `visible` is the flag that actually removes the draw call. FieldContours
+     * already did this for its lines; this surface is far larger and had no
+     * equivalent.
+     */
+    if (meshRef.current) {
+      meshRef.current.visible = opacitySmoothed.current > VISIBLE_EPSILON;
+    }
   });
 
   return (
-    <mesh position={[0, 0, -0.03]} renderOrder={-1}>
+    <mesh ref={meshRef} visible={false} position={[0, 0, -0.03]} renderOrder={-1}>
       <planeGeometry
         args={[SECTION_HALF_EXTENT.x * 2, SECTION_HALF_EXTENT.y * 2, 1, 1]}
       />

@@ -156,6 +156,26 @@ export default function GLTFTumor({
   }, [cloned]);
 
   useFrame((state, delta) => {
+    /*
+     * REDUCED MOTION MEANS STOPPED, NOT SLOWED.
+     *
+     * This branch used to keep a shallow sway running (`delta * 0.06`, +/-0.05
+     * rad, plus an x tilt) under prefers-reduced-motion, on the reasoning that
+     * a slow idle rotation is gentle. It is still rotation, on the one
+     * experience whose entire purpose is that nothing moves, and it is
+     * unattended and unstoppable — the visitor cannot pause it and it never
+     * ends. Measured on the built page at 1512x950 with reduced motion on, that
+     * sway alone kept a 3024x1672 WebGL frame recompositing continuously for
+     * the whole visit.
+     *
+     * Returning early here (rather than damping toward the same values every
+     * frame) is also what makes the canvas's `frameloop="demand"` meaningful:
+     * `useFrame` subscribers are what a demand loop has to be woken for.
+     * Everything this callback would set is already at its resting value —
+     * progress is pinned at 0 in the fallback, so separation, offset and
+     * scroll-yaw are all exactly zero, and the JSX defaults are those zeros.
+     */
+    if (reducedMotion) return;
     const p = progressRef.current;
     const aspect = state.size.width / Math.max(state.size.height, 1);
     sepSmoothed.current = damp(sepSmoothed.current, separationAmount(p), 3.2, delta);
@@ -171,26 +191,25 @@ export default function GLTFTumor({
     if (regions.edema) regions.edema.position.set(0.04 * sep, 0.45 * sep, 0.08 * sep);
     if (regions.margin) regions.margin.position.set(-0.06 * sep, 0.04 * sep, -0.45 * sep);
 
+    // Past the guard above, `reducedMotion` is always false — the ternaries
+    // that used to appear on every line here were all dead in one direction
+    // and are gone with it.
     if (rootGroup.current) {
       if (isPlanar) {
         // A flat section must never turn edge-on, or it vanishes. Instead of
         // a full spin, OSCILLATE within a shallow angle so the slice keeps
         // facing the viewer and the parallax still reads as depth.
-        autoRotation.current += delta * (reducedMotion ? 0.06 : 0.22);
-        const sway = Math.sin(autoRotation.current) * (reducedMotion ? 0.05 : 0.16);
-        scrollRotation.current = reducedMotion
-          ? 0
-          : damp(scrollRotation.current, p * 0.35, 2.4, delta);
+        autoRotation.current += delta * 0.22;
+        const sway = Math.sin(autoRotation.current) * 0.16;
+        scrollRotation.current = damp(scrollRotation.current, p * 0.35, 2.4, delta);
         rootGroup.current.rotation.y = sway + scrollRotation.current;
         rootGroup.current.rotation.x = Math.cos(autoRotation.current * 0.6) * 0.05;
       } else {
-        autoRotation.current += delta * (reducedMotion ? 0.035 : 0.12);
-        scrollRotation.current = reducedMotion
-          ? 0
-          : damp(scrollRotation.current, p * 0.6, 2.4, delta);
+        autoRotation.current += delta * 0.12;
+        scrollRotation.current = damp(scrollRotation.current, p * 0.6, 2.4, delta);
         rootGroup.current.rotation.y = autoRotation.current + scrollRotation.current;
       }
-      rootGroup.current.position.x = reducedMotion ? 0 : offsetSmoothed.current * 1.15;
+      rootGroup.current.position.x = offsetSmoothed.current * 1.15;
     }
   });
 

@@ -26,7 +26,23 @@ const CELL_TYPES = [
 
 export default function SpecimenCaption() {
   return (
-    <figcaption className="specimen" aria-label="Specimen details for the tissue shown">
+    /*
+     * A <figure>, not the <figcaption> this used to be.
+     *
+     * `figcaption` is only defined as a child of `figure`, and there is no
+     * `figure` anywhere on this page — it was rendered directly inside the
+     * hero's copy column. Outside its parent it maps to no role at all, which
+     * has one concrete consequence: `aria-label` is ignored on a role-less
+     * element, so the name that was set here was never exposed. `figure` maps
+     * to role="figure", which does support an accessible name, so the label
+     * below now does what it was written to do and the block is announced as
+     * one grouped unit rather than as four loose lists.
+     *
+     * The class is unchanged, so every rule in the `.specimen` block in
+     * globals.css still applies; `figure`'s UA margin is already overridden
+     * there.
+     */
+    <figure className="specimen" aria-label="Specimen details for the tissue shown">
       <div className="specimen__id">
         Xenium GBM · 319-gene panel
       </div>
@@ -63,6 +79,6 @@ export default function SpecimenCaption() {
       <p className="specimen__note">
         10x Genomics, CC BY 4.0 · positions and types as measured
       </p>
-    </figcaption>
+    </figure>
   );
 }
