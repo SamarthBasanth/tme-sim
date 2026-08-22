@@ -380,13 +380,46 @@ class TestProvenanceIsTrue:
         # that softening this one did not soften the renderer's stop behaviour.
         assert any("MUST NOT" in cv or "NOT DEFENSIBLE" in cv for cv in c.caveats)
 
-    def test_the_ranking_claim_is_qualified_not_advertised(self, alpha):
-        """The CAN list may no longer promise an unqualified ranking: the one
-        dataset that tested the transport model refuted it for similar-mass
-        compounds. It must point at that limit rather than sell around it."""
+    def test_the_ranking_claim_is_not_offered_at_all(self, alpha):
+        """The CAN list must not invite a cross-compound ordering.
+
+        STRENGTHENED 2026-08-22, and the reason is the point. This test used to
+        assert ``"not a validated prediction" in can`` -- a QUALIFIER, because
+        the list still *offered* the ranking and hung a warning on it:
+
+            "Compare this compound against others on the SAME tissue section
+             ... and read the ORDERING rather than the levels ... Note what
+             this ordering is: a statement about THIS MODEL's inputs, not a
+             validated prediction."
+
+        The cross-compound ranking was measured and WITHDRAWN on 2026-08-21,
+        and the prohibition is absolute rather than conditional. So a qualified
+        offer is no longer good enough: ``CAN_CONCLUDE`` is rendered verbatim by
+        the API and the Studio, and it was telling bring-your-own-compound users
+        to go and do the withdrawn thing, in its own words, for a day after the
+        withdrawal. It survived every guard because it never contained the
+        retired SENTENCE -- only the retired INSTRUCTION.
+
+        The old assertion would pass against that text and fail against the
+        corrected one, i.e. it was pinning the wrong state. What is pinned now
+        is the prohibition and its receipt, plus the honest capability that
+        replaced it.
+        """
         d = compile_user_compound("ACME-101", ASPIRIN, alpha=alpha).as_dict()
         can = " ".join(d["can_conclude"])
-        assert "not a validated prediction" in can
+
+        # The prohibition, and the receipt that makes it checkable rather than
+        # assertable.
+        assert "DO NOT read an ORDERING across compounds" in can
+        assert "WITHDRAWN" in can and "2026-08-21" in can
+        assert "pk_ranking_robustness.md" in can
+
+        # What is offered INSTEAD -- a within-map reading, which survives the
+        # uncertainties that broke the ordering because a per-compound plasma
+        # factor cancels from a ratio between two points of one map.
+        assert "against ITSELF" in can and "RELATIVE exposure" in can
+
+        # Unchanged, and still the most reliable thing the compiler does.
         assert "INDISTINGUISHABLE" in can
 
     def test_supplied_ic50_is_labelled_as_the_operators_own(self, alpha):
