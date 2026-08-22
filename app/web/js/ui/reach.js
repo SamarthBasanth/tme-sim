@@ -496,19 +496,37 @@ export function createReachPanel() {
     /* THE LADDER'S BOUND, NAMED. A bound that says where it stops holding is
      * worth more than one that implies it holds generally, so this states the
      * capacity range over which the ladder is usable AND what happens past it.
-     * Measured on the flagship section: <= 0.0011 movement over R = 1 to 39,
-     * flat to R = 60, and up to 0.80 over the full measured 3.2-4184 range. */
+     * The principle stands; the figures it was originally written with do not
+     * -- see the dated correction below. */
+    /* CORRECTED 2026-08-22. All three shipped figures here were refuted by
+     * direct measurement (results/reach_invariances_measure.md): the claim was
+     * "<= 0.0011 over R = 1 to 39, exactly flat to R = 60, up to 0.80 over
+     * 3.2-4184", and NO arm and NO reading reproduces any of the three. The
+     * defect was not a bad measurement but a claim that outgrew one: read as
+     * the HEADLINE RUNG the numbers were conservative and safe to rely on;
+     * read as written -- "the whole ladder" -- all three understate, 0.0011 by
+     * a factor of 365. Stated per-rung below, because a single max over rungs
+     * reports the worst rung and the headline is the best one. */
     el.appendChild(h('div.caveat', h('span',
-      h('b', 'THIS LADDER IS USABLE FOR TISSUE CAPACITY R ≲ 60, AND NOT BEYOND '
-        + 'IT. '),
-      'The engine assigns every compound a capacity of 1.0. Over R = 1 to 39 — '
-      + '1 to the best available constant from 33 measured values — the whole '
-      + 'ladder moves by at most 0.0011, and it is exactly flat out to R = 60. '
-      + 'Past that it degrades fast: across the full measured range of 3.2 to '
-      + '4184 mL/g it moves by up to 0.80, which is worse than the '
-      + 'cross-compound ordering this product withdrew. The bound is stated '
-      + 'rather than implied because a reader who assumes it holds generally '
-      + 'would be making the same mistake the withdrawn ordering made.')));
+      reach.window_mode === 'steady_state'
+        ? [h('b', 'THIS LADDER DOES NOT DEPEND ON TISSUE CAPACITY. '),
+           'The engine assigns every compound a capacity of 1.0, and measured '
+           + 'values span 3.2 to 4184 mL/g (n = 33). On a converged steady '
+           + 'state that assignment does not matter: capacity multiplies the '
+           + 'time derivative, which this map does not have. Measured across '
+           + 'the full 3.2 to 4184 range, every rung moves exactly 0.000e+00 — '
+           + 'it counts cells below a threshold and no cell crossed one.']
+        : [h('b', 'THE BOTTOM OF THIS LADDER SURVIVES TISSUE CAPACITY; THE TOP '
+             + 'OF IT DOES NOT. '),
+           'The engine assigns every compound a capacity of 1.0; measured '
+           + 'values span 3.2 to 4184 mL/g (n = 33, best available constant '
+           + '39). Over R = 1 to 39 the headline rung F(0.1) and every rung '
+           + 'below it are bit-identical — 0.000000, and flat out to R = 80. '
+           + 'The WHOLE ladder moves 0.4021 over that same range, because the '
+           + 'top rung F(1.0) carries essentially all of it. Across the full '
+           + 'measured range the headline rung moves 0.7409 and the whole '
+           + 'ladder 0.9427, both worse than the cross-compound ordering this '
+           + 'product withdrew. Read the rung you are using, not the ladder.'])));
 
     /* ---- falloff ------------------------------------------------------- */
     const fall = reach.falloff || {};
@@ -548,25 +566,52 @@ export function createReachPanel() {
       // Measured on the flagship section: the normalised falloff moves 0.3772
       // ABSOLUTE at capacity R = 39 (the best-available constant), on a curve
       // whose entire range is 1.0 to 0.51, with the fitted penetration length
-      // collapsing 279.7 -> 76.7 um. The under-reached ladder is nearly immune
-      // over the same range (<= 0.0011); the SHAPE is not. This is exactly the
-      // asymmetry the panel must not blur, because the two figures sit adjacent
-      // and look equally solid.
+      // collapsing 279.7 -> 76.7 um. Those three figures reproduced to four
+      // significant figures on re-measurement (0.37723, 1.0 -> 0.51284,
+      // 279.715 -> 76.740) and are the solid part of this block.
+      // What did NOT survive is the asymmetry that used to be drawn from them
+      // -- the ladder is not the safe counterpart, it moves 0.4021 over the
+      // same range. The real asymmetry is BETWEEN RUNGS, not between the
+      // ladder and the curve. See the dated correction below.
+      /* CORRECTED 2026-08-22. This caveat previously read "THE SHAPE IS NOT
+       * CAPACITY-INVARIANT — the ladder above nearly is, and this is not",
+       * and printed the two figures side by side on that basis. The asymmetry
+       * does not exist: measured on the flagship at R = 39 the falloff moves
+       * 0.3772 and the whole 7-rung ladder moves 0.4021. They move by the SAME
+       * amount. What is nearly immune is the bottom four rungs (x <= 0.1,
+       * which include the headline); the top rung F(1.0) goes 0.4056 -> 0.8077
+       * and is plotted on the same chart the caveat was reassuring about.
+       * It also asserted the 6 h window "has not converged", citing 0.01302
+       * decaying as 281/T. That was measuring the ESTIMATOR: any AUC-based
+       * ratio carries an O(1/T) tail however converged the field is, and the
+       * field is converged to 1.112e-05 at 6 h.
+       * Sources: results/reach_invariances_measure.md, steady_state_reach.md. */
       el.appendChild(h('div.caveat.crit', h('span',
-        h('b', 'THE SHAPE IS NOT CAPACITY-INVARIANT — the ladder above nearly '
-          + 'is, and this is not. '),
-        'The engine assigns every compound a tissue capacity of 1.0; measured '
-        + 'values span 3.2 to 4184 mL/g (n = 33, best available constant 39). A '
-        + 'capacity term rescales time rather than level, so it cancels from a '
-        + 'ratio only where the field has CONVERGED, and at the shipping 6 h '
-        + 'window it has not — the gap to the infinite-window limit is 0.01302 '
-        + 'and decays as 281/T with no plateau, so about 78 h would be needed '
-        + 'to reach 0.001. At R = 39 this curve moves 0.3772 absolute and the '
-        + 'fitted penetration length collapses from 279.7 to 76.7 um. Read the '
-        + 'SHAPE as carrying an unquantified capacity term of that size. The '
-        + 'under-reached ladder above moves at most 0.0011 over the same range '
-        + 'and is flat to R = 60, which is why the two are not presented as '
-        + 'equally solid.')));
+        reach.window_mode === 'steady_state'
+          ? [h('b', 'CAPACITY CANNOT REACH THIS FIGURE. '),
+             'A tissue-capacity term R multiplies the TIME DERIVATIVE and '
+             + 'nothing else, and a converged steady state has no time '
+             + 'derivative — so R is absent from this map by inspection, not '
+             + 'small. Measured across R = 1 to 4184: this curve moves at most '
+             + '4.5e-14 and the ladder above moves exactly 0.000e+00, which is '
+             + 'float64 round-off and an unmoved threshold count, not a '
+             + 'residual. This is the one limit that a finite-window reading '
+             + 'of the same field DOES carry — there, at R = 39, this curve '
+             + 'moves 0.3772 and the ladder 0.4021.']
+          : [h('b', 'THIS SHAPE AND THE LADDER ABOVE ARE BOTH '
+               + 'CAPACITY-SENSITIVE, BY ABOUT THE SAME AMOUNT. '),
+             'The engine assigns every compound a tissue capacity of 1.0; '
+             + 'measured values span 3.2 to 4184 mL/g (n = 33, best available '
+             + 'constant 39). Capacity rescales TIME, so over a finite window '
+             + 'it changes the shape the field has reached. At R = 39 this '
+             + 'curve moves 0.3772 absolute on a curve whose entire range is '
+             + '1.0 to 0.51, the fitted penetration length collapses from '
+             + '279.7 to 76.7 um, and the ladder above moves 0.4021 — the same '
+             + 'size. Do not read one as solid because the other is flagged. '
+             + 'The exception is the BOTTOM of the ladder: F(0.1) and below, '
+             + 'which include the headline, are bit-identical out to R = 80. '
+             + 'The movement is almost entirely in the top rung F(1.0), '
+             + '0.4056 to 0.8077, which is on this chart.'])));
       el.appendChild(h('div.caveat', h('span',
         h('b', 'HOW MUCH OF THIS IS THE VASCULATURE? '),
         'Where a compound’s penetration length is short compared with the '

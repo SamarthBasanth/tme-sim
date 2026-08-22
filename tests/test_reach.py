@@ -518,6 +518,107 @@ class TestSteadyCapacityInvariance:
             f"capacity emulation is not reaching the solve (moved {move:.3e})")
 
 
+class TestSteadyDegenerateTissue:
+    """Where a one-shot direct solve returns a number it should not.
+
+    A time march on a zero source produces zeros and the refusal rule catches
+    it. A direct solve on a degenerate system produces whatever the linear
+    solver produces, and the failure mode is a PLAUSIBLE FINITE NUMBER rather
+    than an error. These are the cases where that could happen.
+    """
+
+    def test_absent_vasculature_refuses_and_returns_no_number(
+            self, real_micro, real_result, distance_um, real_drug, velocity):
+        base = np.array(real_micro.fields.vascular_density, copy=True)
+        try:
+            real_micro.fields.vascular_density = base * 0.0
+            out = compute_reach(real_micro, real_result,
+                                distance_um=distance_um, drug=real_drug,
+                                velocity=velocity, convection=True)
+        finally:
+            real_micro.fields.vascular_density = base
+        _assert_refused(out)
+        assert "E_ref" in out["null_reason"]
+
+    def test_sparse_vasculature_does_NOT_refuse_and_that_is_correct(
+            self, real_micro, real_result, distance_um, real_drug, velocity):
+        """Kept as an assertion because it is counter-intuitive.
+
+        Scaling the vessel density down by 1e-3 leaves a well-defined map: the
+        field is exactly linear in the source, so the RATIOS this module
+        publishes are unchanged. Refusing here would be discarding a number
+        that is defined, which the module docstring calls the opposite of the
+        refusal rule. Measured on the flagship at dx = 30 the same holds
+        geometrically — 4 endothelial cells still gives a usable first bin and
+        a real perivascular mean (results/steady_state_reach.md sec. 9c).
+        """
+        base = np.array(real_micro.fields.vascular_density, copy=True)
+        ref = compute_reach(real_micro, real_result, distance_um=distance_um,
+                            drug=real_drug, velocity=velocity, convection=True)
+        try:
+            real_micro.fields.vascular_density = base * 1e-3
+            out = compute_reach(real_micro, real_result,
+                                distance_um=distance_um, drug=real_drug,
+                                velocity=velocity, convection=True)
+        finally:
+            real_micro.fields.vascular_density = base
+        assert out["null_reason"] is None
+        np.testing.assert_allclose(out["falloff"]["normalised_mean_auc"],
+                                   ref["falloff"]["normalised_mean_auc"],
+                                   rtol=0.0, atol=1e-12)
+        assert (out["curve"]["under_reached_fraction"]
+                == ref["curve"]["under_reached_fraction"])
+
+    def test_where_the_denormal_cliff_IS(self, real_micro, real_result,
+                                         distance_um, real_drug, velocity):
+        """The one silent-wrong regime this map has, PINNED rather than guarded.
+
+        Scaling the source until ``E_ref`` goes denormal eventually returns a
+        plausible finite falloff that is simply wrong, with no refusal. It is
+        deliberately not guarded: a positivity floor above ``E_ref > 0`` would
+        be a threshold chosen to defend a case that cannot occur, and the
+        realised ``E_ref`` on real tissue is O(1-10) because the plasma scalar
+        — the one axis that could be tiny — divides out by construction.
+
+        So the cliff's LOCATION is asserted instead. This survives someone
+        later changing what feeds ``E_ref``; a magic floor would be inherited
+        and never re-derived. MEASURED on the flagship: exact to 2.220e-16 at
+        1e-300, 3.804e-13 at 1e-310, 4.745e-08 at 1e-315, 5.050e-02 at 1e-320
+        (results/steady_state_reach.md sec. 9d).
+        """
+        base = np.array(real_micro.fields.vascular_density, copy=True)
+        ref = compute_reach(real_micro, real_result, distance_um=distance_um,
+                            drug=real_drug, velocity=velocity, convection=True)
+        rf = np.asarray(ref["falloff"]["normalised_mean_auc"])
+        try:
+            # Still exact 250 orders down: the ratio is scale-free until the
+            # floats stop being able to represent the scale.
+            real_micro.fields.vascular_density = base * 1e-250
+            far = compute_reach(real_micro, real_result,
+                                distance_um=distance_um, drug=real_drug,
+                                velocity=velocity, convection=True)
+            assert far["null_reason"] is None
+            assert float(np.abs(
+                np.asarray(far["falloff"]["normalised_mean_auc"]) - rf).max()
+            ) < 1e-15
+            # And broken by 1e-320, silently. If this ever STOPS being broken,
+            # the cliff has moved and the sentence in the results file is stale.
+            real_micro.fields.vascular_density = base * 1e-320
+            gone = compute_reach(real_micro, real_result,
+                                 distance_um=distance_um, drug=real_drug,
+                                 velocity=velocity, convection=True)
+        finally:
+            real_micro.fields.vascular_density = base
+        if gone["null_reason"] is None:
+            moved = float(np.abs(
+                np.asarray(gone["falloff"]["normalised_mean_auc"]) - rf).max())
+            assert moved > 1e-3, (
+                "the denormal cliff has MOVED: scaling the source to 1e-320 no "
+                f"longer breaks the falloff (moved {moved:.3e}). "
+                "results/steady_state_reach.md sec. 9d locates it here and is "
+                "now stale.")
+
+
 class TestWindowMode:
     """A payload always says WHICH OBJECT it is. That is the defect this repo
     spent the week fixing: records that were true about a configuration nobody

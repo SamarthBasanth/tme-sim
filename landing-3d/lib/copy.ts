@@ -533,17 +533,33 @@ export const SECTION_COPY: readonly SectionCopy[] = [
      * ranking. The exception itself is unchanged and is stated at the same
      * strength — what changed is which output it is pointed at.
      *
-     * THE REPLACEMENT DELIBERATELY NAMES NO OUTPUT, and that is not vagueness.
-     * A cutover of the reach map to a CONVERGED STEADY STATE was in flight on
-     * 2026-08-22 ("the reach this geometry permits" rather than "the reach a
-     * 6 h exposure achieved"), and if it lands then the map moves INTO the
-     * regime where the capacity invariance is exact and out of the regime this
-     * clause describes. A clause that had said "which is the window every
-     * number here is read from" would have been silently falsified by that
-     * change. "The one regime the invariance does not cover" is true either
-     * way. When the cutover is confirmed, this beat and beat 05's capacity row
-     * may BOTH be strengthened — say which outputs are converged and which are
-     * not — and neither should be until then.
+     * THE REPLACEMENT DELIBERATELY NAMES NO OUTPUT, and that is not vagueness —
+     * it is the clause earning its keep within hours of being written. A
+     * cutover of the reach map to a CONVERGED STEADY STATE ("the reach this
+     * geometry permits" rather than "the reach a 6 h exposure achieved") landed
+     * in 4cab273 while this pass was being measured. The earlier wording, "which
+     * is the window every number here is read from", would have been silently
+     * falsified by it: the MAP is now a steady object and is exactly
+     * capacity-invariant, with the ladder measured to move 0.000e+00 at every R
+     * (results/steady_state_reach.md sec. 4). "The one regime the invariance
+     * does not cover" survived unchanged, because it names a regime rather than
+     * an output.
+     *
+     * WHAT DID HAVE TO CHANGE, AND THE SPLIT IS NOW THE INTERESTING PART. Beat
+     * 05's capacity row had said the falloff shape is not protected the way the
+     * equilibrium quantities are. That was true of the 6 h march and is false
+     * of the steady map, so it is gone. The map and the verdict are now in
+     * DIFFERENT regimes and the row says which: the map is converged and the
+     * term cannot reach it; the per-cell verdict in beat 03 is still read off a
+     * finite exposure window, and there the term still moves things. Do not
+     * collapse those two halves back together in either direction.
+     *
+     * ONE TRAP RECORDED, because it is the kind that gets quoted at us rather
+     * than by us: with convection ON — the shipped setting — the published
+     * capacity sweep is not a faithful capacity change at all (it multiplies
+     * the Peclet number by R as well), so it produces a large residual against
+     * a map that is exactly invariant. That is a statement about the
+     * instrument, not about the map, and no version of it belongs in the copy.
      */
     body: "Convection, diffusion and reaction, solved on that geometry. Interstitial pressure builds where vessels leak and drainage fails and pushes back against the drug coming in; oxygen and hypoxia solve on the same grid, and response follows Hill kinetics from the concentration each cell sees. What that buys is the shape of the field, not its magnitude — and the difference is measured, not asserted. One piece of it is exact rather than argued: how much drug the tissue can store is a number the engine assumes rather than measures, and it cannot move a converged field at all — checked to one part in a billion. It does move what a finite exposure window accumulates — the one regime the invariance does not cover.",
     align: "left",
@@ -880,7 +896,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
           label: "Tissue capacity",
           state: "ASSUMED 1.0",
           detail:
-            "Every compound is given a capacity of 1.0; measured rat brain-slice values run 3.2 to 4184 (n = 33), assumed to carry to human tissue. A converged gradient cannot move with it — checked to one part in a billion — but anything read off a finite exposure window can, and the falloff shape is not protected the way the equilibrium quantities are.",
+            "Every compound is given a capacity of 1.0; measured rat brain-slice values run 3.2 to 4184 (n = 33), assumed to carry to human tissue. It cannot move a converged field at all — checked to one part in a billion — but the verdict in 03 is read off a finite exposure window, and there it does move.",
         },
         {
           label: "Close analogues",
