@@ -227,6 +227,42 @@ export const detachRun = noServer('DELETE .../specimens/{sid}/runs/{run}');
 export const compareProject = noServer('GET /api/projects/{id}/compare');
 export const getCapability = noServer('GET /api/capability/{section}');
 
+/* --- compound library: mutable server-side state ------------------------- */
+/* A stored compound is a row the backend writes to app/compounds/, and
+   compiling SMILES is an rdkit call in the server process. Neither can happen
+   in a file, and an empty list would read as "your library is empty" rather
+   than "this cannot work here". */
+export const postCompoundCompile = noServer('POST /api/compounds/compile');
+export const postCompound = noServer('POST /api/compounds');
+export const listCompounds = noServer('GET /api/compounds');
+export const getCompound = noServer('GET /api/compounds/{id}');
+export const deleteCompound = noServer('DELETE /api/compounds/{id}');
+
+/* --- bring-your-own tissue ----------------------------------------------- */
+/* Sections register BY FILESYSTEM PATH on the server's own machine — nothing
+   is ever uploaded — so a scan is the server reading a directory it can see.
+   A file opened from file:// has no such directory and no such server, and
+   the confinement that bounds the real route (TMESIM_STUDIO_DATA_ROOTS) lives
+   in that server's environment. Refused, with the command that does work. */
+export const postSectionScan = noServer('POST /api/sections/scan');
+export const deleteSection = noServer('DELETE /api/sections/{id}');
+
+/**
+ * No-op, deliberately, and NOT a refusal.
+ *
+ * This is the one name in this list that is not a route: in js/api.js it sets
+ * a header for later requests and remembers it in localStorage. This export
+ * issues no request, so there is no header to set and no gate to satisfy —
+ * `probe()` reports the baked data as reachable and ui/apikey.js never opens.
+ *
+ * It stays callable rather than throwing because a caller reaching it is not
+ * an error the way `postRun()` is, and it deliberately does NOT write to
+ * localStorage: persisting a secret from a page that cannot use it would
+ * leave a real API key in browser storage for a file that has no server to
+ * send it to.
+ */
+export function setApiKey() { /* no request is ever issued from this file */ }
+
 export async function getGeometry(id) {
   return timed(() => {
     const r = runOr404(id);

@@ -20,6 +20,14 @@ Every dataset this project ships with is open, public research data (10x
 Genomics/GEO Xenium and Visium sections) with no patient-identifiable
 information — see `docs/DATA_INVENTORY.md`.
 
+**If you want the commands rather than the model, read
+[`RUNBOOK_DEPLOY.md`](RUNBOOK_DEPLOY.md) instead.** This page explains what each
+mode *means* and what it does not do for you; the runbook is the shortest path
+from a fresh clone to a finished simulation, with every command executed and
+every output copied from the session that ran it. It also lists what that
+exercise found broken, which on the last pass was seven things — including the
+command this page led with in §1b.
+
 ## 0. Field testing on your own tissue
 
 A field tester may point Codon at **de-identified tissue only**. That is a real
@@ -141,7 +149,55 @@ codon studio --host 0.0.0.0
 ```
   api key     Xk3n... [generated (not persisted -- save it now)]
               every request needs header: X-API-Key: Xk3n...
+  tissue roots /path/to/repo/data_cache  [defaulted for this non-loopback bind]
+              tissue outside that directory will be REFUSED; set TMESIM_STUDIO_DATA_ROOTS to include yours
 ```
+
+Both of those lines are real output, copied from a run. Note the **second**
+one: a non-loopback bind now confines the scanner as well as authenticating it
+(§1c, §4). If your samples live outside this repo, that line is telling you the
+server will refuse them until you say where they are.
+
+**That command did not run until 2026-08-22, and this page led with it anyway.**
+`--api-key` was an argument of `python -m app.server` only; `codon studio` is a
+thin delegate and its subparser never forwarded the flag, so the first thing
+this section told a reader to type exited 2 with `unrecognized arguments:
+--api-key`. It was found by running the documentation rather than reading it,
+and fixed in the CLI rather than in the prose — `codon studio` is the branded
+entry point and the flag matters most on exactly the non-loopback bind this
+section is about. Verified after the fix: the banner reads `[set via
+--api-key]`, an unkeyed request is `401` and a keyed one is `200`.
+
+All three spellings now work and are equivalent, except that `--api-key` beats
+an exported variable (§4):
+
+```bash
+codon studio --host 0.0.0.0 --api-key <a-real-secret>
+TMESIM_STUDIO_API_KEY=<a-real-secret> codon studio --host 0.0.0.0
+python -m app.server --host 0.0.0.0 --api-key <a-real-secret>
+```
+
+The environment variable is the one that also composes with Docker's `-e` and
+systemd's `Environment=`, which is why the rest of this page uses it.
+
+**One thing to know before you rely on reading that key out of a log file.**
+The startup banner goes to **stdout**, and CPython block-buffers stdout when it
+is a pipe — which is what systemd, `nohup`, and any supervisor give you.
+Measured on this repo, `codon studio` with stdout redirected to a file:
+
+| | first lines of the log |
+|---|---|
+| default | `INFO: Uvicorn running on ...` at line 4, `Codon Studio backend` at line **5** |
+| `PYTHONUNBUFFERED=1` | `Codon Studio backend` at line 1, `INFO: Uvicorn running` at line **30** |
+
+So by default the banner — including an **auto-generated API key, which is
+printed exactly once and never persisted** — lands *after* the server is
+already accepting requests, and until the buffer fills it is not in the file at
+all. The Docker image sets `ENV PYTHONUNBUFFERED=1` for precisely this reason
+and the comment in the `Dockerfile` describes the failure; nothing sets it on
+the `codon studio` path. **If you are running this under systemd or behind any
+redirect, set `PYTHONUNBUFFERED=1` too**, or pass `--api-key` yourself so there
+is no generated key you need to go looking for.
 
 Passing any `--host` other than `127.0.0.1`/`localhost`/`::1` with no
 `--api-key` and no `TMESIM_STUDIO_API_KEY` environment variable **auto-
@@ -208,7 +264,21 @@ been built and run.** On `linux/arm64`, measured rather than reasoned about:
   published port — so the `CMD` really does bind an address `-p` can reach.
   `docker stop -t 30` **exits 0 immediately**: PID 1 handles SIGTERM, there is
   no 30 s wait and no SIGKILL.
-* A real end-to-end run completed **in-container in 4 s on 40,887 cells**.
+* A real end-to-end run — reconstruction plus transport plus metrics, submitted
+  over the published port and polled to `done` — completes in-container on
+  **40,887 cells**. On the stock `GET /api/defaults` spec (`xenium_319`,
+  temozolomide, `dx 12 um`, 6 h window, `plasma_peak 50 uM`) that is
+  **`runtime_s` 47.13 cold**, on a 4-CPU VM-backed daemon. The reported
+  `kill_fraction` was **0.11221232991768859**, bit-identical across two
+  submissions in the same container.
+
+  This line used to read "in 4 s on 40,887 cells" and that could not be
+  reproduced. The defect is not really the number: it is that **a runtime was
+  quoted with no RunSpec attached**, and on this product a runtime without a
+  spec is not a measurement — the window, the mesh and the compound each move
+  it. Quote the spec or don't quote the time. Do not read the figure above as a
+  benchmark either; it is one machine, and the point of measuring it was to
+  establish that a real run finishes in a container at all.
 * With **no cache mounted**, `/api/sections` reports **7 sections, 0
   available**, each with a reason, and the server still boots. Mounting
   `data_cache` read-only makes **all 7 available**.
@@ -353,17 +423,69 @@ a valid Xenium bundle:
 | root image | `platform: xenium`, `confidence: 1.0`, `ingestable: true`, and the absolute path of every file inside it |
 | uid 10001 | `platform: unknown`, `confidence: 0.0`, `ingestable: false`, `"/root/probe is not a directory and does not exist"` |
 
-Read what that table does and does not say. **The route is still unconfined and
-still answers `200`** — `scan {"path": "/etc"}` returns `200` under both,
-because `/etc` is world-readable and a non-root user can list it perfectly
-well. What changed is the *set of files the process can reach*, not the
-route's behaviour. **In this image's default configuration the key is still
-equivalent to read access as uid 10001 on that host** — the `path`-root
-restriction §2 named now exists, but it is opt-in and nothing here sets it. Pass
-`-e TMESIM_STUDIO_DATA_ROOTS=/app/data_cache` (§4) and a `scan` of a path
-outside that root is refused with a `403` before the filesystem is touched at
-all, under either uid. That is the route's behaviour, measured against a local
-server rather than inside this image; the container adds nothing to it.
+Read what that table does and does not say. It is about the **uid**, and at the
+time it was measured the uid was the only control in the image: the route was
+unconfined, so `scan {"path": "/etc"}` answered `200` under both rows, because
+`/etc` is world-readable and a non-root user can list it perfectly well. What
+the `USER` line changed is the *set of files the process can reach*, not the
+route's behaviour.
+
+**That is no longer the whole story, and this paragraph used to say the
+opposite of what the image now does.** It read: "the `path`-root restriction §2
+named now exists, but it is opt-in and nothing here sets it." Something does
+now. The default `CMD` binds `0.0.0.0`, and on a non-loopback bind
+`app/server/__main__.py` fills in `TMESIM_STUDIO_DATA_ROOTS` with
+`<repo>/data_cache` — which inside this image is `/app/data_cache`, the mount
+point — exactly as it fills in an API key. So a stock `docker run` gets **both**
+halves of §2's advice without being asked, and says so on startup:
+
+```
+  api key     verify-key-2026  [set via TMESIM_STUDIO_API_KEY]
+  tissue roots /app/data_cache  [defaulted for this non-loopback bind]
+              tissue outside that directory will be REFUSED; set TMESIM_STUDIO_DATA_ROOTS to include yours
+```
+
+Measured in that container, with a valid key:
+
+| `scan {"path": ...}` | |
+|---|---|
+| `/etc` | **403** `path_outside_data_roots` — refused before the filesystem is touched |
+| `/app` | **403** — the repo root is outside the allowlist, and being the *parent* of a root does not admit it |
+| `/app/data_cache/../etc` | **403** — the path is resolved first, so `..` cannot walk out |
+| `data_cache/<a real sample>` | **200** — resolves inside the root, and is scanned |
+
+The cost is the one you would expect and it is the reason this is worth
+knowing before a field test: **a sample that is not under the mounted
+`data_cache` is refused**, including one bind-mounted somewhere else in the
+container. Add it explicitly, remembering that this is `os.pathsep`-separated
+and that §1d's re-register command needs `data_cache` in the list too:
+
+```bash
+docker run -p 127.0.0.1:8000:8000 \
+  -v $(pwd)/data_cache:/app/data_cache:ro \
+  -v /srv/tissue:/tissue:ro \
+  -e TMESIM_STUDIO_DATA_ROOTS=/app/data_cache:/tissue \
+  -e TMESIM_STUDIO_API_KEY=<your-key> \
+  codon-studio
+```
+
+Two things that are **not** true of this default, both checked rather than
+assumed. It does not fire on a loopback bind: `docker run codon-studio --host
+127.0.0.1` still prints `api key NONE` and still answers `scan {"path":
+"/etc"}` with `200`, so the §1a workflow is untouched. And it does not
+overwrite a value you set — including an empty one. `-e
+TMESIM_STUDIO_DATA_ROOTS=` (no value) is read as "you asked for confinement and
+named no directory", and the server refuses **every** scan rather than falling
+back to the default root or to unconfined:
+
+```
+  tissue roots NONE -- every scan is refused  [set via TMESIM_STUDIO_DATA_ROOTS]
+```
+
+A scan of `/app/data_cache` — the directory the automatic default *would* have
+allowed — then returns `403`. That is the intended behaviour (§4) and it is
+what makes the auto-default safe to have: it can only ever add confinement to a
+deployment that specified none.
 
 **What this costs you, and it is only the one thing:** a **host directory**
 bind-mounted over a writable path arrives with the *host's* ownership, and uid
@@ -503,7 +625,10 @@ What is on the other end of that URL is worse than "your tissue data":
   and public, that is a filesystem reconnaissance primitive on the host, not just
   access to the sections you meant to share. Verified by request, not inferred.
   `TMESIM_STUDIO_DATA_ROOTS` (§4) bounds which directories it will read, and is
-  worth setting here as well as a key — but it is off unless you set it.
+  worth setting here as well as a key. **The automatic confinement does not
+  help you here**: like the automatic key, it keys off the bind address, and
+  the whole point of this section is that you are on a loopback bind. Both
+  defaults are off, and a tunnel makes neither of them fire. Set both by hand.
 * The destructive routes are equally open: `DELETE /api/sections/{id}` unregisters
   an ingested section, `DELETE /api/compounds/{id}` forgets a stored compound, and
   `DELETE /api/projects/{id}` removes a project. `DELETE /api/runs/{id}` and
@@ -532,18 +657,30 @@ If the thing in front of Codon does not check who the caller is, Codon must.
   bundle one, to avoid maintaining certificate/domain logic orthogonal to the
   simulator itself).
 * **Multi-user accounts.** One shared key, not per-user identity. See §1b.
-* **Confining `POST /api/sections/scan` to a directory root — unless you turn it
-  on.** The key makes `scan` **authenticated, not safe**. It takes an arbitrary
-  `path` in the request body, so with no allowlisted root any tester holding the
-  key can enumerate and read any directory the *server process* can read,
-  anywhere on the host, not just under `data_cache/`. **That is still the
-  default.** The allowlist now exists — `TMESIM_STUDIO_DATA_ROOTS`, §4 — but it
-  is opt-in, because the bring-your-own-tissue workflow legitimately points the
-  scanner outside this repo and a default root would break it silently. **Until
-  you set it, treat the key as equivalent to shell read access on the host, and
-  hand it out on that basis.** Set it before you give the key to anyone who is
-  not you. The other control, which applies either way, is §0's: run the server
-  as a user that cannot read anything you would mind a tester listing.
+* **Confining `POST /api/sections/scan` to a directory root — on a loopback
+  bind, unless you turn it on.** The key makes `scan` **authenticated, not
+  safe**. It takes an arbitrary `path` in the request body, so with no
+  allowlisted root any tester holding the key can enumerate and read any
+  directory the *server process* can read, anywhere on the host, not just under
+  `data_cache/`. The allowlist that stops that is `TMESIM_STUDIO_DATA_ROOTS`,
+  §4.
+
+  **Whether it is on by default depends entirely on the bind address, so work
+  out which case you are in.** On a **non-loopback** bind — `--host 0.0.0.0`,
+  which is every stock `docker run` — it is filled in with `<repo>/data_cache`
+  automatically, alongside the auto-generated key, and the startup banner names
+  the directory it chose. On a **loopback** bind it is **off**, deliberately:
+  bring-your-own tissue is the product's main input, §0 tells you to copy a
+  sample to a study-code directory that is almost never inside this repo, and
+  confining the single-user workflow by default would break it silently. The
+  first unconfined scan in each process prints a warning naming this variable.
+
+  **So on a loopback bind, until you set it, treat the key as equivalent to
+  shell read access on the host and hand it out on that basis** — and note from
+  §1e that a loopback bind is exactly the case where a tunnel can publish that
+  API with no key generated either. Set it before you give the key to anyone
+  who is not you. The other control, which applies either way, is §0's: run the
+  server as a user that cannot read anything you would mind a tester listing.
 
   **The Docker image now does that for you** — it runs as `codon`, uid 10001,
   after a spell of running as root, i.e. of doing the precise opposite of the
@@ -624,13 +761,19 @@ anything else that mutates it. It also means there is no restart-shaped moment
 at which an operator gets to notice that traces are being served, or that a
 scan root was widened.
 
-`codon studio` / `python -m app.server` writes two of them into its own
-environment (`TMESIM_STUDIO_API_KEY`, `TMESIM_STUDIO_ALLOWED_HOSTS`), and in both
-cases a value you exported yourself **beats the automatic behaviour and is never
-clobbered** — so `-e` on `docker run`, `Environment=` in a systemd unit and a
-plain shell export all compose correctly. An explicit `--api-key` on the command
-line still overrides the exported key; that is the one deliberate exception, and
-it is the ordering you'd expect.
+`codon studio` / `python -m app.server` writes **three** of them into its own
+environment before the app is built — `TMESIM_STUDIO_API_KEY`,
+`TMESIM_STUDIO_ALLOWED_HOSTS` and, since the confinement default landed,
+`TMESIM_STUDIO_DATA_ROOTS` — and in all three cases a value you exported
+yourself **beats the automatic behaviour and is never clobbered**, so `-e` on
+`docker run`, `Environment=` in a systemd unit and a plain shell export all
+compose correctly. "Never clobbered" includes an **empty** value: exporting
+`TMESIM_STUDIO_DATA_ROOTS=` is read as a confinement you asked for and left
+empty, and every scan is refused rather than the default root being filled in
+behind you (verified; §1c). An explicit `--api-key` on the command line still
+overrides the exported key — that is the one deliberate exception, it is the
+ordering you'd expect, and it is available only on `python -m app.server`
+(§1b).
 
 ### `TMESIM_STUDIO_API_KEY`
 
@@ -651,7 +794,10 @@ rather than failing to render.
   not, which is exactly the gap this variable closes by hand.
 * `--api-key` sets the same thing and takes precedence over the exported value.
   `--api-key ''` explicitly disables the gate even on a non-loopback bind; the
-  warning still prints, which is the point of it.
+  warning still prints, which is the point of it. `codon studio` forwards the
+  flag to `python -m app.server` and preserves all three states, including the
+  `--api-key ''` one — it did not accept the flag at all until 2026-08-22, when
+  running §1b's own headline command found that out (§1b).
 
 ### `TMESIM_STUDIO_ALLOWED_HOSTS`
 
@@ -762,9 +908,19 @@ planted inside an allowed root, and a `..` that traverses *through* a symlink
 are all refused. Containment is by path component, so a root of `/data` allows
 `/data` itself and `/data/anything`, and does **not** allow `/data_other`.
 
-* **Unset:** no confinement. `scan` reads any directory the server process can
-  read, exactly as it always has, and **the first scan in each process prints a
-  warning on stderr** naming this variable and the path it just read. This is
+* **Unset on a NON-LOOPBACK bind:** `codon studio` / `python -m app.server`
+  fills it in with `<repo>/data_cache` before the app is built and prints the
+  directory it chose, on the same principle as the auto-generated API key: the
+  moment the server is reachable from another machine, an unconfined
+  filesystem-scan route is not a default anyone chose. **If your samples live
+  outside this repo you must set it yourself** — the fill-in is a floor for a
+  deployment that specified nothing, not a guess at where your tissue is, and
+  it will `403` a directory you legitimately meant to scan. Inside the Docker
+  image this resolves to `/app/data_cache`, the documented mount point (§1c).
+* **Unset on a LOOPBACK bind:** no confinement. `scan` reads any directory the
+  server process can read, exactly as it always has, and **the first scan in
+  each process prints a warning on stderr** naming this variable and the path
+  it just read. This is
   the same trade as §1a's unauthenticated loopback default: bring-your-own
   tissue is the product's main input and the documented workflow points the
   scanner at wherever the operator's export actually lives (§0 tells you to copy

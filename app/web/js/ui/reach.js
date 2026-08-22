@@ -55,7 +55,7 @@
 // exactly how `1x IC50` came to be defended as though it meant something.
 
 import { h, clear } from '../util/dom.js';
-import { pct, num, NULL_GLYPH } from '../util/fmt.js';
+import { pct, num, sci, NULL_GLYPH } from '../util/fmt.js';
 
 /* Chart geometry. The rail is ~347 px wide, so these are drawn into a viewBox
  * and scaled by CSS rather than sized in pixels. */
@@ -157,16 +157,20 @@ function lineChart({ xs, ys, xLabel, yLabel, fmtX, fmtY, markIndex, yMax }) {
 }
 
 /** A prose paragraph at the disclosure floor. Every sentence on this panel goes
- *  through here so none of them can drift below it. */
-function prose(text, cls) {
-  return h('p' + (cls ? '.' + cls : ''), {
+ *  through here so none of them can drift below it.
+ *
+ *  Variadic, so a paragraph can carry glossed terms (see `term()`) inline
+ *  rather than being forced to a single flat string. A lone string argument
+ *  still behaves exactly as before. */
+function prose(...kids) {
+  return h('p', {
     style: {
       margin: '0 0 var(--sp-4)',
       fontSize: 'var(--fs-disclosure)',
       lineHeight: 'var(--lh-body)',
       color: 'var(--fg-1)',
     },
-  }, text);
+  }, ...kids);
 }
 
 function microLabel(text) {
@@ -177,6 +181,117 @@ function microLabel(text) {
       textTransform: 'uppercase', margin: 'var(--sp-4) 0 var(--sp-2)',
     },
   }, text);
+}
+
+/* ------------------------------------------------- INVENTED VOCABULARY ---
+ * Words this project made up, and what they mean to someone who has never
+ * read this repo.
+ *
+ * A first-time reader was measured against this panel and stalled on all six.
+ * They are not obscure by accident — each one names a quantity that had no
+ * name before, which is exactly the kind of term a reader cannot look up and
+ * cannot guess. "Under-reached fraction" in particular reads as though it must
+ * mean "the fraction the drug failed to reach", and it does not: it is a count
+ * against a threshold that is itself a chosen convention.
+ *
+ * Rendered as a `<abbr>` with a dotted underline: the term keeps its exact
+ * spelling (so it still matches the results files and the API payload) and
+ * acquires a hover gloss and a screen-reader expansion. NOTHING is replaced —
+ * a reader who already knows the vocabulary sees the same words in the same
+ * places. This adds a reading, it does not substitute one. */
+const GLOSSARY = {
+  'under-reached fraction':
+    'The share of viable tumour cells whose exposure sits below a chosen '
+    + 'fraction of the best-perfused tissue in this same map. It is a count '
+    + 'against a threshold, NOT a measurement of where the drug failed to go — '
+    + 'the threshold is a reporting convention this project picked, and the '
+    + 'whole ladder of thresholds is printed so the choice stays visible.',
+  'ladder':
+    'The full table of thresholds, rather than one. Printed because reading a '
+    + 'single threshold as "the answer" is the mistake that made "1x IC50" look '
+    + 'settled when it was not.',
+  'rung':
+    'One row of that table — one threshold. Different rungs have very '
+    + 'different robustness, so "the ladder moves X" and "the rung you are '
+    + 'using moves X" are different statements.',
+  'delivery spread':
+    'How uneven delivery is inside this one section: the exposure of the '
+    + 'best-perfused tenth of tumour cells divided by that of the worst-'
+    + 'perfused tenth. Both numbers come from the same map, so the dose, the '
+    + 'potency and the vessel-wall permeability all cancel.',
+  // Two entries, because the reference is NOT the same physical quantity in
+  // the two modes: the finite-window map normalises by an exposure (uM*s), the
+  // steady map by a settled concentration (uM). The payload field is called
+  // `E_ref_uM_s` in both, which is why the word on screen is chosen from
+  // `E_ref_units` and never from the field name.
+  'reference exposure':
+    'The exposure in the tissue immediately next to a vessel, in this same '
+    + 'run. Every ratio on this panel is some other exposure divided by this '
+    + 'one, which is what makes those ratios carry no dose and no potency.',
+  'reference concentration':
+    'The settled drug concentration in the tissue immediately next to a '
+    + 'vessel, in this same run. Every ratio on this panel is some other '
+    + 'concentration divided by this one, which is what makes those ratios '
+    + 'carry no dose and no potency.',
+  'exposure':
+    'The time-integral of drug concentration at a point — concentration '
+    + 'multiplied by time, in uM.s. It is what the transport solve produces; '
+    + 'it is not a concentration and not a dose.',
+};
+
+/** The term, verbatim, carrying its plain-language gloss. */
+function term(word) {
+  const gloss = GLOSSARY[String(word).toLowerCase()];
+  if (!gloss) return word;
+  return h('abbr.gloss', { title: gloss }, word);
+}
+
+/* The axis markers the backend already writes into `scale_invariance`:
+ * "(1) PLASMA/DOSE SCALE:", "(2) TISSUE CAPACITY:", "(3) TRANSVASCULAR
+ * PENETRANCE:". Deliberately narrow — a digit in parens, then SHOUTED words,
+ * then a colon — so it cannot fire on ordinary prose.
+ *
+ * The em dash is in the class because the two modes do not word the marker
+ * identically: the finite-window note writes "(2) TISSUE CAPACITY:" and the
+ * steady-state note writes "(2) TISSUE CAPACITY — A STATEMENT ABOUT THE MAP:".
+ * Without it the steady note splits into two parts instead of three and the
+ * capacity argument — the whole reason the product moved to a steady map —
+ * stays buried inside the plasma paragraph. Nothing is lost either way; the
+ * lossless contract on splitAxes() holds for any input. */
+const AXIS_MARK = /\(\d+\)\s+[A-Z][A-Z0-9 /,'–—-]*[A-Z]\s*:/g;
+
+/**
+ * Split one long caveat into `{head, body}` paragraphs on its own axis
+ * markers, LOSSLESSLY.
+ *
+ * The contract, and the only thing that makes this safe to do to a caveat:
+ *
+ *     splitAxes(s).map(p => (p.head || '') + p.body).join('') === s
+ *
+ * for every input, including one with no markers at all (which returns a
+ * single part carrying the whole string). Nothing is dropped, nothing is
+ * reordered, nothing is reworded — the marker is promoted from mid-sentence
+ * to its own line and that is the entire transformation.
+ *
+ * @param {string} s
+ * @returns {{head: string|null, body: string}[]}
+ */
+export function splitAxes(s) {
+  const text = String(s);
+  const marks = [];
+  AXIS_MARK.lastIndex = 0;
+  let m;
+  while ((m = AXIS_MARK.exec(text)) !== null) marks.push({ at: m.index, mark: m[0] });
+  if (!marks.length) return [{ head: null, body: text }];
+
+  const out = [];
+  if (marks[0].at > 0) out.push({ head: null, body: text.slice(0, marks[0].at) });
+  for (let i = 0; i < marks.length; i += 1) {
+    const start = marks[i].at + marks[i].mark.length;
+    const end = i + 1 < marks.length ? marks[i + 1].at : text.length;
+    out.push({ head: marks[i].mark, body: text.slice(start, end) });
+  }
+  return out;
 }
 
 // Leading zero KEPT deliberately. Stripped, `0.1x` renders as `.1x`, which in a
@@ -190,7 +305,9 @@ export function createReachPanel() {
 
   function renderEmpty(msg) {
     clear(el);
-    el.appendChild(prose(msg, 'dim'));
+    const p = prose(msg);
+    p.classList.add('dim');
+    el.appendChild(p);
   }
 
   /**
@@ -332,6 +449,67 @@ export function createReachPanel() {
     /* ---- DELIVERY EVIDENCE — the half that rules delivery in or out ----- */
     el.appendChild(microLabel('delivery evidence'));
 
+    /* ---- WHICH QUESTION THIS MAP ANSWERS -------------------------------
+     * MOVED TO THE TOP OF THIS HALF, 2026-08-22, and reworded from a label
+     * into a question.
+     *
+     * The payload has always known whether the map came from a converged
+     * steady state or from a finite exposure window; when it was first put on
+     * screen it went in at the BOTTOM of the panel, under every caveat it
+     * governs. Measured on a first session: a reader reaches the falloff
+     * curve, the reach ladder and four capacity caveats — all of which mean
+     * different things in the two modes — roughly 600 words before being told
+     * which mode they are in. By then the reading is already formed.
+     *
+     * It leads this half instead. It does NOT lead the whole panel, and that
+     * placement is deliberate: the verdict above (delivery vs dose) is read
+     * off the per-cell mechanism attribution, which is not this object and
+     * does not change with it. A banner over the verdict saying "FINITE
+     * WINDOW" would attach a qualifier to a number it does not qualify.
+     *
+     * Phrased as the question rather than the object name. "steady_state" is
+     * an implementation word; "what does this tissue's geometry permit" is
+     * the thing a bench scientist is actually being handed, and the two modes
+     * are only distinguishable to a newcomer if the difference is stated as
+     * two different questions rather than two different nouns.
+     *
+     * Three states, deliberately, because there are three. A record written
+     * before `window_mode` existed has the key ABSENT, which is NOT the same
+     * as finite_window: treating a missing key as the historical default is
+     * how a record ends up labelled with a claim nobody verified it makes.
+     * Absent is reported as unknown and says so. */
+    const wmode = reach.window_mode;
+    if (wmode === 'steady_state' || wmode === 'finite_window') {
+      const steady = wmode === 'steady_state';
+      el.appendChild(h('div.caveat.info', h('span',
+        h('b', steady
+          ? 'THIS ANSWERS: WHAT DOES THIS TISSUE’S GEOMETRY PERMIT? '
+          : 'THIS ANSWERS: WHAT DID THIS EXPOSURE WINDOW ACHIEVE? '),
+        steady
+          ? 'The map below is the reach this geometry permits once transport '
+            + 'has settled — vessel spacing and this compound\'s transport, with '
+            + 'no dosing schedule in it. No exposure window enters the '
+            + 'computation, so nothing below is a statement about how long the '
+            + 'drug was present. '
+          : 'The map below is the exposure this run actually accumulated over '
+            + 'its own window, so it is a property of the schedule and the '
+            + 'window length as well as of the tissue. It is NOT the same '
+            + 'object as "the reach this geometry permits" — a longer window '
+            + 'or a different schedule moves it. ',
+        h('b', 'These are different questions'),
+        ', and an answer to one is not an answer to the other.',
+        reach.window_note ? ' ' + String(reach.window_note) : '')));
+    } else {
+      el.appendChild(h('div.caveat', h('span',
+        h('b', 'WHICH QUESTION THIS ANSWERS IS NOT RECORDED. '),
+        'This run predates the field that says whether the map below is the '
+        + 'reach the geometry permits (settled transport, no window) or the '
+        + 'reach one finite exposure window achieved (entangled with the '
+        + 'schedule). Those are different questions, and which one this is '
+        + 'cannot be read off the record. It is not being assumed to be '
+        + 'either.')));
+    }
+
     /* SCOPE: this half means what it claims ONLY where the cell positions were
      * MEASURED. It is not a data-provenance footnote, it is a statement about
      * this specific figure, so it sits on top of it.
@@ -426,7 +604,7 @@ export function createReachPanel() {
                            color: 'var(--fg-0)' } }, num(p90 / p10, 2) + 'x'),
       h('span', { style: { fontSize: 'var(--fs-disclosure)', color: 'var(--fg-1)',
                            lineHeight: 'var(--lh-body)' } },
-      h('b', 'DELIVERY SPREAD'), ' — the best-perfused tenth of tumour cells '
+      h('b', term('DELIVERY SPREAD')), ' — the best-perfused tenth of tumour cells '
         + 'receives this many times the exposure of the worst-perfused tenth. A '
         + 'ratio of two percentiles of one field: no dose, no potency, no '
         + 'threshold to choose, and computed over the tumour cell set rather '
@@ -454,13 +632,55 @@ export function createReachPanel() {
         + 'brain-penetration or barrier result.')));
     }
 
+    /* THE REFERENCE EXPOSURE, in that order: what it is, then where it came
+     * from. This paragraph used to OPEN on the backend's `E_ref_source`
+     * string, which is a Python expression —
+     * `delivery_metrics.penetration_length_fit(...)['drug']['perivascular_mean']`
+     * — printed as the first eleven words a bench scientist reads about the
+     * quantity every ratio on this panel is divided by. The expression is not
+     * removed: it is the traceable provenance and it is the thing an engineer
+     * greps for. It is DEMOTED to a mono provenance line under the sentence
+     * that says, in words, what the quantity is. */
+    /* WHICH QUANTITY THE REFERENCE IS — and it is NOT the same quantity in the
+     * two modes. The finite-window map normalises by an EXPOSURE (AUC, uM*s);
+     * the steady map normalises by a CONCENTRATION (uM). The payload says so in
+     * `E_ref_units`, and the field it arrives in is called `E_ref_uM_s` in both
+     * cases, which is a name that is simply wrong in steady mode. Calling a
+     * concentration an exposure on screen would be this panel repeating that
+     * mistake in words, where a reader can act on it — so the word is read off
+     * the units, never assumed. */
+    const refUnits = reach.E_ref_units || (reach.units && reach.units.E_ref) || 'uM*s';
+    const refIsConc = /^\s*uM\s*$/i.test(String(refUnits));
     el.appendChild(prose(
-      `The reference is ${reach.E_ref_source || 'the perivascular mean of this run'}`
-      + `. It is an exposure, in ${(reach.units && reach.units.E_ref) || 'uM.s'}, `
-      + `measured over tissue in the first ${(reach.falloff && reach.falloff.bin_um) || 10} um `
-      + 'distance bin from the nearest endothelial cell. Every number in this '
-      + 'section is that exposure divided into another one, so the ratio carries '
-      + 'no dose and no potency.'));
+      'Every ratio on this panel is ',
+      refIsConc ? 'some concentration' : 'some exposure',
+      ' divided by the ',
+      term(refIsConc ? 'reference concentration' : 'reference exposure'), ': the ',
+      refIsConc ? 'settled drug concentration' : term('exposure'),
+      ` in the tissue immediately beside a vessel — the first `
+      + `${(reach.falloff && reach.falloff.bin_um) || 10} um distance bin from the `
+      + 'nearest endothelial cell — in this same run. Because both halves of '
+      + 'every ratio come from one map, the dose and the potency divide out and '
+      + 'no number here carries either.'));
+    if (reach.E_ref_source) {
+      el.appendChild(h('div', {
+        style: {
+          fontSize: 'var(--fs-micro)', fontFamily: 'var(--font-mono)',
+          color: 'var(--fg-2)', lineHeight: 'var(--lh-body)',
+          margin: '0 0 var(--sp-4)', overflowWrap: 'anywhere',
+        },
+        title: 'The backend\'s own description of where this value is read '
+          + 'from, verbatim. Quoted so the number can be traced to the call '
+          + 'that produced it.',
+      }, `source · ${String(reach.E_ref_source)}`));
+    }
+    if (Number.isFinite(reach.E_ref_uM_s)) {
+      el.appendChild(prose(
+        `On this run it is ${sci(reach.E_ref_uM_s, 3)} ${refUnits}. That absolute `
+        + 'value is shown so the ratios can be unwound, not because it is '
+        + 'defensible on its own — it carries the plasma level and the delivery '
+        + 'law, and the ratios above are exactly what it is divided out of.'));
+    }
 
     /* ---- the curve ----------------------------------------------------- */
     const curve = reach.curve || {};
@@ -468,6 +688,20 @@ export function createReachPanel() {
     const cy = curve.under_reached_fraction || [];
     if (cx.length && cy.length === cx.length) {
       el.appendChild(microLabel('under-reached fraction vs threshold'));
+      /* WHAT THE READER IS LOOKING AT, BEFORE THE CHART.
+       * "Under-reached fraction" is a term this project invented, and it reads
+       * to a newcomer as "the fraction the drug did not reach" — a measurement.
+       * It is not one: it is a count of cells below a threshold, and the
+       * threshold is a convention. The chart used to arrive with only its own
+       * name above it, which is precisely the case where an invented word gets
+       * read as the meaning it merely sounds like. */
+      el.appendChild(prose(
+        'Read this as: "how much of the viable tumour sits below X times the ',
+        term(refIsConc ? 'reference concentration' : 'reference exposure'),
+        '?" Each row of the ', term('ladder'),
+        ' below is one threshold X. The curve is the point, not any one ',
+        term('rung'), ' of it — the thresholds are a reporting convention, '
+        + 'nothing in the tissue or the compound picks one out.'));
       el.appendChild(lineChart({
         xs: cx, ys: cy,
         xLabel: 'threshold', yLabel: 'under-reached',
@@ -625,41 +859,45 @@ export function createReachPanel() {
         + 'in Metrics, and treat a short one as close to a vessel map.')));
     }
 
-    /* ---- WHICH OBJECT THIS IS ------------------------------------------
-     * The payload has always known whether the map came from a converged
-     * steady state or from a finite exposure window; until now nothing put it
-     * on the screen. Those are different claims — "the reach this geometry
-     * permits" versus "the reach this exposure achieved" — and a panel that
-     * renders them identically invites the reader to carry a conclusion from
-     * one to the other.
+    /* ---- the invariance statement, from the backend --------------------
+     * RESTRUCTURED, NOT REDUCED, 2026-08-22.
      *
-     * Three states, deliberately, because there are three. A record written
-     * before `window_mode` existed has the key ABSENT, which is NOT the same
-     * as finite_window: treating a missing key as the historical default is
-     * how a record ends up labelled with a claim nobody verified it makes.
-     * Absent is reported as unknown and says so. */
-    const wmode = reach.window_mode;
-    if (wmode === 'steady_state' || wmode === 'finite_window') {
-      const label = wmode === 'steady_state' ? 'STEADY STATE' : 'FINITE WINDOW';
-      const gist = wmode === 'steady_state'
-        ? 'the reach this geometry permits once transport has converged — no '
-          + 'exposure window enters the computation'
-        : 'the reach achieved over one finite exposure window, which is a '
-          + 'property of that window as well as of the geometry';
-      el.appendChild(h('div.caveat.info', h('span',
-        h('b', label + ' — '), gist,
-        reach.window_note ? '. ' + String(reach.window_note) : '.')));
-    } else {
-      el.appendChild(h('div.caveat', h('span',
-        h('b', 'Object not recorded. '),
-        'This run predates the field that says whether the map is a converged '
-        + 'steady state or a finite-window exposure, so which one it is cannot '
-        + 'be read off the record. It is not being assumed to be either.')));
-    }
-
-    /* ---- the invariance statement, verbatim from the backend ----------- */
+     * This is one string and it is ~1,100 words — longer than everything else
+     * on this panel put together. It was rendered as a single undifferentiated
+     * `<span>`, and on a first session it was the block a reader bounced off
+     * hardest: it opens on an argument, contains three numbered axes, two
+     * dated self-corrections about what a previous version of itself got
+     * wrong, a digression about an estimator versus a field, and closes on the
+     * one sentence that most needs to be read — "an axis not named here was
+     * not tested."
+     *
+     * A caveat nobody reads protects nobody. That is an argument about
+     * PRESENTATION and never about content, so: not one word is removed, not
+     * one word is reordered, and nothing is collapsed or clamped. The string
+     * is split ONLY on the axis markers it already writes into itself —
+     * "(1) PLASMA/DOSE SCALE:", "(2) TISSUE CAPACITY:", "(3) TRANSVASCULAR
+     * PENETRANCE:" — so each swept axis becomes its own paragraph under its
+     * own name, in the original order, with the lead-in and the closing
+     * sentence kept as their own paragraphs around them.
+     *
+     * If the backend rewords those markers the regex stops matching and the
+     * whole string renders as one block again, exactly as it does today. That
+     * is the intended failure: degrade to the current behaviour, never to a
+     * partial caveat. `splitAxes` returns a single-element array on no match
+     * and the join is asserted lossless in tests/test_first_session.py. */
     if (reach.scale_invariance) {
-      el.appendChild(h('div.caveat.info', h('span', String(reach.scale_invariance))));
+      const full = String(reach.scale_invariance);
+      const parts = splitAxes(full);
+      el.appendChild(h('div.caveat.info', { title: full },
+        parts.map(({ head, body }) => h('div', { style: { margin: '0 0 var(--sp-3)' } },
+          head ? h('div', {
+            style: {
+              fontSize: 'var(--fs-micro)', color: 'var(--fg-2)',
+              fontFamily: 'var(--font-mono)', letterSpacing: 'var(--tr-wide)',
+              margin: '0 0 var(--sp-1)',
+            },
+          }, head) : null,
+          h('span', body)))));
     }
     if (reach.penetration_fit_error) {
       el.appendChild(h('div.caveat', h('span',

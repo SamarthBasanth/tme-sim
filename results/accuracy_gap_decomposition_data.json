@@ -1,0 +1,711 @@
+{
+ "verify": {
+  "alpha": 22.223477711172563,
+  "config": {
+   "arm": "A (uniform slab, Kyle's geometry) unless stated",
+   "dx_um": 2.0,
+   "ecm": 0.08747329648865268,
+   "thickness_um": 140.0,
+   "window_um": 30.0,
+   "exposure_s": 3600.0,
+   "convection": false,
+   "solver": "simulate_response, frozen"
+  },
+  "V1_reproduction": {
+   "doxorubicin": {
+    "R_auc_live": 2.997645248639645,
+    "R_auc_published": 2.997645248639645,
+    "rel_diff": 0.0,
+    "R_conc_live": 2.8613068686053995,
+    "lambda_um": 72.48923855044154
+   },
+   "daunorubicin": {
+    "R_auc_live": 3.6456683362306537,
+    "R_auc_published": 3.6456683362306537,
+    "rel_diff": 0.0,
+    "R_conc_live": 3.4987617966395756,
+    "lambda_um": 64.40440131892363
+   },
+   "mitoxantrone": {
+    "R_auc_live": 5.154056049706473,
+    "R_auc_published": null,
+    "rel_diff": null,
+    "R_conc_live": 4.990973224328317,
+    "lambda_um": 53.9637847629314
+   }
+  },
+  "V2_what_the_14x_is": {
+   "numerator": "Kyle 2004 Table 1 fluorescence near:far for daunorubicin (dimensionless concentration ratio)",
+   "denominator": "engine arm-A AUC near:far for daunorubicin (dimensionless exposure ratio)",
+   "value": 13.714906400864823,
+   "band_from_measured_sd": [
+    9.600434480605376,
+    17.82937832112427
+   ],
+   "note": "BOTH quantities are dimensionless. This is a ratio of ratios, NOT a ratio of two lengths.",
+   "the_other_number_3p7x": {
+    "R_sim": 1.2161773771880067,
+    "R_measured": 4.545454545454546,
+    "value": 3.7374930916445357,
+    "note": "sec. 6's C3 '~3.7x compressed' is the FOLD comparison. It is contained in the 14x: 14x = 3.7x (compound under-separation) x the doxorubicin-row residual."
+   }
+  },
+  "V3_transfer_function": {
+   "form": "R(lam) = [sinh(T/lam) - sinh((T-W)/lam)] / sinh(W/lam), T=140.0 um, W=30.0 um, steady state, Dirichlet near face, sealed far face",
+   "curve": [
+    {
+     "lambda_um": 5.0,
+     "R": 3576048707.613729
+    },
+    {
+     "lambda_um": 5.75,
+     "R": 202252600.60117784
+    },
+    {
+     "lambda_um": 6.6125,
+     "R": 16593317.993667142
+    },
+    {
+     "lambda_um": 7.604374999999999,
+     "R": 1878891.6250448853
+    },
+    {
+     "lambda_um": 8.745031249999998,
+     "R": 281169.83363960794
+    },
+    {
+     "lambda_um": 10.056785937499997,
+     "R": 53556.41885620578
+    },
+    {
+     "lambda_um": 11.565303828124996,
+     "R": 12570.951993800645
+    },
+    {
+     "lambda_um": 13.300099402343745,
+     "R": 3536.677629024519
+    },
+    {
+     "lambda_um": 15.295114312695306,
+     "R": 1164.7155635767162
+    },
+    {
+     "lambda_um": 17.5893814595996,
+     "R": 440.03168825828567
+    },
+    {
+     "lambda_um": 20.22778867853954,
+     "R": 187.45741575197812
+    },
+    {
+     "lambda_um": 23.26195698032047,
+     "R": 88.72487838803015
+    },
+    {
+     "lambda_um": 26.751250527368537,
+     "R": 46.063531873223724
+    },
+    {
+     "lambda_um": 30.763938106473816,
+     "R": 25.94320363390777
+    },
+    {
+     "lambda_um": 35.378528822444885,
+     "R": 15.699213536311483
+    },
+    {
+     "lambda_um": 40.68530814581162,
+     "R": 10.123705584088432
+    },
+    {
+     "lambda_um": 46.78810436768336,
+     "R": 6.9081895954924235
+    },
+    {
+     "lambda_um": 53.80632002283586,
+     "R": 4.958910068249354
+    },
+    {
+     "lambda_um": 61.877268026261234,
+     "R": 3.7259488412438864
+    },
+    {
+     "lambda_um": 71.15885823020041,
+     "R": 2.9176982631238144
+    },
+    {
+     "lambda_um": 81.83268696473047,
+     "R": 2.3719180813877645
+    },
+    {
+     "lambda_um": 94.10759000944003,
+     "R": 1.9943286806150995
+    },
+    {
+     "lambda_um": 108.22372851085603,
+     "R": 1.7279377088627947
+    },
+    {
+     "lambda_um": 124.45728778748443,
+     "R": 1.5370429845214297
+    },
+    {
+     "lambda_um": 143.12588095560707,
+     "R": 1.398554759822833
+    },
+    {
+     "lambda_um": 164.59476309894814,
+     "R": 1.2971144024964365
+    },
+    {
+     "lambda_um": 189.28397756379033,
+     "R": 1.2222539128777485
+    }
+   ],
+   "implied_lambda_um": {
+    "engine_daunorubicin_R_auc": 62.59818943460735,
+    "engine_doxorubicin_R_auc": 69.98645785018606,
+    "kyle_daunorubicin_50": 26.260132332221712,
+    "kyle_daunorubicin_35_minus1sd": 28.535086262903956,
+    "kyle_daunorubicin_65_plus1sd": 24.800461922924146,
+    "kyle_doxorubicin_11": 39.56378420167144,
+    "kyle_doxorubicin_6_minus1sd": 49.53098424112984,
+    "kyle_doxorubicin_16_plus1sd": 35.17965797087083
+   },
+   "headline": {
+    "engine_lambda_um_at_arm_A_ecm": 64.40440131892363,
+    "kyle_implied_lambda_um": 26.260132332221712,
+    "lambda_error_fold": 2.4525543323290164,
+    "lambda_error_band": [
+     2.2570249385455803,
+     2.59690329636126
+    ],
+    "D_over_k_error_fold": 6.015022753025828,
+    "mean_amplification_dlnR_dlnlambda": 2.9187331902325377,
+    "local_amplification_at_engine_lambda": -1.8091945352258638,
+    "local_amplification_at_kyle_lambda": -4.464548636681591
+   }
+  },
+  "V4_engine_vs_analytic": {
+   "drug": "daunorubicin",
+   "k_scaled_on_a_local_copy_only": true,
+   "sweep": [
+    {
+     "k_scale": 0.25,
+     "lambda_um": 128.80880263784726,
+     "R_auc_engine": 1.6227579961023204,
+     "R_conc_engine": 1.5080005354512789,
+     "R_analytic": 1.4988259171638763,
+     "engine_auc_over_analytic": 1.082686106184334,
+     "engine_conc_over_analytic": 1.006121203391494
+    },
+    {
+     "k_scale": 0.5,
+     "lambda_um": 91.08157782174145,
+     "R_auc_engine": 2.207749778509669,
+     "R_conc_engine": 2.087211848621791,
+     "R_analytic": 2.070996811741989,
+     "engine_auc_over_analytic": 1.06603243712995,
+     "engine_conc_over_analytic": 1.0078295808027649
+    },
+    {
+     "k_scale": 1.0,
+     "lambda_um": 64.40440131892363,
+     "R_auc_engine": 3.6456683362306537,
+     "R_conc_engine": 3.4987617966395756,
+     "R_analytic": 3.4598988762087393,
+     "engine_auc_over_analytic": 1.0536921646176767,
+     "engine_conc_over_analytic": 1.0112323862116517
+    },
+    {
+     "k_scale": 2.0,
+     "lambda_um": 45.540788910870724,
+     "R_auc_engine": 7.7362316918726375,
+     "R_conc_engine": 7.514604973563066,
+     "R_analytic": 7.40736958731232,
+     "engine_auc_over_analytic": 1.0443966107919884,
+     "engine_conc_over_analytic": 1.014476851058495
+    },
+    {
+     "k_scale": 4.0,
+     "lambda_um": 32.202200659461816,
+     "R_auc_engine": 22.666888788934465,
+     "R_conc_engine": 22.21503351565591,
+     "R_analytic": 21.85046628962085,
+     "engine_auc_over_analytic": 1.0373640767429033,
+     "engine_conc_over_analytic": 1.016684642844818
+    },
+    {
+     "k_scale": 8.0,
+     "lambda_um": 22.770394455435362,
+     "R_auc_engine": 101.87173485009669,
+     "R_conc_engine": 100.46856003471817,
+     "R_analytic": 98.84619331244268,
+     "engine_auc_over_analytic": 1.0306085792104365,
+     "engine_conc_over_analytic": 1.0164130419989705
+    },
+    {
+     "k_scale": 16.0,
+     "lambda_um": 16.101100329730908,
+     "R_auc_engine": 819.2697302360833,
+     "R_conc_engine": 811.4800146481632,
+     "R_analytic": 802.3804786113847,
+     "engine_auc_over_analytic": 1.021048931367233,
+     "engine_conc_over_analytic": 1.0113406747538605
+    },
+    {
+     "k_scale": 32.0,
+     "lambda_um": 11.385197227717681,
+     "R_auc_engine": 14724.44726326196,
+     "R_conc_engine": 14627.511203366435,
+     "R_analytic": 14653.060987623854,
+     "engine_auc_over_analytic": 1.0048717654078148,
+     "engine_conc_over_analytic": 0.9982563517425473
+    }
+   ]
+  },
+  "V5_estimator": {
+   "auc_over_snapshot": {
+    "doxorubicin": 1.0476489891839869,
+    "daunorubicin": 1.0419881512745954,
+    "mitoxantrone": 1.0326755560585288
+   },
+   "note": "the engine reports an AUC ratio; Kyle read a SNAPSHOT of frozen tissue. At the engine's own settings these differ by the factor above.",
+   "dx_sensitivity": [
+    {
+     "dx_um": 1.0,
+     "R_auc": 3.6251077387723014
+    },
+    {
+     "dx_um": 2.0,
+     "R_auc": 3.6456683362306537
+    },
+    {
+     "dx_um": 4.0,
+     "R_auc": 3.75828410029059
+    }
+   ],
+   "window_sensitivity": [
+    {
+     "window_um": 15.0,
+     "R_auc": 4.2222475050018256,
+     "R_analytic": 3.949545567733856
+    },
+    {
+     "window_um": 30.0,
+     "R_auc": 3.6456683362306537,
+     "R_analytic": 3.4598988762087393
+    },
+    {
+     "window_um": 45.0,
+     "R_auc": 3.1694352175818867,
+     "R_analytic": 2.995554147363344
+    }
+   ],
+   "exposure_sensitivity": [
+    {
+     "exposure_s": 600.0,
+     "R_auc": 4.823081522409158
+    },
+    {
+     "exposure_s": 3600.0,
+     "R_auc": 3.6456683362306537
+    },
+    {
+     "exposure_s": 21600.0,
+     "R_auc": 3.5218355683998657
+    }
+   ]
+  },
+  "V6_source": {
+   "sweep": [
+    {
+     "source_density": 0.25,
+     "R_auc": 3.6456683362306537
+    },
+    {
+     "source_density": 1.0,
+     "R_auc": 3.6456683362306537
+    }
+   ],
+   "max_rel_spread": 0.0,
+   "note": "arm A has NO vessel map and NO delivery geometry \u2014 it is a uniform slab with a planar source in column 0. The source candidate is ruled out for the 14x BY CONSTRUCTION; this sweep confirms the readout is invariant to source LEVEL too."
+  },
+  "V7_preparation_inputs": {
+   "ecm_sweep": [
+    {
+     "ecm": 0.0,
+     "lambda_um": 66.16407820610631,
+     "R_analytic": 3.2976632748540755
+    },
+    {
+     "ecm": 0.08747329648865268,
+     "lambda_um": 64.40440131892363,
+     "R_analytic": 3.4598988762087393
+    },
+    {
+     "ecm": 0.2,
+     "lambda_um": 62.06740703042219,
+     "R_analytic": 3.7044123427888187
+    },
+    {
+     "ecm": 0.4,
+     "lambda_um": 57.68050611858786,
+     "R_analytic": 4.278276440519099
+    }
+   ],
+   "phi_sweep": [
+    {
+     "phi": 0.7,
+     "hindrance": 0.22222222222222224,
+     "hindrance_rel_to_default": 1.4701665612481551,
+     "lambda_um": 78.09061045016391,
+     "R_analytic": 2.5322790546120513
+    },
+    {
+     "phi": 0.7892,
+     "hindrance": 0.1511544528897175,
+     "hindrance_rel_to_default": 1.0,
+     "lambda_um": 64.40440131892363,
+     "R_analytic": 3.4598988762087393
+    },
+    {
+     "phi": 0.85,
+     "hindrance": 0.10526315789473685,
+     "hindrance_rel_to_default": 0.6963946869070209,
+     "lambda_um": 53.74564411447354,
+     "R_analytic": 4.971260185618197
+    },
+    {
+     "phi": 0.9,
+     "hindrance": 0.0689655172413793,
+     "hindrance_rel_to_default": 0.4562585879735653,
+     "lambda_um": 43.50318694798682,
+     "R_analytic": 8.373661401263242
+    }
+   ],
+   "note": "arm A's slab uses ecm = 0.0875, the mean of the 10x Xenium human GBM SECTION, and a FIXED cell volume fraction phi = 0.7892 (two_route.DEFAULT_CELL_VOLUME_FRACTION). Neither was measured on an HCT-116 multicell layer, which is the preparation being scored."
+  },
+  "V8_transient_store": {
+   "D_eff_um2_s_daunorubicin_at_arm_A_ecm": 26.788909131437318,
+   "engine_is_equilibrated": {
+    "one_over_k_s": 154.83746982370764,
+    "T2_over_D_s": 731.6460668045273,
+    "exposure_s": 3600.0
+   },
+   "retardation_sweep": [
+    {
+     "R_f": 1.0,
+     "D_apparent_um2_s": 26.788909131437318,
+     "tau_dimensionless": 4.920411881284405,
+     "near_far_at_1h_no_loss": 1.0000055377396975
+    },
+    {
+     "R_f": 2.0,
+     "D_apparent_um2_s": 13.394454565718659,
+     "tau_dimensionless": 2.4602059406422025,
+     "near_far_at_1h_no_loss": 1.002403750171406
+    },
+    {
+     "R_f": 5.0,
+     "D_apparent_um2_s": 5.3577818262874635,
+     "tau_dimensionless": 0.9840823762568811,
+     "near_far_at_1h_no_loss": 1.1028306169430209
+    },
+    {
+     "R_f": 10.0,
+     "D_apparent_um2_s": 2.6788909131437317,
+     "tau_dimensionless": 0.49204118812844055,
+     "near_far_at_1h_no_loss": 1.4898251761702124
+    },
+    {
+     "R_f": 20.0,
+     "D_apparent_um2_s": 1.3394454565718659,
+     "tau_dimensionless": 0.24602059406422028,
+     "near_far_at_1h_no_loss": 2.7558182126688626
+    },
+    {
+     "R_f": 50.0,
+     "D_apparent_um2_s": 0.5357781826287463,
+     "tau_dimensionless": 0.09840823762568811,
+     "near_far_at_1h_no_loss": 13.599545873929797
+    },
+    {
+     "R_f": 90.0,
+     "D_apparent_um2_s": 0.29765454590485907,
+     "tau_dimensionless": 0.05467124312538228,
+     "near_far_at_1h_no_loss": 84.09612482709709
+    },
+    {
+     "R_f": 100.0,
+     "D_apparent_um2_s": 0.26788909131437316,
+     "tau_dimensionless": 0.049204118812844054,
+     "near_far_at_1h_no_loss": 128.50962055508077
+    },
+    {
+     "R_f": 200.0,
+     "D_apparent_um2_s": 0.13394454565718658,
+     "tau_dimensionless": 0.024602059406422027,
+     "near_far_at_1h_no_loss": 6289.360477883763
+    }
+   ],
+   "note": "PURE retarded diffusion with ZERO loss. Its steady state is uniform (ratio 1). Any ratio here is a TIME-SCALE effect."
+  },
+  "V9_split": {
+   "space": "log of the transport length lambda; terms are additive",
+   "total_ln": 0.8971300660668368,
+   "total_fold": 2.4525543323290164,
+   "doxorubicin_inherited": {
+    "ln": 0.6055239576048093,
+    "fold": 1.8322119588191241,
+    "share": 0.6749567097439105,
+    "what": "the residual on the compound alpha is FIT to. Not a prediction: calibrate_alpha() pins doxorubicin's L to the Primeau 2005 40-50 um half-distance anchor (PMID 16361566). This term IS the Primeau-vs-Kyle anchor conflict."
+   },
+   "daunorubicin_specific": {
+    "ln": 0.2916061084620275,
+    "fold": 1.3385756601598149,
+    "share": 0.3250432902560894,
+    "what": "the genuine out-of-sample prediction error \u2014 the compound-to-compound under-separation sec. 6 reports as '~3.7x compressed', expressed as a length"
+   },
+   "primeau_band_L_um": [
+    57.70780163555854,
+    72.13475204444818
+   ],
+   "kyle_dox_band_lambda_um": [
+    35.17965797087083,
+    49.53098424112984
+   ],
+   "bands_overlap": false,
+   "arm_A_ecm_inconsistency": {
+    "lambda_at_arm_A_ecm_0p0875": 64.40440131892363,
+    "lambda_at_calibration_ecm_0p4": 57.68050611858786,
+    "R_at_arm_A_ecm": 3.4598988762087393,
+    "R_at_calibration_ecm": 4.278276440519099,
+    "fold_on_R": 1.2365322206200187,
+    "what": "results/kyle2004_penetration.md sec. 4's L column is computed at ecm 0.4; arm A's slab is solved at ecm 0.0875. The file prints an L next to a run that does not have that L."
+   }
+  }
+ },
+ "anchors": {
+  "compound": "tirapazamine",
+  "ecm_reference": 0.4,
+  "engine": {
+   "D_eff_um2_s": 49.33219989048552,
+   "k_per_s": 0.0006918160135823861,
+   "lambda_um": 267.0360750530505,
+   "alpha": 22.223477711172563
+  },
+  "measured": {
+   "D_eff_um2_s": {
+    "V79-171b": 74.0,
+    "MGH-U1": 130.0,
+    "SiHa": 130.0
+   },
+   "k_per_s": {
+    "V79-171b": 0.008666666666666666,
+    "MGH-U1": 0.005166666666666667
+   },
+   "D_band": [
+    74.0,
+    130.0
+   ],
+   "k_band": [
+    0.005166666666666667,
+    0.008666666666666666
+   ],
+   "lambda_band_um": [
+    92.40379612581692,
+    158.6231077825064
+   ]
+  },
+  "D_error_fold_engine_over_measured": [
+   0.37947846069604246,
+   0.6666513498714259
+  ],
+  "k_error_fold_engine_over_measured": [
+   0.07982492464412148,
+   0.13389987359659086
+  ],
+  "lambda_error_fold_engine_over_measured": [
+   1.6834626353380548,
+   2.8898820854659957
+  ],
+  "mcl_appropriate_arm": {
+   "D_eff_um2_s": 77.00903010112671,
+   "k_per_s": 0.0006918160135823861,
+   "lambda_um": 333.63800955897904,
+   "D_inside_measured_band": true,
+   "lambda_error_fold": [
+    2.103337995473154,
+    3.6106526305986155
+   ],
+   "what": "the IMPERMEABLE-cell term alone, which results/cellular_exclusion.md sec. 4.1 and scorecard.py both name as the MCL-appropriate arm. If D_eff lands INSIDE its measured band on this arm, then on the preparation Kyle actually used the D term contributes NOTHING to the lambda error and k carries all of it."
+  },
+  "log_split": {
+   "vs_low_D_high_k": {
+    "k_term_ln": 1.263959742197624,
+    "D_term_ln": -0.20274404178247965,
+    "total_ln": 1.0612157004151443,
+    "lambda_fold": 2.8898820854659957,
+    "k_share_of_magnitude": 0.861768924307057,
+    "D_share_of_magnitude": 0.138231075692943,
+    "D_term_sign": "OPPOSITE \u2014 D_eff being too SMALL partially masks the k error"
+   },
+   "vs_high_D_low_k": {
+    "k_term_ln": 1.0053314851494835,
+    "D_term_ln": -0.48447872040818596,
+    "total_ln": 0.5208527647412975,
+    "lambda_fold": 1.6834626353380546,
+    "k_share_of_magnitude": 0.674805073424212,
+    "D_share_of_magnitude": 0.325194926575788,
+    "D_term_sign": "OPPOSITE \u2014 D_eff being too SMALL partially masks the k error"
+   }
+  },
+  "caveat": "scorecard.py declares the k row NOT_TESTABLE because the measured constant is anoxic bioreductive metabolism of a hypoxia-activated prodrug and the engine's k is a generic binding+clearance sink. That objection is about MECHANISM, not about commensurability of the number: both sit in the -kC slot of the same diffusion-reaction equation and both were fitted from the same MCL slab flux, so the LENGTH sqrt(D/k) they jointly determine is the quantity that experiment actually measures well. It is reported here as a DERIVED row and must be quoted with this caveat."
+ },
+ "prep": {
+  "declared_before_the_run": {
+   "ecm_mcl": 0.0,
+   "ecm_source": "results/cellular_exclusion.md sec. 4.1 and tmesim/validation/scorecard.py's arm-B note \u2014 an MCL is packed cells with little matrix, so the ECM tortuosity leg describes matrix this preparation does not have",
+   "phi_mcl": null,
+   "phi_source": "NO SOURCED VALUE EXISTS. results/cellular_exclusion.md sec. 4.1 records a literature search that returned nothing usable and logs it as an open item. Direction only is sourced: an MCL is likely DENSER than the section phi was measured on.",
+   "registered_prediction": "correcting ecm 0.0875 -> 0.0 lowers R by ~1.05x, i.e. the gap gets WORSE"
+  },
+  "config": "arm A, dx = 2 um, 140 um, 30 um windows, 1 h, convection OFF",
+  "daunorubicin": {
+   "shipped_ecm_0p0875": {
+    "lambda_um": 64.40440131892363,
+    "R_auc": 3.6456683362306537,
+    "gap_vs_measured": 13.714906400864823
+   },
+   "corrected_ecm_0p0": {
+    "lambda_um": 66.16407820610631,
+    "R_auc": 3.469421300664167,
+    "gap_vs_measured": 14.41162535966107
+   },
+   "fold_on_R": 0.9516557680755149,
+   "fold_on_lambda": 1.027322307965708
+  },
+  "doxorubicin": {
+   "shipped_ecm_0p0875": {
+    "lambda_um": 72.48923855044154,
+    "R_auc": 2.997645248639645,
+    "gap_vs_measured": 3.6695469568962125
+   },
+   "corrected_ecm_0p0": {
+    "lambda_um": 74.46981185031638,
+    "R_auc": 2.8698458891417795,
+    "gap_vs_measured": 3.8329584322346744
+   },
+   "fold_on_R": 0.9573667499328474
+  },
+  "phi_is_NOT_corrected_because": "NO SOURCED VALUE EXISTS. results/cellular_exclusion.md sec. 4.1 records a literature search that returned nothing usable and logs it as an open item. Direction only is sourced: an MCL is likely DENSER than the section phi was measured on.",
+  "phi_open_ended_sensitivity": [
+   {
+    "phi": 0.7,
+    "hindrance": 0.22222222222222224,
+    "lambda_um": 80.22422615811342,
+    "R_analytic": 2.4375045309788503,
+    "residual_gap": 20.51278238236589,
+    "phi_at_which_gap_closes": null
+   },
+   {
+    "phi": 0.7892,
+    "hindrance": 0.1511544528897175,
+    "lambda_um": 66.16407820610631,
+    "R_analytic": 3.2976632748540755,
+    "residual_gap": 15.162251519513479,
+    "phi_at_which_gap_closes": null
+   },
+   {
+    "phi": 0.85,
+    "hindrance": 0.10526315789473685,
+    "lambda_um": 55.21409915478453,
+    "R_analytic": 4.688236254117453,
+    "residual_gap": 10.664991542627016,
+    "phi_at_which_gap_closes": null
+   },
+   {
+    "phi": 0.9,
+    "hindrance": 0.0689655172413793,
+    "lambda_um": 44.691794419269485,
+    "R_analytic": 7.7850315211378875,
+    "residual_gap": 6.422581573914016,
+    "phi_at_which_gap_closes": null
+   }
+  ],
+  "phi_that_would_close_the_gap_DO_NOT_ADOPT": {
+   "phi": 0.9647043143122056,
+   "why_reported": "to demonstrate that an UNMEASURED parameter can absorb the entire residual. That is the argument for measuring it, and the argument against using it. This value is not adopted, not written back, and must never be quoted as a result."
+  }
+ },
+ "offslab": {
+  "config": {
+   "arm": "B (10x Xenium human GBM, hBrain 319-gene panel, dx12_repaired)",
+   "dx_um": 12.0,
+   "convection": true,
+   "total_time_s": 21600.0,
+   "dt_s": 10.0,
+   "bin_um": 10.0,
+   "readout": "model-free empirical half-distance of the AUC field binned by direct_vessel_distance_um"
+  },
+  "free_points": {
+   "ecm_section_mean": 0.08747329648865268,
+   "points": [
+    {
+     "drug": "doxorubicin",
+     "lambda_um": 72.48923855044154,
+     "d_half_um": 45.18752771106239,
+     "fit_L_um": 49.65054732838623
+    },
+    {
+     "drug": "daunorubicin",
+     "lambda_um": 64.40440131892363,
+     "d_half_um": 38.91452461320843,
+     "fit_L_um": 43.1927156959992
+    },
+    {
+     "drug": "mitoxantrone",
+     "lambda_um": 53.9637847629314,
+     "d_half_um": 31.48913942589313,
+     "fit_L_um": 35.484680522141325
+    }
+   ],
+   "log_log_slope_dlnd_half_dlnlambda": 1.2217208033772171,
+   "d_half_over_lambda": [
+    0.6233687732782391,
+    0.6042215099633937,
+    0.5835235531426908
+   ],
+   "note": "d_half ~ lambda^1.22 over the narrow range lambda 54.0-72.5 um. For a 1-D exponential the slope would be exactly 1 and d_half/lambda = ln2 = 0.693; on the real vessel field it is 0.584-0.623."
+  },
+  "paid_points": {
+   "ecm_section_mean": 0.08783852062769582,
+   "drug": "daunorubicin",
+   "points": [
+    {
+     "k_scale": 1.0,
+     "lambda_um": 64.39695340196023,
+     "d_half_um": 38.989444110494745,
+     "fit_L_um": 43.13258538535305,
+     "d_half_over_lambda": 0.60545479329008
+    },
+    {
+     "k_scale": 4.0,
+     "lambda_um": 32.198476700980116,
+     "d_half_um": 20.61573796168505,
+     "fit_L_um": 22.005563431879136,
+     "d_half_over_lambda": 0.6402705989211442
+    },
+    {
+     "k_scale": 16.0,
+     "lambda_um": 16.099238350490058,
+     "d_half_um": 14.183454017827383,
+     "fit_L_um": 12.733129569409064,
+     "d_half_over_lambda": 0.8810015547968852
+    }
+   ],
+   "log_log_slope_dlnd_half_dlnlambda": 0.7294373394357245
+  }
+ }
+}

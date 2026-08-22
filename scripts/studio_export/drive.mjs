@@ -117,6 +117,48 @@ ok(await evalIn('document.querySelectorAll(".caveat").length') >= 7, 'caveats re
 ok(await evalIn('document.body.textContent.includes("FALSIFIED AS VALUE-ADD")'),
   'the falsification caveat is on screen');
 
+// --- withdrawn claims are MARKED, not hidden ------------------------------ //
+// The export baked runs whose stored caveats still say "The CROSS-DRUG RANKING
+// is invariant across all three routes and is the defensible output" — a claim
+// this product withdrew on 2026-08-21. The record is not edited (it is the
+// execution record) so the sentence stays; what must be true is that a reader
+// is told BEFORE they reach it.
+//
+// This is checked HERE, on the rendered DOM, and not only in the build script,
+// because the two failure modes are different and only one of them is a
+// payload problem. build_studio_export.py's check_claim_set() proves the
+// VERDICT was baked; this proves the front end DREW it. An export could carry
+// a correct verdict and still show the sentence unmarked — that is precisely
+// what shipped for weeks, and a payload assertion would not have caught it.
+console.log('withdrawn claims');
+const RETIRED = 'The CROSS-DRUG RANKING is invariant across all three routes '
+  + 'and is the defensible output';
+const cs = await evalIn('(()=>{'
+  + 'const b=document.querySelector(".cs-superseded");'
+  + `const t=${JSON.stringify(RETIRED)};`
+  + 'const cav=[...document.querySelectorAll(".caveat")].find(e=>e.textContent.includes(t));'
+  + 'return{banner:!!b,bannerText:b?b.textContent:"",'
+  + 'sentenceShown:!!cav,'
+  // Node.DOCUMENT_POSITION_FOLLOWING (4): the caveat comes AFTER the banner.
+  + 'bannerFirst:!!(b&&cav&&(b.compareDocumentPosition(cav)&4)),'
+  + 'era:!!document.querySelector(".cs-era"),'
+  + 'strip:(document.querySelector(".cv-index .stale")||{}).textContent||"",'
+  + 'hidden:!!(b&&getComputedStyle(b).display==="none"),'
+  + '};})()');
+ok(cs.sentenceShown, 'the withdrawn sentence is still shown (the record is not edited)');
+ok(cs.banner && !cs.hidden, 'a visible claim-set banner is rendered above the caveats');
+ok(/SUPERSEDED CLAIM SET/.test(cs.bannerText),
+  'the banner names the finding: '
+  + (cs.bannerText.match(/CAVEATS RECORDED UNDER A [A-Z ]+/) || [''])[0].trim());
+ok(cs.bannerText.includes('WITHDRAWN') || cs.bannerText.includes('withdrawn'),
+  'the banner says the claim was withdrawn');
+ok(cs.bannerFirst,
+  'the banner precedes the withdrawn sentence in the DOM (told before read)');
+ok(cs.era, 'the run\'s own caveats carry an era label');
+ok(cs.strip.trim() === 'superseded',
+  `the caveat index strip flags it: "${cs.strip.trim()}"`);
+await shot('claim-set-banner.png');
+
 console.log('dead controls');
 ok(await evalIn('!Array.from(document.querySelectorAll("button")).some(b=>/^Submit run$/.test(b.textContent.trim()))'),
   'no Submit button anywhere in the DOM');

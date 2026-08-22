@@ -268,17 +268,60 @@ _DECLARED_BY = {
 
 
 def bake_runs(run_ids, root=None):
-    """RunResults + deduplicated base64 binaries for the requested runs."""
+    """RunResults + deduplicated base64 binaries for the requested runs.
+
+    The document baked here is the one a CLIENT reads, not the one on disk.
+    That distinction is the whole of :meth:`app.server.jobs.Job.result_view`'s
+    ``annotate`` flag and it is not cosmetic. ``annotate=False`` is the view
+    ``_persist`` writes; ``annotate=True`` adds the two fields that are facts
+    about the reader's moment rather than about the run — the backfilled
+    delivery law, and the CLAIM-SET VERDICT that banners a stored caveat whose
+    claim has since been withdrawn.
+
+    This function used to ``json.load`` ``result.json`` straight off disk,
+    which silently produced the disk view and shipped it as the client view.
+    The consequence was on the product surface for weeks: the exports carried
+    "The CROSS-DRUG RANKING is invariant across all three routes and is the
+    defensible output" — retired by claim set 1 on 2026-08-21 — three times,
+    with no ``provenance.claim_set`` anywhere in the file, so
+    ``app/web/js/ui/inspect.js`` computed ``stale = false`` and rendered a
+    withdrawn claim as if it were current. Regenerating did not fix it; the
+    export was bypassing the layer that does the marking.
+
+    The stored caveats themselves are still baked verbatim and unedited. That
+    is deliberate and is the same rule the server follows: the record is the
+    execution record, marking it is honest and rewriting it would not be.
+
+    ``log_tail`` is re-attached from the stored document because
+    ``result_view`` does not carry it (the live API serves it from
+    ``GET /api/runs/{id}/status``) and ``scripts/studio_export/static_shell.js``
+    renders it as a panel. Dropping it would blank that panel.
+    """
     from app.server.cache import runs_dir
+    from app.server.jobs import JobManager
 
     root = root or runs_dir()
+    # start_worker=False: this is a build script, not a server. It reads the
+    # run store through the server's own restore path and must not start a
+    # queue thread that could execute anything.
+    manager = JobManager(root=root, start_worker=False)
+
     runs, blobs, payloads, raw_bytes = [], {}, {}, 0
     for rid in run_ids:
         d = os.path.join(root, rid)
         with open(os.path.join(d, "result.json")) as fh:
-            doc = json.load(fh)
-        if doc.get("status") != "done":
-            raise SystemExit(f"{rid} is {doc.get('status')}, not done")
+            stored = json.load(fh)
+        if stored.get("status") != "done":
+            raise SystemExit(f"{rid} is {stored.get('status')}, not done")
+        job = manager.get(rid)
+        if job is None:
+            raise SystemExit(
+                f"{rid} has a result.json under {root} but JobManager did not "
+                f"restore it. The export must bake the view the server serves, "
+                f"so it cannot fall back to reading the file directly.")
+        doc = job.result_view()
+        if stored.get("log_tail"):
+            doc["log_tail"] = stored["log_tail"]
         runs.append(doc)
 
         pmap = {}
@@ -308,6 +351,58 @@ def bake_runs(run_ids, root=None):
     return runs, blobs, payloads, raw_bytes
 
 
+def check_claim_set(runs) -> None:
+    """No baked run may show a withdrawn claim with nothing saying so.
+
+    This is the check whose absence let the exports ship a retired sentence
+    unbannered. It asserts the two things :func:`bake_runs` now guarantees,
+    and it asserts them on the BAKED payload rather than on the code that
+    produced it, so any future path that reaches the payload without the
+    server's read annotation fails here instead of on a researcher's screen.
+
+    1. every run carries ``provenance.claim_set`` — the verdict
+       ``app/web/js/ui/inspect.js`` reads to decide whether to banner. Absent,
+       it computes ``stale = false`` and marks nothing;
+    2. a run whose stored caveats contain a sentence some claim set RETIRED is
+       actually flagged by that verdict (``superseded`` or ``contradicted``).
+
+    (2) is the one that bites. (1) can hold while the verdict says "clean"
+    about a record that is not, which is exactly what a version stamp cannot
+    catch on its own — see ``tests/test_claim_set.py``'s
+    ``TestARecordCanContradictItsOwnStamp``.
+    """
+    from app.server.jobs import CLAIM_SET_LOG
+
+    retired = [(e["version"], t)
+               for e in CLAIM_SET_LOG for t in (e.get("retired_text") or ())]
+    for doc in runs:
+        rid = doc.get("run_id")
+        prov = doc.get("provenance") or {}
+        verdict = prov.get("claim_set")
+        if not isinstance(verdict, dict):
+            raise SystemExit(
+                f"export: {rid} was baked with no provenance.claim_set. The "
+                f"front end reads that key to decide whether to banner a "
+                f"withdrawn claim, so this export would render every stored "
+                f"caveat as if it were current. bake_runs must go through "
+                f"Job.result_view() (annotate=True), not read result.json.")
+        caveats = [str(c) for c in (prov.get("caveats") or [])]
+        for version, sentence in retired:
+            if not any(sentence in c for c in caveats):
+                continue
+            if not (verdict.get("superseded") or verdict.get("contradicted")):
+                raise SystemExit(
+                    f"export: {rid} carries a sentence retired by claim set "
+                    f"{version} ({sentence!r}) and its claim-set verdict "
+                    f"flags NEITHER superseded NOR contradicted, so nothing "
+                    f"on screen would mark it. Do not edit the stored caveat "
+                    f"— it is the execution record. Fix the verdict.")
+            print(f"  claim set     {rid}: retired-by-{version} sentence "
+                  f"present, verdict = "
+                  f"{'contradicted' if verdict.get('contradicted') else 'superseded'} "
+                  f"(bannered)")
+
+
 def main(argv) -> int:
     from app.server.api import default_spec, drug_rows, validate_spec
     from app.server.cache import list_sections
@@ -324,6 +419,7 @@ def main(argv) -> int:
             run_ids = manifest
     print(f"  runs dir      {root or 'app/runs (shared)'}")
     runs, blobs, payloads, raw_bytes = bake_runs(run_ids, root)
+    check_claim_set(runs)
 
     sections = list_sections()
     drugs = drug_rows()
@@ -439,6 +535,30 @@ def main(argv) -> int:
 
     style_block = "<style>\n" + "\n".join(css) + "\n</style>\n"
     bundle_js = bundle()
+
+    # A retired sentence is allowed in the BAKED PAYLOAD — there it is a stored
+    # caveat under a banner, and the withdrawal notice quotes it deliberately.
+    # It is never allowed in the markup or the bundle, because nothing there is
+    # a record: that is the page speaking in the present tense, and no banner
+    # can attach to it.
+    #
+    # This has already happened once in this directory, in a form this exact
+    # check does NOT catch: reports_static.js kept a PARAPHRASE of the
+    # withdrawn ranking claim ("the ranking is the output") after js/ui/
+    # reports.js was corrected. An exact-match scan is the floor, not the
+    # ceiling — the override modules are hand-copied claim text and have to be
+    # reread against their live counterparts when a claim moves.
+    from app.server.jobs import CLAIM_SET_LOG
+    for entry in CLAIM_SET_LOG:
+        for sentence in (entry.get("retired_text") or ()):
+            for where, text in (("index.html markup", body),
+                                ("the JS bundle", bundle_js)):
+                if sentence in text:
+                    raise SystemExit(
+                        f"export: {where} contains a sentence retired by claim "
+                        f"set {entry['version']} ({sentence!r}) as LIVE COPY. "
+                        f"A stored caveat can be bannered; page text cannot. "
+                        f"Correct the source, do not exclude it here.")
 
     def data_block(title: str) -> str:
         # </script> cannot appear inside the JSON; escape defensively.

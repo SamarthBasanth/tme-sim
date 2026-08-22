@@ -22,6 +22,7 @@ import { METRICS, metricProvenance, reportProvenance, fieldProvenance, chip, STA
 import { auto, num, int, pct, sci, dur, NULL_GLYPH } from '../util/fmt.js';
 import { railGroup, railNav } from './rail.js';
 import { createReachPanel } from './reach.js';
+import { createFindingPanel } from './finding.js';
 
 const CHAN_VARS = ['--ch-tumor', '--ch-stromal', '--ch-immune', '--ch-endothelial', '--ch-necrotic'];
 
@@ -300,6 +301,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   /* --------------------------------------------------------- metrics -- */
 
   const metricsEl = h('div');
+  const findingPanel = createFindingPanel();
   const reachPanel = createReachPanel();
   const provEl = h('dl.kv');
   const caveatsEl = h('div.caveats');
@@ -311,6 +313,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   }, NULL_GLYPH);
 
   function renderRun(run) {
+    findingPanel.render(run || null);
     reachPanel.render(run && run.status === 'done' ? run : null);
     headRunEl.textContent = (run && run.run_id) || NULL_GLYPH;
     headRunEl.title = run
@@ -339,18 +342,46 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       metricsEl.appendChild(h('div.dim', { style: { fontSize: 'var(--fs-xs)', padding: '4px 0' } },
         `Run ${run.run_id} is ${run.status}; no metrics yet.`));
     } else {
-      // METRICS is declared in the order the operator asks the questions, so
-      // the first entry is the one the run was submitted to answer. It is set
-      // at --fs-xl; the rest stay at --fs-lg. Same pattern, same provenance
-      // chip, same one-line source — one rank of emphasis, so the panel has a
-      // place for the eye to land instead of four equal numbers.
-      let first = true;
+      /* NO METRIC IN THIS TABLE GETS `.lead` ANY MORE. 2026-08-22.
+       *
+       * It used to: "the first entry is the one the run was submitted to
+       * answer", set at --fs-xl while the rest stayed at --fs-lg, so the panel
+       * had "a place for the eye to land instead of four equal numbers". The
+       * reasoning was sound and the result was the worst defect found in a
+       * first session with this product.
+       *
+       * The first entry is `kill_fraction`. So the first and largest number on
+       * the READ rail — the thing a reader who has never seen this Studio
+       * lands on, at the largest type size the panel has — was an absolute
+       * kill percentage, on a section whose own caveat four sections below
+       * reads "ABSOLUTE KILL MUST NOT BE QUOTED FROM THIS SECTION UNDER ANY
+       * STATE ROUTE". A stranger reads top-down and quotes the one number this
+       * project forbids. The product exists to prevent exactly that failure
+       * and was committing it in its own UI, in the largest available type.
+       *
+       * The fix is NOT to remove the number: it is a real output, it is the
+       * denominator of the survivor arithmetic, and hiding it would be its own
+       * dishonesty. The fix is to stop it being where the eye lands. The eye
+       * now lands on the FINDING block at the top of this group, which states
+       * the defensible claim — the delivery/potency split among survivors, in
+       * counts of cells — and which cannot print an absolute kill rate as a
+       * headline by construction.
+       *
+       * Why no OTHER metric was promoted into the vacancy: there is no
+       * defensible candidate. All four read an absolute level. `kill_fraction`
+       * and `therapeutic_coverage_1x` are no-resistance upper bounds that read
+       * the IC50; `mean_tumor_auc` scales with the plasma level; and
+       * `penetration_length_um` is a fitted parameter of a gradient this repo
+       * measures as ~14x too shallow (results/kyle2004_penetration.md sec. 6).
+       * Promoting any of them would move the violation rather than fix it.
+       * Four equal numbers is the honest layout for four quantities of which
+       * none is the answer. */
       for (const key of Object.keys(METRICS)) {
         const v = run.metrics[key];
         const m = METRICS[key];
         const p = metricProvenance(key, run);
         const isNull = v === null || v === undefined;
-        metricsEl.appendChild(h('div.metric' + (first ? '.lead' : ''),
+        metricsEl.appendChild(h('div.metric',
           h('div.m-name', m.label),
           h('div.m-val' + (isNull ? '.null' : ''),
             fmtMetric(key, v),
@@ -359,7 +390,19 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
             chip(p.kind, p.why),
             h('span.m-src', m.src)),
         ));
-        first = false;
+        /* THE HARD STOP, ON THE NUMBER, NOT A THOUSAND WORDS BELOW IT.
+         *
+         * `m.hard_stop` marks a metric whose own caveat says it must not leave
+         * this screen at all, as distinct from one that is merely qualified.
+         * The full statement is still in Caveats, in full, unedited — this
+         * removes nothing and adds a pointer that cannot be scrolled past,
+         * because it is rendered between this metric and the next one. A
+         * caveat nobody reads protects nobody, and a reader who quotes a
+         * number never reaches the block that forbids it. */
+        if (m.hard_stop && !isNull) {
+          metricsEl.appendChild(h('div.caveat.crit', { title: p.why },
+            h('span', h('b', 'DO NOT QUOTE THIS NUMBER. '), m.hard_stop)));
+        }
       }
       const extra = Object.keys(run.metrics).filter((k) => !(k in METRICS));
       for (const key of extra) {
@@ -613,6 +656,17 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   const railBody = h('div.rail-body',
     /* ---- RESULT: what did the run find, and how much of it is measured -- */
     railGroup('result', 'Result', 'RunResult',
+      // THE FINDING LEADS THE RAIL. Everything below it is supporting detail,
+      // and until 2026-08-22 the rail opened on the supporting detail instead:
+      // four absolute metrics, led by the one number the project forbids
+      // quoting. This section states what the run found, in counts of cells,
+      // in words nobody has to learn first — and names the measurement that
+      // would refute it, which is the whole reason this claim replaced a
+      // compound ranking. js/ui/finding.js carries the full argument.
+      h('details.sect', { open: true, id: 'sect-finding' },
+        h('summary', 'The finding', h('span.hint', 'what this run says, in cells')),
+        h('div.sect-body', findingPanel.el)),
+
       h('details.sect', { open: true },
         h('summary', 'Metrics', h('span.hint', 'provenance on every value')),
         h('div.sect-body', errorEl, metricsEl)),

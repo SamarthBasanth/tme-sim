@@ -495,6 +495,23 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 
    The full unmodified string is also on the element's `title`, so the
    verbatim sentence is one hover away from the restructured one. */
+/* ------------------------------------------------- invented vocabulary ---
+   A term this project made up, carrying a plain-language gloss on hover and
+   in the accessibility tree (js/ui/reach.js::GLOSSARY). The word itself is
+   NEVER replaced — it still matches the results files, the API payload and
+   what a colleague will say out loud — so the mark has to be quiet enough to
+   sit inside running prose without turning a paragraph into a link farm: a
+   dotted underline at the text colour, no colour change, no weight change.
+
+   `text-decoration` rather than `border-bottom` so it follows the text across
+   a line wrap instead of boxing the fragment on each line. `cursor: help`
+   is the one affordance that says "there is something here" without a click. */
+abbr.gloss {
+  text-decoration: underline dotted var(--fg-3);
+  text-underline-offset: 2px;
+  cursor: help;
+}
+
 .caveats { display: flex; flex-direction: column; gap: 0; }
 .caveat {
   display: grid;

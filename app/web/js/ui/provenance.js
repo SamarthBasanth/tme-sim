@@ -228,10 +228,27 @@ export function fieldProvenance(name, run) {
 
 /** Metric display metadata: label, unit, formatter hint, base provenance. */
 export const METRICS = {
+  // `hard_stop` marks a metric whose own caveats say it must not be quoted off
+  // this screen at all, as distinct from the many that qualify how a number
+  // should be read. inspect.js renders it INLINE, directly under the value,
+  // because the block that carries the full statement sits about a thousand
+  // words below and a reader who is going to quote a number never gets there.
+  // This duplicates a caveat on purpose; it replaces none of them.
+  //
+  // Absolute kill is the project's standing example of a non-defensible
+  // output. It was, until 2026-08-22, also the first and largest number on the
+  // READ rail — see the comment on the metric loop in inspect.js.
   kill_fraction: {
     label: 'Kill fraction', unit: 'frac', fmt: 'pct', better: 'higher',
     base: 'computed',
     src: 'Hill kill on per-cell drug AUC (cells/pkpd)',
+    hard_stop: 'It is a no-resistance upper bound, not an expected response, '
+      + 'and it has never been scored against a measured treatment response. On '
+      + 'a section whose panel cannot measure hypoxia it moves by up to 0.3252 '
+      + 'absolute (1.77x) purely with which cell-state route is chosen, with '
+      + 'tissue, drug, transport and RNG held identical. What this run supports '
+      + 'is the delivery-versus-potency split among survivors, above — a ratio '
+      + 'inside one map — not this level. Full statement in Caveats, below.',
   },
   mean_tumor_auc: {
     label: 'Mean tumour AUC', unit: 'uM.s', fmt: 'sci', better: 'higher',
