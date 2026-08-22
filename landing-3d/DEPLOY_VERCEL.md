@@ -95,9 +95,9 @@ So 24.x is a safe bump if Vercel ever retires 22.x; change the one line in
 
 **There is exactly one, and the default is wrong in production.**
 
-| Variable | Read by | Default if unset |
+| Variable | Read by | If unset |
 | --- | --- | --- |
-| `NEXT_PUBLIC_STUDIO_URL` | `lib/env.ts`, and independently by `scripts/audit-origins.mjs` at build time | `http://localhost:8000` |
+| `NEXT_PUBLIC_STUDIO_URL` | `lib/env.ts`, and independently by `scripts/audit-origins.mjs` at build time | **production build FAILS**; `npm run dev` falls back to `http://localhost:8000` |
 
 That is the entire list. Grep confirms no other `process.env` reference exists
 in `app/`, `components/`, `lib/` or `hooks/`. No API keys, no secrets, no
@@ -106,12 +106,23 @@ this one variable.
 
 Two things about it will bite a first-time deployer:
 
-1. **If you do not set it, the deploy succeeds and the page's two primary
-   "Open the Studio" buttons point at `http://localhost:8000`.** Nothing errors.
-   The build is green, the page renders, the audits pass, and the main call to
-   action on a public marketing site is a dead link to the visitor's own
-   machine. Verified: `localhost:8000` is present in the production HTML of a
-   build made without the variable set.
+1. **If you do not set it, the production build now FAILS — deliberately.**
+   `lib/env.ts` throws, naming the consequence and both places to set the
+   value.
+
+   > **Corrected 2026-08-22.** This section previously said the opposite: *"the
+   > deploy succeeds and the page's two primary 'Open the Studio' buttons point
+   > at `http://localhost:8000`"*. That was true when this runbook was written
+   > and was made false, in the same commit that added the runbook, by the
+   > refusal in `lib/env.ts`. The old behaviour is exactly why the refusal
+   > exists — the deploy was green in every direction (build passed, page
+   > rendered, both audits passed) while the main call to action on a public
+   > site pointed at the visitor's own machine, and nothing anywhere reported
+   > it. `npm run dev` still falls back to localhost so local work needs no
+   > setup.
+
+   So the failure mode is now a loud build error instead of a silent bad
+   deploy. **Set it before the first production deploy.**
 
 2. **It is a `NEXT_PUBLIC_*` variable, so it is inlined into the JavaScript
    bundle at build time.** Adding or changing it in the Vercel dashboard has no
