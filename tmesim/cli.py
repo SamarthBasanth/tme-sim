@@ -282,6 +282,17 @@ def cmd_studio(args: argparse.Namespace) -> int:
         argv.append("--reload")
     if args.cache_size is not None:
         argv += ["--cache-size", str(args.cache_size)]
+    # THREE STATES, and the difference is load-bearing -- `is not None`, never
+    # a truthiness test. app.server.__main__ treats them differently:
+    #   absent            -> respect TMESIM_STUDIO_API_KEY, and GENERATE one
+    #                        off loopback rather than serve unauthenticated
+    #   --api-key SECRET  -> use it, overriding the environment
+    #   --api-key ''      -> explicitly DISABLE the gate
+    # `if args.api_key:` would silently collapse the third into the first and
+    # turn "serve with no authentication, I mean it" into "generate a key",
+    # which is the opposite of what the operator asked for.
+    if args.api_key is not None:
+        argv += ["--api-key", args.api_key]
     return int(_studio_main(argv))
 
 
@@ -1217,6 +1228,16 @@ def build_parser() -> argparse.ArgumentParser:
                           choices=("critical", "error", "warning", "info", "debug"))
     p_studio.add_argument("--cache-size", type=int, default=None,
                           help="max cached reconstructions (default 4)")
+    # Added 2026-08-22. docs/DEPLOYMENT.md §1b's headline command has always
+    # been `codon studio --host 0.0.0.0 --api-key <secret>`, which exited 2 --
+    # the flag existed on `python -m app.server` and was never forwarded here.
+    # default=None is deliberate: it keeps "--api-key ''" distinguishable from
+    # not passing the flag at all. See cmd_studio.
+    p_studio.add_argument("--api-key", default=None,
+                          help="require this key in the X-API-Key header on "
+                               "/api/* routes. Omitted and --host non-loopback: "
+                               "one is generated and printed once. Pass '' to "
+                               "explicitly serve with NO authentication.")
     p_studio.set_defaults(func=cmd_studio)
 
     # ingest

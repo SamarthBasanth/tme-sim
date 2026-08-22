@@ -631,11 +631,16 @@ class TestARunExecutedNowIsNotBannered:
           parser in pieces and is invisible here BY CONSTRUCTION. Closing it
           needs partial evaluation, not parsing. This is the hardest limit of
           the three and it is not attempted.
-        * **JavaScript.** ``app/web/js/mock.js`` writes caveats, so a retired
-          claim could survive there. Lower severity rather than equal: mock.js
-          runs only in STUB MODE, when the backend did not answer, and every
-          number it produces is already labelled ``synthetic`` and refused as a
-          result. Dev-facing, not customer-facing -- but not zero.
+        * **JavaScript.** Covered as of 2026-08-22 by
+          :meth:`test_no_shipped_javascript_repeats_a_retired_claim` below,
+          because this paragraph used to say the JS gap was "dev-facing, not
+          customer-facing" on the reasoning that only ``mock.js`` was exposed,
+          and **that was measured and found false**:
+          ``scripts/studio_export/reports_static.js`` is bundled VERBATIM into
+          ``results/studio_export.html`` and was carrying the withdrawn ranking
+          claim as CURRENT page copy, in a file a customer opens. Python-only
+          scanning is still this method's limit; the JS surface is now guarded
+          separately rather than reasoned about.
         * **``results/*.md``.** The prose claim surface. Out of scope here;
           ``tests/test_claim_guard.py`` is the module that guards documents.
 
@@ -664,6 +669,75 @@ class TestARunExecutedNowIsNotBannered:
                         "and quotes what it replaced); a comment or docstring "
                         "quoting it is fine, a string the product emits is not.")
         assert checked > 50, f"only {checked} sources scanned; the glob is wrong"
+
+    def test_no_shipped_javascript_repeats_a_retired_claim(self):
+        """The JavaScript surface, guarded rather than reasoned about.
+
+        WHY THIS EXISTS. The Python scan above excluded ``scripts/`` on the
+        stated reasoning that scripts "do not render to a user". That is false
+        for ``scripts/studio_export/*.js``: ``build_studio_export.py``
+        concatenates them VERBATIM into ``results/studio_export.html``, a
+        single-file artefact a customer opens. ``reports_static.js`` is a
+        hand-copy of ``app/web/js/ui/reports.js``; the original was corrected
+        when the ranking was withdrawn on 2026-08-21 and the copy was missed,
+        so it shipped "one ranked drug panel out" and "the ranking is the
+        output" as live page copy for a day. It slipped BOTH guards -- the
+        Python scan reads ``.py`` only, and the exclusion would have skipped it
+        anyway.
+
+        So the two holes were independent and the reasoning behind one of them
+        was simply wrong. A guard is worth what its demonstrated failure is
+        worth, and this one has a demonstrated failure.
+
+        WHAT IT COVERS: every ``.js`` under ``app/web/`` (the Studio front end)
+        and ``scripts/studio_export/`` (bundled into the export).
+
+        WHAT IT DOES NOT: ``.mjs`` is excluded deliberately -- ``drive.mjs`` is
+        a headless-Chrome test driver that PLANTS the retired sentence to prove
+        the export build refuses it, so scanning it would fire on the guard
+        that proves the guard works. It is not bundled.
+
+        RETRACTIONS STAY LEGAL. This repo corrects a stale claim by quoting it
+        under a banner, so the sentence may appear where retraction wording
+        appears near it. Quoting a corpse is fine; presenting it alive is not.
+        """
+        markers = ("withdraw", "WITHDRAW", "retire", "RETIRE", "no longer",
+                   "superseded", "SUPERSEDED", "earlier version", "2026-08-21",
+                   "CORRECTED", "RETRACT", "retract")
+        retired = [(e["version"], t) for e in CLAIM_SET_LOG
+                   for t in e.get("retired_text") or ()]
+        assert retired, "claim set 1 retired a sentence; say which"
+
+        roots = (os.path.join(REPO, "app", "web"),
+                 os.path.join(REPO, "scripts", "studio_export"))
+        checked = 0
+        for top in roots:
+            if not os.path.isdir(top):
+                continue
+            for root, dirs, files in os.walk(top):
+                dirs[:] = [d for d in dirs if d != "node_modules"]
+                for name in sorted(files):
+                    if not name.endswith(".js"):
+                        continue
+                    path = os.path.join(root, name)
+                    checked += 1
+                    text = open(path, encoding="utf-8").read()
+                    for version, sentence in retired:
+                        at = text.find(sentence)
+                        if at < 0:
+                            continue
+                        window = text[max(0, at - 600):at + 600]
+                        assert any(m in window for m in markers), (
+                            f"{os.path.relpath(path, REPO)} carries a claim "
+                            f"withdrawn by claim set {version} with no "
+                            "retraction anywhere near it:\n"
+                            f"  {sentence}\n"
+                            "This file ships to a user. Correct it in place "
+                            "and quote what it replaced, as the rest of the "
+                            "repo does.")
+        assert checked > 5, (
+            f"only {checked} JavaScript sources scanned; the glob is wrong "
+            "and this guard has gone blind")
 
     def test_execute_run_stamps_the_provenance_it_writes(self):
         """Source-level, so it holds without a cached section.
