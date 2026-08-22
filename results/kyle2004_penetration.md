@@ -341,6 +341,16 @@ already carries; only daunorubicin is new.
 | daunorubicin | 527.53 | 1.029 | 5 | 185.8 | 187.035 | 0.1512 | 2.27e-04 | 28.273 | 6.458e-03 | **57.68** |
 | mitoxantrone | 444.49 | −0.139 | 8 | 163.2 | 200.639 | 0.1512 | 1.56e-09 | 30.328 | 9.868e-03 | **48.33** |
 
+> **CONFIGURATION DECLARED 2026-08-22 — this `L` column is NOT the `L` of the
+> arm-A run it sits beside.** These values are computed at
+> `ecm_reference = 0.4`; the arm-A slab below is solved at **ecm = 0.0875**, the
+> flagship GBM section's mean. At the slab's own ECM the same compounds give
+> `L` = **72.49 / 72.49 / 64.40 / 53.96 µm**. The difference is worth **1.24×**
+> on the near:far ratio, and it was undeclared — a table printing one
+> configuration next to a run solved at another, which is the defect this repo
+> keeps paying for. Neither column is wrong; the omission was. Measured in
+> `results/accuracy_gap_decomposition.md` §5.
+
 **C0 — the epimer control PASSES, and it is worth reading twice.** Doxorubicin and
 epirubicin compile to *bitwise identical* transport parameters (relative
 difference exactly `0.000e+00` in both `D_eff` and `k_loss`). The measurement does
@@ -422,10 +432,22 @@ construction is the one `vessel_profile.isolated_vessel_profile` already uses.
 at fixed concentration (a Dirichlet condition); the engine has no Dirichlet
 inflow, so the exposed face is represented by the vascular source occupying the
 first column. For a decaying profile the two produce the same shape; they are not
-identical, and the mismatch biases the modelled ratio **downward** relative to a
-clean fixed-concentration boundary. That bias is common to all four compounds, so
-it cancels from the fold comparison (C3) and does **not** cancel from the
-absolute comparison (C4) — which is why C3 carries the magnitude verdict.
+identical, and the mismatch biases the modelled ratio ~~**downward**~~ relative
+to a clean fixed-concentration boundary. That bias is common to all four
+compounds, so it cancels from the fold comparison (C3) and does **not** cancel
+from the absolute comparison (C4) — which is why C3 carries the magnitude
+verdict.
+
+> **SIGN CORRECTED 2026-08-22 — it biases the ratio UP, not down.** Measured
+> against the analytic Dirichlet steady state at the slab's own `λ`
+> (daunorubicin, 64.40 µm): analytic **3.460**, engine **3.646**. The
+> source-column construction makes the modelled ratio **1.1 % LARGER**, not
+> smaller. The direction matters because the sentence above was used to argue
+> that part of C4 is construction rather than model error — it is the opposite:
+> the construction **flatters** the model and hides a small part of the gap.
+> Full ledger in `results/accuracy_gap_decomposition.md` §3: the two
+> estimator/construction terms multiply to **0.949×** combined, so they conceal
+> ~5 % of the gap instead of explaining any of it.
 
 **The repository's own propagation guard shaped this arm.**
 `tests/test_propagation.py::test_no_undeclared_paths[transvascular_exchange]`
@@ -473,11 +495,46 @@ shortfall.** The corroboration is worth more than the individual number.
 (doxorubicin is the α fit; epirubicin is numerically doxorubicin). Daunorubicin's
 **3.65 against 35–65** is **~14× too shallow**.
 
-Part of that is construction: the source-term boundary biases the modelled ratio
-down relative to Kyle's stirred reservoir, and doxorubicin's own 3.00-against-11
-shows the offset is present even where the model cannot be wrong about `L`. But
-the bias is common to all four compounds, so it cannot explain C3 — **the fold
-comparison, which cancels it, still fails by 3.7×.**
+~~Part of that is construction: the source-term boundary biases the modelled
+ratio down relative to Kyle's stirred reservoir~~, and doxorubicin's own
+3.00-against-11 shows the offset is present even where the model cannot be wrong
+about `L`. But the bias is common to all four compounds, so it cannot explain
+C3 — **the fold comparison, which cancels it, still fails by 3.7×.**
+
+> **CORRECTED 2026-08-22 — none of it is construction, and the "14×" is not a
+> length error.** The struck sentence had the sign backwards (see the boundary
+> note above): construction biases the ratio **up** by 1.1 %, so it hides part
+> of the gap rather than contributing to it.
+>
+> More importantly, **this is a ratio of two dimensionless ratios, not of two
+> lengths**, and Kyle's readout is *exponential* in the transport length. Run
+> both sides through the same estimator and the honest statement is that the
+> transport length `λ` is **2.45× too long** (2.00–2.98× with the paper's own
+> SDs propagated), i.e. `D_eff/k` is ~6× too large. The 14× is that error
+> amplified by `dlnR/dlnλ ≈ 2.9` over the interval.
+>
+> It also **factorises exactly**: `3.6696 × 3.7374 = 13.71` — the doxorubicin-row
+> residual times C3's under-separation. So **C4 is not an independent failure**;
+> two thirds of it is inherited from the compound `α` is fit to, and that term
+> is an anchor conflict rather than a model error: Primeau implies
+> `λ_dox` 57.71–72.13 µm and Kyle implies 30.73–55.68 µm — **disjoint**, so no
+> value of `λ_dox` satisfies both and "fit `α` better" is provably not a fix.
+>
+> **And on the product's own readout the amplification does not transfer.** On
+> the Xenium GBM section the map's half-distance responds to `λ` with exponent
+> **0.92–1.22** — near-linear — against 2.92 for Kyle's near:far. A 2.45× `λ`
+> error is **~2.2–3.0× on the map**, not 14×.
+>
+> Finally, **it is not established that this anchor measures a length at all.**
+> Pure retarded diffusion with *zero* loss reproduces near:far 13.6 at `Rf` = 50
+> and 84.1 at `Rf` = 90, so `Rf` ≈ 60–70 gives the measured 50 with `λ = ∞`;
+> Kyle's own ~7× near-side accumulation is direct evidence of exactly that
+> intracellular store, which §9.2 says the engine does not have. If Kyle is in
+> that regime the measurement constrains a **time constant**, not a length, and
+> inverting it to `λ` is invalid.
+>
+> Derivation, ledger and the failed hypotheses:
+> `results/accuracy_gap_decomposition.md`.
 
 ---
 

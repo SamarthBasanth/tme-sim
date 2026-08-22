@@ -962,6 +962,17 @@ def _run_mcl_transport_coefficients() -> List[Row]:
              f"absolute value does not, which is the signature of a residual "
              f"FREE-diffusivity error — the hindrance is right and the thing it "
              f"is hindering is not (results/cellular_exclusion.md sec. 4.2). "
+             f"DO NOT 'FIX' THIS ROW ON ITS OWN — IT WOULD MAKE THE GRADIENT "
+             f"WORSE, MEASURED. This D_eff is too SMALL, and the loss rate k "
+             f"is too small too, by a LARGER factor and in the same direction, "
+             f"so the two errors partially cancel in the length that actually "
+             f"sets the exposure gradient, lam = sqrt(D_eff/k). Raising D_eff "
+             f"alone to land inside the band above lengthens lam further, and "
+             f"lam is ALREADY too long: measured, every gradient number gets "
+             f"1.22-1.62x worse (results/accuracy_gap_decomposition.md sec. 7). "
+             f"On the MCL-appropriate arm D_eff lands INSIDE its measured band "
+             f"and k carries 100% of a 2.10-3.61x length error. A single row "
+             f"read alone is exactly how this trap is sprung. "
              f"{mcl_arm}",
         conditional=("mcl-no-vasculature", "cell-exclusion-default-off",
                      "coefficient-not-field"),
