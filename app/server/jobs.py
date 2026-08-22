@@ -1047,6 +1047,46 @@ def execute_run(spec: Dict, ctx: _Ctx,
         "hypoxic_tumor_fraction": float(res.extras["hypoxic_tumor_fraction"]),
         "plasma_mean_uM": float(res.extras["plasma_mean"]),
         "plasma_peak_uM": float(res.extras["plasma_peak"]),
+        # --- two ratios the CLIENT was computing, moved here ----------------
+        # Both are divisions of quantities already in this dict, and the panel
+        # was doing them itself for want of a supplied field. A number computed
+        # in the browser has no provenance, cannot be asserted against, and does
+        # not survive into result.json -- so it is computed once, here.
+        #
+        # plasma_peak_over_ic50 -- BELOW 1 MEANS NO CELL CAN REACH IC50, at any
+        # depth, however good the transport is. On the shipped default that is
+        # 50 / 606 = 0.083, so a "dose-limited" verdict on that run is partly
+        # an INPUT rather than a finding, and the panel now says so beside the
+        # verdict instead of leaving a reader to divide two numbers.
+        #
+        # tissue_median_over_plasma_PEAK is THE BOUND, and it is the one to
+        # read. C <= Cp is a physical constraint: absent an accumulation or
+        # binding mechanism -- which this engine does not model
+        # (results/kyle2004_penetration.md sec. 9.2) -- tissue concentration
+        # cannot exceed the HIGHEST concentration the blood ever reached. The
+        # transport law's entry term is one-way and has no saturation, with a
+        # measured entry elasticity of exactly 1, so nothing enforces it
+        # (results/permeability_split.md sec. 4). ABOVE 1 IS THE LAW'S KNOWN
+        # UNBOUNDEDNESS MADE VISIBLE, never the tissue concentrating the drug.
+        #
+        # ...over_plasma_MEAN is reported beside it because it is the intuitive
+        # comparison and it is the WEAKER one: plasma decays over a long window,
+        # so the mean falls and the ratio inflates for a reason that is about
+        # the schedule rather than about the bound. On the shipped 6 h default
+        # the two read ~5.96 (mean) and ~3.71 (peak) -- both above 1, so that
+        # run does violate it; on a short window they can sit below 1 while the
+        # law is exactly as unbounded. Quote the peak one.
+        "plasma_peak_over_ic50": (
+            float(res.extras["plasma_peak"]) / float(dp.ic50)
+            if float(dp.ic50) > 0 else None),
+        "tissue_median_over_plasma_peak": (
+            float(head["E_p50_uM"]) / float(res.extras["plasma_peak"])
+            if float(res.extras["plasma_peak"]) > 0
+            and head["E_p50_uM"] is not None else None),
+        "tissue_median_over_plasma_mean": (
+            float(head["E_p50_uM"]) / float(res.extras["plasma_mean"])
+            if float(res.extras["plasma_mean"]) > 0
+            and head["E_p50_uM"] is not None else None),
         "n_tumor": int(res.extras["n_tumor"]),
         "exposure_window_s": float(dm["T_s"]),
         "low_o2_over_high_o2_exposure": head["low_o2_over_high_o2_exposure"],
