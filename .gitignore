@@ -74,3 +74,16 @@ results/fprof/
 results/*profile/
 */Default/Login Data
 */Default/Cookies
+
+# --- secrets -------------------------------------------------------------- #
+# A root .env was NOT ignored until 2026-08-22, so anything written there would
+# have been committed to a PUBLIC repository. This repo has already paid for one
+# credential exposure (a browser profile in git history, purged from every
+# remote branch, secrets still pending rotation) and does not need a second.
+#
+# Ignore every .env variant, and keep the *.example files that document them --
+# those carry names and placeholder values, never real ones.
+.env
+.env.*
+!.env.example
+!.env.*.example
