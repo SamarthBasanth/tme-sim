@@ -1,0 +1,804 @@
+{
+ "alpha_asserted": 22.223477711172563,
+ "shipped_defaults": {
+  "PDEConfig.transvascular_exchange": false,
+  "transvascular.SPLIT_DEFAULT": false,
+  "drugs.PS_SCALE_S_INV": 1.0,
+  "PKConfig": {
+   "plasma_peak": 50.0,
+   "half_life": 14400.0,
+   "n_doses": 1,
+   "dose_interval": 86400.0
+  }
+ },
+ "entanglement": {
+  "alpha": 22.223477711172563,
+  "config_off": "slab 140 um, dx = 2 um, ecm 0.0875, 1 h window, convection OFF, exchange OFF",
+  "config_on": "slab 140 um, dx = 2 um, ecm 0.0875, 1 h window, convection OFF, exchange ON",
+  "one_way": [
+   {
+    "c": 1e-06,
+    "ratio": 2.997687165949104,
+    "auc_wall": 0.018507747011716008,
+    "max_shape_deviation": 2.5202062658991053e-14
+   },
+   {
+    "c": 0.001,
+    "ratio": 2.9976871659491064,
+    "auc_wall": 18.507747011715896,
+    "max_shape_deviation": 4.451994328746878e-14
+   },
+   {
+    "c": 1.0,
+    "ratio": 2.9976871659491016,
+    "auc_wall": 18507.74701171583,
+    "max_shape_deviation": 0.0
+   },
+   {
+    "c": 1000.0,
+    "ratio": 2.9976871659490905,
+    "auc_wall": 18507747.0117161,
+    "max_shape_deviation": 2.042810365310288e-14
+   },
+   {
+    "c": 1000000.0,
+    "ratio": 2.9976871659491144,
+    "auc_wall": 18507747011.71627,
+    "max_shape_deviation": 1.4099832412739488e-14
+   }
+  ],
+  "split": [
+   {
+    "c": 0.01,
+    "ps_wall_s_inv": 0.00020567870235594195,
+    "ratio": 2.9976816200886676,
+    "auc_wall": 184.870669479369
+   },
+   {
+    "c": 0.1,
+    "ps_wall_s_inv": 0.0020567870235594196,
+    "ratio": 2.99763229819892,
+    "auc_wall": 1830.3002930444259
+   },
+   {
+    "c": 1.0,
+    "ps_wall_s_inv": 0.020567870235594195,
+    "ratio": 2.9971913163268873,
+    "auc_wall": 16645.520863165126
+   },
+   {
+    "c": 10.0,
+    "ps_wall_s_inv": 0.20567870235594196,
+    "ratio": 2.9951609694993104,
+    "auc_wall": 87329.46857927587
+   },
+   {
+    "c": 100.0,
+    "ps_wall_s_inv": 2.0567870235594197,
+    "ratio": 2.993409339312274,
+    "auc_wall": 151731.01624369173
+   },
+   {
+    "c": 1000.0,
+    "ps_wall_s_inv": 20.567870235594196,
+    "ratio": 2.9930906213291695,
+    "auc_wall": 163805.74790345487
+   }
+  ],
+  "reproduction_near_far": 2.9976871659491016,
+  "published_near_far": 3.0,
+  "one_way_ratio_spread": 1.000000000000008,
+  "one_way_max_shape_deviation": 4.451994328746878e-14,
+  "split_ratio_range": [
+   2.9930906213291695,
+   2.9976816200886676
+  ],
+  "split_largest_move": -0.0015333636785534184,
+  "split_moves_toward_measurement": false
+ },
+ "lambda": {
+  "alpha": 22.223477711172563,
+  "config": "slab 140 um, dx = 2 um, ecm 0.0875, 1 h window, convection OFF, exchange OFF",
+  "shipped": {
+   "doxorubicin": {
+    "d_eff_um2_s": 26.459489535609855,
+    "k_loss_s_inv": 0.005035489904182864,
+    "lambda_um": 72.4886256662236
+   },
+   "epirubicin": {
+    "d_eff_um2_s": 26.459489535609855,
+    "k_loss_s_inv": 0.005035489904182864,
+    "lambda_um": 72.4886256662236
+   },
+   "daunorubicin": {
+    "d_eff_um2_s": 26.788456141985563,
+    "k_loss_s_inv": 0.006458385048131851,
+    "lambda_um": 64.40385679063331
+   },
+   "mitoxantrone": {
+    "d_eff_um2_s": 28.735312355780483,
+    "k_loss_s_inv": 0.009867757389245583,
+    "lambda_um": 53.96332850828336
+   }
+  },
+  "map": [
+   {
+    "lambda_um": 20.0,
+    "ratio_via_k": 205.5962128948357,
+    "ratio_via_d": 243.59712280571517,
+    "disagreement": 1.1848327329371444
+   },
+   {
+    "lambda_um": 25.0,
+    "ratio_via_k": 64.65085021459518,
+    "ratio_via_d": 73.54882264501371,
+    "disagreement": 1.1376311742364338
+   },
+   {
+    "lambda_um": 27.0,
+    "ratio_via_k": 45.755443509050764,
+    "ratio_via_d": 51.41857395593857,
+    "disagreement": 1.1237695454917314
+   },
+   {
+    "lambda_um": 30.0,
+    "ratio_via_k": 29.645084202817543,
+    "ratio_via_d": 32.79812332169449,
+    "disagreement": 1.1063595939652373
+   },
+   {
+    "lambda_um": 35.0,
+    "ratio_via_k": 16.918169674951088,
+    "ratio_via_d": 18.332030629169893,
+    "disagreement": 1.0835705623825347
+   },
+   {
+    "lambda_um": 40.0,
+    "ratio_via_k": 11.090793607346637,
+    "ratio_via_d": 11.820980064800576,
+    "disagreement": 1.0658371693951871
+   },
+   {
+    "lambda_um": 45.0,
+    "ratio_via_k": 7.984313937039541,
+    "ratio_via_d": 8.394522571314859,
+    "disagreement": 1.051376816782259
+   },
+   {
+    "lambda_um": 50.0,
+    "ratio_via_k": 6.142397612491176,
+    "ratio_via_d": 6.383015432967978,
+    "disagreement": 1.0391732733139063
+   },
+   {
+    "lambda_um": 60.0,
+    "ratio_via_k": 4.159586197873337,
+    "ratio_via_d": 4.239891499433061,
+    "disagreement": 1.0193060794366473
+   },
+   {
+    "lambda_um": 72.487,
+    "ratio_via_k": 2.997790912569346,
+    "ratio_via_d": 2.9977974618728602,
+    "disagreement": 1.0000021847099099
+   },
+   {
+    "lambda_um": 90.0,
+    "ratio_via_k": 2.240022443383098,
+    "ratio_via_d": 2.193475983727155,
+    "disagreement": 1.0212204099799858
+   }
+  ],
+  "implied_lambda": {
+   "doxorubicin": {
+    "measured_near_far": 11.0,
+    "measured_sd": 5.0,
+    "implied_lambda_um": 40.14613584665381,
+    "implied_lambda_um_band": [
+     35.78780712305095,
+     50.718160140905894
+    ],
+    "shipped_lambda_um": 72.4886256662236,
+    "fold_error": 1.8056190001226615
+   },
+   "epirubicin": {
+    "measured_near_far": 12.0,
+    "measured_sd": 3.0,
+    "implied_lambda_um": 39.21988354440704,
+    "implied_lambda_um_band": [
+     36.64582622838998,
+     43.36521372943662
+    ],
+    "shipped_lambda_um": 72.4886256662236,
+    "fold_error": 1.8482621342857315
+   },
+   "daunorubicin": {
+    "measured_near_far": 50.0,
+    "measured_sd": 15.0,
+    "implied_lambda_um": 26.550731396567002,
+    "implied_lambda_um_band": [
+     24.987614002377754,
+     29.00283121647499
+    ],
+    "shipped_lambda_um": 64.40385679063331,
+    "fold_error": 2.4256904952516942
+   }
+  }
+ },
+ "tissue": {
+  "alpha": 22.223477711172563,
+  "config": "10x Xenium GBM flagship section, dx = 12 um, repair = 1, dt = 10 s, 6 h window, convection ON",
+  "compounds": {
+   "doxorubicin": {
+    "OFF": {
+     "kill_fraction": 0.04581723500755919,
+     "n_tumor": 23812,
+     "counts": {
+      "KILLED": 1091,
+      "SURVIVED_UNREACHED": 8735,
+      "SURVIVED_UNDERDOSED": 13986,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "unreached_fraction_of_tumor": 0.3668318494876533,
+     "survival_breakdown": {
+      "delivery": 0.38444610712556665,
+      "dose": 0.6155538928744333,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "mean_auc": 48715.972566414035,
+     "solve_s": 45.96539807319641
+    },
+    "ON": {
+     "kill_fraction": 0.03913992944733746,
+     "n_tumor": 23812,
+     "counts": {
+      "KILLED": 932,
+      "SURVIVED_UNREACHED": 11368,
+      "SURVIVED_UNDERDOSED": 11512,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "unreached_fraction_of_tumor": 0.4774063497396271,
+     "survival_breakdown": {
+      "delivery": 0.49685314685314685,
+      "dose": 0.5031468531468531,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "mean_auc": 40790.40650770557,
+     "solve_s": 47.14192605018616
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 2757,
+     "fraction_changed": 0.06742974539584709,
+     "transitions": {
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 2598,
+      "KILLED->SURVIVED_UNDERDOSED": 124,
+      "KILLED->SURVIVED_UNREACHED": 35
+     }
+    },
+    "dominant_limiter_inverts": false
+   },
+   "epirubicin": {
+    "OFF": {
+     "kill_fraction": 0.04581723500755919,
+     "n_tumor": 23812,
+     "counts": {
+      "KILLED": 1091,
+      "SURVIVED_UNREACHED": 8735,
+      "SURVIVED_UNDERDOSED": 13986,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "unreached_fraction_of_tumor": 0.3668318494876533,
+     "survival_breakdown": {
+      "delivery": 0.38444610712556665,
+      "dose": 0.6155538928744333,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "mean_auc": 48715.972566414035,
+     "solve_s": 50.66138410568237
+    },
+    "ON": {
+     "kill_fraction": 0.03913992944733746,
+     "n_tumor": 23812,
+     "counts": {
+      "KILLED": 932,
+      "SURVIVED_UNREACHED": 11368,
+      "SURVIVED_UNDERDOSED": 11512,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "unreached_fraction_of_tumor": 0.4774063497396271,
+     "survival_breakdown": {
+      "delivery": 0.49685314685314685,
+      "dose": 0.5031468531468531,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "mean_auc": 40790.40650770557,
+     "solve_s": 47.44833016395569
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 2757,
+     "fraction_changed": 0.06742974539584709,
+     "transitions": {
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 2598,
+      "KILLED->SURVIVED_UNDERDOSED": 124,
+      "KILLED->SURVIVED_UNREACHED": 35
+     }
+    },
+    "dominant_limiter_inverts": false
+   },
+   "daunorubicin": {
+    "OFF": {
+     "kill_fraction": 0.044263396606752936,
+     "n_tumor": 23812,
+     "counts": {
+      "KILLED": 1054,
+      "SURVIVED_UNREACHED": 9759,
+      "SURVIVED_UNDERDOSED": 12999,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "unreached_fraction_of_tumor": 0.40983537712077944,
+     "survival_breakdown": {
+      "delivery": 0.42881624044292116,
+      "dose": 0.5711837595570788,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "mean_auc": 47046.97942135444,
+     "solve_s": 49.90314793586731
+    },
+    "ON": {
+     "kill_fraction": 0.037502099781622666,
+     "n_tumor": 23812,
+     "counts": {
+      "KILLED": 893,
+      "SURVIVED_UNREACHED": 12403,
+      "SURVIVED_UNDERDOSED": 10516,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "unreached_fraction_of_tumor": 0.5208718293297497,
+     "survival_breakdown": {
+      "delivery": 0.5411667175705747,
+      "dose": 0.4588332824294254,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "delivery",
+     "mean_auc": 39108.60765140582,
+     "solve_s": 47.54762601852417
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 2766,
+     "fraction_changed": 0.06764986426003375,
+     "transitions": {
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 2605,
+      "KILLED->SURVIVED_UNDERDOSED": 122,
+      "KILLED->SURVIVED_UNREACHED": 39
+     }
+    },
+    "dominant_limiter_inverts": true
+   },
+   "mitoxantrone": {
+    "OFF": {
+     "kill_fraction": 0.02511338820762643,
+     "n_tumor": 23812,
+     "counts": {
+      "KILLED": 598,
+      "SURVIVED_UNREACHED": 18311,
+      "SURVIVED_UNDERDOSED": 4903,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "unreached_fraction_of_tumor": 0.7689820258693096,
+     "survival_breakdown": {
+      "delivery": 0.7887912466614974,
+      "dose": 0.21120875333850261,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "delivery",
+     "mean_auc": 27344.025181189587,
+     "solve_s": 58.69278907775879
+    },
+    "ON": {
+     "kill_fraction": 0.021123803124475038,
+     "n_tumor": 23812,
+     "counts": {
+      "KILLED": 503,
+      "SURVIVED_UNREACHED": 19656,
+      "SURVIVED_UNDERDOSED": 3653,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "unreached_fraction_of_tumor": 0.8254661515202419,
+     "survival_breakdown": {
+      "delivery": 0.8432794199665365,
+      "dose": 0.15672058003346348,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "delivery",
+     "mean_auc": 24061.470769030122,
+     "solve_s": 50.79777932167053
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 1400,
+     "fraction_changed": 0.0342407122068139,
+     "transitions": {
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 1305,
+      "KILLED->SURVIVED_UNREACHED": 40,
+      "KILLED->SURVIVED_UNDERDOSED": 55
+     }
+    },
+    "dominant_limiter_inverts": false
+   }
+  },
+  "ps_sweep": [
+   {
+    "c": 0.01,
+    "exchange": false,
+    "drug": "doxorubicin",
+    "kill_fraction": 4.1995632454217e-05,
+    "mean_auc": 487.15972566414035,
+    "counts": {
+     "KILLED": 1,
+     "SURVIVED_UNREACHED": 23811,
+     "SURVIVED_UNDERDOSED": 0,
+     "SURVIVED_RESISTANT": 0,
+     "SURVIVED_STOCHASTIC": 0,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   },
+   {
+    "c": 0.01,
+    "exchange": true,
+    "drug": "doxorubicin",
+    "kill_fraction": 4.1995632454217e-05,
+    "mean_auc": 486.17422221817156,
+    "counts": {
+     "KILLED": 1,
+     "SURVIVED_UNREACHED": 23811,
+     "SURVIVED_UNDERDOSED": 0,
+     "SURVIVED_RESISTANT": 0,
+     "SURVIVED_STOCHASTIC": 0,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   },
+   {
+    "c": 0.1,
+    "exchange": false,
+    "drug": "doxorubicin",
+    "kill_fraction": 0.0036536200235175453,
+    "mean_auc": 4871.597256641403,
+    "counts": {
+     "KILLED": 87,
+     "SURVIVED_UNREACHED": 23725,
+     "SURVIVED_UNDERDOSED": 0,
+     "SURVIVED_RESISTANT": 0,
+     "SURVIVED_STOCHASTIC": 0,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   },
+   {
+    "c": 0.1,
+    "exchange": true,
+    "drug": "doxorubicin",
+    "kill_fraction": 0.0034856374937006773,
+    "mean_auc": 4775.281818503894,
+    "counts": {
+     "KILLED": 83,
+     "SURVIVED_UNREACHED": 23729,
+     "SURVIVED_UNDERDOSED": 0,
+     "SURVIVED_RESISTANT": 0,
+     "SURVIVED_STOCHASTIC": 0,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   },
+   {
+    "c": 1.0,
+    "exchange": false,
+    "drug": "doxorubicin",
+    "kill_fraction": 0.04581723500755919,
+    "mean_auc": 48715.972566414035,
+    "counts": {
+     "KILLED": 1091,
+     "SURVIVED_UNREACHED": 8735,
+     "SURVIVED_UNDERDOSED": 13986,
+     "SURVIVED_RESISTANT": 0,
+     "SURVIVED_STOCHASTIC": 0,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   },
+   {
+    "c": 1.0,
+    "exchange": true,
+    "drug": "doxorubicin",
+    "kill_fraction": 0.03913992944733746,
+    "mean_auc": 40790.40650770557,
+    "counts": {
+     "KILLED": 932,
+     "SURVIVED_UNREACHED": 11368,
+     "SURVIVED_UNDERDOSED": 11512,
+     "SURVIVED_RESISTANT": 0,
+     "SURVIVED_STOCHASTIC": 0,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   },
+   {
+    "c": 10.0,
+    "exchange": false,
+    "drug": "doxorubicin",
+    "kill_fraction": 0.28796405173861916,
+    "mean_auc": 487159.72566414025,
+    "counts": {
+     "KILLED": 6857,
+     "SURVIVED_UNREACHED": 157,
+     "SURVIVED_UNDERDOSED": 7014,
+     "SURVIVED_RESISTANT": 9249,
+     "SURVIVED_STOCHASTIC": 535,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   },
+   {
+    "c": 10.0,
+    "exchange": true,
+    "drug": "doxorubicin",
+    "kill_fraction": 0.15412397110700482,
+    "mean_auc": 177479.67952219464,
+    "counts": {
+     "KILLED": 3670,
+     "SURVIVED_UNREACHED": 196,
+     "SURVIVED_UNDERDOSED": 19865,
+     "SURVIVED_RESISTANT": 76,
+     "SURVIVED_STOCHASTIC": 5,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   },
+   {
+    "c": 100.0,
+    "exchange": false,
+    "drug": "doxorubicin",
+    "kill_fraction": 0.5026877204770703,
+    "mean_auc": 4871597.256641403,
+    "counts": {
+     "KILLED": 11970,
+     "SURVIVED_UNREACHED": 141,
+     "SURVIVED_UNDERDOSED": 12,
+     "SURVIVED_RESISTANT": 11620,
+     "SURVIVED_STOCHASTIC": 69,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   },
+   {
+    "c": 100.0,
+    "exchange": true,
+    "drug": "doxorubicin",
+    "kill_fraction": 0.21934318830841593,
+    "mean_auc": 286612.12239315995,
+    "counts": {
+     "KILLED": 5223,
+     "SURVIVED_UNREACHED": 157,
+     "SURVIVED_UNDERDOSED": 15720,
+     "SURVIVED_RESISTANT": 2507,
+     "SURVIVED_STOCHASTIC": 205,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   },
+   {
+    "c": 1000.0,
+    "exchange": false,
+    "drug": "doxorubicin",
+    "kill_fraction": 0.5316647068704854,
+    "mean_auc": 48715972.56641404,
+    "counts": {
+     "KILLED": 12660,
+     "SURVIVED_UNREACHED": 140,
+     "SURVIVED_UNDERDOSED": 1,
+     "SURVIVED_RESISTANT": 11004,
+     "SURVIVED_STOCHASTIC": 7,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   },
+   {
+    "c": 1000.0,
+    "exchange": true,
+    "drug": "doxorubicin",
+    "kill_fraction": 0.23387367713757767,
+    "mean_auc": 315522.4079828069,
+    "counts": {
+     "KILLED": 5569,
+     "SURVIVED_UNREACHED": 154,
+     "SURVIVED_UNDERDOSED": 13355,
+     "SURVIVED_RESISTANT": 4394,
+     "SURVIVED_STOCHASTIC": 340,
+     "UNATTRIBUTED": 0,
+     "ALREADY_DEAD": 0,
+     "NOT_TUMOR": 17075
+    }
+   }
+  ],
+  "sweep_auc_span_off": 100000.00000000001,
+  "sweep_auc_span_on": 648.990410357906,
+  "sweep_c_span": 100000.0
+ },
+ "scope": {
+  "alpha": 22.223477711172563,
+  "ps_scale_s_inv": 1.0,
+  "compounds": {
+   "doxorubicin": {
+    "bbb_penetrance": 0.020567870235594195,
+    "implied_permeability_um_s": {
+     "2.0": 0.020567870235594195,
+     "4.0": 0.04113574047118839,
+     "8.0": 0.08227148094237678
+    }
+   },
+   "epirubicin": {
+    "bbb_penetrance": 0.020567870235594195,
+    "implied_permeability_um_s": {
+     "2.0": 0.020567870235594195,
+     "4.0": 0.04113574047118839,
+     "8.0": 0.08227148094237678
+    }
+   },
+   "daunorubicin": {
+    "bbb_penetrance": 0.025424049536715655,
+    "implied_permeability_um_s": {
+     "2.0": 0.025424049536715655,
+     "4.0": 0.05084809907343131,
+     "8.0": 0.10169619814686262
+    }
+   },
+   "mitoxantrone": {
+    "bbb_penetrance": 0.022520999284355227,
+    "implied_permeability_um_s": {
+     "2.0": 0.022520999284355227,
+     "4.0": 0.045041998568710453,
+     "8.0": 0.09008399713742091
+    }
+   }
+  },
+  "elasticity": [
+   {
+    "ps_s_inv": 1e-06,
+    "elasticity_one_way": 1.0,
+    "elasticity_split": 0.999801449021238,
+    "plasma_multiple_one_way": 0.00019859040908200875,
+    "plasma_fraction_split": 0.00019855097876191277,
+    "boundary_layer_um_split": 72.48142896519029
+   },
+   {
+    "ps_s_inv": 0.0001,
+    "elasticity_one_way": 1.0,
+    "elasticity_split": 0.9805276610672431,
+    "plasma_multiple_one_way": 0.019859040908200877,
+    "plasma_fraction_split": 0.019472338932756905,
+    "boundary_layer_um_split": 71.77939455199727
+   },
+   {
+    "ps_s_inv": 0.005035489904182864,
+    "elasticity_one_way": 1.0,
+    "elasticity_split": 0.5,
+    "plasma_multiple_one_way": 1.0,
+    "plasma_fraction_split": 0.5,
+    "boundary_layer_um_split": 51.25719876747993
+   },
+   {
+    "ps_s_inv": 0.01,
+    "elasticity_one_way": 1.0,
+    "elasticity_split": 0.3349069392665412,
+    "plasma_multiple_one_way": 1.9859040908200876,
+    "plasma_fraction_split": 0.6650930607334589,
+    "boundary_layer_um_split": 41.949997473997165
+   },
+   {
+    "ps_s_inv": 0.1,
+    "elasticity_one_way": 1.0,
+    "elasticity_split": 0.04794084274540365,
+    "plasma_multiple_one_way": 19.85904090820088,
+    "plasma_fraction_split": 0.9520591572545964,
+    "boundary_layer_um_split": 15.871672661902881
+   },
+   {
+    "ps_s_inv": 1.0,
+    "elasticity_one_way": 1.0,
+    "elasticity_split": 0.005010260786574744,
+    "plasma_multiple_one_way": 198.59040908200876,
+    "plasma_fraction_split": 0.9949897392134253,
+    "boundary_layer_um_split": 5.130976573007989
+   },
+   {
+    "ps_s_inv": 100.0,
+    "elasticity_one_way": 1.0,
+    "elasticity_split": 5.0352363553645374e-05,
+    "plasma_multiple_one_way": 19859.040908200877,
+    "plasma_fraction_split": 0.9999496476364463,
+    "boundary_layer_um_split": 0.5143749336600036
+   }
+  ],
+  "regime_at_shipped_ps": {
+   "damkohler": 15.235753360816096,
+   "spacing_um": 140.0,
+   "ps_s_inv": 0.020567870235594195,
+   "d_eff_um2_s": 26.459489535609855,
+   "k_loss_s_inv": 0.005035489904182864,
+   "entry_resistance_s": 48.61952105616785,
+   "transport_resistance_s": 740.7550313327783,
+   "regime": "transport_limited"
+  },
+  "boundary_layer_um_at_shipped_ps_split": 32.14713308497217,
+  "boundary_layer_um_one_way": 72.4886256662236
+ },
+ "runtime_s": 1098.9234759807587
+}

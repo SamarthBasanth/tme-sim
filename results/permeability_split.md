@@ -25,7 +25,8 @@ shipped parameters, with no scaling required.**
 |---|---|:--|
 | **A** | is entry conflated with spread? | **the brief had the polarity backwards** — entry contributes *exactly nothing* to shape; `D_eff`/`k_loss` does both jobs |
 | **B** | does the split move the Kyle gradient? | **NO — and it cannot.** Best available move −0.15 %, *away* from the measurement, against gaps of 3.67× and 13.7× |
-| **C** | does the split invert a per-cell verdict? | **YES.** Daunorubicin's dominant limiter flips DOSE → DELIVERY on the flagship section at the shipped `PS` |
+| **C** | does the split invert a per-cell verdict? | **YES.** Daunorubicin's dominant limiter flips DOSE → DELIVERY on the flagship section at the shipped `PS`; doxorubicin lands at 0.497 : 0.503 |
+| **C′** | *why* it can | the shipped law has **no plasma bound**: entry elasticity is exactly 1, so absolute exposure is unbounded in an unmeasured constant |
 | **D** | does the split need an unmeasured parameter? | **it trades an unbounded one for a saturating one.** It does not introduce a measured `P`; nobody has one |
 | **E** | *(not the assignment)* what IS the accuracy gap? | **an error of ≤ 2.43× in ONE length**, `λ = sqrt(D_eff/k_loss)` |
 
@@ -87,10 +88,19 @@ and a misleading sentence about the model.
 
 1. **λ cannot tell you whether the error is in `D_eff` or in `k_loss`.** It is
    their ratio. The two-route columns above are the only handle this
-   construction gives and they agree to within **1.185×** at the far end and
-   1.00× at the shipped point — far too weak to separate `D` from `k`. A
-   sibling is decomposing the accuracy gap in `experiments/accuracy_gap_*`;
-   this file hands the question over, it does not answer it.
+   construction gives and they agree to within **1.185×** at λ = 20 µm, falling
+   monotonically to 1.00× at the shipped point — far too weak to separate `D`
+   from `k`. This file hands the question over; it does not answer it.
+
+   > **Answered elsewhere, and recorded here because it changes how §1 should be
+   > read.** A parallel decomposition in `experiments/accuracy_gap_*` reports
+   > that `k_loss` carries essentially all of the length error and that `D_eff`
+   > is wrong in the **opposite** direction, currently masking it — so
+   > correcting `D_eff` alone makes every gradient number 1.22–1.62× worse.
+   > **That result is not measured in this file and is not mine**; it is
+   > consistent with the polarity here and it is quoted so that nobody reads
+   > "λ is 1.8–2.4× too long" as licence to move `D_eff`. Read it in its own
+   > file before acting on it.
 2. **The ratio is very nearly, but not exactly, a function of λ alone.** The
    two routes differ by up to 18.5 % at λ = 20 µm. The 1 h window is ~18 loss
    time constants at the shipped `k` but fewer when `D` is what moves, so the
@@ -189,7 +199,89 @@ is **refuted**. It is not part of it, and §1 says what is instead.
 
 ---
 
-## 4. It DOES invert a per-cell verdict, on real tissue, at the shipped `PS`
+## 4. The shipped law has no plasma bound — and that is what inverts a verdict
+
+**Lead with the physics, because the verdict inversion is its consequence and
+not an independent finding.**
+
+Under the shipped one-way law there is **nothing that stops tissue exposure
+exceeding the plasma level it came from.** `C ≤ Cp` is a physical bound that
+should hold by construction and does not: the source is `PS·Cp` with no return
+path, the only losses are `clearance` and `binding`, and the steady state
+`PS·Cp/(clearance + binding)` has no reason whatsoever to sit at or below `Cp`.
+`results/breast_kp_validation.md` already measured that failing — 5-fluorouracil
+predicted at 7.80× plasma against 0.61× measured.
+
+§4.1 shows it on the flagship section, in the production path, with convection
+on: mean exposure rises **exactly proportionally** with the entry term over five
+decades, and the kill fraction ramps to 0.532 without saturating. The elasticity
+of exposure with respect to entry is **exactly 1 at every `PS`**, against
+`k_loss/(PS + k_loss)` under the split. That is the cleanest statement of the
+defect available: **this is a missing physical bound, not a calibration gap.**
+
+And because the entry term carries an underived factor of exactly 1 s⁻¹, every
+*absolute* quantity the engine reports — which is every per-cell DOSE /
+DELIVERY / RESISTANCE call, since those are thresholds on `E / IC50` — is
+arbitrary up to that unvalidated constant. §4.2 is what that costs at the
+shipped parameters.
+
+### 4.1 Entry is unbounded, and the split saturates it
+
+Flagship section and configuration as in §4.2 below, doxorubicin, sweeping
+the entry scale by `c`:
+
+| `c` | law | kill fraction | mean AUC (µM·s) | KILLED | UNREACHED | UNDERDOSED |
+|---:|:--|---:|---:|---:|---:|---:|
+| 1e−02 | OFF | 0.000042 | 4.8716e+02 | 1 | 23,811 | 0 |
+| 1e−02 | ON | 0.000042 | 4.8617e+02 | 1 | 23,811 | 0 |
+| 1e−01 | OFF | 0.003654 | 4.8716e+03 | 87 | 23,725 | 0 |
+| 1e−01 | ON | 0.003486 | 4.7753e+03 | 83 | 23,729 | 0 |
+| 1e+00 | OFF | 0.045817 | 4.8716e+04 | 1,091 | 8,735 | 13,986 |
+| 1e+00 | ON | 0.039140 | 4.0790e+04 | 932 | 11,368 | 11,512 |
+| 1e+01 | OFF | 0.287964 | 4.8716e+05 | 6,857 | 157 | 7,014 |
+| 1e+01 | ON | 0.154124 | 1.7748e+05 | 3,670 | 196 | 19,865 |
+| 1e+02 | OFF | 0.502688 | 4.8716e+06 | 11,970 | 141 | 12 |
+| 1e+02 | ON | 0.219343 | 2.8661e+05 | 5,223 | 157 | 15,720 |
+| 1e+03 | OFF | 0.531665 | 4.8716e+07 | 12,660 | 140 | 1 |
+| 1e+03 | ON | 0.233874 | 3.1552e+05 | 5,569 | 154 | 13,355 |
+
+Read the OFF column of mean AUC: `4.8716e+02, 4.8716e+03, 4.8716e+04,
+4.8716e+05, 4.8716e+06, 4.8716e+07`. **Exactly proportional over five decades,
+on real tissue with convection ON** — the homogeneity result of §2, surviving
+the full production path with advection, a real vascular field and a real
+tissue mask. The ON column saturates: `4.8617e+02 → 3.1552e+05`, a factor of
+649 for a factor of 100,000 in entry.
+
+The run states it as one line: *over a 1e+05 sweep of the entry scale, mean
+exposure spans **100000.00000000001×** under the one-way law and **648.99×**
+under the split.* **The one-way span equals the sweep, to the last digit the
+solver carries.** That is elasticity 1, measured rather than derived.
+
+**Why that is a correctness problem rather than a scaling nuisance.** Per-cell
+DOSE / DELIVERY / RESISTANCE calls are thresholds on an *absolute* exposure
+(`E / IC50`). Under the shipped law every absolute exposure is proportional to
+`PS`, and `PS` carries an **implicit, underived factor of exactly 1 s⁻¹**
+(`drugs.PS_SCALE_S_INV`; the dimensional audit is
+`results/transvascular_exchange_revalidation.md` §6.2). So the per-cell map is
+arbitrary up to an unvalidated multiplicative constant, and the sweep above
+shows it: the same tissue and the same compound go from **23,811 unreached
+cells (every viable tumour cell on the section) to 140** across five decades of
+a number nobody has measured.
+
+Formally, the elasticity of exposure with respect to the entry term is
+
+* one-way: **exactly 1**, at every `PS`, without bound;
+* split: `k_loss / (PS + k_loss)`, which → 0 as the wall opens.
+
+(`transvascular.entry_elasticity`, asserted in `tests/test_permeability_split.py`.)
+
+**What stays safe under the shipped law.** Everything that is a *ratio within
+one map* — "this region got N× less than that region", the compound rank by
+half-distance, the shape of the reach curve. Those are exactly invariant to the
+unmeasured scale, by §2, to `4.45e−14`. That invariance is a real asset and it
+is why the map claim survived while the absolute claims did not.
+
+### 4.2 The consequence: a reported verdict inverts, at the shipped `PS`
 
 Flagship 10x Xenium human GBM section, `dx = 12 µm`, 424 × 675,
 `repair = 1`, `dt = 10 s`, 6 h window, **convection ON**, through
@@ -227,60 +319,21 @@ The other transitions are `KILLED → SURVIVED_UNDERDOSED` (55–124) and
 `KILLED → SURVIVED_UNREACHED` (35–40). The direction is uniform: the split
 moves cells *away* from "we killed it" and *toward* "the drug never got there".
 
-**This is the whole remaining case for the split**, and it is the one the
-landing page already carries as its first limit. It is not a caveat. It is a
+**Doxorubicin at 0.497 : 0.503 is arguably the worse row.** It does not invert,
+so it reports a dominant limiter with the same confidence as any other run —
+and it is one cell from the opposite answer. A verdict that *looks* decided and
+is not is harder to catch than one that flips.
+
+> **The instruction that follows, and it is now in the product.** Read a
+> near-even delivery : dose split as **undecided**, not as a finding. The
+> delivery/dose discrimination is what replaced the withdrawn ranking and is
+> what a reader carries away, so the sensitivity belongs beside that sentence
+> rather than in a caveat block below it.
+
+**This is the whole remaining case for the split.** It is not a caveat. It is a
 reported conclusion changing sign under a law the engine ships in the OFF
 position.
 
-### 4.1 And the deeper reason: the shipped law makes every absolute verdict unbounded
-
-Same section and configuration, doxorubicin, sweeping the entry scale by `c`:
-
-| `c` | law | kill fraction | mean AUC (µM·s) | KILLED | UNREACHED | UNDERDOSED |
-|---:|:--|---:|---:|---:|---:|---:|
-| 1e−02 | OFF | 0.000042 | 4.8716e+02 | 1 | 23,811 | 0 |
-| 1e−02 | ON | 0.000042 | 4.8617e+02 | 1 | 23,811 | 0 |
-| 1e−01 | OFF | 0.003654 | 4.8716e+03 | 87 | 23,725 | 0 |
-| 1e−01 | ON | 0.003486 | 4.7753e+03 | 83 | 23,729 | 0 |
-| 1e+00 | OFF | 0.045817 | 4.8716e+04 | 1,091 | 8,735 | 13,986 |
-| 1e+00 | ON | 0.039140 | 4.0790e+04 | 932 | 11,368 | 11,512 |
-| 1e+01 | OFF | 0.287964 | 4.8716e+05 | 6,857 | 157 | 7,014 |
-| 1e+01 | ON | 0.154124 | 1.7748e+05 | 3,670 | 196 | 19,865 |
-| 1e+02 | OFF | 0.502688 | 4.8716e+06 | 11,970 | 141 | 12 |
-| 1e+02 | ON | 0.219343 | 2.8661e+05 | 5,223 | 157 | 15,720 |
-| 1e+03 | OFF | 0.531665 | 4.8716e+07 | 12,660 | 140 | 1 |
-| 1e+03 | ON | 0.233874 | 3.1552e+05 | 5,569 | 154 | 13,355 |
-
-Read the OFF column of mean AUC: `4.8716e+02, 4.8716e+03, 4.8716e+04,
-4.8716e+05, 4.8716e+06, 4.8716e+07`. **Exactly proportional over five decades,
-on real tissue with convection ON** — the homogeneity result of §2, surviving
-the full production path with advection, a real vascular field and a real
-tissue mask. The ON column saturates: `4.8617e+02 → 3.1552e+05`, a factor of
-649 for a factor of 100,000 in entry.
-
-**Why that is a correctness problem rather than a scaling nuisance.** Per-cell
-DOSE / DELIVERY / RESISTANCE calls are thresholds on an *absolute* exposure
-(`E / IC50`). Under the shipped law every absolute exposure is proportional to
-`PS`, and `PS` carries an **implicit, underived factor of exactly 1 s⁻¹**
-(`drugs.PS_SCALE_S_INV`; the dimensional audit is
-`results/transvascular_exchange_revalidation.md` §6.2). So the per-cell map is
-arbitrary up to an unvalidated multiplicative constant, and the sweep above
-shows it: the same tissue and the same compound go from **23,811 unreached
-cells (every viable tumour cell on the section) to 140** across five decades of
-a number nobody has measured.
-
-Formally, the elasticity of exposure with respect to the entry term is
-
-* one-way: **exactly 1**, at every `PS`, without bound;
-* split: `k_loss / (PS + k_loss)`, which → 0 as the wall opens.
-
-(`transvascular.entry_elasticity`, asserted in `tests/test_permeability_split.py`.)
-
-**What stays safe under the shipped law.** Everything that is a *ratio within
-one map* — "this region got N× less than that region", the compound rank by
-half-distance, the shape of the reach curve. Those are exactly invariant to the
-unmeasured scale, by §2, to `4.45e−14`. That invariance is a real asset and it
-is why the map claim survived while the absolute claims did not.
 
 ---
 
@@ -422,11 +475,16 @@ from 23,811 unreached cells — every viable tumour cell on the section — to 1
    *honest* without a parameter nobody has measured.
 
 **What I would do instead, and it is §1's finding, not this one's.** The
-accuracy gap is a single length that is 1.8–2.4× too long. `λ` cannot say
-whether that sits in `D_eff` or in `k_loss`, and that is now the highest-value
-open question in the transport model. It is a much smaller target than "the map
-is 14× too shallow", and unlike the entry term it is reachable by the anchors
-the project already has.
+accuracy gap is a single length that is 1.8–2.4× too long. That is a much
+smaller target than "the map is 14× too shallow", and unlike the entry term it
+is reachable by anchors the project already has. `λ` alone cannot say whether it
+sits in `D_eff` or in `k_loss`; the parallel decomposition quoted in §1 reports
+`k_loss` and warns that `D_eff` is wrong in the opposite direction, so **do not
+move `D_eff` on the strength of §1**. Read that file first.
+
+**What ships from this one.** The code, default OFF, with the sensitivity
+disclosed beside the delivery/dose verdict rather than beneath it — because
+that verdict is the product, and §4.2 says it can invert.
 
 ---
 
