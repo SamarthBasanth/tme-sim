@@ -126,6 +126,29 @@ ENV HOME=/home/codon
 RUN mkdir -p data_cache app/runs \
     && chown -R codon:codon /app/data_cache /app/app
 
+# --- the one tissue section, FETCHED FROM SOURCE AT BUILD TIME -------------- #
+# Without this the image starts fine and can run NOTHING: .dockerignore
+# excludes data_cache/ (5.3 GB locally), so a hosted container has no tissue and
+# every section is unavailable. That is correct for a local deploy that bind-
+# mounts the host's cache, and useless for a hosted one, which has no host.
+#
+# FETCHED, NOT COPIED, and the distinction is deliberate. `codon acquire`
+# downloads xenium_319 (~16.6 MB) from the ORIGINAL source, so the image carries
+# data obtained under the source's own terms rather than a redistribution of one
+# developer's local copy. It also cannot silently ship a section that has been
+# modified on someone's laptop.
+#
+# ARG so a local build can skip it: --build-arg FETCH_SECTION=0 gives the old
+# no-tissue image for the bind-mount workflow, which is still what
+# docs/DEPLOYMENT.md describes.
+ARG FETCH_SECTION=1
+RUN if [ "$FETCH_SECTION" = "1" ]; then \
+      python -m tmesim.cli acquire --sections xenium_319 --timeout 180 \
+      && chown -R codon:codon /app/data_cache ; \
+    else \
+      echo "[build] FETCH_SECTION=0 -- image ships with NO tissue; bind-mount one" ; \
+    fi
+
 EXPOSE 8000
 
 # Everything above this line runs as root (apt, pip, COPY). Everything the
