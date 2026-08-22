@@ -27,6 +27,31 @@
  */
 const RAW = process.env.NEXT_PUBLIC_STUDIO_URL;
 
+/** Hosts that only ever mean "this machine". */
+const LOOPBACK = /^(https?:\/\/)?(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:|\/|$)/i;
+
+if (RAW && LOOPBACK.test(RAW.trim()) && process.env.NODE_ENV === "production") {
+  // A SET-BUT-LOOPBACK VALUE IS WORSE THAN AN UNSET ONE, and the unset check
+  // below cannot see it. `.env.local.example` ships
+  // `NEXT_PUBLIC_STUDIO_URL=http://localhost:8000` because that is correct for
+  // local development -- so importing that file into a hosting dashboard, which
+  // is the obvious thing to do with it, would satisfy the unset check and ship
+  // the precise defect the unset check exists to prevent: a public page whose
+  // primary call to action points at the visitor's own machine.
+  throw new Error(
+    `NEXT_PUBLIC_STUDIO_URL is set to a loopback address (${RAW}) in a ` +
+      "production build.\n\n" +
+      "That address means 'this computer' to whoever loads the page, so the " +
+      "'Open the Studio' links would point at the VISITOR'S machine, not at " +
+      "the Studio. It is inlined into the browser bundle at build time.\n\n" +
+      "This usually means .env.local.example was imported into a hosting " +
+      "dashboard. That file is correct for `npm run dev` and wrong for a " +
+      "deployment. Set the variable to the Studio's real public URL and " +
+      "rebuild.\n\n" +
+      "See landing-3d/DEPLOY_VERCEL.md.",
+  );
+}
+
 if (!RAW && process.env.NODE_ENV === "production") {
   throw new Error(
     "NEXT_PUBLIC_STUDIO_URL is not set, and this is a production build.\n\n" +
