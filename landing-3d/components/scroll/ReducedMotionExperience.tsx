@@ -151,7 +151,7 @@ export default function ReducedMotionExperience({ isMobile }: { isMobile: boolea
                   </a>
                   <a
                     className="cta-link"
-                    href="mailto:samarthbasanth@gmail.com?subject=Codon%20enquiry"
+                    href="mailto:samarthbasanth@gmail.com?subject=Vivum%20enquiry"
                   >
                     or email us about your tissue
                   </a>

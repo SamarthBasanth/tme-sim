@@ -2,7 +2,7 @@
 
 Why this module exists
 ----------------------
-Codon has stopped ranking compounds. The cross-compound ordering was measured
+Vivum has stopped ranking compounds. The cross-compound ordering was measured
 and does not hold (``results/pk_ranking_robustness.md``,
 ``results/capacity_ranking_robustness.md``), so the product is the SINGLE-compound
 map: one real tissue, one compound, where the drug reaches and how much of the

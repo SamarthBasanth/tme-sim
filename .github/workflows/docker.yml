@@ -85,13 +85,13 @@ jobs:
     name: build + smoke-test image (linux/amd64)
     runs-on: ubuntu-latest
     env:
-      IMAGE: codon-studio:ci
+      IMAGE: vivum-studio:ci
       # A fixed key for the explicit-key container. Not a secret: it only ever
       # exists inside this ephemeral runner, and the whole point is that the
       # gate rejects requests that lack it.
       SMOKE_KEY: ci-smoke-key-not-a-secret
-      SMOKE_CONTAINER: codon-smoke
-      AUTOKEY_CONTAINER: codon-autokey
+      SMOKE_CONTAINER: vivum-smoke
+      AUTOKEY_CONTAINER: vivum-autokey
 
     steps:
       - uses: actions/checkout@v4
@@ -184,18 +184,60 @@ jobs:
                 echo "ok    absent: /app/$p"
               fi
             done
-            for d in data_cache app/runs; do
-              if [ ! -d "/app/$d" ]; then
-                echo "FAIL  missing mount point: /app/$d"
-                fail=1
-              elif [ -n "$(ls -A "/app/$d")" ]; then
-                echo "FAIL  not empty -- real data was baked into the image: /app/$d"
-                ls -A "/app/$d" | head -20
+            if [ ! -d /app/app/runs ]; then
+              echo "FAIL  missing mount point: /app/app/runs"
+              fail=1
+            elif [ -n "$(ls -A /app/app/runs)" ]; then
+              echo "FAIL  not empty -- run history was baked into the image"
+              ls -A /app/app/runs | head -20
+              fail=1
+            else
+              echo "ok    empty mount point: /app/app/runs"
+            fi
+
+            # data_cache is NO LONGER EMPTY, and emptiness is no longer the
+            # right test. The Dockerfile now runs `vivum acquire` at build time
+            # (ARG FETCH_SECTION=1), because an image with no tissue starts
+            # cleanly and can simulate NOTHING -- fine for the local deploy that
+            # bind-mounts the host cache, useless for a hosted one.
+            #
+            # The GUARD'S PURPOSE IS UNCHANGED and still matters: catch a
+            # .dockerignore regression that bakes the OPERATOR'S LOCAL 5.3 GB
+            # cache -- possibly including unpublished tissue -- into a layer.
+            # "Empty" was a proxy for that. The real property is: nothing is in
+            # here except what the build deliberately DOWNLOADED FROM SOURCE.
+            #
+            # So: an allowlist of exactly what `acquire` produces, plus a size
+            # ceiling. A COPY of the host cache fails both -- it brings entries
+            # that are not on this list, and it is ~60x over the cap.
+            if [ ! -d /app/data_cache ]; then
+              echo "FAIL  missing mount point: /app/data_cache"
+              fail=1
+            else
+              for entry in $(ls -A /app/data_cache); do
+                case "$entry" in
+                  xenium_gbm|ivy_gap|tcga_expression|\
+                  tcga_gbm_clinical.json|gdsc_glioma_dose_response.csv)
+                    echo "ok    expected acquired source: $entry" ;;
+                  *)
+                    echo "FAIL  UNEXPECTED entry in data_cache -- this is what a"
+                    echo "      .dockerignore regression looks like: $entry"
+                    fail=1 ;;
+                esac
+              done
+              kb=$(du -sk /app/data_cache | cut -f1)
+              echo "      data_cache size: $((kb / 1024)) MB"
+              # ~87 MB as acquired. 300 MB leaves room for a source to grow and
+              # still fails a copy of the 5.3 GB local cache by ~18x.
+              if [ "$kb" -gt 307200 ]; then
+                echo "FAIL  data_cache is over 300 MB -- far larger than the"
+                echo "      acquired sources, so something was COPIED in."
+                du -sh /app/data_cache/* | head -20
                 fail=1
               else
-                echo "ok    empty mount point: /app/$d"
+                echo "ok    data_cache within the acquired-source ceiling"
               fi
-            done
+            fi
             # ...and the things that MUST be there.
             for p in tmesim/__init__.py tmesim/core tmesim/cli.py \
                      app/server/__main__.py app/server/api.py app/web/index.html; do
@@ -633,7 +675,7 @@ jobs:
       # PASS as well as on failure -- see the summary step at the end. An
       # instrument that only reports when it trips never tells you how close to
       # tripping it normally sits.
-      CODON_REFERENCE_DEVIATIONS: reference_deviations.jsonl
+      VIVUM_REFERENCE_DEVIATIONS: reference_deviations.jsonl
 
     steps:
       - uses: actions/checkout@v4
@@ -733,11 +775,11 @@ jobs:
         run: |
           python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json, os
-          path = os.environ.get("CODON_REFERENCE_DEVIATIONS", "")
+          path = os.environ.get("VIVUM_REFERENCE_DEVIATIONS", "")
           print("### Cross-platform reference deviations (linux/amd64 vs the macOS/arm64 reference)\n")
           if not path or not os.path.exists(path):
               print("_No deviation log was written -- either no reference test ran, or the")
-              print("`CODON_REFERENCE_DEVIATIONS` env var did not reach pytest._")
+              print("`VIVUM_REFERENCE_DEVIATIONS` env var did not reach pytest._")
               raise SystemExit(0)
           rows = [json.loads(l) for l in open(path) if l.strip()]
           if not rows:

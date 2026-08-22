@@ -1,11 +1,11 @@
-// tissue.js — BRING YOUR OWN TISSUE: point Codon at a spatial-transcriptomics
+// tissue.js — BRING YOUR OWN TISSUE: point Vivum at a spatial-transcriptomics
 // export on the server's disk, get a verdict on what that specimen can and
 // cannot support, and — only if it survives every check — a section the picker
 // can select.
 //
 // Why this panel exists at all
 // ----------------------------
-// The capability existed in `POST /api/sections/scan` and in `codon ingest`
+// The capability existed in `POST /api/sections/scan` and in `vivum ingest`
 // before this panel did, and appeared NOWHERE in the Studio: the section picker
 // was a read-only list from GET /api/sections. A field tester who will not
 // hand-POST JSON therefore could not load their own sample, which is the entire
@@ -26,7 +26,7 @@
 //
 //  2. THE REFUSAL IS THE PRODUCT. A directory that is not ingestable comes back
 //     with a reason, and the reason is rendered verbatim — it is the same
-//     sentence `codon ingest` prints, so this surface cannot drift from the
+//     sentence `vivum ingest` prints, so this surface cannot drift from the
 //     CLI. What this panel ADDS is one line of "what to do about it" chosen
 //     from the failure class, because "extent 2391947.3 x 1795825.1 um exceeds
 //     100000 um" tells a first-time user what is wrong and not what to type
@@ -64,13 +64,13 @@ const INGEST_TIMEOUT_MS = 15 * 60 * 1000;
 const REMEDIES = [
   [/is not a directory and does not exist|is not a directory/i,
     'Nothing is at that path. It has to be a path on the machine running this '
-    + 'Codon server, not on the computer your browser is running on, and it has '
+    + 'Vivum server, not on the computer your browser is running on, and it has '
     + 'to be the directory itself rather than a file inside it.'],
   [/is a CONTAINER, not a sample/i,
     'This directory holds your samples rather than being one. Ingest one of the '
     + 'child directories named above, one at a time.'],
   [/no recognised layout/i,
-    'Codon could not tell what this directory is. Check you are pointing at the '
+    'Vivum could not tell what this directory is. Check you are pointing at the '
     + 'sample directory itself — for a Xenium run that is the folder holding '
     + 'cells.csv.gz, for Space Ranger the one holding spatial/ and the matrix, '
     + 'and for anything else a MEX triple beside a coordinates table. If a '
@@ -84,7 +84,7 @@ const REMEDIES = [
     'There is not enough tissue here to reconstruct. If this is a crop, ingest a '
     + 'larger region of the same section.'],
   [/is a BUILT-IN section/i,
-    'That id belongs to a built-in specimen, and Codon will not let an ingested '
+    'That id belongs to a built-in specimen, and Vivum will not let an ingested '
     + 'section shadow one — a published number must keep meaning what it was '
     + 'measured from. Give this sample a different section id below.'],
   [/is already ingested from/i,
@@ -128,7 +128,7 @@ export const NOT_VALIDATED = (
  * is before they are typed rather than after they are registered.
  */
 export const DEIDENTIFIED_ONLY = (
-  'DE-IDENTIFIED TISSUE ONLY. Codon has one shared secret and no accounts, no '
+  'DE-IDENTIFIED TISSUE ONLY. Vivum has one shared secret and no accounts, no '
   + 'audit log, no encryption at rest and no per-record access control, so it '
   + 'must not hold data that identifies a person. The tissue itself never '
   + 'leaves this machine — but three of the strings you are about to type do: '
@@ -137,7 +137,7 @@ export const DEIDENTIFIED_ONLY = (
   + 'the SECTION ID and LABEL both default to the directory name, appear in the '
   + 'picker, and put the label in the heading of every exported report. Copy or '
   + 'rename to a study code first. The full checklist, including the '
-  + 'identifiers that ride inside a 10x export without Codon ever reading them, '
+  + 'identifiers that ride inside a 10x export without Vivum ever reading them, '
   + 'is docs/DEPLOYMENT.md §0.'
 );
 
@@ -252,7 +252,7 @@ export function createTissuePanel({ onRegistered }) {
           lineHeight: 'var(--lh-body)',
         },
       },
-      'Point Codon at a 10x Xenium bundle, a Space Ranger (Visium) output, or a '
+      'Point Vivum at a 10x Xenium bundle, a Space Ranger (Visium) output, or a '
       + 'bare MEX triple beside a coordinates table, and it will say what the '
       + 'sample is and what it cannot support before anything is run. '),
       h('p.dim', {
@@ -271,7 +271,7 @@ export function createTissuePanel({ onRegistered }) {
       // this sentence would be a false statement about the product.
       h('b', 'Nothing is uploaded from this browser for tissue.'),
       ' You name a directory and the server process reads it from its own disk, '
-      + 'so the path must exist on the machine running Codon and that process '
+      + 'so the path must exist on the machine running Vivum and that process '
       + 'must be able to read it. (Drug files, in the protocol panel, are a real '
       + 'upload.)'),
       // The de-identification constraint sits IMMEDIATELY above the fields it
@@ -416,7 +416,7 @@ export function createTissuePanel({ onRegistered }) {
         fontSize: 'var(--fs-disclosure)', lineHeight: 'var(--lh-body)',
       },
     },
-    'This is a refusal, not a crash. Codon stops on a sample it cannot honestly '
+    'This is a refusal, not a crash. Vivum stops on a sample it cannot honestly '
     + 'load rather than reconstructing something that would look like tissue. '
     + 'Nothing was registered and nothing was changed.'));
     reveal();
@@ -520,7 +520,7 @@ export function createTissuePanel({ onRegistered }) {
         { style: { padding: 'var(--sp-4) var(--sp-5) var(--sp-1)' } },
         'Capability report'));
       // Verbatim, monospaced, and IN FULL: this is the exact text
-      // `codon ingest` prints, and it is the only place the operator is told
+      // `vivum ingest` prints, and it is the only place the operator is told
       // what their own sample cannot support. It gets its full height — no
       // clamp, no inner scroller, no "show more" — because a limit behind a
       // scrollbar is a limit that does not get read. Only the horizontal axis

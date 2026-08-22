@@ -1,7 +1,7 @@
 """THE EXTERNAL-ANCHOR SCORECARD — one runnable inventory of every place this
 model is scored against an INDEPENDENT MEASURED number.
 
-This module is the data layer behind ``codon validate`` (``tmesim.cli``). It
+This module is the data layer behind ``vivum validate`` (``tmesim.cli``). It
 does not implement a single new comparison. Every number it prints is produced
 by calling the shipping validation module that already owns that comparison,
 unmodified, and every verdict is that module's own declared bar. What this
@@ -38,7 +38,7 @@ The four statuses, and why NOT TESTABLE is load-bearing
     used is worthless.
 ``FAIL``
     The model ran and missed. **Failures are never suppressed and never
-    softened.** ``codon validate`` exits non-zero when any row is FAIL, so this
+    softened.** ``vivum validate`` exits non-zero when any row is FAIL, so this
     is usable as a CI gate.
 ``NOT TESTABLE``
     No verdict is possible, for a stated ``reason``. This is not a soft pass and
@@ -1653,7 +1653,7 @@ def _run_breast_kill_3d2d() -> List[Row]:
     writes ``results/kill_calibration_breast.md`` renders the same object. That
     is deliberate: this function and that generator used to derive the verdict
     separately and disagreed about this exact panel — the report published
-    5 PASS / 1 FAIL while ``codon validate`` printed 3 PASS / 3 FAIL, two of the
+    5 PASS / 1 FAIL while ``vivum validate`` printed 3 PASS / 3 FAIL, two of the
     FAILs against zero-width bands. See ``results/zero_width_bands.md``.
 
     Two kinds of NOT TESTABLE reach this scorecard, and they are different
@@ -2771,7 +2771,7 @@ def build_registry(exchange: bool = False) -> List[AnchorGroup]:
 
 
 #: Validations that were inventoried and DELIBERATELY not registered, with the
-#: reason. Printed by ``codon validate --list`` so the omissions are auditable
+#: reason. Printed by ``vivum validate --list`` so the omissions are auditable
 #: rather than invisible.
 OUT_OF_SCOPE: Tuple[Tuple[str, str], ...] = (
     ("tmesim/validation/efflux_impact.py, ion_trapping_impact.py, "

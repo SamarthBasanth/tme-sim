@@ -146,7 +146,7 @@ def scan(path: str, measure_detection_rates: bool = False) -> Dict:
 
     This is the HTTP boundary, so an UNEXPECTED exception's text is replaced
     here with a stable sentence and a log reference. ``scan_report`` keeps the
-    raw text for ``codon ingest``, where an operator is at the console, and
+    raw text for ``vivum ingest``, where an operator is at the console, and
     flags it as internal; every deliberate refusal (the detection issues, the
     capability report, ``IngestError``) is unflagged and passes through
     verbatim so this surface can never disagree with the CLI.

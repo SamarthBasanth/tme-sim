@@ -5,13 +5,13 @@ Studio can reconstruct — and answers "is this section available?" with an
 honest reason when it is not. That reason names a document. **This module
 names an action**: for every section id, the exact command that turns
 "unavailable" into "runnable", and whether that command is something
-``codon acquire`` can run for you or something you must run by hand.
+``vivum acquire`` can run for you or something you must run by hand.
 
 Two classes of section:
 
 ``AUTO``
     Every file is a plain, open, unauthenticated HTTP GET with a stable URL and
-    a known byte count. ``codon acquire --sections <id>`` fetches it.
+    a known byte count. ``vivum acquire --sections <id>`` fetches it.
 
 ``MANUAL``
     Open, but not a copy-paste-and-go: the deposit needs extraction, a format
@@ -27,7 +27,7 @@ others are verified as *fetchable* and not as *reconstructable-in-this-pass*,
 and each recipe says which of the two it is in ``verified``.
 
 This module is deliberately importable with only the core install (no ``app``
-extra, no FastAPI): ``codon sections`` has to work in the ten minutes before a
+extra, no FastAPI): ``vivum sections`` has to work in the ten minutes before a
 user has decided whether to install anything else.
 """
 from __future__ import annotations
@@ -140,7 +140,7 @@ SECTION_RECIPES: "OrderedDict[str, Dict]" = OrderedDict([
             "# needs a format conversion that this repo does not ship a script\n"
             "# for. There is no verified one-command recipe; do not expect one.\n"
             "# Route that does work on an arbitrary export:\n"
-            "codon ingest /path/to/your/converted/export --register"
+            "vivum ingest /path/to/your/converted/export --register"
         ),
         "note": "no automated recipe exists in this repo — see 'manual' above",
         "verified": "GEO file listing read live 2026-08-15; the conversion step "
@@ -218,7 +218,7 @@ SECTION_RECIPES: "OrderedDict[str, Dict]" = OrderedDict([
 
 
 def auto_section_ids() -> List[str]:
-    """Section ids ``codon acquire --sections`` can fetch, in catalog order."""
+    """Section ids ``vivum acquire --sections`` can fetch, in catalog order."""
     return [k for k, v in SECTION_RECIPES.items() if v["mode"] == AUTO]
 
 
@@ -260,7 +260,7 @@ def remedy_for(section_id: str) -> List[str]:
         return []
     out: List[str] = []
     if rec["mode"] == AUTO:
-        out.append(f"fetch it:  codon acquire --sections {section_id}")
+        out.append(f"fetch it:  vivum acquire --sections {section_id}")
         out.append(f"           {human_bytes(rec.get('bytes'))}, "
                    f"{len(rec['files'])} files, into {rec['cache_dir']}/")
     else:
@@ -336,7 +336,7 @@ _SAMPLE_ARG = {
 
 def run_command(section_id: str, verb: str = "simulate",
                 extra: str = "--drug temozolomide") -> Optional[str]:
-    """The literal ``codon`` command that runs ``verb`` on this section.
+    """The literal ``vivum`` command that runs ``verb`` on this section.
 
     Uses ``--dx 30`` because this string is shown to someone who has not run
     anything yet and a first result should arrive in seconds; every number in
@@ -346,7 +346,7 @@ def run_command(section_id: str, verb: str = "simulate",
     if rec is None:
         return None
     sample = _SAMPLE_ARG.get(section_id)
-    cmd = f"codon {verb} --source {rec['platform']} --dx 30"
+    cmd = f"vivum {verb} --source {rec['platform']} --dx 30"
     if sample:
         cmd += f" --sample {sample}"
     return f"{cmd} {extra}".strip()
@@ -466,7 +466,7 @@ def fetch_section(section_id: str, cache_root: str = "data_cache",
                         f"{', '.join(SECTION_RECIPES)}"}
     if rec["mode"] != AUTO:
         return {"status": "skipped", "path": None, "n_records": 0,
-                "note": "not auto-fetchable — run `codon sections "
+                "note": "not auto-fetchable — run `vivum sections "
                         f"{section_id}` for the exact commands"}
 
     # The recipe's cache_dir is repo-relative by construction; honour a caller

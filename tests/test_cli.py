@@ -1,12 +1,12 @@
-"""Tests for ``tmesim.cli`` — the ``codon`` console script / ``python -m
+"""Tests for ``tmesim.cli`` — the ``vivum`` console script / ``python -m
 tmesim.cli`` entry point.
 
 Two kinds of coverage:
 
 1. **Argparse plumbing** — every subcommand is registered, ``--help`` works
-   for each without crashing, and ``codon`` is what the tool calls itself now
+   for each without crashing, and ``vivum`` is what the tool calls itself now
    that it is a real installed command (``pyproject.toml``'s
-   ``[project.scripts]``). The pre-rename ``vivum`` name stays registered as an
+   ``[project.scripts]``). The superseded ``codon`` name stays registered as an
    alias so the commands quoted in ``results/*.md`` still run.
 2. **``simulate`` end-to-end, and ``compare-drugs`` staying gone** —
    reconstructs the real (open, cached) Xenium GBM section at a coarse grid and
@@ -59,7 +59,7 @@ def _skip_if_no_real_data() -> None:
 
 @pytest.fixture(scope="module")
 def one_map(tmp_path_factory):
-    """ONE real ``codon simulate`` run, shared by the tests below.
+    """ONE real ``vivum simulate`` run, shared by the tests below.
 
     This is the product now: one real tissue, one compound. The run is done
     once at module scope because reconstruct+solve is the expensive part, and
@@ -108,29 +108,31 @@ class TestArgparsePlumbing:
         with pytest.raises(SystemExit) as exc:
             cli.build_parser().parse_args(args)
         # argparse exits 0 for --help, 2 for a genuinely missing subcommand
-        # (bare `codon` with no args, since the subparser is required).
+        # (bare `vivum` with no args, since the subparser is required).
         assert exc.value.code in (0, 2)
 
-    def test_prog_name_is_codon(self):
+    def test_prog_name_is_vivum(self):
         # cosmetic, but this is the name pyproject.toml registers as the
         # console script, and the QUICKSTART examples assume it.
-        assert cli.build_parser().prog == "codon"
+        assert cli.build_parser().prog == "vivum"
 
     def test_both_console_scripts_point_at_the_cli(self):
-        """`codon` is the name; `vivum` is kept as a working alias.
+        """`vivum` is the name; `codon` is kept as a working alias.
 
-        The rename happened after ~200 dated files in ``results/`` had already
-        quoted `vivum ...` commands as their reproduce instructions. Dropping
-        the old entry point would break every one of them, so both names are
-        registered and both resolve to the same ``main``.
+        The product name went Vivum -> Codon (2026-08-14) -> Vivum
+        (2026-08-22). Both renames landed after dated files in ``results/`` had
+        already quoted commands as their reproduce instructions, so one era of
+        that record says `vivum ...` and the other says `codon ...`. Those files
+        are not edited, so dropping EITHER entry point would break one era of
+        them: both names are registered and both resolve to the same ``main``.
         """
         import re
         root = pathlib.Path(__file__).resolve().parents[1]
         text = (root / "pyproject.toml").read_text(encoding="utf-8")
         block = text.split("[project.scripts]", 1)[1].split("\n[", 1)[0]
         entries = dict(re.findall(r'^(\w+)\s*=\s*"([^"]+)"', block, re.M))
-        assert entries.get("codon") == "tmesim.cli:main"
         assert entries.get("vivum") == "tmesim.cli:main"
+        assert entries.get("codon") == "tmesim.cli:main"
 
     def test_compare_drugs_is_refused_and_the_help_points_at_simulate(self, capsys):
         """Converted from ``test_compare_drugs_defaults``.
@@ -499,7 +501,7 @@ class TestStudioDelegatesToAppServer:
 # --------------------------------------------------------------------------- #
 # acquire / sections — the first-run contract
 #
-# The failure these lock down: `codon acquire` used to fetch four TABULAR
+# The failure these lock down: `vivum acquire` used to fetch four TABULAR
 # sources, report 4/4 ok, and leave every tissue section unavailable, with
 # nothing in its output connecting those two facts. A user ran the command the
 # README recommends and was returned to the start. Every assertion here is
@@ -534,7 +536,7 @@ class TestAcquirePlanAndSections:
         assert "xenium_319" in out  # tells you what IS known
 
     def test_every_unavailable_section_carries_an_action(self, capsys):
-        """The point of `codon sections`: a remedy, not just a diagnosis."""
+        """The point of `vivum sections`: a remedy, not just a diagnosis."""
         from tmesim.data import section_catalog as SC
 
         rc = cli.main(["sections"])
@@ -548,7 +550,7 @@ class TestAcquirePlanAndSections:
                 continue
             assert "TO FIX IT:" in out
             if rec["mode"] == SC.AUTO:
-                assert f"codon acquire --sections {sid}" in out
+                assert f"vivum acquire --sections {sid}" in out
             else:
                 assert "NOT auto-fetchable" in out
 
@@ -607,7 +609,7 @@ class TestSectionCatalog:
 
         for sid in SC.manual_section_ids():
             remedy = "\n".join(SC.remedy_for(sid))
-            assert "curl" in remedy or "codon ingest" in remedy
+            assert "curl" in remedy or "vivum ingest" in remedy
 
     def test_resolve_section_arg(self):
         from tmesim.data import section_catalog as SC
@@ -625,7 +627,7 @@ class TestSectionCatalog:
 
         out = SC.fetch_section("visium_gbm1", cache_root=str(tmp_path))
         assert out["status"] == "skipped"
-        assert "codon sections" in out["note"]
+        assert "vivum sections" in out["note"]
         assert not list(tmp_path.iterdir())
 
     def test_human_bytes_never_invents_a_number(self):

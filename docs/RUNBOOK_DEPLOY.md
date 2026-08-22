@@ -10,6 +10,13 @@ colima-backed Docker daemon (linux/arm64, 4 CPUs, 5.7 GB)** on **2026-08-22**,
 and every output quoted is copied from that session. Where a number is
 machine-specific it says so.
 
+**One substitution in those transcripts, and only one.** That session ran under
+the name **Codon**; the product was renamed back to **Vivum** later on
+2026-08-22 (it was Vivum until 2026-08-14). The product name has been
+substituted throughout the commands and quoted output below — the image tag, the
+container name, the container's unix account, the startup banner. Nothing else
+was touched: no timing, no line number, no verdict, no uid.
+
 **What this runbook does not establish.** It was executed on **one
 architecture**. `linux/amd64` resolves a different set of wheels from the same
 version pins and is settled only by `.github/workflows/docker.yml`; until that
@@ -57,7 +64,7 @@ onto an occupied port, `docker run` still exits 0, the container still says
 ### A1. Build
 
 ```bash
-docker build -t codon-studio .
+docker build -t vivum-studio .
 ```
 
 Exits 0. Measured on the machine above: **58 s** for `docker build --no-cache`
@@ -77,22 +84,22 @@ your tissue — and run history goes to a **named volume**, which is the only
 shape that works without a host-side `chown` (`docs/DEPLOYMENT.md` §1c).
 
 ```bash
-docker run -d --name codon \
+docker run -d --name vivum \
   -p 127.0.0.1:8401:8000 \
   -v "$(pwd)/data_cache:/app/data_cache:ro" \
-  -v codon_runs:/app/app/runs \
+  -v vivum_runs:/app/app/runs \
   -e TMESIM_STUDIO_API_KEY=<a-real-secret> \
-  codon-studio
+  vivum-studio
 ```
 
 ### A3. Read the banner — it tells you the security posture it chose
 
 ```bash
-docker logs codon
+docker logs vivum
 ```
 
 ```
-Codon Studio backend
+Vivum Studio backend
   repo        /app
   run history /app/app/runs
   recon cache maxsize=4
@@ -185,11 +192,11 @@ Confirm the history landed in the volume rather than in the container's
 writable layer:
 
 ```bash
-docker exec codon sh -c 'id; ls /app/app/runs/'
+docker exec vivum sh -c 'id; ls /app/app/runs/'
 ```
 
 ```
-uid=10001(codon) gid=10001(codon) groups=10001(codon)
+uid=10001(vivum) gid=10001(vivum) groups=10001(vivum)
 _cfl_speeds.json  _section_meta.json  r_00001
 ```
 
@@ -204,14 +211,14 @@ visible *inside the container*, and it has to be inside the scan allowlist —
 which, per §A3, defaulted to `/app/data_cache` alone.
 
 ```bash
-docker run -d --name codon \
+docker run -d --name vivum \
   -p 127.0.0.1:8401:8000 \
   -v "$(pwd)/data_cache:/app/data_cache:ro" \
   -v /srv/tissue:/tissue:ro \
-  -v codon_runs:/app/app/runs \
+  -v vivum_runs:/app/app/runs \
   -e TMESIM_STUDIO_DATA_ROOTS=/app/data_cache:/tissue \
   -e TMESIM_STUDIO_API_KEY=<a-real-secret> \
-  codon-studio
+  vivum-studio
 ```
 
 `:`-separated (`os.pathsep`), **not** commas — a directory name may contain a
@@ -220,13 +227,13 @@ or the re-register command in `docs/DEPLOYMENT.md` §1d will `403`.
 
 Before pointing this at anything, read `docs/DEPLOYMENT.md` §0: a
 spatial-transcriptomics export carries identifiers in the **directory name**,
-the section id and label, and files Codon never reads but which travel with the
+the section id and label, and files Vivum never reads but which travel with the
 directory.
 
 ### A8. Stop
 
 ```bash
-docker stop codon      # exits 0 immediately; PID 1 handles SIGTERM, no 30 s wait
+docker stop vivum      # exits 0 immediately; PID 1 handles SIGTERM, no 30 s wait
 ```
 
 ---
@@ -262,7 +269,7 @@ image, which is expected and does not touch a number.
 ### B2. Start it
 
 ```bash
-./.venv/bin/codon studio --port 8401
+./.venv/bin/vivum studio --port 8401
 ```
 
 Binds `127.0.0.1`. **No key is generated and none is required** — that is the
@@ -280,15 +287,15 @@ container's 7, because the host has ingested sections registered in
 To gate it anyway — all three are equivalent:
 
 ```bash
-./.venv/bin/codon studio --port 8401 --api-key <a-real-secret>
-TMESIM_STUDIO_API_KEY=<a-real-secret> ./.venv/bin/codon studio --port 8401
+./.venv/bin/vivum studio --port 8401 --api-key <a-real-secret>
+TMESIM_STUDIO_API_KEY=<a-real-secret> ./.venv/bin/vivum studio --port 8401
 ./.venv/bin/python -m app.server --port 8401 --api-key <a-real-secret>
 ```
 
 Verified: banner reads `api key SECRET123 [set via --api-key]`, an unkeyed
 `/api/health` is **401** and a keyed one is **200**.
 
-> `codon studio --api-key` did not exist until 2026-08-22 — it exited 2 with
+> `vivum studio --api-key` did not exist until 2026-08-22 — it exited 2 with
 > `unrecognized arguments` while being the headline command in
 > `docs/DEPLOYMENT.md` §1b. It was found by running the documentation.
 
@@ -301,8 +308,8 @@ the environment differing:
 
 | | log ordering |
 |---|---|
-| default | `INFO: Uvicorn running` line 4, `Codon Studio backend` line **5** |
-| `PYTHONUNBUFFERED=1` | `Codon Studio backend` line 1, `INFO: Uvicorn running` line **30** |
+| default | `INFO: Uvicorn running` line 4, `Vivum Studio backend` line **5** |
+| `PYTHONUNBUFFERED=1` | `Vivum Studio backend` line 1, `INFO: Uvicorn running` line **30** |
 
 By default the banner lands *after* the server is already serving, and until
 the buffer fills it is not in the file at all. On a non-loopback bind that
@@ -311,7 +318,7 @@ nowhere. The Docker image sets `ENV PYTHONUNBUFFERED=1` for exactly this reason;
 nothing sets it here.
 
 ```bash
-PYTHONUNBUFFERED=1 ./.venv/bin/codon studio --host 0.0.0.0
+PYTHONUNBUFFERED=1 ./.venv/bin/vivum studio --host 0.0.0.0
 ```
 
 ### B3. The rest is identical
@@ -383,7 +390,7 @@ that was not actually run.
 | 1 | The export baked the **disk** view of a run, not the client view, so three runs shipped a claim withdrawn on 2026-08-21 with no banner | `scripts/build_studio_export.py::bake_runs` | fixed — goes through `Job.result_view()` |
 | 2 | The export **could not be rebuilt at all**: the static API adapter was missing 8 exports the front end had grown | `scripts/studio_export/api_baked.js` | fixed — honest refusals, plus a documented no-op for `setApiKey` |
 | 3 | The static reports panel still carried the withdrawn ranking claim as **current page copy** | `scripts/studio_export/reports_static.js` | fixed — matches the live panel |
-| 4 | `codon studio --host 0.0.0.0 --api-key <secret>` — §1b's headline command — exited 2 | `tmesim/cli.py::cmd_studio` subparser | fixed in the CLI (`ef46459`), re-verified here |
+| 4 | `vivum studio --host 0.0.0.0 --api-key <secret>` — §1b's headline command — exited 2 | `tmesim/cli.py::cmd_studio` subparser | fixed in the CLI (`ef46459`), re-verified here |
 | 5 | §1c and §2 asserted scan confinement was "opt-in and nothing here sets it"; the image now sets it on every default run | `docs/DEPLOYMENT.md` | fixed |
 | 6 | §1c quoted a 4 s in-container run with no RunSpec attached; not reproducible | `docs/DEPLOYMENT.md` | fixed — 47.13 s with the spec stated |
 | 7 | Startup banner (and any auto-generated key) is reordered behind uvicorn when stdout is a pipe; the `PYTHONUNBUFFERED` fix exists only in the `Dockerfile` | `app/server/__main__.py::main` | documented here and in §1b; **not fixed in code** |

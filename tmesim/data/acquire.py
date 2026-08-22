@@ -8,7 +8,7 @@ back to synthetic data if nothing usable landed on disk.
 
 **What the four tabular sources below do NOT do: make a tissue section
 runnable.** They supply per-drug potency, background expression and niche
-context. Every one of them can succeed and ``codon reconstruct`` will still
+context. Every one of them can succeed and ``vivum reconstruct`` will still
 refuse, because reconstruction needs *spatial* tissue, which lives in a section
 cache directory and is fetched by :mod:`tmesim.data.section_catalog` — see
 ``sections=`` on :func:`acquire_all`. That split used to be silent and it was
@@ -357,7 +357,7 @@ def acquire_all(cache_dir: str = "data_cache", timeout: int = 60,
     ``"section:<id>"`` so a caller can tell the two apart, because they answer
     different questions: a tabular source parameterises a drug, a section is the
     thing a drug is simulated ON. Default ``None`` fetches no section, which is
-    the historical behaviour of this function; ``codon acquire`` passes the
+    the historical behaviour of this function; ``vivum acquire`` passes the
     default section explicitly.
 
     Never raises: any per-source exception is caught and recorded as ``failed``.

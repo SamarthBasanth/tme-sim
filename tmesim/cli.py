@@ -1,17 +1,20 @@
-"""Command-line interface for **tmesim** / **Codon** — the glioblastoma +
+"""Command-line interface for **tmesim** / **Vivum** — the glioblastoma +
 breast-cancer tumor-microenvironment drug-response simulator (REAL data only).
 
-Installed as the ``codon`` console script (``pip install -e .``), or run as a
+Installed as the ``vivum`` console script (``pip install -e .``), or run as a
 module directly — both are equivalent::
 
-    codon reconstruct --source xenium --dx 12
+    vivum reconstruct --source xenium --dx 12
     python -m tmesim.cli reconstruct --source xenium --dx 12
 
-    codon simulate --source xenium --dx 12 --drug temozolomide
-    codon studio
+    vivum simulate --source xenium --dx 12 --drug temozolomide
+    vivum studio
 
-The pre-rename name ``vivum`` is still registered as an alias console script and
-runs exactly the same entry point, so older copy-pasted commands keep working.
+The product name went Vivum -> Codon (2026-08-14) -> Vivum (2026-08-22), so the
+dated files in ``results/`` written between those two dates quote their commands
+as ``codon ...``. Those files are a published record and are not edited, so
+``codon`` is still registered as an alias console script and runs exactly the
+same entry point — every command copied out of them keeps working.
 
 See ``docs/QUICKSTART.md`` for a full copy-pasteable walkthrough (install,
 first run, and the underlying Python API for notebook use).
@@ -46,7 +49,7 @@ Subcommands
     real tissue and takes minutes. **Exits non-zero if any anchor FAILS**, so it
     is usable as a CI gate. See :mod:`tmesim.validation.scorecard`.
 ``ingest``
-    Point Codon at YOUR OWN raw 10x Xenium / Visium export directory. Detects
+    Point Vivum at YOUR OWN raw 10x Xenium / Visium export directory. Detects
     the platform, validates the bytes, and reports what the section IS (cells,
     extent, panel) and what it CANNOT support — a missing endothelial marker
     means no oxygen or delivery result at all, and on spot data the per-cell
@@ -64,7 +67,7 @@ Subcommands
     that is not, **the exact command that fixes it**. This is the command to run
     when anything says a section is unavailable.
 ``studio``
-    Launch the Codon Studio web backend (thin delegate to
+    Launch the Vivum Studio web backend (thin delegate to
     ``python -m app.server``; needs the optional ``pip install -e '.[app]'``
     extra).
 
@@ -78,10 +81,10 @@ Design notes
 * The commands use a *reduced* ``PDEConfig.total_time`` so the CLI finishes
   quickly; the full-fidelity window lives in the library defaults.
 * The repository root is put on ``sys.path`` unconditionally at startup (see
-  ``_ensure_repo_root_on_path``) so ``codon studio`` can find the ``app``
+  ``_ensure_repo_root_on_path``) so ``vivum studio`` can find the ``app``
   package regardless of the caller's current working directory. Commands that
   read or write real data (``data_cache/``, ``results/``) still resolve those
-  paths relative to the current working directory, so run ``codon`` from the
+  paths relative to the current working directory, so run ``vivum`` from the
   repository root (exactly as ``python -m tmesim.cli`` already required).
 """
 from __future__ import annotations
@@ -257,7 +260,7 @@ def cmd_simulate(args: argparse.Namespace) -> int:
 # studio
 # --------------------------------------------------------------------------- #
 def cmd_studio(args: argparse.Namespace) -> int:
-    """Launch the Codon Studio web backend.
+    """Launch the Vivum Studio web backend.
 
     Thin delegate to ``app.server.__main__`` (the existing, already-working
     Studio entry point, normally run as ``python -m app.server``) — nothing
@@ -273,7 +276,7 @@ def cmd_studio(args: argparse.Namespace) -> int:
         print("[studio] the Studio web backend needs the optional 'app' extra "
               f"(fastapi / uvicorn / httpx), which is not installed ({exc}).")
         print("[studio] install it with:  pip install -e '.[app]'")
-        print("[studio] then re-run:      codon studio")
+        print("[studio] then re-run:      vivum studio")
         return 1
 
     argv: List[str] = ["--host", args.host, "--port", str(args.port),
@@ -325,7 +328,7 @@ def _print_scorecard(result: dict) -> None:
 
     print()
     print(_v_rule("="))
-    print("CODON EXTERNAL-ANCHOR SCORECARD"
+    print("VIVUM EXTERNAL-ANCHOR SCORECARD"
           f"    mode={mode}    "
           f"{result['seconds']:.1f}s")
     print(_v_rule("="))
@@ -470,7 +473,7 @@ def _print_scorecard(result: dict) -> None:
               "anchors are")
         print("          published limitations of the model, not symptoms of a "
               "bad setup.")
-        print("          `codon validate --list` is the registry, with what was "
+        print("          `vivum validate --list` is the registry, with what was "
               "deliberately")
         print("          left out and why. To gate CI on a SUBSET, use "
               "`--only <key,key>`.")
@@ -484,7 +487,7 @@ def _print_anchor_list() -> None:
     """``--list``: the registry and the deliberate omissions, no computation."""
     from tmesim.validation import scorecard as SC
 
-    print("\nRegistered external anchors (codon validate):\n")
+    print("\nRegistered external anchors (vivum validate):\n")
     print(f"{'KEY':28s} {'TIER':6s} {'SCOPE':9s} {'TISSUE':8s} EST")
     print(_v_rule("-", 92))
     for g in SC.build_registry():
@@ -579,7 +582,7 @@ def _acquire_print_plan(section_ids, out_dir: str) -> None:
         total = SC.total_auto_bytes(section_ids)
         print(f"[acquire]   {len(section_ids)} spatial tissue section(s) — "
               f"this is what makes")
-        print("[acquire]   `codon reconstruct` / `simulate` / the Studio work:")
+        print("[acquire]   `vivum reconstruct` / `simulate` / the Studio work:")
         for sid in section_ids:
             rec = SC.SECTION_RECIPES.get(sid, {})
             print(f"[acquire]       {sid:22s} {rec.get('label', '?')}  "
@@ -595,7 +598,7 @@ def _acquire_print_plan(section_ids, out_dir: str) -> None:
     not_fetched = [s for s in SC.SECTION_RECIPES if s not in section_ids]
     if not_fetched:
         print("[acquire]   NOT fetched by this run: " + ", ".join(not_fetched))
-        print("[acquire]     `codon sections` prints the exact command for each.")
+        print("[acquire]     `vivum sections` prints the exact command for each.")
     print()
 
 
@@ -626,7 +629,7 @@ def _acquire_print_next_steps(out_dir: str) -> None:
     else:
         print()
         print("[acquire] NO section is runnable yet — nothing can be simulated.")
-    print("[acquire] what to do about the unavailable ones: codon sections")
+    print("[acquire] what to do about the unavailable ones: vivum sections")
     if os.path.abspath(out_dir) != os.path.abspath("data_cache"):
         print(f"[acquire] NOTE: you downloaded into {out_dir!r}, but the "
               "loaders read ./data_cache/. The")
@@ -700,7 +703,7 @@ def cmd_sections(args: argparse.Namespace) -> int:
     reconstruct error path both say *what is wrong* ("cache directory
     data_cache/xenium_gbm does not exist"); a name of a missing directory is not
     an instruction. Every unavailable row here carries the literal command that
-    fixes it — one ``codon acquire --sections`` line where the data is a plain
+    fixes it — one ``vivum acquire --sections`` line where the data is a plain
     HTTP GET, and the actual shell block where it is not.
 
     Exits 0 when at least one section is runnable, 1 when none is, so a setup
@@ -770,13 +773,13 @@ def cmd_sections(args: argparse.Namespace) -> int:
     else:
         print("[sections] nothing is runnable yet. The shortest path to a first "
               "result:")
-        print(f"[sections]   codon acquire --sections {SC.DEFAULT_SECTION}"
+        print(f"[sections]   vivum acquire --sections {SC.DEFAULT_SECTION}"
               f"   ({SC.human_bytes(SC.total_auto_bytes([SC.DEFAULT_SECTION]))})")
         print(f"[sections]   {SC.run_command(SC.DEFAULT_SECTION)}")
     print("[sections] sections YOU registered are listed separately: "
-          "codon ingest --list")
+          "vivum ingest --list")
     print("[sections] your own tissue is a first-class option too: "
-          "codon ingest <dir> --register")
+          "vivum ingest <dir> --register")
     return 0 if n_avail else 1
 
 
@@ -849,7 +852,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
             return 0
         if not sections:
             print("[ingest] no ingested sections. "
-                  "Add one with: codon ingest <dir> --register")
+                  "Add one with: vivum ingest <dir> --register")
             return 0
         print(f"=== ingested sections ({len(sections)}) ===")
         for sid, rec in sections.items():
@@ -909,7 +912,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
             print("[ingest] NOTE: this section is INSPECT-ONLY — "
                   "reconstruct_real has no route for its platform.")
         else:
-            print(f"[ingest] run it:  codon simulate --source "
+            print(f"[ingest] run it:  vivum simulate --source "
                   f"{sec.get('platform')} --sample {sec.get('sample')} "
                   f"--drug {_DEFAULT_DRUG}")
             print("[ingest] that maps ONE compound on THIS section: where it "
@@ -1123,8 +1126,8 @@ def _add_real_source_args(p: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     """Construct the top-level argument parser with all subcommands."""
     parser = argparse.ArgumentParser(
-        prog="codon",
-        description="Codon (tmesim) — glioblastoma + breast-cancer tumor-"
+        prog="vivum",
+        description="Vivum (tmesim) — glioblastoma + breast-cancer tumor-"
                     "microenvironment drug-response simulator (REAL data "
                     "only). Also runnable as `python -m tmesim.cli`.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -1213,8 +1216,8 @@ def build_parser() -> argparse.ArgumentParser:
     # studio
     p_studio = sub.add_parser(
         "studio",
-        help="launch the Codon Studio web backend (needs the 'app' extra)",
-        description="Launch the Codon Studio web backend — a thin delegate "
+        help="launch the Vivum Studio web backend (needs the 'app' extra)",
+        description="Launch the Vivum Studio web backend — a thin delegate "
                     "to 'python -m app.server'. Needs 'pip install -e .[app]'.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p_studio.add_argument("--host", default="127.0.0.1",
@@ -1229,7 +1232,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_studio.add_argument("--cache-size", type=int, default=None,
                           help="max cached reconstructions (default 4)")
     # Added 2026-08-22. docs/DEPLOYMENT.md §1b's headline command has always
-    # been `codon studio --host 0.0.0.0 --api-key <secret>`, which exited 2 --
+    # been `vivum studio --host 0.0.0.0 --api-key <secret>`, which exited 2 --
     # the flag existed on `python -m app.server` and was never forwarded here.
     # default=None is deliberate: it keeps "--api-key ''" distinguishable from
     # not passing the flag at all. See cmd_studio.
@@ -1305,7 +1308,7 @@ def build_parser() -> argparse.ArgumentParser:
                        help="comma-separated spatial sections to fetch, or "
                             "'all' (every auto-fetchable one) or 'none'. "
                             "Default: the smallest runnable section "
-                            "(xenium_319). `codon sections` lists them")
+                            "(xenium_319). `vivum sections` lists them")
     p_acq.add_argument("--list", dest="list_plan", action="store_true",
                        help="print what this run WOULD download, then exit "
                             "without downloading anything")
@@ -1394,7 +1397,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"[{args.command}] this is a missing-data refusal, not a "
                   "crash — nothing was computed and no synthetic data was "
                   "substituted.", file=sys.stderr)
-            print(f"[{args.command}] `codon sections` lists every section and "
+            print(f"[{args.command}] `vivum sections` lists every section and "
                   "the exact command that makes each one runnable.",
                   file=sys.stderr)
             return 1

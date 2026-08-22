@@ -29,7 +29,7 @@ What is pinned here:
     denominator beside it is how that happens, so the denominator is pinned.
 
 The browser is driven against a plain static server over ``app/web``, NOT
-against a running Codon backend: these assertions are about rendering, and a
+against a running Vivum backend: these assertions are about rendering, and a
 test that needs the physics stack to check a heading is a test that will be
 skipped. Run payloads are FIXTURES built in this file — see ``_run_fixture``.
 """
@@ -56,7 +56,7 @@ playwright_api = pytest.importorskip(
 
 # --------------------------------------------------------------------------- #
 # a static server over app/web, so the ES modules load with real module
-# semantics (file:// blocks them) and nothing needs the Codon backend
+# semantics (file:// blocks them) and nothing needs the Vivum backend
 # --------------------------------------------------------------------------- #
 @pytest.fixture(scope="module")
 def web_server():
@@ -88,7 +88,7 @@ def page(web_server):
         # Any page under the served root works; the modules are imported by URL.
         pg.goto(f"{web_server}/index.html", wait_until="domcontentloaded")
         pg.wait_for_timeout(300)
-        pg._codon_errors = errors  # type: ignore[attr-defined]
+        pg._vivum_errors = errors  # type: ignore[attr-defined]
         yield pg
         browser.close()
 
@@ -451,7 +451,7 @@ def test_reach_panel_does_not_call_a_concentration_an_exposure(page, web_server)
 
 
 def test_no_console_errors_on_module_load(page):
-    assert page._codon_errors == []  # type: ignore[attr-defined]
+    assert page._vivum_errors == []  # type: ignore[attr-defined]
 
 
 # --------------------------------------------------------------------------- #

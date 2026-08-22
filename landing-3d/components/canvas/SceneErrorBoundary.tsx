@@ -73,7 +73,7 @@ export default class SceneErrorBoundary extends Component<
     // One warning, not a throw: the page is expected to keep working without
     // this subtree, and a silent swallow would make a broken asset invisible
     // to whoever deployed it.
-    console.warn(`[codon] ${this.props.label} failed; continuing without it.`, error, info);
+    console.warn(`[vivum] ${this.props.label} failed; continuing without it.`, error, info);
     this.props.onFailure?.();
   }
 

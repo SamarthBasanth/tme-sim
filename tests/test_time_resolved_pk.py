@@ -486,7 +486,7 @@ def _relative_deviation(got: float, want: float) -> float:
 
 
 def _record_deviations(case: str, rows) -> None:
-    """Append this case's per-field deviations to ``$CODON_REFERENCE_DEVIATIONS``.
+    """Append this case's per-field deviations to ``$VIVUM_REFERENCE_DEVIATIONS``.
 
     The linux/amd64 job in ``.github/workflows/docker.yml`` is a MEASUREMENT of
     cross-platform float reproducibility, so it should produce the measurement
@@ -497,7 +497,7 @@ def _record_deviations(case: str, rows) -> None:
     passes. Unset variable, unwritable path, anything — the measurement is lost,
     the assertions are not.
     """
-    path = os.environ.get("CODON_REFERENCE_DEVIATIONS")
+    path = os.environ.get("VIVUM_REFERENCE_DEVIATIONS")
     if not path:
         return
     try:
@@ -702,7 +702,7 @@ def test_the_deviation_log_records_every_field_even_when_the_run_passes(
     the point of it is that a PASSING run still says how close to the bound the
     platform sat."""
     log = tmp_path / "deviations.jsonl"
-    monkeypatch.setenv("CODON_REFERENCE_DEVIATIONS", str(log))
+    monkeypatch.setenv("VIVUM_REFERENCE_DEVIATIONS", str(log))
     monkeypatch.setattr(sys.modules[__name__], "_ON_REFERENCE_PLATFORM", False)
 
     check = _ReferenceCheck("synthetic", steps=0)
@@ -743,7 +743,7 @@ def test_both_reference_contracts_are_enforced_and_name_every_bad_field(
     # would otherwise be appended to the deviation log and would then dominate
     # the "worst deviation this run" line in CI's summary, which is exactly the
     # number a reader trusts.
-    monkeypatch.delenv("CODON_REFERENCE_DEVIATIONS", raising=False)
+    monkeypatch.delenv("VIVUM_REFERENCE_DEVIATIONS", raising=False)
 
     def build():
         check = _ReferenceCheck("synthetic", steps=0)
@@ -894,7 +894,7 @@ def production_micro_dx12():
 
     if resolve_xenium_files(_DX12_SAMPLE).get("cells") is None:
         pytest.skip(f"no cached Xenium GBM section at {_DX12_SAMPLE!r} "
-                    "(see `codon sections`) -- the dx = 12 production pins need "
+                    "(see `vivum sections`) -- the dx = 12 production pins need "
                     "the real bytes")
 
     return reconstruct_real(source="xenium", sample=_DX12_SAMPLE,

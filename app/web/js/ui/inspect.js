@@ -337,7 +337,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
           + 'directly above.'
         : 'This run failed, so it produced no metrics — and the server sent no '
           + 'reason with it. The failure is recorded on the console of the '
-          + 'process running Codon.')));
+          + 'process running Vivum.')));
     } else if (!run.metrics) {
       metricsEl.appendChild(h('div.dim', { style: { fontSize: 'var(--fs-xs)', padding: '4px 0' } },
         `Run ${run.run_id} is ${run.status}; no metrics yet.`));

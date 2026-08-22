@@ -1496,7 +1496,7 @@ def create_app(manager: Optional[JobManager] = None,
         yield
 
     app = FastAPI(
-        title="Codon Studio API",
+        title="Vivum Studio API",
         version="1",
         description=__doc__,
         lifespan=lifespan,
@@ -1695,7 +1695,7 @@ def create_app(manager: Optional[JobManager] = None,
         It adds NO capability and NO new trust boundary — every request it makes
         is one ``POST /api/sections/scan`` that any client could already make,
         under the same ``X-API-Key`` gate. It renders ``capability_text``
-        verbatim (the exact report ``codon ingest`` prints) rather than
+        verbatim (the exact report ``vivum ingest`` prints) rather than
         re-deriving a summary, so this surface can never disagree with the CLI
         about what a sample can support.
 
@@ -2242,7 +2242,7 @@ def _binary(jobs: JobManager, run_id: str, payload: str, label: str):
 #: in nothing external. The only endpoint it touches is
 #: ``POST /api/sections/scan``.
 _INGEST_PAGE = """<!doctype html><meta charset="utf-8">
-<title>Codon Studio &mdash; bring your own tissue</title>
+<title>Vivum Studio &mdash; bring your own tissue</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
  body{background:#101214;color:#d8dadd;font:13px/1.6 ui-monospace,Menlo,monospace;
@@ -2273,7 +2273,7 @@ _INGEST_PAGE = """<!doctype html><meta charset="utf-8">
 sample <em>is</em> and what it <strong>cannot</strong> support. Registering adds
 it to the section list, so it becomes selectable in Studio after a reload.
 Same endpoint as <code>POST /api/sections/scan</code> and the same report
-<code>codon ingest</code> prints &mdash; this page just saves you the
+<code>vivum ingest</code> prints &mdash; this page just saves you the
 <code>curl</code>.</p>
 
 <div class="b">
@@ -2419,7 +2419,7 @@ Remove an ingested section with
 
 
 _PLACEHOLDER = """<!doctype html><meta charset="utf-8">
-<title>Codon Studio</title>
+<title>Vivum Studio</title>
 <style>
  body{background:#101214;color:#d8dadd;font:13px/1.5 ui-monospace,Menlo,monospace;
       margin:0;padding:32px}
@@ -2428,7 +2428,7 @@ _PLACEHOLDER = """<!doctype html><meta charset="utf-8">
  code{color:#7fb6e8} a{color:#7fb6e8} li{margin:2px 0}
  .b{border:1px solid #2a2e33;padding:14px 16px;max-width:760px}
 </style>
-<h1>Codon Studio &mdash; backend up, front end not built</h1>
+<h1>Vivum Studio &mdash; backend up, front end not built</h1>
 <div class="b">
 <p>The API is serving. <code>app/web/index.html</code> does not exist yet, so this
 placeholder is shown instead.</p>

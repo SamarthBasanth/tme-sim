@@ -1,4 +1,4 @@
-# Codon (tmesim) Studio -- self-hosting image.
+# Vivum (tmesim) Studio -- self-hosting image.
 #
 # Ships the simulator + Studio web UI. Does NOT ship any data cache: real
 # tissue data (data_cache/) is gitignored and not baked into this image, in
@@ -12,16 +12,16 @@
 # would be false. Do not delete it.)
 #
 # Build:
-#   docker build -t codon-studio .
+#   docker build -t vivum-studio .
 # Run (local-only): bind the PUBLISHED port to the host loopback. Inside the
 # container the server must still listen on 0.0.0.0 -- a socket bound to the
 # container's own 127.0.0.1 is unreachable from a published port, since -p
 # forwards into the container's network namespace.
-#   docker run -p 127.0.0.1:8000:8000 -v $(pwd)/data_cache:/app/data_cache codon-studio
+#   docker run -p 127.0.0.1:8000:8000 -v $(pwd)/data_cache:/app/data_cache vivum-studio
 # Run (network-exposed, auth required -- see docs/DEPLOYMENT.md):
 #   docker run -p 8000:8000 -v $(pwd)/data_cache:/app/data_cache \
 #     -e TMESIM_STUDIO_API_KEY=<your-key> \
-#     codon-studio
+#     vivum-studio
 #
 # NOTE the default CMD listens on 0.0.0.0, which app/server/__main__.py treats
 # as non-loopback: with no TMESIM_STUDIO_API_KEY set it AUTO-GENERATES a key
@@ -96,8 +96,8 @@ COPY . .
 # HOME is pinned because Docker resolves it from /etc/passwd for USER but not
 # every runtime that consumes an OCI image does, and matplotlib writes a font
 # cache into HOME on first import.
-RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin codon
-ENV HOME=/home/codon
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin vivum
+ENV HOME=/home/vivum
 
 # data_cache/ and app/runs/ are gitignored (real tissue data, run history) --
 # create empty mount points so the app starts cleanly even with nothing
@@ -116,7 +116,7 @@ ENV HOME=/home/codon
 # .dockerignore regression that bakes the operator's unpublished SMILES into a
 # layer would show up.
 #
-# data_cache/ is chowned for `docker exec <container> codon acquire`, which
+# data_cache/ is chowned for `docker exec <container> vivum acquire`, which
 # downloads into it. A read-only bind mount over it ignores this ownership
 # (the host's wins), which is the documented and recommended shape.
 #
@@ -124,7 +124,7 @@ ENV HOME=/home/codon
 # static front end and site-packages are not things a running server should be
 # able to rewrite.
 RUN mkdir -p data_cache app/runs \
-    && chown -R codon:codon /app/data_cache /app/app
+    && chown -R vivum:vivum /app/data_cache /app/app
 
 # --- the one tissue section, FETCHED FROM SOURCE AT BUILD TIME -------------- #
 # Without this the image starts fine and can run NOTHING: .dockerignore
@@ -132,11 +132,23 @@ RUN mkdir -p data_cache app/runs \
 # every section is unavailable. That is correct for a local deploy that bind-
 # mounts the host's cache, and useless for a hosted one, which has no host.
 #
-# FETCHED, NOT COPIED, and the distinction is deliberate. `codon acquire`
-# downloads xenium_319 (~16.6 MB) from the ORIGINAL source, so the image carries
+# FETCHED, NOT COPIED, and the distinction is deliberate. `vivum acquire`
+# downloads xenium_319 from the ORIGINAL source, so the image carries
 # data obtained under the source's own terms rather than a redistribution of one
 # developer's local copy. It also cannot silently ship a section that has been
 # modified on someone's laptop.
+#
+# WHAT THIS ACTUALLY COSTS: 87 MB, MEASURED IN THE IMAGE. `--sections
+# xenium_319` selects the SPATIAL section (16 MB) and `acquire` fetches the four
+# TABULAR sources alongside it regardless -- Ivy GAP 37 MB, TCGA expression
+# 33 MB, GDSC dose-response 1.9 MB, TCGA clinical 64 KB. Those are not optional
+# padding: the GDSC file is where a compound's MEASURED IC50 comes from, and
+# without it the drug panel falls back to flagged placeholders.
+#
+# The commit that added this step said "~16.6 MB", which was the section's
+# download size mistaken for the step's cost. .github/workflows/docker.yml
+# asserts an allowlist of exactly these five entries plus a 300 MB ceiling, so
+# the real figure is now pinned by CI rather than by a comment.
 #
 # ARG so a local build can skip it: --build-arg FETCH_SECTION=0 gives the old
 # no-tissue image for the bind-mount workflow, which is still what
@@ -144,7 +156,7 @@ RUN mkdir -p data_cache app/runs \
 ARG FETCH_SECTION=1
 RUN if [ "$FETCH_SECTION" = "1" ]; then \
       python -m tmesim.cli acquire --sections xenium_319 --timeout 180 \
-      && chown -R codon:codon /app/data_cache ; \
+      && chown -R vivum:vivum /app/data_cache ; \
     else \
       echo "[build] FETCH_SECTION=0 -- image ships with NO tissue; bind-mount one" ; \
     fi
@@ -152,11 +164,11 @@ RUN if [ "$FETCH_SECTION" = "1" ]; then \
 EXPOSE 8000
 
 # Everything above this line runs as root (apt, pip, COPY). Everything the
-# SERVER does runs as codon. Verified in a real container, not assumed: the
+# SERVER does runs as vivum. Verified in a real container, not assumed: the
 # five 0700 runtime trees are created and written, a read-only data_cache
 # bind mount is readable, and a named volume on /app/app/runs inherits this
 # ownership so it is writable with no host-side chown.
-USER codon
+USER vivum
 
 ENTRYPOINT ["python", "-m", "app.server"]
 # 0.0.0.0 = "this container's interface", NOT "exposed to the world". The real

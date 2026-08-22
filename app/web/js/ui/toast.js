@@ -106,7 +106,7 @@ const CLASSES = [
   },
   {
     test: (e) => statusOf(e) === 0,
-    head: 'Could not reach the Codon server',
+    head: 'Could not reach the Vivum server',
     next: 'The request did not complete: either it never arrived or the answer '
       + 'never came back. Check the server process is still running, and that '
       + 'this page is still pointed at it, then try again.',
@@ -135,7 +135,7 @@ const CLASSES = [
     test: (e) => statusOf(e) === 404,
     head: 'The server has no record of that',
     next: 'It was deleted, or it was never on this server — a run id from a '
-      + 'different Codon instance will not resolve here. Refresh the list you '
+      + 'different Vivum instance will not resolve here. Refresh the list you '
       + 'opened it from and see whether it is still there.',
     saidLbl: 'What the server said',
   },
@@ -173,7 +173,7 @@ const CLASSES = [
     head: 'The server hit a fault handling that',
     next: 'This is a fault on the server side, not something wrong with what '
       + 'you sent. The full detail is in the console of the process running '
-      + 'Codon, not here — its short message is below.',
+      + 'Vivum, not here — its short message is below.',
     saidLbl: 'What the server said',
   },
 ];
@@ -189,7 +189,7 @@ function statusOf(err) {
  * It has to be asked before the table above is consulted, because the table's
  * `status === 0` row would otherwise swallow every client-side fault that has
  * no status — `notifyError('Cannot format: JSON does not parse', syntaxError)`
- * would be answered with "Could not reach the Codon server". That is not a
+ * would be answered with "Could not reach the Vivum server". That is not a
  * cosmetic mislabel: it sends the operator to restart a backend that is fine.
  *
  * js/api.js guarantees the two shapes below — every transport failure leaves it
@@ -320,7 +320,7 @@ const RUN_FAILED_NEXT =
 const RUN_FAILED_SILENT =
   'The server reported this run as failed and sent no reason with it, so this '
   + 'Studio has nothing of its account to show you. The failure is recorded '
-  + 'server-side: read the console of the process running Codon.';
+  + 'server-side: read the console of the process running Vivum.';
 
 /**
  * Render a failed run as an answer — the same four parts as notifyError().

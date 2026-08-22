@@ -12,7 +12,7 @@
  * was corrected to a drug-transport simulator. They describe how a
  * glioblastoma reads on contrast-enhanced MRI, which is a genuine and
  * correctly-cited basis for a *procedural stand-in*, but it is not what
- * Codon reconstructs: Codon builds tissue from spatial transcriptomics,
+ * Vivum reconstructs: Vivum builds tissue from spatial transcriptomics,
  * cell by cell, and never touches an MRI.
  *
  * So: the citations are accurate about what they claim, and irrelevant to

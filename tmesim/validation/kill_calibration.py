@@ -951,7 +951,7 @@ def unit_transport_cache_key(name: str, drug: DrugParams, dx_um: float, *,
     that consumed ``diffusivity``, ``binding``, ``clearance`` and
     ``bbb_penetrance``. So any change to a descriptor, a partition constant or
     ``HBD_LOGP_DECREMENT`` was silently ignored on a warm cache, and
-    ``codon validate`` published 3-D:2-D kill ratios that did not recompute
+    ``vivum validate`` published 3-D:2-D kill ratios that did not recompute
     (measured: temozolomide 0.2583 cache-served vs 0.2518 cold, 2.6 % off;
     doxorubicin 0.2044 vs 0.2081, 1.8 % off). See
     ``results/hbd_convention_audit.md`` sections 6.2-6.3.

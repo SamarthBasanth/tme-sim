@@ -16,7 +16,7 @@ export default function Home() {
         `position: fixed` and never participated in this flow.
       */}
       <header className="site-header">
-        <span className="site-header__mark">CODON</span>
+        <span className="site-header__mark">VIVUM</span>
       </header>
       <main>
         <ScrollExperience />

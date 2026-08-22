@@ -144,7 +144,7 @@ def log_internal(exc: BaseException, context: str) -> str:
     what the browser was told to quote.
     """
     ref = uuid.uuid4().hex[:8]
-    print(f"[codon:{ref}] {context}: {_detail(exc)}", file=sys.stderr)
+    print(f"[vivum:{ref}] {context}: {_detail(exc)}", file=sys.stderr)
     # Only when there IS one. Called from a boundary that was handed a string
     # rather than from an ``except`` block, ``print_exc`` writes the literal
     # line "NoneType: None", which reads like a second, failed diagnosis.
@@ -376,7 +376,7 @@ def _warn_unconfined(resolved: str) -> None:
         return
     _UNCONFINED_WARNED = True
     print(
-        f"[codon] POST /api/sections/scan is UNCONFINED: it just resolved and "
+        f"[vivum] POST /api/sections/scan is UNCONFINED: it just resolved and "
         f"read {resolved!r}, and it will read ANY directory this process can "
         f"read. {DATA_ROOTS_VAR} is unset, so anyone holding the API key has "
         f"read access to this host as this uid (docs/DEPLOYMENT.md §2). To "
@@ -427,7 +427,7 @@ def confine_scan_path(path: str, *, raw=_ENV) -> Optional[str]:
     # The operator gets the real detail on the console; the client gets a
     # sentence that names its own input, the control, and the way out.
     print(
-        f"[codon] REFUSED scan of {str(path)!r} (resolves to {resolved!r}): "
+        f"[vivum] REFUSED scan of {str(path)!r} (resolves to {resolved!r}): "
         f"outside every root in {DATA_ROOTS_VAR}.",
         file=sys.stderr,
     )
@@ -1627,7 +1627,7 @@ def recon_cache_size(raw: Optional[str] = None,
             )
 
     print(
-        f"[codon] TMESIM_RECON_CACHE_SIZE={raw!r} is not usable: {problem}. "
+        f"[vivum] TMESIM_RECON_CACHE_SIZE={raw!r} is not usable: {problem}. "
         f"Valid values are integers >= 1 (each entry holds a full cell "
         f"population and several float64 grids; 1 is the minimum, {default} "
         f"is the default). Continuing with {default}. Set --cache-size or "

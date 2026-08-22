@@ -469,7 +469,7 @@ EXEMPTIONS: Tuple[Exemption, ...] = (
         path="app/server/cache.py",
         qualname="log_internal",
         caught="<param>",
-        expr='f"[codon:{ref}] {context}: {_detail(exc)}"',
+        expr='f"[vivum:{ref}] {context}: {_detail(exc)}"',
         reason=(
             "THE record. This is the one line in the backend whose job is to "
             "write the real failure down, and it writes it to STDERR under "
@@ -517,7 +517,7 @@ EXEMPTIONS: Tuple[Exemption, ...] = (
             "Xenium bundle ...' -- the sentence that tells an operator what "
             "shape of directory to hand it. It is caught in its own handler "
             "ahead of the broad one (which redacts), and it is rendered "
-            "verbatim so the Studio and `codon ingest` can never disagree. "
+            "verbatim so the Studio and `vivum ingest` can never disagree. "
             "Pinned byte-for-byte by "
             "test_an_ingest_refusal_survives_the_http_boundary_byte_for_byte."
         ),
@@ -780,7 +780,7 @@ def test_a_redacted_response_hides_the_detail_and_logs_it_under_the_reference(
     # (c) the two are correlated by the reference the caller was handed
     ref = re.search(r"reference ([0-9a-f]{8})", shown)
     assert ref, f"no quotable reference in {shown!r}"
-    assert f"[codon:{ref.group(1)}]" in logged
+    assert f"[vivum:{ref.group(1)}]" in logged
 
 
 def test_the_brief_form_logs_identically_and_still_carries_the_reference(
@@ -796,7 +796,7 @@ def test_the_brief_form_logs_identically_and_still_carries_the_reference(
     assert secret not in shown and "OSError" not in shown
     assert secret in logged and "OSError" in logged
     ref = re.search(r"reference ([0-9a-f]{8})", shown)
-    assert ref and f"[codon:{ref.group(1)}]" in logged
+    assert ref and f"[vivum:{ref.group(1)}]" in logged
 
 
 def test_a_client_facing_registry_failure_is_redacted_in_the_response(
@@ -818,7 +818,7 @@ def test_a_client_facing_registry_failure_is_redacted_in_the_response(
         assert "OSError" not in row["reason"]
         ref = re.search(r"reference ([0-9a-f]{8})", row["reason"])
         assert ref, f"no quotable reference in {row['reason']!r}"
-        assert f"[codon:{ref.group(1)}]" in logged
+        assert f"[vivum:{ref.group(1)}]" in logged
     assert secret in logged
 
 
@@ -1020,7 +1020,7 @@ def test_an_unexpected_sweep_failure_is_redacted_at_the_boundary(
     # The operator gets everything, under the id the browser was given.
     ref = re.search(r"reference ([0-9a-f]{8})", published["grid"][0]["error"])
     assert secret in logged
-    assert f"[codon:{ref.group(1)}]" in logged
+    assert f"[vivum:{ref.group(1)}]" in logged
 
 
 def test_a_polled_sweep_does_not_change_the_reference_under_the_client(
@@ -1036,8 +1036,8 @@ def test_a_polled_sweep_does_not_change_the_reference_under_the_client(
     assert len(refs) == 1
     # Three publications happened (two polls plus the final one); exactly one
     # record was written, so the id the client holds is the only id there is.
-    assert logged.count("[codon:") == 1
-    assert f"[codon:{refs[0]}]" in logged
+    assert logged.count("[vivum:") == 1
+    assert f"[vivum:{refs[0]}]" in logged
 
 
 def test_a_deliberate_refusal_survives_the_sweep_boundary(monkeypatch, capsys):
@@ -1055,7 +1055,7 @@ def test_a_deliberate_refusal_survives_the_sweep_boundary(monkeypatch, capsys):
         assert "unexpected internal failure" not in projection[0]["error"]
         assert "reference" not in projection[0]["error"]
     # A refusal is not a fault: nothing was written to the internal log.
-    assert "[codon:" not in logged
+    assert "[vivum:" not in logged
     # ...and the job log carries the sentence itself, not a pointer.
     assert any(refusal in line for line in ctx.job.log_lines)
 
@@ -1089,7 +1089,7 @@ def test_a_preformatted_failure_logs_without_a_wrapper_class(
     ref = re.search(r"reference ([0-9a-f]{8})", out["error"])
     assert ref
 
-    record = [ln for ln in logged.splitlines() if ln.startswith("[codon:")]
+    record = [ln for ln in logged.splitlines() if ln.startswith("[vivum:")]
     assert len(record) == 1
     assert record[0].endswith(f"ImportError: no BLAS at {secret}")
     assert "RuntimeError" not in record[0], (
@@ -1152,7 +1152,7 @@ def test_a_plan_time_failure_is_redacted_in_every_projection(
     # The operator's record has everything, under the quoted reference.
     ref = re.search(r"reference ([0-9a-f]{8})", as_attr).group(1)
     assert secret in logged
-    assert f"[codon:{ref}]" in logged
+    assert f"[vivum:{ref}]" in logged
     assert "KeyError" in logged
 
 
@@ -1172,7 +1172,7 @@ def test_re_planning_does_not_mint_a_new_reference(monkeypatch, capsys):
     logged = capsys.readouterr().err
 
     assert len(seen) == 1, f"five re-plans handed out {len(seen)} references"
-    assert logged.count(f"[codon:{seen.pop()}]") == 1, (
+    assert logged.count(f"[vivum:{seen.pop()}]") == 1, (
         "the same failure was recorded more than once")
 
 
@@ -1192,4 +1192,4 @@ def test_a_deliberate_plan_time_refusal_is_untouched(capsys):
     for m in messages:
         assert "unexpected internal failure" not in m
     # A refusal is not a fault: nothing was written to the internal log.
-    assert "[codon:" not in logged
+    assert "[vivum:" not in logged

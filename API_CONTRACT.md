@@ -13,7 +13,7 @@ Run: `./.venv/bin/python -m app.server` → serves the UI at `http://127.0.0.1:8
 ## Design constraints (both sides)
 
 The **visual** reference is diagnostic-imaging software — HALO, Visiopharm, Paige, Sectra —
-**not** consumer web. That is a statement about layout and density and nothing else: Codon is
+**not** consumer web. That is a statement about layout and density and nothing else: Vivum is
 a research tool, not a diagnostic product. Concretely:
 
 - **Square corners** (≤2px radius). No pills, no large rounded cards.

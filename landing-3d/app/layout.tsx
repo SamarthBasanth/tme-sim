@@ -157,7 +157,7 @@ const atkinsonMono = Atkinson_Hyperlegible_Mono({
  * visibility one there is: this is the string search engines and link previews
  * render. It violated guardrail 1b in lib/copy.ts -- `Do NOT write "validated"`
  * -- in the same repository that forbids it, and the README records that
- * `codon validate` reports more failures than passes.
+ * `vivum validate` reports more failures than passes.
  *
  * "Scored, with the failures published alongside the passes" is not a softened
  * version of the same boast. It is the actual differentiator: anyone can claim
@@ -166,9 +166,9 @@ const atkinsonMono = Atkinson_Hyperlegible_Mono({
  * the first half reads as the claim this replaced.
  */
 export const metadata: Metadata = {
-  title: "Codon — See Where the Drug Actually Goes",
+  title: "Vivum — See Where the Drug Actually Goes",
   description:
-    "Codon reconstructs real tumor tissue from spatial biology data and simulates drug transport physics through it — penetration, exposure, and delivery, scored against real measured tissue benchmarks with the failures published alongside the passes. Built for pharma, biotech, and research teams comparing candidate therapies.",
+    "Vivum reconstructs real tumor tissue from spatial biology data and simulates drug transport physics through it — penetration, exposure, and delivery, scored against real measured tissue benchmarks with the failures published alongside the passes. Built for pharma, biotech, and research teams comparing candidate therapies.",
 };
 
 export default function RootLayout({

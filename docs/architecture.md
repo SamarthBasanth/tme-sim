@@ -661,7 +661,7 @@ bands.
   **0.945 → 0.016**), the endothelial fraction (replicates, but only after two
   rounds of correcting the comparison methodology itself), and the vascular area
   fraction (`results/reconstruction_validation_roadmap.md` §5). *Transport
-  physics*: in `codon validate --quick`, **13 of 13 scored rows never invoke the
+  physics*: in `vivum validate --quick`, **13 of 13 scored rows never invoke the
   solver**; in the full run **21 of 33** do not; and of the rows where a solved
   field is compared to an external measurement there are **three, and all three
   FAIL** (`results/CLAIM_INVENTORY.md` §0, §1e). What *has* held is

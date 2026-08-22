@@ -1,4 +1,4 @@
-"""Tests for ``codon validate`` — the external-anchor scorecard.
+"""Tests for ``vivum validate`` — the external-anchor scorecard.
 
 Deliberately **fast and data-free**: not one test here touches ``data_cache/``
 or runs a PDE. The real anchors are exercised by running the command; what is
@@ -526,7 +526,7 @@ class TestBrainSlicePreregisteredRow:
     statistic, the 3.0 bar, the bootstrap and the withdrawal conditions BEFORE
     the prediction was computed; ``results/brain_slice_anchor.md`` executed it
     and it FAILED (ratio 12.05 against a bar of 3.0). Prereg sec. 8.5 requires
-    that failure to appear in ``codon validate`` and to make it exit 1. Until
+    that failure to appear in ``vivum validate`` and to make it exit 1. Until
     it did, the failure was recorded in a markdown file while the scorecard
     reported as though nothing had happened — a check that had stopped
     checking. These tests pin the three properties that keep it checking:
@@ -572,7 +572,7 @@ class TestBrainSlicePreregisteredRow:
                       if g.key == "brain-slice-tissue-capacity"), None)
         assert group is not None, (
             "prereg sec. 8.5 requires this anchor to be registered in "
-            "codon validate; without it the FAIL is recorded but not enforced")
+            "vivum validate; without it the FAIL is recorded but not enforced")
         assert group.tier == SC.TIER_QUICK
         assert group.needs, "the row must declare the table it scores against"
 
@@ -733,7 +733,7 @@ class TestBrainSlicePreregisteredRow:
         assert res["counts"][SC.FAIL] == 1
         assert res["counts"][SC.PASS] == 0
         assert res["exit_code"] == 1, (
-            "prereg sec. 8.5: an anchor that fails must make codon validate "
+            "prereg sec. 8.5: an anchor that fails must make vivum validate "
             "exit 1")
         # it is scored, and it is NOT solver evidence
         assert res["n_scored"] == 1
@@ -935,7 +935,7 @@ class TestPhysicsProvenance:
 # --------------------------------------------------------------------------- #
 #
 # The defect these guard against, recorded in results/zero_width_bands.md:
-# ``codon validate`` scored the breast kill panel 3 PASS / 3 FAIL while
+# ``vivum validate`` scored the breast kill panel 3 PASS / 3 FAIL while
 # results/kill_calibration_breast.md published 5 PASS / 1 FAIL, because the
 # scorecard and the report generator each decided SEPARATELY which band a drug
 # is scored against. Two of the scorecard's FAILs were rendered against
@@ -1029,7 +1029,7 @@ class TestBreastKillPanelCannotDiverge:
 
     Data-free: a synthetic ``res`` is fed to the real
     ``build_ratio_section``, and the verdict the DOCUMENT would print is
-    compared cell-for-cell with the status ``codon validate`` assigns. No
+    compared cell-for-cell with the status ``vivum validate`` assigns. No
     tissue, no PDE, no data_cache.
     """
 

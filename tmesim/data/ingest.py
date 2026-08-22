@@ -1837,7 +1837,7 @@ def scan_report(path: str, measure_detection_rates: bool = False) -> Dict:
             out["error"] = str(exc)
             return out
         except Exception as exc:  # noqa: BLE001 - the failure IS the answer
-            # UNEXPECTED. The full detail is kept here because `codon ingest`
+            # UNEXPECTED. The full detail is kept here because `vivum ingest`
             # prints it to an operator sitting at the console; the HTTP layer
             # (app/server/ingest_registry.scan) replaces it for the browser,
             # keyed off this flag. See cache.redact_exception.

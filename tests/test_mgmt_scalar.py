@@ -204,7 +204,7 @@ def test_visium_pseudobulk_mgmt_is_recovered_and_labelled_pseudobulk():
     # machine that has the cache.
     if not list_samples():
         pytest.skip("no Visium GBM section is cached in this checkout "
-                    "(see data_cache/ and `codon sections`)")
+                    "(see data_cache/ and `vivum sections`)")
 
     table = mgmt_from_visium_all()
     assert table, "no cached Visium GBM sections found"

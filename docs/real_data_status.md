@@ -25,7 +25,7 @@
 >
 > For the current state read [`../README.md`](../README.md),
 > [`../results/CLAIM_INVENTORY.md`](../results/CLAIM_INVENTORY.md) and
-> `codon validate`.
+> `vivum validate`.
 
 This document is the HONEST record of running the tmesim
 reconstruct -> sim loop on a **real spatial-transcriptomics** GBM sample instead

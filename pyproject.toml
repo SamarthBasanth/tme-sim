@@ -83,19 +83,22 @@ dependencies = [
 
 [project.scripts]
 # `pip install -e .` registers this as a real command, e.g.:
-#   codon reconstruct --source xenium --dx 12
-#   codon simulate --source xenium --dx 30 --drug temozolomide
-#   codon sections
-#   codon studio
+#   vivum reconstruct --source xenium --dx 12
+#   vivum simulate --source xenium --dx 30 --drug temozolomide
+#   vivum sections
+#   vivum studio
 # (`compare-drugs` was withdrawn 2026-08-21 with the cross-drug ranking claim.)
 # Equivalent to `python -m tmesim.cli ...` (tmesim/cli.py); see that module's
 # docstring and docs/QUICKSTART.md for the full command list.
-codon = "tmesim.cli:main"
-# Pre-rename alias. The product was called Vivum until the Codon rename, and
-# every command in the dated `results/*.md` record is written as `vivum ...`.
-# Same entry point, so those commands still reproduce; `--help` prints the new
-# name. Keep it until the historical record no longer needs to be runnable.
 vivum = "tmesim.cli:main"
+# Retained alias, NOT dead weight. The product name went Vivum -> Codon
+# (2026-08-14) -> Vivum (2026-08-22), and the dated `results/*.md` files written
+# between those two dates quote their reproduce instructions as `codon ...`.
+# Those files are a published record and are not edited, so the command they
+# name has to keep resolving. Same entry point, so they still reproduce;
+# `--help` prints `vivum`. Keep it until the historical record no longer needs
+# to be runnable.
+codon = "tmesim.cli:main"
 
 [project.optional-dependencies]
 # Readers and fitters that PRODUCE PUBLISHED NUMBERS but are only imported

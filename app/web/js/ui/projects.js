@@ -243,7 +243,7 @@ export function createProjectsPanel({ store }) {
 
     if (!projects.length) {
       railEl.appendChild(h('div.caveat.info', h('span',
-        // "by PATIENT" until 2026-08-15. Codon is scoped to de-identified
+        // "by PATIENT" until 2026-08-15. Vivum is scoped to de-identified
         // tissue (docs/DEPLOYMENT.md §0), and the grouping key is the specimen
         // anyway — a string the operator chose, which must not be a patient
         // identifier. A UI that names the unit "patient" invites one.

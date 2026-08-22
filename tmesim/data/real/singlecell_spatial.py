@@ -289,7 +289,7 @@ def load(
     # the HTTP boundary rather than here.
     #
     # The Studio deliberately renders the server's refusal VERBATIM, so that the
-    # UI can never disagree with `codon ingest` about what a specimen supports.
+    # UI can never disagree with `vivum ingest` about what a specimen supports.
     # To do that safely it distinguishes two kinds of exception: a DELIBERATE,
     # informative refusal (IngestError -- passed through word for word) and an
     # UNEXPECTED internal failure (anything else -- replaced with a stable
@@ -312,9 +312,9 @@ def load(
         raise IngestError(
             f"Missing cached cells file: {os.path.join(path, _CELLS_FILE)}. "
             f"No Xenium cell/matrix/panel files were found under {path!r}. "
-            "TO FIX IT: run `codon sections` — it lists every section, whether "
+            "TO FIX IT: run `vivum sections` — it lists every section, whether "
             "it is runnable, and the exact command for each one that is not. "
-            "For the default GBM section that command is `codon acquire "
+            "For the default GBM section that command is `vivum acquire "
             "--sections xenium_319` (16.6 MB). "
             "This loader is shared by every Xenium section (GBM, breast, ...); "
             "for the GBM section see docs/real_data/singlecell_spatial.md, and "

@@ -5,7 +5,7 @@
  * These are NOT invented brand colours. They are matplotlib's viridis control
  * points, copied from the real product's own ramp table
  * (`app/web/js/gl/ramps.js`, `STOPS.viridis`), which is what the Studio uses
- * to paint scalar overlays — so a reader who has seen a Codon field overlay
+ * to paint scalar overlays — so a reader who has seen a Vivum field overlay
  * sees the same ramp here rather than a third, decorative palette invented for
  * the landing page. Nine of the seventeen stops are enough at the sizes this
  * is drawn at; the ramp stays perceptually monotone either way, which is the

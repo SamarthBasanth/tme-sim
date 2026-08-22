@@ -480,7 +480,7 @@ was scored against 71 measured compounds and falsified (§3); the two-route mode
 that replaced it scores R² = 0.718 on the same data and brought the
 multicellular-layer **hindrance** anchor inside its measured band for the first
 time (FAIL → PASS, 1.77-fold → 10.33-fold against a measured 12-fold). The
-multicellular-layer **absolute `D_eff`** anchor still FAILS in `codon validate`,
+multicellular-layer **absolute `D_eff`** anchor still FAILS in `vivum validate`,
 with its miss now on the low side rather than the high; and `bbb_penetrance`
 still fails its rank ordering against measured brain:plasma ratios. What remains genuinely untested is
 the *solved field*: nothing public measures a spatially resolved free-interstitial

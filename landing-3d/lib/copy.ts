@@ -3,7 +3,7 @@
  * prefers-reduced-motion fallback so the two never drift out of sync.
  *
  * Positioning guardrails (these are product constraints, not style
- * preferences). Codon is a mechanistic drug-transport simulator for
+ * preferences). Vivum is a mechanistic drug-transport simulator for
  * research users. Copy here must NOT claim or imply: clinical response or
  * patient outcome prediction, any diagnostic / treatment-planning /
  * surgical use, AI or machine learning of any kind, "digital twin", or
@@ -12,7 +12,7 @@
  * traceable to a real run or a real dataset count.
  *
  * DATA PROVENANCE, AND WHOSE PROPERTY A PRIVACY CLAIM IS ABOUT. Copy here
- * must not invite, imply or accommodate identifiable patient data: Codon is
+ * must not invite, imply or accommodate identifiable patient data: Vivum is
  * scoped to de-identified tissue (docs/DEPLOYMENT.md §0), and there is no
  * tissue upload to describe — sections are registered by directory path, so
  * the exposed surface is the path, id and label, and the label becomes the
@@ -497,7 +497,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "01",
     eyebrow: "Real measured tissue",
     headline: "See Where the Drug Actually Goes.",
-    body: "The section behind this text is a real one. Codon rebuilds tumor architecture from spatial transcriptomics, then runs transport physics on the result to work out where a drug actually reaches.",
+    body: "The section behind this text is a real one. Vivum rebuilds tumor architecture from spatial transcriptomics, then runs transport physics on the result to work out where a drug actually reaches.",
     align: "left",
   },
   {
@@ -964,7 +964,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
      * promise that the limits TRAVEL with the output. As of this pass it is
      * more than a promise here, because the limits are now literally below it.
      */
-    body: "Codon runs where your tissue already is: the solve is a single process on your own machine, and it sends no tissue or compound data anywhere. De-identified tissue only. Bring a section and a compound, and get back a per-cell verdict — delivery or potency — the map that is the evidence for it, and the limits below attached to both, on your tissue, with your numbers in them.",
+    body: "Vivum runs where your tissue already is: the solve is a single process on your own machine, and it sends no tissue or compound data anywhere. De-identified tissue only. Bring a section and a compound, and get back a per-cell verdict — delivery or potency — the map that is the evidence for it, and the limits below attached to both, on your tissue, with your numbers in them.",
     align: "center",
     /*
      * WHY A SECOND LEDGER EXISTS, AND WHY IT IS HERE RATHER THAN ON BEAT 05.

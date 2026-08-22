@@ -12,7 +12,7 @@ object (``e_unit``, the per-cell unit-concentration exposure field) is the
 output of a PDE solve that consumed ``diffusivity``, ``binding``, ``clearance``
 and ``bbb_penetrance``. Any change to a descriptor, a partition constant or
 ``HBD_LOGP_DECREMENT`` was therefore silently ignored on a warm cache, and
-``codon validate`` published 3-D:2-D kill ratios that did not recompute (see
+``vivum validate`` published 3-D:2-D kill ratios that did not recompute (see
 ``results/hbd_convention_audit.md`` sections 6.2-6.3).
 
 The fix derives the key from ``dataclasses.fields(DrugParams)`` so it cannot go

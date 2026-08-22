@@ -34,7 +34,7 @@ function markSeen() {
  * shows, centered, rather than anchoring to nothing. */
 const STEPS = [
   {
-    title: 'Welcome to Codon',
+    title: 'Welcome to Vivum',
     selector: null,
     body: () => [
       h('p',
@@ -110,7 +110,7 @@ const STEPS = [
       h('p',
         'Two things it will say to you, and both are load-bearing: a section ' +
         'you ingest is ', h('b', 'not validated'), ' — the built-in specimens ' +
-        'are the ones this project ships measured evidence for — and Codon ' +
+        'are the ones this project ships measured evidence for — and Vivum ' +
         'may be pointed at ', h('b', 'de-identified tissue only'), '.'),
     ],
   },

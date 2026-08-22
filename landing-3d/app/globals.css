@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   Codon — cinematic scroll experience
+   Vivum — cinematic scroll experience
    Palette: black / charcoal / off-white, one cool accent (cyan) for interface
    furniture, plus the drug-concentration ramp for anything that depicts a
    quantity. That ramp is viridis, taken from the product's own table
@@ -184,7 +184,7 @@
  * the band around one of the four widths this stylesheet actually asks for:
  *
  *     80%  headings          .narrative-section h1/h2, reduced-motion h1/h2
- *     88%  the CODON mark    .site-header__mark
+ *     88%  the VIVUM mark    .site-header__mark
  *     92%  ledger labels     .ledger__label
  *     ~100% nothing today    kept so a future width degrades sensibly
  *
@@ -2112,7 +2112,7 @@ body::after {
 
   /* Every beat clears the fixed header band. Sections are absolutely
      positioned and vertically centred, so without this the taller ones
-     centre their kicker underneath the CODON mark — measured, beat 03's
+     centre their kicker underneath the VIVUM mark — measured, beat 03's
      kicker sat at y = 59 against a header occupying the top ~62px. */
   .narrative-section {
     padding-top: 4.5rem;

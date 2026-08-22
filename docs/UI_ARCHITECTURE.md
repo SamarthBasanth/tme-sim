@@ -1,4 +1,4 @@
-# Codon Studio — information architecture
+# Vivum Studio — information architecture
 
 Status: normative for `app/web/`. Written before the consolidation pass, and
 kept as the rule the front end is measured against afterwards.
@@ -83,7 +83,7 @@ except for the workspace launchers.
 
 | Group | Content |
 |---|---|
-| identity | `Codon Studio`, version |
+| identity | `Vivum Studio`, version |
 | specimen | active section id + its one-line description |
 | run | active run id + status chip |
 | scale | cell count |

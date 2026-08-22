@@ -1,8 +1,8 @@
-# Codon
+# Vivum
 
 **A mechanistic drug-transport simulator that runs on real, measured tumour tissue.**
 
-Codon reconstructs the microenvironment of a real tumour section from spatial
+Vivum reconstructs the microenvironment of a real tumour section from spatial
 transcriptomics — cell types and states, vasculature, ECM, oxygen — then solves
 convection–diffusion–reaction transport, interstitial fluid pressure and a
 steady-state oxygen field on that geometry, and maps the concentration each cell
@@ -14,7 +14,7 @@ glioblastoma section (**40,887 measured cells**) and a breast carcinoma section
 transport question: on this tissue architecture, which of these compounds
 actually reaches the cells, and is the limit delivery or potency? A compound that
 never arrives and a compound that arrives too weak look identical in a survival
-curve and need opposite fixes; Codon separates them.
+curve and need opposite fixes; Vivum separates them.
 
 **The single output this project will defend is the *relative* comparison of
 compounds on *one* tissue section.** Everything absolute has been tested against
@@ -54,7 +54,7 @@ sentence are documented below, with a pointer to the measurement behind each.
 > transport number is defensible in either.
 > → [`results/two_route_promotion.md`](results/two_route_promotion.md)
 
-> ### What Codon does not do
+> ### What Vivum does not do
 >
 > * It does **not** predict clinical response or patient outcome. No open dataset
 >   anywhere pairs measured spatial drug distribution with measured treatment
@@ -78,63 +78,85 @@ pip install -e .
 pip install rdkit openpyxl statsmodels xlrd pyxlsb rdata   # see docs/REPRODUCE.md §1
 ```
 
-`pip install -e .` registers a `codon` console script; `codon <cmd>` and
+`pip install -e .` registers a `vivum` console script; `vivum <cmd>` and
 `python -m tmesim.cli <cmd>` are the same tool. The second `pip` line is not in
 `pyproject.toml` and is needed for the molecular descriptors and the
 external-validation readers. Python ≥ 3.9; pin with
 `pip install -c constraints.txt -e .` if you intend to reproduce a number rather
 than merely run the code.
 
+**If a file under `results/` tells you to run `codon ...`, run it as written.**
+The product was named Vivum, renamed to Codon on 2026-08-14, and renamed back to
+Vivum on 2026-08-22. The dated files written in between quote their reproduce
+instructions as `codon ...`; they are a published record and are not edited, so
+`codon` is still registered as an alias console script pointing at the same
+entry point.
+
 **A fresh clone has no data.** `data_cache/` is gitignored, so on a clone every
 tissue section is unavailable and `reconstruct` refuses. One command fixes that:
 
 ```bash
-codon sections                  # what tissue exists, what is runnable, how to fix what is not
-codon acquire                   # 4 tabular sources + the xenium_319 tissue section
-codon simulate --source xenium --dx 30 --drug temozolomide   # first result
+vivum sections                  # what tissue exists, what is runnable, how to fix what is not
+vivum acquire                   # 4 tabular sources + the xenium_319 tissue section
+vivum simulate --source xenium --dx 30 --drug temozolomide   # first result
 ```
 
-`codon acquire` fetches two different kinds of thing and the difference matters:
+`vivum acquire` fetches two different kinds of thing and the difference matters:
 four **tabular** sources (TCGA clinical, TCGA expression, Ivy GAP, GDSC2 potency)
 that parameterise *drugs*, and one **spatial tissue section** — the thing a drug
 is simulated *on*. Only the second makes `reconstruct`, `simulate` and the Studio
-work. `codon acquire --list` prints the plan without downloading; `--sections
+work. `vivum acquire --list` prints the plan without downloading; `--sections
 all` adds the larger auto-fetchable sections; `--sections none` is the old
 tabular-only behaviour. Sections that need extraction, a conversion or a
-companion dataset are **not** auto-fetched, and `codon sections` prints the exact
+companion dataset are **not** auto-fetched, and `vivum sections` prints the exact
 shell block for each one rather than pointing at a document.
 
 ```bash
-codon --help                    # every subcommand
-codon molecules                 # library drugs + structure-derived descriptors, no data
-codon reconstruct --source xenium --dx 12          # real GBM niche, 40,887 cells
-codon simulate --source xenium --dx 12 --drug temozolomide
+vivum --help                    # every subcommand
+vivum molecules                 # library drugs + structure-derived descriptors, no data
+vivum reconstruct --source xenium --dx 12          # real GBM niche, 40,887 cells
+vivum simulate --source xenium --dx 12 --drug temozolomide
 
-# The core use case: one reconstruction, several compounds, ranked.
-codon compare-drugs --dx 12 --drugs temozolomide,cisplatin,doxorubicin
-codon compare-drugs --dx 12 --library breast --sample data_cache/xenium_breast_janesick/rep1
+# The core use case: ONE reconstruction, ONE compound, and the question
+# "when this failed, did the drug not arrive, or arrive and stay too weak?"
+vivum sections                  # which tissue is runnable, and how to fix the rest
+vivum studio                    # the same thing with the per-cell map, in a browser
 
-codon validate --quick          # the scorecard, analytic tier only (seconds)
-codon validate                  # full scorecard, real tissue + PDE solves (~15-25 min)
-codon validate --list           # the anchor registry, plus what was deliberately left out
+vivum validate --quick          # the scorecard, analytic tier only (seconds)
+vivum validate                  # full scorecard, real tissue + PDE solves (~15-25 min)
+vivum validate --list           # the anchor registry, plus what was deliberately left out
 ```
 
-**`codon validate` exits 1 on a correct install, and that is the point.** Several
+**`vivum validate` exits 1 on a correct install, and that is the point.** Several
 anchors FAIL against measured data; they are the *published limitations* listed
 under *What has failed* below, they fail identically on every machine, and a
 build that reported them as passing would be the broken one. Read exit 1 here as
 "the scorecard ran", not "the install is wrong". The command says so in its own
 output.
 
-**Pass `--dx 12` explicitly.** `compare-drugs` still defaults to `--dx 30`, and
+> **`compare-drugs` WAS REMOVED ON 2026-08-21, WITH THE CLAIM IT EXISTED TO
+> MAKE.** This block used to open on it — *"the core use case: one
+> reconstruction, several compounds, ranked"* — and the cross-compound ordering
+> was measured and does not hold (`results/pk_ranking_robustness.md`,
+> `results/capacity_ranking_robustness.md`: per-compound plasma exposure spans
+> 113.1× across the retained compounds, and there is no per-compound
+> tissue-capacity term at all). The command is gone, so those two lines errored
+> rather than misled — but the sentence above them still called ranking the core
+> use case, which is the part that mattered. Both are replaced above.
+>
+> Dated files under `results/` still show `codon compare-drugs …`. They are a
+> published record and are not edited; the `codon` console script is retained
+> for exactly that reason.
+
+**Pass `--dx 12` explicitly.** The CLI's fast defaults use a coarser grid, and
 values quoted at dx = 30 are superseded — a coarse grid cannot resolve the
 perivascular boundary layer. dx = 12 is the production resolution, and it is
 **not** a converged one either; see *What is retracted*.
 
-The two Xenium sections are fetched by `codon acquire` (`--sections all`). The
+The two Xenium sections are fetched by `vivum acquire` (`--sections all`). The
 Visium sections, GSE84465 and HGCC are **not**: they need extraction, a
 conversion or a companion dataset, so no single command is honest about them.
-`codon sections` prints the literal shell block for each; the same commands are
+`vivum sections` prints the literal shell block for each; the same commands are
 in [`docs/REPRODUCE.md`](docs/REPRODUCE.md) §2b and the complete byte-level
 record is [`docs/DATA_INVENTORY.md`](docs/DATA_INVENTORY.md).
 
@@ -143,7 +165,7 @@ panel):
 
 ```bash
 pip install -e '.[app]'
-codon studio                    # or: python -m app.server
+vivum studio                    # or: python -m app.server
 ```
 
 **Your own tissue** — nothing here is limited to the sections this project
@@ -151,8 +173,8 @@ prepared. Point the ingester at a raw 10x export (Xenium or Visium, or a bare
 MEX triple plus a coordinates table as the escape hatch for an unseen platform):
 
 ```bash
-codon ingest /path/to/your/export              # what is it, and what can it support?
-codon ingest /path/to/your/export --register   # + make it selectable in Studio
+vivum ingest /path/to/your/export              # what is it, and what can it support?
+vivum ingest /path/to/your/export --register   # + make it selectable in Studio
 ```
 
 or open **`/ingest`** in a running Studio for the same thing in a browser. It
@@ -161,7 +183,7 @@ sample *cannot* support — a panel with no endothelial marker means no oxygen o
 delivery result at all, and it says so rather than producing one. A directory it
 cannot use is refused with a reason instead of a broken section.
 
-**De-identified tissue only.** Codon is not built for identifiable patient data
+**De-identified tissue only.** Vivum is not built for identifiable patient data
 and must not be used with it — no accounts, no audit log, no encryption at rest.
 The sample directory is read where it lies and never uploaded anywhere, but its
 absolute path, the section id and the label all become visible to anyone who can
@@ -169,7 +191,7 @@ reach the server, so keep identifiers out of those too.
 [`docs/DEPLOYMENT.md` §0](docs/DEPLOYMENT.md) says where to look before you
 ingest.
 
-**`codon validate`** is the honesty layer, and it is meant to be read as much as
+**`vivum validate`** is the honesty layer, and it is meant to be read as much as
 run. It scores the model against independent published measurements, prints
 PASS / FAIL / NOT TESTABLE / DEFERRED per row with the reasoning inline, refuses
 to score a solver number whose delivery law is undeclared, and **exits 1 on any
@@ -265,7 +287,7 @@ the molecular layer uses measured IC50 rather than a structure→potency regress
 That same file records why the regression was rejected: a descriptor model reaches
 Spearman 0.42 on real sensitivity, but the dominant feature is molecular weight and
 the signal is a drug-**class** confound, not a within-class QSAR. Note this is a
-check on the **data**, not on any Codon model.
+check on the **data**, not on any Vivum model.
 → [`results/pharmacology_real.md`](results/pharmacology_real.md)
 
 ---
@@ -302,13 +324,13 @@ biasing all three ratios high by +1.2 / +2.4 / +2.7 %
 only four of ten drugs are testable at all.** This reconciles two earlier counts
 that were **both wrong**. `kill_calibration_breast.md` §3 published **5 PASS /
 1 FAIL** by falling back to a broad cross-tumour band for two drugs whose own
-literature is a single row with no spread; the shipped `codon validate` did not
+literature is a single row with no spread; the shipped `vivum validate` did not
 fall back and printed **3 PASS / 3 FAIL**, scoring 5-fluorouracil and paclitaxel
 against **zero-width** bands (`0.1636–0.1636`, `0.0412–0.0412`) that no
 prediction can land inside — a bar nothing can fail versus a bar nothing can
 pass, the mirror image of the defect for which the GBM IFP row was declared NOT
 TESTABLE. A single-study band is now **NOT TESTABLE** in both paths, which can no
-longer disagree. Live `codon validate --only breast-kill-3d2d` prints
+longer disagree. Live `vivum validate --only breast-kill-3d2d` prints
 `PASS 3 FAIL 1 NOT TESTABLE 6 (of 10 rows)`. Docetaxel is the one FAIL.
 → [`results/zero_width_bands.md`](results/zero_width_bands.md)
 
@@ -392,7 +414,7 @@ measurement. These are listed so nobody has to rediscover them.
 anchor (Marien 2016 areal fraction, 4.70 %) was **added** to the scorecard, not
 substituted for the incommensurable one (Tamma 2022 CD34 stain-positivity 2.1 %,
 where the lumen contributes no stained pixels but the model paints the whole vessel
-profile). `scorecard.py` still reads the 2.1 % key, so **`codon validate` still
+profile). `scorecard.py` still reads the 2.1 % key, so **`vivum validate` still
 prints 5.23×**. Do not quote 2.34× as the product's number until the scorecard
 scores it. Either way it is a FAIL.
 
@@ -404,7 +426,7 @@ Refinement makes IFP *worse*, not better: breast IFP falls monotonically
 ([`ifp_validation.md`](results/ifp_validation.md) §5).
 
 **And the scorecard mostly does not test the solver at all.** Live
-`codon validate --quick` on the shipping physics returns
+`vivum validate --quick` on the shipping physics returns
 **PASS 7 · FAIL 6 · NOT TESTABLE 4 · DEFERRED 8** of 25 rows, and prints its own
 disclosure: ***13 of the 13 scored rows never invoke the transport PDE.*** The full
 run does reach the solver — 12 PDE-scoped scored rows — but every PASS among them
@@ -449,7 +471,7 @@ classifier ([`heldout_patient.md`](results/heldout_patient.md) §2).
 
 ## The honest summary
 
-Codon is a research instrument whose defensible output is the **relative
+Vivum is a research instrument whose defensible output is the **relative
 comparison of compounds on one tissue section**, with essentially **no external
 validation of the transport physics itself**. The narrow claim has been attacked
 from several directions and held — with one measured exception that a user must
@@ -471,7 +493,7 @@ testable and currently fail in identifiable, structural ways"* is defensible;
 *"our predicted concentration fields are validated"* is not, and no public data
 currently exists that would make it so.
 
-`codon validate` reports more failures than passes and exits non-zero. That is
+`vivum validate` reports more failures than passes and exits non-zero. That is
 not a defect being disclosed reluctantly; it is the product's most reliable
 component. The modules that could flatter a result and the modules that check it
 are separate, and the checking modules are allowed to fail loudly. Every
@@ -565,8 +587,8 @@ data/real/  ─►  reconstruct/real_*  ─►  Microenvironment  ─►  physic
 | `tmesim.cells` | `agents` (oxygen → cell state), `pkpd` (local AUC → Hill kill probability). |
 | `tmesim.treatment` | `drugs` — lookup, plasma PK profile, spatial delivery source. |
 | `tmesim.sim` | `engine.simulate_response` — the deterministic per-tissue integrator. |
-| `tmesim.validation` | The honesty layer, and where this project spends most of its code. `scorecard` (what `codon validate` runs), `calibration` (the single α), `numerical_rigor`, `kill_calibration`, `delivery_metrics`, `ranking_robustness`, plus the external-measurement modules: `pk_multidrug`, `glioma_regional_pk`, `gist_imatinib`, `gbm_tmz_exvivo`, `moncayo_explant`, `pharmacology_real`, `heldout_patient`. |
-| `tmesim.cli` | `reconstruct`, `simulate`, `compare-drugs`, `validate`, `molecules`, `molecular-run`, `acquire`, `studio`. |
+| `tmesim.validation` | The honesty layer, and where this project spends most of its code. `scorecard` (what `vivum validate` runs), `calibration` (the single α), `numerical_rigor`, `kill_calibration`, `delivery_metrics`, `ranking_robustness`, plus the external-measurement modules: `pk_multidrug`, `glioma_regional_pk`, `gist_imatinib`, `gbm_tmz_exvivo`, `moncayo_explant`, `pharmacology_real`, `heldout_patient`. |
+| `tmesim.cli` | `reconstruct`, `simulate`, `sections`, `validate`, `molecules`, `molecular-run`, `acquire`, `studio`. |
 | `experiments/` | Runnable real-data studies: flagship simulation, drug panel, cross-tissue, niche response, combination, dose/schedule, per-patient report. |
 
 The frozen public interface: [`ARCHITECTURE_CONTRACT.md`](ARCHITECTURE_CONTRACT.md);

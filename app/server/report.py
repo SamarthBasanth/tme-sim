@@ -2883,7 +2883,7 @@ against itself, which is why it was simulated twice.</p>
         # CLINICAL USE stays IN the title on purpose: this document travels off a
         # USB stick, and the browser tab is the one part of it that survives a
         # screenshot of the window frame.
-        f"<title>Codon exposure map {_esc(doc.get('report_id'))} — "
+        f"<title>Vivum exposure map {_esc(doc.get('report_id'))} — "
         f"{_esc(drug_name or 'no compound')} on {_esc(doc.get('section'))} — "
         f"NOT FOR CLINICAL USE</title>\n"
         f"<style>\n{_tokens_css()}\n{_DOC_CSS}\n{_print_css()}\n</style>\n"

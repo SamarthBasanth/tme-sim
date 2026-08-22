@@ -266,7 +266,7 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
   const jobNote = h('div.dim', {
     style: { fontSize: 'var(--fs-disclosure)', lineHeight: 'var(--lh-body)' },
   },
-  'The run executes in the Codon server process, not in this tab. Closing the '
+  'The run executes in the Vivum server process, not in this tab. Closing the '
   + 'tab or reloading does not stop it, and this panel picks up a run that is '
   + 'still in flight when the page loads. Cancel is what stops one, and it '
   + 'takes effect at the next stage boundary rather than instantly.');
@@ -408,7 +408,7 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     sectionCaveats.style.display = '';
     if (ingested) {
       sectionCaveats.appendChild(h('div.hint', { title: NOT_VALIDATED },
-        h('b', 'This specimen was ingested here, not shipped with Codon. '),
+        h('b', 'This specimen was ingested here, not shipped with Vivum. '),
         NOT_VALIDATED.replace(/^INGESTED — NOT VALIDATED\.\s*/, '')));
     }
     if (!blocking.length) return;

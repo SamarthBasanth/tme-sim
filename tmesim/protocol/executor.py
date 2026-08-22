@@ -75,7 +75,7 @@ __all__ = [
 # The raw text stays in the returned structure on purpose. ``execute_plan`` is
 # an exported engine entry point (``from tmesim.protocol import execute_plan``)
 # and a library caller with no HTTP layer in front of them should get the real
-# failure, exactly as ``codon ingest`` does. Redacting HERE would put a server
+# failure, exactly as ``vivum ingest`` does. Redacting HERE would put a server
 # concern -- reference ids, a stderr format, ``app.server.cache`` -- inside the
 # engine, and would make the engine lie to a notebook.
 # --------------------------------------------------------------------------- #
@@ -106,13 +106,13 @@ def internal_diagnostic(exc: BaseException, context: str) -> str:
     ---------------------------------------------------
     Every other place this backend redacts, it does so at an HTTP boundary and
     the engine keeps the raw text behind ``error_is_internal`` -- because a
-    SECOND consumer exists who should see the real failure: ``codon ingest``
+    SECOND consumer exists who should see the real failure: ``vivum ingest``
     at a console, or a library caller of :func:`execute_plan`, whose result is
     a computation they asked for rather than a message for a screen.
 
     A ``Diagnostic`` has no such second consumer. It exists to be displayed to
     a human editing a script; its only production reader is the editor surface
-    (there is no ``codon protocol`` command). Giving ``Diagnostic`` a flag
+    (there is no ``vivum protocol`` command). Giving ``Diagnostic`` a flag
     would mean redacting at roughly a dozen call sites in
     ``app/server/protocol_api.py`` and ``protocol_wire.py`` -- and two of those
     (``_refusal``, ``_caveat_lines``) read ``.message`` off the object rather

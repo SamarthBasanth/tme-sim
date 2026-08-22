@@ -1,4 +1,4 @@
-"""Tests for the Codon Studio backend (``app/server/``).
+"""Tests for the Vivum Studio backend (``app/server/``).
 
 Four things are checked, in rising order of what they would cost if they broke:
 
@@ -725,7 +725,7 @@ class TestJobLifecycle:
         layout the ingester accepts. Both the CLI and the Studio render it
         verbatim, so redaction must not touch it. If this ever starts
         returning a reference number instead, the Studio has begun disagreeing
-        with ``codon ingest``.
+        with ``vivum ingest``.
         """
         from tmesim.data.ingest import IngestError
 
@@ -1231,7 +1231,7 @@ class TestUnexpectedExceptionsDoNotLeakInternals:
         reason = cache_mod.list_sections()[0]["reason"]
         err = capsys.readouterr().err
         ref = reason.split("reference ")[1].split()[0].rstrip(".,")
-        assert f"[codon:{ref}]" in err
+        assert f"[vivum:{ref}]" in err
         assert "FileNotFoundError" in err
         assert repo_root() in err
 

@@ -7,12 +7,12 @@ pharma/biotech or research team wants to reach it from somewhere other than
 the machine it's running on.
 
 **What this does NOT cover: identifiable patient data, or a clinical
-decision.** Codon is not built for either and must not be used with either. It
+decision.** Vivum is not built for either and must not be used with either. It
 has one shared secret and no accounts, no audit log, no encryption at rest, and
 no per-record access control — §2 is the full list of what it does not do for
 you. Software with those gaps has no business holding data that identifies a
 person, and declining that scope is more honest than claiming a bar this
-application does not clear. Codon reconstructs a tissue section and ranks
+application does not clear. Vivum reconstructs a tissue section and ranks
 compounds against it; it performs no diagnosis and produces nothing that is
 intended to select therapy for a patient.
 
@@ -30,10 +30,10 @@ command this page led with in §1b.
 
 ## 0. Field testing on your own tissue
 
-A field tester may point Codon at **de-identified tissue only**. That is a real
+A field tester may point Vivum at **de-identified tissue only**. That is a real
 constraint rather than a formality, because a spatial-transcriptomics export
 carries identifiers in more places than the obvious columns. Before you run
-`codon ingest <dir>` or use the `/ingest` page, check all four of these:
+`vivum ingest <dir>` or use the `/ingest` page, check all four of these:
 
 1. **The directory path itself.** `GET /api/sections` returns `cache_dir` — the
    absolute path of the directory you registered — to every client that can
@@ -49,9 +49,9 @@ carries identifiers in more places than the obvious columns. Before you run
    `SampleID` column holding whatever the sequencing operator typed, and 10x
    output filenames are routinely prefixed with that same string — this repo's
    own cache has `zh1007inf_metrics.csv` and
-   `Xenium_FFPE_Human_Breast_Cancer_Rep1_cells.csv.gz`. Codon does not read
+   `Xenium_FFPE_Human_Breast_Cancer_Rep1_cells.csv.gz`. Vivum does not read
    those fields, but they travel with the directory.
-4. **Everything else in the directory.** Codon reads the count matrix and the
+4. **Everything else in the directory.** Vivum reads the count matrix and the
    coordinates table and ignores the rest — but "ignores" is not "removes". A
    Visium export also ships tissue and fiducial images, QC summaries and run
    logs; whatever you put in the directory stays in the directory.
@@ -67,11 +67,11 @@ requires before tissue-derived data leaves the system it was generated in.
 ### What the deployment model does for you, and what it leaves to you
 
 The deployment model genuinely helps here, and it is worth stating plainly
-rather than defensively: **the sample never leaves the machine you run Codon on
+rather than defensively: **the sample never leaves the machine you run Vivum on
 unless you deliberately expose it.** Two things that were checked rather than
 assumed:
 
-* **Sections are registered by path, not by upload.** `codon ingest` and the
+* **Sections are registered by path, not by upload.** `vivum ingest` and the
   `/ingest` page both take a directory on the *server's own* filesystem; the
   bytes are read where they lie. There is no HTTP upload route for tissue at
   all, so there is no copy of the sample to lose track of.
@@ -79,14 +79,14 @@ assumed:
   reporting, no analytics, no license check anywhere in `app/server/`. The
   Studio front end loads no third-party assets either — fonts are vendored under
   `app/web/fonts/` — so a browser rendering it contacts nothing but your own
-  server. (Note that `codon acquire`, a separate command, *does* download public
+  server. (Note that `vivum acquire`, a separate command, *does* download public
   datasets; that is the one deliberate exception and it fetches, never sends.)
 
 Which means the exposure surface is exactly the machine and the network you put
 it on, and both of those are yours:
 
 * **The default is loopback, and widening it puts tissue-derived data on the
-  wire.** `codon studio` binds `127.0.0.1`. Everything in §1b and §3 below is
+  wire.** `vivum studio` binds `127.0.0.1`. Everything in §1b and §3 below is
   about deliberately widening that — and once you do, the browser is a remote
   client, so cell coordinates, phenotype calls and field arrays for the selected
   section travel to it over plain HTTP unless you have put TLS in front (§2).
@@ -96,11 +96,11 @@ it on, and both of those are yours:
   is encrypted at rest. `data_cache/`, `app/runs/`, `app/reports/`,
   `app/projects/` and the ingested-section table are ordinary files with your
   umask on them. Host-level disk encryption and filesystem permissions are the
-  control here, because Codon supplies none.
+  control here, because Vivum supplies none.
 * **Exports are the moment data crosses off the machine.** A downloaded report
   or a shared run carries the section label and its provenance with it. That
   happens because a person chose to; the server never sends anything on its own.
-* **Removing a section is not deleting data.** `codon ingest --remove <id>` and
+* **Removing a section is not deleting data.** `vivum ingest --remove <id>` and
   `DELETE /api/sections/<id>` drop the entry from the registry and nothing else.
   Your data directory is untouched, and so are reports already written and
   reconstructions already cached.
@@ -112,7 +112,7 @@ it on, and both of those are yours:
 ### 1a. Local, single-user (the default, unchanged)
 
 ```bash
-codon studio
+vivum studio
 ```
 
 Binds to `127.0.0.1`. No API key is required or generated. Nothing here
@@ -137,13 +137,13 @@ before you demo this to anyone who is not sitting at the machine.
 ### 1b. On your own network, one shared key
 
 ```bash
-codon studio --host 0.0.0.0 --api-key <a-real-secret>
+vivum studio --host 0.0.0.0 --api-key <a-real-secret>
 ```
 
 or generate one automatically:
 
 ```bash
-codon studio --host 0.0.0.0
+vivum studio --host 0.0.0.0
 ```
 
 ```
@@ -159,11 +159,11 @@ one: a non-loopback bind now confines the scanner as well as authenticating it
 server will refuse them until you say where they are.
 
 **That command did not run until 2026-08-22, and this page led with it anyway.**
-`--api-key` was an argument of `python -m app.server` only; `codon studio` is a
+`--api-key` was an argument of `python -m app.server` only; `vivum studio` is a
 thin delegate and its subparser never forwarded the flag, so the first thing
 this section told a reader to type exited 2 with `unrecognized arguments:
 --api-key`. It was found by running the documentation rather than reading it,
-and fixed in the CLI rather than in the prose — `codon studio` is the branded
+and fixed in the CLI rather than in the prose — `vivum studio` is the branded
 entry point and the flag matters most on exactly the non-loopback bind this
 section is about. Verified after the fix: the banner reads `[set via
 --api-key]`, an unkeyed request is `401` and a keyed one is `200`.
@@ -172,8 +172,8 @@ All three spellings now work and are equivalent, except that `--api-key` beats
 an exported variable (§4):
 
 ```bash
-codon studio --host 0.0.0.0 --api-key <a-real-secret>
-TMESIM_STUDIO_API_KEY=<a-real-secret> codon studio --host 0.0.0.0
+vivum studio --host 0.0.0.0 --api-key <a-real-secret>
+TMESIM_STUDIO_API_KEY=<a-real-secret> vivum studio --host 0.0.0.0
 python -m app.server --host 0.0.0.0 --api-key <a-real-secret>
 ```
 
@@ -183,19 +183,19 @@ systemd's `Environment=`, which is why the rest of this page uses it.
 **One thing to know before you rely on reading that key out of a log file.**
 The startup banner goes to **stdout**, and CPython block-buffers stdout when it
 is a pipe — which is what systemd, `nohup`, and any supervisor give you.
-Measured on this repo, `codon studio` with stdout redirected to a file:
+Measured on this repo, `vivum studio` with stdout redirected to a file:
 
 | | first lines of the log |
 |---|---|
-| default | `INFO: Uvicorn running on ...` at line 4, `Codon Studio backend` at line **5** |
-| `PYTHONUNBUFFERED=1` | `Codon Studio backend` at line 1, `INFO: Uvicorn running` at line **30** |
+| default | `INFO: Uvicorn running on ...` at line 4, `Vivum Studio backend` at line **5** |
+| `PYTHONUNBUFFERED=1` | `Vivum Studio backend` at line 1, `INFO: Uvicorn running` at line **30** |
 
 So by default the banner — including an **auto-generated API key, which is
 printed exactly once and never persisted** — lands *after* the server is
 already accepting requests, and until the buffer fills it is not in the file at
 all. The Docker image sets `ENV PYTHONUNBUFFERED=1` for precisely this reason
 and the comment in the `Dockerfile` describes the failure; nothing sets it on
-the `codon studio` path. **If you are running this under systemd or behind any
+the `vivum studio` path. **If you are running this under systemd or behind any
 redirect, set `PYTHONUNBUFFERED=1` too**, or pass `--api-key` yourself so there
 is no generated key you need to go looking for.
 
@@ -221,7 +221,7 @@ If you'd rather set the key yourself (e.g. to something a whole team already
 shares) instead of taking the generated one:
 
 ```bash
-TMESIM_STUDIO_API_KEY=<your-key> codon studio --host 0.0.0.0
+TMESIM_STUDIO_API_KEY=<your-key> vivum studio --host 0.0.0.0
 ```
 
 An already-exported `TMESIM_STUDIO_API_KEY` is always respected over the
@@ -237,11 +237,11 @@ auth proxy in front (see §3) rather than extending this shared-key check.
 ### 1c. Docker
 
 ```bash
-docker build -t codon-studio .
+docker build -t vivum-studio .
 docker run -p 8000:8000 \
   -v $(pwd)/data_cache:/app/data_cache \
   -e TMESIM_STUDIO_API_KEY=<your-key> \
-  codon-studio --host 0.0.0.0
+  vivum-studio --host 0.0.0.0
 ```
 
 **Honesty note on this section specifically.** This section was written before
@@ -282,7 +282,7 @@ been built and run.** On `linux/arm64`, measured rather than reasoned about:
 * With **no cache mounted**, `/api/sections` reports **7 sections, 0
   available**, each with a reason, and the server still boots. Mounting
   `data_cache` read-only makes **all 7 available**.
-* The server runs as **`codon`, uid 10001, not root** (see the `USER` note
+* The server runs as **`vivum`, uid 10001, not root** (see the `USER` note
   further down). All five 0700 runtime trees are created and written by that
   user, a read-only `data_cache` bind mount stays readable, and a named volume
   on `/app/app/runs` inherits the ownership and is writable with no host-side
@@ -390,11 +390,11 @@ Build it once yourself and open an issue if any of this doesn't hold.
 "real data, explicitly acquired, never silently bundled" rule extends to the
 container) — mount your own populated cache, or fetch it inside the running
 container. Note the `ENTRYPOINT` is `python -m app.server`, so
-`docker run codon-studio codon acquire` does **not** work (it becomes
-`python -m app.server codon acquire` and exits 2). Use:
+`docker run vivum-studio vivum acquire` does **not** work (it becomes
+`python -m app.server vivum acquire` and exits 2). Use:
 
 ```bash
-docker exec <container> codon acquire
+docker exec <container> vivum acquire
 ```
 
 **Writable state does not survive container replacement.** Run history,
@@ -405,11 +405,11 @@ image's filesystem. Mount them if you want them to persist:
 ```bash
 docker run -p 127.0.0.1:8000:8000 \
   -v $(pwd)/data_cache:/app/data_cache \
-  -v codon_runs:/app/app/runs \
-  codon-studio
+  -v vivum_runs:/app/app/runs \
+  vivum-studio
 ```
 
-**The container runs as `codon`, uid 10001 — not root.** It used to run as
+**The container runs as `vivum`, uid 10001 — not root.** It used to run as
 root, which was the exact opposite of the control §2 names for
 `POST /api/sections/scan`: that route takes an arbitrary filesystem path, is
 not confined to a root, and the API key makes it *authenticated, not safe*, so
@@ -466,11 +466,11 @@ docker run -p 127.0.0.1:8000:8000 \
   -v /srv/tissue:/tissue:ro \
   -e TMESIM_STUDIO_DATA_ROOTS=/app/data_cache:/tissue \
   -e TMESIM_STUDIO_API_KEY=<your-key> \
-  codon-studio
+  vivum-studio
 ```
 
 Two things that are **not** true of this default, both checked rather than
-assumed. It does not fire on a loopback bind: `docker run codon-studio --host
+assumed. It does not fire on a loopback bind: `docker run vivum-studio --host
 127.0.0.1` still prints `api key NONE` and still answers `scan {"path":
 "/etc"}` with `200`, so the §1a workflow is untouched. And it does not
 overwrite a value you set — including an empty one. `-e
@@ -492,7 +492,7 @@ bind-mounted over a writable path arrives with the *host's* ownership, and uid
 10001 almost certainly does not own it.
 
 * **Use a named volume, and there is nothing to do** — `-v
-  codon_runs:/app/app/runs`, as in the example above. Docker seeds a new named
+  vivum_runs:/app/app/runs`, as in the example above. Docker seeds a new named
   volume from the image's directory, ownership included, so it comes up owned
   by uid 10001 and writable with no host-side step. **Verified in a real
   container**: a full run wrote its history into exactly that mount. This is
@@ -518,7 +518,7 @@ bind-mounted over a writable path arrives with the *host's* ownership, and uid
   Linux daemon, do the `chown` and check it before you rely on it:
 
   ```bash
-  docker run --rm -v "$PWD/runs:/app/app/runs" --entrypoint sh codon-studio \
+  docker run --rm -v "$PWD/runs:/app/app/runs" --entrypoint sh vivum-studio \
     -c 'touch /app/app/runs/.probe && echo WRITABLE || echo NOT-WRITABLE'
   ```
 
@@ -545,12 +545,12 @@ sections available.
 
 **Check the host port is free before you publish onto it, because Docker may
 not tell you.** Measured: with a plain `python -m http.server` already holding
-`127.0.0.1:8305`, `docker run -d -p 127.0.0.1:8305:8000 codon-studio` **exited
+`127.0.0.1:8305`, `docker run -d -p 127.0.0.1:8305:8000 vivum-studio` **exited
 0, the container stayed `running`, and every request to that port reached the
 *host* process instead.** `/api/health` answered — with the host process's
 JSON. Nothing in `docker ps`, `docker logs` or the response says the container
 is not the thing you are talking to; you can spend a long time reading a stale
-server's data and calling it a Codon bug.
+server's data and calling it a Vivum bug.
 
 That was measured on a VM-backed daemon (colima/Lima on macOS), where the
 published port is forwarded by a host-side proxy rather than bound by the
@@ -562,7 +562,7 @@ pre-check costs one command and is correct on both:
 lsof -nP -iTCP:8000 -sTCP:LISTEN     # must print nothing before you publish :8000
 ```
 
-Empty output means the port is free. Anything else — an old `codon studio`, a
+Empty output means the port is free. Anything else — an old `vivum studio`, a
 previous container, an unrelated dev server — take the other port, or stop that
 process first.
 
@@ -597,7 +597,7 @@ already-running processes still need the restart above.
 
 ## 1e. Tunnels and reverse proxies — where the loopback default stops working
 
-**Read this before you demo Codon to anyone remote.** It is the most likely way
+**Read this before you demo Vivum to anyone remote.** It is the most likely way
 a field test goes wrong, and nothing in the software can detect it for you.
 
 The auto-generate rule in §1b keys off the **bind address**. The thing that
@@ -605,7 +605,7 @@ actually matters is **reachability**. Those are the same right up until you do
 the single most ordinary thing anyone does when showing software to a colleague:
 
 ```bash
-codon studio                 # binds 127.0.0.1, so no key is generated
+vivum studio                 # binds 127.0.0.1, so no key is generated
 ngrok http 8000              # ...and now it is on the internet
 ```
 
@@ -637,17 +637,17 @@ What is on the other end of that URL is worse than "your tissue data":
   but it does mean someone else can empty your section list and your compound
   library while you are demoing.)
 
-**So: if anything forwards traffic to Codon, set a key, regardless of what you
+**So: if anything forwards traffic to Vivum, set a key, regardless of what you
 bound to.**
 
 ```bash
-TMESIM_STUDIO_API_KEY=<a-real-secret> codon studio   # still 127.0.0.1, now gated
+TMESIM_STUDIO_API_KEY=<a-real-secret> vivum studio   # still 127.0.0.1, now gated
 ```
 
 This is also why §3's reverse-proxy setup says the proxy is the boundary: that
 is only true if the proxy **actually authenticates**. A proxy that terminates TLS
 and forwards everything is not a boundary — it is a tunnel with a certificate.
-If the thing in front of Codon does not check who the caller is, Codon must.
+If the thing in front of Vivum does not check who the caller is, Vivum must.
 
 ## 2. What is NOT handled for you
 
@@ -682,10 +682,10 @@ If the thing in front of Codon does not check who the caller is, Codon must.
   who is not you. The other control, which applies either way, is §0's: run the
   server as a user that cannot read anything you would mind a tester listing.
 
-  **The Docker image now does that for you** — it runs as `codon`, uid 10001,
+  **The Docker image now does that for you** — it runs as `vivum`, uid 10001,
   after a spell of running as root, i.e. of doing the precise opposite of the
   sentence above. §1c has the measured before/after and the one thing it costs
-  (a `chown` on host bind mounts over writable paths). Running `codon studio`
+  (a `chown` on host bind mounts over writable paths). Running `vivum studio`
   directly still runs as **whoever you are**, so on that path the sentence is
   still advice you have to take yourself: don't run it as root, and don't run
   it as the account that can read the rest of the department's data.
@@ -705,7 +705,7 @@ For a small pharma/research team (a handful of people, trusted network or VPN,
 no need for per-user accounts):
 
 ```
-[team's machines] --HTTPS--> [Caddy/nginx, TLS termination] --HTTP, localhost--> [codon studio --host 127.0.0.1]
+[team's machines] --HTTPS--> [Caddy/nginx, TLS termination] --HTTP, localhost--> [vivum studio --host 127.0.0.1]
 ```
 
 i.e. keep Studio itself bound to loopback (no API key needed at all — the
@@ -761,7 +761,7 @@ anything else that mutates it. It also means there is no restart-shaped moment
 at which an operator gets to notice that traces are being served, or that a
 scan root was widened.
 
-`codon studio` / `python -m app.server` writes **three** of them into its own
+`vivum studio` / `python -m app.server` writes **three** of them into its own
 environment before the app is built — `TMESIM_STUDIO_API_KEY`,
 `TMESIM_STUDIO_ALLOWED_HOSTS` and, since the confinement default landed,
 `TMESIM_STUDIO_DATA_ROOTS` — and in all three cases a value you exported
@@ -794,7 +794,7 @@ rather than failing to render.
   not, which is exactly the gap this variable closes by hand.
 * `--api-key` sets the same thing and takes precedence over the exported value.
   `--api-key ''` explicitly disables the gate even on a non-loopback bind; the
-  warning still prints, which is the point of it. `codon studio` forwards the
+  warning still prints, which is the point of it. `vivum studio` forwards the
   flag to `python -m app.server` and preserves all three states, including the
   `--api-key ''` one — it did not accept the flag at all until 2026-08-22, when
   running §1b's own headline command found that out (§1b).
@@ -807,7 +807,7 @@ defence in depth against DNS rebinding — a hostile domain that resolves to
 **not** the fix for a Host-header auth bypass; that is fixed at the gate itself.
 
 * **Unset:** the middleware is not installed and there is no host validation at
-  all — *except* that on an **IPv4 loopback** bind `codon studio` fills it in with
+  all — *except* that on an **IPv4 loopback** bind `vivum studio` fills it in with
   `localhost,127.0.0.1` before the app is built, so the default local workflow is
   covered without you doing anything. **`--host ::1` is deliberately excluded
   from that fill-in and therefore gets no validation** — see the sharp edge at
@@ -824,7 +824,7 @@ defence in depth against DNS rebinding — a hostile domain that resolves to
 * **Must set it when:** you bind non-loopback or sit behind a proxy. Use the
   hostname the *browser* sends, which is the one the proxy forwards.
 * **Sharp edge, and it is a real one: an IPv6 loopback bind gets no host
-  validation at all.** `codon studio --host ::1` is *excluded* from the
+  validation at all.** `vivum studio --host ::1` is *excluded* from the
   automatic loopback fill-in above, deliberately, so `TrustedHostMiddleware` is
   never installed on it. The server works — `http://[::1]:<port>/` returns
   **200** — but it has **no DNS-rebinding protection**, unlike the IPv4
@@ -850,7 +850,7 @@ defence in depth against DNS rebinding — a hostile domain that resolves to
   match, for the same `split(":")` reason.
 
   ```bash
-  TMESIM_STUDIO_ALLOWED_HOSTS=localhost codon studio --host ::1   # reach it at http://localhost:8000/
+  TMESIM_STUDIO_ALLOWED_HOSTS=localhost vivum studio --host ::1   # reach it at http://localhost:8000/
   ```
 
   Measured on that command: `http://localhost:<port>/` → **200**,
@@ -881,7 +881,7 @@ no defence there, because the browser is a local process.
   on its own port talking to this backend. That is broken until you set it:
 
   ```bash
-  TMESIM_STUDIO_ALLOWED_ORIGINS=http://localhost:5173 codon studio
+  TMESIM_STUDIO_ALLOWED_ORIGINS=http://localhost:5173 vivum studio
   ```
 
   Full origins including scheme and port, not bare hostnames.
@@ -895,7 +895,7 @@ confinement §2 says the API key does not give you: the key makes `scan`
 *authenticated*, this makes it *bounded*.
 
 It applies to the **HTTP route** — which is the trust boundary, and also what
-the `/ingest` page calls. `codon ingest <dir>` on the command line is not
+the `/ingest` page calls. `vivum ingest <dir>` on the command line is not
 confined by it and is not meant to be: that is the operator running a program as
 themselves on their own machine, with no boundary to enforce. So the two
 surfaces can disagree about a directory, and when they do it is because one of
@@ -908,7 +908,7 @@ planted inside an allowed root, and a `..` that traverses *through* a symlink
 are all refused. Containment is by path component, so a root of `/data` allows
 `/data` itself and `/data/anything`, and does **not** allow `/data_other`.
 
-* **Unset on a NON-LOOPBACK bind:** `codon studio` / `python -m app.server`
+* **Unset on a NON-LOOPBACK bind:** `vivum studio` / `python -m app.server`
   fills it in with `<repo>/data_cache` before the app is built and prints the
   directory it chose, on the same principle as the auto-generated API key: the
   moment the server is reachable from another machine, an unconfined
@@ -946,7 +946,7 @@ are all refused. Containment is by path component, so a root of `/data` allows
   the server's uid. Point it at the directory tree your samples live in:
 
   ```bash
-  TMESIM_STUDIO_DATA_ROOTS=/srv/tissue:/data/study_a codon studio --host 0.0.0.0
+  TMESIM_STUDIO_DATA_ROOTS=/srv/tissue:/data/study_a vivum studio --host 0.0.0.0
   ```
 
   **Include this repo's own `data_cache/` if you use it.** §1d's re-register
@@ -954,7 +954,7 @@ are all refused. Containment is by path component, so a root of `/data` allows
   only your tissue tree will `403` it. Two entries, not one:
 
   ```bash
-  TMESIM_STUDIO_DATA_ROOTS=/srv/tissue:$PWD/data_cache codon studio --host 0.0.0.0
+  TMESIM_STUDIO_DATA_ROOTS=/srv/tissue:$PWD/data_cache vivum studio --host 0.0.0.0
   ```
 
 * **Three things it does not do**, stated so nobody reads more into it. It
@@ -965,7 +965,7 @@ are all refused. Containment is by path component, so a root of `/data` allows
   sections already in `app/runs/_ingested_sections.json` keep working and keep
   reporting their absolute `cache_dir` through `GET /api/sections` even if that
   directory is outside every root — setting this variable stops new directories
-  being reached, it does not un-register old ones (`codon ingest --remove <id>`
+  being reached, it does not un-register old ones (`vivum ingest --remove <id>`
   does). All three are far smaller than the "any path at all" they replace; none
   is closable at this layer. The control that covers them is still §0's: run the
   server as a user that cannot read anything you would mind a tester listing.
@@ -1013,7 +1013,7 @@ at import; changing it needs a restart. Not a security control.
   effect, so the two never disagree.
 
   ```
-  [codon] TMESIM_RECON_CACHE_SIZE='' is not usable: it is empty. Valid values are
+  [vivum] TMESIM_RECON_CACHE_SIZE='' is not usable: it is empty. Valid values are
   integers >= 1 (each entry holds a full cell population and several float64
   grids; 1 is the minimum, 4 is the default). Continuing with 4. ...
   ```

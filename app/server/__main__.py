@@ -78,7 +78,7 @@ def _no_auth_warning(host: str) -> str:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="python -m app.server",
-        description="Codon Studio backend (API_CONTRACT.md v1).",
+        description="Vivum Studio backend (API_CONTRACT.md v1).",
     )
     p.add_argument("--host", default="127.0.0.1",
                    help="bind address (default 127.0.0.1, local only)")
@@ -160,7 +160,7 @@ def main(argv=None) -> int:
         os.environ[DATA_ROOTS_VAR] = os.path.join(root, "data_cache")
         roots_generated = True
 
-    print(f"Codon Studio backend")
+    print(f"Vivum Studio backend")
     print(f"  repo        {root}")
     print(f"  run history {runs_dir()}")
     print(f"  recon cache maxsize={RECON_CACHE.maxsize}")
