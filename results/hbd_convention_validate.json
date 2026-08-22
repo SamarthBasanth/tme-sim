@@ -1,0 +1,3254 @@
+{
+  "before": {
+    "mode": "full",
+    "exchange": false,
+    "physics": {
+      "transvascular_exchange_requested": false,
+      "transvascular_exchange_repo_default": false,
+      "is_shipping_default": true,
+      "law": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)",
+      "note": "The breast interstitial:plasma anchor differs by roughly 10x between the two laws. Any comparison of two scorecards that does not first check this field is meaningless."
+    },
+    "counts": {
+      "FAIL": 17,
+      "NOT TESTABLE": 19,
+      "DEFERRED": 0,
+      "PASS": 14
+    },
+    "n_rows": 50,
+    "n_scored": 31,
+    "n_scored_not_pde": 21,
+    "exit_code": 1,
+    "seconds": 180.16,
+    "groups": [
+      {
+        "key": "gbm-penetration",
+        "title": "GBM perivascular penetration depth (fit + 2 out-of-sample)",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/pk_multidrug.py::run_penetration (drives calibration.calibrate_alpha; same anchors as calibration.revalidate, plus topotecan)",
+        "report": "results/calibration.md, results/pk_multidrug.md",
+        "seconds": 1.5,
+        "n_rows": 3
+      },
+      {
+        "key": "bbb-ordering",
+        "title": "bbb_penetrance ordering vs measured brain/CSF:plasma ordering",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/pk_multidrug.py::run_partition",
+        "report": "results/pk_multidrug.md",
+        "seconds": 0.98,
+        "n_rows": 1
+      },
+      {
+        "key": "glioma-partition",
+        "title": "Human glioma tissue:plasma partition, 6 measured drugs",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/glioma_regional_pk.py::run_scorecard",
+        "report": "results/glioma_regional_pk.md",
+        "seconds": 0.22,
+        "n_rows": 6
+      },
+      {
+        "key": "gbm-tmz-exvivo",
+        "title": "Temozolomide potency extrapolated out of range vs measured ex-vivo viability",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/gbm_tmz_exvivo.py::test_a_potency_axis",
+        "report": "results/gbm_tmz_exvivo.md",
+        "seconds": 0.64,
+        "n_rows": 1
+      },
+      {
+        "key": "gist-imatinib",
+        "title": "GIST imatinib tumour:normal partition vs measured MALDI-MSI",
+        "tissue": "GIST",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/gist_imatinib.py::score",
+        "report": "results/gist_imatinib.md",
+        "seconds": 0.7,
+        "n_rows": 1
+      },
+      {
+        "key": "ps-scale",
+        "title": "Implicit unit scale PS_SCALE_S_INV vs measured brain PA product",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/ps_scale.py::calibrate_ps_scale",
+        "report": "results/transvascular_exchange_revalidation.md sec. 6.2",
+        "seconds": 0.0,
+        "n_rows": 1
+      },
+      {
+        "key": "immune-sink",
+        "title": "Immune (TAM) drug sequestration magnitude",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "PDE",
+        "source": "tmesim/validation/immune_sink_impact.py",
+        "report": "results/immune_sink_impact.md",
+        "seconds": 0.0,
+        "n_rows": 1
+      },
+      {
+        "key": "mcl-transport-coefficients",
+        "title": "Compiled transport coefficients vs measured multicellular-layer D, hindrance and consumption rate (Hicks 1998/2007)",
+        "tissue": "MCL",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "experiments/anchor_prototype.py (owns the measured constants, each traced to its PMID) driving the unmodified molecular pipeline descriptors.from_smiles -> compile_drug.build_profile, which since results/two_route_promotion.md APPLIES the two-route cell term -- so the verdicts are the cell-term-ON numbers. The pre-promotion arm (two_route=False) and the impermeable-cell arms are computed live and score nothing",
+        "report": "results/two_route_promotion.md, results/external_anchor_survey.md sec. 2.1 + 3, results/cellular_exclusion.md, results/anchor_registration.md",
+        "seconds": 1.12,
+        "n_rows": 3
+      },
+      {
+        "key": "breast-transvascular",
+        "title": "Breast interstitial:plasma AUC vs measured human microdialysis",
+        "tissue": "breast",
+        "tier": "full",
+        "scope": "PDE",
+        "source": "experiments/breast_kp_anchor.py",
+        "report": "results/breast_kp_validation.md",
+        "seconds": 107.13,
+        "n_rows": 2
+      },
+      {
+        "key": "gbm-kill-3d2d",
+        "title": "GBM 3-D:2-D kill ratio vs measured spheroid-vs-monolayer shift",
+        "tissue": "GBM",
+        "tier": "full",
+        "scope": "PDE",
+        "source": "tmesim/validation/kill_calibration.py::run + analyse",
+        "report": "results/kill_calibration.md",
+        "seconds": 7.66,
+        "n_rows": 3
+      },
+      {
+        "key": "breast-kill-3d2d",
+        "title": "Breast 3-D:2-D kill ratio vs measured spheroid-vs-monolayer shift",
+        "tissue": "breast",
+        "tier": "full",
+        "scope": "PDE",
+        "source": "experiments/kill_calibration_breast.py (+ kill_calibration_breast_report.build_ratio_section)",
+        "report": "results/kill_calibration_breast.md",
+        "seconds": 13.74,
+        "n_rows": 10
+      },
+      {
+        "key": "vascular-morphometry",
+        "title": "Reconstructed vascular geometry vs measured human GBM morphometry",
+        "tissue": "GBM",
+        "tier": "full",
+        "scope": "geometry",
+        "source": "tmesim/validation/vascular_validation.py::measure",
+        "report": "results/vascular_validation.md",
+        "seconds": 4.24,
+        "n_rows": 5
+      },
+      {
+        "key": "breast-vascular-morphometry",
+        "title": "Reconstructed breast vasculature vs measured human IDC morphometry",
+        "tissue": "breast",
+        "tier": "full",
+        "scope": "geometry",
+        "source": "experiments/vascular_validation_breast.py (drives validation.vascular_validation.measure verbatim)",
+        "report": "results/vascular_validation_breast.md",
+        "seconds": 8.86,
+        "n_rows": 5
+      },
+      {
+        "key": "endothelial-cellularity",
+        "title": "Section cellularity and endothelial fraction vs measured human histology",
+        "tissue": "GBM",
+        "tier": "full",
+        "scope": "geometry",
+        "source": "tmesim/validation/endothelial_density.py::run (section s1 only) -> definitional_reconciliation",
+        "report": "results/endothelial_density.md",
+        "seconds": 0.95,
+        "n_rows": 2
+      },
+      {
+        "key": "heldout-patient-geometry",
+        "title": "HELD-OUT second GBM patient: reconstructed geometry vs the same measured human GBM histology",
+        "tissue": "GBM",
+        "tier": "full",
+        "scope": "geometry",
+        "source": "tmesim/validation/heldout_patient.py::reconstruct_section + vascular_block / composition_block, section 2 (data_cache/xenium_gbm_io) -- GEOMETRY ONLY, the module's 10 PDE solves are NOT registered",
+        "report": "results/heldout_patient.md, results/heldout_patient_validation.md",
+        "seconds": 25.7,
+        "n_rows": 3
+      },
+      {
+        "key": "ifp-wick-in-needle",
+        "title": "Solved interstitial fluid pressure vs measured human wick-in-needle IFP (GBM not testable, breast FAILS ~40x)",
+        "tissue": "GBM + breast",
+        "tier": "full",
+        "scope": "PDE",
+        "source": "experiments/ifp_validation.py::measure_section + score (calls tmesim.physics.pressure.solve_ifp exactly as it ships; no coefficient is read back or fitted)",
+        "report": "results/ifp_validation.md",
+        "seconds": 6.74,
+        "n_rows": 3
+      }
+    ],
+    "rows": [
+      {
+        "group": "gbm-penetration",
+        "label": "doxorubicin",
+        "status": "NOT TESTABLE",
+        "scope": "analytic",
+        "quantity": "analytic penetration length L = sqrt(D_eff/k_eff) vs measured perivascular half-distance (immunofluorescence vs distance-from-vessel)",
+        "predicted": "L = 64.9 um",
+        "measured": "40-50 um half-distance (= 58-72 um e-fold, d_half/ln2)",
+        "pmids": [
+          "16361566"
+        ],
+        "bar": "n/a \u2014 this IS the fit",
+        "note": "",
+        "reason": "IN-SAMPLE. alpha is solved in closed form so that L equals this target exactly; the model reproduces it by construction and could not have failed. Reporting it as a PASS would be circular.",
+        "conditional": [
+          "analytic-only"
+        ],
+        "values": {
+          "predicted_L_um": 64.92127684000336,
+          "efold_band_um": [
+            57.70780163555854,
+            72.13475204444818
+          ],
+          "half_distance_band_um": [
+            40.0,
+            50.0
+          ],
+          "ratio_to_band_mid": 1.0,
+          "module_verdict": "FIT",
+          "alpha": 22.223477711172563
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "gbm-penetration",
+        "label": "mitoxantrone",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "OUT-OF-SAMPLE analytic penetration length L = sqrt(D_eff/k_eff), alpha frozen, vs measured perivascular half-distance",
+        "predicted": "L = 48.3 um  (0.67x band mid)",
+        "measured": "25-75 um half-distance (= 36-108 um e-fold, d_half/ln2)",
+        "pmids": [
+          "23680920"
+        ],
+        "bar": "inside the published e-fold band, else within 3x of its midpoint",
+        "note": "anthracenedione DNA-intercalator (SAME strongly-bound class as doxorubicin -- a magnitude-transfer test, not a maximally independent one)",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "analytic-only"
+        ],
+        "values": {
+          "predicted_L_um": 48.32990220321861,
+          "efold_band_um": [
+            36.06737602222409,
+            108.20212806667226
+          ],
+          "half_distance_band_um": [
+            25.0,
+            75.0
+          ],
+          "ratio_to_band_mid": 0.6699947089779773,
+          "module_verdict": "PASS",
+          "alpha": 22.223477711172563
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "gbm-penetration",
+        "label": "topotecan",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "OUT-OF-SAMPLE analytic penetration length L = sqrt(D_eff/k_eff), alpha frozen, vs measured perivascular half-distance",
+        "predicted": "L = 148.3 um  (2.06x band mid)",
+        "measured": "25-75 um half-distance (= 36-108 um e-fold, d_half/ln2)",
+        "pmids": [
+          "23680920"
+        ],
+        "bar": "inside the published e-fold band, else within 3x of its midpoint",
+        "note": "OUTSIDE the published band; passes only on the 3x order-of-magnitude bar (pk_reality.ORDER_OF_MAGNITUDE_FACTOR). camptothecin topoisomerase-I inhibitor (chemically DISTINCT from the anthracycline fit -- a more independent test)",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "analytic-only"
+        ],
+        "values": {
+          "predicted_L_um": 148.2895416758122,
+          "efold_band_um": [
+            36.06737602222409,
+            108.20212806667226
+          ],
+          "half_distance_band_um": [
+            25.0,
+            75.0
+          ],
+          "ratio_to_band_mid": 2.055729554382314,
+          "module_verdict": "PASS(3x)",
+          "alpha": 22.223477711172563
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "bbb-ordering",
+        "label": "MTX/cisplatin/TMZ",
+        "status": "FAIL",
+        "scope": "analytic",
+        "quantity": "rank order of structure-only bbb_penetrance vs rank order of measured brain-or-CSF:plasma partition ratio (RANKS ONLY \u2014 the dimensionless score is not a partition ratio)",
+        "predicted": "model order methotrexate < temozolomide < cisplatin (Kendall tau 0.33, Spearman rho 0.50)",
+        "measured": "measured order methotrexate < cisplatin < temozolomide",
+        "pmids": [
+          "3855310",
+          "8548876",
+          "19861433"
+        ],
+        "bar": "every pairwise order concordant",
+        "note": "discordant pair(s): temozolomide vs cisplatin",
+        "reason": "",
+        "conditional": [
+          "analytic-only"
+        ],
+        "values": {
+          "kendall_tau": 0.3333333333333333,
+          "spearman_rho": 0.5,
+          "concordant_pairs": 2,
+          "discordant_pairs": 1,
+          "real_order": [
+            "methotrexate",
+            "cisplatin",
+            "temozolomide"
+          ],
+          "model_order": [
+            "methotrexate",
+            "temozolomide",
+            "cisplatin"
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "eribulin",
+        "status": "FAIL",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.0353  (6.94x measured)",
+        "measured": "0.0051 (range 0.0051-0.0051)",
+        "pmids": [
+          "39422741"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=1; comparator = microdialysis (free drug)",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.03531872693623568,
+          "measured_mean": 0.005086255990411808,
+          "fold_error": 6.943953863670182,
+          "pass_3x": false,
+          "pass_10x": true,
+          "n_measured": 1,
+          "method": "intracerebral_microdialysis"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "cefazolin",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.1526  (1.02x measured)",
+        "measured": "0.1496 (range 0.0000-1.4700)",
+        "pmids": [
+          "PMC12962645"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=117; comparator = tissue homogenate (TOTAL drug, incl. intracellular). Homogenate measures total drug and can exceed 1 by definition, while the engine computes free interstitial \u2014 the comparison is not modality-matched",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.15258002911172316,
+          "measured_mean": 0.1495726495726496,
+          "fold_error": 1.020106480346949,
+          "pass_3x": true,
+          "pass_10x": true,
+          "n_measured": 117,
+          "method": "tissue_homogenate_LCMS"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "methotrexate",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.1415  (0.79x measured)",
+        "measured": "0.1780 (range 0.0320-0.3050)",
+        "pmids": [
+          "18787762"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=4; comparator = microdialysis (free drug)",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.1415070576046895,
+          "measured_mean": 0.17800000000000002,
+          "fold_error": 0.7949834696892668,
+          "pass_3x": true,
+          "pass_10x": true,
+          "n_measured": 4,
+          "method": "intracerebral_microdialysis"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "temozolomide",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.1594  (0.82x measured)",
+        "measured": "0.1951 (range 0.0330-0.4490)",
+        "pmids": [
+          "19861433",
+          "29332604"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=14; comparator = microdialysis (free drug)",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.15937158358322562,
+          "measured_mean": 0.19507142857142856,
+          "fold_error": 0.8169909081527494,
+          "pass_3x": true,
+          "pass_10x": true,
+          "n_measured": 14,
+          "method": "intracerebral_microdialysis"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "levetiracetam",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.9466  (1.36x measured)",
+        "measured": "0.6972 (range 0.0000-2.0500)",
+        "pmids": [
+          "PMC12962645"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=125; comparator = tissue homogenate (TOTAL drug, incl. intracellular). Homogenate measures total drug and can exceed 1 by definition, while the engine computes free interstitial \u2014 the comparison is not modality-matched",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.9465556482607032,
+          "measured_mean": 0.6971999999999999,
+          "fold_error": 1.3576529665242445,
+          "pass_3x": true,
+          "pass_10x": true,
+          "n_measured": 125,
+          "method": "tissue_homogenate_LCMS"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "adavosertib",
+        "status": "FAIL",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.5785  (0.24x measured)",
+        "measured": "2.4600 (range 0.7400-4.1800)",
+        "pmids": [
+          "39820282"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=2; comparator = tissue homogenate (TOTAL drug, incl. intracellular). Homogenate measures total drug and can exceed 1 by definition, while the engine computes free interstitial \u2014 the comparison is not modality-matched",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.5784765155825272,
+          "measured_mean": 2.46,
+          "fold_error": 0.23515305511484846,
+          "pass_3x": false,
+          "pass_10x": true,
+          "n_measured": 2,
+          "method": "tissue_homogenate_LCMS"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "gbm-tmz-exvivo",
+        "label": "temozolomide",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "GDSC Hill curve extrapolated to the assay's 100 uM dose (3.3x above the GDSC concentration ceiling) vs MEASURED ATP viability in patient-derived GSC cultures",
+        "predicted": "78.1% viability (median, IQR 69.4-85.0)",
+        "measured": "82.4% viability (median, n=40)",
+        "pmids": [
+          "37620410"
+        ],
+        "bar": "Mann-Whitney p >= 0.05 (distributions not separable)",
+        "note": "Mann-Whitney p = 0.272; predicted/measured = 0.95x. Genuinely out-of-range: GDSC's own dose window tops out below the assay concentration.",
+        "reason": "",
+        "conditional": [
+          "gdsc-potency"
+        ],
+        "values": {
+          "pred_median_pct": 78.0597961618357,
+          "meas_median_pct": 82.405,
+          "fold": 0.947270143338823,
+          "mannwhitney_p": 0.271562074999961,
+          "n_measured": 40
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "gist-imatinib",
+        "label": "imatinib",
+        "status": "FAIL",
+        "scope": "analytic",
+        "quantity": "analytic 1-D Krogh-slab delivery efficiency x tissue partitioning -> tumour:normal imatinib ratio, vs MEASURED MALDI-MSI tumour:normal ion ratio in human GIST",
+        "predicted": "GM |fold error| 11.38x over n=6 patients (Spearman rho 0.655)",
+        "measured": "no-partitioning null gives 12.96x (model beats null by only 1.14x)",
+        "pmids": [
+          "PMC6650609"
+        ],
+        "bar": "beat the no-partitioning null by >= 3x GM fold error",
+        "note": "FALSIFIED as a sufficient explanation (results/gist_imatinib.md): 4 of 5 liver ratios lie BELOW the model's structural floor, so no penetration length can reproduce them. n=6 with 5 of 6 sharing the same tissue pairing, i.e. ~one independent comparison.",
+        "reason": "",
+        "conditional": [
+          "analytic-only"
+        ],
+        "values": {
+          "model_gm_abs_fold": 11.381852664246205,
+          "null_gm_abs_fold": 12.960878234986744,
+          "beats_null_by": 1.1387318582765291,
+          "n": 6,
+          "spearman_rho": 0.6546536707079772
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "ps-scale",
+        "label": "PS_SCALE_S_INV",
+        "status": "NOT TESTABLE",
+        "scope": "analytic",
+        "quantity": "engine volume-averaged permeability-surface-area product (1/s) vs MEASURED intact-blood-brain-barrier PA product",
+        "predicted": "a single k0 = 0.1612 1/s would be needed; the per-drug values disagree by 8.70x (methotrexate 0.0546, temozolomide 0.476)",
+        "measured": "n=2 measured brain PA anchors",
+        "pmids": [
+          "524251",
+          "39690422"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "THE MODEL CANNOT EXPRESS THE MEASURED QUANTITY. bbb_penetrance is a dimensionless brain:plasma PARTITION, but the delivery law consumes it as a first-order RATE via an implicit, underived conversion of exactly 1 1/s (PS_SCALE_S_INV). Read as rates the drugs are mutually incoherent by 8.7x; read as partitions they agree to ~1.04x. That is the signature of a units error, not a calibration error, and no single k0 can remove it (irreducible residual 2.95x). See results/transvascular_exchange_revalidation.md sec. 6.2.",
+        "conditional": [
+          "ps-scale",
+          "analytic-only"
+        ],
+        "values": {
+          "k0": 0.16121537317661533,
+          "disagreement_fold": 8.703923900118907,
+          "gm_fold_before": 6.202882394500157,
+          "gm_fold_after": 2.9502413291320604,
+          "irreducible_residual": 2.9502413291320604,
+          "n_anchors": 2.0
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "immune-sink",
+        "label": "TAM sequestration",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "first-order drug loss proportional to the MEASURED local immune-cell area fraction vs a measured free-drug macrophage:interstitium uptake ratio",
+        "predicted": "swept over the strength range, never fitted",
+        "measured": "NONE \u2014 0 of 3 panel drugs has a measured free-drug TAM uptake ratio",
+        "pmids": [
+          "26503691"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS. The literature supports a DIRECTION and not a MAGNITUDE, and for free doxorubicin the one direct measurement is NEGATIVE (a depot, the opposite sign). The module's permutation test is an INTERNAL null on the model's own field, not a comparison against any measured number, so it is not an external anchor and is not scored here whatever its value. Do not quote its magnitude from memory: results/immune_sink_impact.md carries a CORRECTION NOTICE demoting the original label-permutation null (that null under-clumps the field it is compared against) and reporting a much smaller excess against spatially-aware nulls, part of it attributable to a transport gradient with depth into tissue rather than to immune biology. The sink does not improve the measured human-glioma anchor and ships DEFAULT-OFF.",
+        "conditional": [],
+        "values": {
+          "n_drugs_with_measured_uptake_ratio": 0,
+          "n_drugs": 3
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "mcl-transport-coefficients",
+        "label": "effective diffusivity (tirapazamine)",
+        "status": "FAIL",
+        "scope": "analytic",
+        "quantity": "compiled MolecularProfile.effective_diffusivity (um^2/s) \u2014 the D_eff the transport PDE would be handed \u2014 vs the MEASURED tissue diffusion coefficient of the same drug in multicellular layers, obtained by fitting slab flux to a diffusion-reaction model of the same form",
+        "predicted": "49.3 um^2/s as shipped (0.67x the lowest measured cell line, 0.38x the highest); 287.3 um^2/s before the two-route promotion, i.e. the miss FLIPPED DIRECTION from 2.21x ABOVE the band to 0.67x BELOW it",
+        "measured": "74-130 um^2/s across three MCL cell lines (V79-171b 74, MGH-U1 130, PMID 9806526; SiHa 130 +/- 5, PMID 17869669)",
+        "pmids": [
+          "9806526",
+          "17869669"
+        ],
+        "bar": "inside the measured 74-130 um^2/s range. results/external_anchor_survey.md sec. 4 recommends this anchor as a FAIL row and that is the bar adopted",
+        "note": "THE MISS FLIPPED DIRECTION AND DID NOT CLOSE. The three measurements agree with EACH OTHER to 1.8x. Before the two-route promotion the engine was above all three (287.3 um^2/s); it is now below all three (49.3 um^2/s), by a smaller factor. Overshooting a band in the other direction is progress in magnitude and is NOT a pass, and this row is not recorded as one. It does pass the repo's loosest declared band (3x, pk_reality.ORDER_OF_MAGNITUDE_FACTOR), which is not the bar here. READ THIS ROW AGAINST THE HINDRANCE ROW BELOW, WHICH NOW PASSES: the dimensionless ratio lands inside its band while the absolute value does not, which is the signature of a residual FREE-diffusivity error \u2014 the hindrance is right and the thing it is hindering is not (results/cellular_exclusion.md sec. 4.2). PRE-PROMOTION arm, reported for comparison and NOT scored: with two_route=False the same compile gives D_eff 287.3 um^2/s and 1.77-fold hindrance, which is what every number in results/diffusivity_falsification.md and results/cellular_exclusion.md was computed against. Two further arms, also unscored: arm B (the IMPERMEABLE-cell term alone, the MCL-appropriate arm, since an MCL is packed cells with little matrix) gives 77.0 um^2/s and 6.62-fold; arm A (the old chain plus the impermeable term) gives 43.4 um^2/s and 11.73-fold. Arm A's proximity to the measurement is partly the WRONG TERM DOING THE RIGHT WORK \u2014 it credits an MCL with ECM the MCL does not have (results/cellular_exclusion.md sec. 4.1), and that objection now applies to the SHIPPING number too, because the shipping chain is arm A with a permeable membrane. Arm B's fold is 6.6157 exactly; cellular_exclusion.md sec. 0 prints it as 6.61x, rounded down.",
+        "reason": "",
+        "conditional": [
+          "mcl-no-vasculature",
+          "cell-exclusion-default-off",
+          "coefficient-not-field"
+        ],
+        "values": {
+          "shipped_D_eff_um2s": 49.33219989048552,
+          "superseded_mw_only_D_eff_um2s": 287.32155645469413,
+          "free_diffusivity_um2s": 509.47245435973105,
+          "measured_band_um2s": [
+            74.0,
+            130.0
+          ],
+          "cell_term_on_armA_D_eff_um2s": 43.42993266933137,
+          "cell_term_on_armB_D_eff_um2s": 77.00903010112671,
+          "phi_cell": 0.7892,
+          "ecm_reference": 0.4
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "mcl-transport-coefficients",
+        "label": "hindrance factor D_free/D_eff (tirapazamine)",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "compiled 1/MolecularProfile.hindrance \u2014 the dimensionless fold reduction of the same drug's diffusivity in tissue versus in free medium \u2014 vs the MEASURED fold reduction of tirapazamine's diffusion coefficient in a V79-171b multicellular layer relative to culture medium",
+        "predicted": "10.33-fold as shipped (0.86x measured); 1.77-fold (0.15x measured) before the two-route promotion",
+        "measured": "12-fold lower than in culture medium (V79-171b MCL; no uncertainty published)",
+        "pmids": [
+          "9806526"
+        ],
+        "bar": "within the repo's own loosest declared band, pk_reality.ORDER_OF_MAGNITUDE_FACTOR = 3x either side of the measured 12-fold, i.e. 4.0-36.0-fold. The measured value carries no published uncertainty, so inventing a tighter band would be inventing a number; this is the most GENEROUS bar available, it was chosen while the engine was FAILING it, and it has not been widened or moved now that the engine passes",
+        "note": "THE SHARPEST ROW IN THIS GROUP, AND THE ONE THE TWO-ROUTE PROMOTION MOVED: no units, no compartment translation, no cohort matching \u2014 a pure dimensionless ratio of one drug's diffusivity in tissue versus in free medium. It went 1.77x -> 10.33x against a measured 12x, i.e. FAIL -> PASS (0.86x measured, inside a band of 4-36). WHAT THAT DOES AND DOES NOT MEAN. The diagnosis this row carried was structural and correct: the old engine's only obstacle population was ECM, so cellular volume exclusion \u2014 most of a tumour's volume \u2014 was absent from the hindrance law, and an MCL is almost pure packed cells, which is exactly why it exposed that. The shipping law now has cells in it and the row passes. But the band is 3x wide either side of a measurement that carries NO published uncertainty, the pass is 1.16x short of the central value, and the ABSOLUTE diffusivity row above still fails \u2014 so what has been established is that the hindrance RATIO is now the right size, not that the transport model is right. PRE-PROMOTION arm, reported for comparison and NOT scored: with two_route=False the same compile gives D_eff 287.3 um^2/s and 1.77-fold hindrance, which is what every number in results/diffusivity_falsification.md and results/cellular_exclusion.md was computed against. Two further arms, also unscored: arm B (the IMPERMEABLE-cell term alone, the MCL-appropriate arm, since an MCL is packed cells with little matrix) gives 77.0 um^2/s and 6.62-fold; arm A (the old chain plus the impermeable term) gives 43.4 um^2/s and 11.73-fold. Arm A's proximity to the measurement is partly the WRONG TERM DOING THE RIGHT WORK \u2014 it credits an MCL with ECM the MCL does not have (results/cellular_exclusion.md sec. 4.1), and that objection now applies to the SHIPPING number too, because the shipping chain is arm A with a permeable membrane. Arm B's fold is 6.6157 exactly; cellular_exclusion.md sec. 0 prints it as 6.61x, rounded down.",
+        "reason": "",
+        "conditional": [
+          "mcl-no-vasculature",
+          "cell-exclusion-default-off",
+          "coefficient-not-field"
+        ],
+        "values": {
+          "shipped_fold": 10.327381618714124,
+          "superseded_mw_only_fold": 1.7731786665998603,
+          "measured_fold": 12.0,
+          "band_fold": [
+            4.0,
+            36.0
+          ],
+          "cell_term_on_armA_fold": 11.730905922391674,
+          "cell_term_on_armB_fold": 6.615749525616698,
+          "armB_shortfall_x": 1.81385343467661,
+          "phi_cell": 0.7892
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "mcl-transport-coefficients",
+        "label": "first-order tissue consumption rate k (tirapazamine)",
+        "status": "NOT TESTABLE",
+        "scope": "analytic",
+        "quantity": "the engine's first-order interstitial loss rate k (1/s) \u2014 the -kC sink of the transport PDE \u2014 vs the MEASURED anoxic metabolic consumption rate constant of tirapazamine fitted in the same position of the same diffusion-reaction equation",
+        "predicted": "TWO readings that differ by 7x and land on OPPOSITE sides of the measurement: k_raw = clearance + binding = 9.747e-05 /s (0.0112-0.0189x measured), and k_calibrated = clearance + alpha*binding = 6.918e-04 /s at alpha = 22.2235 (0.080-0.134x measured)",
+        "measured": "8.667e-03 /s (0.52 /min, V79-171b) and 5.167e-03 /s (0.31 /min, MGH-U1)",
+        "pmids": [
+          "9806526"
+        ],
+        "bar": "n/a",
+        "note": "WHAT MAY HONESTLY BE SAID, AND IT IS NOW WEAKER THAN IT WAS. Before the two-route promotion the magnitude alpha implied for a small-molecule interstitial loss rate landed within 2x of one independently measured rate constant of the same class, in a fit that saw no tirapazamine, no MCL and no rate constant \u2014 weaker than validation, stronger than nothing (results/external_anchor_survey.md sec. 3.3). At the new alpha it lands 7.5-12.5x below that measurement instead. THIS IS THE COST SIDE OF THE PROMOTION AND IT IS NOT COSMETIC: the same change that brought the dimensionless hindrance row inside its band pushed this reading out of its own. The two anchors are coupled \u2014 the Primeau penetration fit pins the RATIO D/k, so lowering D lowers k by the same factor \u2014 and they now disagree about where the engine sits. That disagreement is unresolved and is the sharpest open question the promotion leaves (results/two_route_promotion.md sec. 8).",
+        "reason": "PARTIALLY COMMENSURABLE ONLY, and the owning survey says so before any number is quoted. TWO INDEPENDENT REASONS, either sufficient. (1) THE PROCESS IS NOT THE SAME PROCESS. The measured constant is ANOXIC BIOREDUCTIVE METABOLISM of a hypoxia-activated prodrug \u2014 a real, drug-specific consumption reaction that the engine's panel drugs do not have \u2014 while the engine's k is a generic binding-plus-clearance sink. Same units, same slot in the same equation, DIFFERENT PHYSICAL PROCESS. results/external_anchor_survey.md sec. 2.1 declares it a measured ORDER-OF-MAGNITUDE BOUND on how large a real interstitial consumption rate can be, and explicitly NOT a like-for-like score. (2) THE ENGINE HAS NO SINGLE NUMBER TO SCORE. k_raw and k_calibrated differ by 7x and straddle the measurement: the uncalibrated sink is 53-89x TOO SMALL (which independently reproduces results/pk_reality.md's ~300x diagnosis on a different drug, in a different system, against a directly measured rate constant rather than a penetration depth \u2014 that FAIL-shaped fact is recorded here, not suppressed), while the alpha-amplified sink lands within 1.2-2.0x. Picking the flattering reading would manufacture a PASS and picking the other would manufacture a FAIL, and nothing about this anchor determines the choice. NOTE WHICH WAY THIS COSTS \u2014 AND THAT IT REVERSED. Until results/two_route_promotion.md, scoring this row on k_calibrated would have PASSED the repo's 3x band (0.49-0.82x measured at alpha = 148.6082), so declining to score removed a PASS from the tally. The promotion cut alpha to 22.2235 \u2014 because doxorubicin's compiled D fell 6.6x and alpha is fitted from L = sqrt(D/k) against the same measured anchor \u2014 and k_calibrated fell with it. Scored on k_calibrated TODAY this row would FAIL: 0.080-0.134x measured, i.e. 7.5-12.5x TOO SMALL, outside the 3x band. So declining to score now removes a FAILURE from the tally, not a pass. The decision not to score is unchanged and rests on reason (1), which is about commensurability and is untouched by any of this; what changed is which way the omission flatters us, and that is stated here rather than left as a stale claim.",
+        "conditional": [
+          "mcl-no-vasculature",
+          "alpha-fit",
+          "coefficient-not-field"
+        ],
+        "values": {
+          "k_raw_per_s": 9.746754268365528e-05,
+          "k_calibrated_per_s": 0.0006918160135823861,
+          "alpha": 22.223477711172563,
+          "measured_k_per_s": {
+            "V79-171b": 0.008666666666666666,
+            "MGH-U1": 0.005166666666666667
+          },
+          "raw_ratio_to_measured": [
+            0.011246254925037148,
+            0.018864685680707472
+          ],
+          "calibrated_ratio_to_measured": [
+            0.07982492464412148,
+            0.13389987359659086
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-transvascular",
+        "label": "5-fluorouracil",
+        "status": "FAIL",
+        "scope": "PDE",
+        "quantity": "mean_tumor_auc / (plasma_mean * total_time) \u2014 free interstitial drug AUC at tumour cells over plasma AUC \u2014 vs MEASURED in-vivo microdialysis interstitial:plasma AUC in primary human breast tumour",
+        "predicted": "7.6589  (12.56x measured)",
+        "measured": "0.61 +/- 0.11 (mean +/- SE, n=10)",
+        "pmids": [
+          "9205062"
+        ],
+        "bar": "inside measured mean +/- SE",
+        "note": "delivery law: one-way leak S = PS*Cp (repo default). This anchor moves by roughly 10x between the two laws, so the number above is only interpretable together with the physics line.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "untreated-section"
+        ],
+        "values": {
+          "ratio": 7.658853663899377,
+          "measured_mean": 0.61,
+          "measured_se": 0.11,
+          "n": 10,
+          "fold_of_measured": 12.55549780967111,
+          "transvascular_exchange": false,
+          "repo_default_transvascular_exchange": false
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-transvascular",
+        "label": "methotrexate",
+        "status": "FAIL",
+        "scope": "PDE",
+        "quantity": "mean_tumor_auc / (plasma_mean * total_time) \u2014 free interstitial drug AUC at tumour cells over plasma AUC \u2014 vs MEASURED in-vivo microdialysis interstitial:plasma AUC in primary human breast tumour",
+        "predicted": "0.0537  (0.09x measured)",
+        "measured": "0.60 +/- 0.20 (mean +/- SE, n=9)",
+        "pmids": [
+          "9679959"
+        ],
+        "bar": "inside measured mean +/- SE",
+        "note": "delivery law: one-way leak S = PS*Cp (repo default). This anchor moves by roughly 10x between the two laws, so the number above is only interpretable together with the physics line.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "untreated-section"
+        ],
+        "values": {
+          "ratio": 0.05369359680163938,
+          "measured_mean": 0.6,
+          "measured_se": 0.2,
+          "n": 9,
+          "fold_of_measured": 0.08948932800273231,
+          "transvascular_exchange": false,
+          "repo_default_transvascular_exchange": false
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "gbm-kill-3d2d",
+        "label": "cisplatin",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2746 (implied IC50 fold 4.63x)",
+        "measured": "ratio band 0.2086-1.5004 (measured fold 0.4-6x)",
+        "pmids": [
+          "33395433",
+          "32152850"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:cisplatin. Real untreated Xenium GBM section, dx = 12 um, 6 h window.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "band-wider-than-assay",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.27459037325976776,
+          "lit_ratio_lo": 0.20864163423872006,
+          "lit_ratio_hi": 1.5003511388489135,
+          "implied_fold": 4.625646333007028,
+          "scope": "drug:cisplatin",
+          "ic50_uM": 24.550285905059777
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "gbm-kill-3d2d",
+        "label": "doxorubicin",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2044 (implied IC50 fold 6.12x)",
+        "measured": "ratio band 0.0575-1.0000 (measured fold 1-19x)",
+        "pmids": [
+          "33395433",
+          "37869710"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:doxorubicin. Real untreated Xenium GBM section, dx = 12 um, 6 h window.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "band-wider-than-assay",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.20438068694057704,
+          "lit_ratio_lo": 0.05746191856610602,
+          "lit_ratio_hi": 1.0,
+          "implied_fold": 6.116157742164069,
+          "scope": "drug:doxorubicin",
+          "ic50_uM": 0.5
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "gbm-kill-3d2d",
+        "label": "temozolomide",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2583 (implied IC50 fold 3.31x)",
+        "measured": "ratio band 0.1590-0.4622 (measured fold 2-5x)",
+        "pmids": [
+          "30694423"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:temozolomide. Real untreated Xenium GBM section, dx = 12 um, 6 h window.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "band-wider-than-assay",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.2582908679488508,
+          "lit_ratio_lo": 0.15898511609865443,
+          "lit_ratio_hi": 0.4622133669344504,
+          "implied_fold": 3.3078981381114385,
+          "scope": "drug:temozolomide",
+          "ic50_uM": 606.0466722391783
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "5-fluorouracil",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.3374",
+        "measured": "a single measured point, fold 7.5x -> zero-width ratio band 0.1636-0.1636",
+        "pmids": [
+          "33395433"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (7.5x fold shift), so the min-max interval is zero-width (0.1636-0.1636) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.33744986067994853,
+          "n_literature_rows": 1
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "cisplatin",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.3080 (implied IC50 fold 4.14x)",
+        "measured": "ratio band 0.2086-1.5004 (measured fold 0.4-6x)",
+        "pmids": [
+          "33395433",
+          "32152850"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:cisplatin. Real untreated Janesick Xenium breast section (PMID 38114474), dx = 12 um, 6 h window. Drug-matched band, n=5.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.3080303494732204,
+          "lit_ratio_lo": 0.20864163423872,
+          "lit_ratio_hi": 1.5003511388489135,
+          "implied_fold": 4.135225685581464,
+          "scope": "drug:cisplatin",
+          "ic50_uM": 82.41570389441263
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "cyclophosphamide",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2834",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS \u2014 no published 3-D-vs-2-D potency comparison for this drug in any tumour type. The broad cross-tumour-type band is reported for context only and is deliberately NOT scored. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.28339911239353033,
+          "n_literature_rows": 0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "docetaxel",
+        "status": "FAIL",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.1480 (implied IC50 fold 8.21x)",
+        "measured": "ratio band 0.0152-0.1463 (measured fold 8.3-58x)",
+        "pmids": [
+          "29221130",
+          "33431915"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:docetaxel. model predicts a SMALLER 3-D penalty than measured. Real untreated Janesick Xenium breast section (PMID 38114474), dx = 12 um, 6 h window. Drug-matched band, n=2.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.14804742593166595,
+          "lit_ratio_lo": 0.015191651385247596,
+          "lit_ratio_hi": 0.1462692215159669,
+          "implied_fold": 8.210271145542178,
+          "scope": "drug:docetaxel",
+          "ic50_uM": 0.0566993234737221
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "doxorubicin",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2297 (implied IC50 fold 5.48x)",
+        "measured": "ratio band 0.0575-1.0000 (measured fold 1-19x)",
+        "pmids": [
+          "33395433",
+          "37869710"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:doxorubicin. Real untreated Janesick Xenium breast section (PMID 38114474), dx = 12 um, 6 h window. Drug-matched band, n=5.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.22972181418342885,
+          "lit_ratio_lo": 0.05746191856610602,
+          "lit_ratio_hi": 1.0,
+          "implied_fold": 5.48318291276444,
+          "scope": "drug:doxorubicin",
+          "ic50_uM": 0.5
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "epirubicin",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2297 (implied IC50 fold 5.48x)",
+        "measured": "ratio band 0.0110-1.0000 (measured fold 1-76x)",
+        "pmids": [
+          "29221130"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:epirubicin. Real untreated Janesick Xenium breast section (PMID 38114474), dx = 12 um, 6 h window. Drug-matched band, n=2.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.22972181418342882,
+          "lit_ratio_lo": 0.01100669697548635,
+          "lit_ratio_hi": 1.0,
+          "implied_fold": 5.483182912764441,
+          "scope": "drug:epirubicin",
+          "ic50_uM": 0.8411910287790403
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "paclitaxel",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.1499",
+        "measured": "a single measured point, fold 25x -> zero-width ratio band 0.0412-0.0412",
+        "pmids": [
+          "41422245"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (25x fold shift), so the min-max interval is zero-width (0.0412-0.0412) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.14990328640793615,
+          "n_literature_rows": 1
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "palbociclib",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2189",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS \u2014 no published 3-D-vs-2-D potency comparison for this drug in any tumour type. The broad cross-tumour-type band is reported for context only and is deliberately NOT scored. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.21892249772599506,
+          "n_literature_rows": 0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "tamoxifen",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.1715",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS \u2014 no published 3-D-vs-2-D potency comparison for this drug in any tumour type. The broad cross-tumour-type band is reported for context only and is deliberately NOT scored. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.1715436380371588,
+          "n_literature_rows": 0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "vinorelbine",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.1573",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS \u2014 no published 3-D-vs-2-D potency comparison for this drug in any tumour type. The broad cross-tumour-type band is reported for context only and is deliberately NOT scored. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.157280317349169,
+          "n_literature_rows": 0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "vascular-morphometry",
+        "label": "microvessel density",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "reconstructed vessel-cluster density (per mm^2) vs MEASURED whole-slide CD31 microvessel density in human GBM",
+        "predicted": "110.8 /mm^2",
+        "measured": "65 +/- 30 /mm^2 (n=20 patients)",
+        "pmids": [
+          "27583442"
+        ],
+        "bar": "inside the module's frozen LIT_RANGES['mvd_gbm_per_mm2'] = 35..95",
+        "note": "not reproduced on the held-out patient either (results/heldout_patient.md)",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "value": 110.78738685421455,
+          "band": [
+            35.0,
+            95.0
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "vascular-morphometry",
+        "label": "intercapillary distance (directly measured)",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "median reconstructed vessel-to-nearest-vessel distance (um) vs MEASURED Voronoi intercapillary distance in the proliferating area of human glioma",
+        "predicted": "41.5 um",
+        "measured": "77.8 +/- 15.9 um (n=22 patients; normal white matter 123 +/- 4.2)",
+        "pmids": [
+          "3359450"
+        ],
+        "bar": "inside the module's frozen LIT_RANGES['intercapillary_yoshii_glioma_um'] = 61.9..93.7",
+        "note": "the only spacing anchor here that is a direct measurement rather than a Poisson consequence of a published density",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "value": 41.48047566479317,
+          "band": [
+            61.9,
+            93.7
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "vascular-morphometry",
+        "label": "tumour cells >100 um from a vessel",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "fraction of reconstructed tumour cells further than 100 um from the nearest vessel vs the Poisson fraction implied by the MEASURED GBM microvessel density",
+        "predicted": "4.4%",
+        "measured": "5.1-33.3% implied by 65 +/- 30 /mm^2",
+        "pmids": [
+          "27583442",
+          "13304213"
+        ],
+        "bar": "inside the module's frozen LIT_RANGES['frac_gt_100_pct'] = 5.056..33.3",
+        "note": "100 um is the load-bearing length because it is the lower edge of Thomlinson & Gray's 100-180 um diffusion-limited viable-cord band",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "value": 4.430539223920713,
+          "band": [
+            5.056412122422674,
+            33.30184354719648
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "vascular-morphometry",
+        "label": "vascular area fraction",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "reconstructed vascular area fraction (%) vs MEASURED whole-section CD34+ area fraction in IDH-wildtype GBM",
+        "predicted": "3.67% (KDE threshold 0.3; the 0.2/0.5 thresholds give 4.77% / 2.10%)",
+        "measured": "1.8-2.4% (2.1 +/- 0.3%, n=30)",
+        "pmids": [
+          "36611806"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "THRESHOLD-CHOSEN, NOT A VALIDATION. The reconstructed value is set by which KDE threshold is picked, and nothing determines that threshold independently, so landing on the measured value is a choice rather than a result. results/vascular_validation.md annotates this row with exactly that wording. It also DOES NOT REPLICATE on the held-out patient (5.23x, results/heldout_patient.md).",
+        "conditional": [],
+        "values": {
+          "area_pct_at_0.3": 3.6680911680911676,
+          "area_pct_at_0.5": 2.0975267352078943,
+          "area_pct_at_0.2": 4.77414426689789,
+          "band": [
+            1.8,
+            2.4
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "vascular-morphometry",
+        "label": "vascular area fraction (threshold-free)",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "grid-independent, data-derived sub-grid vascular area fraction (%) vs MEASURED whole-section CD34+ area fraction in IDH-wildtype GBM",
+        "predicted": "1.25%  (0.59x measured; module verdict LOW). Legacy fixed-radius binary field gave 8.38%",
+        "measured": "2.1% (range 1.8-2.4%, n=30)",
+        "pmids": [
+          "36611806"
+        ],
+        "bar": "inside the module's frozen PUBLISHED range 1.8-2.4% (vessel_network.segmentation_report)",
+        "note": "This row and the KDE row above score the SAME measured number against two different reconstructions and must not be pooled: this one has no threshold to choose, so it can fail. The vessel radii come from literature constants (20 endothelial nuclei per mm of vessel, PMID 38723085; mean vessel degree 1.5, PMID 37582180) that were not tuned to the 2.1% target. results/vessel_geometry_fix.md sec. 5 reports 0.99 / 7.14 / 17.79% across the three available GBM sections, i.e. it does NOT replicate across sections. Tamma R, Ingravallo G, Annese T, d'Amati A, Lorusso L, Ribatti D, Cells 2022;12(1):11",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "area_pct": 1.2454553485889797,
+          "ratio_to_measured": 0.5930739755185617,
+          "band": [
+            1.8,
+            2.4
+          ],
+          "module_verdict": "LOW",
+          "legacy_binary_area_pct": 8.382365085263636
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-vascular-morphometry",
+        "label": "microvessel density",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "reconstructed vessel-cluster density (per mm^2, 20 um single-linkage) vs MEASURED factor-VIII hotspot microvessel counts in human invasive ductal breast carcinoma",
+        "predicted": "149 /mm^2  (1.51x band mid)",
+        "measured": "61-136 /mm^2 (45-101 vessels per 200x field, node-negative to node-positive means)",
+        "pmids": [
+          "1701519"
+        ],
+        "bar": "inside 61-136 /mm^2",
+        "note": "WEAKER EVIDENCE THAN THE GBM EQUIVALENT, twice over. Weidner counts the single most vascular HOTSPOT, so the published band is already biased high and exceeding it is worse than it looks. And the per-field-to-per-mm^2 conversion uses a 0.74 mm^2 field area INFERRED from a different paper's microscope (PMID 7539869, bladder), not stated in the breast studies themselves.",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "mvd_per_mm2": 149.24029533606964,
+          "band": [
+            60.810810810810814,
+            136.48648648648648
+          ],
+          "weidner_field_mm2": 0.74
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-vascular-morphometry",
+        "label": "vascular area fraction",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "reconstructed vascular area fraction (%) vs MEASURED whole-slide digital CD34 relative endothelial area in human invasive ductal carcinoma (n=50)",
+        "predicted": "7.68% (KDE field threshold 0.3)",
+        "measured": "0.91-4.20% across compartments (stroma 0.91, parenchyma 1.95, invasive front 4.20)",
+        "pmids": [
+          "24073397"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "THRESHOLD-CHOSEN, NOT A VALIDATION \u2014 the same defect as the GBM row. The value is set by which KDE field threshold is picked and nothing determines that threshold independently, so landing near the measured range would be a choice rather than a result. results/vascular_validation_breast.md sec. 3.5 gives this row no validation weight. Unlike GBM there is also no threshold-free breast counterpart registered here.",
+        "conditional": [],
+        "values": {
+          "area_pct_at_0.3": 7.675161851566992,
+          "measured_range_pct": [
+            0.91,
+            4.2
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-vascular-morphometry",
+        "label": "vascular heterogeneity",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "p90/p10 endothelial-density spread across 500 um tiles vs MEASURED CD34 area contrast between pathologist-defined tumour compartments",
+        "predicted": "6.6x p90/p10 across 500 um tiles",
+        "measured": "4.61x invasive front vs tumour-associated stroma (a three-compartment contrast, n=50)",
+        "pmids": [
+          "24073397"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NOT THE SAME QUANTITY. The measured 4.61x is a contrast between three pathologist-defined COMPARTMENTS within a tumour; the model's number is an unlabelled tile-to-tile spread. No between-case breast CD34 area-fraction range analogous to GBM's Sipos 2024 (PMID 38928515) was found despite a dedicated search, so there is nothing to score the spread against.",
+        "conditional": [],
+        "values": {
+          "p90_over_p10": 6.560869565217391,
+          "measured_compartment_contrast": 4.61
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-vascular-morphometry",
+        "label": "intercapillary distance",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "median reconstructed vessel-to-nearest-vessel distance (um) vs a measured intercapillary distance in breast IDC",
+        "predicted": "38.0 um",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS. A dedicated search found no Voronoi or otherwise directly-measured intercapillary-distance study for breast IDC. GBM has one (Yoshii & Sugiyama, PMID 3359450); breast does not, and reporting the GBM value here would be importing a brain measurement into breast tissue.",
+        "conditional": [],
+        "values": {
+          "vessel_nn_median_um": 38.017294643660875
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-vascular-morphometry",
+        "label": "tumour cells >100 um from a vessel",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "fraction of reconstructed tumour cells further than 100 um from the nearest vessel vs a measured breast equivalent",
+        "predicted": "4.4%",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS. The GBM row derives its band from Marien's whole-slide unbiased MVD (PMID 27583442), whose full text was retrieved and confirmed to cover colorectal, glioblastoma, ovarian and renal carcinoma and explicitly NOT breast \u2014 the authors themselves flag breast as undone work. No follow-up exists.",
+        "conditional": [],
+        "values": {
+          "frac_gt_100_pct": 4.417218911844963
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "endothelial-cellularity",
+        "label": "section cellularity",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "reconstructed cells per mm^2 of tissue on a 5 um Xenium section vs MEASURED nuclei per mm^2 on 5 um H&E sections of human high-grade glioma",
+        "predicted": "1465 cells/mm^2  (0.34x the measured mean)",
+        "measured": "4350 /mm^2 (range 1941-6360; matched non-tumour control 1107 /mm^2)",
+        "pmids": [
+          "24066240"
+        ],
+        "bar": "inside the measured 1941-6360 /mm^2 range",
+        "note": "MODALITY-MATCHED, which is why it is scored: both sides are 2-D nuclear profiles on a 5 um section, so no volume-to-section depth conversion enters. Corroborated to within 5% by an independent 37-patient, 561-biopsy series (4557 +/- 3169 /mm^2, PMID 28103256). Two caveats, both of which push the SAME way as the observed miss and neither of which excuses it: the measured fields were selected for MAXIMUM cellularity in both arms, and Xenium retains only DAPI nuclei that segment and receive assigned transcripts, so in-situ under-detection relative to H&E nuclear counting is expected. The row is scored anyway because the section geometry genuinely matches; what it bounds is the reconstruction's cell recall, not the transport model.",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "obs_cells_per_mm2": 1465.4687435484536,
+          "measured_mean": 4350.0,
+          "band": [
+            1941.0,
+            6360.0
+          ],
+          "cellularity_ratio_vs_h01": 2.148591660104261
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "endothelial-cellularity",
+        "label": "endothelial cell fraction",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "reconstructed endothelial percentage of all cells vs the MEASURED endothelial fraction of a 1.05 mm^3 volume-EM reconstruction of normal-appearing human temporal cortex",
+        "predicted": "154 endothelial/mm^2; fraction ratio 1.30x the reference, of which 1.50x is estimated classifier over-call",
+        "measured": "8.05% of cells (4,604 endothelial of 57,180, n=1 volume)",
+        "pmids": [
+          "38723085",
+          "29113946"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "THE TWO SIDES DO NOT COUNT THE SAME THING, and the reference is the wrong tissue. One unit of the measurement is a whole cell traced in 3-D through 1.05 mm^3; one unit of the model is a 2-D polygon on a ~5 um section, so the comparison needs the profile-counting relation N_A = N_V*(t+h) and an effective sampling depth that is estimated, not measured. The reference is also NORMAL temporal cortex, n=1, with no published spread, while the section is tumour. endothelial_density.py deliberately reports a factorised BUDGET here rather than a verdict, because the raw ratio (7.0x) is dominated by definitional depth and cellularity terms that carry no endothelial information at all.",
+        "conditional": [],
+        "values": {
+          "obs_ec_per_mm2": 153.941063260709,
+          "h01_ec_fraction_pct": 8.051766351871283,
+          "fraction_ratio": 1.3046281887672575,
+          "apparent_ratio_naive": 7.02163841979776,
+          "apparent_ratio_depth_corrected": 2.803113245922257,
+          "classifier_purity": 0.6669353903151419
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "heldout-patient-geometry",
+        "label": "vascular area fraction (held-out section)",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "reconstructed threshold-free sub-grid vascular area fraction (%) on the HELD-OUT section vs MEASURED whole-section CD34+ area fraction in IDH-wildtype human GBM",
+        "predicted": "10.98%  (5.23x the measured mean)",
+        "measured": "2.10% (range 1.8-2.4%, n=30)",
+        "pmids": [
+          "36611806"
+        ],
+        "bar": "inside vessel_network.PUBLISHED range 1.8-2.4%",
+        "note": "HELD OUT: this section was never inspected while any reconstruction constant was chosen. The 20 um linking distance and the vessel radius model are section-1 / literature values, used here unchanged and NOT refitted. THE LOAD-BEARING ROW: it is the only anchor here that tests the vascular FIELD rather than the point pattern, and it has no threshold to pick. Section 1 lands at 1.25% (0.59x, LOW); this section lands high, so the two sections miss the same published value in OPPOSITE directions -- which is why results/sweep/vascular_area_fraction_generalization_2026-07-30T03-18-42Z.md could find no section-invariant radius model that fixes both. The published value is a population cohort mean, which is context for a single patient rather than a target; vessel_network.segmentation_report says so on every row it emits, and that caveat travels with these two.",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "area_fraction_pct": 10.981885031249634,
+          "band": [
+            1.8,
+            2.4
+          ],
+          "ratio_vs_published": 5.229469062499826,
+          "section": "data_cache/xenium_gbm_io"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "heldout-patient-geometry",
+        "label": "microvessel density (held-out section)",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "reconstructed vessel-cluster density (per mm^2, 20 um single-linkage) on the HELD-OUT section vs MEASURED whole-slide CD31 microvessel density in human GBM",
+        "predicted": "233 /mm^2  (3.59x the measured mean)",
+        "measured": "65 /mm^2 (range 35-95, n=20 patients)",
+        "pmids": [
+          "27583442"
+        ],
+        "bar": "inside vessel_network.PUBLISHED range 35-95 /mm^2",
+        "note": "HELD OUT: this section was never inspected while any reconstruction constant was chosen. The 20 um linking distance and the vessel radius model are section-1 / literature values, used here unchanged and NOT refitted. This is NOT a held-out failure on its own: section 1 misses the same band in the same direction (111 /mm^2), so the two sections AGREE with each other while both disagree with the literature. That points at the segmentation over-splitting endothelial cells into vessel objects, not at the held-out patient. The published value is a population cohort mean, which is context for a single patient rather than a target; vessel_network.segmentation_report says so on every row it emits, and that caveat travels with these two.",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "mvd_per_mm2": 233.27391916454704,
+          "band": [
+            35.0,
+            95.0
+          ],
+          "ratio_vs_published": 3.588829525608416,
+          "n_vessels": 20875,
+          "n_endothelial_cells": 57733,
+          "section": "data_cache/xenium_gbm_io"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "heldout-patient-geometry",
+        "label": "endothelial cell fraction (held-out section)",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "reconstructed endothelial percentage of all cells on the HELD-OUT section vs the MEASURED endothelial fraction of a 1.05 mm^3 volume-EM reconstruction of normal-appearing human temporal cortex",
+        "predicted": "7.07% of cells (0.88x the reference)",
+        "measured": "8.05% of cells (4,604 endothelial of 57,180, n=1 volume)",
+        "pmids": [
+          "38723085"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NOT TESTABLE FOR TWO INDEPENDENT REASONS, and heldout_patient.py scores it PASS against a 1.5x tolerance anyway -- which is why it is carried here explicitly rather than left to that report. (1) SAME DEFECT AS THE SECTION-1 ROW: endothelial-cellularity above already reports this exact comparison NOT TESTABLE, because one unit of the measurement is a whole cell traced in 3-D through 1.05 mm^3 and one unit of the model is a 2-D polygon on a ~5 um section, and the reference is normal cortex, n=1. Nothing about a second section repairs that. (2) IT IS NOT BLIND: results/classifier_fix.md sec. 0 selected the production typing rule (matched_null_z) on a cross-SECTION consistency criterion computed WITH this section in it, and that selection is what moved this number from 4.18% (0.52x -- outside the 1.5x tolerance) to its present value. The rule was not optimised against the 8.0% anchor, but it was optimised toward agreement with a section that is anchored near it, so the resulting agreement is not out-of-sample evidence.",
+        "conditional": [],
+        "values": {
+          "endothelial_pct": 7.0684612173086885,
+          "fold_vs_volume_em": 0.8835576521635861,
+          "endothelial_per_mm2": 645.1546431198465,
+          "cell_density_per_mm2": 9127.229014711756,
+          "pre_fix_endothelial_pct": 4.18,
+          "section": "data_cache/xenium_gbm_io"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "ifp-wick-in-needle",
+        "label": "GBM section IFP vs human intracranial-tumour IFP",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "solved interstitial fluid pressure (mmHg) at wick-scale placements in the tumour mass of the real Xenium GBM section vs MEASURED intraoperative wick-in-needle IFP in human intracranial tumours",
+        "predicted": "0.499 mmHg (median over placements; IQR 0.310-0.629, max 0.765)",
+        "measured": "2.0 +/- 2.5 mmHg (mean +/- SD, n=11); 10 of 11 tumours lay in 0.0-3.0, one astrocytoma at 9.5; glioblastoma-only subset n=5 mean 1.2, range 0.0-3.0",
+        "pmids": [
+          "9062403",
+          "1423283"
+        ],
+        "bar": "n/a \u2014 no bar is declared, because no bar on this anchor discriminates",
+        "note": "Not a null result: the DISCRIMINATING version of this same comparison is the breast row below, which the engine FAILS by ~40x. Read the two together. The screened-Poisson screening length sqrt(K/(a+d)) has median 7.1 um (GBM) and 6.2 um (breast), BELOW the 12 um production spacing at 99.78% and 99.92% of tissue nodes respectively.",
+        "reason": "THE ANCHOR CANNOT DISCRIMINATE, for three independent reasons, and the engine's number would sit inside it either way. (1) UNCERTAINTY. The paper's Statistical analysis section states verbatim that 'the data are presented as the mean +/- standard deviation', so 2.5 is an SD over 11 patients, not an SEM. On a non-negative quantity that the solver clips at zero, mean +/- 1 SD is effectively 0.0-4.5 mmHg, and the paper's own per-patient table has 10 of 11 tumours in 0.0-3.0 INCLUDING A MEASURED 0.0. Any engine output from nothing up to 4.5 mmHg passes. A verdict that cannot be failed is not a verdict. (2) IT DOES NOT SEPARATE TUMOUR FROM NORMAL TISSUE. Less 1992 (PMID 1423283) measured normal human tissue at 2 +/- 4 mmHg, n=11, by the SAME wick-in-needle technique with Boucher and Jain on both author lists. The intracranial-tumour figure is statistically indistinguishable from it, so agreement with it is not evidence that the engine reproduces tumour interstitial hypertension -- it is equally consistent with the engine having no tumour effect at all, which on this section is close to what it has. (3) TREATED, DECOMPRESSED STATE. All 11 patients received dexamethasone 10 mg + mannitol 0.5 mg/kg + furosemide 20 mg i.v. and were hyperventilated to PaCO2 25-32 mmHg, and IFP was taken after the cranium was opened and the dura removed. The authors' own conclusion is that 'antioedema therapy in patients with brain tumours is responsible in part for the low tumour IFP', and the same paper measures a 17-50% fall in rodent tumour IFP from hypocapnia alone (27 +/- 15 -> 18 +/- 10 mmHg). The engine models no steroid, no osmotic agent, no diuretic and no decompression, so even a matching number would be matching a different physiological state. COMMENSURABILITY. A wick-in-needle probe is a 23-gauge needle whose side hole equilibrates with the mobile interstitial fluid over a sub-millimetre to millimetre contact region, at ONE placement inside the tumour mass. The commensurable model statistic is therefore the solved field's local mean over a wick-sized window at tumour-bearing locations -- NOT the domain mean, NOT the field maximum, and NOT the landing page's iso-contour levels, which are fractions of a coarse-grained maximum chosen for rendering. Reported here as the median over placements at a 250 um Gaussian window over nodes with tumour occupancy >= 0.5; the 125 um and 500 um windows are in results/sweep/ifp_validation.json and move it by under 1.4x.",
+        "conditional": [
+          "ifp-uncalibrated",
+          "ifp-unresolved-mesh",
+          "ifp-grid-unconverged",
+          "untreated-section"
+        ],
+        "values": {
+          "wick250_tumour_median_mmhg": 0.49865097512205847,
+          "wick250_tumour_iqr_mmhg": [
+            0.310126434791047,
+            0.6286473191783174
+          ],
+          "raw_field_max_mmhg": 13.464376918341621,
+          "raw_field_median_in_tissue_mmhg": 0.0048166417217820135,
+          "raw_field_mean_in_tissue_mmhg": 0.13362429895509267,
+          "anchor_mean_mmhg": 2.0,
+          "anchor_sd_mmhg": 2.5,
+          "normal_tissue_reference_mmhg": [
+            2.0,
+            4.0
+          ],
+          "dx_um": 12.0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "ifp-wick-in-needle",
+        "label": "breast section IFP vs human primary-breast-carcinoma IFP",
+        "status": "FAIL",
+        "scope": "PDE",
+        "quantity": "solved interstitial fluid pressure (mmHg) at wick-scale placements in the tumour mass of the real Xenium breast section vs MEASURED wick-in-needle IFP in human primary breast carcinoma",
+        "predicted": "0.380 mmHg (median over placements; IQR 0.161-0.494, max 0.582) \u2014 39x BELOW the measured mean, 16x below the band floor",
+        "measured": "15 +/- 9 mmHg (mean +/- SD) in primary breast carcinoma; all neoplasms 20 +/- 13 (SD), range 4-50, n=41 measurements / 21 tumours; normal tissue 2 +/- 4 (SD), n=11",
+        "pmids": [
+          "1423283",
+          "7850532"
+        ],
+        "bar": "inside the measured mean +/- 1 SD = 6-24 mmHg",
+        "note": "THE LOAD-BEARING ROW OF THIS GROUP, and it is the one the intracranial anchor could not be. 15 +/- 9 mmHg is far from zero and 7x the same study's normal-tissue value, so unlike the brain figure it cannot be passed by producing nothing \u2014 and the engine does not pass it. Corroborated independently by Nathanson 1994 (PMID 7850532), 29 +/- 3 mmHg in invasive ductal carcinoma, n=25 \u2014 whose uncertainty is a STANDARD ERROR, not an SD, and must not be read as one; against that value the engine is ~78x low. The direction is consistent with every other absolute quantity this engine has been scored on. Mechanistically the miss is not mysterious: pressure.py's own docstring predicts a flat tumour plateau approaching _PV = 25 mmHg, but on real reconstructed tissue the vascular density that drives the Starling source is zero at 94.3% of breast tissue nodes (97.3% on GBM), so the solved field is near-zero almost everywhere (median 0.0078 mmHg in tissue) with isolated spikes to 10.5 mmHg at endothelial cells. The engine reproduces the peak magnitude and misses the plateau, which is the opposite of the Jain effect it claims. COMMENSURABILITY. A wick-in-needle probe is a 23-gauge needle whose side hole equilibrates with the mobile interstitial fluid over a sub-millimetre to millimetre contact region, at ONE placement inside the tumour mass. The commensurable model statistic is therefore the solved field's local mean over a wick-sized window at tumour-bearing locations -- NOT the domain mean, NOT the field maximum, and NOT the landing page's iso-contour levels, which are fractions of a coarse-grained maximum chosen for rendering. Reported here as the median over placements at a 250 um Gaussian window over nodes with tumour occupancy >= 0.5; the 125 um and 500 um windows are in results/sweep/ifp_validation.json and move it by under 1.4x.",
+        "reason": "",
+        "conditional": [
+          "ifp-uncalibrated",
+          "ifp-unresolved-mesh",
+          "ifp-grid-unconverged",
+          "untreated-section"
+        ],
+        "values": {
+          "wick250_tumour_median_mmhg": 0.37982765334578444,
+          "wick250_tumour_iqr_mmhg": [
+            0.16054016187366824,
+            0.49383700321991547
+          ],
+          "band_mmhg": [
+            6.0,
+            24.0
+          ],
+          "fold_below_measured_mean": 39.491595379824595,
+          "raw_field_max_mmhg": 10.527065790227164,
+          "raw_field_median_in_tissue_mmhg": 0.007752392976815962,
+          "dx_um": 12.0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "ifp-wick-in-needle",
+        "label": "IFP solve is under-resolved on every grid the engine runs at",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "screened-Poisson screening length sqrt(K/(a+d)) implied by physics/pressure.py's own shipped coefficients vs the grid spacings the engine actually solves on (8-30 um)",
+        "predicted": "median screening length 7.1 um (GBM) / 6.2 um (breast); L/dx = 0.59 / 0.51 at the 12 um production spacing",
+        "measured": "n/a \u2014 this row is scored against the discretisation, not against a measurement",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "Grid ladder, wick-scale tumour median: GBM 0.358 -> 0.434 -> 0.462 -> 0.370 mmHg and breast 0.621 -> 0.424 -> 0.370 -> 0.286 mmHg at dx = 24, 18, 12, 8 um. Full ladder in results/sweep/ifp_validation.json.",
+        "reason": "NO MEASUREMENT IS INVOLVED; this row is registered so that the two rows above cannot be quoted without it. The screened-Poisson screening length sqrt(K/(a+d)) has median 7.1 um (GBM) and 6.2 um (breast), BELOW the 12 um production spacing at 99.78% and 99.92% of tissue nodes respectively. A screened-Poisson solve whose screening length is below the mesh cannot represent the operator it discretises: the reaction term dominates the diagonal (median (a+d)*dx^2/K = 2.9 on GBM, 3.8 on breast), so each node relaxes toward its own LOCAL algebraic equilibrium a*p_v/(a+d) with the Laplacian barely coupling neighbours. Measured directly: the solved field correlates with that pointwise algebraic limit at r = 0.92 (GBM) and 0.94 (breast). At production dx the 'solved pressure field' is therefore closer to a pointwise nonlinear map of the vascular-density KDE than to a transport solve, and the margin pressure gradient that carries the Jain effect into the convection term is not resolved. Refining the mesh does not fix it and is not free: the field is not grid-converged either (see the ifp-grid-unconverged conditional), and pressure.py's tumour-occupancy smoothing _TUMOR_SIGMA = 5.0 is specified in GRID CELLS, so the physical smoothing scale is itself a function of dx (60 um at dx=12, 120 um at dx=24) and the model changes as the mesh changes.",
+        "conditional": [
+          "ifp-unresolved-mesh",
+          "ifp-grid-unconverged"
+        ],
+        "values": {
+          "screening_length_um_gbm": {
+            "p5": 6.628361640576865,
+            "p25": 6.876059135005593,
+            "p50": 7.078132031932166,
+            "p75": 7.371550760324304,
+            "p95": 8.292519887898791,
+            "p99": 9.769416312990785
+          },
+          "screening_length_um_breast": {
+            "p5": 5.493480102187369,
+            "p25": 5.9084952573290135,
+            "p50": 6.154010111824865,
+            "p75": 6.8021304798773565,
+            "p95": 8.01497767271013,
+            "p99": 9.090536618962643
+          },
+          "frac_tissue_unresolved_gbm": 0.9977806680705231,
+          "frac_tissue_unresolved_breast": 0.9991898087649997,
+          "corr_solved_vs_local_equilibrium_gbm": 0.9210181148480852,
+          "corr_solved_vs_local_equilibrium_breast": 0.9438723268605637
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      }
+    ],
+    "conditionals": {
+      "alpha-fit": "Inherits alpha, the single free constant fit ONCE in closed form to the doxorubicin perivascular anchor (PMID 16361566) by validation.calibration.calibrate_alpha. Anything downstream of alpha is conditional on that one fit and is not independent of it.",
+      "analytic-only": "Computed in closed form from molecular descriptors; the transport PDE is never invoked. Verified by call-counter instrumentation in results/transvascular_exchange_revalidation.md sec. 6.1. This row cannot confirm or refute the solver.",
+      "band-wider-than-assay": "The literature band is wider than the assay spread it is meant to correct (the 2-D reference's own IQR is ~19x, PMID 34794398), so a pass here is a weak pass by construction (results/kill_calibration.md).",
+      "cell-exclusion-default-off": "The cellular volume-exclusion term (molecular/ecm_mesh.py::cell_exclusion, Maxwell's impermeable-inclusion limit) is MERGED BUT NOT WIRED IN. results/cellular_exclusion.md sec. 7 recommends merging the physics and explicitly NOT flipping the default; nothing in compile_drug calls it, so DrugParams.diffusivity is bit-identical to the pre-merge value. Every VERDICT in this group is therefore scored on the engine AS IT SHIPS, with the term OFF. The cell-term-ON arm is reported alongside each verdict and carries three caveats of its own, none of which is a footnote: (a) phi_cell = 0.7892 is measured by Delesse's principle on the repo's real Xenium BREAST TUMOUR section and then applied to a V79 hamster multicellular layer \u2014 a literature search for an MCL extracellular-volume measurement returned nothing usable, so the packing density is imported from the wrong system (cellular_exclusion.md sec. 4.1); (b) Xenium's boundary segmentation tiles the section, so phi_cell is an UPPER estimate and every hindrance derived from it is too; (c) stacking the cell term on the existing chain DOUBLE-COUNTS by up to ~1.9x, because brownian.py's 300 nm obstacle field and ALPHA_TORTUOSITY = 0.6 were partly standing in for cell-scale obstruction, and cellular_exclusion.md sec. 5.3 states in terms that it cannot resolve which.",
+      "coefficient-not-field": "This row scores an INPUT COEFFICIENT of the transport PDE, not any solved field. The prediction is read straight off MolecularProfile after descriptors.from_smiles -> compile_drug.build_profile; the solver is never entered, verified by a call counter on physics.diffusion.simulate_drug_transport and sim.engine.simulate_response and recorded in results/anchor_registration.md sec. 3. It is a stronger row than an unanchored coefficient and a weaker one than a field test: it can FALSIFY the hindrance law, and it cannot confirm or refute the solver.",
+      "gdsc-potency": "Intrinsic potency comes from the GDSC cell-line screen, not from this patient's tissue; the 3-D:2-D ratio therefore constrains the PRODUCT of delivery and cell-state resistance, not either factor alone (results/kill_calibration.md).",
+      "ifp-grid-unconverged": "The wick-scale IFP statistic is not grid-converged. Across dx = 24, 18, 12, 8 um it moves 0.358 -> 0.434 -> 0.462 -> 0.370 mmHg on GBM (non-monotone, 1.29x spread) and 0.621 -> 0.424 -> 0.370 -> 0.286 mmHg on breast (monotone, 2.17x spread, still falling 22.5% over the last refinement with no plateau). Two contributions are known: the vascular-density KDE is rebuilt per grid, and _TUMOR_SIGMA = 5.0 in pressure.py is specified in GRID CELLS, so the physical tumour smoothing scale is 40/60/90/120 um at dx = 8/12/18/24 um and the model itself changes with the mesh.",
+      "ifp-uncalibrated": "Every coefficient in tmesim/physics/pressure.py is a hardcoded order-of-magnitude constant, by its own docstring 'not patient-calibrated': _K0 = 1.2, _K_ECM_ATTEN = 0.6, _PV = 25.0 mmHg, _LP_NORMAL = 1e-3, _LEAK_GAIN = 12.0, _LAMBDA_LYMPH = 3e-2. None was fitted to any measurement, which makes any IFP score genuinely out-of-sample \u2014 and also means nothing constrains the absolute scale. _PV = 25.0 in particular is an upper bound on the predicted core plateau and was NOT chosen against any of the anchors scored here.",
+      "ifp-unresolved-mesh": "The screened-Poisson screening length sqrt(K/(a+d)) implied by those coefficients is ~6-7 um on both real sections, BELOW every grid spacing the engine runs at (8-30 um), at >99.7% of tissue nodes. The reaction term dominates the diagonal, so the discrete solution collapses toward the pointwise algebraic limit a*p_v/(a+d) (measured correlation r = 0.90 GBM / 0.93 breast) and the interior Laplacian barely couples neighbours. Any IFP number is conditional on a mesh that does not resolve the operator being solved (results/ifp_validation.md sec. 5).",
+      "leak-fit": "The additive paracellular leak constant reconstruct.barrier.L_PARACELLULAR_LEAK = 0.238 was FITTED to the same contrast-enhancing-vs-non-enhancing contrasts these rows are scored against, so the leak-on score is not fully out-of-sample (results/glioma_regional_pk.md).",
+      "mcl-no-vasculature": "COMMENSURABILITY BOUND, and it is the load-bearing caveat on this group. A multicellular layer is a stack of cells grown on a porous support: packed cells, little stroma, NO VASCULATURE, no necrosis, no interstitial convection and no plasma source term. Hicks measured flux across that slab and fitted it to a diffusion-reaction equation of the SAME FORM the engine solves, which is exactly what makes D and k commensurable AS COEFFICIENTS. What that licenses: scoring the engine's compiled per-drug D_eff, and the hindrance law that produces it, against a directly measured tissue diffusion coefficient in the same units and the same functional role. What it does NOT license: any claim about a vascularised tissue section. Nothing in an MCL constrains vessel spacing, the transvascular source term, IFP-driven convection, or the spatial concentration field the solver produces on real reconstructed geometry. Reading an MCL row as evidence that the engine's tissue predictions are validated would be the modality pooling results/external_anchor_survey.md sec. 0 catalogues three live instances of, and which this project has manufactured a false regression from twice.",
+      "ps-scale": "Conditional on an UNCALIBRATED unit scale. tmesim/treatment/drugs.py::PS_SCALE_S_INV = 1.0 is an implicit, undocumented, underived conversion from a dimensionless product to a rate in 1/s; nothing in the repo derives it. See results/transvascular_exchange_revalidation.md sec. 6.2. Every transvascular-exchange-ON number carries this.",
+      "untreated-section": "The open spatial section is an UNTREATED resection. There is no paired measured drug response on this tissue; the anchor is a cohort-level literature value, not this patient's outcome."
+    }
+  },
+  "after": {
+    "mode": "full",
+    "exchange": false,
+    "physics": {
+      "transvascular_exchange_requested": false,
+      "transvascular_exchange_repo_default": false,
+      "is_shipping_default": true,
+      "law": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)",
+      "note": "The breast interstitial:plasma anchor differs by roughly 10x between the two laws. Any comparison of two scorecards that does not first check this field is meaningless."
+    },
+    "counts": {
+      "FAIL": 17,
+      "NOT TESTABLE": 19,
+      "DEFERRED": 0,
+      "PASS": 14
+    },
+    "n_rows": 50,
+    "n_scored": 31,
+    "n_scored_not_pde": 21,
+    "exit_code": 1,
+    "seconds": 178.05,
+    "groups": [
+      {
+        "key": "gbm-penetration",
+        "title": "GBM perivascular penetration depth (fit + 2 out-of-sample)",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/pk_multidrug.py::run_penetration (drives calibration.calibrate_alpha; same anchors as calibration.revalidate, plus topotecan)",
+        "report": "results/calibration.md, results/pk_multidrug.md",
+        "seconds": 1.67,
+        "n_rows": 3
+      },
+      {
+        "key": "bbb-ordering",
+        "title": "bbb_penetrance ordering vs measured brain/CSF:plasma ordering",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/pk_multidrug.py::run_partition",
+        "report": "results/pk_multidrug.md",
+        "seconds": 1.29,
+        "n_rows": 1
+      },
+      {
+        "key": "glioma-partition",
+        "title": "Human glioma tissue:plasma partition, 6 measured drugs",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/glioma_regional_pk.py::run_scorecard",
+        "report": "results/glioma_regional_pk.md",
+        "seconds": 0.01,
+        "n_rows": 6
+      },
+      {
+        "key": "gbm-tmz-exvivo",
+        "title": "Temozolomide potency extrapolated out of range vs measured ex-vivo viability",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/gbm_tmz_exvivo.py::test_a_potency_axis",
+        "report": "results/gbm_tmz_exvivo.md",
+        "seconds": 0.27,
+        "n_rows": 1
+      },
+      {
+        "key": "gist-imatinib",
+        "title": "GIST imatinib tumour:normal partition vs measured MALDI-MSI",
+        "tissue": "GIST",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/gist_imatinib.py::score",
+        "report": "results/gist_imatinib.md",
+        "seconds": 0.85,
+        "n_rows": 1
+      },
+      {
+        "key": "ps-scale",
+        "title": "Implicit unit scale PS_SCALE_S_INV vs measured brain PA product",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "tmesim/validation/ps_scale.py::calibrate_ps_scale",
+        "report": "results/transvascular_exchange_revalidation.md sec. 6.2",
+        "seconds": 0.0,
+        "n_rows": 1
+      },
+      {
+        "key": "immune-sink",
+        "title": "Immune (TAM) drug sequestration magnitude",
+        "tissue": "GBM",
+        "tier": "quick",
+        "scope": "PDE",
+        "source": "tmesim/validation/immune_sink_impact.py",
+        "report": "results/immune_sink_impact.md",
+        "seconds": 0.0,
+        "n_rows": 1
+      },
+      {
+        "key": "mcl-transport-coefficients",
+        "title": "Compiled transport coefficients vs measured multicellular-layer D, hindrance and consumption rate (Hicks 1998/2007)",
+        "tissue": "MCL",
+        "tier": "quick",
+        "scope": "analytic",
+        "source": "experiments/anchor_prototype.py (owns the measured constants, each traced to its PMID) driving the unmodified molecular pipeline descriptors.from_smiles -> compile_drug.build_profile, which since results/two_route_promotion.md APPLIES the two-route cell term -- so the verdicts are the cell-term-ON numbers. The pre-promotion arm (two_route=False) and the impermeable-cell arms are computed live and score nothing",
+        "report": "results/two_route_promotion.md, results/external_anchor_survey.md sec. 2.1 + 3, results/cellular_exclusion.md, results/anchor_registration.md",
+        "seconds": 1.23,
+        "n_rows": 3
+      },
+      {
+        "key": "breast-transvascular",
+        "title": "Breast interstitial:plasma AUC vs measured human microdialysis",
+        "tissue": "breast",
+        "tier": "full",
+        "scope": "PDE",
+        "source": "experiments/breast_kp_anchor.py",
+        "report": "results/breast_kp_validation.md",
+        "seconds": 102.85,
+        "n_rows": 2
+      },
+      {
+        "key": "gbm-kill-3d2d",
+        "title": "GBM 3-D:2-D kill ratio vs measured spheroid-vs-monolayer shift",
+        "tissue": "GBM",
+        "tier": "full",
+        "scope": "PDE",
+        "source": "tmesim/validation/kill_calibration.py::run + analyse",
+        "report": "results/kill_calibration.md",
+        "seconds": 5.64,
+        "n_rows": 3
+      },
+      {
+        "key": "breast-kill-3d2d",
+        "title": "Breast 3-D:2-D kill ratio vs measured spheroid-vs-monolayer shift",
+        "tissue": "breast",
+        "tier": "full",
+        "scope": "PDE",
+        "source": "experiments/kill_calibration_breast.py (+ kill_calibration_breast_report.build_ratio_section)",
+        "report": "results/kill_calibration_breast.md",
+        "seconds": 9.99,
+        "n_rows": 10
+      },
+      {
+        "key": "vascular-morphometry",
+        "title": "Reconstructed vascular geometry vs measured human GBM morphometry",
+        "tissue": "GBM",
+        "tier": "full",
+        "scope": "geometry",
+        "source": "tmesim/validation/vascular_validation.py::measure",
+        "report": "results/vascular_validation.md",
+        "seconds": 3.26,
+        "n_rows": 5
+      },
+      {
+        "key": "breast-vascular-morphometry",
+        "title": "Reconstructed breast vasculature vs measured human IDC morphometry",
+        "tissue": "breast",
+        "tier": "full",
+        "scope": "geometry",
+        "source": "experiments/vascular_validation_breast.py (drives validation.vascular_validation.measure verbatim)",
+        "report": "results/vascular_validation_breast.md",
+        "seconds": 8.37,
+        "n_rows": 5
+      },
+      {
+        "key": "endothelial-cellularity",
+        "title": "Section cellularity and endothelial fraction vs measured human histology",
+        "tissue": "GBM",
+        "tier": "full",
+        "scope": "geometry",
+        "source": "tmesim/validation/endothelial_density.py::run (section s1 only) -> definitional_reconciliation",
+        "report": "results/endothelial_density.md",
+        "seconds": 0.92,
+        "n_rows": 2
+      },
+      {
+        "key": "heldout-patient-geometry",
+        "title": "HELD-OUT second GBM patient: reconstructed geometry vs the same measured human GBM histology",
+        "tissue": "GBM",
+        "tier": "full",
+        "scope": "geometry",
+        "source": "tmesim/validation/heldout_patient.py::reconstruct_section + vascular_block / composition_block, section 2 (data_cache/xenium_gbm_io) -- GEOMETRY ONLY, the module's 10 PDE solves are NOT registered",
+        "report": "results/heldout_patient.md, results/heldout_patient_validation.md",
+        "seconds": 31.53,
+        "n_rows": 3
+      },
+      {
+        "key": "ifp-wick-in-needle",
+        "title": "Solved interstitial fluid pressure vs measured human wick-in-needle IFP (GBM not testable, breast FAILS ~40x)",
+        "tissue": "GBM + breast",
+        "tier": "full",
+        "scope": "PDE",
+        "source": "experiments/ifp_validation.py::measure_section + score (calls tmesim.physics.pressure.solve_ifp exactly as it ships; no coefficient is read back or fitted)",
+        "report": "results/ifp_validation.md",
+        "seconds": 10.18,
+        "n_rows": 3
+      }
+    ],
+    "rows": [
+      {
+        "group": "gbm-penetration",
+        "label": "doxorubicin",
+        "status": "NOT TESTABLE",
+        "scope": "analytic",
+        "quantity": "analytic penetration length L = sqrt(D_eff/k_eff) vs measured perivascular half-distance (immunofluorescence vs distance-from-vessel)",
+        "predicted": "L = 64.9 um",
+        "measured": "40-50 um half-distance (= 58-72 um e-fold, d_half/ln2)",
+        "pmids": [
+          "16361566"
+        ],
+        "bar": "n/a \u2014 this IS the fit",
+        "note": "",
+        "reason": "IN-SAMPLE. alpha is solved in closed form so that L equals this target exactly; the model reproduces it by construction and could not have failed. Reporting it as a PASS would be circular.",
+        "conditional": [
+          "analytic-only"
+        ],
+        "values": {
+          "predicted_L_um": 64.92127684000336,
+          "efold_band_um": [
+            57.70780163555854,
+            72.13475204444818
+          ],
+          "half_distance_band_um": [
+            40.0,
+            50.0
+          ],
+          "ratio_to_band_mid": 1.0,
+          "module_verdict": "FIT",
+          "alpha": 15.100926279598324
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "gbm-penetration",
+        "label": "mitoxantrone",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "OUT-OF-SAMPLE analytic penetration length L = sqrt(D_eff/k_eff), alpha frozen, vs measured perivascular half-distance",
+        "predicted": "L = 58.5 um  (0.81x band mid)",
+        "measured": "25-75 um half-distance (= 36-108 um e-fold, d_half/ln2)",
+        "pmids": [
+          "23680920"
+        ],
+        "bar": "inside the published e-fold band, else within 3x of its midpoint",
+        "note": "anthracenedione DNA-intercalator (SAME strongly-bound class as doxorubicin -- a magnitude-transfer test, not a maximally independent one)",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "analytic-only"
+        ],
+        "values": {
+          "predicted_L_um": 58.53806289610374,
+          "efold_band_um": [
+            36.06737602222409,
+            108.20212806667226
+          ],
+          "half_distance_band_um": [
+            25.0,
+            75.0
+          ],
+          "ratio_to_band_mid": 0.811509865037501,
+          "module_verdict": "PASS",
+          "alpha": 15.100926279598324
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "gbm-penetration",
+        "label": "topotecan",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "OUT-OF-SAMPLE analytic penetration length L = sqrt(D_eff/k_eff), alpha frozen, vs measured perivascular half-distance",
+        "predicted": "L = 178.8 um  (2.48x band mid)",
+        "measured": "25-75 um half-distance (= 36-108 um e-fold, d_half/ln2)",
+        "pmids": [
+          "23680920"
+        ],
+        "bar": "inside the published e-fold band, else within 3x of its midpoint",
+        "note": "OUTSIDE the published band; passes only on the 3x order-of-magnitude bar (pk_reality.ORDER_OF_MAGNITUDE_FACTOR). camptothecin topoisomerase-I inhibitor (chemically DISTINCT from the anthracycline fit -- a more independent test)",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "analytic-only"
+        ],
+        "values": {
+          "predicted_L_um": 178.78142979972085,
+          "efold_band_um": [
+            36.06737602222409,
+            108.20212806667226
+          ],
+          "half_distance_band_um": [
+            25.0,
+            75.0
+          ],
+          "ratio_to_band_mid": 2.478436880043046,
+          "module_verdict": "PASS(3x)",
+          "alpha": 15.100926279598324
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "bbb-ordering",
+        "label": "MTX/cisplatin/TMZ",
+        "status": "FAIL",
+        "scope": "analytic",
+        "quantity": "rank order of structure-only bbb_penetrance vs rank order of measured brain-or-CSF:plasma partition ratio (RANKS ONLY \u2014 the dimensionless score is not a partition ratio)",
+        "predicted": "model order methotrexate < temozolomide < cisplatin (Kendall tau 0.33, Spearman rho 0.50)",
+        "measured": "measured order methotrexate < cisplatin < temozolomide",
+        "pmids": [
+          "3855310",
+          "8548876",
+          "19861433"
+        ],
+        "bar": "every pairwise order concordant",
+        "note": "discordant pair(s): temozolomide vs cisplatin",
+        "reason": "",
+        "conditional": [
+          "analytic-only"
+        ],
+        "values": {
+          "kendall_tau": 0.3333333333333333,
+          "spearman_rho": 0.5,
+          "concordant_pairs": 2,
+          "discordant_pairs": 1,
+          "real_order": [
+            "methotrexate",
+            "cisplatin",
+            "temozolomide"
+          ],
+          "model_order": [
+            "methotrexate",
+            "temozolomide",
+            "cisplatin"
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "eribulin",
+        "status": "FAIL",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.0329  (6.48x measured)",
+        "measured": "0.0051 (range 0.0051-0.0051)",
+        "pmids": [
+          "39422741"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=1; comparator = microdialysis (free drug)",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.03293530390483048,
+          "measured_mean": 0.005086255990411808,
+          "fold_error": 6.4753531805944124,
+          "pass_3x": false,
+          "pass_10x": true,
+          "n_measured": 1,
+          "method": "intracerebral_microdialysis"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "cefazolin",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.1526  (1.02x measured)",
+        "measured": "0.1496 (range 0.0000-1.4700)",
+        "pmids": [
+          "PMC12962645"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=117; comparator = tissue homogenate (TOTAL drug, incl. intracellular). Homogenate measures total drug and can exceed 1 by definition, while the engine computes free interstitial \u2014 the comparison is not modality-matched",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.15258002911172316,
+          "measured_mean": 0.1495726495726496,
+          "fold_error": 1.020106480346949,
+          "pass_3x": true,
+          "pass_10x": true,
+          "n_measured": 117,
+          "method": "tissue_homogenate_LCMS"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "methotrexate",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.1393  (0.78x measured)",
+        "measured": "0.1780 (range 0.0320-0.3050)",
+        "pmids": [
+          "18787762"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=4; comparator = microdialysis (free drug)",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.13932674223325586,
+          "measured_mean": 0.17800000000000002,
+          "fold_error": 0.7827345069284036,
+          "pass_3x": true,
+          "pass_10x": true,
+          "n_measured": 4,
+          "method": "intracerebral_microdialysis"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "temozolomide",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.1501  (0.77x measured)",
+        "measured": "0.1951 (range 0.0330-0.4490)",
+        "pmids": [
+          "19861433",
+          "29332604"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=14; comparator = microdialysis (free drug)",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.15012732829395997,
+          "measured_mean": 0.19507142857142856,
+          "fold_error": 0.7696018294088025,
+          "pass_3x": true,
+          "pass_10x": true,
+          "n_measured": 14,
+          "method": "intracerebral_microdialysis"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "levetiracetam",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.9117  (1.31x measured)",
+        "measured": "0.6972 (range 0.0000-2.0500)",
+        "pmids": [
+          "PMC12962645"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=125; comparator = tissue homogenate (TOTAL drug, incl. intracellular). Homogenate measures total drug and can exceed 1 by definition, while the engine computes free interstitial \u2014 the comparison is not modality-matched",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.9116778832770098,
+          "measured_mean": 0.6971999999999999,
+          "fold_error": 1.3076274860542312,
+          "pass_3x": true,
+          "pass_10x": true,
+          "n_measured": 125,
+          "method": "tissue_homogenate_LCMS"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "glioma-partition",
+        "label": "adavosertib",
+        "status": "FAIL",
+        "scope": "analytic",
+        "quantity": "predicted tissue:plasma partition (assumption A1: R = clip(bbb_penetrance + L*disruption, 0, 1)) vs MEASURED human glioma tissue:plasma AUC ratio",
+        "predicted": "0.5785  (0.24x measured)",
+        "measured": "2.4600 (range 0.7400-4.1800)",
+        "pmids": [
+          "39820282"
+        ],
+        "bar": "fold error within 3x (module BAND_TIGHT); 10x reported alongside",
+        "note": "inside 10x; n=2; comparator = tissue homogenate (TOTAL drug, incl. intracellular). Homogenate measures total drug and can exceed 1 by definition, while the engine computes free interstitial \u2014 the comparison is not modality-matched",
+        "reason": "",
+        "conditional": [
+          "analytic-only",
+          "leak-fit"
+        ],
+        "values": {
+          "predicted_partition": 0.5784765155825272,
+          "measured_mean": 2.46,
+          "fold_error": 0.23515305511484846,
+          "pass_3x": false,
+          "pass_10x": true,
+          "n_measured": 2,
+          "method": "tissue_homogenate_LCMS"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "gbm-tmz-exvivo",
+        "label": "temozolomide",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "GDSC Hill curve extrapolated to the assay's 100 uM dose (3.3x above the GDSC concentration ceiling) vs MEASURED ATP viability in patient-derived GSC cultures",
+        "predicted": "78.1% viability (median, IQR 69.4-85.0)",
+        "measured": "82.4% viability (median, n=40)",
+        "pmids": [
+          "37620410"
+        ],
+        "bar": "Mann-Whitney p >= 0.05 (distributions not separable)",
+        "note": "Mann-Whitney p = 0.272; predicted/measured = 0.95x. Genuinely out-of-range: GDSC's own dose window tops out below the assay concentration.",
+        "reason": "",
+        "conditional": [
+          "gdsc-potency"
+        ],
+        "values": {
+          "pred_median_pct": 78.0597961618357,
+          "meas_median_pct": 82.405,
+          "fold": 0.947270143338823,
+          "mannwhitney_p": 0.271562074999961,
+          "n_measured": 40
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "gist-imatinib",
+        "label": "imatinib",
+        "status": "FAIL",
+        "scope": "analytic",
+        "quantity": "analytic 1-D Krogh-slab delivery efficiency x tissue partitioning -> tumour:normal imatinib ratio, vs MEASURED MALDI-MSI tumour:normal ion ratio in human GIST",
+        "predicted": "GM |fold error| 11.83x over n=6 patients (Spearman rho 0.655)",
+        "measured": "no-partitioning null gives 12.96x (model beats null by only 1.10x)",
+        "pmids": [
+          "PMC6650609"
+        ],
+        "bar": "beat the no-partitioning null by >= 3x GM fold error",
+        "note": "FALSIFIED as a sufficient explanation (results/gist_imatinib.md): 4 of 5 liver ratios lie BELOW the model's structural floor, so no penetration length can reproduce them. n=6 with 5 of 6 sharing the same tissue pairing, i.e. ~one independent comparison.",
+        "reason": "",
+        "conditional": [
+          "analytic-only"
+        ],
+        "values": {
+          "model_gm_abs_fold": 11.827198490535178,
+          "null_gm_abs_fold": 12.960878234986744,
+          "beats_null_by": 1.0958536161677512,
+          "n": 6,
+          "spearman_rho": 0.6546536707079772
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "ps-scale",
+        "label": "PS_SCALE_S_INV",
+        "status": "NOT TESTABLE",
+        "scope": "analytic",
+        "quantity": "engine volume-averaged permeability-surface-area product (1/s) vs MEASURED intact-blood-brain-barrier PA product",
+        "predicted": "a single k0 = 0.1612 1/s would be needed; the per-drug values disagree by 8.70x (methotrexate 0.0546, temozolomide 0.476)",
+        "measured": "n=2 measured brain PA anchors",
+        "pmids": [
+          "524251",
+          "39690422"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "THE MODEL CANNOT EXPRESS THE MEASURED QUANTITY. bbb_penetrance is a dimensionless brain:plasma PARTITION, but the delivery law consumes it as a first-order RATE via an implicit, underived conversion of exactly 1 1/s (PS_SCALE_S_INV). Read as rates the drugs are mutually incoherent by 8.7x; read as partitions they agree to ~1.04x. That is the signature of a units error, not a calibration error, and no single k0 can remove it (irreducible residual 2.95x). See results/transvascular_exchange_revalidation.md sec. 6.2.",
+        "conditional": [
+          "ps-scale",
+          "analytic-only"
+        ],
+        "values": {
+          "k0": 0.16121537317661533,
+          "disagreement_fold": 8.703923900118907,
+          "gm_fold_before": 6.202882394500157,
+          "gm_fold_after": 2.9502413291320604,
+          "irreducible_residual": 2.9502413291320604,
+          "n_anchors": 2.0
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "immune-sink",
+        "label": "TAM sequestration",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "first-order drug loss proportional to the MEASURED local immune-cell area fraction vs a measured free-drug macrophage:interstitium uptake ratio",
+        "predicted": "swept over the strength range, never fitted",
+        "measured": "NONE \u2014 0 of 3 panel drugs has a measured free-drug TAM uptake ratio",
+        "pmids": [
+          "26503691"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS. The literature supports a DIRECTION and not a MAGNITUDE, and for free doxorubicin the one direct measurement is NEGATIVE (a depot, the opposite sign). The module's permutation test is an INTERNAL null on the model's own field, not a comparison against any measured number, so it is not an external anchor and is not scored here whatever its value. Do not quote its magnitude from memory: results/immune_sink_impact.md carries a CORRECTION NOTICE demoting the original label-permutation null (that null under-clumps the field it is compared against) and reporting a much smaller excess against spatially-aware nulls, part of it attributable to a transport gradient with depth into tissue rather than to immune biology. The sink does not improve the measured human-glioma anchor and ships DEFAULT-OFF.",
+        "conditional": [],
+        "values": {
+          "n_drugs_with_measured_uptake_ratio": 0,
+          "n_drugs": 3
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "mcl-transport-coefficients",
+        "label": "effective diffusivity (tirapazamine)",
+        "status": "FAIL",
+        "scope": "analytic",
+        "quantity": "compiled MolecularProfile.effective_diffusivity (um^2/s) \u2014 the D_eff the transport PDE would be handed \u2014 vs the MEASURED tissue diffusion coefficient of the same drug in multicellular layers, obtained by fitting slab flux to a diffusion-reaction model of the same form",
+        "predicted": "43.7 um^2/s as shipped (0.59x the lowest measured cell line, 0.34x the highest); 287.3 um^2/s before the two-route promotion, i.e. the miss FLIPPED DIRECTION from 2.21x ABOVE the band to 0.59x BELOW it",
+        "measured": "74-130 um^2/s across three MCL cell lines (V79-171b 74, MGH-U1 130, PMID 9806526; SiHa 130 +/- 5, PMID 17869669)",
+        "pmids": [
+          "9806526",
+          "17869669"
+        ],
+        "bar": "inside the measured 74-130 um^2/s range. results/external_anchor_survey.md sec. 4 recommends this anchor as a FAIL row and that is the bar adopted",
+        "note": "THE MISS FLIPPED DIRECTION AND DID NOT CLOSE. The three measurements agree with EACH OTHER to 1.8x. Before the two-route promotion the engine was above all three (287.3 um^2/s); it is now below all three (43.7 um^2/s), by a smaller factor. Overshooting a band in the other direction is progress in magnitude and is NOT a pass, and this row is not recorded as one. It does pass the repo's loosest declared band (3x, pk_reality.ORDER_OF_MAGNITUDE_FACTOR), which is not the bar here. READ THIS ROW AGAINST THE HINDRANCE ROW BELOW, WHICH NOW PASSES: the dimensionless ratio lands inside its band while the absolute value does not, which is the signature of a residual FREE-diffusivity error \u2014 the hindrance is right and the thing it is hindering is not (results/cellular_exclusion.md sec. 4.2). PRE-PROMOTION arm, reported for comparison and NOT scored: with two_route=False the same compile gives D_eff 287.3 um^2/s and 1.77-fold hindrance, which is what every number in results/diffusivity_falsification.md and results/cellular_exclusion.md was computed against. Two further arms, also unscored: arm B (the IMPERMEABLE-cell term alone, the MCL-appropriate arm, since an MCL is packed cells with little matrix) gives 77.0 um^2/s and 6.62-fold; arm A (the old chain plus the impermeable term) gives 43.4 um^2/s and 11.73-fold. Arm A's proximity to the measurement is partly the WRONG TERM DOING THE RIGHT WORK \u2014 it credits an MCL with ECM the MCL does not have (results/cellular_exclusion.md sec. 4.1), and that objection now applies to the SHIPPING number too, because the shipping chain is arm A with a permeable membrane. Arm B's fold is 6.6157 exactly; cellular_exclusion.md sec. 0 prints it as 6.61x, rounded down.",
+        "reason": "",
+        "conditional": [
+          "mcl-no-vasculature",
+          "cell-exclusion-default-off",
+          "coefficient-not-field"
+        ],
+        "values": {
+          "shipped_D_eff_um2s": 43.70732169633713,
+          "superseded_mw_only_D_eff_um2s": 287.32155645469413,
+          "free_diffusivity_um2s": 509.47245435973105,
+          "measured_band_um2s": [
+            74.0,
+            130.0
+          ],
+          "cell_term_on_armA_D_eff_um2s": 43.42993266933137,
+          "cell_term_on_armB_D_eff_um2s": 77.00903010112671,
+          "phi_cell": 0.7892,
+          "ecm_reference": 0.4
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "mcl-transport-coefficients",
+        "label": "hindrance factor D_free/D_eff (tirapazamine)",
+        "status": "PASS",
+        "scope": "analytic",
+        "quantity": "compiled 1/MolecularProfile.hindrance \u2014 the dimensionless fold reduction of the same drug's diffusivity in tissue versus in free medium \u2014 vs the MEASURED fold reduction of tirapazamine's diffusion coefficient in a V79-171b multicellular layer relative to culture medium",
+        "predicted": "11.66-fold as shipped (0.97x measured); 1.77-fold (0.15x measured) before the two-route promotion",
+        "measured": "12-fold lower than in culture medium (V79-171b MCL; no uncertainty published)",
+        "pmids": [
+          "9806526"
+        ],
+        "bar": "within the repo's own loosest declared band, pk_reality.ORDER_OF_MAGNITUDE_FACTOR = 3x either side of the measured 12-fold, i.e. 4.0-36.0-fold. The measured value carries no published uncertainty, so inventing a tighter band would be inventing a number; this is the most GENEROUS bar available, it was chosen while the engine was FAILING it, and it has not been widened or moved now that the engine passes",
+        "note": "THE SHARPEST ROW IN THIS GROUP, AND THE ONE THE TWO-ROUTE PROMOTION MOVED: no units, no compartment translation, no cohort matching \u2014 a pure dimensionless ratio of one drug's diffusivity in tissue versus in free medium. It went 1.77x -> 11.66x against a measured 12x, i.e. FAIL -> PASS (0.97x measured, inside a band of 4-36). WHAT THAT DOES AND DOES NOT MEAN. The diagnosis this row carried was structural and correct: the old engine's only obstacle population was ECM, so cellular volume exclusion \u2014 most of a tumour's volume \u2014 was absent from the hindrance law, and an MCL is almost pure packed cells, which is exactly why it exposed that. The shipping law now has cells in it and the row passes. But the band is 3x wide either side of a measurement that carries NO published uncertainty, the pass is 1.03x short of the central value, and the ABSOLUTE diffusivity row above still fails \u2014 so what has been established is that the hindrance RATIO is now the right size, not that the transport model is right. PRE-PROMOTION arm, reported for comparison and NOT scored: with two_route=False the same compile gives D_eff 287.3 um^2/s and 1.77-fold hindrance, which is what every number in results/diffusivity_falsification.md and results/cellular_exclusion.md was computed against. Two further arms, also unscored: arm B (the IMPERMEABLE-cell term alone, the MCL-appropriate arm, since an MCL is packed cells with little matrix) gives 77.0 um^2/s and 6.62-fold; arm A (the old chain plus the impermeable term) gives 43.4 um^2/s and 11.73-fold. Arm A's proximity to the measurement is partly the WRONG TERM DOING THE RIGHT WORK \u2014 it credits an MCL with ECM the MCL does not have (results/cellular_exclusion.md sec. 4.1), and that objection now applies to the SHIPPING number too, because the shipping chain is arm A with a permeable membrane. Arm B's fold is 6.6157 exactly; cellular_exclusion.md sec. 0 prints it as 6.61x, rounded down.",
+        "reason": "",
+        "conditional": [
+          "mcl-no-vasculature",
+          "cell-exclusion-default-off",
+          "coefficient-not-field"
+        ],
+        "values": {
+          "shipped_fold": 11.656455591110426,
+          "superseded_mw_only_fold": 1.7731786665998603,
+          "measured_fold": 12.0,
+          "band_fold": [
+            4.0,
+            36.0
+          ],
+          "cell_term_on_armA_fold": 11.730905922391674,
+          "cell_term_on_armB_fold": 6.615749525616698,
+          "armB_shortfall_x": 1.81385343467661,
+          "phi_cell": 0.7892
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "mcl-transport-coefficients",
+        "label": "first-order tissue consumption rate k (tirapazamine)",
+        "status": "NOT TESTABLE",
+        "scope": "analytic",
+        "quantity": "the engine's first-order interstitial loss rate k (1/s) \u2014 the -kC sink of the transport PDE \u2014 vs the MEASURED anoxic metabolic consumption rate constant of tirapazamine fitted in the same position of the same diffusion-reaction equation",
+        "predicted": "TWO readings that differ by 6x and land on OPPOSITE sides of the measurement: k_raw = clearance + binding = 1.048e-04 /s (0.0121-0.0203x measured), and k_calibrated = clearance + alpha*binding = 6.033e-04 /s at alpha = 15.1009 (0.070-0.117x measured)",
+        "measured": "8.667e-03 /s (0.52 /min, V79-171b) and 5.167e-03 /s (0.31 /min, MGH-U1)",
+        "pmids": [
+          "9806526"
+        ],
+        "bar": "n/a",
+        "note": "WHAT MAY HONESTLY BE SAID, AND IT IS NOW WEAKER THAN IT WAS. Before the two-route promotion the magnitude alpha implied for a small-molecule interstitial loss rate landed within 2x of one independently measured rate constant of the same class, in a fit that saw no tirapazamine, no MCL and no rate constant \u2014 weaker than validation, stronger than nothing (results/external_anchor_survey.md sec. 3.3). At the new alpha it lands 8.6-14.4x below that measurement instead. THIS IS THE COST SIDE OF THE PROMOTION AND IT IS NOT COSMETIC: the same change that brought the dimensionless hindrance row inside its band pushed this reading out of its own. The two anchors are coupled \u2014 the Primeau penetration fit pins the RATIO D/k, so lowering D lowers k by the same factor \u2014 and they now disagree about where the engine sits. That disagreement is unresolved and is the sharpest open question the promotion leaves (results/two_route_promotion.md sec. 8).",
+        "reason": "PARTIALLY COMMENSURABLE ONLY, and the owning survey says so before any number is quoted. TWO INDEPENDENT REASONS, either sufficient. (1) THE PROCESS IS NOT THE SAME PROCESS. The measured constant is ANOXIC BIOREDUCTIVE METABOLISM of a hypoxia-activated prodrug \u2014 a real, drug-specific consumption reaction that the engine's panel drugs do not have \u2014 while the engine's k is a generic binding-plus-clearance sink. Same units, same slot in the same equation, DIFFERENT PHYSICAL PROCESS. results/external_anchor_survey.md sec. 2.1 declares it a measured ORDER-OF-MAGNITUDE BOUND on how large a real interstitial consumption rate can be, and explicitly NOT a like-for-like score. (2) THE ENGINE HAS NO SINGLE NUMBER TO SCORE. k_raw and k_calibrated differ by 6x and straddle the measurement: the uncalibrated sink is 53-89x TOO SMALL (which independently reproduces results/pk_reality.md's ~300x diagnosis on a different drug, in a different system, against a directly measured rate constant rather than a penetration depth \u2014 that FAIL-shaped fact is recorded here, not suppressed), while the alpha-amplified sink lands within 1.2-2.0x. Picking the flattering reading would manufacture a PASS and picking the other would manufacture a FAIL, and nothing about this anchor determines the choice. NOTE WHICH WAY THIS COSTS \u2014 AND THAT IT REVERSED. Until results/two_route_promotion.md, scoring this row on k_calibrated would have PASSED the repo's 3x band (0.49-0.82x measured at alpha = 148.6082), so declining to score removed a PASS from the tally. The promotion cut alpha to 22.2235 \u2014 because doxorubicin's compiled D fell 6.6x and alpha is fitted from L = sqrt(D/k) against the same measured anchor \u2014 and k_calibrated fell with it. Scored on k_calibrated TODAY this row would FAIL: 0.070-0.117x measured, i.e. 8.6-14.4x TOO SMALL, outside the 3x band. So declining to score now removes a FAILURE from the tally, not a pass. The decision not to score is unchanged and rests on reason (1), which is about commensurability and is untouched by any of this; what changed is which way the omission flatters us, and that is stated here rather than left as a stale claim.",
+        "conditional": [
+          "mcl-no-vasculature",
+          "alpha-fit",
+          "coefficient-not-field"
+        ],
+        "values": {
+          "k_raw_per_s": 0.0001048170733704024,
+          "k_calibrated_per_s": 0.0006033387233159405,
+          "alpha": 15.100926279598324,
+          "measured_k_per_s": {
+            "V79-171b": 0.008666666666666666,
+            "MGH-U1": 0.005166666666666667
+          },
+          "raw_ratio_to_measured": [
+            0.012094277696584893,
+            0.020287175491045625
+          ],
+          "calibrated_ratio_to_measured": [
+            0.06961600653645468,
+            0.1167752367708272
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-transvascular",
+        "label": "5-fluorouracil",
+        "status": "FAIL",
+        "scope": "PDE",
+        "quantity": "mean_tumor_auc / (plasma_mean * total_time) \u2014 free interstitial drug AUC at tumour cells over plasma AUC \u2014 vs MEASURED in-vivo microdialysis interstitial:plasma AUC in primary human breast tumour",
+        "predicted": "7.6589  (12.56x measured)",
+        "measured": "0.61 +/- 0.11 (mean +/- SE, n=10)",
+        "pmids": [
+          "9205062"
+        ],
+        "bar": "inside measured mean +/- SE",
+        "note": "delivery law: one-way leak S = PS*Cp (repo default). This anchor moves by roughly 10x between the two laws, so the number above is only interpretable together with the physics line.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "untreated-section"
+        ],
+        "values": {
+          "ratio": 7.658853663899377,
+          "measured_mean": 0.61,
+          "measured_se": 0.11,
+          "n": 10,
+          "fold_of_measured": 12.55549780967111,
+          "transvascular_exchange": false,
+          "repo_default_transvascular_exchange": false
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-transvascular",
+        "label": "methotrexate",
+        "status": "FAIL",
+        "scope": "PDE",
+        "quantity": "mean_tumor_auc / (plasma_mean * total_time) \u2014 free interstitial drug AUC at tumour cells over plasma AUC \u2014 vs MEASURED in-vivo microdialysis interstitial:plasma AUC in primary human breast tumour",
+        "predicted": "0.0215  (0.04x measured)",
+        "measured": "0.60 +/- 0.20 (mean +/- SE, n=9)",
+        "pmids": [
+          "9679959"
+        ],
+        "bar": "inside measured mean +/- SE",
+        "note": "delivery law: one-way leak S = PS*Cp (repo default). This anchor moves by roughly 10x between the two laws, so the number above is only interpretable together with the physics line.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "untreated-section"
+        ],
+        "values": {
+          "ratio": 0.021492662086200365,
+          "measured_mean": 0.6,
+          "measured_se": 0.2,
+          "n": 9,
+          "fold_of_measured": 0.03582110347700061,
+          "transvascular_exchange": false,
+          "repo_default_transvascular_exchange": false
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "gbm-kill-3d2d",
+        "label": "cisplatin",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2746 (implied IC50 fold 4.63x)",
+        "measured": "ratio band 0.2086-1.5004 (measured fold 0.4-6x)",
+        "pmids": [
+          "33395433",
+          "32152850"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:cisplatin. Real untreated Xenium GBM section, dx = 12 um, 6 h window.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "band-wider-than-assay",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.27459037325976776,
+          "lit_ratio_lo": 0.20864163423872006,
+          "lit_ratio_hi": 1.5003511388489135,
+          "implied_fold": 4.625646333007028,
+          "scope": "drug:cisplatin",
+          "ic50_uM": 24.550285905059777
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "gbm-kill-3d2d",
+        "label": "doxorubicin",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2044 (implied IC50 fold 6.12x)",
+        "measured": "ratio band 0.0575-1.0000 (measured fold 1-19x)",
+        "pmids": [
+          "33395433",
+          "37869710"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:doxorubicin. Real untreated Xenium GBM section, dx = 12 um, 6 h window.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "band-wider-than-assay",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.20438068694057704,
+          "lit_ratio_lo": 0.05746191856610602,
+          "lit_ratio_hi": 1.0,
+          "implied_fold": 6.116157742164069,
+          "scope": "drug:doxorubicin",
+          "ic50_uM": 0.5
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "gbm-kill-3d2d",
+        "label": "temozolomide",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2583 (implied IC50 fold 3.31x)",
+        "measured": "ratio band 0.1590-0.4622 (measured fold 2-5x)",
+        "pmids": [
+          "30694423"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:temozolomide. Real untreated Xenium GBM section, dx = 12 um, 6 h window.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "band-wider-than-assay",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.2582908679488508,
+          "lit_ratio_lo": 0.15898511609865443,
+          "lit_ratio_hi": 0.4622133669344504,
+          "implied_fold": 3.3078981381114385,
+          "scope": "drug:temozolomide",
+          "ic50_uM": 606.0466722391783
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "5-fluorouracil",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.3374",
+        "measured": "a single measured point, fold 7.5x -> zero-width ratio band 0.1636-0.1636",
+        "pmids": [
+          "33395433"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (7.5x fold shift), so the min-max interval is zero-width (0.1636-0.1636) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.33744986067994853,
+          "n_literature_rows": 1
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "cisplatin",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.3080 (implied IC50 fold 4.14x)",
+        "measured": "ratio band 0.2086-1.5004 (measured fold 0.4-6x)",
+        "pmids": [
+          "33395433",
+          "32152850"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:cisplatin. Real untreated Janesick Xenium breast section (PMID 38114474), dx = 12 um, 6 h window. Drug-matched band, n=5.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.3080303494732204,
+          "lit_ratio_lo": 0.20864163423872,
+          "lit_ratio_hi": 1.5003511388489135,
+          "implied_fold": 4.135225685581464,
+          "scope": "drug:cisplatin",
+          "ic50_uM": 82.41570389441263
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "cyclophosphamide",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2834",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS \u2014 no published 3-D-vs-2-D potency comparison for this drug in any tumour type. The broad cross-tumour-type band is reported for context only and is deliberately NOT scored. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.28339911239353033,
+          "n_literature_rows": 0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "docetaxel",
+        "status": "FAIL",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.1480 (implied IC50 fold 8.21x)",
+        "measured": "ratio band 0.0152-0.1463 (measured fold 8.3-58x)",
+        "pmids": [
+          "29221130",
+          "33431915"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:docetaxel. model predicts a SMALLER 3-D penalty than measured. Real untreated Janesick Xenium breast section (PMID 38114474), dx = 12 um, 6 h window. Drug-matched band, n=2.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.14804742593166595,
+          "lit_ratio_lo": 0.015191651385247596,
+          "lit_ratio_hi": 0.1462692215159669,
+          "implied_fold": 8.210271145542178,
+          "scope": "drug:docetaxel",
+          "ic50_uM": 0.0566993234737221
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "doxorubicin",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2297 (implied IC50 fold 5.48x)",
+        "measured": "ratio band 0.0575-1.0000 (measured fold 1-19x)",
+        "pmids": [
+          "33395433",
+          "37869710"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:doxorubicin. Real untreated Janesick Xenium breast section (PMID 38114474), dx = 12 um, 6 h window. Drug-matched band, n=5.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.22972181418342885,
+          "lit_ratio_lo": 0.05746191856610602,
+          "lit_ratio_hi": 1.0,
+          "implied_fold": 5.48318291276444,
+          "scope": "drug:doxorubicin",
+          "ic50_uM": 0.5
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "epirubicin",
+        "status": "PASS",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio on the real section (delivery x cell-state resistance) vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2297 (implied IC50 fold 5.48x)",
+        "measured": "ratio band 0.0110-1.0000 (measured fold 1-76x)",
+        "pmids": [
+          "29221130"
+        ],
+        "bar": "predicted ratio inside the literature-derived ratio band (kill_calibration.ratio_test)",
+        "note": "literature scope used: drug:epirubicin. Real untreated Janesick Xenium breast section (PMID 38114474), dx = 12 um, 6 h window. Drug-matched band, n=2.",
+        "reason": "",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency",
+          "untreated-section"
+        ],
+        "values": {
+          "predicted_ratio": 0.22972181418342882,
+          "lit_ratio_lo": 0.01100669697548635,
+          "lit_ratio_hi": 1.0,
+          "implied_fold": 5.483182912764441,
+          "scope": "drug:epirubicin",
+          "ic50_uM": 0.8411910287790403
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "paclitaxel",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.1499",
+        "measured": "a single measured point, fold 25x -> zero-width ratio band 0.0412-0.0412",
+        "pmids": [
+          "41422245"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "SINGLE-STUDY BAND (n=1) \u2014 the only drug-matched measurement is a point estimate (25x fold shift), so the min-max interval is zero-width (0.0412-0.0412) and no prediction can land inside it. Reported NOT TESTABLE rather than FAIL, and NOT re-scored against the broad cross-tumour-type band, which is the same non-drug-matched band the no-literature drugs in this panel are explicitly refused a verdict on. See results/zero_width_bands.md. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.14990328640793615,
+          "n_literature_rows": 1
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "palbociclib",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.2189",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS \u2014 no published 3-D-vs-2-D potency comparison for this drug in any tumour type. The broad cross-tumour-type band is reported for context only and is deliberately NOT scored. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.21892249772599506,
+          "n_literature_rows": 0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "tamoxifen",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.1715",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS \u2014 no published 3-D-vs-2-D potency comparison for this drug in any tumour type. The broad cross-tumour-type band is reported for context only and is deliberately NOT scored. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.1715436380371588,
+          "n_literature_rows": 0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "breast-kill-3d2d",
+        "label": "vinorelbine",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "predicted 3-D:2-D kill ratio vs MEASURED spheroid-vs-monolayer IC50 fold shift",
+        "predicted": "ratio 0.1573",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS \u2014 no published 3-D-vs-2-D potency comparison for this drug in any tumour type. The broad cross-tumour-type band is reported for context only and is deliberately NOT scored. For context only, and NOT a verdict: against the broad non-drug-matched 'solid' band (0.4-25x, n=20) this ratio would score PASS.",
+        "conditional": [
+          "alpha-fit",
+          "gdsc-potency"
+        ],
+        "values": {
+          "predicted_ratio": 0.157280317349169,
+          "n_literature_rows": 0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "vascular-morphometry",
+        "label": "microvessel density",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "reconstructed vessel-cluster density (per mm^2) vs MEASURED whole-slide CD31 microvessel density in human GBM",
+        "predicted": "110.8 /mm^2",
+        "measured": "65 +/- 30 /mm^2 (n=20 patients)",
+        "pmids": [
+          "27583442"
+        ],
+        "bar": "inside the module's frozen LIT_RANGES['mvd_gbm_per_mm2'] = 35..95",
+        "note": "not reproduced on the held-out patient either (results/heldout_patient.md)",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "value": 110.78738685421455,
+          "band": [
+            35.0,
+            95.0
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "vascular-morphometry",
+        "label": "intercapillary distance (directly measured)",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "median reconstructed vessel-to-nearest-vessel distance (um) vs MEASURED Voronoi intercapillary distance in the proliferating area of human glioma",
+        "predicted": "41.5 um",
+        "measured": "77.8 +/- 15.9 um (n=22 patients; normal white matter 123 +/- 4.2)",
+        "pmids": [
+          "3359450"
+        ],
+        "bar": "inside the module's frozen LIT_RANGES['intercapillary_yoshii_glioma_um'] = 61.9..93.7",
+        "note": "the only spacing anchor here that is a direct measurement rather than a Poisson consequence of a published density",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "value": 41.48047566479317,
+          "band": [
+            61.9,
+            93.7
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "vascular-morphometry",
+        "label": "tumour cells >100 um from a vessel",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "fraction of reconstructed tumour cells further than 100 um from the nearest vessel vs the Poisson fraction implied by the MEASURED GBM microvessel density",
+        "predicted": "4.4%",
+        "measured": "5.1-33.3% implied by 65 +/- 30 /mm^2",
+        "pmids": [
+          "27583442",
+          "13304213"
+        ],
+        "bar": "inside the module's frozen LIT_RANGES['frac_gt_100_pct'] = 5.056..33.3",
+        "note": "100 um is the load-bearing length because it is the lower edge of Thomlinson & Gray's 100-180 um diffusion-limited viable-cord band",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "value": 4.430539223920713,
+          "band": [
+            5.056412122422674,
+            33.30184354719648
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "vascular-morphometry",
+        "label": "vascular area fraction",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "reconstructed vascular area fraction (%) vs MEASURED whole-section CD34+ area fraction in IDH-wildtype GBM",
+        "predicted": "3.67% (KDE threshold 0.3; the 0.2/0.5 thresholds give 4.77% / 2.10%)",
+        "measured": "1.8-2.4% (2.1 +/- 0.3%, n=30)",
+        "pmids": [
+          "36611806"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "THRESHOLD-CHOSEN, NOT A VALIDATION. The reconstructed value is set by which KDE threshold is picked, and nothing determines that threshold independently, so landing on the measured value is a choice rather than a result. results/vascular_validation.md annotates this row with exactly that wording. It also DOES NOT REPLICATE on the held-out patient (5.23x, results/heldout_patient.md).",
+        "conditional": [],
+        "values": {
+          "area_pct_at_0.3": 3.6680911680911676,
+          "area_pct_at_0.5": 2.0975267352078943,
+          "area_pct_at_0.2": 4.77414426689789,
+          "band": [
+            1.8,
+            2.4
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "vascular-morphometry",
+        "label": "vascular area fraction (threshold-free)",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "grid-independent, data-derived sub-grid vascular area fraction (%) vs MEASURED whole-section CD34+ area fraction in IDH-wildtype GBM",
+        "predicted": "1.25%  (0.59x measured; module verdict LOW). Legacy fixed-radius binary field gave 8.38%",
+        "measured": "2.1% (range 1.8-2.4%, n=30)",
+        "pmids": [
+          "36611806"
+        ],
+        "bar": "inside the module's frozen PUBLISHED range 1.8-2.4% (vessel_network.segmentation_report)",
+        "note": "This row and the KDE row above score the SAME measured number against two different reconstructions and must not be pooled: this one has no threshold to choose, so it can fail. The vessel radii come from literature constants (20 endothelial nuclei per mm of vessel, PMID 38723085; mean vessel degree 1.5, PMID 37582180) that were not tuned to the 2.1% target. results/vessel_geometry_fix.md sec. 5 reports 0.99 / 7.14 / 17.79% across the three available GBM sections, i.e. it does NOT replicate across sections. Tamma R, Ingravallo G, Annese T, d'Amati A, Lorusso L, Ribatti D, Cells 2022;12(1):11",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "area_pct": 1.2454553485889797,
+          "ratio_to_measured": 0.5930739755185617,
+          "band": [
+            1.8,
+            2.4
+          ],
+          "module_verdict": "LOW",
+          "legacy_binary_area_pct": 8.382365085263636
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-vascular-morphometry",
+        "label": "microvessel density",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "reconstructed vessel-cluster density (per mm^2, 20 um single-linkage) vs MEASURED factor-VIII hotspot microvessel counts in human invasive ductal breast carcinoma",
+        "predicted": "149 /mm^2  (1.51x band mid)",
+        "measured": "61-136 /mm^2 (45-101 vessels per 200x field, node-negative to node-positive means)",
+        "pmids": [
+          "1701519"
+        ],
+        "bar": "inside 61-136 /mm^2",
+        "note": "WEAKER EVIDENCE THAN THE GBM EQUIVALENT, twice over. Weidner counts the single most vascular HOTSPOT, so the published band is already biased high and exceeding it is worse than it looks. And the per-field-to-per-mm^2 conversion uses a 0.74 mm^2 field area INFERRED from a different paper's microscope (PMID 7539869, bladder), not stated in the breast studies themselves.",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "mvd_per_mm2": 149.24029533606964,
+          "band": [
+            60.810810810810814,
+            136.48648648648648
+          ],
+          "weidner_field_mm2": 0.74
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-vascular-morphometry",
+        "label": "vascular area fraction",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "reconstructed vascular area fraction (%) vs MEASURED whole-slide digital CD34 relative endothelial area in human invasive ductal carcinoma (n=50)",
+        "predicted": "7.68% (KDE field threshold 0.3)",
+        "measured": "0.91-4.20% across compartments (stroma 0.91, parenchyma 1.95, invasive front 4.20)",
+        "pmids": [
+          "24073397"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "THRESHOLD-CHOSEN, NOT A VALIDATION \u2014 the same defect as the GBM row. The value is set by which KDE field threshold is picked and nothing determines that threshold independently, so landing near the measured range would be a choice rather than a result. results/vascular_validation_breast.md sec. 3.5 gives this row no validation weight. Unlike GBM there is also no threshold-free breast counterpart registered here.",
+        "conditional": [],
+        "values": {
+          "area_pct_at_0.3": 7.675161851566992,
+          "measured_range_pct": [
+            0.91,
+            4.2
+          ]
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-vascular-morphometry",
+        "label": "vascular heterogeneity",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "p90/p10 endothelial-density spread across 500 um tiles vs MEASURED CD34 area contrast between pathologist-defined tumour compartments",
+        "predicted": "6.6x p90/p10 across 500 um tiles",
+        "measured": "4.61x invasive front vs tumour-associated stroma (a three-compartment contrast, n=50)",
+        "pmids": [
+          "24073397"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NOT THE SAME QUANTITY. The measured 4.61x is a contrast between three pathologist-defined COMPARTMENTS within a tumour; the model's number is an unlabelled tile-to-tile spread. No between-case breast CD34 area-fraction range analogous to GBM's Sipos 2024 (PMID 38928515) was found despite a dedicated search, so there is nothing to score the spread against.",
+        "conditional": [],
+        "values": {
+          "p90_over_p10": 6.560869565217391,
+          "measured_compartment_contrast": 4.61
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-vascular-morphometry",
+        "label": "intercapillary distance",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "median reconstructed vessel-to-nearest-vessel distance (um) vs a measured intercapillary distance in breast IDC",
+        "predicted": "38.0 um",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS. A dedicated search found no Voronoi or otherwise directly-measured intercapillary-distance study for breast IDC. GBM has one (Yoshii & Sugiyama, PMID 3359450); breast does not, and reporting the GBM value here would be importing a brain measurement into breast tissue.",
+        "conditional": [],
+        "values": {
+          "vessel_nn_median_um": 38.017294643660875
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "breast-vascular-morphometry",
+        "label": "tumour cells >100 um from a vessel",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "fraction of reconstructed tumour cells further than 100 um from the nearest vessel vs a measured breast equivalent",
+        "predicted": "4.4%",
+        "measured": "NONE",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NO MEASURED TARGET EXISTS. The GBM row derives its band from Marien's whole-slide unbiased MVD (PMID 27583442), whose full text was retrieved and confirmed to cover colorectal, glioblastoma, ovarian and renal carcinoma and explicitly NOT breast \u2014 the authors themselves flag breast as undone work. No follow-up exists.",
+        "conditional": [],
+        "values": {
+          "frac_gt_100_pct": 4.417218911844963
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "endothelial-cellularity",
+        "label": "section cellularity",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "reconstructed cells per mm^2 of tissue on a 5 um Xenium section vs MEASURED nuclei per mm^2 on 5 um H&E sections of human high-grade glioma",
+        "predicted": "1465 cells/mm^2  (0.34x the measured mean)",
+        "measured": "4350 /mm^2 (range 1941-6360; matched non-tumour control 1107 /mm^2)",
+        "pmids": [
+          "24066240"
+        ],
+        "bar": "inside the measured 1941-6360 /mm^2 range",
+        "note": "MODALITY-MATCHED, which is why it is scored: both sides are 2-D nuclear profiles on a 5 um section, so no volume-to-section depth conversion enters. Corroborated to within 5% by an independent 37-patient, 561-biopsy series (4557 +/- 3169 /mm^2, PMID 28103256). Two caveats, both of which push the SAME way as the observed miss and neither of which excuses it: the measured fields were selected for MAXIMUM cellularity in both arms, and Xenium retains only DAPI nuclei that segment and receive assigned transcripts, so in-situ under-detection relative to H&E nuclear counting is expected. The row is scored anyway because the section geometry genuinely matches; what it bounds is the reconstruction's cell recall, not the transport model.",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "obs_cells_per_mm2": 1465.4687435484536,
+          "measured_mean": 4350.0,
+          "band": [
+            1941.0,
+            6360.0
+          ],
+          "cellularity_ratio_vs_h01": 2.148591660104261
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "endothelial-cellularity",
+        "label": "endothelial cell fraction",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "reconstructed endothelial percentage of all cells vs the MEASURED endothelial fraction of a 1.05 mm^3 volume-EM reconstruction of normal-appearing human temporal cortex",
+        "predicted": "154 endothelial/mm^2; fraction ratio 1.30x the reference, of which 1.50x is estimated classifier over-call",
+        "measured": "8.05% of cells (4,604 endothelial of 57,180, n=1 volume)",
+        "pmids": [
+          "38723085",
+          "29113946"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "THE TWO SIDES DO NOT COUNT THE SAME THING, and the reference is the wrong tissue. One unit of the measurement is a whole cell traced in 3-D through 1.05 mm^3; one unit of the model is a 2-D polygon on a ~5 um section, so the comparison needs the profile-counting relation N_A = N_V*(t+h) and an effective sampling depth that is estimated, not measured. The reference is also NORMAL temporal cortex, n=1, with no published spread, while the section is tumour. endothelial_density.py deliberately reports a factorised BUDGET here rather than a verdict, because the raw ratio (7.0x) is dominated by definitional depth and cellularity terms that carry no endothelial information at all.",
+        "conditional": [],
+        "values": {
+          "obs_ec_per_mm2": 153.941063260709,
+          "h01_ec_fraction_pct": 8.051766351871283,
+          "fraction_ratio": 1.3046281887672575,
+          "apparent_ratio_naive": 7.02163841979776,
+          "apparent_ratio_depth_corrected": 2.803113245922257,
+          "classifier_purity": 0.6669353903151419
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "heldout-patient-geometry",
+        "label": "vascular area fraction (held-out section)",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "reconstructed threshold-free sub-grid vascular area fraction (%) on the HELD-OUT section vs MEASURED whole-section CD34+ area fraction in IDH-wildtype human GBM",
+        "predicted": "10.98%  (5.23x the measured mean)",
+        "measured": "2.10% (range 1.8-2.4%, n=30)",
+        "pmids": [
+          "36611806"
+        ],
+        "bar": "inside vessel_network.PUBLISHED range 1.8-2.4%",
+        "note": "HELD OUT: this section was never inspected while any reconstruction constant was chosen. The 20 um linking distance and the vessel radius model are section-1 / literature values, used here unchanged and NOT refitted. THE LOAD-BEARING ROW: it is the only anchor here that tests the vascular FIELD rather than the point pattern, and it has no threshold to pick. Section 1 lands at 1.25% (0.59x, LOW); this section lands high, so the two sections miss the same published value in OPPOSITE directions -- which is why results/sweep/vascular_area_fraction_generalization_2026-07-30T03-18-42Z.md could find no section-invariant radius model that fixes both. The published value is a population cohort mean, which is context for a single patient rather than a target; vessel_network.segmentation_report says so on every row it emits, and that caveat travels with these two.",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "area_fraction_pct": 10.981885031249634,
+          "band": [
+            1.8,
+            2.4
+          ],
+          "ratio_vs_published": 5.229469062499826,
+          "section": "data_cache/xenium_gbm_io"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "heldout-patient-geometry",
+        "label": "microvessel density (held-out section)",
+        "status": "FAIL",
+        "scope": "geometry",
+        "quantity": "reconstructed vessel-cluster density (per mm^2, 20 um single-linkage) on the HELD-OUT section vs MEASURED whole-slide CD31 microvessel density in human GBM",
+        "predicted": "233 /mm^2  (3.59x the measured mean)",
+        "measured": "65 /mm^2 (range 35-95, n=20 patients)",
+        "pmids": [
+          "27583442"
+        ],
+        "bar": "inside vessel_network.PUBLISHED range 35-95 /mm^2",
+        "note": "HELD OUT: this section was never inspected while any reconstruction constant was chosen. The 20 um linking distance and the vessel radius model are section-1 / literature values, used here unchanged and NOT refitted. This is NOT a held-out failure on its own: section 1 misses the same band in the same direction (111 /mm^2), so the two sections AGREE with each other while both disagree with the literature. That points at the segmentation over-splitting endothelial cells into vessel objects, not at the held-out patient. The published value is a population cohort mean, which is context for a single patient rather than a target; vessel_network.segmentation_report says so on every row it emits, and that caveat travels with these two.",
+        "reason": "",
+        "conditional": [],
+        "values": {
+          "mvd_per_mm2": 233.27391916454704,
+          "band": [
+            35.0,
+            95.0
+          ],
+          "ratio_vs_published": 3.588829525608416,
+          "n_vessels": 20875,
+          "n_endothelial_cells": 57733,
+          "section": "data_cache/xenium_gbm_io"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "heldout-patient-geometry",
+        "label": "endothelial cell fraction (held-out section)",
+        "status": "NOT TESTABLE",
+        "scope": "geometry",
+        "quantity": "reconstructed endothelial percentage of all cells on the HELD-OUT section vs the MEASURED endothelial fraction of a 1.05 mm^3 volume-EM reconstruction of normal-appearing human temporal cortex",
+        "predicted": "7.07% of cells (0.88x the reference)",
+        "measured": "8.05% of cells (4,604 endothelial of 57,180, n=1 volume)",
+        "pmids": [
+          "38723085"
+        ],
+        "bar": "n/a",
+        "note": "",
+        "reason": "NOT TESTABLE FOR TWO INDEPENDENT REASONS, and heldout_patient.py scores it PASS against a 1.5x tolerance anyway -- which is why it is carried here explicitly rather than left to that report. (1) SAME DEFECT AS THE SECTION-1 ROW: endothelial-cellularity above already reports this exact comparison NOT TESTABLE, because one unit of the measurement is a whole cell traced in 3-D through 1.05 mm^3 and one unit of the model is a 2-D polygon on a ~5 um section, and the reference is normal cortex, n=1. Nothing about a second section repairs that. (2) IT IS NOT BLIND: results/classifier_fix.md sec. 0 selected the production typing rule (matched_null_z) on a cross-SECTION consistency criterion computed WITH this section in it, and that selection is what moved this number from 4.18% (0.52x -- outside the 1.5x tolerance) to its present value. The rule was not optimised against the 8.0% anchor, but it was optimised toward agreement with a section that is anchored near it, so the resulting agreement is not out-of-sample evidence.",
+        "conditional": [],
+        "values": {
+          "endothelial_pct": 7.0684612173086885,
+          "fold_vs_volume_em": 0.8835576521635861,
+          "endothelial_per_mm2": 645.1546431198465,
+          "cell_density_per_mm2": 9127.229014711756,
+          "pre_fix_endothelial_pct": 4.18,
+          "section": "data_cache/xenium_gbm_io"
+        },
+        "physics": "n/a \u2014 transport solver never invoked for this row"
+      },
+      {
+        "group": "ifp-wick-in-needle",
+        "label": "GBM section IFP vs human intracranial-tumour IFP",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "solved interstitial fluid pressure (mmHg) at wick-scale placements in the tumour mass of the real Xenium GBM section vs MEASURED intraoperative wick-in-needle IFP in human intracranial tumours",
+        "predicted": "0.499 mmHg (median over placements; IQR 0.310-0.629, max 0.765)",
+        "measured": "2.0 +/- 2.5 mmHg (mean +/- SD, n=11); 10 of 11 tumours lay in 0.0-3.0, one astrocytoma at 9.5; glioblastoma-only subset n=5 mean 1.2, range 0.0-3.0",
+        "pmids": [
+          "9062403",
+          "1423283"
+        ],
+        "bar": "n/a \u2014 no bar is declared, because no bar on this anchor discriminates",
+        "note": "Not a null result: the DISCRIMINATING version of this same comparison is the breast row below, which the engine FAILS by ~40x. Read the two together. The screened-Poisson screening length sqrt(K/(a+d)) has median 7.1 um (GBM) and 6.2 um (breast), BELOW the 12 um production spacing at 99.78% and 99.92% of tissue nodes respectively.",
+        "reason": "THE ANCHOR CANNOT DISCRIMINATE, for three independent reasons, and the engine's number would sit inside it either way. (1) UNCERTAINTY. The paper's Statistical analysis section states verbatim that 'the data are presented as the mean +/- standard deviation', so 2.5 is an SD over 11 patients, not an SEM. On a non-negative quantity that the solver clips at zero, mean +/- 1 SD is effectively 0.0-4.5 mmHg, and the paper's own per-patient table has 10 of 11 tumours in 0.0-3.0 INCLUDING A MEASURED 0.0. Any engine output from nothing up to 4.5 mmHg passes. A verdict that cannot be failed is not a verdict. (2) IT DOES NOT SEPARATE TUMOUR FROM NORMAL TISSUE. Less 1992 (PMID 1423283) measured normal human tissue at 2 +/- 4 mmHg, n=11, by the SAME wick-in-needle technique with Boucher and Jain on both author lists. The intracranial-tumour figure is statistically indistinguishable from it, so agreement with it is not evidence that the engine reproduces tumour interstitial hypertension -- it is equally consistent with the engine having no tumour effect at all, which on this section is close to what it has. (3) TREATED, DECOMPRESSED STATE. All 11 patients received dexamethasone 10 mg + mannitol 0.5 mg/kg + furosemide 20 mg i.v. and were hyperventilated to PaCO2 25-32 mmHg, and IFP was taken after the cranium was opened and the dura removed. The authors' own conclusion is that 'antioedema therapy in patients with brain tumours is responsible in part for the low tumour IFP', and the same paper measures a 17-50% fall in rodent tumour IFP from hypocapnia alone (27 +/- 15 -> 18 +/- 10 mmHg). The engine models no steroid, no osmotic agent, no diuretic and no decompression, so even a matching number would be matching a different physiological state. COMMENSURABILITY. A wick-in-needle probe is a 23-gauge needle whose side hole equilibrates with the mobile interstitial fluid over a sub-millimetre to millimetre contact region, at ONE placement inside the tumour mass. The commensurable model statistic is therefore the solved field's local mean over a wick-sized window at tumour-bearing locations -- NOT the domain mean, NOT the field maximum, and NOT the landing page's iso-contour levels, which are fractions of a coarse-grained maximum chosen for rendering. Reported here as the median over placements at a 250 um Gaussian window over nodes with tumour occupancy >= 0.5; the 125 um and 500 um windows are in results/sweep/ifp_validation.json and move it by under 1.4x.",
+        "conditional": [
+          "ifp-uncalibrated",
+          "ifp-unresolved-mesh",
+          "ifp-grid-unconverged",
+          "untreated-section"
+        ],
+        "values": {
+          "wick250_tumour_median_mmhg": 0.49865097512205847,
+          "wick250_tumour_iqr_mmhg": [
+            0.310126434791047,
+            0.6286473191783174
+          ],
+          "raw_field_max_mmhg": 13.464376918341621,
+          "raw_field_median_in_tissue_mmhg": 0.0048166417217820135,
+          "raw_field_mean_in_tissue_mmhg": 0.13362429895509267,
+          "anchor_mean_mmhg": 2.0,
+          "anchor_sd_mmhg": 2.5,
+          "normal_tissue_reference_mmhg": [
+            2.0,
+            4.0
+          ],
+          "dx_um": 12.0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "ifp-wick-in-needle",
+        "label": "breast section IFP vs human primary-breast-carcinoma IFP",
+        "status": "FAIL",
+        "scope": "PDE",
+        "quantity": "solved interstitial fluid pressure (mmHg) at wick-scale placements in the tumour mass of the real Xenium breast section vs MEASURED wick-in-needle IFP in human primary breast carcinoma",
+        "predicted": "0.380 mmHg (median over placements; IQR 0.161-0.494, max 0.582) \u2014 39x BELOW the measured mean, 16x below the band floor",
+        "measured": "15 +/- 9 mmHg (mean +/- SD) in primary breast carcinoma; all neoplasms 20 +/- 13 (SD), range 4-50, n=41 measurements / 21 tumours; normal tissue 2 +/- 4 (SD), n=11",
+        "pmids": [
+          "1423283",
+          "7850532"
+        ],
+        "bar": "inside the measured mean +/- 1 SD = 6-24 mmHg",
+        "note": "THE LOAD-BEARING ROW OF THIS GROUP, and it is the one the intracranial anchor could not be. 15 +/- 9 mmHg is far from zero and 7x the same study's normal-tissue value, so unlike the brain figure it cannot be passed by producing nothing \u2014 and the engine does not pass it. Corroborated independently by Nathanson 1994 (PMID 7850532), 29 +/- 3 mmHg in invasive ductal carcinoma, n=25 \u2014 whose uncertainty is a STANDARD ERROR, not an SD, and must not be read as one; against that value the engine is ~78x low. The direction is consistent with every other absolute quantity this engine has been scored on. Mechanistically the miss is not mysterious: pressure.py's own docstring predicts a flat tumour plateau approaching _PV = 25 mmHg, but on real reconstructed tissue the vascular density that drives the Starling source is zero at 94.3% of breast tissue nodes (97.3% on GBM), so the solved field is near-zero almost everywhere (median 0.0078 mmHg in tissue) with isolated spikes to 10.5 mmHg at endothelial cells. The engine reproduces the peak magnitude and misses the plateau, which is the opposite of the Jain effect it claims. COMMENSURABILITY. A wick-in-needle probe is a 23-gauge needle whose side hole equilibrates with the mobile interstitial fluid over a sub-millimetre to millimetre contact region, at ONE placement inside the tumour mass. The commensurable model statistic is therefore the solved field's local mean over a wick-sized window at tumour-bearing locations -- NOT the domain mean, NOT the field maximum, and NOT the landing page's iso-contour levels, which are fractions of a coarse-grained maximum chosen for rendering. Reported here as the median over placements at a 250 um Gaussian window over nodes with tumour occupancy >= 0.5; the 125 um and 500 um windows are in results/sweep/ifp_validation.json and move it by under 1.4x.",
+        "reason": "",
+        "conditional": [
+          "ifp-uncalibrated",
+          "ifp-unresolved-mesh",
+          "ifp-grid-unconverged",
+          "untreated-section"
+        ],
+        "values": {
+          "wick250_tumour_median_mmhg": 0.37982765334578444,
+          "wick250_tumour_iqr_mmhg": [
+            0.16054016187366824,
+            0.49383700321991547
+          ],
+          "band_mmhg": [
+            6.0,
+            24.0
+          ],
+          "fold_below_measured_mean": 39.491595379824595,
+          "raw_field_max_mmhg": 10.527065790227164,
+          "raw_field_median_in_tissue_mmhg": 0.007752392976815962,
+          "dx_um": 12.0
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      },
+      {
+        "group": "ifp-wick-in-needle",
+        "label": "IFP solve is under-resolved on every grid the engine runs at",
+        "status": "NOT TESTABLE",
+        "scope": "PDE",
+        "quantity": "screened-Poisson screening length sqrt(K/(a+d)) implied by physics/pressure.py's own shipped coefficients vs the grid spacings the engine actually solves on (8-30 um)",
+        "predicted": "median screening length 7.1 um (GBM) / 6.2 um (breast); L/dx = 0.59 / 0.51 at the 12 um production spacing",
+        "measured": "n/a \u2014 this row is scored against the discretisation, not against a measurement",
+        "pmids": [],
+        "bar": "n/a",
+        "note": "Grid ladder, wick-scale tumour median: GBM 0.358 -> 0.434 -> 0.462 -> 0.370 mmHg and breast 0.621 -> 0.424 -> 0.370 -> 0.286 mmHg at dx = 24, 18, 12, 8 um. Full ladder in results/sweep/ifp_validation.json.",
+        "reason": "NO MEASUREMENT IS INVOLVED; this row is registered so that the two rows above cannot be quoted without it. The screened-Poisson screening length sqrt(K/(a+d)) has median 7.1 um (GBM) and 6.2 um (breast), BELOW the 12 um production spacing at 99.78% and 99.92% of tissue nodes respectively. A screened-Poisson solve whose screening length is below the mesh cannot represent the operator it discretises: the reaction term dominates the diagonal (median (a+d)*dx^2/K = 2.9 on GBM, 3.8 on breast), so each node relaxes toward its own LOCAL algebraic equilibrium a*p_v/(a+d) with the Laplacian barely coupling neighbours. Measured directly: the solved field correlates with that pointwise algebraic limit at r = 0.92 (GBM) and 0.94 (breast). At production dx the 'solved pressure field' is therefore closer to a pointwise nonlinear map of the vascular-density KDE than to a transport solve, and the margin pressure gradient that carries the Jain effect into the convection term is not resolved. Refining the mesh does not fix it and is not free: the field is not grid-converged either (see the ifp-grid-unconverged conditional), and pressure.py's tumour-occupancy smoothing _TUMOR_SIGMA = 5.0 is specified in GRID CELLS, so the physical smoothing scale is itself a function of dx (60 um at dx=12, 120 um at dx=24) and the model changes as the mesh changes.",
+        "conditional": [
+          "ifp-unresolved-mesh",
+          "ifp-grid-unconverged"
+        ],
+        "values": {
+          "screening_length_um_gbm": {
+            "p5": 6.628361640576865,
+            "p25": 6.876059135005593,
+            "p50": 7.078132031932166,
+            "p75": 7.371550760324304,
+            "p95": 8.292519887898791,
+            "p99": 9.769416312990785
+          },
+          "screening_length_um_breast": {
+            "p5": 5.493480102187369,
+            "p25": 5.9084952573290135,
+            "p50": 6.154010111824865,
+            "p75": 6.8021304798773565,
+            "p95": 8.01497767271013,
+            "p99": 9.090536618962643
+          },
+          "frac_tissue_unresolved_gbm": 0.9977806680705231,
+          "frac_tissue_unresolved_breast": 0.9991898087649997,
+          "corr_solved_vs_local_equilibrium_gbm": 0.9210181148480852,
+          "corr_solved_vs_local_equilibrium_breast": 0.9438723268605637
+        },
+        "physics": "transvascular_exchange=False \u2014 one-way leak, S = PS*Cp (source never depends on local tissue concentration)"
+      }
+    ],
+    "conditionals": {
+      "alpha-fit": "Inherits alpha, the single free constant fit ONCE in closed form to the doxorubicin perivascular anchor (PMID 16361566) by validation.calibration.calibrate_alpha. Anything downstream of alpha is conditional on that one fit and is not independent of it.",
+      "analytic-only": "Computed in closed form from molecular descriptors; the transport PDE is never invoked. Verified by call-counter instrumentation in results/transvascular_exchange_revalidation.md sec. 6.1. This row cannot confirm or refute the solver.",
+      "band-wider-than-assay": "The literature band is wider than the assay spread it is meant to correct (the 2-D reference's own IQR is ~19x, PMID 34794398), so a pass here is a weak pass by construction (results/kill_calibration.md).",
+      "cell-exclusion-default-off": "The cellular volume-exclusion term (molecular/ecm_mesh.py::cell_exclusion, Maxwell's impermeable-inclusion limit) is MERGED BUT NOT WIRED IN. results/cellular_exclusion.md sec. 7 recommends merging the physics and explicitly NOT flipping the default; nothing in compile_drug calls it, so DrugParams.diffusivity is bit-identical to the pre-merge value. Every VERDICT in this group is therefore scored on the engine AS IT SHIPS, with the term OFF. The cell-term-ON arm is reported alongside each verdict and carries three caveats of its own, none of which is a footnote: (a) phi_cell = 0.7892 is measured by Delesse's principle on the repo's real Xenium BREAST TUMOUR section and then applied to a V79 hamster multicellular layer \u2014 a literature search for an MCL extracellular-volume measurement returned nothing usable, so the packing density is imported from the wrong system (cellular_exclusion.md sec. 4.1); (b) Xenium's boundary segmentation tiles the section, so phi_cell is an UPPER estimate and every hindrance derived from it is too; (c) stacking the cell term on the existing chain DOUBLE-COUNTS by up to ~1.9x, because brownian.py's 300 nm obstacle field and ALPHA_TORTUOSITY = 0.6 were partly standing in for cell-scale obstruction, and cellular_exclusion.md sec. 5.3 states in terms that it cannot resolve which.",
+      "coefficient-not-field": "This row scores an INPUT COEFFICIENT of the transport PDE, not any solved field. The prediction is read straight off MolecularProfile after descriptors.from_smiles -> compile_drug.build_profile; the solver is never entered, verified by a call counter on physics.diffusion.simulate_drug_transport and sim.engine.simulate_response and recorded in results/anchor_registration.md sec. 3. It is a stronger row than an unanchored coefficient and a weaker one than a field test: it can FALSIFY the hindrance law, and it cannot confirm or refute the solver.",
+      "gdsc-potency": "Intrinsic potency comes from the GDSC cell-line screen, not from this patient's tissue; the 3-D:2-D ratio therefore constrains the PRODUCT of delivery and cell-state resistance, not either factor alone (results/kill_calibration.md).",
+      "ifp-grid-unconverged": "The wick-scale IFP statistic is not grid-converged. Across dx = 24, 18, 12, 8 um it moves 0.358 -> 0.434 -> 0.462 -> 0.370 mmHg on GBM (non-monotone, 1.29x spread) and 0.621 -> 0.424 -> 0.370 -> 0.286 mmHg on breast (monotone, 2.17x spread, still falling 22.5% over the last refinement with no plateau). Two contributions are known: the vascular-density KDE is rebuilt per grid, and _TUMOR_SIGMA = 5.0 in pressure.py is specified in GRID CELLS, so the physical tumour smoothing scale is 40/60/90/120 um at dx = 8/12/18/24 um and the model itself changes with the mesh.",
+      "ifp-uncalibrated": "Every coefficient in tmesim/physics/pressure.py is a hardcoded order-of-magnitude constant, by its own docstring 'not patient-calibrated': _K0 = 1.2, _K_ECM_ATTEN = 0.6, _PV = 25.0 mmHg, _LP_NORMAL = 1e-3, _LEAK_GAIN = 12.0, _LAMBDA_LYMPH = 3e-2. None was fitted to any measurement, which makes any IFP score genuinely out-of-sample \u2014 and also means nothing constrains the absolute scale. _PV = 25.0 in particular is an upper bound on the predicted core plateau and was NOT chosen against any of the anchors scored here.",
+      "ifp-unresolved-mesh": "The screened-Poisson screening length sqrt(K/(a+d)) implied by those coefficients is ~6-7 um on both real sections, BELOW every grid spacing the engine runs at (8-30 um), at >99.7% of tissue nodes. The reaction term dominates the diagonal, so the discrete solution collapses toward the pointwise algebraic limit a*p_v/(a+d) (measured correlation r = 0.90 GBM / 0.93 breast) and the interior Laplacian barely couples neighbours. Any IFP number is conditional on a mesh that does not resolve the operator being solved (results/ifp_validation.md sec. 5).",
+      "leak-fit": "The additive paracellular leak constant reconstruct.barrier.L_PARACELLULAR_LEAK = 0.238 was FITTED to the same contrast-enhancing-vs-non-enhancing contrasts these rows are scored against, so the leak-on score is not fully out-of-sample (results/glioma_regional_pk.md).",
+      "mcl-no-vasculature": "COMMENSURABILITY BOUND, and it is the load-bearing caveat on this group. A multicellular layer is a stack of cells grown on a porous support: packed cells, little stroma, NO VASCULATURE, no necrosis, no interstitial convection and no plasma source term. Hicks measured flux across that slab and fitted it to a diffusion-reaction equation of the SAME FORM the engine solves, which is exactly what makes D and k commensurable AS COEFFICIENTS. What that licenses: scoring the engine's compiled per-drug D_eff, and the hindrance law that produces it, against a directly measured tissue diffusion coefficient in the same units and the same functional role. What it does NOT license: any claim about a vascularised tissue section. Nothing in an MCL constrains vessel spacing, the transvascular source term, IFP-driven convection, or the spatial concentration field the solver produces on real reconstructed geometry. Reading an MCL row as evidence that the engine's tissue predictions are validated would be the modality pooling results/external_anchor_survey.md sec. 0 catalogues three live instances of, and which this project has manufactured a false regression from twice.",
+      "ps-scale": "Conditional on an UNCALIBRATED unit scale. tmesim/treatment/drugs.py::PS_SCALE_S_INV = 1.0 is an implicit, undocumented, underived conversion from a dimensionless product to a rate in 1/s; nothing in the repo derives it. See results/transvascular_exchange_revalidation.md sec. 6.2. Every transvascular-exchange-ON number carries this.",
+      "untreated-section": "The open spatial section is an UNTREATED resection. There is no paired measured drug response on this tissue; the anchor is a cohort-level literature value, not this patient's outcome."
+    }
+  },
+  "flips": [],
+  "quick": false
+}

@@ -1,5 +1,59 @@
 # logP provenance audit and blast-radius test
 
+> # ⚠️ CORRECTED 2026-08-14 — §1 FINDING 2 AND §2.3 ARE FALSE OF THE SHIPPING ENGINE. logP NOW ENTERS TRANSPORT DIRECTLY.
+>
+> **This banner is the only edit made to this file.** No number, table or
+> recommendation below it has been changed, re-run or corrected. Everything below
+> was true of the engine as it stood on **2026-08-08**, the date of the audit.
+>
+> **What changed.** Commit `fd2a9e7` (2026-08-14, *"Flip two-route transport ON:
+> the first physics change that adds capability"*) made the two-route cell term
+> the shipping default. `tmesim/molecular/compile_drug.py::build_profile` now
+> passes `descriptors["logp"]` and `descriptors["hbd"]` into
+> `two_route.two_route_diffusivity` and multiplies its hindrance factor into
+> `effective_D` on **every compile**. The dated record is
+> `results/two_route_promotion.md`.
+>
+> **Which specific statements are now false.**
+>
+> | where | statement | status |
+> |---|---|---|
+> | §1, finding 2 | *"logP cannot move transport directly… logP is not an input to it at any point."* | **FALSE as of `fd2a9e7`.** `logp` is an input to `effective_diffusivity`. |
+> | §1, finding 2 | *"Its only routes to an output are the first-order loss rate (`binding`, `clearance`) and the delivery scalar (`bbb_penetrance`)."* | **INCOMPLETE.** There is now a fourth route, and it is the transport coefficient itself. |
+> | §2.3 | *"`No logP anywhere in that chain.`"* and the five-line `effective_D` chain above it | **SUPERSEDED.** The chain gained a terminal `× two-route cell term` step that consumes `logp` and `hbd`. |
+> | §2.3 | *"doxorubicin and epirubicin… both compile to `D = 184.75 µm²/s`"* | **The equality survives, the value does not.** Crippen is stereochemistry-blind, so dox and epi still receive identical `logp`/`hbd` and therefore still compile to the same `D`. That `D` is no longer 184.75 µm²/s. |
+> | §2.4 | *"Because logP touches no expensive quantity, the sweep does not need to re-run the Brownian simulation per scenario."* | **NO LONGER VALID as a method.** `experiments/logp_sensitivity.py` caches `d_eff` per drug and re-evaluates only the closed-form terms; under the shipping engine `d_eff` is itself a function of the swept variable. Every ratio in §5 is therefore a **lower bound on the blast radius, not a bound on it**. |
+>
+> **What this does to §5.3, the file's dominant finding.** §5.3 measures that
+> correcting doxorubicin's logP from Crippen `0.001` to the measured `1.27` moves
+> `alpha` from `148.6082` to `68.6368` (0.4619×) and rescales every other drug's
+> penetration length by ~1.47×. **That measurement was made on the MW-only
+> engine and does not transfer.** Under the shipping engine the same edit moves
+> the anchor's own `D_eff` as well as its loss rate, so both sides of the
+> Primeau `D/k` fit move together and the ~1.47× global rescale cannot be assumed
+> to hold in magnitude or in sign. `alpha` has separately moved to
+> **22.223477711172563** at the promotion (`results/two_route_promotion.md`),
+> so `148.6082` is no longer the starting point either. **§5.3 must be re-measured
+> before it is acted on.** Nothing in §5.3 has been deleted; it is the record of
+> what the pre-`fd2a9e7` engine did.
+>
+> **What is NOT affected, and still stands.** §3 (the literature audit: which
+> logP values are measured, refuted, laundered or propagated) is a claim about
+> the *literature*, not about the engine, and is untouched by this. §6's
+> per-drug recommendations on *provenance* — adopt cisplatin's `-2.53`, store
+> palbociclib as pH-resolved logD, do not adopt tamoxifen's 7.1 or epirubicin's
+> 1.27 — stand unchanged. What does not stand is the sequencing argument in §6.2,
+> which rests on §5's magnitudes.
+>
+> **Why this matters operationally.** `tmesim/molecular/lipophilicity.py::resolve_logp`
+> exists with measured values and, as of this banner, **still has no caller** in
+> `tmesim/` or `app/` — the only references outside the module itself are in
+> `experiments/descriptor_falsification.py`. Anyone reading this file's finding 2
+> would conclude that wiring it up is transport-inert. **It is not.** Wiring
+> `resolve_logp` in is now a change to the transport coefficient of every
+> compound whose logP it supersedes, and needs a revalidation run, not a
+> provenance review.
+
 **Scope.** Where octanol/water logP is used in tmesim, what the repo's current values
 actually are, how they compare to a literature audit of nine drugs, and how far a
 simulated output moves if a logP is wrong.

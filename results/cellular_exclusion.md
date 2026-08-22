@@ -1,5 +1,39 @@
 # Cellular volume exclusion — the obstacle population the hindrance law never had
 
+> # ⚠️ CORRECTED 2026-08-14 — THE MERGE RECOMMENDATION WAS SUPERSEDED: THE DEFAULT WAS FLIPPED, AND THE CHAIN IN §1 IS NO LONGER THE CHAIN THE ENGINE RUNS
+>
+> **This banner is the only edit made to this file.** No number, table or verdict
+> below it has been changed or re-run. Everything below was true on
+> **2026-08-10**.
+>
+> **What changed.** Commit `fd2a9e7` (2026-08-14, *"Flip two-route transport
+> ON"*) promoted the permeable-cell law to the shipping default. Record:
+> `results/two_route_promotion.md`.
+>
+> **Which statements are now false.**
+>
+> | where | statement | status |
+> |---|---|---|
+> | header | *"Nothing is wired into `compile_drug.py`… `DX_UM` and `alpha`'s published value are untouched."* | **FALSE.** `compile_drug.build_profile` now calls `two_route.two_route_diffusivity` on every compile, and `alpha` moved from `148.60815765445545` to `22.223477711172563`. |
+> | §1 table | the five-step chain ending *"⇒ `DrugParams.diffusivity` = **184.75 µm²/s**"* for doxorubicin | **SUPERSEDED.** The chain gained a terminal two-route cell term. Read `results/two_route_promotion.md` for the shipping values. |
+> | §1 | *"Where an obstacle volume fraction enters… **exactly three places, and all three count matrix**."* | **FALSE.** There is now a fourth, and it is the one this file argued was missing: a **cell** volume fraction, consumed by `two_route_diffusivity` at compile time. |
+> | §2(a) | *"No function in the chain accepts a cellular fraction."* | **FALSE** — this was the defect, and it is closed. |
+> | §7 | *"**MERGE the physics, do NOT flip the default.**"* | **SUPERSEDED, deliberately and with its gating conditions discharged.** The default was flipped four days later. This file's recommendation was correct on its date; `results/two_route_promotion.md` is the document that records why it was overtaken. |
+>
+> **What still stands.** The diagnosis this file exists for — that the hindrance
+> law had no cellular obstacle population, and that cells are most of a tumour's
+> volume — is **confirmed, not corrected**. So is §4.4's disclosure discipline
+> and the finding that the correction **deepens rather than rescues** the panel's
+> only FAIL; the promotion re-measured that and it deepened again. The cell
+> volume fraction derived stereologically in §3.2 is still the derivation the
+> shipping law uses.
+>
+> **One caveat carried forward.** This file's law enters through
+> `ecm_mesh.tissue_hindrance_two_route`; the shipping path calls
+> `two_route.two_route_diffusivity` from `compile_drug` directly. The wrapper is
+> **not** the shipping call site — see `tmesim/molecular/ecm_mesh.py`'s module
+> docstring.
+
 **What this file is.** A structural defect in the transport physics, found
 independently by two investigations approaching from opposite directions, plus
 the physics that closes it, what the corrected law gives against measurement, and

@@ -120,6 +120,20 @@ const STEPS = [
         h('b', 'Submit run'),
         '. The viewer, mechanism breakdown, and metrics populate once it ' +
         'finishes — usually well under a minute at a coarse grid spacing.'),
+      // The tour previously stopped at "it populates", which leaves a new
+      // user staring at six numbers with no idea which one is the answer.
+      // Naming the reading order is the actual skill being taught, and it
+      // doubles as the product's central claim: the ranking is the output.
+      h('p',
+        'When it lands, read it in this order: the ', h('b', 'MECHANISM'),
+        ' breakdown first — it tells you ', h('b', 'why'),
+        ' a compound did or did not work, which is the question this tool ' +
+        'answers. The metrics above it are supporting detail, and the ' +
+        'absolute values among them are not defensible on their own.'),
+      h('p',
+        'You can leave and come back: a run in flight is picked up again ' +
+        'when you reload, and the run history at the bottom reopens any ' +
+        'finished run exactly as it was.'),
     ],
   },
   {
@@ -143,6 +157,32 @@ const STEPS = [
         'This ', h('b', '"protocol"'), ' tab is a real code editor for ' +
         'defining and sweeping drug/dose experiments — 6 working templates ' +
         'to start from, syntax highlighting, inline diagnostics.'),
+    ],
+  },
+  // A tour that ends on a feature leaves the reader with nothing to do. This
+  // step exists to hand over one concrete first action and to pre-empt the
+  // first real failure, which for a new operator is far more likely than a
+  // successful exotic run.
+  {
+    title: '6 · When it goes wrong',
+    selector: null,
+    side: 'center',
+    body: () => [
+      h('p',
+        'Failures here are meant to be readable. A run that fails says what ' +
+        'went wrong in plain language, and the stage clears rather than ' +
+        'leaving the previous run\'s numbers standing under a failed ' +
+        'heading — if there is nothing to draw, you get told why.'),
+      h('p',
+        'If a failure was unexpected the message carries a short ',
+        h('b', 'reference code'), '. That code matches one line in the ' +
+        'server\'s own log, so quoting it to whoever runs this server points ' +
+        'them straight at the cause. Copy it as-is.'),
+      h('p',
+        h('b', 'A good first run:'), ' take the section already selected, ' +
+        'leave every setting alone, and submit it. It is the fastest way to ' +
+        'see the whole loop, and everything you have just been shown is ' +
+        'easier to read once there is a real result on the screen.'),
     ],
   },
 ];
@@ -206,6 +246,25 @@ function positionCard(card, targetEl, side) {
  */
 export function createWelcomeOverlay({ onGoToProtocol } = {}) {
   let i = 0;
+
+  /*
+   * Tear down any tour that is already on screen before mounting this one.
+   *
+   * Every call used to append a fresh `.tour-popover` and nothing ever removed
+   * the previous card, so pressing the `tour` button twice left two dialogs
+   * stacked at identical coordinates, three times left three, and so on --
+   * measured 1/2/3/4 popovers over four presses. Only the topmost receives the
+   * click, so `Next` advanced one card while the ones underneath stayed on
+   * step 1 for ever; dismissing the top one uncovered an identical dialog and
+   * the tour read as refusing to close. It also put N elements with
+   * role="dialog" and the same aria-labelledby into the accessibility tree.
+   *
+   * Done here rather than at the call sites because the invariant belongs to
+   * the tour: there is at most ONE tour on screen. A caller cannot forget it
+   * if the constructor enforces it.
+   */
+  document.querySelectorAll('.tour-popover').forEach((el) => el.remove());
+  clearHighlight();
 
   function close() {
     markSeen();

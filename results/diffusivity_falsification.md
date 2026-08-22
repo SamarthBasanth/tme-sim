@@ -1,5 +1,31 @@
 # Diffusivity falsification test — does the MW-only `D_eff` model survive contact with 71 measured tissue diffusion coefficients?
 
+> # ⚠️ CONTEXT NOTICE 2026-08-14 — THE FALSIFICATION STANDS; THE MODEL IT FALSIFIES NO LONGER SHIPS. READ "THE ENGINE" BELOW AS THE PRE-`fd2a9e7` ENGINE.
+>
+> **This banner is the only edit made to this file.** No number below it has been
+> changed or re-run, and **nothing here is retracted** — this file did its job.
+>
+> **What changed.** Commit `fd2a9e7` (2026-08-14, *"Flip two-route transport
+> ON"*) replaced the MW-only diffusivity model this file refutes. Since then
+> `compile_drug.build_profile` routes `logp` and `hbd` into `effective_D`, so the
+> claim in §1 that *"Molecular weight — the engine's only molecular input to
+> diffusivity"* is **no longer true of the shipping engine**, and neither is
+> *"the engine is flat by construction"* at matched molecular weight. Record:
+> `results/two_route_promotion.md`.
+>
+> **Why the finding is not weakened by that.** The measurement is a property of
+> the data and of the MW-only law, not of the repo's configuration: 71 compounds
+> spanning 29.7-fold, an engine spanning 2.4-fold, R² = 0.028, and a 3.7-fold
+> measured spread at identical MW where the law is flat. Nothing re-ran those.
+> This file is **the evidence the replacement was built on**, and it should be
+> read as the reason the shipping model changed, not as a live indictment of it.
+>
+> **What must NOT be read from this file.** That the shipping engine's transport
+> ranking is currently falsified — it is scored, and separately qualified. See
+> `results/two_route_promotion.md` for the replacement's blind score and
+> **`results/descriptor_falsification.md`, which qualifies that score for the
+> descriptors the shipping pipeline actually computes.** Both, not one.
+
 **Verdict up front: NO. The model is falsified, and not marginally.**
 
 Measured `D_mcl` spans **29.7-fold** across 71 compounds measured by one method

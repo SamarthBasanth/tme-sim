@@ -203,11 +203,16 @@ LOGK_MEMBRANE_MAX = 3.0
 #:     a(water -> hexadecane)     = -3.587
 #:     => Delta log P donor coefficient = 3.621 per unit A
 #:
-#: Both coefficients read VERBATIM from the open-access Table 1 of Abraham MH,
-#: Acree WE Jr, ACS Omega 2019;4(7):12920-12926, doi:10.1021/acsomega.8b03242
-#: (PMC6648601); cross-checked against Table 1 of J Comput Aided Mol Des 2017
-#: (PMC5579141) and the open-access Acree/Abraham compilation (hexadecane
-#: -3.587, cyclohexane -3.740, hexane -3.578, heptane -3.571).
+#: Both coefficients read VERBATIM from the open-access wet-solvent
+#: water-to-organic log P coefficient table of Acree WE Jr, Grubbs LM,
+#: Abraham MH, in Toxicity and Drug Testing, IntechOpen 2012 (octan-1-ol wet
+#: a = 0.034; hexadecane a = -3.587; cyclohexane a = -3.740). Independently
+#: confirmed in Table 1 of Abraham MH, Acree WE Jr, "Descriptors for
+#: Pentane-2,4-dione and Its Derivatives", J Solution Chem 2017;46(8):1625-1638,
+#: doi:10.1007/s10953-017-0667-y, PMC5579141, which carries both values.
+#: NOT the source, despite earlier revisions of this file: ACS Omega
+#: 2019;4(2):2883-2892, doi:10.1021/acsomega.8b03242, PMC6648601 -- its Table 1
+#: has no hexadecane row. See results/abraham_citation_erratum.md.
 #:
 #: The model's input is an integer donor COUNT (`Lipinski.NumHDonors`), not `A`,
 #: so a typical `A` per donor GROUP is required. THIS IS THE ONE REMAINING

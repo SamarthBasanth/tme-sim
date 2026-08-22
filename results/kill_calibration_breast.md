@@ -1,5 +1,44 @@
 # Breast-cancer kill calibration: the 3-D:2-D ratio test, on the real Xenium section
 
+> ## RATIOS SUPERSEDED 2026-08-21 — verdicts unchanged, and the errors here are large
+>
+> Same cause as the GBM module: `d77d169` and `fd2a9e7` both moved `e_unit`
+> after this file was measured, and neither regenerated it.
+>
+> | drug | §3 here | current (cold) | error |
+> |---|---:|---:|---:|
+> | 5-fluorouracil | 0.3374 | **0.3333** | −1.2 % |
+> | cisplatin | 0.3080 | **0.3069** | −0.4 % |
+> | cyclophosphamide | 0.2834 | **0.3466** | +22.3 % |
+> | docetaxel | 0.1480 | **0.1548** | +4.6 % |
+> | doxorubicin | 0.2297 | **0.2333** | +1.6 % |
+> | epirubicin | 0.2297 | **0.2333** | +1.6 % |
+> | paclitaxel | 0.1499 | **0.1770** | +18.1 % |
+> | palbociclib | 0.2189 | **0.3016** | +37.8 % |
+> | tamoxifen | 0.1715 | **0.2619** | +52.7 % |
+> | vinorelbine | 0.1573 | **0.2495** | +58.6 % |
+>
+> **Verdicts unchanged: 3 PASS / 1 FAIL / 6 NOT TESTABLE**, row for row.
+>
+> **The error pattern is not random, and it is the point.** The four largest —
+> vinorelbine, tamoxifen, palbociclib, cyclophosphamide — are the high-logP,
+> few-donor compounds whose transcellular route `fd2a9e7` *opened*. They are
+> exactly the drugs the new physics was added to handle. So the stale values were
+> suppressing the evidence of that change most precisely where the change mattered
+> most: anyone checking whether two-route did anything would have looked at these
+> rows and seen their pre-change numbers.
+>
+> **Docetaxel matters beyond bookkeeping** — it is claim K3, the project's stated
+> falsification instance. Against the band ceiling 0.1463 it is **+5.81 % outside**,
+> not the +1.5 % published here. The FAIL goes deeper, so the verdict is safe; but
+> K3's own falsifier reads *"anything moving the ratio by >1.5 %"* and the move was
+> +1.824 %. **That condition was met a week ago and nothing re-read the claim.**
+> See `results/CLAIM_INVENTORY.md` note (ii), whose perturbation ladder is
+> re-baselined but deliberately not re-numbered.
+>
+> Six of these agree to four decimals with `results/area_conservation_promotion.md`
+> §2. The body below is left as measured.
+
 **Breast-cancer analogue of `results/kill_calibration.md` (the GBM module) — same engine, same falsifiable test, same honesty standard, run on `results/breast_cancer_flagship.md`'s real Xenium breast section and its extended 10-drug panel (expanded from the original 4-drug panel specifically to be a credible pharma/biotech drug-comparison tool — see `results/breast_cancer_flagship.md` §2 for the full selection/rejection writeup on every new drug). This module (`experiments/kill_calibration_breast.py` / `experiments/kill_calibration_breast_report.py`) is a driver script only: every physics, PK/PD, calibration and reconstruction function it calls is imported unmodified from `tmesim/` — nothing under `tmesim/` was changed to produce this report.**
 
 > ### Headline

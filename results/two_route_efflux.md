@@ -1,5 +1,40 @@
 # The two blockers that kept the two-route model default-off
 
+> # ⚠️ CORRECTED 2026-08-14 — THE BLOCKERS WERE DISCHARGED AND THE DEFAULT WAS FLIPPED. THE TITLE NOW DESCRIBES A CLOSED STATE.
+>
+> **This banner is the only edit made to this file.** No number, table or verdict
+> below it has been changed or re-run. Everything below was true on
+> **2026-08-13**.
+>
+> **What changed.** This file produced the evidence for a flip decision and
+> explicitly *"does not flip anything."* Commit `fd2a9e7` (2026-08-14, *"Flip
+> two-route transport ON"*) took that decision. Record:
+> `results/two_route_promotion.md`.
+>
+> **Specifically false now:** the header's *"Nothing is wired into
+> `compile_drug.py`, `DrugParams.diffusivity` is bit-identical, and
+> `calibrate_alpha()` still returns **148.60815765445545**."* All three clauses
+> are false of the shipping engine; `alpha` is **22.223477711172563**. The title
+> — *"the two blockers that kept the two-route model default-off"* — should be
+> read in the past tense.
+>
+> **What still stands, and is the reason this file matters.** The efflux
+> composition is an algebraic identity with no free parameter; the H-bond-donor
+> decrement is taken from published Abraham coefficients and **scores worse on R²
+> than the value it replaces**, and the sourced value was adopted anyway. That
+> discipline is unchanged and was re-verified at the promotion.
+>
+> **Two qualifications added later, which this file could not have carried.**
+> 1. `results/descriptor_falsification.md` finds the published blind R² was
+>    computed with the **paper's own measured descriptors**, not the ones the
+>    shipping pipeline computes. Every R² below — 0.718, 0.725, and the
+>    0.588–0.722 sweep range — inherits that qualification.
+> 2. The H-bond-donor count is the variable this file's §3 sweeps. A units
+>    question has since been raised about which donor count the engine feeds that
+>    law at runtime. It is **under investigation and unresolved**; nothing here is
+>    corrected for it. Do not treat §3.3's robustness range as settled until it
+>    closes.
+
 **What this file is.** `results/two_route_transport.md` added a transcellular
 route that moved the blind Pruijn score from R² = 0.022 to 0.725, and then
 recommended against flipping the default for two stated reasons: an unresolved
@@ -377,12 +412,25 @@ hydrogen-bond **acidity** (donor strength). The octanol → alkane correction is
 | water → hexadecane | **−3.587** |
 | **Δlog P donor coefficient** | **3.621 per unit A** |
 
-> Both read verbatim from the open-access Table 1 of **Abraham MH, Acree WE Jr.**
-> *ACS Omega* 2019;4(7):12920–12926,
-> [DOI](https://doi.org/10.1021/acsomega.8b03242), PMC6648601; cross-checked
-> against Table 1 of *J Comput Aided Mol Des* 2017, PMC5579141, and against the
-> open-access Acree/Abraham compilation (hexadecane −3.587, cyclohexane −3.740,
-> hexane −3.578, heptane −3.571).
+> Both read verbatim from the open-access wet-solvent water-to-organic log P
+> coefficient table of **Acree WE Jr, Grubbs LM, Abraham MH**, "Prediction of
+> Partition Coefficients and Permeability of Drug Molecules in Biological
+> Systems with Abraham Model Solute Descriptors…", in *Toxicity and Drug
+> Testing*, IntechOpen 2012 (octan-1-ol wet `a` = 0.034; hexadecane
+> `a` = −3.587; cyclohexane `a` = −3.740). Independently confirmed in Table 1 of
+> **Abraham MH, Acree WE Jr**, "Descriptors for Pentane-2,4-dione and Its
+> Derivatives", *J Solution Chem* 2017;46(8):1625–1638,
+> [DOI](https://doi.org/10.1007/s10953-017-0667-y), PMC5579141, which carries
+> both values.
+>
+> **Not the source**, despite earlier revisions of this file: *ACS Omega*
+> 2019;4(2):2883–2892, [DOI](https://doi.org/10.1021/acsomega.8b03242),
+> PMC6648601 — its Table 1 has no hexadecane row. Earlier revisions also
+> cross-checked against an unnamed "Acree/Abraham compilation" quoting hexane
+> −3.578 and heptane −3.571; the IntechOpen table prints **−3.599** and
+> **−3.317**, so those two values did not reproduce and the cross-check has been
+> withdrawn. Neither enters any calculation. See
+> `results/abraham_citation_erratum.md`.
 
 The model's input is an **integer donor count** (`NumHDonors`), not `A`, so a
 typical `A` per donor group is required. Measured `A` values, verified in the

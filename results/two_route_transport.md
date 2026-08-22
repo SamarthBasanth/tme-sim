@@ -1,5 +1,38 @@
 # Two-route tissue diffusivity — the transcellular route the transport model never had
 
+> # ⚠️ CORRECTED 2026-08-14 — THIS LAW NOW SHIPS. THE HEADER'S "NOTHING IS WIRED IN" PARAGRAPH IS FALSE.
+>
+> **This banner is the only edit made to this file.** No number, table or verdict
+> below it has been changed or re-run. Everything below was true on
+> **2026-08-13**, when this law was default-OFF.
+>
+> **What changed.** Commit `fd2a9e7` (2026-08-14, *"Flip two-route transport
+> ON"*) made it the default. `compile_drug.build_profile` now calls
+> `two_route.two_route_diffusivity` on every compile, passing `logp` and `hbd`.
+> The promotion — its gating conditions, its verdict propagation, and the values
+> that moved — is `results/two_route_promotion.md`, which supersedes this file
+> wherever the two disagree about the shipping configuration.
+>
+> **Specifically false now:** the header's *"Nothing is wired into
+> `compile_drug.py`, no frozen snapshot is touched, `DrugParams.diffusivity` is
+> bit-identical, and `calibrate_alpha()` still returns **148.60815765445545**."*
+> All four clauses are false of the shipping engine. `alpha` is
+> **22.223477711172563**. The superseded value is still exactly recoverable by
+> passing `two_route=False`, and that is asserted in `tests/test_two_route.py`.
+>
+> **What still stands:** the physics, the citation, the limit check, and above all
+> the pre-registration discipline — nothing was fitted to Pruijn, and the
+> pre-registered sweep file is untouched. §4.4's disclosure of the one parameter
+> with no primary source remains the least comfortable and most important
+> section here; `results/two_route_efflux.md` resolved it with a **sourced** value
+> that scores slightly worse.
+>
+> **A qualification added later, which this file could not have carried.**
+> `results/descriptor_falsification.md` finds that the published blind R² was
+> computed with the **paper's own measured descriptors**, not the descriptors the
+> shipping pipeline computes. Every R² quoted below inherits that qualification.
+> Read it before quoting a number from this file.
+
 **What this file is.** The physics that closes the defect
 `results/diffusivity_falsification.md` established, its citation, the limit check
 that proves the algebra, what it scores against 71 out-of-sample measurements,

@@ -208,11 +208,26 @@ methodology `experiments/real_drug_panel.py` uses, just wrapped in a CLI.
 > them, and the whole test is one cell line. **Read a ranking over such a series
 > as a hypothesis worth testing, not as a transport measurement.** Ranking
 > compounds that differ substantially in mass remains the best-supported case.
+>
+> **And a second thing that is not true yet.** That R² = 0.718 was scored with
+> Pruijn's own *measured* `logP₇.₄` and hydrogen-bond-donor columns as the model's
+> inputs. The `D_eff` column above is computed from **RDKit descriptors**
+> instead — a neutral-species Crippen `logP` with no pKa anywhere, and a donor
+> count that uses the other of RDKit's two donor conventions. On the five Pruijn
+> compounds whose structures are public the Crippen `logP` misses the measured
+> `logP₇.₄` by an RMS of **1.6 log units**, and propagating an error that size
+> through the same scoring run takes R² from 0.718 to **≈ 0.27**. So **the
+> descriptor layer that ships has never been scored**, and 0.718 is a score of
+> the physics on inputs the engine does not have.
+> → [`../results/descriptor_falsification.md`](../results/descriptor_falsification.md)
 > → [`../results/two_route_promotion.md`](../results/two_route_promotion.md)
 > → [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md),
 > [`../results/two_route_transport.md`](../results/two_route_transport.md)
-> (the two-route fix reaches R² = 0.725 blind, but is **default-OFF and wired
-> into nothing**, so no number here benefits from it).
+> (that file scores the same physics at R² = 0.725 under its original
+> pre-registered `hbd_logp_decrement` of 1.0; the shipping value is the sourced
+> 1.34, which scores 0.718 — the *lower* of the two, adopted anyway because it
+> comes from Abraham LSER coefficients rather than from fitting. See
+> `results/two_route_promotion.md` §1 and §4.)
 
 Drop `--drugs` and it compares **every** drug currently in the molecular
 library instead of a fixed list:

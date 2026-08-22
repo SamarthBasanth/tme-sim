@@ -1,0 +1,182 @@
+{
+ "descriptors": {
+  "per_compound": [
+   {
+    "name": "Mannitol",
+    "mw": 182.0,
+    "paper_logp": -2.62,
+    "paper_logp_source": "meas",
+    "crippen_logp": -3.585,
+    "d_logp": -0.9649999999999999,
+    "paper_hd": 6,
+    "engine_hbd": 6,
+    "d_hbd": 0,
+    "meas_D_um2s": 21.099999999999998,
+    "tpsa": 121.38,
+    "hba": 6,
+    "formal_charge": 0
+   },
+   {
+    "name": "NLCQ-1",
+    "mw": 332.0,
+    "paper_logp": 0.22,
+    "paper_logp_source": "meas",
+    "crippen_logp": 3.495,
+    "d_logp": 3.275,
+    "paper_hd": 1,
+    "engine_hbd": 1,
+    "d_hbd": 0,
+    "meas_D_um2s": 60.6,
+    "tpsa": 85.88,
+    "hba": 6,
+    "formal_charge": 0
+   },
+   {
+    "name": "SN24280 (TPZ)",
+    "mw": 178.0,
+    "paper_logp": -0.38,
+    "paper_logp_source": "meas",
+    "crippen_logp": -0.916,
+    "d_logp": -0.536,
+    "paper_hd": 2,
+    "engine_hbd": 1,
+    "d_hbd": -1,
+    "meas_D_um2s": 40.400000000000006,
+    "tpsa": 92.79,
+    "hba": 4,
+    "formal_charge": 0
+   },
+   {
+    "name": "Urea",
+    "mw": 60.1,
+    "paper_logp": -2.01,
+    "paper_logp_source": "meas",
+    "crippen_logp": -0.976,
+    "d_logp": 1.0339999999999998,
+    "paper_hd": 4,
+    "engine_hbd": 2,
+    "d_hbd": -2,
+    "meas_D_um2s": 45.0,
+    "tpsa": 69.11,
+    "hba": 1,
+    "formal_charge": 0
+   },
+   {
+    "name": "acridan-9(10H)-one",
+    "mw": 195.0,
+    "paper_logp": 2.96,
+    "paper_logp_source": "meas",
+    "crippen_logp": 2.681,
+    "d_logp": -0.2789999999999999,
+    "paper_hd": 1,
+    "engine_hbd": 1,
+    "d_hbd": 0,
+    "meas_D_um2s": 317.0,
+    "tpsa": 32.86,
+    "hba": 1,
+    "formal_charge": 0
+   }
+  ],
+  "logp_error": {
+   "n": 5,
+   "mean": 0.5058,
+   "rms": 1.618094125815924,
+   "mae": 1.2178,
+   "min": -0.9649999999999999,
+   "max": 3.275,
+   "n_positive": 2
+  },
+  "hbd_error": {
+   "mean": -0.6,
+   "min": -2,
+   "max": 0,
+   "n_mismatched": 2
+  },
+  "hbd_convention": [
+   {
+    "name": "Mannitol",
+    "table_hd": 6,
+    "num_h_donors": 6,
+    "nhoh_count": 6
+   },
+   {
+    "name": "NLCQ-1",
+    "table_hd": 1,
+    "num_h_donors": 1,
+    "nhoh_count": 1
+   },
+   {
+    "name": "SN24280 (TPZ)",
+    "table_hd": 2,
+    "num_h_donors": 1,
+    "nhoh_count": 2
+   },
+   {
+    "name": "Urea",
+    "table_hd": 4,
+    "num_h_donors": 2,
+    "nhoh_count": 4
+   },
+   {
+    "name": "acridan-9(10H)-one",
+    "table_hd": 1,
+    "num_h_donors": 1,
+    "nhoh_count": 1
+   }
+  ],
+  "ionisation": {
+   "tokens_found": [],
+   "handled": false,
+   "report": [
+    "descriptors.compute_descriptors -> 'logp' is Crippen.MolLogP: True",
+    "compile_drug passes descriptors['logp'] straight to two_route: True",
+    "pH/pKa/logD/ionisation tokens anywhere on that path: NONE",
+    "VERDICT: ionisation is NOT handled on the transport path. RDKit's Crippen MolLogP is a neutral-species octanol/water logP with no pKa input at all.",
+    "The repo DOES have a pKa table (molecular/ion_trapping.py) but it serves lysosomal trapping and is not on this path.",
+    "Consequence: substituting Crippen logP for Pruijn's logP7.4 is a SYSTEMATIC discrepancy for any ionisable compound, not noise. Its sign is fixed: for a compound ionised at pH 7.4, logD7.4 < logP, so the engine reports it MORE lipophilic than it is, opens the transcellular route too far, and over-predicts D."
+   ]
+  },
+  "end_to_end": [
+   {
+    "name": "Mannitol",
+    "meas": 21.099999999999998,
+    "shipping_D": 43.06894235876076,
+    "shipping_ratio": 2.0411821023109367,
+    "paper_desc_D": 43.07881510189656,
+    "paper_desc_ratio": 2.041650004829221
+   },
+   {
+    "name": "NLCQ-1",
+    "meas": 60.6,
+    "shipping_D": 200.60958742064244,
+    "shipping_ratio": 3.3103892313637364,
+    "paper_desc_D": 82.18754216515732,
+    "paper_desc_ratio": 1.356230068731969
+   },
+   {
+    "name": "SN24280 (TPZ)",
+    "meas": 40.400000000000006,
+    "shipping_D": 49.33219989048552,
+    "shipping_ratio": 1.221094056695186,
+    "paper_desc_D": 44.39828007911168,
+    "paper_desc_ratio": 1.098967328690883
+   },
+   {
+    "name": "Urea",
+    "meas": 45.0,
+    "shipping_D": 65.47515820193007,
+    "shipping_ratio": 1.455003515598446,
+    "paper_desc_D": 65.121203003726,
+    "paper_desc_ratio": 1.4471378445272443
+   },
+   {
+    "name": "acridan-9(10H)-one",
+    "meas": 317.0,
+    "shipping_D": 239.50081043172779,
+    "shipping_ratio": 0.7555230612988258,
+    "paper_desc_D": 240.4104258676776,
+    "paper_desc_ratio": 0.7583925106235886
+   }
+  ]
+ }
+}

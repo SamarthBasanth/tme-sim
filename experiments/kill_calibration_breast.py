@@ -83,6 +83,7 @@ from tmesim.validation.kill_calibration import (  # noqa: E402
     state_breakdown,
     state_dependency,
     unit_transport,
+    unit_transport_cache_key,
     window_plasma_mean,
 )
 
@@ -312,7 +313,17 @@ def run(dx_um: float = DX_UM, drugs: Sequence[str] = DRUGS, verbose: bool = True
         sens_uniform = np.asarray(m2.cells.sensitivity, dtype=np.float64)[tumor]
         d["sensitivity_uniform_mean"] = float(sens_uniform.mean())
 
-        ckey = f"{name}|{dx_um}|{DT_S}|{WINDOW_S}|{SAVE_EVERY}|ic50={drug.ic50:.6g}"
+        # ONE key function, imported -- never rebuilt here. This site used to
+        # key on `ic50={drug.ic50:.6g}`, i.e. the ONE drug parameter that does
+        # NOT determine the cached `e_unit`, while omitting the four that do
+        # (diffusivity, binding, clearance, bbb_penetrance -- everything
+        # `unit_transport` actually reads). A key that looks parameterised and
+        # is not is why nobody looked at it. See
+        # results/hbd_convention_audit.md sec. 6.3 and
+        # tmesim/validation/kill_calibration.unit_transport_cache_key.
+        ckey = unit_transport_cache_key(name, drug, dx_um, dt_s=DT_S,
+                                        window_s=WINDOW_S,
+                                        save_every=SAVE_EVERY)
         tr = None
         if ckey in cache:
             log("  unit transport: cache hit")

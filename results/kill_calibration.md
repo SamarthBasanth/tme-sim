@@ -1,5 +1,30 @@
 # ABSOLUTE KILL: the 3-D:2-D ratio test
 
+> ## RATIOS SUPERSEDED 2026-08-21 — verdicts unchanged
+>
+> **§3's scored ratios predate two physics changes and were never regenerated.**
+> This file was last measured at `697bf57` (2026-08-12). Afterwards `d77d169`
+> (area-conserving vessel source) and `fd2a9e7` (two-route transport ON) both
+> moved `e_unit`, which moves every kill ratio. Neither commit re-read this
+> document.
+>
+> | | §3 here (2026-08-12) | current (cold, shipping default) |
+> |---|---:|---:|
+> | temozolomide | 0.2626 | **0.2518** |
+> | cisplatin | 0.2791 | **0.2739** |
+> | doxorubicin | 0.2077 | **0.2081** |
+>
+> **All three verdicts are unchanged: PASS / PASS / PASS**, and the literature
+> bands are unaffected. Corroborated independently — the current values agree to
+> four decimals with `results/area_conservation_promotion.md` §2, which measured
+> them at promotion time, one of 9 of 9 such agreements across the GBM and breast
+> panels.
+>
+> Separately: until 2026-08-21 `codon validate` printed a **third** set
+> (0.2583 / 0.2746 / 0.2044) which matches *neither* — a cache-key defect served
+> PDE solves from a drug-parameter state that no longer exists in the history.
+> Fixed; see `tests/test_kill_cache_key.py`. The body below is left as measured.
+
 **The measured anchor we hold is a 2-D monolayer assay. The model is a 3-D microenvironment. That gap is not error — it is the phenomenon the model exists to reproduce, and this file tests whether it reproduces it.**
 
 > ### Headline

@@ -1,5 +1,37 @@
 # External anchor survey — can the transport physics be validated against public data?
 
+> # ⚠️ CORRECTED 2026-08-14 — THE SURVEY'S STRUCTURAL DIAGNOSIS OF THE DIFFUSIVITY MODEL NO LONGER DESCRIBES THE SHIPPING ENGINE, AND ITS HIGHEST-VALUE BLOCKED ANCHOR IS NO LONGER BLOCKED
+>
+> **This banner is the only edit made to this file.** No number, quotation or
+> verdict below it has been changed or re-run. Everything below was true on
+> **2026-08-09**.
+>
+> **What changed, in two steps.**
+> 1. `d3b9955` (2026-08-13, *"Pruijn 2008 retrieved"*) obtained the
+>    compound-by-compound table this survey records as unobtainable, and scored
+>    the anchor.
+> 2. `fd2a9e7` (2026-08-14, *"Flip two-route transport ON"*) changed the
+>    diffusivity model this survey diagnoses. `compile_drug.build_profile` now
+>    routes `logp` and `hbd` into `effective_D`. Record:
+>    `results/two_route_promotion.md`.
+>
+> **Which statements are now false.**
+>
+> | where | statement | status |
+> |---|---|---|
+> | §2 (Hicks/TPZ row) | *"The engine derives `D_eff` from a Stokes–Einstein radius that is a function of **MW alone**… times a Brownian hindrance factor that depends on the **ECM fraction, not on the molecule**."* | **FALSE of the shipping engine.** The hindrance now depends on the molecule, through `logp` and `hbd`. |
+> | §2 (same row) | *"Scoring the spread… would be a cheap and decisive test… It is blocked solely on the compound-by-compound table."* | **NO LONGER BLOCKED, AND NO LONGER PENDING.** The table was retrieved and the test was run — see `results/diffusivity_falsification.md` (the MW-only model, falsified) and `results/two_route_promotion.md` (the replacement, scored). This survey's call was correct: it was the highest-value anchor identified, and it decided the physics. |
+> | §3.2 | *"the engine's only obstacle population is 'ECM'… so **cellular volume exclusion — which is most of a tumour's volume — is not in the hindrance law**."* | **FALSE.** This defect was the subject of `results/cellular_exclusion.md` and is closed. |
+> | §3.2 | *"**The engine hinders diffusion about 7× too weakly**"*, engine 1.77-fold vs measured 12-fold, ratio **0.148×** | **SUPERSEDED.** At the promotion the MCL hindrance factor is **10.3274-fold** against the same measured 12-fold, and that row went **FAIL → PASS** (`results/two_route_promotion.md`). |
+>
+> **What still stands, and is the more durable half of this file.** The survey's
+> premise — that the project sells transport physics and externally validates
+> very little of it — is what motivated everything above, and the retrieval
+> discipline (every value quoted with its DOI, nothing inferred from a title) is
+> unchanged. Note also that the **absolute** MCL `D_eff` row still FAILS after the
+> promotion; it merely fails in the opposite direction. The hindrance *ratio*
+> passing is not the absolute value passing.
+
 **Question this file answers.** `vivum validate` scores 13 anchor groups and prints
 about itself that **11 of its 11 scored quick-tier rows never invoke the transport
 PDE**. `results/heldout_patient_validation.md` found that the one anchor hoped to

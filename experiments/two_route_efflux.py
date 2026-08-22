@@ -82,10 +82,18 @@ T0 = time.time()
 #   a(water -> hexadecane)     = -3.587
 #   => Delta log P donor coefficient = 0.034 - (-3.587) = 3.621  per unit A
 #
-# VERIFIED, verbatim, in the open-access coefficient tables of
-#   Abraham MH, Acree WE Jr. ACS Omega 2019;4(7):12920-12926,
-#   doi:10.1021/acsomega.8b03242, PMC6648601, Table 1;
-# cross-checked against the Table 1 of J Comput Aided Mol Des 2017, PMC5579141.
+# VERIFIED, verbatim, in the open-access wet-solvent water-to-organic log P
+# coefficient table of
+#   Acree WE Jr, Grubbs LM, Abraham MH, "Prediction of Partition Coefficients
+#   and Permeability of Drug Molecules in Biological Systems with Abraham Model
+#   Solute Descriptors...", in Toxicity and Drug Testing, IntechOpen 2012
+#   (octan-1-ol wet a = 0.034; hexadecane a = -3.587);
+# independently confirmed in Table 1 of Abraham MH, Acree WE Jr, "Descriptors
+#   for Pentane-2,4-dione and Its Derivatives", J Solution Chem
+#   2017;46(8):1625-1638, doi:10.1007/s10953-017-0667-y, PMC5579141.
+# NOT the source, despite earlier revisions of this file: ACS Omega
+#   2019;4(2):2883-2892, doi:10.1021/acsomega.8b03242, PMC6648601 -- its Table 1
+#   has no hexadecane row. See results/abraham_citation_erratum.md.
 #
 # The model's input is an INTEGER donor COUNT (RDKit NumHDonors), not `A`, so the
 # conversion needs a typical `A` per donor group. Measured `A` values, verified in
@@ -393,10 +401,16 @@ def stage_hbd(decrements=None) -> dict:
       a(water -> wet octan-1-ol) = +0.034      a(water -> hexadecane) = -3.587
       => Delta log P donor coefficient = 3.621 per unit A
 
-  Both coefficients read VERBATIM from the open-access Table 1 of Abraham &
-  Acree, ACS Omega 2019;4(7):12920-12926, doi:10.1021/acsomega.8b03242
-  (PMC6648601), cross-checked against Table 1 of J Comput Aided Mol Des 2017
-  (PMC5579141). Measured `A` per donor group from PMC5830486 / PMC3477586.
+  Both coefficients read VERBATIM from the open-access wet-solvent
+  water-to-organic log P coefficient table of Acree WE Jr, Grubbs LM,
+  Abraham MH, in Toxicity and Drug Testing, IntechOpen 2012; independently
+  confirmed in Table 1 of Abraham MH, Acree WE Jr, "Descriptors for
+  Pentane-2,4-dione and Its Derivatives", J Solution Chem 2017;46(8):1625-1638,
+  doi:10.1007/s10953-017-0667-y (PMC5579141). NOT the source, despite earlier
+  revisions: ACS Omega 2019;4(2):2883-2892, doi:10.1021/acsomega.8b03242
+  (PMC6648601) -- its Table 1 has no hexadecane row. See
+  results/abraham_citation_erratum.md. Measured `A` per donor group from
+  PMC5830486 / PMC3477586.
 
   NOT USED, AND WHY. Abraham, Chadha, Whiting & Mitchell, J Pharm Sci
   1994;83(8):1085-1100 (PMID 7983591) is the canonical Delta log P citation and

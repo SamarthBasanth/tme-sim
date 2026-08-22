@@ -123,9 +123,11 @@ from tmesim.validation.kill_calibration import (  # noqa: E402
     kill_ratio_to_ic50_fold,
     prepare_tissue,
     ratio_test,
+    require_cached_unit_field,
     resistance_vector,
     score_ratio_row,
     unit_transport,
+    unit_transport_cache_key,
     window_plasma_mean,
 )
 from tmesim.validation.pk_reality import DEFAULT_ECM  # noqa: E402
@@ -677,12 +679,15 @@ def published_reference_check(drugs: Sequence[str] = TESTABLE,
     rows = []
     for name in drugs:
         drug, mol, _ = _compile_breast_cached(name, float(alpha))
-        ckey = (f"{name}|{dx_um}|{DT_S}|{WINDOW_S}|{SAVE_EVERY}"
-                f"|ic50={drug.ic50:.6g}")
-        if ckey not in cache:
-            log(f"  {name}: NO cache entry ({ckey}) -- skipped")
-            continue
-        e_unit = np.asarray(cache[ckey]["e_unit"], dtype=np.float64)
+        # ONE key function, imported -- never rebuilt here, and a miss RAISES
+        # rather than being logged and skipped. A drug quietly dropped from
+        # this table is indistinguishable from a drug that was never asked for.
+        ckey = unit_transport_cache_key(name, drug, dx_um, dt_s=DT_S,
+                                        window_s=WINDOW_S,
+                                        save_every=SAVE_EVERY)
+        e_unit = require_cached_unit_field(
+            cache, name, drug, dx_um, source=PUBLISHED_CACHE, dt_s=DT_S,
+            window_s=WINDOW_S, save_every=SAVE_EVERY)
         resist = resistance_vector(state_t, pd_cfg, drug=drug)
         rec = score(name, e_unit, sens[name], resist, drug, pd_cfg, bands,
                     plasma_mean)
@@ -757,12 +762,13 @@ def seed_checkpoint_from_published_cache(checkpoint: str,
                 assert drug == pub, (
                     f"{name}/{mode}: scale-1.0 drug params differ from the published "
                     f"compile; the cached exposure field is NOT reusable")
-                ckey = (f"{name}|{dx_um}|{DT_S}|{WINDOW_S}|{SAVE_EVERY}"
-                        f"|ic50={drug.ic50:.6g}")
-                if ckey not in cache:
-                    print(f"  no cache entry for {ckey}; skipping", flush=True)
-                    continue
-                e_unit = np.asarray(cache[ckey]["e_unit"], dtype=np.float64)
+                # ONE key function, imported -- never rebuilt here, and a miss
+                # RAISES rather than skipping. The old `continue` degraded a
+                # stale-cache miss into "nothing was cached", which produces a
+                # shorter checkpoint that looks complete.
+                e_unit = require_cached_unit_field(
+                    cache, name, drug, dx_um, source=PUBLISHED_CACHE,
+                    dt_s=DT_S, window_s=WINDOW_S, save_every=SAVE_EVERY)
                 resist = resistance_vector(state_t, pd_cfg, drug=drug)
                 rec = score(name, e_unit, sens[name], resist, drug, pd_cfg,
                             bands, plasma_mean)

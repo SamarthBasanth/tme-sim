@@ -1,13 +1,26 @@
-Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
+Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors
+Copyright 2020-2024 The Atkinson Hyperlegible Mono Project Authors
+(https://github.com/googlefonts/atkinson-hyperlegible)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:
 http://scripts.sil.org/OFL
 
-Files in this directory are the Latin subsets of IBM Plex Sans and IBM Plex
-Mono as distributed by Google Fonts. They are vendored here so the Studio
-renders identical numeric columns on every machine rather than falling through
-to whatever monospace face the operating system supplies; see ../css/fonts.css.
+Both copyright lines above were read directly out of the shipped fonts' `name`
+tables (nameID 0) rather than transcribed from memory.
+
+Files in this directory are the latin and latin-ext subsets of Atkinson
+Hyperlegible Next and Atkinson Hyperlegible Mono as distributed by Google
+Fonts. They are vendored here so the Studio renders identical numeric columns
+on every machine rather than falling through to whatever monospace face the
+operating system supplies; see ../css/fonts.css for why this family.
+
+HISTORY. Until 2026-08-21 this directory held the Latin subsets of IBM Plex
+Sans and IBM Plex Mono, also under this same licence, copyright (c) 2017 IBM
+Corp with Reserved Font Name "Plex". Those files were removed when the faces
+were replaced, so this notice now covers only the Atkinson files present. Plex
+remains named in the --font-ui / --font-mono fallback chains in ../css/tokens.css
+as a request to the operating system; no Plex file is redistributed here.
 
 -----------------------------------------------------------
 SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007

@@ -1,0 +1,5 @@
+cell_line,urea_Dmcl_x1e7_cm2_s,urea_Dmcl_sem_x1e7_cm2_s,n_replicates,mcl_thickness_um_fig3a,source
+HT29,4.50,0.23,6,163,"Experimental / MCL Flux Studies, p.692 (Dmcl); Fig. 3 caption, p.689 (thickness)"
+SiHa,9.62,0.85,9,245,"Experimental / MCL Flux Studies, p.692 (Dmcl); Fig. 3 caption, p.689 (thickness)"
+HCT8-Ea,1.31,0.37,15,182,"Experimental / MCL Flux Studies, p.692 (Dmcl); Fig. 3 caption, p.689 (thickness)"
+HCT8-Ra,26.8,0.72,13,206,"Experimental / MCL Flux Studies, p.692 (Dmcl); Fig. 3 caption, p.689 (thickness)"

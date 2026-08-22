@@ -286,14 +286,71 @@ CONDITIONALS: Dict[str, str] = {
     ),
     "coefficient-not-field": (
         "This row scores an INPUT COEFFICIENT of the transport PDE, not any "
-        "solved field. The prediction is read straight off MolecularProfile "
-        "after descriptors.from_smiles -> compile_drug.build_profile; the "
-        "solver is never entered, verified by a call counter on "
+        "solved field. Two provenance routes carry this tag and both were "
+        "verified rather than asserted, by a call counter on "
         "physics.diffusion.simulate_drug_transport and "
-        "sim.engine.simulate_response and recorded in "
-        "results/anchor_registration.md sec. 3. It is a stronger row than an "
+        "sim.engine.simulate_response: (i) the MCL coefficient rows, whose "
+        "prediction is read straight off MolecularProfile after "
+        "descriptors.from_smiles -> compile_drug.build_profile (counters 0/0, "
+        "plus a sys.setprofile sweep, recorded in "
+        "results/anchor_registration.md sec. 3); (ii) the brain-slice "
+        "tissue-capacity row, whose prediction is the two-route capacity term "
+        "s_eff evaluated at the shipping constants (counters 0/0, recorded in "
+        "results/brain_slice_anchor.md sec. 0). It is a stronger row than an "
         "unanchored coefficient and a weaker one than a field test: it can "
-        "FALSIFY the hindrance law, and it cannot confirm or refute the solver."
+        "FALSIFY the coefficient law it scores, and it cannot confirm or "
+        "refute the solver."
+    ),
+    "capacity-normalised-to-one": (
+        "THE ENGINE'S TISSUE CAPACITY IS 1.0 BY CONSTRUCTION, NOT BY CHOICE, "
+        "and that is the load-bearing caveat on the brain-slice row. The "
+        "quantity scored is the two-route capacity term written down in "
+        "molecular/two_route.py's own derivation, s_eff = (1 - phi) + "
+        "phi*K*(1 + K_b): matrix (interstitial) capacity normalised to 1, "
+        "inclusion (cell) capacity K*(1 + K_b), combined by an exact volume "
+        "average. At the shipping constants phi = 0.7892, K = cell_partition "
+        "= 1.0 and K_b absent (compile_drug.build_profile never passes "
+        "bound_to_free_ratio), so s_eff = 1.000000 EXACTLY, for every "
+        "compound. Nobody set that value: it is the normalisation implied by "
+        "publishing a CONDUCTANCE and declining to publish a capacity "
+        "(two_route.py: 'this module's published output is a CONDUCTANCE, "
+        "computed against a convention in which the no-binding capacity is "
+        "1'). EVERY dimensionless partition/capacity quantity in the shipping "
+        "engine equals exactly 1.0 -- cell_partition, "
+        "two_route.retardation_factor, the unshipped ion_trapping "
+        "retardation R, and s_eff -- so the verdict does not depend on which "
+        "of them a reader prefers. TWO CONSEQUENCES FOR THE FIX, and neither "
+        "knob is clean. (1) K (cell_partition) is NOT a capacity-only knob: "
+        "it also sets the inclusion conductivity in two_route_factor "
+        "(sigma_c = cell_partition * cytoplasm_D), so raising it to lift the "
+        "capacity would move D_eff and re-open the Pruijn HT-29 fit -- and "
+        "prereg sec. 3.2 independently forbids using Vu,brain, a LUMPED "
+        "quantity, to set K, which is one component of the lump. THIS ROW "
+        "DOES NOT LICENSE MOVING cell_partition AND MUST NOT BE CITED AS IF "
+        "IT DID; K remains unconstrained by any measurement. (2) K_b "
+        "(intracellular retardation) IS the per-compound capacity term the "
+        "engine lacks -- and it was built and REFUTED on Pruijn HT-29 "
+        "(results/intracellular_retardation.md: R^2 0.718 -> 0.606; "
+        "matched-MW rank agreement 77.4% -> 51.6%). The term this failure "
+        "points at and the term the earlier work rejected are the SAME TERM, "
+        "and the two datasets point in opposite directions. That tension is "
+        "unresolved and is a model decision, not a scorecard one."
+    ),
+    "brain-slice-not-tumour": (
+        "COMMENSURABILITY BOUND (prereg results/transport_anchor_prereg.md "
+        "sec. 3.10). The measurement is an unbound distribution volume in RAT "
+        "BRAIN SLICES: 300 um fresh slices in oxygenated artificial ECF, "
+        "Vi-corrected, at the assay's own pH -- no vasculature, no plasma "
+        "source term, no tumour, and not human. What it licenses: scoring the "
+        "engine's implied tissue drug CAPACITY, an input coefficient, in the "
+        "same units and the same functional role. What it does NOT license: "
+        "any statement about the transport solver (never entered here), any "
+        "solved concentration field, vessel spacing, transvascular delivery, "
+        "interstitial convection, any absolute kill fraction, D_eff accuracy, "
+        "or human tumour tissue. The anchor is weakest exactly where the "
+        "quantity matters most: tumour interstitium is acidic and rat brain "
+        "is not, and the ion-trapping direction that follows is precisely the "
+        "term the engine does not ship."
     ),
     "brain-permeability-in-breast": (
         "PS is bbb_penetrance, a blood-BRAIN-barrier term, applied to breast "
@@ -1074,6 +1131,276 @@ def _run_mcl_transport_coefficients() -> List[Row]:
                 "calibrated_ratio_to_measured": [k_cal / k_hi, k_cal / k_lo]},
     ))
     return rows
+
+
+def _run_brain_slice_capacity() -> List[Row]:
+    """The engine's implied tissue drug CAPACITY vs measured rat brain-slice
+    ``Vu,brain`` — TEST B of ``results/transport_anchor_prereg.md``.
+
+    THE CRITERION WAS FIXED BEFORE THE NUMBER WAS COMPUTED
+    ------------------------------------------------------
+    This is the repo's first genuinely pre-registered external test. The plan
+    (``results/transport_anchor_prereg.md``) was written and committed by one
+    agent; the dataset cascade, the statistic, the 3.0 bar, the bootstrap and
+    the withdrawal conditions were all fixed in it; a different agent then
+    executed it and published ``results/brain_slice_anchor.md``. Every bar
+    below is transcribed from the plan by
+    ``experiments/brain_slice_anchor.py``, which also mirrors them into the
+    frozen ``results/sweep/transport_anchor_prereg.json`` (prereg sec. 7.3).
+    Nothing here may be re-chosen now that the result is known.
+
+    THE HEADLINE IS ENGINE-INDEPENDENT, AND IT IS NOT DROPPABLE
+    -----------------------------------------------------------
+    ``GMFE_floor`` — the best unsigned geometric-mean fold error ANY constant
+    predictor could achieve on this measurement — is the number prereg
+    sec. 3.5a insists be published whatever the verdict. It contains no engine
+    quantity, no descriptor and no code version, so it does not move under any
+    recalibration of ``alpha``, any resolution of the ``HD``-convention
+    question, or any bug fix. It is what quantifies the missing per-compound
+    term: a re-centred constant would pass THE TEST by construction and would
+    still be wrong by ``GMFE_floor`` on average, so re-centring must never be
+    reported as a fix. The floor is therefore carried in ``measured``, in the
+    ``note`` and in ``values``, and a test pins that it cannot be dropped.
+
+    SCOPE IS ``analytic``, AND THAT IS NOT A FORMALITY
+    --------------------------------------------------
+    This row scores an INPUT COEFFICIENT — a capacity term compiled in closed
+    form — not a solved field. Prereg sec. 8.5 registers it as
+    ``SCOPE_ANALYTIC`` and says **never** ``SCOPE_PDE``. The executor verified
+    the solver was not entered (both call counters 0), and the runner
+    re-verifies it live on every run and records the counts in ``values``.
+    Tagging it ``PDE`` would move the summary's "N of N scored rows never
+    invoke the transport PDE" line without a single extra solve, which is the
+    disclosure that line exists to make.
+
+    NOTHING IS TUNED HERE
+    ---------------------
+    The measured values come from ``data_cache/brain_slice/vu_brain.csv``,
+    whose ``INCLUSION_RULE.md`` was frozen before extraction; the cascade,
+    statistics and engine quantity all come from
+    ``experiments/brain_slice_anchor.py`` unmodified. The verdict is recomputed
+    LIVE rather than quoted, so if the engine's capacity term ever moves, this
+    row moves with it instead of going stale.
+    """
+    import numpy as np
+
+    B = _import_experiment("brain_slice_anchor")
+
+    all_rows = B._load_rows()
+    scored = B.cascade(all_rows)["scored"]
+    v = B._values(scored)
+
+    # prereg sec. 2.3 / 9.5 rider 3. A drift here does NOT soften the verdict:
+    # the test is recomputed live either way, and the drift is shouted in the
+    # note. Converting a FAIL to NOT TESTABLE on a constant change is exactly
+    # the "check that stopped checking" pattern this row exists to avoid.
+    try:
+        B.assert_frozen_constants()
+        frozen_drift = ""
+    except AssertionError as exc:          # pragma: no cover - drift is a defect
+        frozen_drift = str(exc)
+
+    # GATE 1 (prereg sec. 3.3), with the solver guard the executor used.
+    with B._SolverGuard() as guard:
+        gate = B.engine_tissue_capacity()
+    solver_calls = dict(guard.counts)
+
+    pred = float(gate["implied_vu_brain_ml_per_g"])
+    floor, c_opt = B.gmfe_floor(v)
+    _f, f_lo, f_hi, _fz0, _fa, _ = B.bca(
+        v, lambda x: B.gmfe_floor(x)[0], B.BOOTSTRAP_RESAMPLES,
+        B.BOOTSTRAP_SEED, B.BOOTSTRAP_CI)
+    g_eng = B.gmfe(pred, v)
+    ratio = g_eng / floor
+    _r, r_lo, r_hi, z0, acc, _ = B.bca(
+        v, lambda x: B.gmfe(pred, x) / B.gmfe_floor(x)[0],
+        B.BOOTSTRAP_RESAMPLES, B.BOOTSTRAP_SEED, B.BOOTSTRAP_CI)
+
+    bar_x = float(B.THE_TEST_BAR)
+    # prereg sec. 3.6: the interval must lie ENTIRELY on one side of the bar. A
+    # straddle is UNDERPOWERED (bucket B-C) and is NOT a soft pass.
+    if r_lo > bar_x:
+        status, bucket = FAIL, "B-B MISCALIBRATED"
+    elif r_hi < bar_x:
+        status, bucket = PASS, "B-A CONSTRAINED"
+    else:
+        status, bucket = NOT_TESTABLE, "B-C UNDERPOWERED"
+
+    lo_m, hi_m = float(v.min()), float(v.max())
+    bw1 = not (lo_m <= pred <= hi_m)
+    below = int(np.sum(pred < v))
+    within3 = B._coverage(pred, v, 3.0) * 100.0
+    within10 = B._coverage(pred, v, 10.0) * 100.0
+    pmids = tuple(dict.fromkeys(r["source_pmid"] for r in scored))
+
+    note = (
+        f"GMFE_floor = {floor:.2f}x IS THE HEADLINE, AND IT IS "
+        f"ENGINE-INDEPENDENT (prereg sec. 3.5a). {floor:.2f}x "
+        f"(90 % BCa CI {f_lo:.2f}-{f_hi:.2f}) is the best unsigned "
+        f"geometric-mean fold error ANY constant predictor could achieve on "
+        f"these {len(v)} measurements, attained at the constant "
+        f"{c_opt:.0f} mL.g brain^-1. It contains no engine quantity and does "
+        f"not move under any recalibration of alpha, any resolution of the "
+        f"HD-convention question, or any bug fix. Read plainly: the engine "
+        f"has NO per-compound tissue-capacity term at all, and this is what "
+        f"that costs. A single re-centred constant would cut GMFE(engine) "
+        f"from {g_eng:.2f}x to {floor:.2f}x and would then PASS THE TEST BY "
+        f"CONSTRUCTION while still being wrong by {floor:.2f}x on average -- "
+        f"nearly {floor / B.REPRODUCIBILITY_FLOOR:.0f}x the assay's own "
+        f"{B.REPRODUCIBILITY_FLOOR:.2f}x reproducibility floor. RE-CENTRING "
+        f"IS THEREFORE NOT A FIX AND MUST NOT BE REPORTED AS ONE; the "
+        f"headroom a better CONSTANT is competing for is zero, and the "
+        f"headroom a per-compound term is competing for is "
+        f"{floor:.2f}x down to {B.REPRODUCIBILITY_FLOOR:.2f}x. "
+        f"DIRECTION: the miss is one-directional -- the engine is below "
+        f"{below} of {len(v)} measured values (B-S4), within-3x coverage "
+        f"{within3:.1f} %, within-10x {within10:.1f} %, worst case "
+        f"{float(np.max(np.maximum(pred / v, v / pred))):.0f}x -- and the "
+        f"non-base stratum's ratio is 6.58, so prereg sec. 4.3's "
+        f"'concentrated in the base stratum' exemption was checked and does "
+        f"NOT apply. WITHDRAWAL CONDITION BW1 IS "
+        f"{'TRIGGERED' if bw1 else 'NOT TRIGGERED'}: the engine's implied "
+        f"value {pred:.3f} lies "
+        f"{'OUTSIDE' if bw1 else 'inside'} the retained measured range "
+        f"[{lo_m:g}, {hi_m:g}]. The claim BW1 withdraws, verbatim from prereg "
+        f"sec. 4.2, is 'the engine's treatment of tissue drug capacity is a "
+        f"physically defensible approximation, rather than a placeholder "
+        f"whose value was never checked against anything' -- WITHDRAWN, not "
+        f"narrowed. "
+        f"TWO JUDGEMENT CALLS ARE RECORDED RATHER THAN RESOLVED, both flagged "
+        f"by the executor and both carried forward here. (1) GATE 1's ENGINE "
+        f"QUANTITY. prereg sec. 3.3 lists four candidates and rejects three; "
+        f"the quantity actually scored, the two-route capacity term s_eff, is "
+        f"not on that list, and sec. 8.4 hands the slot to the executor. THE "
+        f"ALTERNATIVE READING, STATED SO THE DECISION IS VISIBLE AND "
+        f"REVERSIBLE: a reader could hold that a capacity fixed at 1 by a "
+        f"NORMALISATION CONVENTION is not a quantity the engine 'expresses' "
+        f"at all, in which case GATE 1 fails and this bucket is B-D, NOT "
+        f"TESTABLE, reason 'the model cannot express the measured quantity'. "
+        f"THIS ROW REGISTERS THE LESS FLATTERING READING -- FAIL -- because "
+        f"s_eff = (1-phi) + phi*K*(1+K_b) is a real expression whose "
+        f"parameters happen to be unity and it passes all four of sec. 3.3's "
+        f"gate items on its own terms. Both readings are non-passes and "
+        f"neither supports the claim, and the NUMBER is unaffected either "
+        f"way: cell_partition, two_route.retardation_factor, the unshipped "
+        f"ion_trapping R and s_eff are ALL exactly 1.0 as shipped. (2) PREREG "
+        f"sec. 4.2 IS INTERNALLY INCONSISTENT ABOUT BW1 AND NEEDS AMENDMENT "
+        f"UNDER sec. 9.5 -- which an implementer may not do, so it is flagged "
+        f"here and not touched. BW1's operative sentence says 'outside "
+        f"[min, max] of the RETAINED measurements' (retained min "
+        f"{lo_m:g} -> trips), while its illustrative paragraph quotes the "
+        f"pre-E6 range 0.436-4184, which straddles unity (-> would not trip). "
+        f"The executor applied the operative sentence because 'retained' has "
+        f"a single fixed meaning in that document. NOTHING TURNS ON IT: THE "
+        f"TEST fails by {ratio / bar_x:.1f}x under either reading, and BW1 is "
+        f"a separate condition from THE TEST. "
+        f"The engine prediction has ZERO VARIANCE -- one distinct capacity "
+        f"state over 210 descriptor combinations spanning logP -4..8, HBD "
+        f"0..16 and radius 0.15-3.0 nm -- so Spearman rho is NOT COMPUTABLE "
+        f"(prereg sec. 3.5 registered this in advance); it is not 0.00 and "
+        f"not a separate failure. Sensitivity: at rho_tissue = 1.04 g.mL^-1 "
+        f"the engine value is "
+        f"{gate['implied_vu_brain_ml_per_g_at_1p04']:.3f} and every verdict "
+        f"is unchanged. Every sensitivity arm the executor ran also fails "
+        f"(E1/E5/E6 relaxed: ratios 10.94, 12.17, 10.45), so no exclusion is "
+        f"doing load-bearing work; the separate, never-pooled mouse arm sits "
+        f"at 3.11 and carries no verdict (prereg sec. 3.4 E2). Reproducibility "
+        f"floor {B.REPRODUCIBILITY_FLOOR:.2f}x (n = 2 replicate pairs; an "
+        f"order-of-magnitude bound, not a calibrated uncertainty) prints "
+        f"beside every fold-error figure above, per prereg sec. 3.4a."
+    )
+    if frozen_drift:                        # pragma: no cover - drift is a defect
+        note = ("!! prereg sec. 2.3 FROZEN CONSTANT DRIFT: " + frozen_drift +
+                " The verdict above was recomputed LIVE against the moved "
+                "engine and is NOT softened, but this row is no longer the "
+                "pre-registered execution and prereg sec. 9.5 requires the "
+                "coordinator to re-register it. " + note)
+    if any(solver_calls.values()):          # pragma: no cover - a scope defect
+        note = (f"!! SCOPE TAG DEFECT: the transport solver WAS entered while "
+                f"producing this row ({solver_calls}), so scope=analytic is "
+                f"no longer true of it. The verdict stands; the tag does not. "
+                + note)
+
+    return [Row(
+        group="brain-slice-tissue-capacity",
+        label="implied tissue capacity Vu,brain (33 compounds, rat brain slice)",
+        status=status, scope=SCOPE_ANALYTIC,
+        quantity="the engine's implied unbound brain tissue distribution "
+                 "volume Vu,brain (mL.g brain^-1) -- the two-route capacity "
+                 "term s_eff = (1-phi) + phi*K*(1+K_b) from "
+                 "molecular/two_route.py at the shipping constants, converted "
+                 "at a density of 1.00 g.mL^-1 declared IN ADVANCE -- vs "
+                 "MEASURED rat brain-slice Vu,brain, the same ratio of tissue "
+                 "content to unbound interstitial concentration, measured by "
+                 "the equilibrium brain-slice method",
+        predicted=f"{pred:.3f} mL.g brain^-1, THE SAME NUMBER FOR EVERY "
+                  f"COMPOUND (s_eff = "
+                  f"{gate['s_eff_ml_per_ml_tissue']:.6f} exactly). "
+                  f"GMFE(engine) = {g_eng:.2f}x, i.e. ratio to the floor = "
+                  f"{ratio:.3f} against a bar of {bar_x:.1f} "
+                  f"[90 % BCa CI {r_lo:.2f}-{r_hi:.2f}, entirely "
+                  f"{'ABOVE' if r_lo > bar_x else 'below'} the bar] -- bucket "
+                  f"{bucket}. The engine sits {c_opt / pred:.1f}x below the "
+                  f"best available constant and below "
+                  f"{below}/{len(v)} measurements",
+        measured=f"{len(v)} retained rows, {lo_m:g}-{hi_m:g} mL.g brain^-1 "
+                 f"(spread {hi_m / lo_m:.0f}x), rat, equilibrium brain slice, "
+                 f"from open-access primary sources. GMFE_floor = "
+                 f"{floor:.2f}x (90 % BCa CI {f_lo:.2f}-{f_hi:.2f}) at the "
+                 f"optimal constant {c_opt:.0f} mL.g brain^-1 -- the best ANY "
+                 f"constant predictor could do, and the number that "
+                 f"quantifies the missing per-compound term",
+        pmids=pmids,
+        bar=f"PRE-REGISTERED IN ADVANCE, results/transport_anchor_prereg.md "
+            f"sec. 3.5: GMFE(engine) / GMFE_floor <= {bar_x:.1f}, with the "
+            f"90 % BCa interval ({B.BOOTSTRAP_RESAMPLES} resamples over "
+            f"compounds, seed {B.BOOTSTRAP_SEED}) required to lie ENTIRELY on "
+            f"one side of the bar (sec. 3.6); a straddle is UNDERPOWERED and "
+            f"NOT a soft pass. The bar is baseline-relative and forgiving BY "
+            f"CONSTRUCTION on a set this wide, and it was fixed and committed "
+            f"before any prediction was computed -- it has not been widened, "
+            f"and prereg sec. 4.1 says the required next action on a miss is "
+            f"to constrain the coefficient, NOT to widen the bar",
+        reason=("" if status != NOT_TESTABLE else
+                f"UNDERPOWERED (bucket B-C, prereg sec. 3.6): the 90 % BCa "
+                f"interval [{r_lo:.2f}, {r_hi:.2f}] straddles the bar "
+                f"{bar_x:.1f}, so the sign of the comparison is not "
+                f"established. This is NOT a soft pass and must never be "
+                f"pooled with one."),
+        note=note,
+        conditional=("coefficient-not-field", "capacity-normalised-to-one",
+                     "brain-slice-not-tumour"),
+        values={
+            "verdict_bucket": bucket,
+            "engine_vu_brain_ml_per_g": pred,
+            "s_eff": float(gate["s_eff_ml_per_ml_tissue"]),
+            "gmfe_engine_x": float(g_eng),
+            "gmfe_floor_x": float(floor),
+            "gmfe_floor_ci90": [float(f_lo), float(f_hi)],
+            "gmfe_floor_optimal_constant_ml_per_g": float(c_opt),
+            "ratio": float(ratio),
+            "ratio_ci90": [float(r_lo), float(r_hi)],
+            "the_test_bar": bar_x,
+            "n": int(v.size),
+            "measured_range_ml_per_g": [lo_m, hi_m],
+            "reproducibility_floor_x": float(B.REPRODUCIBILITY_FLOOR),
+            "bw1_reachability_triggered": bool(bw1),
+            "n_below_engine": below,
+            "within_3x_pct": float(within3),
+            "within_10x_pct": float(within10),
+            "spearman_rho": "NOT COMPUTABLE -- zero-variance prediction",
+            "density_g_per_ml": float(B.TISSUE_DENSITY_G_PER_ML),
+            "bca": {"resamples": int(B.BOOTSTRAP_RESAMPLES),
+                    "seed": int(B.BOOTSTRAP_SEED),
+                    "level": float(B.BOOTSTRAP_CI),
+                    "z0": float(z0), "a": float(acc)},
+            "solver_calls": solver_calls,
+            "frozen_constants_drift": frozen_drift,
+            "prereg": "results/transport_anchor_prereg.md",
+            "prereg_frozen_json": "results/sweep/transport_anchor_prereg.json",
+            "execution_record": "results/brain_slice_anchor.md",
+        },
+    )]
 
 
 # --------------------------------------------------------------------------- #
@@ -2317,6 +2644,27 @@ def build_registry(exchange: bool = False) -> List[AnchorGroup]:
             runner=_run_mcl_transport_coefficients, est="~10 s",
         ),
         AnchorGroup(
+            key="brain-slice-tissue-capacity",
+            title="PRE-REGISTERED (TEST B): implied tissue drug capacity "
+                  "Vu,brain vs measured rat brain-slice Vu,brain, 33 compounds",
+            tissue="rat brain", tier=TIER_QUICK, scope=SCOPE_ANALYTIC,
+            source="experiments/brain_slice_anchor.py (owns the sec. 3.1 "
+                   "cascade, the statistics of sec. 3.5 and the GATE 1 engine "
+                   "quantity; every bar transcribed from the pre-registration "
+                   "and mirrored into results/sweep/transport_anchor_prereg.json "
+                   "before any prediction was computed) driving the unmodified "
+                   "molecular.two_route capacity term. The transport solver is "
+                   "NOT entered -- call counters re-checked live on every run",
+            report="results/brain_slice_anchor.md (execution record, FAIL), "
+                   "results/transport_anchor_prereg.md (the PRE-REGISTRATION: "
+                   "sec. 3.5 THE TEST, sec. 3.5a GMFE_floor, sec. 4.1 buckets, "
+                   "sec. 4.2 withdrawal, sec. 8.5 this registration), "
+                   "data_cache/brain_slice/PROVENANCE.md",
+            runner=_run_brain_slice_capacity, est="~3 s",
+            needs=("data_cache/brain_slice/vu_brain.csv",
+                   "data_cache/brain_slice/INCLUSION_RULE.md"),
+        ),
+        AnchorGroup(
             key="breast-transvascular",
             title="Breast interstitial:plasma AUC vs measured human microdialysis",
             tissue="breast", tier=TIER_FULL, scope=SCOPE_PDE,
@@ -2552,6 +2900,24 @@ OUT_OF_SCOPE: Tuple[Tuple[str, str], ...] = (
      "the PARENT DRUG ONLY — DFCR, DFUR and 5-FU are metabolites generated "
      "intracellularly en route, so their interstitial concentration carries a "
      "local generation term the engine does not model."),
+    ("TEST C of results/transport_anchor_prereg.md (sec. 3.8) -- Kp,uu,cell, "
+     "data_cache/brain_slice/kp_uu_cell.csv -- and the two other columns that "
+     "sit beside the registered brain-slice anchor: "
+     "data_cache/brain_slice/kp_uu_brain_DO_NOT_SCORE.csv, and the MOUSE arm "
+     "of vu_brain.csv",
+     "REGISTERED IN THE PRE-REGISTRATION AND DELIBERATELY NOT SCORED, each "
+     "for a reason fixed before the data were read. TEST C is NOT RUNNABLE: "
+     "only 4 scoreable Kp,uu,cell values survive open-access retrieval, below "
+     "any power the plan would accept, and prereg sec. 3.8 registers it as "
+     "such rather than running it small (it is also the one column that WOULD "
+     "constrain cell_partition, which therefore remains unconstrained by any "
+     "measurement). Kp,uu,brain is excluded by prereg sec. 3.4 E3 and its file "
+     "is named DO_NOT_SCORE: it is a blood-brain-BARRIER ratio, not a tissue "
+     "capacity, so scoring it against a capacity term would be the "
+     "units/role error prereg sec. 4.2 BW3 exists to catch. The mouse arm is "
+     "excluded by E2 -- species are never pooled -- and is reported "
+     "separately in results/brain_slice_anchor.md B-S10 (ratio 3.11, no "
+     "verdict); it is NOT evidence that the rat result is marginal."),
     ("Tunggal 1999 (PMID 10389947) and Cowan 2001 (PMID 11149410) "
      "multicellular-layer flux ratios on FOUR OF THE ENGINE'S OWN PANEL DRUGS",
      "NOT ACTIONABLE WITHOUT NEW GEOMETRY, and the omission is expensive. "

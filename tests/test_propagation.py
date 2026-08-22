@@ -23,6 +23,11 @@ Layout
    declared in, and ``NO_PDE`` entries carry a written reason.
 3. The sweep -- no file anywhere in the repo calls the solver bare without
    being declared, so a NEW module cannot join the failure mode unnoticed.
+4. The SECOND flag -- ``compile_drug.build_profile(two_route=...)``, which
+   landed with the same silent-no-op shape and, until the ``Flag``
+   parameterisation, had no table and no wiring invariant of its own. Sections
+   2 and 3 are parameterised over every flag rather than duplicated, which is
+   also the proof that the generalisation is real and not a rename.
 
 Cost
 ----
@@ -45,10 +50,13 @@ from tmesim.core.config import PDEConfig, SimConfig
 from tmesim.sim.engine import simulate_response
 from tmesim.validation.propagation import (
     DECLARATIONS,
+    EXCHANGE,
     EXEMPTIONS,
-    WIRING_POINTS,
+    FLAGS,
+    TWO_ROUTE,
     Category,
     Declaration,
+    Flag,
     check_flag_propagation,
     declaration_for,
     digest,
@@ -56,6 +64,8 @@ from tmesim.validation.propagation import (
     scan_call_sites,
     sweep_repo,
     undeclared_direct_callers,
+    undeclared_paths,
+    undeclared_wiring,
     wiring_points,
 )
 
@@ -346,16 +356,27 @@ def test_digest_is_bit_level_not_approximate():
 
 # =========================================================================== #
 # 2. The declared table
+#
+# Parameterised over FLAGS. Every one of these was written for
+# ``transvascular_exchange``; that they hold ``two_route`` to the same word
+# without a second copy is the point of the ``Flag`` parameterisation.
 # =========================================================================== #
-def test_every_declaration_has_a_written_reason():
+_ALL_DECLARATIONS = [(f, d) for f in FLAGS for d in f.declarations]
+_DECL_IDS = [f"{f.name}:{d.name}" for f, d in _ALL_DECLARATIONS]
+
+
+@pytest.mark.parametrize("flag", FLAGS, ids=[f.name for f in FLAGS])
+def test_every_declaration_has_a_written_reason(flag: Flag):
     """``NO_PDE`` in particular can never be an inferred default: it exists only
     where a person wrote down why. ``Declaration`` enforces this at
     construction, so this test also proves the enforcement is live."""
-    assert DECLARATIONS, "the allow-list must not be empty"
-    for d in DECLARATIONS:
+    assert flag.declarations, f"{flag.name}: the allow-list must not be empty"
+    for d in flag.declarations:
         assert len(d.reason.strip()) >= 25, d.name
-    for e in EXEMPTIONS:
+    for e in flag.exemptions:
         assert len(e.reason.strip()) >= 25, e.path
+    # The flag itself carries the same obligation as everything it declares.
+    assert len(flag.reason.strip()) >= 25, flag.name
 
     with pytest.raises(ValueError):
         Declaration(path="x.py", category=Category.NO_PDE, reason="")
@@ -363,34 +384,80 @@ def test_every_declaration_has_a_written_reason():
         Declaration(path="x.py", category=Category.NO_PDE, reason="unreachable")
 
 
-def test_no_pde_entries_are_explicitly_declared():
-    """There must be at least one NO_PDE entry and it must name a real file that
-    genuinely contains no solver call site."""
-    no_pde = [d for d in DECLARATIONS if d.category is Category.NO_PDE]
+def test_a_flag_cannot_be_added_without_a_reason_or_a_way_to_fail():
+    """The two ways a new ``Flag`` would be born blind, both refused.
+
+    A flag with no reason is an undocumented switch. A CARRIER-LESS flag with
+    no precursors is worse: it can never report anything, because a call is an
+    arrival and there are no bare calls to find, so the guard would be green by
+    construction. That is precisely the state ``two_route`` was in.
+    """
+    with pytest.raises(ValueError):
+        Flag(name="x", destination="d", carrier="c", reason="short")
+    with pytest.raises(ValueError):
+        Flag(name="x", destination="d", carrier=None, precursors=(),
+             reason="a perfectly adequate written reason, but no precursors")
+
+
+def test_unreachable_is_the_same_verdict_as_no_pde():
+    """The general name and the PDE spelling must be ONE member, not two.
+
+    Two names for one claim is how "unreachable" and "no transport solve" drift
+    into meaning subtly different things -- the exact conflation this module
+    exists to prevent, one level up.
+    """
+    assert Category.UNREACHABLE is Category.NO_PDE
+    assert Category.UNREACHABLE.value == "NO_PDE"
+
+
+@pytest.mark.parametrize("flag", FLAGS, ids=[f.name for f in FLAGS])
+def test_no_pde_entries_are_explicitly_declared(flag: Flag):
+    """There must be at least one unreachable entry per flag and it must name a
+    real file that genuinely never reaches that flag's destination."""
+    no_pde = [d for d in flag.declarations if d.category is Category.NO_PDE]
     assert no_pde, "category C must be an explicit allow-list, not an absence"
     for d in no_pde:
         assert (REPO / d.path).is_file(), d.path
-        cs = scan_call_sites(REPO / d.path, d.symbol)
-        assert not cs.direct_calls, f"{d.name} is declared NO_PDE but calls the solver"
-        assert not cs.engine_calls, f"{d.name} is declared NO_PDE but calls the engine"
+        cs = scan_call_sites(REPO / d.path, d.symbol, flag=flag)
+        assert not cs.direct_calls, f"{d.name} is declared NO_PDE but calls the destination"
+        assert not cs.engine_calls, f"{d.name} is declared NO_PDE but calls an entry point"
+        assert not cs.precursor_calls, (
+            f"{d.name} is declared NO_PDE but computes the governed quantity "
+            "out of the precursors -- that is INERT, which is a different claim")
 
 
-@pytest.mark.parametrize("decl", DECLARATIONS, ids=[d.name for d in DECLARATIONS])
-def test_declared_path_lands_in_its_declared_category(decl: Declaration):
+@pytest.mark.parametrize("flag,decl", _ALL_DECLARATIONS, ids=_DECL_IDS)
+def test_declared_path_lands_in_its_declared_category(flag: Flag, decl: Declaration):
     """Every known path, held to its word. Source-level, so it covers all of the
     named modules -- including the expensive ones -- without a reconstruction.
 
     ``vessel_profile.py`` is declared per-function precisely because a
     whole-file answer would average an engine-path function together with a
     direct-solver one and produce something false about both.
+    ``molecular/ecm_mesh.py`` is the same shape for the two-route flag.
     """
-    cs = scan_call_sites(REPO / decl.path, decl.symbol)
+    cs = scan_call_sites(REPO / decl.path, decl.symbol, flag=flag)
     assert cs.predicted is decl.category, (
-        f"{decl.name}: declared {decl.category.value} but the source says "
-        f"{cs.predicted.value} (direct={cs.direct_calls}, "
-        f"bare={cs.bare_direct_calls}, engine={cs.engine_calls}).\n"
+        f"{flag.name}: {decl.name}: declared {decl.category.value} but the "
+        f"source says {cs.predicted.value} (destination={cs.direct_calls}, "
+        f"bare={cs.bare_direct_calls}, entry={cs.engine_calls}, "
+        f"precursor={cs.precursor_calls}).\n"
         f"Declared reason: {decl.reason}"
     )
+
+
+def test_ecm_mesh_is_split_not_averaged():
+    """The two-route twin of ``test_vessel_profile_is_split_not_averaged``.
+
+    ``tissue_hindrance`` composes the IMPERMEABLE-cell law and cannot see the
+    flag; ``tissue_hindrance_two_route`` reaches it. One file, two categories,
+    and a file-level verdict would be false about one of them.
+    """
+    path = REPO / "tmesim/molecular/ecm_mesh.py"
+    assert scan_call_sites(
+        path, "tissue_hindrance_two_route", flag=TWO_ROUTE).predicted is Category.PROPAGATED
+    assert scan_call_sites(
+        path, "tissue_hindrance", flag=TWO_ROUTE).predicted is Category.INERT
 
 
 def test_vessel_profile_is_split_not_averaged():
@@ -407,69 +474,223 @@ def test_vessel_profile_is_split_not_averaged():
 # =========================================================================== #
 # 3. The sweep: a new module cannot join the failure mode unnoticed
 # =========================================================================== #
-def test_no_undeclared_direct_solver_callers():
+@pytest.mark.parametrize("flag", FLAGS, ids=[f.name for f in FLAGS])
+def test_no_undeclared_paths(flag: Flag):
     """The part that does not depend on anyone remembering.
 
-    Any file that calls ``simulate_drug_transport`` without ``exchange_k`` and
-    is neither declared nor exempted is a code path on which a ``PDEConfig``
-    physics flag is silently inert and nobody has written it down.
+    A file that reaches the destination without the carrier -- or that computes
+    the governed quantity out of the precursors and never reaches the
+    destination at all -- is a code path on which the flag is silently inert
+    and nobody has written it down.
     """
-    undeclared = undeclared_direct_callers(REPO)
+    undeclared = undeclared_paths(REPO, flag=flag)
     assert not undeclared, (
-        "these files call simulate_drug_transport without exchange_k and have "
-        "no propagation declaration, so PDEConfig physics flags are silent "
-        "no-ops there:\n  " + "\n  ".join(undeclared) + "\n\n"
-        "Add a Declaration (with a reason) to "
-        "tmesim.validation.propagation.DECLARATIONS, or pass "
-        "exchange_coefficient(micro, drug) as exchange_k=. Widening EXEMPTIONS "
-        "is not the fix."
+        f"the {flag.name} flag is a silent no-op in these files and they have "
+        "no declaration:\n  " + "\n  ".join(undeclared) + "\n\n"
+        f"Add a Declaration (with a reason) to the {flag.name} table in "
+        "tmesim.validation.propagation, or route the computation through "
+        + (" / ".join(flag.entry_points) or "the destination")
+        + ". Widening the exemptions is not the fix."
     )
 
 
-def _wired_paths():
+def test_the_exchange_alias_still_answers_the_original_question():
+    """``undeclared_direct_callers`` is the name every existing failure message
+    and brief uses. It must keep meaning exactly what it meant."""
+    assert undeclared_direct_callers(REPO) == undeclared_paths(REPO, flag=EXCHANGE)
+
+
+def _wired_paths(flag: Flag = EXCHANGE):
     return {
         path
-        for path, cs in sweep_repo(REPO).items()
-        if cs.direct_calls_with_exchange_k
+        for path, cs in sweep_repo(REPO, flag=flag).items()
+        if cs.arrivals
     }
 
 
-def test_engine_is_the_only_place_that_wires_the_flag_up():
-    """The original invariant, unchanged and still strict.
+#: One production wiring point per flag, named. A SECOND one means two places
+#: decide whether the physics is active, which is how a flag ends up silently
+#: on in one path and off in another.
+_PRODUCTION = {
+    "transvascular_exchange": {"tmesim/sim/engine.py"},
+    "two_route": {"tmesim/molecular/compile_drug.py"},
+}
+
+
+@pytest.mark.parametrize("flag", FLAGS, ids=[f.name for f in FLAGS])
+def test_there_is_exactly_one_production_wiring_point(flag: Flag):
+    """The original invariant, unchanged and still strict -- now for both flags.
 
     If a SECOND PRODUCTION wiring point ever appears, the mental model behind
-    this whole guard has changed and every verdict above needs revisiting --
-    two places deciding whether the delivery law is active is how a flag ends
-    up on in one path and off in another.
+    this whole guard has changed and every verdict above needs revisiting.
     """
-    production = wiring_points(production_only=True)
-    assert production == {"tmesim/sim/engine.py"}, production
-    assert _wired_paths() >= production, "the production wiring point vanished"
+    production = wiring_points(production_only=True, flag=flag)
+    assert production == _PRODUCTION[flag.name], production
+    assert len(production) == 1
+    assert _wired_paths(flag) >= production, "the production wiring point vanished"
 
 
-def test_every_wiring_point_is_declared():
+def test_engine_is_the_only_place_that_wires_the_flag_up():
+    """Kept under its original name: this is THE invariant of this module."""
+    assert wiring_points(production_only=True) == {"tmesim/sim/engine.py"}
+
+
+@pytest.mark.parametrize("flag", FLAGS, ids=[f.name for f in FLAGS])
+def test_every_wiring_point_in_scope_is_declared(flag: Flag):
     """Validation experiments that measure an INERT path have to inject
     ``exchange_k`` by hand -- the flag alone would be a silent no-op there, so
     doing the obvious thing would yield a confident, meaningless "no change".
     They are legitimate, but each one is written down individually rather than
     exempted by directory, because a blanket rule would let an undeclared
     no-op back in exactly where nobody would look for it.
+
+    ``two_route`` narrows the SCOPE of that rule to ``tmesim/`` and the
+    argument is at ``Flag.wiring_scope``: it has no carrier to inject, so a
+    script calling the law directly is not faking a production path.
     """
-    undeclared = _wired_paths() - wiring_points()
+    undeclared = undeclared_wiring(REPO, flag=flag)
     assert not undeclared, (
-        "these files pass exchange_k to the solver but are not in "
-        "tmesim.validation.propagation.WIRING_POINTS:\n  "
-        + "\n  ".join(sorted(undeclared))
-        + "\n\nAdd a WiringPoint (production=False for an experiment) with a "
-        "written reason. Do NOT exempt experiments/ wholesale."
+        f"these files reach the {flag.name} destination inside "
+        f"{flag.wiring_scope} but are not declared wiring points:\n  "
+        + "\n  ".join(undeclared)
+        + "\n\nAdd a WiringPoint (production=False for anything that is not "
+        "the shipped path) with a written reason. Do NOT exempt a directory "
+        "wholesale."
     )
 
 
-def test_declared_wiring_points_still_exist():
+@pytest.mark.parametrize("flag", FLAGS, ids=[f.name for f in FLAGS])
+def test_declared_wiring_points_still_exist(flag: Flag):
     """A stale entry is a hole: it would silently permit a future file at that
     path to wire the flag up with nobody re-reading the reason."""
-    missing = {w.path for w in WIRING_POINTS} - _wired_paths()
-    assert not missing, f"declared wiring points that no longer wire anything: {missing}"
+    missing = {w.path for w in flag.wiring_points} - _wired_paths(flag)
+    assert not missing, f"{flag.name}: wiring points that no longer wire anything: {missing}"
+
+
+@pytest.mark.parametrize("flag", FLAGS, ids=[f.name for f in FLAGS])
+def test_no_declaration_or_exemption_is_stale(flag: Flag):
+    """A table nobody can delete an entry from stops meaning anything.
+
+    Every declared file must still exist, and every exemption must still be
+    excusing something real -- an exemption that matches nothing is a standing
+    permission for whatever is written at that path next.
+    """
+    for d in flag.declarations:
+        assert (REPO / d.path).is_file(), f"{flag.name}: declared file is gone: {d.name}"
+    swept = sweep_repo(REPO, flag=flag)
+    for e in flag.exemptions:
+        cs = swept.get(e.path)
+        # An exemption excuses one of two things: an undeclarable call site
+        # (bare or stranded), or reaching the destination inside the wiring
+        # scope without being a WiringPoint. Either is enough to keep it alive;
+        # neither means the file has moved on and the entry is now a standing
+        # permission for whatever gets written there next.
+        excusing = cs is not None and (
+            cs.undeclarable or (cs.arrivals and flag.in_wiring_scope(e.path))
+        )
+        assert excusing, (
+            f"{flag.name}: {e.path} no longer has anything to excuse -- delete "
+            "the exemption rather than leaving a standing permission")
+
+
+# =========================================================================== #
+# 4. The second flag, dynamically
+#
+# The static sweep says a file's call sites are in order. These two run the
+# thing and watch the boundary, which is the stronger instrument and the one
+# that separates "the law was applied and did nothing" from "the law was never
+# applied". Cost: four molecular compiles at the module's own reduced
+# particle/step defaults, ~1.5 s total. No tissue, no PDE.
+# =========================================================================== #
+def test_two_route_propagates_through_build_profile():
+    """``build_profile(two_route=...)`` really does reach the law, and the
+    number really does move. Without this the static table could be perfectly
+    self-consistent about a parameter that does nothing."""
+    from tmesim.molecular import compile_drug
+    from tmesim.molecular.library import get_molecule
+
+    mol = get_molecule("doxorubicin")
+
+    def run(flag: bool) -> float:
+        return float(
+            compile_drug.build_profile(mol, two_route=flag).effective_diffusivity
+        )
+
+    v = check_flag_propagation(run, label="compile_drug.build_profile", flag=TWO_ROUTE)
+
+    assert v.category is Category.PROPAGATED, v
+    assert v.solver_calls_on == 1, "the law ran exactly once with the flag ON"
+    assert v.solver_calls_off == 0, "and not at all with it OFF"
+    assert v.exchange_k_calls_on == 1, "a call to a carrier-less destination IS an arrival"
+    assert v.results_differ and v.trustworthy
+
+
+def test_two_route_stranded_path_is_inert_not_unreachable():
+    """The failure this flag can actually have, and the distinction that matters.
+
+    Computing an effective diffusivity the pre-promotion way -- Brownian
+    micro-tortuosity times the Ogston-Renkin mesh gate -- produces a number that
+    is bit-identical whatever ``two_route`` is set to, because the law is never
+    reached. That is INERT. Reporting it as UNREACHABLE would say "there is no
+    diffusivity here for the flag to change", which is false: there is one, and
+    it is the falsified one.
+    """
+    from tmesim.molecular import brownian, ecm_mesh, stokes_einstein
+
+    def run(flag: bool) -> float:
+        # Exactly steps 2-3b of build_profile, and then a stop.
+        free_D = stokes_einstein.free_diffusivity(0.539)
+        sim = brownian.simulate_effective_diffusivity(
+            free_D, 0.4, n_particles=60, steps=400, seed=0, particle_radius_nm=0.539
+        )
+        mesh = ecm_mesh.ogston_renkin_hindrance(0.539)
+        return float(sim["effective_D"]) * float(mesh["effective_hindrance"])
+
+    v = check_flag_propagation(run, label="pre-promotion D_eff chain", flag=TWO_ROUTE)
+
+    assert v.category is Category.INERT, v
+    assert v.solver_calls_on == 0, "the law genuinely was not called"
+    assert v.category is not Category.UNREACHABLE
+    assert not v.trustworthy
+    assert "RE-IMPLEMENTED" in v.detail
+    # And the raw symptom a human would see: the two runs are the same run.
+    assert run(False) == run(True)
+
+
+def test_a_carrier_less_flag_has_no_bare_calls_by_construction():
+    """The polarity, asserted rather than left implicit.
+
+    For ``exchange_k`` the defect is a call that does not carry the flag. For
+    ``two_route`` no such call can exist, so a guard copied across unchanged
+    would have been green forever. ``stranded_calls`` is the dual, and this
+    pins that the two halves do not overlap.
+    """
+    for path, cs in sweep_repo(REPO, flag=TWO_ROUTE).items():
+        assert cs.bare_direct_calls == (), path
+    stranded = {p: cs.stranded_calls
+                for p, cs in sweep_repo(REPO, flag=TWO_ROUTE).items()
+                if cs.stranded_calls}
+    assert stranded, "the stranded sweep found nothing; the flag is blind again"
+
+    # ...and the exchange flag is the mirror image: bare calls exist, and it
+    # declares no precursors, so nothing is ever stranded.
+    assert EXCHANGE.precursors == ()
+    bare = {p for p, cs in sweep_repo(REPO).items() if cs.bare_direct_calls}
+    assert bare, "the bare sweep found nothing; the original flag is blind"
+    assert not any(cs.stranded_calls for cs in sweep_repo(REPO).values())
+
+
+def test_the_two_route_sweep_actually_reads_the_modules_it_claims_to():
+    """A sweep over an empty file list passes vacuously. Pin the floor."""
+    swept = sweep_repo(REPO, flag=TWO_ROUTE)
+    for expected in ("tmesim/molecular/compile_drug.py",
+                     "tmesim/molecular/ecm_mesh.py",
+                     "tmesim/molecular/two_route.py",
+                     "tmesim/molecular/brownian.py",
+                     "tmesim/validation/calibration.py"):
+        assert expected in swept, f"{expected} vanished from the two-route sweep"
+    assert swept["tmesim/molecular/compile_drug.py"].arrivals, (
+        "the production wiring point stopped reaching the law")
 
 
 def test_no_unaccounted_reimplemented_solver():

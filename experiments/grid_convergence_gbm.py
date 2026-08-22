@@ -192,6 +192,7 @@ from tmesim.validation.kill_calibration import (  # noqa: E402
     literature_bridge,
     prepare_tissue,
     ratio_test,
+    require_cached_unit_field,
     resistance_vector,
     unit_transport,
     window_plasma_mean,
@@ -735,11 +736,16 @@ def scoring_control(bands: Dict, compiled: Dict, alpha: float,
 
     rows = []
     for name, drug in compiled.items():
-        ckey = f"{name}|{float(DX_UM)}|{DT_S}|{WINDOW_S}|{SAVE_EVERY}"
-        if ckey not in cache:
-            rows.append({"drug": name, "ok": False, "reason": "no cache entry"})
-            continue
-        e_pub = np.asarray(cache[ckey]["e_unit"], dtype=np.float64)
+        # ONE key function, imported -- never rebuilt here. This site used to
+        # hand-reconstruct the old f-string, which carried no drug parameter at
+        # all, so it re-scored whatever field happened to be under (name, dx)
+        # regardless of the drug it was solved for. And a miss was appended as
+        # a row with ok=False and skipped, which is the worse half: a silent
+        # miss is indistinguishable from "nothing was cached", so a reader
+        # feeding a published number would have published a SHORTER table that
+        # looked complete. `require_cached_unit_field` raises instead.
+        e_pub = require_cached_unit_field(cache, name, drug, float(DX_UM),
+                                          source=PUBLISHED_CACHE)
         resist = resistance_vector(state_t, pd_cfg, drug=drug)
         sens = sensitivity_uniform(work, labeled, name, tumor)
         rec = score(name, e_pub, sens, resist, drug, pd_cfg, bands, plasma_mean)

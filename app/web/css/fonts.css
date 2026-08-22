@@ -1,5 +1,6 @@
 /* ==========================================================================
-   Self-hosted IBM Plex — the Studio's only external-resource stylesheet.
+   Self-hosted Atkinson Hyperlegible — the Studio's only external-resource
+   stylesheet.
 
    WHY THIS IS A SEPARATE FILE AND NOT PART OF tokens.css.
    `app/server/report.py::_tokens_css()` inlines tokens.css VERBATIM into every
@@ -11,44 +12,106 @@
    token file. Reports keep resolving --font-ui/--font-mono through the system
    fallbacks, exactly as they do today.
 
-   WHY SELF-HOST AT ALL. tokens.css named "IBM Plex Mono" in --font-mono and
-   never loaded it, so the Studio fell through to SF Mono on macOS, Consolas on
-   Windows, DejaVu on Linux. For a tool whose entire readout is columns of
-   numbers that is not a cosmetic difference: digit advance width varies
-   between those faces, so tabular alignment in the metrics rail and the run
-   history was machine-dependent. Now every machine renders the same columns.
+   WHY SELF-HOST AT ALL. tokens.css once named a face it never loaded, so the
+   Studio fell through to SF Mono on macOS, Consolas on Windows, DejaVu on
+   Linux. For a tool whose entire readout is columns of numbers that is not a
+   cosmetic difference: digit advance width varies between those faces, so
+   tabular alignment in the metrics rail and the run history was
+   machine-dependent. Now every machine renders the same columns.
 
-   PROVENANCE. These are the Latin subsets Google serves, obtained from the
-   build that next/font already performed for landing-3d rather than fetched
-   separately, so the two surfaces are byte-identical typography. IBM Plex is
-   SIL Open Font License 1.1 (c) 2017 IBM Corp -- redistribution in a product
-   is permitted, and the OFL requires the licence travel with the files, hence
-   fonts/LICENSE.txt.
+   ---------------------------------------------------------------------------
+   WHY THIS FAMILY, AND WHY NOT THE ONE IT REPLACED.
 
-   Plex Sans ships as ONE variable file covering the whole weight axis; Mono is
-   static, so it needs a face per weight. 64 KB total, no network at runtime.
+   Until 2026-08-21 the Studio was set in IBM Plex Sans / Plex Mono. Plex is a
+   good technical face and there was nothing wrong with it as type. It was
+   replaced for one reason: it is the family Anthropic's Claude interface is
+   set in, so a product whose whole argument is that it is an INSTRUMENT read
+   as a skin of a chat assistant. `landing-3d/app/layout.tsx` had already
+   rejected Plex on exactly that ground and moved the marketing surface to
+   Atkinson; the Studio was left behind, so the two halves of the product
+   disagreed about what it looked like. They now agree.
+
+   DO NOT restate this as "Plex could not tell 0 from O". That was checked and
+   it is FALSE: Plex Mono's `zero` carries 3 contours against `O`'s 2 -- it has
+   a slashed zero, same as this face. (The earlier finding that six variants
+   rendered identically was about stylistic-set ALTERNATES, ss01-ss05, not
+   about the base glyphs.) Inventing a defect to justify a decision that stands
+   on its own is the exact failure mode this repo keeps logging.
+
+   What IS true, and is why this family in particular: Atkinson Hyperlegible
+   was commissioned by the Braille Institute with character disambiguation as
+   its stated design goal rather than as a side effect. Every quantity in this
+   Studio -- a SMILES string, a section id, a reference code a field tester has
+   to quote back to an operator -- is meant to be transcribed and checked. A
+   face drawn against that requirement is an instrument-grade choice.
+
+   Taking BOTH text roles from one matched superfamily is load-bearing rather
+   than tidy: the metrics rail sets a sans label against a mono value on one
+   shared baseline, and a mono drawn against its own sans keeps x-height and
+   baseline in agreement without per-element nudging.
+
+   ---------------------------------------------------------------------------
+   PROVENANCE. Copied from the build that next/font already performed for
+   landing-3d rather than fetched separately, so the two surfaces are
+   byte-identical typography. Two subsets per family, with the unicode-range
+   split reproduced exactly as Google serves it, so an accented character in a
+   user-supplied section label still resolves instead of rendering tofu.
+
+   Both are variable fonts: ONE file per subset covers the whole 200-800 weight
+   axis. 78 KB total, no network at runtime.
+
+   Licence: SIL Open Font License 1.1. Copyright strings read directly out of
+   the shipped name tables rather than from memory --
+     "Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors"
+     "Copyright 2020-2024 The Atkinson Hyperlegible Mono Project Authors"
+     (https://github.com/googlefonts/atkinson-hyperlegible)
+   The OFL requires the licence travel with the files; see fonts/LICENSE.txt.
    ========================================================================== */
 
+/* --- prose / UI ---------------------------------------------------------- */
 @font-face {
-  font-family: "IBM Plex Sans";
+  font-family: "Atkinson Hyperlegible Next";
   font-style: normal;
-  font-weight: 100 700; /* variable axis - one file covers every weight used */
+  font-weight: 200 800; /* variable axis - one file covers every weight used */
   font-display: swap;
-  src: url("../fonts/plex-sans-var.woff2") format("woff2");
+  src: url("../fonts/atkinson-next-var-latin.woff2") format("woff2");
+  unicode-range: U+00??, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: "IBM Plex Mono";
+  font-family: "Atkinson Hyperlegible Next";
   font-style: normal;
-  font-weight: 400;
+  font-weight: 200 800;
   font-display: swap;
-  src: url("../fonts/plex-mono-400.woff2") format("woff2");
+  src: url("../fonts/atkinson-next-var-latinext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* --- numerals / codes / anything transcribed ----------------------------- */
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("../fonts/atkinson-mono-var-latin.woff2") format("woff2");
+  unicode-range: U+00??, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: "IBM Plex Mono";
+  font-family: "Atkinson Hyperlegible Mono";
   font-style: normal;
-  font-weight: 500;
+  font-weight: 200 800;
   font-display: swap;
-  src: url("../fonts/plex-mono-500.woff2") format("woff2");
+  src: url("../fonts/atkinson-mono-var-latinext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
 }

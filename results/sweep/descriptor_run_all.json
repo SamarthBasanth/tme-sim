@@ -1,0 +1,845 @@
+{
+ "structures": {
+  "computable": [
+   {
+    "name": "Mannitol",
+    "smiles": "C([C@H]([C@H]([C@@H]([C@@H](CO)O)O)O)O)O",
+    "pubchem_cid": 6251,
+    "table_mw": 182.0,
+    "rdkit_mw": 182.172,
+    "mw_abs_error_da": 0.17199999999999704
+   },
+   {
+    "name": "NLCQ-1",
+    "smiles": "C1=CC2=C(C=CN=C2C=C1Cl)NCCCN3C=CN=C3[N+](=O)[O-]",
+    "pubchem_cid": 398939,
+    "table_mw": 332.0,
+    "rdkit_mw": 331.763,
+    "mw_abs_error_da": 0.2370000000000232
+   },
+   {
+    "name": "SN24280 (TPZ)",
+    "smiles": "C1=CC=C2C(=C1)[N+](=NC(=[N+]2[O-])N)[O-]",
+    "pubchem_cid": 36400,
+    "table_mw": 178.0,
+    "rdkit_mw": 178.151,
+    "mw_abs_error_da": 0.15100000000001046
+   },
+   {
+    "name": "Urea",
+    "smiles": "C(=O)(N)N",
+    "pubchem_cid": 1176,
+    "table_mw": 60.1,
+    "rdkit_mw": 60.056,
+    "mw_abs_error_da": 0.044000000000004036
+   },
+   {
+    "name": "acridan-9(10H)-one",
+    "smiles": "C1=CC=C2C(=C1)C(=O)C3=CC=CC=C3N2",
+    "pubchem_cid": 2015,
+    "table_mw": 195.0,
+    "rdkit_mw": 195.221,
+    "mw_abs_error_da": 0.22100000000000364
+   }
+  ],
+  "n_computable": 5,
+  "n_uncomputable": 66,
+  "uncomputable": [
+   "SN26434",
+   "SN28287",
+   "SN29047",
+   "SN28266",
+   "SN27758",
+   "SN27759",
+   "SN27769",
+   "SN28293",
+   "SN27791",
+   "SN27800",
+   "SN27891",
+   "SN29053",
+   "SN28246",
+   "SN28400",
+   "SN28205",
+   "SN29051",
+   "SN28614",
+   "SN29039",
+   "SN28875",
+   "SN27849",
+   "SN27916",
+   "SN28019",
+   "SN28436",
+   "SN28870",
+   "SN28098",
+   "SN27820",
+   "SN27866",
+   "SN28402",
+   "SN28427",
+   "SN28433",
+   "SN28682",
+   "SN28823",
+   "SN28648",
+   "SN28620",
+   "SN29143",
+   "SN29147",
+   "SN28627",
+   "SN28606",
+   "SN29650",
+   "SN28864",
+   "SN28643",
+   "SN29102",
+   "SN29267",
+   "SN29662",
+   "SN28361",
+   "SN28852",
+   "SN28425",
+   "SN29270",
+   "SN29390",
+   "SN29146",
+   "SN28890",
+   "SN29347",
+   "SN29375",
+   "SN29366",
+   "SN29273",
+   "SN26955",
+   "SN28565",
+   "SN27140",
+   "SN28660",
+   "SN28860",
+   "SN28713",
+   "SN27149",
+   "SN28874",
+   "SN28141",
+   "SN28588",
+   "SN28871"
+  ],
+  "uncomputable_reason": "Auckland Cancer Society Research Centre internal code number. Pruijn 2008 publishes these structures only as drawings in the Table S1 accessory PDF; PubChem PUG-REST name lookup returns PUGREST.NotFound. No SMILES exists in this repo or in any public database reachable from it, so descriptors.compute_descriptors CANNOT BE CALLED on them. Deliberately not hand-drawn from the PDF images: a transcribed structure is an invented input, and inventing the input is the exact defect this file measures."
+ },
+ "descriptors": {
+  "per_compound": [
+   {
+    "name": "Mannitol",
+    "mw": 182.0,
+    "paper_logp": -2.62,
+    "paper_logp_source": "meas",
+    "crippen_logp": -3.585,
+    "d_logp": -0.9649999999999999,
+    "paper_hd": 6,
+    "engine_hbd": 6,
+    "d_hbd": 0,
+    "meas_D_um2s": 21.099999999999998,
+    "tpsa": 121.38,
+    "hba": 6,
+    "formal_charge": 0
+   },
+   {
+    "name": "NLCQ-1",
+    "mw": 332.0,
+    "paper_logp": 0.22,
+    "paper_logp_source": "meas",
+    "crippen_logp": 3.495,
+    "d_logp": 3.275,
+    "paper_hd": 1,
+    "engine_hbd": 1,
+    "d_hbd": 0,
+    "meas_D_um2s": 60.6,
+    "tpsa": 85.88,
+    "hba": 6,
+    "formal_charge": 0
+   },
+   {
+    "name": "SN24280 (TPZ)",
+    "mw": 178.0,
+    "paper_logp": -0.38,
+    "paper_logp_source": "meas",
+    "crippen_logp": -0.916,
+    "d_logp": -0.536,
+    "paper_hd": 2,
+    "engine_hbd": 1,
+    "d_hbd": -1,
+    "meas_D_um2s": 40.400000000000006,
+    "tpsa": 92.79,
+    "hba": 4,
+    "formal_charge": 0
+   },
+   {
+    "name": "Urea",
+    "mw": 60.1,
+    "paper_logp": -2.01,
+    "paper_logp_source": "meas",
+    "crippen_logp": -0.976,
+    "d_logp": 1.0339999999999998,
+    "paper_hd": 4,
+    "engine_hbd": 2,
+    "d_hbd": -2,
+    "meas_D_um2s": 45.0,
+    "tpsa": 69.11,
+    "hba": 1,
+    "formal_charge": 0
+   },
+   {
+    "name": "acridan-9(10H)-one",
+    "mw": 195.0,
+    "paper_logp": 2.96,
+    "paper_logp_source": "meas",
+    "crippen_logp": 2.681,
+    "d_logp": -0.2789999999999999,
+    "paper_hd": 1,
+    "engine_hbd": 1,
+    "d_hbd": 0,
+    "meas_D_um2s": 317.0,
+    "tpsa": 32.86,
+    "hba": 1,
+    "formal_charge": 0
+   }
+  ],
+  "logp_error": {
+   "n": 5,
+   "mean": 0.5058,
+   "rms": 1.618094125815924,
+   "mae": 1.2178,
+   "min": -0.9649999999999999,
+   "max": 3.275,
+   "n_positive": 2
+  },
+  "hbd_error": {
+   "mean": -0.6,
+   "min": -2,
+   "max": 0,
+   "n_mismatched": 2
+  },
+  "hbd_convention": [
+   {
+    "name": "Mannitol",
+    "table_hd": 6,
+    "num_h_donors": 6,
+    "nhoh_count": 6
+   },
+   {
+    "name": "NLCQ-1",
+    "table_hd": 1,
+    "num_h_donors": 1,
+    "nhoh_count": 1
+   },
+   {
+    "name": "SN24280 (TPZ)",
+    "table_hd": 2,
+    "num_h_donors": 1,
+    "nhoh_count": 2
+   },
+   {
+    "name": "Urea",
+    "table_hd": 4,
+    "num_h_donors": 2,
+    "nhoh_count": 4
+   },
+   {
+    "name": "acridan-9(10H)-one",
+    "table_hd": 1,
+    "num_h_donors": 1,
+    "nhoh_count": 1
+   }
+  ],
+  "ionisation": {
+   "tokens_found": [],
+   "handled": false,
+   "report": [
+    "descriptors.compute_descriptors -> 'logp' is Crippen.MolLogP: True",
+    "compile_drug passes descriptors['logp'] straight to two_route: True",
+    "pH/pKa/logD/ionisation tokens anywhere on that path: NONE",
+    "VERDICT: ionisation is NOT handled on the transport path. RDKit's Crippen MolLogP is a neutral-species octanol/water logP with no pKa input at all.",
+    "The repo DOES have a pKa table (molecular/ion_trapping.py) but it serves lysosomal trapping and is not on this path.",
+    "Consequence: substituting Crippen logP for Pruijn's logP7.4 is a SYSTEMATIC discrepancy for any ionisable compound, not noise. Its sign is fixed: for a compound ionised at pH 7.4, logD7.4 < logP, so the engine reports it MORE lipophilic than it is, opens the transcellular route too far, and over-predicts D."
+   ]
+  },
+  "end_to_end": [
+   {
+    "name": "Mannitol",
+    "meas": 21.099999999999998,
+    "shipping_D": 43.06894235876076,
+    "shipping_ratio": 2.0411821023109367,
+    "paper_desc_D": 43.07881510189656,
+    "paper_desc_ratio": 2.041650004829221
+   },
+   {
+    "name": "NLCQ-1",
+    "meas": 60.6,
+    "shipping_D": 200.60958742064244,
+    "shipping_ratio": 3.3103892313637364,
+    "paper_desc_D": 82.18754216515732,
+    "paper_desc_ratio": 1.356230068731969
+   },
+   {
+    "name": "SN24280 (TPZ)",
+    "meas": 40.400000000000006,
+    "shipping_D": 49.33219989048552,
+    "shipping_ratio": 1.221094056695186,
+    "paper_desc_D": 44.39828007911168,
+    "paper_desc_ratio": 1.098967328690883
+   },
+   {
+    "name": "Urea",
+    "meas": 45.0,
+    "shipping_D": 65.47515820193007,
+    "shipping_ratio": 1.455003515598446,
+    "paper_desc_D": 65.121203003726,
+    "paper_desc_ratio": 1.4471378445272443
+   },
+   {
+    "name": "acridan-9(10H)-one",
+    "meas": 317.0,
+    "shipping_D": 239.50081043172779,
+    "shipping_ratio": 0.7555230612988258,
+    "paper_desc_D": 240.4104258676776,
+    "paper_desc_ratio": 0.7583925106235886
+   }
+  ]
+ },
+ "substitute": {
+  "baseline": {
+   "n": 68,
+   "min": 29.536897205553,
+   "max": 246.40097847989895,
+   "fold": 8.342141585324509,
+   "pearson_log10": 0.8475321636900099,
+   "r2": 0.7183107684890698,
+   "spearman": 0.8205407159658668,
+   "ratio_min": 0.22726649678499103,
+   "ratio_median": 1.0307142559417533,
+   "ratio_max": 2.9865081270996074,
+   "within_3x": 0.9852941176470589,
+   "geo_bias": 1.03211766562797
+  },
+  "paired_n": 49,
+  "paired_names": [
+   "Urea",
+   "SN26434",
+   "SN28287",
+   "SN24280 (TPZ)",
+   "Mannitol",
+   "SN28266",
+   "SN27758",
+   "SN27759",
+   "SN27769",
+   "acridan-9(10H)-one",
+   "SN27791",
+   "SN27800",
+   "SN27891",
+   "SN28246",
+   "SN28400",
+   "SN27849",
+   "SN27916",
+   "SN28019",
+   "SN28436",
+   "SN28098",
+   "SN27820",
+   "SN27866",
+   "SN28402",
+   "SN28427",
+   "SN28433",
+   "SN28682",
+   "SN28823",
+   "SN28648",
+   "SN28620",
+   "SN29143",
+   "SN29147",
+   "SN28606",
+   "SN29650",
+   "SN28643",
+   "SN29102",
+   "SN29267",
+   "SN29662",
+   "SN28361",
+   "SN28425",
+   "SN29146",
+   "SN28890",
+   "NLCQ-1",
+   "SN26955",
+   "SN28565",
+   "SN27140",
+   "SN28660",
+   "SN27149",
+   "SN28141",
+   "SN28588"
+  ],
+  "measured": {
+   "n": 49,
+   "min": 29.536897205553,
+   "max": 240.4104258676776,
+   "fold": 8.139325677799356,
+   "pearson_log10": 0.8219312115399131,
+   "r2": 0.6755709165034693,
+   "spearman": 0.7769387755102041,
+   "ratio_min": 0.22726649678499103,
+   "ratio_median": 1.098967328690883,
+   "ratio_max": 2.6975422570428482,
+   "within_3x": 0.9795918367346939,
+   "geo_bias": 1.0617667155530337
+  },
+  "calculated": {
+   "n": 49,
+   "min": 29.536897205553,
+   "max": 240.4104258676776,
+   "fold": 8.139325677799356,
+   "pearson_log10": 0.8212034331947053,
+   "r2": 0.6743750786907708,
+   "spearman": 0.7722448979591837,
+   "ratio_min": 0.22726649678499103,
+   "ratio_median": 1.1060466750060016,
+   "ratio_max": 2.6975422570428482,
+   "within_3x": 0.9795918367346939,
+   "geo_bias": 1.0633094023230891
+  },
+  "r2_drop": 0.001195837812698497,
+  "descriptor_error": {
+   "mean": 0.018265306122448983,
+   "rms": 0.10658531123672052,
+   "min": -0.07300000000000001,
+   "max": 0.71,
+   "n_over_1_log": 0
+  },
+  "worst_movers": [
+   {
+    "name": "SN24280 (TPZ)",
+    "mw": 178.0,
+    "meas": 40.400000000000006,
+    "D_meas_logp": 44.39828007911168,
+    "D_calc_logp": 48.23008628524712,
+    "fold": 1.0863052847837278,
+    "d_logp": 0.71
+   },
+   {
+    "name": "SN28400",
+    "mw": 221.0,
+    "meas": 209.0,
+    "D_meas_logp": 188.42279578207547,
+    "D_calc_logp": 182.5841026188938,
+    "fold": 0.9690128089918879,
+    "d_logp": -0.07300000000000001
+   },
+   {
+    "name": "SN28565",
+    "mw": 462.0,
+    "meas": 12.8,
+    "D_meas_logp": 32.168528993512645,
+    "D_calc_logp": 33.0416188752816,
+    "fold": 1.0271411192580497,
+    "d_logp": 0.142
+   },
+   {
+    "name": "SN28682",
+    "mw": 263.0,
+    "meas": 39.900000000000006,
+    "D_meas_logp": 45.678274480212096,
+    "D_calc_logp": 44.6638499430096,
+    "fold": 0.9777919689667361,
+    "d_logp": -0.06000000000000005
+   },
+   {
+    "name": "SN28266",
+    "mw": 191.0,
+    "meas": 261.0,
+    "D_meas_logp": 222.65348922011512,
+    "D_calc_logp": 227.18494547509653,
+    "fold": 1.0203520558822305,
+    "d_logp": 0.12000000000000002
+   },
+   {
+    "name": "SN28098",
+    "mw": 254.0,
+    "meas": 270.0,
+    "D_meas_logp": 196.24930111373283,
+    "D_calc_logp": 199.84905510737633,
+    "fold": 1.0183427608313231,
+    "d_logp": 0.08000000000000007
+   },
+   {
+    "name": "SN28427",
+    "mw": 263.0,
+    "meas": 50.9,
+    "D_meas_logp": 45.1550394604622,
+    "D_calc_logp": 44.50692986446872,
+    "fold": 0.9856470151784283,
+    "d_logp": -0.040000000000000036
+   },
+   {
+    "name": "SN28606",
+    "mw": 291.0,
+    "meas": 36.3,
+    "D_meas_logp": 53.157484589177145,
+    "D_calc_logp": 52.45923854732113,
+    "fold": 0.9868645770722158,
+    "d_logp": -0.020000000000000018
+   },
+   {
+    "name": "SN28620",
+    "mw": 289.0,
+    "meas": 72.3,
+    "D_meas_logp": 49.43793043785518,
+    "D_calc_logp": 49.752766980319166,
+    "fold": 1.0063683196217073,
+    "d_logp": 0.010999999999999954
+   },
+   {
+    "name": "SN28287",
+    "mw": 177.0,
+    "meas": 192.0,
+    "D_meas_logp": 200.60639268505838,
+    "D_calc_logp": 201.45966055892845,
+    "fold": 1.0042534430854835,
+    "d_logp": 0.010000000000000009
+   }
+  ]
+ },
+ "propagate": {
+  "baseline": {
+   "n": 68,
+   "min": 29.536897205553,
+   "max": 246.40097847989895,
+   "fold": 8.342141585324509,
+   "pearson_log10": 0.8475321636900099,
+   "r2": 0.7183107684890698,
+   "spearman": 0.8205407159658668,
+   "ratio_min": 0.22726649678499103,
+   "ratio_median": 1.0307142559417533,
+   "ratio_max": 2.9865081270996074,
+   "within_3x": 0.9852941176470589,
+   "geo_bias": 1.03211766562797
+  },
+  "offsets": [
+   {
+    "n": 68,
+    "min": 28.092852206216012,
+    "max": 179.45740129836838,
+    "fold": 6.388009305038113,
+    "pearson_log10": 0.5671728483871221,
+    "r2": 0.3216850399475614,
+    "spearman": 0.4935917623594073,
+    "ratio_min": 0.14902889618631623,
+    "ratio_median": 0.5677179175922575,
+    "ratio_max": 2.697198753958138,
+    "within_3x": 0.7205882352941176,
+    "geo_bias": 0.5766529751541511,
+    "offset": -2.0
+   },
+   {
+    "n": 68,
+    "min": 28.250766458538237,
+    "max": 216.48002011475162,
+    "fold": 7.662801659999735,
+    "pearson_log10": 0.6804272192678249,
+    "r2": 0.46298120072054466,
+    "spearman": 0.6284367335928945,
+    "ratio_min": 0.15094844505922933,
+    "ratio_median": 0.60330692732165,
+    "ratio_max": 2.69720625666811,
+    "within_3x": 0.8088235294117647,
+    "geo_bias": 0.6302937510538954,
+    "offset": -1.5
+   },
+   {
+    "n": 68,
+    "min": 28.747822272371312,
+    "max": 232.7227572323073,
+    "fold": 8.095317795809887,
+    "pearson_log10": 0.766732365660632,
+    "r2": 0.587878520551549,
+    "spearman": 0.7513336578352758,
+    "ratio_min": 0.15694961518509618,
+    "ratio_median": 0.6713058561005313,
+    "ratio_max": 2.6972299822631234,
+    "within_3x": 0.9411764705882353,
+    "geo_bias": 0.7160149946640738,
+    "offset": -1.0
+   },
+   {
+    "n": 68,
+    "min": 29.153546673778198,
+    "max": 240.02165376706552,
+    "fold": 8.233017287839976,
+    "pearson_log10": 0.8218266312626982,
+    "r2": 0.6753990118525949,
+    "spearman": 0.8014925515934648,
+    "ratio_min": 0.1752631775826575,
+    "ratio_median": 0.7933628168922732,
+    "ratio_max": 2.6973050086110004,
+    "within_3x": 0.9705882352941176,
+    "geo_bias": 0.8447161835716936,
+    "offset": -0.5
+   },
+   {
+    "n": 68,
+    "min": 29.291761587465732,
+    "max": 244.05766974128682,
+    "fold": 8.331956035232848,
+    "pearson_log10": 0.8387031527430349,
+    "r2": 0.7034229784211065,
+    "spearman": 0.8146239514814533,
+    "ratio_min": 0.19495825246916967,
+    "ratio_median": 0.9072593741408728,
+    "ratio_max": 2.6973904036251266,
+    "within_3x": 0.9705882352941176,
+    "geo_bias": 0.9301037838008094,
+    "offset": -0.25
+   },
+   {
+    "n": 68,
+    "min": 29.536897205553,
+    "max": 246.40097847989895,
+    "fold": 8.342141585324509,
+    "pearson_log10": 0.8475321636900099,
+    "r2": 0.7183107684890698,
+    "spearman": 0.8205407159658668,
+    "ratio_min": 0.22726649678499103,
+    "ratio_median": 1.0307142559417533,
+    "ratio_max": 2.9865081270996074,
+    "within_3x": 0.9852941176470589,
+    "geo_bias": 1.03211766562797,
+    "offset": 0.0
+   },
+   {
+    "n": 68,
+    "min": 29.97077569624677,
+    "max": 247.74293645672998,
+    "fold": 8.266150298130414,
+    "pearson_log10": 0.8490684691799677,
+    "r2": 0.7209172653556137,
+    "spearman": 0.8225256950187022,
+    "ratio_min": 0.277441479238885,
+    "ratio_median": 1.1566321370133297,
+    "ratio_max": 3.446676852646774,
+    "within_3x": 0.9705882352941176,
+    "geo_bias": 1.151731902729913,
+    "offset": 0.25
+   },
+   {
+    "n": 68,
+    "min": 30.735942538166306,
+    "max": 248.50540336773955,
+    "fold": 8.085172695099828,
+    "pearson_log10": 0.8450678065142607,
+    "r2": 0.714139597606824,
+    "spearman": 0.8337293748649949,
+    "ratio_min": 0.3490997342019614,
+    "ratio_median": 1.252485291957177,
+    "ratio_max": 3.798792352438407,
+    "within_3x": 0.9852941176470589,
+    "geo_bias": 1.2887890799753703,
+    "offset": 0.5
+   },
+   {
+    "n": 68,
+    "min": 34.400278785519276,
+    "max": 249.17999749353027,
+    "fold": 7.24354587493698,
+    "pearson_log10": 0.8206564153894687,
+    "r2": 0.6734769521198921,
+    "spearman": 0.8520522584296301,
+    "ratio_min": 0.5397923769381885,
+    "ratio_median": 1.5822913524576911,
+    "ratio_max": 4.193318821154732,
+    "within_3x": 0.9117647058823529,
+    "geo_bias": 1.6064714664056192,
+    "offset": 1.0
+   },
+   {
+    "n": 68,
+    "min": 37.643403845673745,
+    "max": 249.3942479932043,
+    "fold": 6.625177920031971,
+    "pearson_log10": 0.7627041298614109,
+    "r2": 0.581717589707652,
+    "spearman": 0.8510788552402588,
+    "ratio_min": 0.6563006526136955,
+    "ratio_median": 2.0246036765170623,
+    "ratio_max": 6.199423717861536,
+    "within_3x": 0.7647058823529411,
+    "geo_bias": 1.9436407017249937,
+    "offset": 1.5
+   },
+   {
+    "n": 68,
+    "min": 37.9720329155881,
+    "max": 249.45486571616567,
+    "fold": 6.569436676479879,
+    "pearson_log10": 0.6743812678547887,
+    "r2": 0.45479009443343227,
+    "spearman": 0.7701718725001665,
+    "ratio_min": 0.6564601729372781,
+    "ratio_median": 2.459657450630571,
+    "ratio_max": 9.450206584915456,
+    "within_3x": 0.6617647058823529,
+    "geo_bias": 2.236472547731309,
+    "offset": 2.0
+   }
+  ],
+  "noise": [
+   {
+    "sigma": 0.0,
+    "mean_r2": 0.7183107684890698,
+    "sd_r2": 0.0,
+    "p05": 0.7183107684890698,
+    "p95": 0.7183107684890698,
+    "mean_spearman": 0.8205407159658668,
+    "replicates": 1
+   },
+   {
+    "sigma": 0.25,
+    "mean_r2": 0.6921088517848364,
+    "sd_r2": 0.02162809197610049,
+    "p05": 0.6556653013529832,
+    "p95": 0.7305376929122634,
+    "mean_spearman": 0.8061085822081594,
+    "replicates": 200
+   },
+   {
+    "sigma": 0.5,
+    "mean_r2": 0.6271976998693493,
+    "sd_r2": 0.044606092411159856,
+    "p05": 0.5634792728484469,
+    "p95": 0.6959247378039425,
+    "mean_spearman": 0.7721663947215254,
+    "replicates": 200
+   },
+   {
+    "sigma": 0.75,
+    "mean_r2": 0.5407041256672914,
+    "sd_r2": 0.06445894603958015,
+    "p05": 0.44676234662483577,
+    "p95": 0.6492310739472403,
+    "mean_spearman": 0.7200036264368244,
+    "replicates": 200
+   },
+   {
+    "sigma": 1.0,
+    "mean_r2": 0.4471243924246744,
+    "sd_r2": 0.07127499073075665,
+    "p05": 0.3203802056918218,
+    "p95": 0.5506847720632679,
+    "mean_spearman": 0.6531030567066174,
+    "replicates": 200
+   },
+   {
+    "sigma": 1.5,
+    "mean_r2": 0.30322587267765094,
+    "sd_r2": 0.08327875714311993,
+    "p05": 0.16617802390751085,
+    "p95": 0.4304937393494604,
+    "mean_spearman": 0.5376734955562392,
+    "replicates": 200
+   },
+   {
+    "sigma": 2.0,
+    "mean_r2": 0.22904405836855865,
+    "sd_r2": 0.08451314711117157,
+    "p05": 0.0991123001751957,
+    "p95": 0.38191422136403286,
+    "mean_spearman": 0.46112648494878156,
+    "replicates": 200
+   }
+  ],
+  "hd_shifts": [
+   {
+    "n": 68,
+    "min": 29.536897205553,
+    "max": 246.40097847989895,
+    "fold": 8.342141585324509,
+    "pearson_log10": 0.8475321636900099,
+    "r2": 0.7183107684890698,
+    "spearman": 0.8205407159658668,
+    "ratio_min": 0.22726649678499103,
+    "ratio_median": 1.0307142559417533,
+    "ratio_max": 2.9865081270996074,
+    "within_3x": 0.9852941176470589,
+    "geo_bias": 1.03211766562797,
+    "hd_shift": 0
+   },
+   {
+    "n": 68,
+    "min": 37.59646962162575,
+    "max": 246.40097847989895,
+    "fold": 6.553832872067525,
+    "pearson_log10": 0.7546306047260122,
+    "r2": 0.5694673495891468,
+    "spearman": 0.8358288719401092,
+    "ratio_min": 0.6432713364288906,
+    "ratio_median": 1.8285937062173427,
+    "ratio_max": 5.31278848941059,
+    "within_3x": 0.7794117647058824,
+    "geo_bias": 1.7653410191154144,
+    "hd_shift": -1
+   },
+   {
+    "n": 68,
+    "min": 39.717712814848745,
+    "max": 253.79672033098842,
+    "fold": 6.390013481242171,
+    "pearson_log10": 0.6018663085445592,
+    "r2": 0.3622430533610546,
+    "spearman": 0.718486071778258,
+    "ratio_min": 0.6432713364288906,
+    "ratio_median": 2.4055767833249786,
+    "ratio_max": 12.611963814944952,
+    "within_3x": 0.6617647058823529,
+    "geo_bias": 2.1594257844579485,
+    "hd_shift": -2
+   }
+  ],
+  "combined": [
+   {
+    "scenario": "Crippen error as measured (n=5)",
+    "bias": 0.5058,
+    "sigma": 1.7184276825051439,
+    "hd_shift": 0,
+    "mean_r2": 0.26577835452867876,
+    "sd_r2": 0.08177876259894601
+   },
+   {
+    "scenario": "... + engine donor convention",
+    "bias": 0.5058,
+    "sigma": 1.7184276825051439,
+    "hd_shift": -1,
+    "mean_r2": 0.21463100710001815,
+    "sd_r2": 0.08542566682236173
+   },
+   {
+    "scenario": "Crippen error EXCLUDING the base (n=4)",
+    "bias": -0.1865,
+    "sigma": 0.861469480983898,
+    "hd_shift": 0,
+    "mean_r2": 0.4954497041978759,
+    "sd_r2": 0.0668162285382537
+   },
+   {
+    "scenario": "... + engine donor convention",
+    "bias": -0.1865,
+    "sigma": 0.861469480983898,
+    "hd_shift": -1,
+    "mean_r2": 0.40242424588991327,
+    "sd_r2": 0.072421025770999
+   }
+  ],
+  "crippen_error_stats": {
+   "per_compound": {
+    "Urea": 1.0339999999999998,
+    "Mannitol": -0.9649999999999999,
+    "SN24280 (TPZ)": -0.536,
+    "acridan-9(10H)-one": -0.2789999999999999,
+    "NLCQ-1": 3.275
+   },
+   "all": {
+    "n": 5,
+    "bias": 0.5058,
+    "rms": 1.618094125815924,
+    "sd": 1.7184276825051439
+   },
+   "ex_ionisable": {
+    "n": 4,
+    "bias": -0.1865,
+    "rms": 0.7690120285145088,
+    "sd": 0.861469480983898
+   }
+  },
+  "seed": 20260821,
+  "replicates": 200
+ }
+}

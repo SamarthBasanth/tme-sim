@@ -114,6 +114,7 @@ from tmesim.validation.kill_calibration import (  # noqa: E402
     kill_ratio_to_ic50_fold,
     prepare_tissue,
     ratio_test,
+    require_cached_unit_field,
     resistance_vector,
     score_ratio_row,
     unit_transport,
@@ -1301,10 +1302,12 @@ def cache_control(res: Dict, drugs: Sequence[str] = TESTABLE) -> Optional[Dict]:
     per_drug = {}
     for name in drugs:
         dp, _, _ = compile_breast_drug(name, alpha)
-        ckey = f"{name}|{12.0}|{DT_S}|{WINDOW_S}|{SAVE_EVERY}|ic50={dp.ic50:.6g}"
-        if ckey not in cache:
-            continue
-        pub = np.asarray(cache[ckey]["e_unit"], dtype=np.float64)
+        # ONE key function, imported -- never rebuilt here. A miss RAISES: this
+        # control exists to compare the PDE output byte for byte, so silently
+        # dropping a drug turns a failed control into a smaller passing one.
+        pub = require_cached_unit_field(
+            cache, name, dp, 12.0, source=PUBLISHED_CACHE, dt_s=DT_S,
+            window_s=WINDOW_S, save_every=SAVE_EVERY)
         rec = next((r for r in res["records"]
                     if r["drug"] == name and abs(float(r["dx_um"]) - 12.0) < 1e-9), None)
         if rec is None:

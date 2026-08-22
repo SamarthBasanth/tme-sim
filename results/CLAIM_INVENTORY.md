@@ -1,5 +1,41 @@
 # CLAIM INVENTORY — what Vivum claims, and what backs each claim
 
+> # ⚠️ CORRECTED 2026-08-14 — TWO TRANSPORT ROWS ARE STALE. THIS INVENTORY PREDATES THE TWO-ROUTE PROMOTION.
+>
+> **This banner is the only edit made to this file.** No row below it has been
+> changed or re-scored. The inventory was compiled on **2026-08-12** and is
+> correct as of that date.
+>
+> **What changed.** Commit `fd2a9e7` (2026-08-14, *"Flip two-route transport
+> ON"*) made the permeable-cell diffusivity law the shipping default.
+> `compile_drug.build_profile` now routes `logp` and `hbd` into `effective_D`,
+> and `calibrate_alpha()` moved from `148.60815765445545` to
+> **`22.223477711172563`**. Record: `results/two_route_promotion.md`.
+>
+> **The two rows that moved**, both in the measured-vs-engine table:
+>
+> | row | as inventoried (2026-08-12) | shipping since `fd2a9e7` |
+> |---|---|---|
+> | Effective diffusivity, MCL | 287.3 µm²/s vs 74–130, **FAIL** | **49.33 µm²/s**, still **FAIL** — but now *below* the band, not above. The direction flipped. |
+> | Hindrance `D_free/D_eff` | 1.77× → **6.61×**, "**1.8× short** after correction" | **10.3274×** against the same measured 12×, **FAIL → PASS**. |
+>
+> **Read the second row carefully before quoting it.** The hindrance *ratio* now
+> passes its band; the *absolute* diffusivity does not. Two external anchors on
+> the same physics now disagree about where the engine sits, and
+> `results/two_route_promotion.md` reports that as unresolved rather than
+> smoothing it.
+>
+> **A qualification this inventory could not have carried.** Any blind R² quoted
+> for the transport law — here or downstream — is qualified by
+> `results/descriptor_falsification.md`, which finds the published figure was
+> computed with the source paper's own measured descriptors rather than the ones
+> the shipping pipeline computes.
+>
+> **Everything else stands**, including this file's own precedence rule — *check
+> the date first; later measurement on the shipped configuration wins* — which is
+> what this banner is an instance of. The IFP, oxygen and breast-Kp rows are
+> untouched by `fd2a9e7`.
+
 **Compiled 2026-08-12.** This file exists because `results/` holds ~80 documents,
 many of which correct each other, and no single page answered *"what does this
 product actually claim, and what backs it?"* This is that page.
@@ -87,9 +123,9 @@ this algebraically). Corrections to the numbers as commonly quoted:
 
 | # | Claim | Backing | Falsifier | Status |
 |---|---|---|---|---|
-| K1 | **GBM 3/3 PASS** at the shipped configuration. | `kill_calibration.md` §3: TMZ 0.2626 (band 0.1590–0.4622), cisplatin 0.2791 (0.2086–1.5004), doxorubicin 0.2077 (0.0575–1.0000). | Any change to the oxygen level or the source geometry. **Already found.** | **CONTINGENT.** |
+| K1 | **GBM 3/3 PASS** at the shipped configuration. | `area_conservation_promotion.md` §2: TMZ 0.2518 (band 0.1590–0.4622), cisplatin 0.2739 (0.2086–1.5004), doxorubicin 0.2081 (0.0575–1.0000). **Re-cited 2026-08-21** — the old backing, `kill_calibration.md` §3, was measured 2026-08-12 and gives 0.2626 / 0.2791 / 0.2077; `d77d169` and `fd2a9e7` both moved `e_unit` afterwards and neither regenerated it. Bands and the 3/3 unaffected; two independent computations agree on the new values to four decimals. | Any change to the oxygen level or the source geometry. **Already found.** | **CONTINGENT.** |
 | K2 | **Breast 5/6 PASS, docetaxel FAIL.** | `kill_calibration_breast.md` §3. | Grid, normaliser, source geometry. **All found** — and the shipped scorecard does not reproduce this count. | **CONTINGENT, and inconsistent with `vivum validate`. See note (iii).** |
-| K3 | **Docetaxel's breast FAIL is the project's falsification instance.** | `kill_calibration_breast.md` §3: ratio **0.1484** vs band ceiling **0.1463** — **+1.5 % outside**. | Anything moving the ratio by >1.5 %. | **CONTINGENT → the shipped-convention verdict is UNDETERMINED.** See notes (ii) and (iii). |
+| K3 | **Docetaxel's breast FAIL is the project's falsification instance.** | `kill_calibration_breast.md` §3 gives ratio **0.1484** vs band ceiling **0.1463** — **+1.5 % outside**. **THAT MARGIN IS SUPERSEDED (2026-08-21).** `area_conservation_promotion.md` §2 measured **0.154806** post-`fd2a9e7`, and §2's own table records the move as **+1.824 %** — i.e. **this row's stated falsifier ("anything moving the ratio by >1.5 %") was MET, and nothing re-read the claim.** The FAIL goes **deeper**, not away: **0.1548 is +5.81 % outside** the ceiling, ~4× the margin quoted here. **Confirmed 2026-08-21 by cold re-measurement on the shipping default** (`use_cache=False`), agreeing with `area_conservation_promotion.md` §2 to four decimals — one of 9 of 9 such agreements across the GBM and breast panels. | Anything moving the ratio by >1.5 %. **Triggered; direction preserved the verdict, so the claim survives and only its margin was wrong.** | **CONTINGENT → the shipped-convention verdict is UNDETERMINED.** See notes (ii) and (iii). |
 
 **K1 contingency, from `kill_calibration.md` §3.1 (PROVISIONAL).** Panel counts
 across five measured alternative configurations: **2/3, 2/3, 3/3, 3/3, 1/3.**
@@ -104,9 +140,24 @@ literature bands, not on numerics**: movement/margin ratios 0.37x / 0.65x / 0.41
 and dx = 12 sits at the **maximum of `F_state` over the whole ladder**, biasing all
 three ratios high by +1.2 / +2.4 / +2.7 %.
 
-**Note (ii) — docetaxel, stated precisely.** It is the only FAIL among the **9
+**Note (ii) — docetaxel, stated precisely.**
+
+> **BASELINE SUPERSEDED 2026-08-21. Every "1.5 %" below is the OLD unperturbed
+> margin.** The shipping baseline is now **+5.81 %** outside (ratio 0.1548, cold
+> re-measurement, corroborated by `area_conservation_promotion.md` §2), because
+> `d77d169` and `fd2a9e7` both moved `e_unit` after these perturbations were run.
+> **The ladder is therefore mis-ordered as written**: it credits docetaxel with
+> surviving excursions to 2.6 % and 3.7 % when the *unperturbed* state is already
+> larger than both. The perturbed values have **not** been re-measured against the
+> new baseline and are not restated here — re-running them is the only honest way
+> to rebuild this ladder, and inventing rebased numbers would be worse than
+> leaving the old ones visibly labelled. The FAIL is unaffected and deeper; the
+> ladder's *ordering argument* is what broke, not its verdict.
+
+It is the only FAIL among the **9
 published 3-D:2-D verdicts**, not the project's only falsification (see §1e). The
-perturbations it survived are real:
+perturbations it survived are real, **measured against the superseded +1.5 %
+baseline**:
 
 * corrected delivery law: **1.5 % → 2.6 %** outside (`breast_kill_revalidation.md` §3 — *not* 3.7 %);
 * 6.6x cellular-exclusion hindrance correction, **`recal` arm**: **1.5 % → 3.7 %** outside (`cellular_exclusion.md` §5.5) — but it flips **FAIL → PASS** in the `frozen` arm, and +2.19 % is smaller than the known −3.4 % grid error;

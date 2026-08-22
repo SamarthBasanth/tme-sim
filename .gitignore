@@ -6,7 +6,27 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 # large downloaded open datasets (regenerate via `python -m tmesim.cli acquire`)
-data_cache/
+# NOTE the trailing `*`: `data_cache/` excludes the DIRECTORY, so git never
+# descends into it and a later `!data_cache/x/` cannot re-include anything.
+# Excluding the CONTENTS instead is what makes the exceptions below work.
+data_cache/*
+#
+# EXCEPT the hand-extracted anchor tables. The rule above is justified by
+# "regenerate via acquire" -- these two cannot be. They were pulled out of
+# publisher PDFs and six open-access papers by hand, carry per-value
+# provenance, and record which rows are model-derived rather than measured.
+# Re-deriving them means redoing the extraction and re-making every judgement
+# call in it.
+#
+# They are also EVIDENCE. results/transport_anchor_prereg.md fixes a criterion
+# against data_cache/brain_slice/, and results/brain_slice_anchor.md publishes
+# a FAIL scored on it. A published result whose dataset is untracked is a
+# result nobody can check -- which is the defect this project keeps finding in
+# itself. 96 KB total; the size argument does not apply.
+!data_cache/pruijn2008/
+!data_cache/pruijn2008/**
+!data_cache/brain_slice/
+!data_cache/brain_slice/**
 # per-regime experiment output dirs (keep the top-level result artifacts)
 results/regime_pp*/
 results/tl_pp*/

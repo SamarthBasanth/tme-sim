@@ -1,5 +1,55 @@
 # Bring your own compound — what a self-compiled molecule is, and what it is not
 
+> # ⚠️ CORRECTED 2026-08-14 — "DIFFUSIVITY IS A FUNCTION OF MW ALONE" NO LONGER DESCRIBES THE SHIPPING COMPILER
+>
+> **This banner is the only edit made to this file.** No number or table below it
+> has been changed or re-run. Everything below was true of the compiler as it
+> stood on **2026-08-13**.
+>
+> **What changed.** Commit `fd2a9e7` (2026-08-14, *"Flip two-route transport ON"*)
+> made the two-route cell term the shipping default.
+> `tmesim/molecular/compile_drug.py::build_profile` now passes
+> `descriptors["logp"]` and `descriptors["hbd"]` into
+> `two_route.two_route_diffusivity` and multiplies its hindrance into
+> `effective_D` on every compile — a user's compound included. Record:
+> `results/two_route_promotion.md`.
+>
+> **Which statements are now false.**
+>
+> - **§1 finding 3**, *"Diffusivity is a function of MW alone"* — **FALSE.** It is
+>   now a function of MW, logP and H-bond-donor count.
+> - **§2 worked table**, the `diffusivity` row `286.1 µm²/s` tagged
+>   ***"from MW alone**, end to end"* — the **provenance tag is false** and the
+>   **number is stale**. The `radius_hydrodynamic_nm` row (`0.3728 nm`, "from MW
+>   alone") is still correct: the radius really is MW-only; it is the step *after*
+>   it that changed. This file's own worked example was not re-run.
+> - **§5 refusal rationale** for `CC(=O)[O-].[Na+]`, *"diffusivity is MW alone —
+>   the salt would travel bonded to the drug"* — the **refusal is still right**,
+>   but its stated reason is no longer the whole reason: a counter-ion now
+>   perturbs the compiled `logp` and `hbd` as well as the MW.
+> - **§9 test description**, *"diffusivity **is** a function of MW alone"* as a
+>   property asserted by `TestProvenanceIsTrue` — `fd2a9e7` modified
+>   `tests/test_byo_compound.py`. **The tests were updated; this file was not.**
+>   Read the test module, not this paragraph, for what is actually asserted.
+>
+> **What still stands, and matters more than the correction.** §1 finding 3's
+> *headline* — that the transport ranking is weakest exactly for analogues of
+> similar molecular weight, which is the usual shape of a real compound series —
+> is the reason two-route was built. It is **improved, not resolved**: see
+> `results/two_route_promotion.md` for what the promoted law scores, and
+> **`results/descriptor_falsification.md`, which qualifies that score for the
+> shipping pipeline.** §1 findings 2, 4 and 5 (the 8-of-11-predictions ratio, the
+> non-defensibility of absolute kill/AUC/depth, and logP being a Crippen
+> prediction) are unaffected. `byo._check_logp_tier` is still an inert backstop:
+> `lipophilicity.resolve_logp` has no caller in `tmesim/` or `app/`.
+>
+> **One consequence worth stating plainly.** logP was previously a *reporting*
+> field for a user compound. It is now an input to that compound's transport
+> coefficient. A user who mistypes a stereocentre still gets an identical logP
+> (Crippen is stereochemistry-blind, §7) — but a user whose compound differs in
+> donor count now gets a different `D`, which this file's provenance table does
+> not tell them.
+
 **What this file is.** The shipped drug picker has thirteen curated molecules (the twelve
 in `molecular.library.GBM_DRUGS` plus the cross-library palbociclib). A researcher's
 own series is the reason they are here, so the Studio now accepts a SMILES and compiles

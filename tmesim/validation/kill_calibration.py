@@ -54,6 +54,8 @@ Writes: ``results/kill_calibration.md``
 """
 from __future__ import annotations
 
+import dataclasses
+import hashlib
 import json
 import math
 import os
@@ -916,6 +918,99 @@ def state_dependency(e_unit: np.ndarray, sens: np.ndarray, state: np.ndarray,
 
 
 # --------------------------------------------------------------------------- #
+# The unit-transport cache: ONE key function, imported everywhere
+# --------------------------------------------------------------------------- #
+class CacheMiss(KeyError):
+    """A cached unit-transport field was required and is not present.
+
+    Raised rather than returned, and rather than degraded to "no data",
+    because a silent miss is indistinguishable from "nothing was cached" —
+    which is exactly the shape of defect this module already shipped once. A
+    reader feeding a published number must fail loudly, not quietly produce a
+    shorter table.
+    """
+
+
+def unit_transport_cache_key(name: str, drug: DrugParams, dx_um: float, *,
+                             dt_s: float = DT_S, window_s: float = WINDOW_S,
+                             save_every: int = SAVE_EVERY) -> str:
+    """Cache key for one unit-transport solve, covering EVERY field of
+    :class:`DrugParams` by construction.
+
+    **This is the only place this key is built.** Import it; do not
+    reconstruct it. Five call sites used to hand-build the f-string
+    independently (here, ``experiments/kill_calibration_breast.py``,
+    ``experiments/grid_convergence_gbm.py``, ``experiments/dtissue_sensitivity.py``,
+    ``experiments/grid_convergence_breast.py``) and they did not agree with
+    each other, which is how the defect below survived.
+
+    WHY THIS IS NOT A HAND-WRITTEN f-STRING. The key this replaced was
+    ``f"{name}|{dx_um}|{DT_S}|{WINDOW_S}|{SAVE_EVERY}"`` -- drug name and grid
+    only, **no drug parameter at all**. The cached object is ``e_unit``, the
+    per-cell unit-concentration exposure field, i.e. the output of a PDE solve
+    that consumed ``diffusivity``, ``binding``, ``clearance`` and
+    ``bbb_penetrance``. So any change to a descriptor, a partition constant or
+    ``HBD_LOGP_DECREMENT`` was silently ignored on a warm cache, and
+    ``codon validate`` published 3-D:2-D kill ratios that did not recompute
+    (measured: temozolomide 0.2583 cache-served vs 0.2518 cold, 2.6 % off;
+    doxorubicin 0.2044 vs 0.2081, 1.8 % off). See
+    ``results/hbd_convention_audit.md`` sections 6.2-6.3.
+
+    The breast twin was worse rather than merely equal: it keyed on ``ic50``,
+    the one drug parameter that does *not* determine ``e_unit``, and omitted
+    the four that do -- a key that looks parameterised and is not, which is why
+    nobody looked at it.
+
+    Adding the four determining fields by hand would be the wrong fix: it goes
+    stale the next time a parameter is added, which is the same "a check that
+    has stopped checking" failure class. Deriving the key from the parameter set
+    cannot. ``tests/test_kill_cache_key.py`` fails if any field stops being
+    covered.
+
+    Deliberately OVER-keys: ``ic50`` and ``hill`` do not affect ``e_unit`` (they
+    enter only afterwards, in the kill computation), so including them costs an
+    occasional needless resolve. That is the safe direction -- a spurious
+    recompute is cheap, a stale published number is not.
+    """
+    blob = json.dumps(dataclasses.asdict(drug), sort_keys=True, default=repr)
+    digest = hashlib.sha256(blob.encode()).hexdigest()[:16]
+    return f"{name}|{dx_um}|{dt_s}|{window_s}|{save_every}|{digest}"
+
+
+#: Back-compatible private alias. Prefer :func:`unit_transport_cache_key`.
+_ckey = unit_transport_cache_key
+
+
+def require_cached_unit_field(cache: Dict, name: str, drug: DrugParams,
+                              dx_um: float, *, source: str,
+                              dt_s: float = DT_S, window_s: float = WINDOW_S,
+                              save_every: int = SAVE_EVERY) -> np.ndarray:
+    """Fetch ``e_unit`` for ``drug`` from ``cache``, or raise :class:`CacheMiss`.
+
+    For the *readers* — the scripts that re-score an already-published cache
+    rather than solving. They must never degrade a miss into a missing row: a
+    reader that silently drops a drug publishes a shorter table that looks
+    complete. The message names the key it wanted and what is actually present,
+    because "no cache entry" without either is unactionable.
+    """
+    key = unit_transport_cache_key(name, drug, dx_um, dt_s=dt_s,
+                                   window_s=window_s, save_every=save_every)
+    if key in cache:
+        return np.asarray(cache[key]["e_unit"], dtype=np.float64)
+    same_drug = sorted(k for k in cache if k.split("|", 1)[0] == name)
+    raise CacheMiss(
+        f"no cached unit-transport field for {name!r} at dx={dx_um} um in "
+        f"{source}.\n  wanted key: {key}\n  {len(same_drug)} entr"
+        f"{'y' if len(same_drug) == 1 else 'ies'} present for this drug: "
+        f"{same_drug}\n"
+        "  If those entries look like the same run, they were written under "
+        "the PRE-FIX cache key, which carried no drug parameter and is "
+        "therefore STALE by construction (results/hbd_convention_audit.md "
+        "sec. 6.2-6.3). Re-run the producing experiment to repopulate the "
+        "cache; do NOT hand-reconstruct the old key to make this pass.")
+
+
+# --------------------------------------------------------------------------- #
 # Orchestration
 # --------------------------------------------------------------------------- #
 def run(dx_um: float = DX_UM, drugs: Sequence[str] = DRUGS,
@@ -998,7 +1093,7 @@ def run(dx_um: float = DX_UM, drugs: Sequence[str] = DRUGS,
         d["sensitivity_determinant_median"] = float(np.median(sens_det))
         d["determinant"] = sinfo.get("determinant") or dinfo.get("determinant")
 
-        ckey = f"{name}|{dx_um}|{DT_S}|{WINDOW_S}|{SAVE_EVERY}"
+        ckey = unit_transport_cache_key(name, drug, dx_um)
         if ckey in cache:
             log("  unit transport: cache hit")
             e_unit = np.asarray(cache[ckey]["e_unit"], dtype=np.float64)

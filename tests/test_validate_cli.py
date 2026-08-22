@@ -18,6 +18,12 @@ tested here is the machinery that decides what a result MEANS:
 4. **Registry hygiene** — every registered anchor names its source module, its
    report, and only conditionals that actually exist.
 
+One documented exception to "data-free": ``TestBrainSlicePreregisteredRow``
+reads ``data_cache/brain_slice/vu_brain.csv``, a 30 kB committed literature
+table — not a tissue section, no PDE, ~3 s. It is there because that row is the
+enforcement of a PRE-REGISTERED failure, and a pre-registered failure that
+nothing tests is the exact defect the row exists to close.
+
 The synthetic registry is injected by monkeypatching
 ``scorecard.build_registry``, so these tests stay valid as anchors are added or
 removed.
@@ -509,6 +515,233 @@ class TestRegistryHygiene:
         assert max(v["raw_ratio_to_measured"]) < 0.1
         assert max(v["calibrated_ratio_to_measured"]) < 0.3
         assert v["k_calibrated_per_s"] > 5 * v["k_raw_per_s"]
+
+
+class TestBrainSlicePreregisteredRow:
+    """The pre-registered rat brain-slice tissue-capacity anchor (TEST B).
+
+    Why this class exists, stated plainly
+    -------------------------------------
+    ``results/transport_anchor_prereg.md`` fixed the dataset cascade, the
+    statistic, the 3.0 bar, the bootstrap and the withdrawal conditions BEFORE
+    the prediction was computed; ``results/brain_slice_anchor.md`` executed it
+    and it FAILED (ratio 12.05 against a bar of 3.0). Prereg sec. 8.5 requires
+    that failure to appear in ``codon validate`` and to make it exit 1. Until
+    it did, the failure was recorded in a markdown file while the scorecard
+    reported as though nothing had happened — a check that had stopped
+    checking. These tests pin the three properties that keep it checking:
+
+    1. the scope tag is ``analytic`` and the solver really is never entered,
+       so the row can never be quoted as PDE evidence (prereg sec. 8.5 says
+       ``SCOPE_ANALYTIC``, **never** ``SCOPE_PDE``);
+    2. ``GMFE_floor`` — the ENGINE-INDEPENDENT headline, the best any constant
+       predictor could do — is not droppable from the row;
+    3. the verdict is recomputed live from the shipping engine and still
+       matches the published execution record, so the row cannot go stale
+       against the document, and a softened verdict cannot pass unnoticed.
+
+    Not data-free (see the module docstring): it reads the 30 kB committed
+    literature table the anchor is scored against. No tissue, no PDE.
+    """
+
+    #: Published in ``results/brain_slice_anchor.md`` sec. 0.2 / sec. 3. The row
+    #: recomputes these live; if it ever stops reproducing them, either the
+    #: engine moved (which must be re-registered under prereg sec. 9.5) or the
+    #: row stopped scoring what the document says it scores.
+    PUBLISHED = {
+        "engine_vu_brain_ml_per_g": 1.000,
+        "gmfe_engine_x": 57.50,
+        "gmfe_floor_x": 4.77,
+        "ratio": 12.045,
+        "gmfe_floor_optimal_constant_ml_per_g": 39.0,
+        "n": 33,
+    }
+
+    @pytest.fixture(scope="class")
+    def row(self):
+        need = os.path.join(SC.REPO_ROOT, "data_cache", "brain_slice",
+                            "vu_brain.csv")
+        if not os.path.exists(need):
+            pytest.skip(f"frozen literature table absent: {need}")
+        rows = SC._stamp_physics(list(SC._run_brain_slice_capacity()))
+        assert len(rows) == 1, "TEST B is one comparison, not several"
+        return rows[0]
+
+    def test_it_is_registered_at_all(self):
+        group = next((g for g in SC.build_registry()
+                      if g.key == "brain-slice-tissue-capacity"), None)
+        assert group is not None, (
+            "prereg sec. 8.5 requires this anchor to be registered in "
+            "codon validate; without it the FAIL is recorded but not enforced")
+        assert group.tier == SC.TIER_QUICK
+        assert group.needs, "the row must declare the table it scores against"
+
+    def test_it_cites_the_prereg_and_the_execution_record(self, row):
+        """A reader must be able to see the criterion was fixed in advance."""
+        group = next(g for g in SC.build_registry()
+                     if g.key == "brain-slice-tissue-capacity")
+        assert "transport_anchor_prereg.md" in group.report
+        assert "brain_slice_anchor.md" in group.report
+        # and in the row itself, not only in the group header
+        assert "transport_anchor_prereg.md" in row.bar
+        assert row.values["prereg"].endswith("transport_anchor_prereg.md")
+        assert row.values["execution_record"].endswith("brain_slice_anchor.md")
+        assert row.pmids, "an EXTERNAL anchor must cite its sources"
+
+    def test_scope_is_analytic_and_the_solver_is_never_entered(self, row):
+        """It scores an INPUT COEFFICIENT. Tagging it PDE would move the
+        summary's 'N of N scored rows never invoke the transport PDE' line
+        without a single solve — the mis-tag prereg sec. 8.5 forbids by name."""
+        group = next(g for g in SC.build_registry()
+                     if g.key == "brain-slice-tissue-capacity")
+        assert group.scope == SC.SCOPE_ANALYTIC
+        assert row.scope == SC.SCOPE_ANALYTIC
+        assert row.physics == SC.PHYSICS_NOT_APPLICABLE
+        assert "coefficient-not-field" in row.conditional
+        # verified, not asserted: the runner's own live call counters
+        assert row.values["solver_calls"] == {
+            "simulate_drug_transport": 0, "simulate_response": 0}
+
+    def test_the_solver_is_never_entered_under_a_profiler_too(self, row):
+        """Call counters catch the two named entry points; the profiler catches
+        indirect and renamed calls that a wrapper would miss."""
+        from tmesim.physics import diffusion as _diff
+        from tmesim.sim import engine as _eng
+
+        seen = []
+        solver_files = {os.path.abspath(_diff.__file__),
+                        os.path.abspath(_eng.__file__)}
+
+        def _profile(frame, event, arg):
+            if event == "call" and frame.f_code.co_filename in solver_files:
+                seen.append(frame.f_code.co_name)
+            return None
+
+        sys.setprofile(_profile)
+        try:
+            SC._run_brain_slice_capacity()
+        finally:
+            sys.setprofile(None)
+        assert not seen, f"the transport solver was entered: {sorted(set(seen))}"
+
+    def test_the_verdict_is_FAIL_and_it_makes_the_suite_exit_one(self, row):
+        assert row.status == SC.FAIL
+        lo, hi = row.values["ratio_ci90"]
+        bar = row.values["the_test_bar"]
+        assert bar == 3.0, "the pre-registered bar may not be widened"
+        assert lo > bar, (
+            "prereg sec. 3.6: the verdict stands only because the 90 % BCa "
+            "interval lies ENTIRELY above the bar; a straddle is B-C "
+            "UNDERPOWERED, which is NOT a soft pass")
+        assert row.values["verdict_bucket"].startswith("B-B")
+
+    def test_the_row_carries_verdict_ratio_AND_floor(self, row):
+        """GMFE_floor is the engine-independent headline (prereg sec. 3.5a) and
+        must not be droppable: it is what says the best ANY constant could do
+        is still ~4.8x, i.e. what quantifies the missing per-compound term."""
+        v = row.values
+        for key in ("gmfe_floor_x", "gmfe_floor_ci90",
+                    "gmfe_floor_optimal_constant_ml_per_g", "ratio",
+                    "ratio_ci90", "gmfe_engine_x", "verdict_bucket"):
+            assert key in v, f"{key} dropped from the row"
+        # ...and visibly, in the text a reader actually sees, not only in the
+        # machine-readable values.
+        assert "GMFE_floor" in row.measured and "GMFE_floor" in row.note
+        assert f"{v['gmfe_floor_x']:.2f}x" in row.note
+        assert f"{v['ratio']:.3f}" in row.predicted
+        assert v["gmfe_floor_x"] == pytest.approx(v["gmfe_engine_x"] / v["ratio"])
+        # the floor is a MEASURED property: no engine quantity may enter it
+        assert v["gmfe_floor_x"] < v["gmfe_engine_x"]
+        assert v["gmfe_floor_x"] > v["reproducibility_floor_x"], (
+            "if the floor ever fell to the assay's own noise floor, a single "
+            "constant WOULD be an adequate model and this row's reading "
+            "changes; that is a finding, not a silent pass")
+
+    def test_recentring_the_constant_is_not_reported_as_a_fix(self, row):
+        # The trap prereg sec. 3.5a exists to close: a re-centred constant
+        # passes THE TEST by construction and is still wrong by GMFE_floor.
+        assert "RE-CENTRING IS THEREFORE NOT A FIX" in row.note
+        assert "BY CONSTRUCTION" in row.note
+
+    def test_it_reproduces_the_published_execution_record(self, row):
+        """Live recomputation, pinned to results/brain_slice_anchor.md."""
+        for key, want in self.PUBLISHED.items():
+            got = row.values[key]
+            assert got == pytest.approx(want, rel=2e-3), (
+                f"{key}: live {got} vs published {want}. Either the engine "
+                f"moved (prereg sec. 9.5 requires re-registration, not a "
+                f"quiet edit) or this row stopped scoring what "
+                f"results/brain_slice_anchor.md says it scores.")
+        assert row.values["frozen_constants_drift"] == "", (
+            "a prereg sec. 2.3 frozen constant has moved since execution")
+
+    def test_the_engine_prediction_is_the_same_for_every_compound(self, row):
+        # The whole content of the failure: one capacity for 33 compounds whose
+        # measured capacities span three orders of magnitude.
+        assert row.values["s_eff"] == 1.0
+        assert row.values["n_below_engine"] == row.values["n"]
+        assert row.values["within_3x_pct"] == 0.0
+        lo, hi = row.values["measured_range_ml_per_g"]
+        assert hi / lo > 1000
+        assert "NOT COMPUTABLE" in row.values["spearman_rho"], (
+            "a zero-variance prediction has no ranks; reporting rho = 0.00 "
+            "would be inventing a number (prereg sec. 3.5)")
+
+    def test_BW1_is_recorded_as_triggered(self, row):
+        lo, hi = row.values["measured_range_ml_per_g"]
+        pred = row.values["engine_vu_brain_ml_per_g"]
+        assert row.values["bw1_reachability_triggered"] is (
+            not (lo <= pred <= hi))
+        assert row.values["bw1_reachability_triggered"] is True
+        assert "BW1" in row.note and "WITHDRAWN, not narrowed" in row.note
+
+    def test_both_judgement_calls_are_recorded_not_papered_over(self, row):
+        """Neither is resolved by this registration; both must stay visible.
+
+        (1) GATE 1's engine quantity is not on prereg sec. 3.3's list, and a
+        reader could hold that a capacity fixed at 1 by NORMALISATION is not a
+        quantity the engine expresses — which would make this NOT TESTABLE
+        (B-D) rather than FAIL. The row takes the less flattering reading and
+        says the other was available.
+        (2) Prereg sec. 4.2 is internally inconsistent about BW1's range. The
+        operative sentence was applied; the inconsistency needs amendment under
+        sec. 9.5, which an implementer may not do.
+        """
+        assert "ALTERNATIVE READING" in row.note
+        assert "B-D" in row.note and "NOT TESTABLE" in row.note
+        assert "LESS FLATTERING READING" in row.note
+        assert "INTERNALLY INCONSISTENT" in row.note
+        assert "sec. 9.5" in row.note
+        # the alternative reading must not be laundered as a pass
+        assert "Both readings are non-passes" in row.note
+        # and the row must say the test fails under either reading of sec. 4.2
+        assert "NOTHING TURNS ON IT" in row.note
+
+    def test_it_does_not_license_moving_cell_partition(self, row):
+        """prereg sec. 3.2: Vu,brain is the LUMP, cell_partition is one
+        component of it. This FAIL constrains neither K nor the solver."""
+        assert "capacity-normalised-to-one" in row.conditional
+        assert "brain-slice-not-tumour" in row.conditional
+        text = SC.CONDITIONALS["capacity-normalised-to-one"]
+        assert "DOES NOT LICENSE MOVING cell_partition" in text
+        assert "K remains unconstrained by any measurement" in text
+        bound = SC.CONDITIONALS["brain-slice-not-tumour"]
+        assert "does NOT license" in bound and "human tumour" in bound
+
+    def test_the_registered_row_reaches_the_suite_and_fails_it(self):
+        res = SC.run_suite(only=["brain-slice-tissue-capacity"])
+        assert res["counts"][SC.FAIL] == 1
+        assert res["counts"][SC.PASS] == 0
+        assert res["exit_code"] == 1, (
+            "prereg sec. 8.5: an anchor that fails must make codon validate "
+            "exit 1")
+        # it is scored, and it is NOT solver evidence
+        assert res["n_scored"] == 1
+        assert res["n_scored_not_pde"] == 1
+        assert res["rows"][0]["bar"] and res["rows"][0]["pmids"]
+        assert "MEASURED" in res["rows"][0]["quantity"].upper()
+        for key in res["rows"][0]["conditional"]:
+            assert key in SC.CONDITIONALS
 
 
 class TestRowHonestyInvariants:

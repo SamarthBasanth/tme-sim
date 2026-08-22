@@ -1,5 +1,48 @@
 # Anchor registration — the Hicks multicellular-layer coefficients
 
+> # ⚠️ CORRECTED 2026-08-14 — THE "UNREGISTERED, BLOCKED ON RETRIEVAL" PRUIJN ROW WAS RETRIEVED AND SCORED, AND THE MODEL IT WOULD HAVE FALSIFIED NO LONGER SHIPS
+>
+> **This banner is the only edit made to this file.** No number, scope
+> justification or verdict below it has been changed or re-run. Everything below
+> was true on **2026-08-10**.
+>
+> **What changed, in two steps.**
+> 1. `d3b9955` (2026-08-13, *"Pruijn 2008 retrieved: the MW-only diffusivity
+>    model is falsified, decisively"*) obtained the compound table this file
+>    records as `UNVERIFIED` and unobtainable.
+> 2. `fd2a9e7` (2026-08-14, *"Flip two-route transport ON"*) replaced the
+>    diffusivity model. Record: `results/two_route_promotion.md`.
+>
+> **The specific row that is now false** is in §"what is still unregistered and
+> why", the **Pruijn 2008 `D_mcl` for 71 compounds** row:
+>
+> - *"blocked on retrieval and not on judgement… the publisher returns HTTP 403…
+>   the compound-by-compound table is **UNVERIFIED** and no row can be built
+>   without inventing numbers"* — **retrieval succeeded three days later.** The
+>   row was built, and the discipline this sentence protected was honoured: the
+>   table was obtained rather than reconstructed.
+> - *"The engine derives `D_eff` from a Stokes–Einstein radius that is a function
+>   of **MW alone** times a hindrance depending on the ECM fraction and **not on
+>   the molecule**"* — **FALSE of the shipping engine.** `logp` and `hbd` now
+>   enter `effective_D`.
+> - *"That is a decisive falsification of the diffusivity model"* — **it was, and
+>   the model was replaced.** See `results/diffusivity_falsification.md` for the
+>   falsification and `results/two_route_promotion.md` for the replacement.
+>
+> **Consequence for the registered rows this file owns.** The
+> `mcl-transport-coefficients` group is scored against the **engine**, so its
+> verdicts moved when the engine did. At the promotion the MCL **hindrance
+> factor** row went **FAIL → PASS** (1.7732-fold → 10.3274-fold against a measured
+> 12-fold) and the MCL **absolute `D_eff`** row stayed **FAIL** while flipping
+> direction (287.32 → 49.33 µm²/s against a 74–130 µm²/s band). **The tallies
+> printed in this file are pre-promotion tallies.** The registration itself — the
+> scope tags, the conditionals, the `ifp-wick-in-needle` audit — is unaffected;
+> it is the scores that moved.
+>
+> **Still-correct and still-open:** the capecitabine row, the Tunggal/Cowan 1-D
+> slab row, and the PR-104A row remain unregistered for the reasons given, none
+> of which `fd2a9e7` touches.
+
 **What this file records.** Three external anchors identified by
 `results/external_anchor_survey.md` and re-scored by `results/cellular_exclusion.md`
 were sitting unregistered: nothing in `vivum validate` scored them, so they could
@@ -472,3 +515,171 @@ literature question, not a compute question, and it is still open.
 Nothing under `tmesim/molecular/`, `tmesim/physics/`, `tmesim/reconstruct/`,
 `app/`, `landing-3d/` or `docs/` was touched, and no existing results file was
 modified. Test suite: **757 passing** (754 baseline + 3 new).
+
+---
+
+## 10. ADDENDUM 2026-08-21 — a second registration: the PRE-REGISTERED brain-slice capacity anchor
+
+**Nothing above this line was changed, re-run or re-scored.** This addendum
+records a separate registration made under the same conventions, because §0's
+rule — *"nothing in `codon validate` scored them, so they could not fail in CI
+and did not appear in any tally"* — had recurred on a **freshly discovered**
+failure.
+
+### What was registered
+
+Anchor group **`brain-slice-tissue-capacity`**, quick tier, scope `analytic`,
+one row. It scores the engine's implied unbound brain tissue distribution
+volume `Vu,brain` — the two-route capacity term
+`s_eff = (1−φ) + φK(1+K_b)`, which is **1.000000 exactly for every compound**
+at the shipping constants — against **33 measured rat brain-slice values**
+spanning 3.2–4184 mL·g brain⁻¹, from three open-access primary sources
+(PMID 23336814, 26116114, 38069277).
+
+This is the first anchor here whose **criterion was fixed in advance by a
+different agent than the one that executed it**:
+
+* the pre-registration is `results/transport_anchor_prereg.md` (TEST B — the
+  cascade, the statistic, the 3.0 bar, the bootstrap and the withdrawal
+  conditions), mirrored into `results/sweep/transport_anchor_prereg.json`
+  before any prediction was computed;
+* the execution record is `results/brain_slice_anchor.md`;
+* §8.5 of the pre-registration **requires** the row to appear in
+  `codon validate` and to make it exit 1. Until this registration the FAIL was
+  recorded in markdown and enforced nowhere — a check that had stopped
+  checking, on a failure two days old.
+
+| | |
+|---|---|
+| `GMFE_floor` (best ANY constant could do) | **4.77×**, 90 % BCa CI 3.60–6.98, at the constant 39 mL·g brain⁻¹ |
+| `GMFE(engine)` | **57.50×** |
+| ratio, against a pre-registered bar of 3.0 | **12.045**, 90 % BCa CI **[7.21, 18.93]** — entirely above the bar |
+| bucket / verdict | **B-B MISCALIBRATED / FAIL**; BW1 (reachability) **TRIGGERED** |
+
+The row carries the verdict, the ratio **and** `GMFE_floor` — the last because
+it is the engine-independent headline (prereg §3.5a): it says a re-centred
+constant would pass THE TEST *by construction* and still be wrong by 4.77× on
+average, so re-centring is not a fix. A regression test asserts the floor
+cannot be dropped from the row.
+
+### Scope — the same decision as §2, for the same reason
+
+**`analytic`, and prereg §8.5 says never `SCOPE_PDE`.** The row scores an input
+coefficient; the executor recorded call counters of **0/0** on
+`physics.diffusion.simulate_drug_transport` and `sim.engine.simulate_response`,
+and the runner **re-verifies that live on every run** and records the counts in
+the row's `values`. Two regression tests pin it — the counter check and a
+`sys.setprofile` sweep, the same instrument §3 used. Tagging it `PDE` would
+have moved the quick tier's "N of N scored rows never invoke the transport PDE"
+line by one row with no extra solve; the line stays at **100 %**.
+
+### Two judgement calls carried forward, not resolved
+
+Both were flagged by the executor and both are recorded **in the row's note**,
+so they are visible in `codon validate` output and reversible:
+
+1. **GATE 1's engine quantity.** `s_eff` is not on prereg §3.3's candidate
+   list; §8.4 hands that slot to the executor. The alternative reading — that a
+   capacity fixed at 1 by *normalisation convention* is not a quantity the
+   engine expresses, making this **B-D NOT TESTABLE** instead of FAIL — is
+   stated in the row. **The registration takes the less flattering reading
+   (FAIL).** The number is unaffected either way: `cell_partition`,
+   `two_route.retardation_factor`, the unshipped `ion_trapping` R and `s_eff`
+   are **all exactly 1.0** as shipped.
+2. **Prereg §4.2 is internally inconsistent about BW1** — its operative
+   sentence says *"outside `[min,max]` of the **retained** measurements"*
+   (retained min 3.2 → trips), its illustration quotes the pre-E6 range
+   0.436–4184 (straddles unity → would not trip). The executor applied the
+   operative sentence. **THE TEST fails by 4× under either reading**, so
+   nothing turns on it. It needs amendment under §9.5, which is the
+   coordinator's to make: **the pre-registration was not edited by this work.**
+
+### New conditionals
+
+* **`capacity-normalised-to-one`** — the capacity is 1.0 *by construction, not
+  by choice* (`two_route.py`: *"this module's published output is a
+  CONDUCTANCE, computed against a convention in which the no-binding capacity
+  is 1"*), and **neither knob is clean**: `K` also sets the inclusion
+  conductivity, and §3.2 forbids using a lumped `Vu,brain` to set one component
+  of the lump — **this row does not license moving `cell_partition`, which
+  remains unconstrained by any measurement**; `K_b` *is* the missing
+  per-compound term and it was **built and refuted** on Pruijn HT-29
+  (`results/intracellular_retardation.md`).
+* **`brain-slice-not-tumour`** — the §3.10 commensurability bound: rat, brain
+  slice, no vasculature, no tumour, not human, and weakest exactly where the
+  quantity matters most.
+* **`coefficient-not-field`** was extended, additively, to name **both**
+  provenance routes it now covers (the MCL rows via `MolecularProfile`, this
+  row via `s_eff`) with each one's own 0/0 verification. No verdict, bar or
+  predicted value changed; one more sentence prints.
+
+### Tallies
+
+`transvascular_exchange=False` (the shipping law) in both tiers.
+
+| `codon validate --quick` | before | after |
+|---|---:|---:|
+| PASS | 8 | **8** |
+| FAIL | 5 | **6** |
+| NOT TESTABLE | 4 | **4** |
+| DEFERRED | 8 | 8 |
+| total rows | 25 | **26** |
+| scored rows | 13 | **14** |
+| scored rows that never invoke the PDE | 13 | **14** |
+
+| `codon validate` (full) | before | after |
+|---|---:|---:|
+| PASS | 14 | **14** |
+| FAIL | 17 | **18** |
+| NOT TESTABLE | 19 | **19** |
+| total rows | 50 | **51** |
+| scored rows | 31 | **32** |
+| scored rows that never invoke the PDE | 21 | **22** (61.3 % → 68.8 %) |
+
+**One failure was added and zero passes, in both tiers, and no existing row
+moved** — verified row by row against the before/after JSON. The "never invokes
+the PDE" fraction stays at **100 %** in the quick tier and goes **up** in the
+full tier: the count of things measured that are not the solver rose by one,
+and the disclosure got worse, not better. Exit code **1** before and after, in
+both tiers; that contract is unchanged, and a test asserts this row alone makes
+the suite exit 1.
+
+*(Provenance note, in the spirit of prereg §9.5 rider 3: sibling agents were
+live in this tree during the registration, and one landed a mid-flight rename
+in `tmesim/validation/kill_calibration.py` that made `breast-kill-3d2d` crash
+in one intermediate full run. The before/after above are from runs where that
+group scored normally, `two_route`'s §2.3 constants were asserted against live
+code and matched, and the row reproduced every published figure exactly.)*
+
+### What was NOT registered, and is now auditable
+
+One `OUT_OF_SCOPE` entry was added covering the three columns that sit beside
+this anchor and are deliberately unscored, each for a reason fixed before the
+data were read: **TEST C (`Kp,uu,cell`) is NOT RUNNABLE** on 4 open-access
+values (prereg §3.8 — and it is the one column that *would* constrain
+`cell_partition`); **`Kp,uu,brain` is excluded by §3.4 E3** and its file is
+named `kp_uu_brain_DO_NOT_SCORE.csv`, because scoring a barrier ratio against a
+capacity term is the units/role error BW3 exists to catch; and the **mouse arm
+is excluded by E2** — species are never pooled — and its ratio of 3.11 is not
+evidence that the rat result is marginal.
+
+### What changed
+
+* `tmesim/validation/scorecard.py` — two new `CONDITIONALS` keys
+  (`capacity-normalised-to-one`, `brain-slice-not-tumour`), an additive
+  extension to `coefficient-not-field`, the runner
+  `_run_brain_slice_capacity`, the `brain-slice-tissue-capacity` registry
+  entry, one new `OUT_OF_SCOPE` entry.
+* `tests/test_validate_cli.py` — `TestBrainSlicePreregisteredRow`, 13 tests.
+  The load-bearing ones are the two solver-entry checks, the
+  `GMFE_floor`-is-not-droppable check, and the check that the live
+  recomputation still reproduces `results/brain_slice_anchor.md`, so the row
+  cannot go stale against the document it enforces.
+* `results/anchor_registration.md` — this addendum.
+
+`results/transport_anchor_prereg.md`, `results/brain_slice_anchor.md`,
+`data_cache/`, `tmesim/molecular/`, `tmesim/physics/` and
+`tmesim/validation/propagation.py` were **not** touched. **No assertion was
+deleted or weakened**; the module docstring of `tests/test_validate_cli.py` was
+amended to disclose that one class now reads a 30 kB committed literature
+table, which is the only departure from that file's data-free rule.

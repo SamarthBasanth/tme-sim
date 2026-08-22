@@ -76,6 +76,48 @@ running it, which is cheap enough to sweep every module in the repo. It is a
 weaker instrument -- see its docstring -- and where the two disagree the dynamic
 :class:`Verdict` wins.
 
+More than one flag
+==================
+Everything above was written for ONE flag reaching ONE solver. It is now
+parameterised by :class:`Flag`, because a second switch of the identical shape
+landed with ``fd2a9e7``: ``compile_drug.build_profile(two_route: bool = True)``
+decides whether the two-route cell term is applied to a compiled drug's
+diffusivity, and until this parameterisation it had no declaration table and no
+"exactly one production wiring point" invariant. It was not red; it was blind.
+
+The two flags are DUALS, and the generalisation turns on noticing that:
+
+``transvascular_exchange``
+    The destination (``simulate_drug_transport``) is called from all over the
+    repo, and the question is whether the flag CAME ALONG -- it travels as the
+    ``exchange_k`` keyword. A call without the carrier is the defect.
+``two_route``
+    The destination (``two_route.two_route_diffusivity``) has no carrier: the
+    flag's whole content is whether the destination is called AT ALL. So a call
+    is an arrival and there is no such thing as a bare one. The defect is the
+    other polarity -- a file that computes an effective diffusivity out of
+    ``brownian``/``ecm_mesh`` primitives and never reaches the cell term. Those
+    are :attr:`Flag.precursors`, and a file holding them with no arrival is
+    STRANDED -- it produced a pre-promotion number that the flag could not have
+    changed. Stranded lands in ``INERT``, which is the same verdict for the
+    same reason: a PDE was solved / a diffusivity was computed, and the flag
+    could not reach it. It is emphatically not ``NO_PDE``.
+
+:attr:`Flag.carrier` is what expresses the difference. ``carrier=None`` means
+"arrival is the call", and every polarity above falls out of that one field
+rather than out of a second copy of the machinery.
+
+One thing did NOT generalise, and it is data rather than logic:
+:attr:`Flag.wiring_scope`. See that field for the argument.
+
+What this module does NOT guard
+===============================
+Code, only. It decides reachability and identity questions about SOURCE. The
+prose that quotes this engine's results is guarded separately, by
+``tests/test_claim_guard.py``, and that guard is narrower still -- see its
+"What this cannot do" section. Neither reaches a published NUMBER and neither
+reaches an INTERPRETATION. A guard is not coverage.
+
 This module is purely observational. It imports the code it watches and
 monkeypatches it only for the duration of a ``with`` block; it changes the
 behaviour of nothing.
@@ -109,12 +151,18 @@ __all__ = [
     "EXEMPTIONS",
     "sweep_repo",
     "undeclared_direct_callers",
+    "undeclared_paths",
     "declaration_for",
     "instrument",
     "check_flag_propagation",
     "digest",
     "CallSites",
     "scan_call_sites",
+    "Flag",
+    "FLAGS",
+    "EXCHANGE",
+    "TWO_ROUTE",
+    "flag_named",
 ]
 
 
@@ -164,6 +212,15 @@ class Category(str, enum.Enum):
     REACHED_UNCHANGED = "REACHED_UNCHANGED"
     NO_PDE = "NO_PDE"
     NONDETERMINISTIC = "NONDETERMINISTIC"
+
+    #: ``NO_PDE`` under its general name. The claim is "the flag is legitimately
+    #: unreachable on this path"; for a PDE flag that is spelled "no transport
+    #: solve happens here", and for :data:`TWO_ROUTE` it is spelled "no
+    #: diffusivity is computed here". Declared as an Enum ALIAS deliberately:
+    #: ``Category.UNREACHABLE is Category.NO_PDE`` is True, so the two spellings
+    #: cannot drift into two subtly different verdicts, which is the exact
+    #: failure this module exists to prevent one level down.
+    UNREACHABLE = "NO_PDE"
 
 
 # --------------------------------------------------------------------------- #
@@ -275,7 +332,10 @@ class CallRecord:
     """One observed call across the instrumented boundary."""
 
     target: str
-    #: Only meaningful for the solver: was ``exchange_k`` supplied and not None?
+    #: Only meaningful for the destination: did the flag ARRIVE on this call?
+    #: For a carrier-bearing flag that means the carrier was supplied and not
+    #: None; for a carrier-less flag the call itself is the arrival, so this is
+    #: True on every destination call. Named for the first flag it served.
     exchange_k: bool = False
     #: Only meaningful for the solver: was a time profile supplied (the
     #: ``time_resolved`` flag's equivalent hand-off)?
@@ -286,23 +346,30 @@ class CallRecord:
 
 @dataclass
 class Probe:
-    """Everything observed at the solver boundary during one run."""
+    """Everything observed at one flag's destination boundary during one run."""
 
     calls: List[CallRecord] = field(default_factory=list)
     opaque: bool = False
+    #: Which flag's boundary this is. ``None`` means :data:`EXCHANGE`, resolved
+    #: lazily so the class can be defined before the flag tables exist.
+    flag: Optional["Flag"] = None
+
+    @property
+    def _flag(self) -> "Flag":
+        return self.flag or EXCHANGE
 
     def of(self, target: str) -> List[CallRecord]:
         return [c for c in self.calls if c.target == target]
 
     @property
     def solver_calls(self) -> int:
-        """How many times the transport PDE was actually solved."""
-        return len(self.of(SOLVER))
+        """How many times the destination actually ran."""
+        return len(self.of(self._flag.destination))
 
     @property
     def exchange_k_calls(self) -> int:
-        """Solver calls that were handed a transvascular-exchange field."""
-        return sum(1 for c in self.of(SOLVER) if c.exchange_k)
+        """Destination calls at which the flag ARRIVED."""
+        return sum(1 for c in self.of(self._flag.destination) if c.exchange_k)
 
     @property
     def source_profile_calls(self) -> int:
@@ -316,16 +383,30 @@ class Probe:
 
     @property
     def alt_solver_calls(self) -> int:
-        """Transport solves that went through a re-implemented solver instead.
+        """Runs that went through a re-implementation of the destination.
 
-        Non-zero means a PDE WAS integrated even if :data:`SOLVER` was never
-        called -- so "no PDE ran" would be a false statement.
+        Non-zero means the work the flag governs WAS done even if the
+        destination was never called -- so "it never happened here" would be a
+        false statement, and ``UNREACHABLE`` must be withheld.
         """
-        return sum(len(self.of(name)) for name in ALT_SOLVERS)
+        return sum(len(self.of(name)) for name in self._flag.alt_destinations)
+
+    @property
+    def precursor_calls(self) -> int:
+        """Primitives of the governed quantity that ran on this path.
+
+        Withholds ``UNREACHABLE`` for the same reason
+        :attr:`alt_solver_calls` does, one step lower down: a run that computed
+        an effective diffusivity out of ``brownian`` and ``ecm_mesh`` and never
+        reached the two-route law did NOT fail to produce the governed
+        quantity. It produced the pre-promotion one. Saying "there was nothing
+        here for the flag to change" would be false.
+        """
+        return sum(len(self.of(name)) for name in self._flag.precursors)
 
     def solver_digest(self) -> str:
-        """Hash of every solver return value, in call order."""
-        return digest([c.result for c in self.of(SOLVER)])
+        """Hash of every destination return value, in call order."""
+        return digest([c.result for c in self.of(self._flag.destination)])
 
 
 def _resolve(mod_name: str, attr: str) -> Any:
@@ -346,14 +427,18 @@ def _make_wrapper(original: Callable[..., Any], name: str, probe: Probe) -> Call
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         exchange_k = False
         source_profile = False
-        if name == SOLVER and sig is not None:
+        flag = probe._flag
+        if name == flag.destination and flag.carrier is None:
+            # No carrier: reaching the destination IS the flag being applied.
+            exchange_k = True
+        elif name == flag.destination and sig is not None:
             try:
                 bound = sig.bind(*args, **kwargs)
-                exchange_k = bound.arguments.get("exchange_k", None) is not None
+                exchange_k = bound.arguments.get(flag.carrier, None) is not None
                 source_profile = bound.arguments.get("source_profile", None) is not None
             except TypeError:
                 # Let the real call raise the real error; record what we can.
-                exchange_k = kwargs.get("exchange_k", None) is not None
+                exchange_k = kwargs.get(flag.carrier, None) is not None
                 source_profile = kwargs.get("source_profile", None) is not None
         out = original(*args, **kwargs)
         d = _Digester().add(out)
@@ -373,8 +458,11 @@ def _make_wrapper(original: Callable[..., Any], name: str, probe: Probe) -> Call
 
 
 @contextmanager
-def instrument(watched: Sequence[Tuple[str, str]] = WATCHED) -> Iterator[Probe]:
-    """Count and fingerprint every call across the solver boundary.
+def instrument(
+    watched: Optional[Sequence[Tuple[str, str]]] = None,
+    flag: Optional["Flag"] = None,
+) -> Iterator[Probe]:
+    """Count and fingerprint every call across one flag's destination boundary.
 
     Patches the defining module AND every already-imported module that did
     ``from ... import simulate_drug_transport`` -- a from-import binds a new
@@ -392,7 +480,9 @@ def instrument(watched: Sequence[Tuple[str, str]] = WATCHED) -> Iterator[Probe]:
 
     Restores everything it touched, including on exception.
     """
-    probe = Probe()
+    flag = flag or EXCHANGE
+    watched = flag.watched if watched is None else watched
+    probe = Probe(flag=flag)
     installed: List[Tuple[Any, str, Any, Any]] = []  # (module, attr, original, wrapper)
 
     try:
@@ -488,6 +578,7 @@ def check_flag_propagation(
     *,
     label: str = "",
     determinism_check: bool = True,
+    flag: Optional["Flag"] = None,
 ) -> Verdict:
     """Run ``run`` with the flag off and on; report whether the flag got through.
 
@@ -509,16 +600,20 @@ def check_flag_propagation(
         nothing to do with the flag, and be reported as PROPAGATED -- a false
         pass, which is the same class of error this module exists to stop.
 
+    flag : Flag, optional
+        Which switch is being checked. Defaults to :data:`EXCHANGE`.
+
     Returns
     -------
     Verdict
     """
-    with instrument() as p_off:
+    flag = flag or EXCHANGE
+    with instrument(flag=flag) as p_off:
         r_off = run(False)
     d_off = _run_digest(p_off, r_off)
 
     if determinism_check:
-        with instrument() as p_ctl:
+        with instrument(flag=flag) as p_ctl:
             r_ctl = run(False)
         d_ctl = _run_digest(p_ctl, r_ctl)
         if d_ctl != d_off:
@@ -537,7 +632,7 @@ def check_flag_propagation(
                 ),
             )
 
-    with instrument() as p_on:
+    with instrument(flag=flag) as p_on:
         r_on = run(True)
     d_on = _run_digest(p_on, r_on)
 
@@ -555,40 +650,56 @@ def check_flag_propagation(
     # (C) No transport solve on this path at all. Legitimately unreachable --
     #     but only ever an honest verdict when it has been DECLARED as such,
     #     and only when no RE-IMPLEMENTED solver ran either.
+    dest = flag.destination
+    carried = f"{flag.carrier}" if flag.carrier else "the flag"
+    route = " or ".join(flag.entry_points) or "a sanctioned entry point"
     if p_off.solver_calls == 0 and p_on.solver_calls == 0:
-        if p_on.alt_solver_calls:
+        if p_on.alt_solver_calls or p_on.precursor_calls:
+            if p_on.alt_solver_calls:
+                how = (
+                    f"{p_on.alt_solver_calls} call(s) went through a "
+                    "RE-IMPLEMENTED destination "
+                    f"({', '.join(flag.alt_destinations)}) that the flag "
+                    "cannot reach at all"
+                )
+            else:
+                how = (
+                    f"{p_on.precursor_calls} call(s) went to the RE-IMPLEMENTED "
+                    "primitives the governed quantity used to be built out of "
+                    f"({', '.join(flag.precursors)}), and the chain stopped "
+                    "there"
+                )
             return Verdict(
                 category=Category.INERT,
                 detail=(
-                    f"simulate_drug_transport never ran, but {p_on.alt_solver_calls} "
-                    "transport solve(s) went through a RE-IMPLEMENTED solver "
-                    f"({', '.join(ALT_SOLVERS)}) that takes no exchange_k "
-                    "argument at all. A PDE was integrated and the flag could "
-                    "not reach it. This is INERT, not NO_PDE: reporting it as "
-                    "'no PDE ran' would be false."
+                    f"{dest} never ran, but {how}. The work the flag governs "
+                    "WAS done and the flag could not reach it. This is INERT, "
+                    "not NO_PDE: reporting it as 'nothing happened here' would "
+                    "be false -- a number was produced, and it is the flag-OFF "
+                    "number whatever the caller set."
                 ),
                 **common,
             )
         return Verdict(
             category=Category.NO_PDE,
             detail=(
-                "simulate_drug_transport was never called, with the flag off or "
-                "on. There is no transport solve on this path for a PDE flag to "
-                "reach (analytic closed form, or the work happens elsewhere). "
-                "'Nothing changed' here means UNREACHABLE, not robust -- it is "
-                "no evidence at all about the physics."
+                f"{dest} was never called, with the flag off or on. There is "
+                "nothing on this path for the flag to reach (analytic closed "
+                "form, or the work happens elsewhere). 'Nothing changed' here "
+                "means UNREACHABLE, not robust -- it is no evidence at all "
+                "about the physics."
             ),
             **common,
         )
 
-    # (B) The solver ran and the flag never crossed the boundary. THE BUG.
+    # (B) The destination ran and the flag never crossed the boundary. THE BUG.
     if p_on.exchange_k_calls == 0:
         if d_off != d_on:
             return Verdict(
                 category=Category.PROPAGATED,
                 detail=(
-                    f"results differ across {p_on.solver_calls} solver call(s) "
-                    "even though exchange_k was never passed, so the flag is "
+                    f"results differ across {p_on.solver_calls} {dest} call(s) "
+                    f"even though {carried} was never passed, so the flag is "
                     "reaching the physics by some OTHER route. Real, but not "
                     "the route this checker models -- find it before trusting it."
                 ),
@@ -598,19 +709,20 @@ def check_flag_propagation(
         return Verdict(
             category=Category.INERT,
             detail=(
-                f"simulate_drug_transport ran {p_on.solver_calls} time(s) with "
-                "the flag ON and was handed exchange_k=None every time"
+                f"{dest} ran {p_on.solver_calls} time(s) with "
+                f"the flag ON and was handed {carried}=None every time"
                 + (
                     f" (exchange_coefficient WAS built {built} time(s) and then "
                     "dropped)"
                     if built
                     else " (exchange_coefficient was never even built)"
+                    if flag is EXCHANGE
+                    else ""
                 )
                 + ". The flag is a silent no-op on this path: the two runs are "
                 "bit-identical because they are the same run. Any 'on vs off' "
                 "conclusion drawn here is a comparison of a run to itself. Fix "
-                "by routing through sim.engine.simulate_response, or by passing "
-                "exchange_coefficient(micro, drug) as exchange_k= explicitly."
+                f"by routing through {route}, or by passing {carried} explicitly."
             ),
             **common,
         )
@@ -620,7 +732,7 @@ def check_flag_propagation(
         return Verdict(
             category=Category.PROPAGATED,
             detail=(
-                f"exchange_k reached the solver on {p_on.exchange_k_calls} of "
+                f"{carried} reached {dest} on {p_on.exchange_k_calls} of "
                 f"{p_on.solver_calls} call(s) and the results changed. An "
                 "on-vs-off comparison on this path is real."
             ),
@@ -631,7 +743,7 @@ def check_flag_propagation(
     return Verdict(
         category=Category.REACHED_UNCHANGED,
         detail=(
-            f"exchange_k reached the solver on {p_on.exchange_k_calls} of "
+            f"{carried} reached {dest} on {p_on.exchange_k_calls} of "
             f"{p_on.solver_calls} call(s), and the results are still "
             "bit-identical. The flag was genuinely applied and genuinely had no "
             "effect (e.g. PS is zero everywhere on this geometry). This is a "
@@ -647,7 +759,7 @@ def check_flag_propagation(
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class CallSites:
-    """What a source file says about how it reaches the solver.
+    """What a source file says about how it reaches one flag's destination.
 
     Read straight off the AST of one file (optionally one function inside it).
     Cheap enough to sweep the whole repo, and it needs no fixtures, but it is
@@ -656,39 +768,92 @@ class CallSites:
     into helper modules, and a dynamic ``exchange_k=`` built behind a conditional
     still counts as passed. Use it to triage; use
     :func:`check_flag_propagation` to conclude.
+
+    The field names are the ``transvascular_exchange`` spelling, kept because
+    every existing caller uses them; the generic aliases beside each one are
+    what the second flag reads.
     """
 
     target: str
-    #: Line numbers of direct ``simulate_drug_transport(...)`` calls.
+    #: Line numbers of direct calls to the flag's destination.
     direct_calls: Tuple[int, ...] = ()
-    #: Subset of ``direct_calls`` that pass an ``exchange_k=`` keyword.
+    #: Subset of ``direct_calls`` that CARRY the flag. When the flag has no
+    #: carrier (:attr:`Flag.carrier` is None) a call IS an arrival, so this
+    #: equals ``direct_calls``.
     direct_calls_with_exchange_k: Tuple[int, ...] = ()
-    #: Line numbers of ``simulate_response(...)`` calls (the engine path).
+    #: Line numbers of calls to a sanctioned entry point (the engine path).
     engine_calls: Tuple[int, ...] = ()
+    #: Line numbers of calls to a :attr:`Flag.precursor` -- a primitive that
+    #: computes the quantity the flag governs, WITHOUT the flag. Empty for a
+    #: carrier-bearing flag, where being a direct caller is already the
+    #: statement that this file is on the path.
+    precursor_calls: Tuple[int, ...] = ()
+    #: Which flag this was scanned for, for the failure message.
+    flag: str = "transvascular_exchange"
+
+    # -- generic aliases ---------------------------------------------------- #
+    @property
+    def destination_calls(self) -> Tuple[int, ...]:
+        return self.direct_calls
+
+    @property
+    def arrivals(self) -> Tuple[int, ...]:
+        """Destination calls at which the flag actually arrived."""
+        return self.direct_calls_with_exchange_k
+
+    @property
+    def entry_calls(self) -> Tuple[int, ...]:
+        return self.engine_calls
 
     @property
     def bare_direct_calls(self) -> Tuple[int, ...]:
-        """Direct solver calls that do NOT pass ``exchange_k``. Each one is a
-        line at which a ``PDEConfig`` physics flag stops existing."""
+        """Destination calls that do NOT carry the flag. Each one is a line at
+        which the flag stops existing.
+
+        Always empty for a carrier-less flag: there, calling the destination is
+        the whole of applying the flag, so a call cannot fail to carry it. The
+        equivalent defect for those flags is :attr:`stranded_calls`.
+        """
         withk = set(self.direct_calls_with_exchange_k)
         return tuple(ln for ln in self.direct_calls if ln not in withk)
+
+    @property
+    def stranded_calls(self) -> Tuple[int, ...]:
+        """Precursor calls in a file that never reaches the destination.
+
+        The dual of :attr:`bare_direct_calls`. The quantity the flag governs is
+        computed here out of the primitives, and the flag cannot touch it -- so
+        a number taken from this file is the flag-OFF number no matter what the
+        caller set.
+        """
+        if self.direct_calls or self.engine_calls:
+            return ()
+        return self.precursor_calls
+
+    @property
+    def undeclarable(self) -> Tuple[int, ...]:
+        """Every line at which this file needs a declaration to stay honest."""
+        return tuple(sorted(set(self.bare_direct_calls) | set(self.stranded_calls)))
 
     @property
     def predicted(self) -> Category:
         """Best static guess at the dynamic category.
 
-        A bare direct call outranks an engine call: if a path can reach the
-        solver without the flag, the honest prediction is INERT even when some
-        other line in the same file does it correctly. Under-claiming here is
-        the safe direction -- the cost of a wrong INERT prediction is one
+        A bare direct call outranks an entry call: if a path can reach the
+        destination without the flag, the honest prediction is INERT even when
+        some other line in the same file does it correctly. Under-claiming here
+        is the safe direction -- the cost of a wrong INERT prediction is one
         investigation, the cost of a wrong PROPAGATED prediction is a published
-        false conclusion.
+        false conclusion. A stranded precursor call is ranked the same way and
+        for the same reason.
         """
         if self.bare_direct_calls:
             return Category.INERT
         if self.direct_calls_with_exchange_k or self.engine_calls:
             return Category.PROPAGATED
-        return Category.NO_PDE
+        if self.precursor_calls:
+            return Category.INERT
+        return Category.UNREACHABLE
 
 
 def _called_name(node: ast.Call) -> str:
@@ -700,14 +865,22 @@ def _called_name(node: ast.Call) -> str:
     return ""
 
 
-def scan_call_sites(path: str | Path, symbol: Optional[str] = None) -> CallSites:
-    """AST-scan one file (or one function in it) for solver call sites.
+def scan_call_sites(
+    path: str | Path,
+    symbol: Optional[str] = None,
+    flag: Optional["Flag"] = None,
+) -> CallSites:
+    """AST-scan one file (or one function in it) for one flag's call sites.
 
     ``symbol`` restricts the scan to a single top-level ``def``/``async def``,
     which is what makes a file like ``validation/vessel_profile.py`` -- one
     function on the engine path and another calling the solver directly --
     describable without averaging the two into a meaningless whole-file answer.
+    ``molecular/ecm_mesh.py`` is the same shape for :data:`TWO_ROUTE`.
+
+    ``flag`` defaults to :data:`EXCHANGE`, so existing callers are unchanged.
     """
+    flag = flag or EXCHANGE
     path = Path(path)
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
@@ -728,16 +901,23 @@ def scan_call_sites(path: str | Path, symbol: Optional[str] = None) -> CallSites
     direct: List[int] = []
     with_k: List[int] = []
     engine: List[int] = []
+    precursor: List[int] = []
     for node in ast.walk(root):
         if not isinstance(node, ast.Call):
             continue
         name = _called_name(node)
-        if name == SOLVER:
+        if name == flag.destination:
             direct.append(node.lineno)
-            if any(kw.arg == "exchange_k" for kw in node.keywords):
+            # No carrier => arriving IS being called. With a carrier, only a
+            # call that actually passes it counts as an arrival.
+            if flag.carrier is None or any(
+                kw.arg == flag.carrier for kw in node.keywords
+            ):
                 with_k.append(node.lineno)
-        elif name == "simulate_response":
+        elif name in flag.entry_points:
             engine.append(node.lineno)
+        elif name in flag.precursors:
+            precursor.append(node.lineno)
 
     target = str(path) if symbol is None else f"{path}::{symbol}"
     return CallSites(
@@ -745,6 +925,8 @@ def scan_call_sites(path: str | Path, symbol: Optional[str] = None) -> CallSites
         direct_calls=tuple(sorted(direct)),
         direct_calls_with_exchange_k=tuple(sorted(with_k)),
         engine_calls=tuple(sorted(engine)),
+        precursor_calls=tuple(sorted(precursor)),
+        flag=flag.name,
     )
 
 
@@ -1023,50 +1205,147 @@ WIRING_POINTS: Tuple[WiringPoint, ...] = (
 )
 
 
-def wiring_points(production_only: bool = False) -> frozenset:
-    """Paths permitted to pass ``exchange_k``; the production one if asked."""
-    return frozenset(
-        w.path for w in WIRING_POINTS if w.production or not production_only
-    )
-
-
-def declaration_for(path: str, symbol: Optional[str] = None) -> Declaration:
-    """Look up a declaration, or raise. There is no default."""
-    name = path if symbol is None else f"{path}::{symbol}"
-    for d in DECLARATIONS:
-        if d.name == name:
-            return d
-    raise LookupError(
-        f"{name} has no propagation declaration. Add one to "
-        "tmesim.validation.propagation.DECLARATIONS with a written reason -- "
-        "an undeclared path is a failure, not a pass."
-    )
-
-
 #: Directories swept by :func:`sweep_repo`.
 SWEPT_ROOTS: Tuple[str, ...] = ("tmesim", "experiments", "scripts", "app")
 
 
-def sweep_repo(root: str | Path = ".") -> Dict[str, CallSites]:
-    """Static-scan the repo for every file containing a solver call site.
+# --------------------------------------------------------------------------- #
+# The flag itself
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class Flag:
+    """One physics switch, the destination it must reach, and its own tables.
+
+    Everything above this line is written against a :class:`Flag` rather than
+    against ``transvascular_exchange``, so a second switch of the same shape
+    gets the same guard instead of a second copy of it.
+    """
+
+    #: The switch as a person would name it in a config or a signature.
+    name: str
+    #: The function the flag has to reach to mean anything.
+    destination: str
+    #: The keyword argument that CARRIES the flag across that boundary, or
+    #: ``None`` when there is no carrier and the call itself is the arrival.
+    #: This one field is the whole difference between the two flags -- see the
+    #: module docstring.
+    carrier: Optional[str]
+    #: Sanctioned routes: calling one of these is how the flag is SUPPOSED to
+    #: reach the destination, and a file that does so is on the honest path.
+    entry_points: Tuple[str, ...] = ()
+    #: Primitives that compute the quantity the flag governs WITHOUT it. Only
+    #: meaningful for a carrier-less flag; see :attr:`CallSites.stranded_calls`.
+    precursors: Tuple[str, ...] = ()
+    #: ``(module, attribute)`` pairs :func:`instrument` patches for this flag.
+    watched: Tuple[Tuple[str, str], ...] = ()
+    #: Re-implementations that answer the same question the destination does,
+    #: and that the flag cannot reach. Their presence WITHHOLDS the
+    #: ``UNREACHABLE`` verdict -- see :data:`ALT_SOLVERS`.
+    alt_destinations: Tuple[str, ...] = ()
+    declarations: Tuple[Declaration, ...] = ()
+    exemptions: Tuple[Exemption, ...] = ()
+    wiring_points: Tuple[WiringPoint, ...] = ()
+    #: Roots swept for undeclared paths.
+    swept_roots: Tuple[str, ...] = SWEPT_ROOTS
+    #: Roots in which a file that reaches the destination must be a declared
+    #: :class:`WiringPoint` (or an :class:`Exemption`).
+    #:
+    #: THIS IS THE ONE THING THAT DID NOT GENERALISE, and it is data, not a
+    #: special case in the logic.
+    #:
+    #: For ``transvascular_exchange`` the scope is the whole sweep, and the
+    #: argument for that is in :data:`WIRING_POINTS`: passing ``exchange_k`` by
+    #: hand is how an experiment FAKES the production path, so an undeclared
+    #: injection is an experiment that may be measuring something other than
+    #: what it says. That danger is real and it lives mostly in
+    #: ``experiments/``.
+    #:
+    #: For ``two_route`` that danger does not exist. There is no carrier to
+    #: inject, so calling ``two_route_diffusivity`` in a script is not faking a
+    #: path -- it is calling a pure function with explicit arguments, which is
+    #: how every one of this law's probe experiments is written and how the
+    #: next one will be. Requiring a WiringPoint per probe would charge a
+    #: written justification for the ordinary way of asking the law a question,
+    #: and a rule that fires on ordinary work is a rule people re-stamp without
+    #: reading. So the scope is narrowed to the SHIPPED PACKAGE, where the
+    #: invariant that actually matters lives: exactly one place inside
+    #: ``tmesim/`` decides whether a compiled drug gets the cell term.
+    #:
+    #: Narrowing the scope costs nothing that was being guarded, because the
+    #: exhaustive sweep for STRANDED paths still covers every root. An
+    #: ``experiments/`` script that computes a diffusivity without the cell
+    #: term is still a failure; only "called the law directly" is untaxed.
+    wiring_scope: Tuple[str, ...] = SWEPT_ROOTS
+    #: Why this flag is watched at all. Required, like every other reason here.
+    reason: str = ""
+
+    def __post_init__(self) -> None:
+        if len(self.reason.strip()) < 25:
+            raise ValueError(
+                f"{self.name}: a Flag needs a written reason (>=25 chars) "
+                "saying what goes silently wrong when it does not propagate."
+            )
+        if self.carrier is None and not self.precursors:
+            raise ValueError(
+                f"{self.name}: a carrier-less flag has no bare calls to find, "
+                "so without precursors this Flag can never report the defect "
+                "it exists to report. Declare the primitives that compute the "
+                "quantity it governs."
+            )
+
+    def in_wiring_scope(self, path: str) -> bool:
+        norm = str(path).replace("\\", "/")
+        return any(norm == r or norm.startswith(r + "/") for r in self.wiring_scope)
+
+
+def wiring_points(
+    production_only: bool = False, flag: Optional[Flag] = None
+) -> frozenset:
+    """Paths permitted to carry the flag; the production one if asked."""
+    flag = flag or EXCHANGE
+    return frozenset(
+        w.path for w in flag.wiring_points if w.production or not production_only
+    )
+
+
+def declaration_for(
+    path: str, symbol: Optional[str] = None, flag: Optional[Flag] = None
+) -> Declaration:
+    """Look up a declaration, or raise. There is no default."""
+    flag = flag or EXCHANGE
+    name = path if symbol is None else f"{path}::{symbol}"
+    for d in flag.declarations:
+        if d.name == name:
+            return d
+    raise LookupError(
+        f"{name} has no {flag.name} propagation declaration. Add one to the "
+        f"declarations of tmesim.validation.propagation.{flag.name.upper()} "
+        "with a written reason -- an undeclared path is a failure, not a pass."
+    )
+
+
+def sweep_repo(root: str | Path = ".", flag: Optional[Flag] = None) -> Dict[str, CallSites]:
+    """Static-scan the repo for every file on one flag's path.
 
     Returns ``{repo-relative path: CallSites}``. Cheap (AST only) and the reason
     the guard does not depend on someone remembering to register a new module:
-    a file that starts calling the solver shows up here whether or not anyone
-    thought about it.
+    a file that starts calling the destination -- or that starts computing the
+    governed quantity out of the primitives -- shows up here whether or not
+    anyone thought about it.
     """
+    flag = flag or EXCHANGE
     root = Path(root)
     found: Dict[str, CallSites] = {}
-    for base in SWEPT_ROOTS:
+    for base in flag.swept_roots:
         base_dir = root / base
         if not base_dir.is_dir():
             continue
         for py in sorted(base_dir.rglob("*.py")):
             try:
-                cs = scan_call_sites(py)
+                cs = scan_call_sites(py, flag=flag)
             except (SyntaxError, UnicodeDecodeError):  # pragma: no cover
                 continue
-            if cs.direct_calls or cs.engine_calls:
+            if cs.direct_calls or cs.engine_calls or cs.precursor_calls:
                 found[str(py.relative_to(root))] = cs
     return found
 
@@ -1114,19 +1393,294 @@ def reimplementation_candidates(root: str | Path = ".") -> Dict[str, Tuple[str, 
     return out
 
 
-def undeclared_direct_callers(root: str | Path = ".") -> List[str]:
-    """Files that call the solver WITHOUT ``exchange_k`` and are neither
-    declared in :data:`DECLARATIONS` nor listed in :data:`EXEMPTIONS`.
+def undeclared_paths(root: str | Path = ".", flag: Optional[Flag] = None) -> List[str]:
+    """Files on which the flag is a silent no-op and nobody has written it down.
 
-    Any name this returns is a code path on which a ``PDEConfig`` physics flag
-    is currently a silent no-op that nobody has written down. The correct
-    response is to add a declaration (or fix the call), never to widen the
-    exemption list.
+    Two shapes, one per polarity (see :class:`CallSites`):
+
+    * BARE -- the destination is called without the carrier.
+    * STRANDED -- the governed quantity is computed out of the precursors and
+      the destination is never reached.
+
+    Either way the run completes, the numbers are plausible, and they are the
+    flag-OFF numbers whatever the caller set. The correct response is to add a
+    declaration (or fix the call), never to widen the exemption list.
     """
-    declared = {d.path for d in DECLARATIONS}
-    exempt = {e.path for e in EXEMPTIONS}
+    flag = flag or EXCHANGE
+    declared = {d.path for d in flag.declarations}
+    exempt = {e.path for e in flag.exemptions}
     return [
         path
-        for path, cs in sweep_repo(root).items()
-        if cs.bare_direct_calls and path not in declared and path not in exempt
+        for path, cs in sweep_repo(root, flag=flag).items()
+        if cs.undeclarable and path not in declared and path not in exempt
     ]
+
+
+def undeclared_direct_callers(root: str | Path = ".") -> List[str]:
+    """:func:`undeclared_paths` for :data:`EXCHANGE`. Kept as the name every
+    existing caller and failure message uses."""
+    return undeclared_paths(root, flag=EXCHANGE)
+
+
+def undeclared_wiring(root: str | Path = ".", flag: Optional[Flag] = None) -> List[str]:
+    """Files inside :attr:`Flag.wiring_scope` that reach the destination WITH
+    the flag and are not declared as a :class:`WiringPoint` (nor exempted).
+
+    Every such file is a second place that decides whether the physics is
+    active, which is how a flag ends up silently on in one path and off in
+    another.
+    """
+    flag = flag or EXCHANGE
+    permitted = wiring_points(flag=flag) | {e.path for e in flag.exemptions}
+    return sorted(
+        path
+        for path, cs in sweep_repo(root, flag=flag).items()
+        if cs.arrivals and flag.in_wiring_scope(path) and path not in permitted
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Flag 2: molecular.compile_drug.build_profile(two_route=...)
+#
+# The second switch of the identical shape, added by fd2a9e7 with no table of
+# its own. `build_profile(two_route: bool = _TWO_ROUTE_DEFAULT)` decides whether
+# a compiled drug's interstitial diffusivity is multiplied by the two-route cell
+# term. Everything below is the same discipline the exchange flag already had,
+# in the dual polarity described in the module docstring.
+# --------------------------------------------------------------------------- #
+
+#: What :func:`instrument` patches for :data:`TWO_ROUTE`. The first is THE
+#: destination. The rest are the precursors, counted so a diagnosis can tell
+#: "the interstitial leg was never even computed" from "it was computed and the
+#: cell term was never applied to it".
+TWO_ROUTE_WATCHED: Tuple[Tuple[str, str], ...] = (
+    ("tmesim.molecular.two_route", "two_route_diffusivity"),
+    ("tmesim.molecular.brownian", "simulate_effective_diffusivity"),
+    ("tmesim.molecular.ecm_mesh", "ogston_renkin_hindrance"),
+    # Alternate destination -- see TWO_ROUTE_ALT.
+    ("tmesim.molecular.ecm_mesh", "cell_exclusion"),
+)
+
+#: The IMPERMEABLE-cell law: it answers the same question the two-route law
+#: answers (how much do cells hinder a solute?) and it cannot see the flag,
+#: because it takes no ``logp`` and no ``hbd`` -- it is identical for every drug.
+#: ``two_route`` reduces to it exactly at zero membrane permeability.
+#:
+#: It is registered here for the same reason ``ALT_SOLVERS`` is: a path that
+#: computes cell hindrance through ``cell_exclusion`` and never reaches
+#: ``two_route_diffusivity`` would otherwise be reported UNREACHABLE -- "the
+#: flag has nothing to reach here" -- when the truth is that the governed
+#: quantity WAS computed and the flag could not reach it. That is INERT.
+TWO_ROUTE_ALT: Tuple[str, ...] = (
+    "cell_exclusion",
+    "tissue_hindrance",
+)
+
+#: The primitives the pre-promotion diffusivity chain was built out of. A file
+#: that calls these and never reaches ``two_route_diffusivity`` (directly or
+#: through ``build_profile``) produces the MOLECULAR-WEIGHT-ONLY number that
+#: ``results/diffusivity_falsification.md`` scored at R^2 = 0.022 -- and it
+#: produces it whatever anyone sets ``two_route`` to.
+TWO_ROUTE_PRECURSORS: Tuple[str, ...] = (
+    "simulate_effective_diffusivity",
+    "ogston_renkin_hindrance",
+    "cell_exclusion",
+    "tissue_hindrance",
+)
+
+TWO_ROUTE_DECLARATIONS: Tuple[Declaration, ...] = (
+    # --- (A) the compile path: the flag propagates ---------------------------
+    Declaration(
+        path="tmesim/molecular/compile_drug.py",
+        symbol="build_profile",
+        category=Category.PROPAGATED,
+        reason=(
+            "The one and only place that reads the two_route parameter, calls "
+            "two_route.two_route_diffusivity with the logp and hbd descriptors, "
+            "and multiplies the interstitial D by the returned factor. Every "
+            "shipped DrugParams.diffusivity in this repo comes through here, "
+            "and alpha moved 148.60815765445545 -> 22.223477711172563 because "
+            "of it."
+        ),
+    ),
+    Declaration(
+        path="tmesim/molecular/ecm_mesh.py",
+        symbol="tissue_hindrance_two_route",
+        category=Category.PROPAGATED,
+        reason=(
+            "Reaches two_route.two_route_diffusivity, so the cell term is "
+            "genuinely applied. This is the half of ecm_mesh.py that is on the "
+            "law; the other half is not, which is why this file is declared "
+            "per-function exactly as vessel_profile.py is for the exchange flag."
+        ),
+    ),
+    # --- (B) stranded: the governed quantity is computed without the flag ----
+    Declaration(
+        path="tmesim/molecular/ecm_mesh.py",
+        symbol="tissue_hindrance",
+        category=Category.INERT,
+        reason=(
+            "Composes ogston_renkin_hindrance with cell_exclusion, the "
+            "IMPERMEABLE-cell law, and never reaches two_route_diffusivity. Its "
+            "number is identical for two drugs of the same size, which is the "
+            "decisive failure results/diffusivity_falsification.md measured. It "
+            "is kept and untouched on purpose as the pre-promotion comparison, "
+            "and it must never be mistaken for the shipping law."
+        ),
+    ),
+    Declaration(
+        path="tmesim/viz/explainer.py",
+        category=Category.INERT,
+        reason=(
+            "The first thing this sweep caught, and it is a real split rather "
+            "than a false alarm. explainer.py calls ecm_mesh."
+            "ogston_renkin_hindrance directly (explainer.py:278) to publish "
+            "mesh_partition and mesh_hindrance, which are the ECM-ONLY leg and "
+            "carry no cell term. The tissue_D column beside them comes from "
+            "calibration.calibrated_drugparams, which does route through "
+            "compile_drug.molecule_to_drugparams and so IS the two-route "
+            "number. The two columns are therefore products of different laws: "
+            "free_D x mesh_hindrance does NOT reproduce tissue_D, and nothing "
+            "in the figure says so. Labelled correctly today; declared here so "
+            "that if the mesh leg is ever presented as the tissue answer, the "
+            "sweep is already holding the distinction."
+        ),
+    ),
+    # --- (C) unreachable: no diffusivity of the governed kind exists here ----
+    Declaration(
+        path="tmesim/molecular/stokes_einstein.py",
+        category=Category.UNREACHABLE,
+        reason=(
+            "Stokes-Einstein in a DILUTE fluid: there are no cells and no ECM "
+            "in the model at all, so a cell-permeability term has nothing to "
+            "reach. free_diffusivity is bit-identical under either setting, and "
+            "that is a statement about this module's scope -- NOT evidence that "
+            "the cell term is negligible."
+        ),
+    ),
+)
+
+TWO_ROUTE_EXEMPTIONS: Tuple[Exemption, ...] = (
+    Exemption(
+        path="tmesim/molecular/two_route.py",
+        reason=(
+            "The module that DEFINES the law, plus its own __main__ self-test. "
+            "The destination is where a flag has to arrive, so 'does the flag "
+            "reach it from here' is not a meaningful question; these calls are "
+            "the law being exercised directly with explicit arguments."
+        ),
+    ),
+    Exemption(
+        path="tmesim/molecular/brownian.py",
+        reason=(
+            "The module that DEFINES simulate_effective_diffusivity, plus its "
+            "own __main__ self-test. It computes the ECM micro-tortuosity leg "
+            "and is SUPPOSED to stop there -- the cell term is applied one "
+            "level up by compile_drug. A stranded verdict here would be the "
+            "checker complaining that a component is a component."
+        ),
+    ),
+)
+
+#: Every file inside the SHIPPED PACKAGE that reaches the two-route law, and why.
+#:
+#: The invariant is the same one WIRING_POINTS protects and it is just as
+#: strict: there is EXACTLY ONE production wiring point. A second place inside
+#: tmesim/ deciding whether a compiled drug gets the cell term is how the same
+#: drug ends up with two different diffusivities depending on which module
+#: compiled it.
+#:
+#: The scope is tmesim/ rather than the whole sweep. The argument is written out
+#: at Flag.wiring_scope; in one line, this flag has no carrier to inject, so an
+#: experiments/ script calling the law directly is not faking a production path
+#: and charging it a written justification would tax ordinary work.
+TWO_ROUTE_WIRING_POINTS: Tuple[WiringPoint, ...] = (
+    WiringPoint(
+        path="tmesim/molecular/compile_drug.py",
+        production=True,
+        reason=(
+            "The shipped compile path, and the only place inside tmesim/ that "
+            "turns the two_route parameter into a call to "
+            "two_route.two_route_diffusivity. Everything a user runs -- every "
+            "DrugParams the engine is handed -- reaches the law through here."
+        ),
+    ),
+    WiringPoint(
+        path="tmesim/molecular/ecm_mesh.py",
+        production=False,
+        reason=(
+            "tissue_hindrance_two_route, a convenience wrapper for analysis. "
+            "Its own docstring says it is NOT the shipping path: it recomputes "
+            "the interstitial leg analytically from Ogston-Renkin instead of "
+            "from the Brownian sim compile_drug uses, so its result is NOT "
+            "bit-identical to a compile and must never be quoted as one. It is "
+            "declared rather than exempted precisely because the two look alike."
+        ),
+    ),
+)
+
+TWO_ROUTE = Flag(
+    name="two_route",
+    destination="two_route_diffusivity",
+    # No carrier. The flag's entire content is whether the law is invoked, so a
+    # call IS an arrival and there is no such thing as a bare one.
+    carrier=None,
+    entry_points=("build_profile", "molecule_to_drugparams"),
+    precursors=TWO_ROUTE_PRECURSORS,
+    watched=TWO_ROUTE_WATCHED,
+    alt_destinations=TWO_ROUTE_ALT,
+    declarations=TWO_ROUTE_DECLARATIONS,
+    exemptions=TWO_ROUTE_EXEMPTIONS,
+    wiring_points=TWO_ROUTE_WIRING_POINTS,
+    wiring_scope=("tmesim",),
+    reason=(
+        "compile_drug.build_profile(two_route=...) decides whether a compiled "
+        "drug's diffusivity carries the two-route cell term. A path that "
+        "computes an effective diffusivity out of brownian/ecm_mesh primitives "
+        "without reaching two_route_diffusivity gets the pre-promotion "
+        "MOLECULAR-WEIGHT-ONLY number -- the model "
+        "results/diffusivity_falsification.md scored at R^2 = 0.022 against 71 "
+        "compounds -- and gets it whatever anyone set the flag to. The run "
+        "completes, the number is plausible, and it is flat by construction at "
+        "matched molecular weight."
+    ),
+)
+
+EXCHANGE = Flag(
+    name="transvascular_exchange",
+    destination=SOLVER,
+    carrier="exchange_k",
+    entry_points=("simulate_response",),
+    # None. For a carrier-bearing flag, being a direct caller of the solver is
+    # already the statement that this file is on the path; there is no separate
+    # "computed it out of primitives" shape to look for at a CALL SITE.
+    # (reimplementation_candidates covers that shape by IMPORT instead.)
+    precursors=(),
+    watched=WATCHED,
+    alt_destinations=ALT_SOLVERS,
+    declarations=DECLARATIONS,
+    exemptions=EXEMPTIONS,
+    wiring_points=WIRING_POINTS,
+    wiring_scope=SWEPT_ROOTS,
+    reason=(
+        "PDEConfig.transvascular_exchange only means something once something "
+        "turns it into an exchange_k field and hands it to the solver. On every "
+        "path that calls the solver directly it is a silent no-op and the two "
+        "runs are BIT-IDENTICAL, measured at auc_sum 1.554447793e+09 either way "
+        "against 6.86608671e+08 when exchange_k was actually passed."
+    ),
+)
+
+#: Every flag under guard. A new physics switch of this shape belongs here, not
+#: in a second copy of this module.
+FLAGS: Tuple[Flag, ...] = (EXCHANGE, TWO_ROUTE)
+
+
+def flag_named(name: str) -> Flag:
+    for f in FLAGS:
+        if f.name == name:
+            return f
+    raise LookupError(
+        f"no Flag named {name!r}; known flags are "
+        + ", ".join(f.name for f in FLAGS)
+    )

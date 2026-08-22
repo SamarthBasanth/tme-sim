@@ -276,14 +276,23 @@ Real measurements whose verdict depends on a configuration choice that is itself
 unvalidated, or that rests on one section.
 
 **The GBM 3-D:2-D kill panel passes 3/3 — under the shipped configuration only.**
-Temozolomide 0.2626 (band 0.1590–0.4622), cisplatin 0.2791 (0.2086–1.5004),
-doxorubicin 0.2077 (0.0575–1.0000), from a model never fitted to any 3-D-vs-2-D
+Temozolomide 0.2518 (band 0.1590–0.4622), cisplatin 0.2739 (0.2086–1.5004),
+doxorubicin 0.2081 (0.0575–1.0000), from a model never fitted to any 3-D-vs-2-D
 measurement. Across five measured alternative configurations the panel counts are
 **2/3, 2/3, 3/3, 3/3, 1/3**, and temozolomide — the matched anchor — is among the
 failures in all three arms that change the count. The two 2/3 arms are independent
 in provenance but land on the same lever (oxygen level) and give bit-identical
 temozolomide ratios, so they are not two independent confirmations.
-→ [`results/kill_calibration.md`](results/kill_calibration.md) §3 and **§3.1**.
+→ [`results/area_conservation_promotion.md`](results/area_conservation_promotion.md) §2
+for the current ratios, and [`results/kill_calibration.md`](results/kill_calibration.md)
+§3 / **§3.1** for the panel's construction and its alternative-configuration arms.
+The three ratios above were **0.2626 / 0.2791 / 0.2077 until 2026-08-21**: that is
+what `kill_calibration.md` §3 measured on 2026-08-12, before `d77d169`
+(area-conserving vessel source) and `fd2a9e7` (two-route transport ON) both moved
+`e_unit`. Neither commit regenerated the document, so this line quoted a superseded
+table for a week. The bands and the 3/3 are unaffected; the citation now points at
+the post-change measurement, which two independent computations agree on to four
+decimals.
 Separately, the 3/3 survives on the *width of the literature bands*, not on
 numerics: `dx = 12` sits at the maximum of `F_state` over the whole grid ladder,
 biasing all three ratios high by +1.2 / +2.4 / +2.7 %
