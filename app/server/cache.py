@@ -63,6 +63,10 @@ __all__ = [
     "PreformattedFailure",
     "redact_exception",
     "runs_dir",
+    "DATA_ROOTS_VAR",
+    "PathNotAllowed",
+    "data_roots",
+    "confine_scan_path",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -238,6 +242,217 @@ def runs_dir() -> str:
 
 def _abs(*parts: str) -> str:
     return os.path.join(repo_root(), *parts)
+
+
+# --------------------------------------------------------------------------- #
+# SECURITY: allowlisted roots for POST /api/sections/scan
+#
+# That route takes a filesystem path in the request body and inspects whatever
+# directory it names. The API key AUTHENTICATES it and does not CONFINE it, so
+# with no allowlist the key is equivalent to read access as this process's uid
+# -- which docs/DEPLOYMENT.md §2 has stated honestly ("treat the key as shell
+# read access") since it was deferred as a MEDIUM. That was an acceptable trade
+# for one operator on their own laptop; it is not acceptable once the key is
+# handed to an external field tester.
+#
+# TMESIM_STUDIO_DATA_ROOTS is the opt-in confinement. Two decisions worth
+# stating, because both could reasonably have gone the other way:
+#
+# 1. UNSET MEANS UNCONFINED, not "confined to data_cache/". Bring-your-own
+#    tissue is the product's main input and the documented workflow points the
+#    scanner at wherever the operator's export actually lives -- §0 tells a
+#    field tester to copy their sample to a study-code directory, which is
+#    almost never inside this repo. A secure-by-default root would break every
+#    existing local workflow silently, and this repo's precedent for exactly
+#    that trade is the unauthenticated loopback default in ``__main__.py``:
+#    keep the single-user path working, and make the risk LOUD instead. So the
+#    first unconfined scan in a process prints a warning naming the variable
+#    (see :func:`_warn_unconfined`).
+#
+# 2. RESOLVE, THEN CHECK. The check is on ``realpath`` of the request's path,
+#    never on the text. A prefix test over the raw string is defeated by ``..``
+#    and by a symlink; so, more subtly, is a test over ``abspath`` alone, which
+#    collapses ``..`` TEXTUALLY: for ``/allowed/link/../x`` with
+#    ``link -> /elsewhere/sub``, ``abspath`` says ``/allowed/x`` -- inside the
+#    root -- while the directory that path really designates is
+#    ``/elsewhere/x``. (This was not hypothetical: the first version of this
+#    module resolved ``realpath(abspath(...))`` and had exactly that hole;
+#    tests/test_scan_confinement.py caught it.) That is also why
+#    :func:`confine_scan_path` returns the resolved path for the caller to use
+#    -- when confinement is in force, the path that was checked is the path
+#    that is scanned.
+# --------------------------------------------------------------------------- #
+#: Environment variable holding ``os.pathsep``-separated allowlisted roots.
+DATA_ROOTS_VAR = "TMESIM_STUDIO_DATA_ROOTS"
+
+#: Sentinel for "read the environment", distinct from an explicit ``None``
+#: (which means the variable is unset, i.e. unconfined).
+_ENV = object()
+
+#: One warning per process, not per scan. Reset in tests.
+_UNCONFINED_WARNED = False
+
+
+class PathNotAllowed(Exception):
+    """A caller-supplied path resolved OUTSIDE every allowlisted root.
+
+    Carries a client-safe diagnostic (``message``) and the caller's own path
+    verbatim (``path``). The RESOLVED path is deliberately not part of it: a
+    caller who sent ``~/x`` would otherwise be told the operator's home
+    directory, and one who sent a symlink would be told where it points. The
+    resolved path goes to the server's stderr instead, which is this backend's
+    standing rule for detail that belongs to the operator and not to the
+    client (see :func:`redact_exception`).
+    """
+
+    def __init__(self, message: str, *, path: str, resolved: str) -> None:
+        super().__init__(message)
+        self.message = message
+        self.path = path
+        self.resolved = resolved
+
+    def as_detail(self) -> Dict:
+        """The ``detail`` body for a 403, in this app's ``{code, message}`` shape."""
+        return {"code": "path_outside_data_roots",
+                "message": self.message,
+                "path": self.path}
+
+
+def data_roots(raw=_ENV) -> Optional[List[str]]:
+    """The allowlisted scan roots, fully resolved.
+
+    Returns ``None`` when :data:`DATA_ROOTS_VAR` is unset — the documented
+    default, meaning no confinement. Returns a list otherwise, which may be
+    EMPTY if the value names nothing usable; an empty list confines scanning to
+    nothing, so every scan is refused. That is deliberate fail-closed
+    behaviour: an operator who set this variable asked for confinement, and a
+    typo or an ``-e VAR=`` with no value must not silently hand back the
+    unconfined behaviour they were trying to switch off.
+
+    Entries are separated by ``os.pathsep`` (``:`` on POSIX), NOT by commas
+    like ``TMESIM_STUDIO_ALLOWED_HOSTS`` and ``_ALLOWED_ORIGINS`` — a directory
+    name may legitimately contain a comma; a hostname or an origin may not.
+    """
+    if raw is _ENV:
+        raw = os.environ.get(DATA_ROOTS_VAR)
+    if raw is None:
+        return None
+    roots: List[str] = []
+    for part in str(raw).split(os.pathsep):
+        part = part.strip()
+        if not part:
+            continue
+        root = os.path.realpath(os.path.expanduser(part))
+        if root not in roots:
+            roots.append(root)
+    return roots
+
+
+def _within(target: str, root: str) -> bool:
+    """Is ``target`` the root itself or something under it?
+
+    ``os.path.commonpath`` compares PATH COMPONENTS, so ``/data`` does not
+    contain ``/data_other`` — which a ``startswith`` test would get wrong.
+    """
+    try:
+        return os.path.commonpath([target, root]) == root
+    except ValueError:
+        # Different drives, or a mix of absolute and relative. Both arguments
+        # are absolute here, so this cannot happen on POSIX; refuse anyway.
+        return False
+
+
+def _warn_unconfined(resolved: str) -> None:
+    """Say once per process that scanning is unconfined, and what it means.
+
+    The unconfined default is a deliberate choice (see the block comment
+    above) but a silent one is not defensible for a capability that reads any
+    directory this process can read. This fires at the moment the capability
+    is actually exercised and names the path, which a startup banner line
+    cannot do.
+    """
+    global _UNCONFINED_WARNED
+    if _UNCONFINED_WARNED:
+        return
+    _UNCONFINED_WARNED = True
+    print(
+        f"[codon] POST /api/sections/scan is UNCONFINED: it just resolved and "
+        f"read {resolved!r}, and it will read ANY directory this process can "
+        f"read. {DATA_ROOTS_VAR} is unset, so anyone holding the API key has "
+        f"read access to this host as this uid (docs/DEPLOYMENT.md §2). To "
+        f"confine it, restart with {DATA_ROOTS_VAR} set to a "
+        f"{os.pathsep!r}-separated list of absolute directories, e.g. "
+        f"{DATA_ROOTS_VAR}={os.path.join(repo_root(), 'data_cache')!r}. "
+        f"This warning prints once per process.",
+        file=sys.stderr,
+    )
+    sys.stderr.flush()
+
+
+def confine_scan_path(path: str, *, raw=_ENV) -> Optional[str]:
+    """Canonicalise ``path`` and confine it to :data:`DATA_ROOTS_VAR`.
+
+    Returns the RESOLVED path when confinement is in force, and ``None`` when
+    it is not (the variable is unset) — in which case the caller must pass the
+    operator's original path through unchanged, so the default workflow is
+    byte-for-byte what it was before this guard existed.
+
+    Raises :class:`PathNotAllowed` when confinement is in force and the
+    resolved path is outside every root.
+
+    Two things this does NOT do, stated so nobody reads more into it:
+
+    * It confines the DIRECTORY that is scanned, not the files inside it. A
+      symlink *within* an allowed sample directory still points wherever it
+      points, and the ingester follows it.
+    * It is a check at one instant. A symlink re-pointed between this call and
+      the read is not caught (TOCTOU). Both residuals are far smaller than the
+      "any path at all" they replace, and neither is closable here.
+    """
+    # NOT realpath(abspath(...)): abspath collapses ``..`` TEXTUALLY first, so
+    # ``<root>/link/../x`` would arrive here already rewritten to ``<root>/x``
+    # and be allowed on the strength of a component that link does not have.
+    # realpath takes the string itself, resolves each component in order
+    # against the filesystem, and makes it absolute on the way -- so a relative
+    # path (docs/DEPLOYMENT.md §1d's own example) still resolves against the
+    # server's working directory, exactly as the ingester would.
+    resolved = os.path.realpath(os.path.expanduser(str(path)))
+    roots = data_roots(raw)
+    if roots is None:
+        _warn_unconfined(resolved)
+        return None
+    if any(_within(resolved, root) for root in roots):
+        return resolved
+
+    # The operator gets the real detail on the console; the client gets a
+    # sentence that names its own input, the control, and the way out.
+    print(
+        f"[codon] REFUSED scan of {str(path)!r} (resolves to {resolved!r}): "
+        f"outside every root in {DATA_ROOTS_VAR}.",
+        file=sys.stderr,
+    )
+    sys.stderr.flush()
+    if not roots:
+        raise PathNotAllowed(
+            f"this server refuses every scan: {DATA_ROOTS_VAR} is set but "
+            f"names no usable directory, so the allowlist of directories "
+            f"/api/sections/scan may read is empty. Ask whoever runs this "
+            f"server to set {DATA_ROOTS_VAR} to a {os.pathsep!r}-separated "
+            f"list of absolute directories and restart it, or to unset it "
+            f"entirely to go back to unconfined scanning.",
+            path=str(path), resolved=resolved)
+    raise PathNotAllowed(
+        f"{str(path)!r} is outside the directories this server allows "
+        f"/api/sections/scan to read. The path was fully resolved first "
+        f"(a leading ~, any .. components and every symlink), so it is the "
+        f"directory it really points at that is outside the allowlist, not "
+        f"the text you sent. The allowlist is the {DATA_ROOTS_VAR} "
+        f"environment variable on the server, and its contents are not "
+        f"disclosed here. To scan this sample: move or copy it under a "
+        f"directory that is already allowed, or ask whoever runs the server "
+        f"to add its root to {DATA_ROOTS_VAR} (a {os.pathsep!r}-separated "
+        f"list of absolute directories) and restart.",
+        path=str(path), resolved=resolved)
 
 
 # --------------------------------------------------------------------------- #

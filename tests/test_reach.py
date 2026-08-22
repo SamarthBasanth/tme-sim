@@ -29,9 +29,15 @@ if _REPO not in sys.path:
 
 from app.server.reach import (  # noqa: E402
     CONVENTION_NOTE,
+    FINITE_WINDOW_NOTE,
     HEADLINE_X,
     REACH_LADDER,
+    STEADY_SCALE_INVARIANCE_NOTE,
+    STEADY_STATE_NOTE,
+    WINDOW_MODES,
+    _advection_matrix,
     compute_reach,
+    steady_state_concentration,
 )
 from tmesim.core import (  # noqa: E402
     CellPopulation,
@@ -65,7 +71,34 @@ INVARIANCE_ATOL = 1e-14
 #: Short transport window; the reach map is a property of whatever exposure
 #: field it is handed, so a 10-minute window exercises every code path a 6 h one
 #: does at a fraction of the cost.
+#:
+#: THIS IS A FINITE-WINDOW CONSTANT and it now says so. Every test that uses it
+#: is testing ``window_mode = "finite_window"``; the steady-state tests below
+#: take no window at all, which is the point of them.
 WINDOW_S = 600.0
+
+#: How far a march has to run before ``C(T)`` may be compared with ``C_ss``.
+#:
+#: The field converges at the reaction rate ``k = clearance + binding``, so the
+#: error falls like ``exp(-k*T)`` and this is expressed in TIME CONSTANTS rather
+#: than in seconds — a fixed number of seconds would be a different amount of
+#: convergence for every compound, which is exactly the confusion the whole
+#: change is about. 25 time constants predicts ``exp(-25) = 1.4e-11``; the
+#: assertion is loosened to 1e-6 because the march also carries its own
+#: backward-Euler time-discretisation error at ``dt = 10 s``, which does NOT
+#: vanish with T and is the larger of the two terms. MEASURED on this fixture:
+#: the agreement reached is reported by the test itself when it fails.
+STEADY_MARCH_TAUS = 25.0
+STEADY_MARCH_ATOL_REL = 1e-6
+
+#: Capacity-invariance tolerance for the STEADY map, relative to the falloff's
+#: own range. The steady problem does not contain R at all, so the only thing
+#: that moves is float64 round-off in forming ``D/R``, ``k/R`` and ``S/R`` and
+#: in the sparse factorisation of a matrix whose entries have been scaled by R.
+#: That is why this is 1e-9 rather than 0: the algebra is exact, the arithmetic
+#: is not. 1e-9 is the same strength ``results/capacity_ranking_robustness.md``
+#: sec. 2b states its own steady-state verification at.
+CAPACITY_ATOL = 1e-9
 
 
 @pytest.fixture(scope="module")
@@ -188,6 +221,494 @@ class TestPlasmaScaleInvariance:
             scaled["falloff"]["normalised_mean_auc"],
             reach["falloff"]["normalised_mean_auc"],
             rtol=0.0, atol=INVARIANCE_ATOL)
+
+
+# --------------------------------------------------------------------------- #
+# THE STEADY-STATE OBJECT
+# --------------------------------------------------------------------------- #
+@pytest.fixture(scope="module")
+def velocity(real_micro):
+    """The interstitial velocity, from the microenvironment alone."""
+    from tmesim.physics.pressure import solve_ifp
+
+    return solve_ifp(real_micro)[1]
+
+
+@pytest.fixture(scope="module")
+def css(real_micro, real_drug, velocity):
+    """``C_ss`` for the real section and the real drug, convection ON."""
+    from tmesim.treatment.drugs import delivery_source
+
+    return steady_state_concentration(
+        real_micro, real_drug, delivery_source(real_micro, real_drug, 1.0),
+        velocity=velocity)
+
+
+@pytest.fixture(scope="module")
+def steady_reach(real_micro, real_result, distance_um, real_drug, velocity):
+    out = compute_reach(real_micro, real_result, distance_um=distance_um,
+                        drug=real_drug, velocity=velocity, convection=True)
+    assert out["null_reason"] is None, out["null_reason"]
+    return out
+
+
+class TestSteadyStateOperator:
+    """The one piece of the engine's discretisation re-expressed here.
+
+    ``steady_state_concentration`` IMPORTS ``_build_diffusion_operator`` and
+    ``_effective_diffusivity``, so those cannot drift. The upwind advection
+    term is the exception: the engine applies it as a function of ``c`` and the
+    steady solve needs it as a matrix. That re-expression is the only place a
+    silent disagreement could live, so it is measured against the engine's own
+    function rather than reasoned about.
+    """
+
+    def test_the_matrix_applies_the_engines_own_advection(self):
+        from tmesim.physics.diffusion import _advective_divergence
+
+        rng = np.random.default_rng(0)
+        worst = 0.0
+        for _ in range(8):
+            ny, nx = int(rng.integers(4, 22)), int(rng.integers(4, 22))
+            dx = float(rng.uniform(5.0, 40.0))
+            tissue = rng.random((ny, nx)) > 0.25
+            vx, vy = rng.normal(size=(ny, nx)), rng.normal(size=(ny, nx))
+            c = rng.random((ny, nx))
+            c[~tissue] = 0.0
+            direct = _advective_divergence(c, vx, vy, tissue, dx)
+            viamat = (_advection_matrix(vx, vy, tissue, dx)
+                      @ c.ravel()).reshape(ny, nx)
+            scale = max(float(np.abs(direct).max()), 1e-300)
+            worst = max(worst, float(np.abs(direct - viamat).max()) / scale)
+        # MEASURED at 2.140e-16 over 6 cases in
+        # results/steady_state_reach.md sec. 0; 1e-13 is ~470x that, tight
+        # enough that any genuine disagreement in signs, faces or the upwind
+        # switch fails immediately.
+        assert worst < 1e-13, worst
+
+    def test_a_zero_velocity_field_contributes_nothing(self):
+        z = np.zeros((5, 6))
+        m = _advection_matrix(z, z, np.ones((5, 6), dtype=bool), 10.0)
+        assert m.nnz == 0 or float(np.abs(m.toarray()).max()) == 0.0
+
+
+class TestSteadyStateField:
+    """``C_ss`` is the fixed point of the shipped stepper, measured not argued."""
+
+    def test_it_is_where_a_long_march_goes(self, real_micro, real_drug, css,
+                                           velocity):
+        """March far past equilibrium and land on the direct solve.
+
+        This is the check that matters: the algebra says the direct solve is
+        the stepper's fixed point, and a fixed point of the WRONG operator
+        would still look like a perfectly good linear solve. Only running the
+        actual stepper can tell the difference.
+        """
+        from tmesim.core import PDEConfig
+        from tmesim.physics.diffusion import simulate_drug_transport
+        from tmesim.treatment.drugs import delivery_source
+
+        k = float(real_drug.clearance) + float(real_drug.binding)
+        total = STEADY_MARCH_TAUS / k
+        tr = simulate_drug_transport(
+            real_micro, real_drug, delivery_source(real_micro, real_drug, 1.0),
+            PDEConfig(dt=10.0, total_time=total, convection=True,
+                      save_every=10 ** 9),
+            velocity=velocity)
+        tissue = np.asarray(real_micro.domain.tissue_mask, dtype=bool)
+        scale = float(css[tissue].max())
+        err = float(np.abs(tr.final_concentration[tissue]
+                           - css[tissue]).max()) / scale
+        assert err < STEADY_MARCH_ATOL_REL, (
+            f"the direct steady solve and a {STEADY_MARCH_TAUS:g}-time-constant "
+            f"march disagree by {err:.3e} of max C_ss")
+
+    def test_the_unclamped_solve_is_still_non_negative(self, css):
+        """The stepper clamps C at zero every step; the direct solve clamps
+        nothing. If the discrete steady state were not non-negative the two
+        routes could not agree, so this is not cosmetic."""
+        assert float(css.min()) >= 0.0, float(css.min())
+
+    def test_it_is_exactly_linear_in_the_source(self, real_micro, real_drug,
+                                                velocity, css):
+        """Every scalar in the source — the plasma level, ``bbb_penetrance`` —
+        multiplies the whole field, which is why the map needs no dose. Solved
+        with a unit source in production, so this is the property that licenses
+        that."""
+        from tmesim.treatment.drugs import delivery_source
+
+        f = 3721.0
+        scaled = steady_state_concentration(
+            real_micro, real_drug,
+            delivery_source(real_micro, real_drug, 1.0) * f, velocity=velocity)
+        ref = css * f
+        denom = max(float(np.abs(ref).max()), 1e-300)
+        assert float(np.abs(scaled - ref).max()) / denom < 1e-12
+
+    def test_solve_ifp_from_micro_reproduces_the_engines_velocity(
+            self, real_micro, velocity):
+        """``compute_reach`` rebuilds the velocity from ``micro`` when it is not
+        given one, and that has to be the SAME array the engine's transport call
+        received. ``solve_ifp`` reads the grid, ``vascular_density``,
+        ``ecm_density`` and the cells' ``cell_type``; the engine sets the oxygen
+        field and updates cell STATE before calling it, and neither is an input.
+        Bit-identical, not close."""
+        from tmesim.core import OxygenConfig
+        from tmesim.cells.agents import update_cell_states
+        from tmesim.physics.oxygen import solve_oxygen
+        from tmesim.physics.pressure import solve_ifp
+        from tmesim.sim.engine import _working_copy
+
+        work = _working_copy(real_micro)
+        ox = solve_oxygen(work, OxygenConfig())
+        work.fields.oxygen = ox
+        update_cell_states(work, ox, OxygenConfig())
+        assert np.array_equal(solve_ifp(work)[1], velocity)
+
+
+class TestSteadyCapacityInvariance:
+    """The measurement the whole change rests on.
+
+    A capacity term ``R`` multiplies the TIME DERIVATIVE and nothing else, so
+    it is absent from the steady problem. That is a prediction of exactly zero
+    movement, and predictions of zero are the ones worth testing — the
+    finite-window falloff moves 0.3772 at ``R = 39``
+    (``results/capacity_ranking_robustness.md``), so there is a large number
+    here to fail to reproduce.
+
+    ``R`` is emulated exactly as ``experiments/capacity_ranking_robustness.py``
+    emulates it — ``D/R``, ``binding/R``, ``clearance/R``, ``bbb_penetrance/R``
+    — and **convection is OFF**, which is not a convenience. Multiply the steady
+    equation of the emulated system through by ``R``:
+
+    ``div(D grad C) - R*div(v C) + S - k*C = 0``
+
+    The advection term does NOT lose its ``R``, because the emulation cannot
+    divide the velocity field (``capacity_ranking_robustness.md`` sec. 2(d): it
+    is built inside ``simulate_response`` and is unreachable from outside). So
+    with convection on, the published emulation is not a capacity change at
+    all — it is a capacity change AND a factor-``R`` boost to the Péclet number,
+    and the map moves accordingly. MEASURED: 1.044e-01 at ``R = 39`` on this
+    fixture with convection on, against the ``< 1e-9`` below with it off.
+
+    ``test_dividing_the_velocity_too_restores_the_invariance`` closes the loop:
+    scale ``v`` by ``1/R`` as well and the invariance returns with convection
+    on, which is what identifies the residual as the emulation's artefact
+    rather than the map's. In the real physics ``R`` multiplies ``dC/dt`` and
+    the steady problem has no ``dC/dt``, convection or not.
+    """
+
+    RS = (39.0, 4184.0)
+
+    #: What the published emulation does to the steady map when convection is
+    #: left ON. Not a tolerance — a measured artefact of the emulation, pinned
+    #: here so that it cannot be mistaken for a property of the map.
+    #:
+    #: This is THIS FIXTURE's value (dx = 80 um). On the flagship at dx = 12 the
+    #: same sweep moves the normalised falloff by 1.226 at R = 39 and 4.380e+03
+    #: at R = 4184 (results/steady_state_reach.md sec. 5). The artefact is
+    #: strongly grid-dependent because it is a Peclet-number boost, which is
+    #: part of why it is easy to walk into and hard to recognise.
+    EMULATION_WITH_CONVECTION_MOVE = 1.044e-01
+
+    @staticmethod
+    def _retard(dp, R):
+        import dataclasses
+
+        return dataclasses.replace(
+            dp, diffusivity=dp.diffusivity / R, binding=dp.binding / R,
+            clearance=dp.clearance / R, bbb_penetrance=dp.bbb_penetrance / R)
+
+    def _reach_at(self, real_micro, real_result, distance_um, dp,
+                  convection=False, velocity=None):
+        out = compute_reach(real_micro, real_result, distance_um=distance_um,
+                            drug=dp, velocity=velocity, convection=convection)
+        assert out["null_reason"] is None, out["null_reason"]
+        return out
+
+    def test_the_published_emulation_is_not_capacity_when_convection_is_on(
+            self, real_micro, real_result, distance_um, real_drug, velocity):
+        """The counter-case, kept as an assertion rather than as a remark.
+
+        If someone later runs the capacity sweep against the steady map with
+        convection left on, they will get a large residual and conclude the
+        invariance claim is false. It is not — the emulation is. This pins the
+        size of that trap.
+        """
+        base = self._reach_at(real_micro, real_result, distance_um, real_drug,
+                              convection=True, velocity=velocity)
+        got = self._reach_at(real_micro, real_result, distance_um,
+                             self._retard(real_drug, 39.0),
+                             convection=True, velocity=velocity)
+        move = float(np.abs(
+            np.asarray(got["curve"]["under_reached_fraction"])
+            - np.asarray(base["curve"]["under_reached_fraction"])).max())
+        assert move == pytest.approx(self.EMULATION_WITH_CONVECTION_MOVE,
+                                     abs=5e-4), move
+
+    def test_dividing_the_velocity_too_restores_the_invariance(
+            self, real_micro, real_result, distance_um, real_drug, velocity):
+        """A FAITHFUL capacity emulation with convection on: ``v/R`` as well.
+
+        ``R*dC/dt = div(D grad C) - div(v C) + S - k*C`` divided through by
+        ``R`` scales the velocity along with everything else. Do that and the
+        residual above collapses to round-off, which is what identifies it as
+        the emulation's artefact.
+        """
+        R = 39.0
+        base = self._reach_at(real_micro, real_result, distance_um, real_drug,
+                              convection=True, velocity=velocity)
+        got = self._reach_at(real_micro, real_result, distance_um,
+                             self._retard(real_drug, R),
+                             convection=True, velocity=velocity / R)
+        for key, arr in (("curve", "under_reached_fraction"),
+                         ("falloff", "normalised_mean_auc")):
+            move = float(np.abs(np.asarray(got[key][arr])
+                                - np.asarray(base[key][arr])).max())
+            assert move < CAPACITY_ATOL, f"{arr} moved {move:.3e} at R = {R:g}"
+
+    def test_the_falloff_shape_does_not_move(self, real_micro, real_result,
+                                             distance_um, real_drug):
+        base = self._reach_at(real_micro, real_result, distance_um, real_drug)
+        b = np.asarray(base["falloff"]["normalised_mean_auc"])
+        for R in self.RS:
+            got = self._reach_at(real_micro, real_result, distance_um,
+                                 self._retard(real_drug, R))
+            g = np.asarray(got["falloff"]["normalised_mean_auc"])
+            assert g.shape == b.shape
+            move = float(np.abs(g - b).max())
+            assert move < CAPACITY_ATOL, (
+                f"R = {R:g} moved the STEADY falloff by {move:.3e}; the steady "
+                f"problem does not contain R, so this is not a tolerance "
+                f"question")
+
+    def test_the_under_reached_ladder_does_not_move(self, real_micro,
+                                                    real_result, distance_um,
+                                                    real_drug):
+        base = self._reach_at(real_micro, real_result, distance_um, real_drug)
+        b = np.asarray(base["curve"]["under_reached_fraction"])
+        for R in self.RS:
+            got = self._reach_at(real_micro, real_result, distance_um,
+                                 self._retard(real_drug, R))
+            move = float(np.abs(
+                np.asarray(got["curve"]["under_reached_fraction"]) - b).max())
+            assert move < CAPACITY_ATOL, f"R = {R:g} moved the ladder {move:.3e}"
+
+    def test_the_finite_window_map_DOES_move(self, real_micro, real_result,
+                                             distance_um, real_drug):
+        """The control. If the finite-window arm did not move either, the test
+        above would be measuring nothing — it would be consistent with the
+        capacity emulation simply not being applied."""
+        from tmesim.core import PDEConfig, SimConfig
+        from tmesim.sim.engine import simulate_response
+
+        base = compute_reach(real_micro, real_result, distance_um=distance_um)
+        b = np.asarray(base["falloff"]["normalised_mean_auc"])
+        res = simulate_response(
+            real_micro,
+            SimConfig(drug=self._retard(real_drug, 39.0),
+                      pde=PDEConfig(dt=10.0, total_time=WINDOW_S,
+                                    convection=True, save_every=500),
+                      seed=0))
+        got = compute_reach(real_micro, res, distance_um=distance_um)
+        move = float(np.abs(
+            np.asarray(got["falloff"]["normalised_mean_auc"]) - b).max())
+        assert move > 1e3 * CAPACITY_ATOL, (
+            "the finite-window falloff did not move under R = 39, so the "
+            f"capacity emulation is not reaching the solve (moved {move:.3e})")
+
+
+class TestWindowMode:
+    """A payload always says WHICH OBJECT it is. That is the defect this repo
+    spent the week fixing: records that were true about a configuration nobody
+    wrote down."""
+
+    def test_the_two_modes_are_labelled(self, reach, steady_reach):
+        assert reach["window_mode"] == "finite_window"
+        assert steady_reach["window_mode"] == "steady_state"
+        assert set(WINDOW_MODES) == {"steady_state", "finite_window"}
+
+    def test_the_finite_window_payload_carries_its_own_window(self, reach):
+        assert reach["window_s"] == pytest.approx(WINDOW_S)
+
+    def test_the_steady_payload_has_no_window_at_all(self, steady_reach):
+        # Not zero, not a default: there is no window in the object.
+        assert steady_reach["window_s"] is None
+
+    def test_the_units_change_because_the_quantity_changes(self, reach,
+                                                           steady_reach):
+        """``E_ref`` is an EXPOSURE in one mode and a CONCENTRATION in the
+        other. The wire key is still ``E_ref_uM_s`` for compatibility with
+        ``app/web`` and ``app/server/report.py``, so the payload has to carry
+        the true unit somewhere a consumer can read it."""
+        assert reach["E_ref_units"] == "uM*s"
+        assert reach["units"]["E_ref"] == "uM*s"
+        assert steady_reach["E_ref_units"] == "uM"
+        assert steady_reach["units"]["E_ref"] == "uM"
+
+    def test_the_mode_is_stated_in_words_not_only_in_a_field(self, reach,
+                                                            steady_reach):
+        assert reach["window_note"] == FINITE_WINDOW_NOTE
+        assert steady_reach["window_note"] == STEADY_STATE_NOTE
+        assert "FINITE WINDOW" in FINITE_WINDOW_NOTE
+        assert "STEADY STATE" in STEADY_STATE_NOTE
+        # The reframing itself, in the sentence a reader meets.
+        assert "GEOMETRY PERMITS" in STEADY_STATE_NOTE
+        # And what it costs, in the same breath.
+        assert "DIFFERENT QUESTION" in STEADY_STATE_NOTE
+
+    def test_a_caller_supplied_fit_is_discarded_under_steady_state(
+            self, real_micro, real_result, distance_um, real_drug, velocity):
+        """The production caller passes a ``penetration_length_fit`` of the
+        finite-window AUC profile. Normalising the STEADY field by a reference
+        taken off a different field would be silently wrong, so it is dropped
+        and the payload says it was."""
+        pen = penetration_length_fit(real_result.fields["auc"], real_micro,
+                                     distance_um=distance_um)
+        out = compute_reach(real_micro, real_result, distance_um=distance_um,
+                            penetration=pen, drug=real_drug,
+                            velocity=velocity, convection=True)
+        assert out["null_reason"] is None
+        assert out["penetration_reused"] is False
+        assert out["E_ref_uM_s"] != pen["drug"]["perivascular_mean"]
+
+    def test_the_finite_window_mode_still_reuses_it(self, real_micro,
+                                                    real_result, distance_um):
+        pen = penetration_length_fit(real_result.fields["auc"], real_micro,
+                                     distance_um=distance_um)
+        out = compute_reach(real_micro, real_result, distance_um=distance_um,
+                            penetration=pen)
+        assert out["penetration_reused"] is True
+        assert out["E_ref_uM_s"] == pen["drug"]["perivascular_mean"]
+
+    def test_omitting_convection_refuses_rather_than_defaulting(
+            self, real_micro, real_result, distance_um, real_drug):
+        """``convection`` must match the run's ``PDEConfig.convection`` and is
+        not carried on a ``SimulationResult``, so there is nothing to infer it
+        from. A default of ``True`` would agree with ``jobs.PDE_CONVECTION``
+        today and stop agreeing silently the moment either moved — which is the
+        same shape as the emulation trap two tests up. So it REFUSES."""
+        out = compute_reach(real_micro, real_result, distance_um=distance_um,
+                            drug=real_drug)
+        _assert_refused(out)
+        assert "convection" in out["null_reason"]
+        assert out["window_mode"] == "steady_state"
+
+    def test_the_finite_window_mode_does_not_require_it(self, reach):
+        """It builds no field, so there is nothing for convection to mean."""
+        assert reach["null_reason"] is None
+
+    def test_a_refusal_still_says_which_object_failed(self, real_micro,
+                                                      real_result, distance_um,
+                                                      real_drug):
+        out = compute_reach(_retyped(real_micro, CellType.ENDOTHELIAL),
+                            real_result, distance_um=distance_um,
+                            drug=real_drug, convection=True)
+        _assert_refused(out)
+        assert out["window_mode"] == "steady_state"
+        assert out["window_note"] == STEADY_STATE_NOTE
+        assert out["scale_invariance"] == STEADY_SCALE_INVARIANCE_NOTE
+
+
+class TestSteadyDisclosure:
+    """The third version of this note in two days. It has to be RIGHT rather
+    than merely current, so every clause that quotes a measurement is pinned
+    at the magnitude, here, at the site that quotes it."""
+
+    def test_it_states_the_capacity_claim_as_exact_and_says_why(self,
+                                                               steady_reach):
+        s = steady_reach["scale_invariance"]
+        assert "THE MAP IS EXACTLY CAPACITY-INVARIANT" in s
+        # The REASON, which is what makes it checkable rather than assertable:
+        # R multiplies the time derivative, and there is no time derivative.
+        assert "TIME DERIVATIVE AND NOTHING ELSE" in s
+        assert "1e-9" in s and "capacity_ranking_robustness.md" in s
+        # The magnitudes, pinned at the site that quotes them.
+        assert "0.000e+00" in s and "4.452e-14" in s and "0.3731" in s
+
+    def test_the_two_capacity_sentences_name_their_own_subjects(self,
+                                                               steady_reach):
+        """(2) is about the MODEL and (2b) is about an INSTRUMENT. Both are
+        true at once, and a reader who did not follow the argument must not be
+        able to read the second as a walk-back of the first — which is what
+        happens if either sentence leaves its subject implicit."""
+        s = steady_reach["scale_invariance"]
+        assert "A STATEMENT ABOUT THE MAP" in s
+        assert "A STATEMENT ABOUT AN INSTRUMENT, NOT A WALK-BACK" in s
+        assert "THE PUBLISHED CAPACITY SWEEP IS NOT A FAITHFUL CAPACITY CHANGE" in s
+        # The trap's size, and the fact the shipping config walks into it.
+        # The flagship magnitudes; 1.044e-01 below is this COARSE fixture's
+        # own value for the same sweep, and the two differ by an order of
+        # magnitude because the Peclet boost is grid-dependent — which is
+        # itself a reason the trap is easy to walk into.
+        assert "1.226" in s and "4.380e+03" in s
+        assert "PDE_CONVECTION" in s
+        assert "different subjects" in s
+
+    def test_the_supersession_pointer_is_present_and_not_hollow(
+            self, steady_reach):
+        """A note that silently drops its own superseded claim is how version 2
+        happened, so the claim is NAMED with its numbers. But full archaeology
+        in the payload buys non-silence at the cost of length, and a disclosure
+        nobody finishes protects nobody — so the derivation lives in results/
+        and this is a pointer. A pointer is only honest if it resolves, so the
+        target is read here rather than trusted."""
+        s = steady_reach["scale_invariance"]
+        assert "SUPERSESSION" in s
+        assert "0.01302" in s and "281/T" in s
+        assert "ESTIMATOR, not the field" in s
+        assert "results/steady_state_reach.md sec. 1" in s
+
+        target = os.path.join(_REPO, "results", "steady_state_reach.md")
+        assert os.path.exists(target), (
+            "the disclosure points a reader at results/steady_state_reach.md "
+            "and it does not exist")
+        doc = open(target, encoding="utf-8").read()
+        # The derivation the pointer promises, with the magnitudes the payload
+        # no longer carries.
+        for token in ("AUC(x,T) = C_ss(x)*T + J(x,T)", "281/T", "0.01302",
+                      "1.112e-05", "1997.0", "10.82"):
+            assert token in doc, f"{token!r} missing from {target}"
+
+    def test_the_untouched_disclosures_survive_verbatim(self, steady_reach):
+        """Permeability blindness, the descriptor-path limit and the plasma
+        bound are unaffected by the steady-state change and must not have been
+        weakened while the capacity clause was rewritten."""
+        s = steady_reach["scale_invariance"]
+        assert "1.41e-14" in s and "pk_ranking_robustness.md" in s
+        assert "bbb_penetrance" in s and "sqrt(D_eff/k)" in s
+        assert "LIMIT AS MUCH AS A PROPERTY" in s
+        assert "descriptor_falsification.md" in s
+        assert "an axis not named here was not tested" in s
+
+    def test_the_limits_come_first_and_name_the_absolute_problem(
+            self, steady_reach):
+        """The note exists because two previous versions were confidently
+        wrong, so it opens with what it does NOT buy. A reader who stops
+        halfway must have read the limits, not three exactness claims."""
+        s = steady_reach["scale_invariance"]
+        assert s.startswith("WHAT THIS MAP DOES NOT BUY")
+        # The limits precede the first exactness claim, not merely exist.
+        assert s.index("WHAT THIS MAP DOES NOT BUY") < s.index("PLASMA/DOSE")
+        # Invariance is not accuracy.
+        assert "exactly as wrong" in s
+        # The absolute claim is bad in a direction that FLATTERS the compound,
+        # and the magnitude is pinned here rather than gestured at.
+        assert "14x too shallow" in s and "3.7x too compressed" in s
+        assert "kyle2004_penetration.md" in s
+        assert "may not" in s
+        # And robustness is not validation.
+        assert "robustness is not accuracy" in s
+
+    def test_the_finite_window_note_is_corrected_too(self, reach):
+        """The old note is still shipped in finite-window mode, so its false
+        sentence had to be fixed there as well — not only in the new one."""
+        s = reach["scale_invariance"]
+        assert "THIS WINDOW IS NOT CONVERGED" not in s
+        assert "ESTIMATOR" in s
+        assert "manufactures one" in s
+        # and its own measured residuals are still pinned
+        assert "0.3772" in s and "0.0011" in s and "0.80" in s
 
 
 # --------------------------------------------------------------------------- #

@@ -20,7 +20,10 @@ GET          /api/runs/{id}/mechanism            TMSM per-cell mechanism labels
                                                  + the aggregate breakdown
 GET          /api/runs/{id}/timelapse            TMSL drug-concentration frames
 POST         /api/validate                       {ok, errors[], warnings[]}
-POST         /api/sections/scan                  ingest ANY directory: detect() +
+POST         /api/sections/scan                  ingest ANY directory (or, with
+                                                 TMESIM_STUDIO_DATA_ROOTS set,
+                                                 any directory under an
+                                                 allowlisted root): detect() +
                                                  capability report; optionally
                                                  register it as a section
 DELETE       /api/sections/{id}                  remove an INGESTED section
@@ -89,7 +92,9 @@ from .cache import (
     OXYGEN_MODES,
     RECON_CACHE,
     SECTIONS,
+    PathNotAllowed,
     all_sections,
+    confine_scan_path,
     lookup_section,
     SENSITIVITY_MODES,
     STATE_MODES,
@@ -1589,6 +1594,22 @@ def create_app(manager: Optional[JobManager] = None,
 
         Never 500s on a bad directory: an unrecognised or broken sample is an
         ANSWER, returned in ``detection.issues`` / ``error``.
+
+        SECURITY: "ANY directory" is the literal truth and the API key does not
+        change it — the key authenticates this route, it does not confine it,
+        so a key handed to a field tester is read access to this host as this
+        process's uid. Setting ``TMESIM_STUDIO_DATA_ROOTS`` confines ``path``
+        to an allowlist of roots, checked against the RESOLVED path (``~``,
+        ``..`` and symlinks all followed first) rather than against the text.
+        Unset, scanning stays unconfined — the bring-your-own-tissue workflow
+        points at wherever the operator's export lives — and the first scan in
+        the process says so on stderr. See ``docs/DEPLOYMENT.md`` §4.
+
+        A refusal is a 403 that names the caller's own path, the variable and
+        how to add a root, and never the roots themselves. It does leak one
+        bit per query about whether a given directory is inside the allowlist;
+        that is the price of a diagnostic that tells an operator what to do,
+        and this route is behind the API key whenever one is set.
         """
         try:
             body = await request.json()
@@ -1605,6 +1626,15 @@ def create_app(manager: Optional[JobManager] = None,
         from . import ingest_registry
 
         path = str(body["path"])
+        try:
+            confined = confine_scan_path(path)
+        except PathNotAllowed as exc:
+            raise HTTPException(status_code=403, detail=exc.as_detail()) from None
+        if confined is not None:
+            # Confinement is in force: hand the ingester the path that was
+            # actually checked, so the object scanned and the object allowed
+            # cannot be two different directories.
+            path = confined
         deep = bool(body.get("measure_detection_rates", False))
         if bool(body.get("register", False)):
             out = ingest_registry.register(
@@ -2341,6 +2371,13 @@ Remove an ingested section with
       if (r.status === 401) {
         show(box("err", "401 &mdash; this server is running with an API key. " +
           "Paste it into the X-API-Key field above."));
+        return;
+      }
+      if (r.status === 403 && r.body && r.body.detail && r.body.detail.message) {
+        // Path confinement (TMESIM_STUDIO_DATA_ROOTS). The server already
+        // wrote a sentence telling the operator what to do; show THAT, not a
+        // JSON blob of it.
+        show(box("err", "403 &mdash; " + esc(r.body.detail.message)));
         return;
       }
       if (r.status >= 400) {

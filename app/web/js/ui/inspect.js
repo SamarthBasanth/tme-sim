@@ -18,7 +18,7 @@ import { h, clear, fill } from '../util/dom.js';
 import { CELL_TYPES } from '../gl/viewer.js';
 import { FIELD_NAMES, fieldMeta } from '../fields.js';
 import { RAMP_NAMES, RAMP_META } from '../gl/ramps.js';
-import { METRICS, metricProvenance, reportProvenance, fieldProvenance, chip, STANDING_LIMITS } from './provenance.js';
+import { METRICS, metricProvenance, reportProvenance, fieldProvenance, chip, STANDING_LIMITS, claimSetNotice, claimSetEraLabel } from './provenance.js';
 import { auto, num, int, pct, sci, dur, NULL_GLYPH } from '../util/fmt.js';
 import { railGroup, railNav } from './rail.js';
 import { createReachPanel } from './reach.js';
@@ -466,6 +466,25 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     clear(caveatsEl);
     const cav = (pv && pv.caveats) || [];
     const hard = [...cav, ...STANDING_LIMITS].filter((c) => CV_HARD.test(String(c))).length;
+    // Two ways a record can put a withdrawn claim on this screen: it predates
+    // the current claim set (`superseded`), or it is stamped with a claim set
+    // its own caveats disagree with (`contradicted` — written by a build that
+    // had not caught up). Both mark; the backend decides which one leads.
+    const cs = (pv && pv.claim_set) || null;
+    const stale = !!(cs && (cs.superseded || cs.contradicted));
+    // The marker names WHICH finding. Calling a contradicted record
+    // "superseded" would be a one-word summary that is false: it is not old,
+    // it is stamped with a claim set its own text disagrees with, and the two
+    // call for different actions (read it as history vs. re-run it).
+    const staleWord = cs && cs.contradicted ? 'contradicted' : 'superseded';
+
+    // The claim-set banner goes ABOVE the index strip, i.e. first in the panel
+    // and before any stored caveat. A reader who is going to be shown a
+    // withdrawn sentence has to be told before they read it, not after. It adds
+    // to the panel and removes nothing: every caveat below is still the run's
+    // own words, complete and in order — see claimSetNotice() for why marking
+    // rather than hiding is the only honest option here.
+    if (stale) caveatsEl.appendChild(claimSetNotice(pv));
 
     // An index strip, not a summary — it counts what is below it and hides
     // none of it. This is the one line that answers "how qualified is this
@@ -474,13 +493,25 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     caveatsEl.appendChild(h('div.cv-index', {
       title: 'Every caveat below is shown in full — none is collapsed, clamped or dismissible. '
         + '"Hard stop" counts the ones that say a number must not be quoted off this screen at '
-        + 'all, as distinct from the ones that qualify how it should be read.',
+        + 'all, as distinct from the ones that qualify how it should be read.'
+        + (stale ? '\n\nThis run\'s caveats were written against a claim set that has since been '
+          + 'superseded. They are shown unedited; the banner above says what has been withdrawn.' : ''),
     },
       h('span', h('b', String(cav.length + STANDING_LIMITS.length)), ' stated'),
       h('span.sep', '·'),
       h('span' + (hard ? '.hard' : ''), h('b', String(hard)), ' hard stop', hard === 1 ? '' : 's'),
+      // One word. "claim set superseded" pushed this fixed-height, nowrap
+      // strip 21 px past the rail and clipped "none hidden" — the one promise
+      // in the panel that must not be the thing that falls off the edge.
+      stale ? h('span.sep', '·') : null,
+      stale ? h('span.stale', staleWord) : null,
       h('span.grow'),
       h('span.dim', 'none hidden')));
+
+    // The run's own caveats get an era label when — and only when — there is
+    // more than one era in play. It is what turns the block below from advice
+    // into a record: same words, stated as what this run said.
+    if (stale) caveatsEl.appendChild(claimSetEraLabel(pv));
 
     if (!cav.length) {
       caveatsEl.appendChild(h('div.caveat.info', h('span',
@@ -502,6 +533,9 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     // anything longer than two tokens wraps out of its own box.
     clear(tallyEl);
     if (hard) tallyEl.appendChild(h('span.hard', `${hard} hard`));
+    // "This run's caveats are historical" is exactly the kind of thing the
+    // header exists to say before the panel is read, so it says it here too.
+    if (stale) tallyEl.appendChild(h('span.stale', staleWord));
 
     /* reconstruction report */
     const rep = (run && run.report) || null;

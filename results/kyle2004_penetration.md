@@ -65,10 +65,19 @@ single-vessel slab the two compounds' nuisance intervals are **disjoint**
 (doxorubicin 2.87–3.08, daunorubicin 3.50–3.76): the *physics* separates them
 robustly. On the **reconstructed tissue map** they are **not** — doxorubicin spans
 39.4–63.1 µm and daunorubicin 32.7–53.9 µm across the registered nuisance grid,
-and those overlap heavily. **The ordering in §7 is reproducible only if every
-analysis choice is held fixed. Allow the grid, the mask, the bin width or the
-distance metric to move, and the compound difference disappears into the
-method.**
+and those overlap heavily.
+
+> **CORRECTED 2026-08-22.** This paragraph previously continued: *"The ordering in
+> §7 is reproducible only if every analysis choice is held fixed. Allow the grid,
+> the mask, the bin width or the distance metric to move, and the compound
+> difference disappears into the method."* **The second sentence is false** and
+> this file's own `results/kyle2004_penetration_data.json` refutes it: the
+> ordering holds in **36 of 36** registered nuisance cells, zero inversions,
+> paired ratio 1.135–1.287. What overlaps is the pair of **marginal** intervals,
+> because the dominant nuisance (bin width) is common mode and moves both
+> compounds together. **C2 fails on the marginal bar and that failure stands; the
+> ordering does not disappear into the method.** See §8's correction block and
+> `results/spatial_noise_decomposition.md`.
 
 **Arm A is clean and arm B is not — and that split is the actionable half of this
 file.** The transport law separates these compounds robustly; the *reconstruction
@@ -551,18 +560,56 @@ decision-relevant result in this file.**
   section, span 39.4–63.1 µm and 32.7–53.9 µm across the registered nuisance grid
   — 36 cells each, no compound ever failing to halve — and those ranges overlap
   across most of their length. The **central** values are correctly ordered
-  (45.2 vs 38.9 µm at the shipped settings, §7). The **ordering is not robust to
-  the analysis choices**: the tissue grid, whether the cell-derived mask is
-  morphologically repaired, exposure versus final concentration, the
+  (45.2 vs 38.9 µm at the shipped settings, §7). The **marginal intervals are not
+  robust to the analysis choices**: the tissue grid, whether the cell-derived mask
+  is morphologically repaired, exposure versus final concentration, the
   distance-bin width, and direct-endothelial-cell versus percentile-mask distance
   together move each compound's half-distance by more than the compound difference
   itself.
 
 **So the honest statement is: the map's compound-to-compound difference is inside
-its own methodological noise.** A user who re-ran the same two compounds at
-`dx = 30 µm` on the native mask with 20 µm bins could get the opposite ordering.
-Nothing about this is hidden by the shipped defaults — it is only visible because
-the nuisance grid was registered in advance and run.
+its own methodological noise, as that noise is defined by the registered
+MARGINAL bar.** Nothing about this is hidden by the shipped defaults — it is only
+visible because the nuisance grid was registered in advance and run.
+
+> ### CORRECTION — 2026-08-22
+>
+> **This paragraph previously ended with a sentence that this file's own saved
+> data refutes. The retracted sentence is quoted here rather than deleted,
+> because silently removing a wrong claim is how the wrong claim got published:**
+>
+> > *"A user who re-ran the same two compounds at `dx = 30 µm` on the native mask
+> > with 20 µm bins could get the opposite ordering."*
+>
+> **That is false.** At exactly that configuration — `dx30_native`, native mask,
+> 20 µm bins, primary direct-cell metric, AUC field — the readouts in
+> `results/kyle2004_penetration_data.json` are **doxorubicin 56.59 µm and
+> daunorubicin 49.60 µm**: correctly ordered. **In all 36 registered nuisance
+> cells, doxorubicin's half-distance exceeds daunorubicin's. Zero inversions.**
+> The paired difference is **+6.14 to +13.89 µm** and the paired ratio **1.135 to
+> 1.287**; excluding the cells where the bin width is finer than the grid pitch —
+> which alias a lattice-quantised distance map and produced all four extremes —
+> the paired ratio tightens to **1.135–1.208**.
+>
+> **The C2 failure is real and is NOT retracted.** What fails is the **marginal**
+> bar: the registered criterion compares doxorubicin at one nuisance setting
+> against daunorubicin at a *different* one, and under that comparison the
+> intervals do overlap. What does not fail is the **ordering**, because the
+> dominant nuisance is common mode — going from 5 µm to 20 µm bins moves
+> doxorubicin by +18.51 µm and daunorubicin by +17.49 µm, so 17.5 of the 18.4 µm
+> cancels out of any comparison a single run actually makes.
+>
+> **Which bar the product claim needs is an OPEN DECISION, not resolved here.**
+> The marginal bar protects a customer reading an absolute half-distance off the
+> panel; the paired bar matches the within-map claim §1 of this file justifies on
+> the grounds that *"within a single map the uncertain per-compound absolutes
+> cancel."* Both are now measured.
+>
+> Derivation, mechanism and the full four-stage attribution:
+> **`results/spatial_noise_decomposition.md`**. Nothing else in this file is
+> changed by that work — §6's magnitude failures (~3.7× compressed, ~14× too
+> shallow) and §9's near-side/far-side findings stand exactly as written, and the
+> spatial reduction being noisy remains true.
 
 ---
 
@@ -640,6 +687,12 @@ difference because a sink is a weaker instrument for this than a store.
   nuisance spread**, while in the clean single-vessel geometry it does. The
   physics separates these compounds; the map's spatial readout does not separate
   them above its own methodological noise.
+  **QUALIFIED 2026-08-22:** true of the registered **marginal** bar only. Read
+  **within** a nuisance cell — both compounds at the same settings, which is what
+  any single run does — the ordering holds in **36 of 36** cells with zero
+  inversions (paired ratio 1.135–1.287). Which bar the product claim needs is an
+  open decision; see §8's correction block and
+  `results/spatial_noise_decomposition.md`.
 * **The promoted two-route transcellular term is inert for this whole compound
   class** — hindrance 0.1512 for all four, the impermeable-cell limit — so the
   engine's diffusivity separation here is entirely the superseded

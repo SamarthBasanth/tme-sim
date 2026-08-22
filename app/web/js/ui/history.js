@@ -6,7 +6,7 @@
 // people end up reading the wrong pair of numbers.
 
 import { h, clear } from '../util/dom.js';
-import { METRICS, metricProvenance, chip } from './provenance.js';
+import { METRICS, metricProvenance, chip, claimSetNotice } from './provenance.js';
 import { auto, num, int, pct, sci, dur, ts, NULL_GLYPH, relPct } from '../util/fmt.js';
 
 function fmtMetric(key, v) {
@@ -123,6 +123,15 @@ export function createHistoryPanel({ onOpen, onRefresh }) {
   function renderCaveatDiff(A, B) {
     const ca = (A.provenance && A.provenance.caveats) || [];
     const cb = (B.provenance && B.provenance.caveats) || [];
+    // Same rule as the inspect rail: a stored caveat is never shown as current
+    // if the claim set it was written against has been superseded. It matters
+    // MORE here — the two sides can sit on different claim sets, and a caveat
+    // that appears under "A only" because B was run after a withdrawal is a
+    // difference in the product's claims, not in the two runs.
+    for (const [side, run] of [['A', A], ['B', B]]) {
+      const n = claimSetNotice(run.provenance, { compact: true, label: side });
+      if (n) cmpEl.appendChild(n);
+    }
     const only = (x, other) => x.filter((c) => !other.includes(c));
     const onlyA = only(ca, cb), onlyB = only(cb, ca);
     if (!onlyA.length && !onlyB.length) {

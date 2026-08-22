@@ -357,8 +357,13 @@ Read what that table does and does not say. **The route is still unconfined and
 still answers `200`** — `scan {"path": "/etc"}` returns `200` under both,
 because `/etc` is world-readable and a non-root user can list it perfectly
 well. What changed is the *set of files the process can reach*, not the
-route's behaviour. §2's deferred `path`-root restriction is still deferred, and
-the key is still equivalent to read access as uid 10001 on that host.
+route's behaviour. **In this image's default configuration the key is still
+equivalent to read access as uid 10001 on that host** — the `path`-root
+restriction §2 named now exists, but it is opt-in and nothing here sets it. Pass
+`-e TMESIM_STUDIO_DATA_ROOTS=/app/data_cache` (§4) and a `scan` of a path
+outside that root is refused with a `403` before the filesystem is touched at
+all, under either uid. That is the route's behaviour, measured against a local
+server rather than inside this image; the container adds nothing to it.
 
 **What this costs you, and it is only the one thing:** a **host directory**
 bind-mounted over a writable path arrives with the *host's* ownership, and uid
@@ -497,6 +502,8 @@ What is on the other end of that URL is worse than "your tissue data":
   body** and reports on any directory the server process can read. Unauthenticated
   and public, that is a filesystem reconnaissance primitive on the host, not just
   access to the sections you meant to share. Verified by request, not inferred.
+  `TMESIM_STUDIO_DATA_ROOTS` (§4) bounds which directories it will read, and is
+  worth setting here as well as a key — but it is off unless you set it.
 * The destructive routes are equally open: `DELETE /api/sections/{id}` unregisters
   an ingested section, `DELETE /api/compounds/{id}` forgets a stored compound, and
   `DELETE /api/projects/{id}` removes a project. `DELETE /api/runs/{id}` and
@@ -525,16 +532,18 @@ If the thing in front of Codon does not check who the caller is, Codon must.
   bundle one, to avoid maintaining certificate/domain logic orthogonal to the
   simulator itself).
 * **Multi-user accounts.** One shared key, not per-user identity. See §1b.
-* **Confining `POST /api/sections/scan` to a directory root.** The key makes
-  `scan` **authenticated, not safe**. It takes an arbitrary `path` in the request
-  body, and there is no allowlisted root — so any tester holding the key can
-  enumerate and read any directory the *server process* can read, anywhere on the
-  host, not just under `data_cache/`. Restricting `path` to a configured root was
-  identified and deliberately **deferred as a MEDIUM**; it is not implemented, and
-  the shared key does not substitute for it. Treat the key as equivalent to shell
-  read access on the host, and hand it out on that basis. The controls that do
-  exist are the ones in §0: run the server as a user that cannot read anything you
-  would mind a tester listing.
+* **Confining `POST /api/sections/scan` to a directory root — unless you turn it
+  on.** The key makes `scan` **authenticated, not safe**. It takes an arbitrary
+  `path` in the request body, so with no allowlisted root any tester holding the
+  key can enumerate and read any directory the *server process* can read,
+  anywhere on the host, not just under `data_cache/`. **That is still the
+  default.** The allowlist now exists — `TMESIM_STUDIO_DATA_ROOTS`, §4 — but it
+  is opt-in, because the bring-your-own-tissue workflow legitimately points the
+  scanner outside this repo and a default root would break it silently. **Until
+  you set it, treat the key as equivalent to shell read access on the host, and
+  hand it out on that basis.** Set it before you give the key to anyone who is
+  not you. The other control, which applies either way, is §0's: run the server
+  as a user that cannot read anything you would mind a tester listing.
 
   **The Docker image now does that for you** — it runs as `codon`, uid 10001,
   after a spell of running as root, i.e. of doing the precise opposite of the
@@ -582,34 +591,38 @@ unauthenticated API, with the server still reporting a loopback bind and still
 generating no key. If you are not certain the front end authenticates, set
 `TMESIM_STUDIO_API_KEY` as well — two checks cost nothing.
 
-Two more things this setup needs that the loopback default does *not* hand you,
-both covered in §4: set `TMESIM_STUDIO_ALLOWED_HOSTS` to the hostname the proxy
-forwards (the automatic loopback allowlist is `localhost,127.0.0.1`, which will
-**400 every proxied request** arriving with your real hostname unless the proxy
-rewrites `Host`), and leave `TMESIM_STUDIO_EXPOSE_TRACEBACKS` unset.
+Three more things this setup needs that the loopback default does *not* hand
+you, all covered in §4: set `TMESIM_STUDIO_ALLOWED_HOSTS` to the hostname the
+proxy forwards (the automatic loopback allowlist is `localhost,127.0.0.1`, which
+will **400 every proxied request** arriving with your real hostname unless the
+proxy rewrites `Host`), set `TMESIM_STUDIO_DATA_ROOTS` to the directories your
+samples live in (everyone the proxy admits can otherwise make this server read
+any directory it can read), and leave `TMESIM_STUDIO_EXPOSE_TRACEBACKS` unset.
 
 ---
 
 ## 4. Environment variables
 
-Five. There is no config file; these are the whole surface, and only the first
-four are security-relevant.
+Six. There is no config file; these are the whole surface, and only the first
+five are security-relevant.
 
-**Four of the five are read once, at process start, and need a restart to
+**Four of the six are read once, at process start, and need a restart to
 change.** `TMESIM_STUDIO_API_KEY`, `TMESIM_STUDIO_ALLOWED_HOSTS` and
 `TMESIM_STUDIO_ALLOWED_ORIGINS` are read while the app is being built — each
 decides whether a middleware is installed at all, so there is nothing left to
 re-read afterwards — and `TMESIM_RECON_CACHE_SIZE` is read at import, when the
 cache object is constructed.
 
-**`TMESIM_STUDIO_EXPOSE_TRACEBACKS` is the exception: it is read per request**,
-inside the `GET /api/runs/{id}/traceback` handler
+**`TMESIM_STUDIO_EXPOSE_TRACEBACKS` and `TMESIM_STUDIO_DATA_ROOTS` are the
+exceptions: they are read per request**, inside the
+`GET /api/runs/{id}/traceback` and `POST /api/sections/scan` handlers
 (`app/server/api.py`). Practically that means the value in force is whatever is
 in the *live process's* environment at the moment the route is called, not
 whatever was set when it started — so a debugging session that mutates the
 process environment takes effect immediately, and, less comfortably, so would
 anything else that mutates it. It also means there is no restart-shaped moment
-at which an operator gets to notice that traces are being served.
+at which an operator gets to notice that traces are being served, or that a
+scan root was widened.
 
 `codon studio` / `python -m app.server` writes two of them into its own
 environment (`TMESIM_STUDIO_API_KEY`, `TMESIM_STUDIO_ALLOWED_HOSTS`), and in both
@@ -726,6 +739,88 @@ no defence there, because the browser is a local process.
   ```
 
   Full origins including scheme and port, not bare hostnames.
+
+### `TMESIM_STUDIO_DATA_ROOTS`
+
+Directories `POST /api/sections/scan` is allowed to read, separated by `:`
+(`os.pathsep`) — **not** commas like the two list-valued variables above,
+because a directory name may legitimately contain a comma. This is the
+confinement §2 says the API key does not give you: the key makes `scan`
+*authenticated*, this makes it *bounded*.
+
+It applies to the **HTTP route** — which is the trust boundary, and also what
+the `/ingest` page calls. `codon ingest <dir>` on the command line is not
+confined by it and is not meant to be: that is the operator running a program as
+themselves on their own machine, with no boundary to enforce. So the two
+surfaces can disagree about a directory, and when they do it is because one of
+them is being driven by a remote caller.
+
+The check is on the **resolved** path. A leading `~`, every `..` component and
+every symlink are followed first, and it is the directory that path really
+designates which must be inside a root — so `data_cache/../..`, a symlink
+planted inside an allowed root, and a `..` that traverses *through* a symlink
+are all refused. Containment is by path component, so a root of `/data` allows
+`/data` itself and `/data/anything`, and does **not** allow `/data_other`.
+
+* **Unset:** no confinement. `scan` reads any directory the server process can
+  read, exactly as it always has, and **the first scan in each process prints a
+  warning on stderr** naming this variable and the path it just read. This is
+  the same trade as §1a's unauthenticated loopback default: bring-your-own
+  tissue is the product's main input and the documented workflow points the
+  scanner at wherever the operator's export actually lives (§0 tells you to copy
+  a sample to a study-code directory, which is almost never inside this repo), so
+  confining by default would silently break the single-user workflow this tool
+  was built for. The default therefore stays permissive and says so out loud.
+* **Set to one or more directories:** only paths resolving inside one of them
+  are scanned. Anything else is a `403` whose body names *your* path, says it
+  resolved outside the allowlist, names this variable and says how to add a
+  root — and never discloses the roots themselves. The server's stderr gets the
+  resolved path; the client does not (it would otherwise leak the operator's
+  home directory to anyone who sent `~/x`). One thing a caller *can* learn, and
+  it is unavoidable in a diagnostic that tells an operator what to do: one bit
+  per request about whether a given directory is inside the allowlist.
+* **Set to a value that names no usable directory** — empty, whitespace, a bare
+  `:`, as an `-e TMESIM_STUDIO_DATA_ROOTS=` with no value produces — **refuses
+  every scan** rather than falling back to unconfined. You asked for
+  confinement; a typo must not quietly hand back the behaviour you were turning
+  off. Unset it to go back to unconfined.
+* **Must set it when:** anyone who is not you holds the API key — an external
+  field tester, a shared team deployment, anything behind §3's proxy. Without
+  it, §2's sentence stands: the key is equivalent to read access on that host as
+  the server's uid. Point it at the directory tree your samples live in:
+
+  ```bash
+  TMESIM_STUDIO_DATA_ROOTS=/srv/tissue:/data/study_a codon studio --host 0.0.0.0
+  ```
+
+  **Include this repo's own `data_cache/` if you use it.** §1d's re-register
+  command passes `data_cache/<your-section-dir>`, and a roots list that names
+  only your tissue tree will `403` it. Two entries, not one:
+
+  ```bash
+  TMESIM_STUDIO_DATA_ROOTS=/srv/tissue:$PWD/data_cache codon studio --host 0.0.0.0
+  ```
+
+* **Three things it does not do**, stated so nobody reads more into it. It
+  bounds the *directory* that is scanned, not the files inside it — a symlink
+  *within* an allowed sample directory still points wherever it points, and the
+  ingester follows it. It is a check at one instant, so a symlink re-pointed
+  between the check and the read is not caught. And it is not retroactive:
+  sections already in `app/runs/_ingested_sections.json` keep working and keep
+  reporting their absolute `cache_dir` through `GET /api/sections` even if that
+  directory is outside every root — setting this variable stops new directories
+  being reached, it does not un-register old ones (`codon ingest --remove <id>`
+  does). All three are far smaller than the "any path at all" they replace; none
+  is closable at this layer. The control that covers them is still §0's: run the
+  server as a user that cannot read anything you would mind a tester listing.
+* **One behavioural difference when it is set:** the scanner is handed the
+  *resolved* path, so that the directory checked and the directory opened cannot
+  be two different things. A section registered through a symlink therefore
+  records its real directory in `cache_dir` (and, if you do not pass
+  `section_id`, derives its id from the real directory's name). Unset, the path
+  you sent is passed through untouched, exactly as before.
+* Read per request, not at startup — but the whole allowlist is process
+  environment, so in practice it changes when you restart.
 
 ### `TMESIM_STUDIO_EXPOSE_TRACEBACKS`
 

@@ -329,7 +329,8 @@ def distance_profile(
     edges = np.arange(n_bins + 1, dtype=np.float64) * float(bin_um)
     idx = np.digitize(dv, edges) - 1
 
-    keys = ("distance_um", "mean", "median", "std", "q25", "q75")
+    keys = ("distance_um", "distance_mean_um", "mean", "median", "std",
+            "q25", "q75")
     acc: Dict[str, List[float]] = {k: [] for k in keys}
     count: List[int] = []
     for b in range(n_bins):
@@ -339,6 +340,7 @@ def distance_profile(
             continue
         vals = fv[sel]
         acc["distance_um"].append(0.5 * (edges[b] + edges[b + 1]))
+        acc["distance_mean_um"].append(float(dv[sel].mean()))
         acc["mean"].append(float(vals.mean()))
         acc["median"].append(float(np.median(vals)))
         acc["std"].append(float(vals.std()))
@@ -349,6 +351,27 @@ def distance_profile(
     out = {k: np.asarray(v, dtype=np.float64) for k, v in acc.items()}
     out["count"] = np.asarray(count, dtype=int)
     out["bin_um"] = float(bin_um)
+    #: ADDITIVE DIAGNOSTICS (2026-08-22, results/spatial_noise_decomposition.md).
+    #: Every pre-existing key above is byte-identical to what this function has
+    #: always returned; these two are new and no shipped number reads them yet.
+    #:
+    #: ``distance_mean_um`` — each bin's COUNT-WEIGHTED MEAN distance, i.e. where
+    #: the bin's own mean value actually sits. The bin CENTRE (``distance_um``)
+    #: is not that location: the pixels inside a bin are not uniform in distance,
+    #: and, more importantly, the first bin's mean is the profile's value at
+    #: roughly ``bin_um/2``, not at 0. See
+    #: :func:`anchor_corrected_half_distance_um` for the consequence.
+    #:
+    #: ``n_empty_bins`` — bins in ``[0, max_distance_um]`` that held no pixel at
+    #: all and were skipped by the ``if n == 0: continue`` above. The distance
+    #: map is sampled on a lattice of pitch ``dx``, so when ``bin_um`` is not
+    #: comfortably larger than ``dx`` the distance histogram is a comb and bins
+    #: alternate between populated shells and empty gaps. That skip is silent —
+    #: an aliased profile is otherwise indistinguishable from a well-sampled one
+    #: in this function's output. ``BIN_UM = 10`` is documented above as
+    #: "comfortably above dx = 12 um", which stops being true the moment the
+    #: ``dx30_native`` arm is reduced at the same bin width.
+    out["n_empty_bins"] = int(n_bins - len(count))
     return out
 
 
@@ -478,6 +501,66 @@ def empirical_half_distance_um(
     if v0 == v1:
         return float(d[i])
     return float(d[i - 1] + (v0 - target) / (v0 - v1) * (d[i] - d[i - 1]))
+
+
+def anchor_corrected_half_distance_um(
+    distance_um: np.ndarray,
+    value: np.ndarray,
+    anchor_distance_um: Optional[float] = None,
+) -> Optional[float]:
+    """:func:`empirical_half_distance_um` MINUS the distance at which its own
+    reference value sits — the half-distance as a LENGTH rather than as a
+    coordinate.
+
+    THE DEFECT THIS CORRECTS
+    ------------------------
+    :func:`empirical_half_distance_um` normalises by ``v[0]``, the **mean of the
+    first bin**, and then reports the crossing as a distance measured **from
+    zero**. But ``v[0]`` is not the profile's value at ``d = 0``: it is its
+    average over ``[0, bin_um)``, i.e. its value at an effective distance of
+    roughly ``bin_um/2``. The returned number is therefore the distance from the
+    ORIGIN to the point where the signal halves relative to a reference taken at
+    ``bin_um/2`` — a half-distance plus half a bin width. The two ends of the
+    interval are measured from different origins.
+
+    For a pure exponential the bias is exact and closed-form. With bin width
+    ``b``, the bin means of ``C0*exp(-d/L)`` are
+
+        ``v_j = C0 * (L/b) * (1 - exp(-b/L)) * exp(-j*b/L)``
+
+    so ``v_j/v_0 = exp(-j*b/L)`` — the bin-averaging prefactor cancels — the
+    profile halves at fractional bin index ``j* = L*ln2/b``, and the shipped
+    estimator reports it at that bin's CENTRE:
+
+        ``d_half_shipped = L*ln2 + b/2``      (exact; the truth is ``L*ln2``)
+
+    Subtracting the first bin's own distance removes the ``b/2`` term exactly.
+    There is no free parameter and nothing is fitted; this is a change of origin,
+    not a correction factor.
+
+    ``anchor_distance_um`` defaults to ``distance_um[0]`` (the shipped bin-centre
+    label). Pass ``profile["distance_mean_um"][0]`` — the first bin's
+    count-weighted mean distance, which :func:`distance_profile` now returns —
+    when the pixel-distance density inside the first bin is strongly non-uniform,
+    which on a real section it is.
+
+    STATUS: this is an ADDITION. Nothing in this module calls it, and no shipped
+    number changes. Whether it should replace :func:`empirical_half_distance_um`
+    on the panel is a promotion decision, not a bug fix, because it moves every
+    published half-distance down by about half a bin width; see
+    ``results/spatial_noise_decomposition.md``.
+    """
+    d = np.asarray(distance_um, dtype=np.float64)
+    crossing = empirical_half_distance_um(d, value)
+    if crossing is None:
+        return None
+    if anchor_distance_um is None:
+        if d.size == 0:
+            return None
+        anchor = float(d[0])
+    else:
+        anchor = float(anchor_distance_um)
+    return float(crossing - anchor)
 
 
 #: How a missing half-distance is rendered. ``empirical_half_distance_um`` returns

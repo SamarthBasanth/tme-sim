@@ -94,6 +94,89 @@ export const STANDING_LIMITS = [
   'NOTHING IN THIS PROJECT HAS BEEN VALIDATED AGAINST A PATIENT OUTCOME. These sections carry no treatment-response label, so every number here is a prediction of the physical model that has never been scored. NOT FOR CLINICAL USE.',
 ];
 
+/* ------------------------------------------------------ claim set ------ */
+
+/**
+ * A run's caveats are written when it executes and the record is never
+ * rewritten — so a run from before a claim was withdrawn still carries, word
+ * for word, a sentence this product has since retracted. `r_00052` still says
+ * the cross-drug ranking "is the defensible output"; that claim was withdrawn
+ * on 2026-08-21 and 65 stored runs repeat it.
+ *
+ * The backend answers this with a VERSION rather than a date cutoff: every run
+ * stamps `provenance.claim_set` with the claim set it was written against, and
+ * `app/server/jobs.py::claim_set_status` compares that stamp with the current
+ * version on every read. An absent stamp is a run older than the stamp itself,
+ * which is all 65 of them, and it supersedes by the same rule.
+ *
+ * This function renders the verdict. It is the vocabulary twin of
+ * `report.py`'s "RESTORED FROM A WITHDRAWN PANEL DOCUMENT" warning, which
+ * solved the same problem for report documents: the SET is superseded, the
+ * individual CLAIMS in it are withdrawn, and neither word is used for the other
+ * thing. Where the two differ is deliberate — a restored panel report does not
+ * re-render its ranking, because a ranking is a NUMBER and re-printing it is
+ * asserting it. A caveat is PROSE ABOUT a number, and hiding it would leave a
+ * reader unable to see what the run said. So this marks; it never hides.
+ *
+ * @param {object} prov  a RunResult.provenance
+ * @param {{compact?: boolean, label?: string}} [opts]
+ *   `compact` drops the change list and keeps one line — for panels (history
+ *   compare) where the caveats themselves are already elided.
+ * @returns {Node|null} null when the record is current, which is the only case
+ *   in which nothing is said.
+ */
+export function claimSetNotice(prov, opts) {
+  const cs = prov && prov.claim_set;
+  if (!cs || !(cs.superseded || cs.contradicted)) return null;
+  const o = opts || {};
+  // Two findings, one banner. `contradicts` is a record whose own caveats
+  // disagree with the claim set it is stamped with — the case an age
+  // comparison cannot see, because the stamp is what is wrong. When both
+  // hold the backend puts that one in the headline, and its list is the one
+  // worth showing: it names the claim the record is actually still carrying.
+  const changes = (cs.contradicted && Array.isArray(cs.contradicts) && cs.contradicts.length)
+    ? cs.contradicts
+    : (Array.isArray(cs.changes) ? cs.changes : []);
+  // Every number and date below is read off the record. Nothing here composes
+  // one, and nothing here restates a caveat's numbers in the app's own voice.
+  const kids = [
+    h('div.cv-key',
+      h('span.cv-subj', cs.headline || 'CAVEATS RECORDED UNDER A SUPERSEDED CLAIM SET'),
+      o.label ? h('span.cv-n', o.label) : null),
+    h('div.cv-body', cs.detail || ''),
+  ];
+  if (!o.compact) {
+    for (const c of changes) {
+      kids.push(h('div.cs-change',
+        h('div.cs-change-hd',
+          h('b', 'WITHDRAWN'),
+          c.adopted ? h('span', ' ' + c.adopted) : null,
+          h('span.dim', ' · claim set ' + c.version)),
+        h('div.cv-body', c.withdrew || ''),
+        (c.sources || []).length ? h('div.cv-ref', (c.sources || []).join('; ')) : null));
+    }
+  }
+  return h('div.caveat.crit.cs-superseded', { title: cs.warning || '' }, ...kids);
+}
+
+/**
+ * The label that goes above a superseded run's own caveats, so the block below
+ * it reads as a record of what was said rather than as current advice. Returns
+ * null for a current run: an era label on the only era there is says nothing.
+ */
+export function claimSetEraLabel(prov) {
+  const cs = prov && prov.claim_set;
+  if (!cs || !(cs.superseded || cs.contradicted)) return null;
+  // Parallel to its sibling "standing limits · independent of this run", and
+  // kept short so the rule `.hr-lbl::after` draws still has room: the banner
+  // 40 px above already names the current set, so repeating it here would cost
+  // the label its rule to say a third time what is on screen twice.
+  return h('div.hr-lbl.cs-era',
+    cs.recorded
+      ? `stated by this run · claim set ${cs.version}`
+      : 'stated by this run · claim set not recorded');
+}
+
 /* ------------------------------------------------------- active run ---- */
 
 /**

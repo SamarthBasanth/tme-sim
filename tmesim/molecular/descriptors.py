@@ -77,6 +77,15 @@ def compute_descriptors(smiles: str) -> Dict[str, float]:
         raise ValueError("RDKit unavailable; cannot compute descriptors from SMILES")
     if not smiles or not isinstance(smiles, str):
         raise ValueError(f"empty/invalid SMILES: {smiles!r}")
+    # Macromolecule marker (molecular/library.py: "ANTIBODY:bevacizumab"). This
+    # is a DELIBERATE sentinel meaning "no small-molecule SMILES exists", so
+    # handing it to RDKit is work whose only possible outcome is the failure we
+    # already know about -- and RDKit reports that failure by printing a
+    # multi-line parse error to stderr, which /api/drugs was emitting on every
+    # request for a compound that resolves perfectly well from the curated
+    # table. Same ValueError, same fallback, same descriptors; just not asked.
+    if smiles.startswith("ANTIBODY:"):
+        raise ValueError(f"macromolecule marker, not a SMILES: {smiles!r}")
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         raise ValueError(f"unparseable SMILES: {smiles!r}")

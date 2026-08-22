@@ -102,7 +102,8 @@ from .cache import (
     state_route_support,
 )
 from .delivery_law import delivery_law
-from .jobs import PDE_DT_S, JobManager, jsonable
+from .jobs import (PDE_DT_S, JobManager, claim_set_stamp, claim_set_status,
+                   jsonable)
 
 __all__ = [
     "MAP_CLAIM",
@@ -1138,6 +1139,12 @@ def assemble(section_id: str, spec_base: Dict, drug: str,
         "reach_reason": reach_reason,
         "microenvironment": jsonable(report),
         "caveats": caveats,
+        # The claim set the caveats above were written against, stamped beside
+        # them for the same reason a run stamps its own: this document is
+        # rendered to report.html and KEPT, and read months later. Without the
+        # stamp a document assembled today is indistinguishable, to a reader,
+        # from one assembled before the claim it repeats was withdrawn.
+        "claim_set": claim_set_stamp(),
         "window_s": window_s,
         "map_claim": MAP_CLAIM,
     }
@@ -1329,6 +1336,28 @@ class ReportManager:
             rep.warnings = list(doc.get("warnings") or [])
             if legacy:
                 rep.warnings.append(legacy)
+            # The ``legacy`` warning above catches a PANEL document, because
+            # that is the shape the withdrawal changed. It does not catch a
+            # SINGLE-COMPOUND document from the same era: that one has no
+            # ``drugs[]``, so it took no warning at all and re-rendered its
+            # stored ``caveats`` verbatim — including, on four of the six
+            # documents in ``app/reports/`` when this was written, a sentence
+            # naming the cross-compound ranking as the defensible output. That
+            # text goes into ``report.html``, which is the file a customer
+            # keeps and forwards, so it is the copy of this defect that has
+            # already left the building.
+            #
+            # This WIDENS the condition rather than replacing it: a panel
+            # document still takes ``legacy`` (it is a statement about the
+            # document's SHAPE that this stamp cannot make), and now every
+            # document also gets the era/compliance verdict that
+            # ``app/server/jobs.py`` computes for runs — same function, same
+            # vocabulary, so the two fronts cannot drift into different words.
+            # Nothing is rewritten: the stored ``caveats`` are restored whole
+            # and the warning sits beside them.
+            cs = claim_set_status(doc.get("claim_set"), doc.get("caveats"))
+            if cs["warning"]:
+                rep.warnings.append(cs["warning"])
             arms = doc.get("arms") or {}
             if drug and isinstance(arms.get(drug), dict):
                 arms = arms[drug]          # flatten the old drug -> arm nesting
@@ -1336,7 +1365,7 @@ class ReportManager:
             rep.body = {k: doc[k] for k in
                         ("compound", "attribution", "mechanism", "reach",
                          "reach_reason", "microenvironment", "caveats",
-                         "window_s", "map_claim") if k in doc}
+                         "claim_set", "window_s", "map_claim") if k in doc}
             with self._lock:
                 self._reports[rep.report_id] = rep
                 self._order.append(rep.report_id)

@@ -181,6 +181,13 @@ WATCHED: Tuple[Tuple[str, str], ...] = (
     # Alternate solvers -- see ALT_SOLVERS.
     ("tmesim.molecular.immune_sink", "transport_with_immune_sink"),
     ("tmesim.validation.moncayo_explant", "bath_diffusion"),
+    # Lives in app/, which is an OPTIONAL extra, so this is a soft reference:
+    # WATCHED holds strings and ``instrument`` skips a target it cannot resolve,
+    # so a checkout without '.[app]' simply does not watch it. That is safe here
+    # and only here -- such a checkout cannot run the reach map either, so there
+    # is no path that solves transport unwatched. It is NOT a licence to point
+    # WATCHED at other optional modules.
+    ("app.server.reach", "steady_state_concentration"),
 )
 
 SOLVER = "simulate_drug_transport"
@@ -201,6 +208,12 @@ SOLVER = "simulate_drug_transport"
 ALT_SOLVERS: Tuple[str, ...] = (
     "transport_with_immune_sink",
     "bath_diffusion",
+    # Not a time loop at all: assembles (K - L + Adv) c = S from the same
+    # primitives and solves it once. It is listed here for exactly the reason
+    # above -- it SOLVES TRANSPORT, so letting it read as NO_PDE ("no transport
+    # solve happens here") would be false in the one direction this module
+    # exists to prevent. It takes exchange_k explicitly and defaults it to None.
+    "steady_state_concentration",
 )
 
 
@@ -1062,6 +1075,27 @@ DECLARATIONS: Tuple[Declaration, ...] = (
             "calls the solver directly with no exchange_k: auc_sum was "
             "1.554447793e+09 with the flag off and bit-identical with it on, "
             "against 6.86608671e+08 when exchange_k was actually passed."
+        ),
+    ),
+    # app/server/reach.py is NOT declared here: it is the HOME of the
+    # steady_state_concentration alt solver, so it is registered in ALT_SOLVERS
+    # and WATCHED alongside immune_sink.py and moncayo_explant.py. Declaring it
+    # instead was tried and was wrong -- the source scan correctly answers
+    # NO_PDE for a file that calls no solver because it IS one, and accepting
+    # that verdict would have published "no transport solve happens here" about
+    # the module that solves the transport steady state.
+    Declaration(
+        path="experiments/steady_state_reach.py",
+        category=Category.INERT,
+        reason=(
+            "march() calls simulate_drug_transport BARE "
+            "(steady_state_reach.py:233) with a hand-built PDEConfig and no "
+            "exchange_k. That is the load-bearing fact and not an incidental "
+            "one: the finite-window arm is the object the steady state is "
+            "measured AGAINST, so both arms of that comparison are "
+            "exchange-OFF and the comparison is internally consistent -- but "
+            "neither arm licenses a claim about exchange. The steady solve it "
+            "drives takes exchange_k explicitly and is passed None."
         ),
     ),
     # --- (C) no PDE at all: DECLARED unreachable, with a reason ---------------

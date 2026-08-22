@@ -67,6 +67,10 @@ __all__ = [
     "SIM_SEED",
     "DEFAULT_TIMELAPSE_FRAMES",
     "TIMELAPSE_BUDGET_BYTES",
+    "CLAIM_SET_VERSION",
+    "CLAIM_SET_LOG",
+    "claim_set_stamp",
+    "claim_set_status",
     "RunCancelled",
     "RUN_REFUSALS",
     "is_run_refusal",
@@ -101,6 +105,221 @@ DEFAULT_TIMELAPSE_FRAMES = 24
 #: returned with the run — the payload is never silently truncated and the
 #: capture is never silently skipped.
 TIMELAPSE_BUDGET_BYTES = 48 * 1024 * 1024
+
+# --------------------------------------------------------------------------- #
+# THE CLAIM SET — a version on "what this product currently says is defensible"
+#
+# A run's caveats are written into ``app/runs/<id>/result.json`` at the moment
+# it executes, and that record is never rewritten: it is the execution record,
+# and editing it to agree with a later claim would falsify the one thing this
+# repo is most careful about. But the claims themselves get WITHDRAWN — twice in
+# one week (the grid-convergence headline, then the cross-compound ranking on
+# 2026-08-21) — and a stored caveat rendered verbatim today therefore shows a
+# reader a withdrawn claim with nothing saying so. ``r_00052`` still carries
+# "The CROSS-DRUG RANKING is invariant across all three routes and is the
+# defensible output", and so does most of the rest of ``app/runs/``. No count
+# is written here on purpose: it would be a number that drifts with the store,
+# which is the failure mode this whole block exists to prevent.
+#
+# The obvious fix is a date cutoff: banner anything created before 2026-08-21.
+# That works exactly once. The next withdrawal needs a second cutoff, and the
+# one after that a third, and each is a code change made under the pressure of
+# having just discovered that something is false.
+#
+# So the record carries a VERSION instead. Every run executed from here on
+# stamps :data:`CLAIM_SET_VERSION` into its provenance beside the caveats it was
+# written against. A reader (:func:`claim_set_status`, rendered by
+# ``app/web/js/ui/inspect.js``) compares the stamp with the current version and
+# banners anything OLDER OR ABSENT. The next withdrawal is then two edits in
+# this block — bump the integer, append what it withdrew to
+# :data:`CLAIM_SET_LOG` — and every stored record predating it banners itself,
+# including the ones written between now and then.
+#
+# Why the stamp sits in ``provenance`` and not next to ``run_id``: the thing
+# being versioned is the CAVEAT TEXT, not the execution. ``report.py`` lifts
+# ``provenance['caveats']`` out of an arm and into a report document, and
+# ``history.js`` lifts it into a comparison; a stamp beside ``run_id`` would be
+# left behind by both, and the text would travel without the one field that says
+# how old it is. Beside the caveats, it travels with them.
+#
+# Version 1 is the first claim set that is RECORDED, not the first that ever
+# existed. Runs older than the stamp are not "version 0" — they ran under a
+# claim set nobody wrote down, which is a weaker statement and the true one, and
+# it is why :func:`claim_set_status` says "unrecorded" for them rather than
+# naming a version they never had.
+# --------------------------------------------------------------------------- #
+#: Bump when a claim in the caveat text is withdrawn, narrowed or replaced, and
+#: append the matching entry to :data:`CLAIM_SET_LOG` in the same edit.
+CLAIM_SET_VERSION = 1
+
+#: One entry per version, oldest first. ``withdrew`` is what a reader of an
+#: OLDER record most needs told; ``sources`` is where it was measured. These
+#: strings are rendered verbatim in the Studio banner, so they are written for a
+#: reader of a stale run and not as a changelog line.
+CLAIM_SET_LOG = (
+    {
+        "version": 1,
+        "adopted": "2026-08-21",
+        "withdrew": (
+            "The CROSS-COMPOUND RANKING is withdrawn. Until 2026-08-21 the "
+            "caveats on a run named the ordering between compounds as the "
+            "defensible output and said it was invariant across the state "
+            "routes. That was measured and it does not hold: per-compound "
+            "plasma exposure spans 113.1x across the compounds the GBM panel "
+            "ordered, while the published order first breaks at a spread of "
+            "1.53x, and under this repo's own capacity rule the breast top-1 "
+            "changes. What survives is the MAP — within ONE compound on ONE "
+            "section, the RELATIVE exposure between regions. The absolute "
+            "level does not, and a comparison BETWEEN compounds does not."
+        ),
+        "sources": ("results/pk_ranking_robustness.md",
+                    "results/capacity_ranking_robustness.md"),
+        # The literal sentences this version retired, as they were EMITTED.
+        # Not shown to anyone: `tests/test_claim_set.py` parses every Python
+        # source under app/ and tmesim/ and fails if any of these survives as a
+        # live string literal. That is the half of the problem the banner does
+        # not solve -- the banner marks a stored record, and this stops a NEW
+        # one being written. It was needed immediately: when the ranking was
+        # withdrawn at 23e51f6 five displayed copies were corrected and the one
+        # in this module's own `execute_run` was missed, so every run for a day
+        # after the withdrawal wrote the withdrawn sentence into a fresh record.
+        # Comments and docstrings are exempt, because this repo corrects a
+        # stale claim by QUOTING it under a banner rather than deleting it.
+        "retired_text": (
+            "The CROSS-DRUG RANKING is invariant across all three routes and "
+            "is the defensible output",
+        ),
+    },
+)
+
+
+def claim_set_stamp() -> Dict:
+    """The stamp written into a run executing NOW, beside its caveats.
+
+    Deliberately minimal: a version and the date that version was adopted, and
+    nothing that could go stale. It states what the caveats were written
+    against, never what is current — "current" is a fact about the reader's
+    moment, so it is computed on read by :func:`claim_set_status`.
+    """
+    current = CLAIM_SET_LOG[-1]
+    return {"version": CLAIM_SET_VERSION, "adopted": current["adopted"]}
+
+
+def claim_set_status(stamp: Optional[Dict],
+                     caveats: Optional[List[str]] = None) -> Dict:
+    """Read-time verdict on a stored record. Reads it, never edits it.
+
+    ``stamp`` is whatever sits at ``provenance['claim_set']`` in the stored
+    document — ``None`` for every run written before this field existed.
+    ``caveats`` is that record's own caveat list.
+
+    TWO independent findings, because there are two ways a record can put a
+    withdrawn claim in front of a reader and only one of them is about age:
+
+    SUPERSEDED — an ERA finding. The stamp is missing, or lower than
+        :data:`CLAIM_SET_VERSION`. The record was written before the claim set
+        it is being read under. ``changes`` is then every log entry it
+        predates, newest first, so the banner can say WHAT was withdrawn since
+        and not merely that something was. An unstamped record predates all of
+        them, which is exactly what the empty-stamp case should mean.
+
+    CONTRADICTED — a COMPLIANCE finding, and the one an era check cannot make.
+        The record's own caveats contain a sentence that a claim set AT OR
+        BELOW its own stamp retired. That means the build which wrote it did
+        not honour the claim set it stamped, so the stamp is true about what
+        that build DECLARED and false about what it DID.
+
+        This is not hypothetical and it is why the check exists. ``r_00090``
+        in ``app/runs/`` is stamped claim set 1 and carries "The CROSS-DRUG
+        RANKING is invariant across all three routes and is the defensible
+        output", because ``execute_run`` was still emitting that sentence for a
+        day after the ranking was withdrawn. On the era check alone that record
+        comes back CLEAN — the version comparison is exactly the thing being
+        lied to. It is retained deliberately as the specimen; see
+        ``tests/test_claim_set.py``.
+
+        The read-time twin of the source scan in that module: the scan stops a
+        non-compliant build from existing, this marks the records one already
+        wrote. Matching is exact-substring against sentences THIS repo declared
+        retired, so it cannot fire on anything it was not told about.
+
+    Either finding banners. ``changes`` carries FOUR keys and not the whole log
+    entry: ``retired_text`` is the withdrawn sentence itself and is deliberately
+    left behind, because putting a retired claim on the wire inside the very
+    payload that says it is retired is how it ends up back on a screen.
+    """
+    version = None
+    if isinstance(stamp, dict) and isinstance(stamp.get("version"), int):
+        version = int(stamp["version"])
+    superseded = version is None or version < CLAIM_SET_VERSION
+
+    def _fields(entry: Dict) -> Dict:
+        return {k: entry[k] for k in ("version", "adopted", "withdrew",
+                                      "sources")}
+
+    since = [_fields(e) for e in CLAIM_SET_LOG
+             if version is None or e["version"] > version]
+
+    # The compliance half. Only claim sets the record CLAIMS to satisfy are
+    # checked -- a sentence retired by a LATER set is not a contradiction, it
+    # is the age finding above, and reporting it twice would say the record is
+    # broken when it is merely old.
+    text = [str(c) for c in (caveats or [])]
+    honoured = [e for e in CLAIM_SET_LOG
+                if version is not None and e["version"] <= version]
+    contradicts = [_fields(e) for e in honoured
+                   if any(t in c for t in e.get("retired_text") or ()
+                          for c in text)]
+
+    out: Dict = {
+        "version": version,
+        "recorded": version is not None,
+        "current": CLAIM_SET_VERSION,
+        "current_adopted": CLAIM_SET_LOG[-1]["adopted"],
+        "superseded": bool(superseded),
+        "contradicted": bool(contradicts),
+        "changes": list(reversed(since)) if superseded else [],
+        "contradicts": list(reversed(contradicts)),
+        "headline": None,
+        "detail": None,
+        "warning": None,
+    }
+    if contradicts:
+        # Stated FIRST when both hold: "this record disagrees with the claim
+        # set it names" is a stronger and stranger fact than "this record is
+        # old", and a reader who has been told only the second will read the
+        # stamp as a reason to trust the text.
+        out["headline"] = "THIS RECORD CONTRADICTS THE CLAIM SET IT IS STAMPED WITH"
+        out["detail"] = (
+            f"It is stamped claim set {version}, but its caveats below still "
+            "contain a claim that claim set had already withdrawn — so the "
+            "build that produced it was not honouring the claim set it "
+            "stamped. The caveats are reproduced exactly as it wrote them and "
+            "are NOT edited; the stamp is what is unreliable here, not the "
+            "record. Re-run it to obtain a compliant one. What was withdrawn "
+            "is listed below."
+        )
+    elif superseded:
+        out["headline"] = "CAVEATS RECORDED UNDER A SUPERSEDED CLAIM SET"
+        out["detail"] = (
+            "The caveats on this run are reproduced exactly as it wrote them "
+            "and are NOT edited "
+            + ("— it predates the claim-set record entirely, so which claims "
+               "it was written against is not recoverable from the record "
+               "itself. "
+               if version is None else
+               f"— it was written against claim set {version}. ")
+            + f"The current claim set is {CLAIM_SET_VERSION}, adopted "
+            f"{CLAIM_SET_LOG[-1]['adopted']}. What changed since is listed "
+            "below; a claim listed there no longer holds and must not be read "
+            "off this record as current."
+        )
+    if out["headline"]:
+        # One string for any consumer that has nowhere to put two — the API,
+        # a text export, a log line. The UI uses the two halves.
+        out["warning"] = f"{out['headline']}. {out['detail']}"
+    return out
+
 
 #: Terminal statuses — a job in one of these is never re-run.
 TERMINAL = ("done", "failed", "cancelled")
@@ -397,10 +616,21 @@ def execute_run(spec: Dict, ctx: _Ctx,
     # results/cell_state_impact.md §5: on a panel that carries NO hypoxia-response
     # transcript, no state route clears the bar — the default's HYPOXIC band is
     # empty for a bookkeeping reason, the marker route declares hypoxia UNMEASURED,
-    # and the vessel-distance route is a geometric proxy. The honest output of such
-    # a section is a RANKING, a coverage map and a delivery metric; the absolute
-    # level is not earned under ANY route. Derived from the panel's gene list, not
-    # hardcoded to a section id.
+    # and the vessel-distance route is a geometric proxy. Derived from the panel's
+    # gene list, not hardcoded to a section id.
+    #
+    # This caveat used to close by naming the CROSS-DRUG RANKING as invariant
+    # across the routes "and the defensible output". THAT CLAIM IS WITHDRAWN
+    # (claim set 1, 2026-08-21) and this line was the last live emitter of it:
+    # api.py's submit warning, app/web/js/mock.js and report.py's limits were all
+    # corrected at 23e51f6 and this one was missed, so every run executed since
+    # was still writing the withdrawn sentence into a fresh record. It is
+    # REPLACED, not deleted -- the measurement it reports (0.3252 absolute,
+    # 1.77x, across the routes) is unaffected by the withdrawal, and a caveat
+    # that states a limit and then names nothing that survives leaves a reader
+    # with no way to use the run at all. The replacement is the same sentence
+    # api.py's warning and provenance.js's standing limits use, so the number's
+    # caveat and the screen's caveat cannot drift apart.
     support = state_route_support(section)
     if support["genes_known"] and not support["hypoxia_present"]:
         caveats.append(
@@ -409,10 +639,19 @@ def execute_run(spec: Dict, ctx: _Ctx,
             "hypoxia is UNMEASURED here and NO state route clears the bar "
             "(results/cell_state_impact.md §5): kill moves by up to 0.3252 "
             "absolute (1.77x relative) purely with the choice of state route, "
-            "with tissue, drug, transport and RNG held identical. The CROSS-DRUG "
-            "RANKING is invariant across all three routes and is the defensible "
-            "output; kill_fraction and any kill ceiling on this section carry an "
-            "unresolved uncertainty of that size."
+            "with tissue, drug, transport and RNG held identical. WHAT SURVIVES "
+            "IS THE MAP: within this one compound on this one section, the "
+            "RELATIVE exposure between regions, because a per-compound plasma "
+            "factor is an exact linear rescale of the whole field and cancels "
+            "from a ratio between points. The LEVEL does not survive, and "
+            "neither does a comparison against another compound — an earlier "
+            "version of this caveat said the CROSS-DRUG RANKING was invariant "
+            "across the routes and was the defensible output, and that claim "
+            "was measured and WITHDRAWN on 2026-08-21 "
+            "(results/pk_ranking_robustness.md, "
+            "results/capacity_ranking_robustness.md). kill_fraction and any "
+            "kill ceiling on this section carry an unresolved uncertainty of "
+            "the size above."
         )
     if str(state_mode) != "oxygen":
         caveats.append(
@@ -451,6 +690,10 @@ def execute_run(spec: Dict, ctx: _Ctx,
         "ic50_source": None,
         "sensitivity_note": None,
         "caveats": caveats,
+        # The version of the claim set `caveats` above was written against.
+        # Beside them on purpose: whatever lifts the caveats out of this record
+        # carries the one field that says how old they are. See CLAIM_SET_LOG.
+        "claim_set": claim_set_stamp(),
         # --- additive, and mandatory per the backend brief ---------------- #
         "sensitivity_mode": sens_mode if drug_name else None,
         "sensitivity_upper_bound": None,
@@ -746,8 +989,14 @@ def execute_run(spec: Dict, ctx: _Ctx,
     # (at the strengths app/server/reach.py states and cites). It reuses the
     # distance map above AND the perivascular mean compute_all just computed, so
     # the reach number and the penetration length cannot drift apart.
+    # convection is passed EXPLICITLY rather than left to compute_reach's
+    # default. It cannot be read off sim_result, and the default agreeing with
+    # PDE_CONVECTION today is a coincidence that a future edit to either
+    # constant would silently end -- with no error, just a reach map describing
+    # a transport regime the run did not use.
     reach = compute_reach(micro, res, distance_um=dist,
-                          penetration=dm["penetration_length"])
+                          penetration=dm["penetration_length"],
+                          drug=dp, convection=PDE_CONVECTION)
     if reach["null_reason"]:
         ctx.log(f"reach: undefined — {reach['null_reason']}")
     else:
@@ -1152,7 +1401,18 @@ class Job:
             "log_tail": self.log_tail(log_lines),
         }
 
-    def result_view(self) -> Dict:
+    def result_view(self, annotate: bool = True) -> Dict:
+        """The run as a client reads it.
+
+        ``annotate=False`` is the view that goes to DISK (:meth:`
+        JobManager._persist`). The difference is exactly the fields below that
+        are facts about the READER'S moment rather than about the run — the
+        backfilled delivery law, and the claim-set verdict, both of which
+        compare the record against what this build ships TODAY. A stored
+        ``"superseded": false`` would be true when written and false forever
+        after, which is the failure this whole mechanism exists to catch; so it
+        is never written. The record on disk stays what the run wrote.
+        """
         out = {
             "run_id": self.run_id,
             "spec": self.spec,
@@ -1181,7 +1441,7 @@ class Job:
         # not RECORDED, and the difference is stated rather than smoothed over.
         # Still a runtime read of PDEConfig; nothing is hard-coded.
         prov = out.get("provenance")
-        if (isinstance(prov, dict) and not prov.get("delivery_law")
+        if (annotate and isinstance(prov, dict) and not prov.get("delivery_law")
                 and (self.spec or {}).get("drug")):
             law = dict(delivery_law(prov.get("pde_transvascular_exchange")))
             law["recorded"] = False
@@ -1193,6 +1453,18 @@ class Job:
             prov = dict(prov)
             prov["delivery_law"] = law
             prov["caveats"] = [law["caveat"]] + list(prov.get("caveats") or [])
+            out["provenance"] = prov
+        # --- claim-set verdict, computed on EVERY read ---------------------- #
+        # Note what this does NOT do: it does not touch `prov['caveats']`. The
+        # stored caveats are served whole and unedited, including the withdrawn
+        # sentences, because a reader is entitled to see what the run actually
+        # said; the verdict sits BESIDE them and says how to read them. Marking
+        # them is honest, and deleting them would not be.
+        prov = out.get("provenance")
+        if annotate and isinstance(prov, dict):
+            prov = dict(prov)
+            prov["claim_set"] = claim_set_status(prov.get("claim_set"),
+                                                 prov.get("caveats"))
             out["provenance"] = prov
         return out
 
@@ -1303,7 +1575,7 @@ class JobManager:
                 fh.write(blob)
             own_only(tmp, PRIVATE_FILE_MODE)
             os.replace(tmp, os.path.join(d, name + ".bin"))
-        doc = job.result_view()
+        doc = job.result_view(annotate=False)
         if status is not None:
             doc["status"] = status
             doc["stage"] = status

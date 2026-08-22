@@ -598,6 +598,38 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--fg-3); }
 .caveat.standing.sev-2 { border-left-color: var(--warn); background: var(--warn-bg); }
 .caveat.standing.sev-2::before { content: "\25A0"; color: var(--warn); }
 
+/* --- superseded claim set ----------------------------------------------
+   The banner over a run whose caveats were written against a claim set that
+   has since been superseded (app/server/jobs.py::claim_set_status). It takes
+   `.caveat.crit` unchanged — it IS a hard stop, and inventing a fifth severity
+   for it would say it is a different KIND of warning than the ones below it,
+   which is the opposite of true. What it adds is the change list: one block
+   per withdrawal the record predates, so the banner says what stopped being
+   true and not merely that something did. */
+.caveat.crit.cs-superseded .cv-key { color: var(--crit); }
+.cs-change {
+  margin-top: var(--sp-4);
+  padding-left: var(--sp-4);
+  border-left: 1px solid var(--crit);
+}
+.cs-change-hd {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--crit);
+  /* tokens.css: "for uppercase micro-labels only" — WITHDRAWN <date> is one. */
+  letter-spacing: var(--tr-wide);
+  margin-bottom: var(--sp-1);
+}
+.cs-change-hd b { font-weight: 700; }
+.cs-change-hd .dim { color: var(--fg-2); }
+/* The era label above the run's OWN caveats. `.hr-lbl` already sets the rule
+   and the type; this only recolours it, because the block it labels is not a
+   neutral subdivision of the list — it is the historical half of it. */
+.hr-lbl.cs-era { color: var(--crit); }
+.hr-lbl.cs-era::after { background: var(--crit); opacity: 0.35; }
+/* The one-word marker in the index strip and in the section header. */
+.cv-index .stale, .cv-tally .stale { color: var(--crit); font-weight: 700; }
+
 /* The tally in the Caveats section header. It is the one thing in the panel
    that answers "how bad is this run" without reading three hundred words, so
    it sits in the header where the eye already is. */

@@ -137,12 +137,98 @@
  * of the swept range, which makes that range look LESS transferable to the
  * human panels the row is about. See results/uptake_proxy_double_count.md.
  *
+ * THE PRODUCT NO LONGER RANKS COMPOUNDS, AND THE PROHIBITION IS NOW ABSOLUTE
+ * RATHER THAN CONDITIONAL. As of 23e51f6 (2026-08-22) ranking is gone from the
+ * CLI, the API, the Studio, the protocol language and the reports — the FEATURE
+ * was removed, not just the claim, on the reasoning that as long as the product
+ * printed a ranked list that is what people would use, and that is the output
+ * that was wrong. Guardrail 1 below used to police HOW an ordering could be
+ * described. There is now no permitted description. No ordering, ranked list,
+ * shortlist, "top pick", "which compound wins", pairwise call or cross-compound
+ * comparison may appear on this page in any form, hedged or not, positive or
+ * negative — including as a limit. A ledger row registering that an ordering is
+ * not robust is not a disclosure once the ordering does not exist; it is a
+ * fossil, and it invites a reader to believe the feature is still there and
+ * merely caveated. Guardrail 1's body is kept below UNCHANGED as the record of
+ * why the claim died, and it is now history rather than an editing rule: read
+ * it before touching the capacity row, do not restore any sentence from it.
+ *
+ * WHAT REPLACED IT, AND WHY IT IS A DIFFERENT KIND OF CLAIM. One compound, one
+ * real section, one question: is the failure a DELIVERY problem or a POTENCY
+ * problem, answered per cell. On the flagship specimen the per-cell attribution
+ * returns 99.8 % DOSE-limited (results/synthesised_positions.md sec. 5.2), and
+ * the measured falloff decays only 1.00 -> 0.50 over 145 um at dx = 12 um (same
+ * sentence, same file) — the drug gets almost everywhere and is almost
+ * everywhere sub-therapeutic. The reason this is worth the page's lead position
+ * is not that it is impressive; it is that it is REFUTABLE. "This compound
+ * reached the tissue and was still short of IC50" is checkable against a bench
+ * measurement on the same section. "Cisplatin outranks temozolomide" was only
+ * ever checkable against an outcome nobody has. The page's honest through-line
+ * is therefore not "we publish what breaks" on its own — that is the support,
+ * not the thesis. It is that the claim was made SMALL ENOUGH TO CHECK, and the
+ * four narrowings that got it there are the evidence that it will be checked.
+ *
+ * A MECHANISM VERDICT MUST NAME THE LAW IT WAS PRODUCED UNDER. This is the
+ * newest guardrail and it is the one that can INVERT the page's lead rather
+ * than merely bound it. Every exposure map and every per-cell verdict this
+ * product emits is produced under `PDEConfig.transvascular_exchange = False`,
+ * the one-way vascular leak `S = PS*Cp`, which has no path from interstitium
+ * back to blood and therefore a steady state unbounded above the plasma level —
+ * something passive delivery cannot do. Against human microdialysis it misses
+ * in OPPOSITE directions (5-fluorouracil 12.8x too high, methotrexate 10.5x too
+ * low; results/breast_kp_validation.md), so no single constant absorbs both,
+ * and correcting it is not a rescale: it re-weights delivery by permeability
+ * and changes the SHAPE of the field, which is the one thing a within-map ratio
+ * does not cancel (results/transvascular_exchange_revalidation.md sec. 4.1).
+ * app/server/delivery_law.py exists to carry that sentence with every run, and
+ * the flagship run's own provenance block says the map "MUST NOT be read as
+ * law-independent". The page's lead IS a mechanism verdict, so the page owes
+ * the same disclosure the product already makes. It is on beat 06.
+ *
+ * A DELIVERY VERDICT HAS NEVER BEEN DEMONSTRATED NON-DEGENERATELY, AND THE
+ * PAGE MUST NOT IMPLY THREE WORKING SETTINGS. It is tempting to say the
+ * discriminator has three settings — dose, delivery, resistance — because all
+ * three have been produced. Two of them were produced by the model. The third
+ * was not: the only DELIVERY verdict obtained comes from a compound carrying
+ * `bbb_penetrance = 0`, so the source term is identically zero by
+ * parameterisation and the model is correctly propagating something it was
+ * TOLD, not discovering a limit (results/synthesised_positions.md sec. 5.2,
+ * and the "THIS IS AN INPUT, NOT A FINDING" branch in app/web/js/ui/reach.js).
+ * None of the four measured-position sections is known to be poorly perfused.
+ * Say two demonstrated settings and one the product can currently only be
+ * handed — the qualified version is the one a sceptical reader trusts, and the
+ * unqualified version is refuted by a file in this repo.
+ *
+ * A NUMBER THE PRODUCT COMPUTED ONCE IS NOT A CITATION. Every figure on this
+ * page must trace to a results/ file, and "the panel printed it and someone
+ * repeated it" does not qualify — it is exactly how a figure drifts a notch
+ * more generous than its source. Three figures were proposed for this page and
+ * REFUSED on that ground alone, all of them real live measurements: the median
+ * tumour cell's exposure shortfall (`mechanism.exposure_shortfall_fold`, ~3.3x
+ * on the flagship), the falloff shape's movement under a capacity term (0.3772
+ * absolute at R = 39, penetration length collapsing 279.7 -> 76.7 um), and the
+ * bit-identity of the map at `bbb_penetrance` 0.1 and 1.0. The first was left
+ * out entirely; the other two ship as QUALITATIVE statements, which lose
+ * nothing, because "the map cannot see the barrier" and "the shape moves where
+ * the ladder does not" are the whole content. If a results/ file later carries
+ * them, the numbers may be added — not before.
+ *
+ * results/mechanism_attribution.md IS STALE AND MUST NOT BE QUOTED FOR NUMBERS.
+ * It was last regenerated on 2026-08-08, before the area-conserving vessel
+ * source and before two-route transport went on, and both move exposure for
+ * every drug. Its sec. 3.2 reports the flagship section as 97.10 % DELIVERY-
+ * limited where the current engine reports 99.8 % DOSE-limited — opposite
+ * conclusions about what limits the same compound on the same section. The
+ * METHOD it describes (the categories, the bit-exact reconciliation, the
+ * precedence rule) is unaffected and still citable. The measurements are not.
+ *
  * Two guardrails narrowed by measurement, both of which read as weaker than
  * the obvious marketing line and must not drift back to it:
  *
- * 1. RANKING IS NOT UNCONDITIONALLY INVARIANT, AND AS OF 2026-08-21 IT IS NOT
- *    ROBUST EITHER. This guardrail has been narrowed twice and the copy must
- *    not drift back to EITHER of the wider versions.
+ * 1. HISTORY, NOT A RULE, AS OF 2026-08-22 — SEE THE ABSOLUTE PROHIBITION
+ *    ABOVE. RANKING IS NOT UNCONDITIONALLY INVARIANT, AND AS OF 2026-08-21 IT
+ *    IS NOT ROBUST EITHER. This guardrail has been narrowed twice and the copy
+ *    must not drift back to EITHER of the wider versions.
  *    WAS (still true, still say it): ordering is invariant to common-mode
  *    perturbations — cell-state route, oxygen route, alpha, grid — and NOT to
  *    drug-specific transport parameters; correcting the transvascular delivery
@@ -432,14 +518,34 @@ export const SECTION_COPY: readonly SectionCopy[] = [
      *
      * The second half of the sentence is not a hedge and must travel with the
      * first. The same term that cannot touch a converged field DOES move what
-     * a finite exposure window accumulates, and the compound ordering is built
-     * on exactly that finite window — which is why beat 05's first ledger row
-     * now reads NOT ROBUST. Stating the invariance without the exception would
-     * hand a reader the sentence guardrail 1 forbids ("the levels are off but
-     * the ordering holds"), assembled out of two beats neither of which said
-     * it. Do not split these two clauses across beats.
+     * a finite exposure window accumulates, and the product's window is six
+     * hours — so every number this page quotes is read from the regime where
+     * the invariance does NOT hold. Stating the invariance without the
+     * exception would hand a reader the sentence the guardrails forbid ("the
+     * levels are off but the shape holds"), assembled out of two beats neither
+     * of which said it. Do not split these two clauses across beats.
+     *
+     * THE CLOSING CLAUSE WAS RE-POINTED ON 2026-08-22 AND THE OLD WORDING MUST
+     * NOT COME BACK. It read "which is where the compound ordering in 05 sits".
+     * The product no longer produces an ordering, so that clause named a thing
+     * a reader could not find and implied the feature still existed; and beat
+     * 05's first row no longer reads NOT ROBUST because it is no longer about
+     * ranking. The exception itself is unchanged and is stated at the same
+     * strength — what changed is which output it is pointed at.
+     *
+     * THE REPLACEMENT DELIBERATELY NAMES NO OUTPUT, and that is not vagueness.
+     * A cutover of the reach map to a CONVERGED STEADY STATE was in flight on
+     * 2026-08-22 ("the reach this geometry permits" rather than "the reach a
+     * 6 h exposure achieved"), and if it lands then the map moves INTO the
+     * regime where the capacity invariance is exact and out of the regime this
+     * clause describes. A clause that had said "which is the window every
+     * number here is read from" would have been silently falsified by that
+     * change. "The one regime the invariance does not cover" is true either
+     * way. When the cutover is confirmed, this beat and beat 05's capacity row
+     * may BOTH be strengthened — say which outputs are converged and which are
+     * not — and neither should be until then.
      */
-    body: "Convection, diffusion and reaction, solved on that geometry. Interstitial pressure builds where vessels leak and drainage fails and pushes back against the drug coming in; oxygen and hypoxia solve on the same grid, and response follows Hill kinetics from the concentration each cell sees. What that buys is the shape of the field, not its magnitude — and the difference is measured, not asserted. One piece of it is exact rather than argued: how much drug the tissue can store is a number the engine assumes rather than measures, and it cannot move a converged field at all — checked to one part in a billion. It does move what a finite exposure window accumulates, which is where the compound ordering in 05 sits.",
+    body: "Convection, diffusion and reaction, solved on that geometry. Interstitial pressure builds where vessels leak and drainage fails and pushes back against the drug coming in; oxygen and hypoxia solve on the same grid, and response follows Hill kinetics from the concentration each cell sees. What that buys is the shape of the field, not its magnitude — and the difference is measured, not asserted. One piece of it is exact rather than argued: how much drug the tissue can store is a number the engine assumes rather than measures, and it cannot move a converged field at all — checked to one part in a billion. It does move what a finite exposure window accumulates — the one regime the invariance does not cover.",
     align: "left",
     /*
      * This beat used to be a four-item feature list with no number in it, and
@@ -525,15 +631,45 @@ export const SECTION_COPY: readonly SectionCopy[] = [
      * later. If a future edit wants a number in this beat it must bring the
      * whole interval, and this beat does not have the room for it (below).
      *
-     * ON LENGTH, MEASURED. This beat is vertically CENTRED, so every line it
-     * gains pushes its kicker up half a line into the fixed header — at 390x844
-     * the longer first draft of this clause collided with the CODON mark by
-     * 16px across four scroll positions. The ceiling here is about 16 lines of
-     * body (~770 characters); the version below is inside it with the
-     * correction intact. If this beat must say more, the layout gives it the
-     * room — do not buy the room by dropping the input condition.
+     * ON LENGTH, MEASURED, AND THE CEILING IS TIGHTER THAN THE OLD NOTE SAID.
+     * This beat is vertically CENTRED, so every line it gains pushes its kicker
+     * up half a line into the fixed header. The previous note here put the
+     * ceiling at "about 16 lines of body (~770 characters)"; re-measured
+     * against a production `next start` build at 390x844 over 240 scroll
+     * positions, the beat's worst-case top across the fade is 65.5px and the
+     * site header's bottom edge is 70.8px, so the collision is ALREADY at zero
+     * margin at the previous body length of 721 characters. Treat 721 as the
+     * ceiling, not 770. The body below is 737 and was measured not to add a
+     * wrapped line at either viewport; anything materially longer will.
+     *
+     * WHAT THE 2026-08-22 REWRITE DID, AND WHAT IT REFUSED TO PAY WITH. The
+     * closing sentence used to be the SETUP with no payoff — "a molecule that
+     * never arrives and one that arrives too weak look identical in a survival
+     * curve, and need opposite fixes" — which stated why the discrimination
+     * matters and never said what it found. It now carries the finding. The
+     * room came from the compilation prose in the first two sentences
+     * ("paracellular and transcellular" as a gloss on "two routes"; "now";
+     * "Even so"), NOT from either protected clause: the input condition and
+     * the quarter-of-the-spread limit are both still here, in the same
+     * sentences as the claims they bound.
+     *
+     * THE LAST TWO SENTENCES ARE THE PAGE'S THESIS AND THEY TRAVEL TOGETHER.
+     * The first is a positive, falsifiable result; the second is what makes it
+     * different in kind from everything this page has retracted. Do not keep
+     * the finding and drop the refutability clause — without it the sentence is
+     * just a smaller claim, and the point is that it is a CHECKABLE one.
+     *
+     * WHAT THE VERDICT SENTENCE OWES, AND WHERE THE DEBT IS PAID. "The drug
+     * arrives almost everywhere" is the model's own reading and is the exact
+     * direction in which the engine is measured to be WRONG — its one
+     * out-of-sample perivascular gradient is ~14x too shallow, which flatters
+     * reach. "Under-dosed" also reads as "raise the dose", which the product
+     * explicitly warns against because most of those cells are resistance-
+     * flagged as well. Neither caveat fits in this beat (see the ceiling
+     * above), so both are ledger rows on beat 06 and both name this sentence.
+     * If this beat is ever given room, those two are what it should buy first.
      */
-    body: "A compound compiles from its own structure: two routes through the cell layer, paracellular and transcellular, fed by lipophilicity and hydrogen-bond donors as well as mass, with potency from measured GDSC2 screens. Structure reaches transport now — scored unfitted against 68 measured compounds, but on descriptor columns supplied by that same measurement; the ones the engine derives from a structure have never been scored. Even so it recovers only about a quarter of the measured spread, so close analogues are under-separated rather than resolved. Each run then decomposes survival cell by cell: a molecule that never arrives and one that arrives too weak look identical in a survival curve, and need opposite fixes.",
+    body: "A compound compiles from its own structure: two routes through the cell layer, fed by lipophilicity and hydrogen-bond donors as well as mass, potency from measured GDSC2 screens. Structure reaches transport — scored unfitted on 68 measured compounds, but on descriptor columns supplied by that measurement, and the engine's own path has never been scored. It recovers about a quarter of the measured spread, so close analogues are under-separated, not resolved. Each run then decomposes survival cell by cell. On the flagship section 99.8% of surviving tumour cells are under-dosed, not unreached: the drug arrives almost everywhere and is almost everywhere too weak. A bench assay on that section could refute it; a ranking never could.",
     align: "right",
   },
   {
@@ -625,6 +761,60 @@ export const SECTION_COPY: readonly SectionCopy[] = [
       caption: "Carried by every run · none of this is buried",
       rows: [
         /*
+         * 2026-08-22 — THIS ROW IS NO LONGER ABOUT RANKING, BECAUSE THE PRODUCT
+         * NO LONGER RANKS. Everything below this block is the history of the
+         * row as a RANKING row and is kept so the retracted claim cannot drift
+         * back. What follows is why the row changed and what it may not lose.
+         *
+         * WHY THE RANKING FRAMING HAD TO GO RATHER THAN BE SOFTENED. The row
+         * read "Ranking on one tissue · FULL ORDER NOT ROBUST". After 23e51f6
+         * there is no ordering in the CLI, the API, the Studio, the protocol
+         * language or the reports. A ledger row registering that a withdrawn
+         * feature's output is not robust is not a disclosure — it is the
+         * strongest possible hint that the feature is still shipping with a
+         * caveat on it, which is precisely the reading the removal exists to
+         * prevent. Retiring a caveat along with the claim it qualifies is not
+         * the same edit as shrinking a caveat, and this is the only place on
+         * the page where that distinction was applied.
+         *
+         * WHAT WAS RETIRED, EXACTLY, AND WHAT WAS KEPT. Retired: the ordering
+         * breakpoints (36.3 on glioblastoma, 5.28 on breast, both below the
+         * best constant of 39), the invariance list, and the delivery-law
+         * top-pick clause — all four are statements ABOUT AN ORDERING and all
+         * four are preserved verbatim in guardrail 1 at the head of this file,
+         * which is now the record rather than an editing rule. KEPT, because it
+         * is a live limit on every number the engine produces including the
+         * map: the engine assumes a tissue capacity of 1.0 for every compound
+         * while measured rat brain-slice values run 3.2 to 4184 (n = 33), and
+         * that range is rat brain slices applied to human tissue, which is
+         * itself an assumption. That provenance clause cost a line to buy on
+         * 2026-08-21 and is not being handed back.
+         *
+         * WHAT THE ROW GAINED, AT NO COST IN LINES. The exact capacity
+         * invariance and its exact exception. A converged gradient cannot move
+         * with the capacity term at all — R divides diffusivity, velocity,
+         * source and sink alike, so C_ss = S/k is fixed, verified to 1e-9
+         * (results/capacity_ranking_robustness.md sec. 2b) — but the product
+         * runs a SIX-HOUR window, which has not converged, and the falloff
+         * shape does move inside it. That contrast is the disclosure: two
+         * adjacent figures of different robustness cannot be fixed by
+         * per-figure caveats, which is why the row states the invariance and
+         * its failure in one breath rather than in two rows. It is stated
+         * WITHOUT the measured movement (0.3772 absolute at R = 39, penetration
+         * length collapsing 279.7 -> 76.7 um) because those figures live only
+         * in app/server/reach.py and app/web/js/ui/reach.js and no results/
+         * file carries them yet — see the citation guardrail at the head of
+         * this file. The qualitative statement loses nothing.
+         *
+         * THE ROW IS 45 CHARACTERS SHORTER THAN THE ONE IT REPLACES. That is
+         * not licence to spend the margin: at 390x844 beat 05's worst-case
+         * bottom edge was measured at 832.9 of 844 before this pass, i.e. 11.1px
+         * of headroom, which is under one ledger detail line. The four
+         * disclosures this pass owed the page did not fit here and are on beat
+         * 06 for that reason, each naming what it limits.
+         *
+         * ---- HISTORY BELOW THIS LINE ----
+         *
          * THIS ROW READ "CONDITIONAL" UNTIL 2026-08-21 AND THE UPGRADE IS THE
          * POINT, SO IT IS RECORDED HERE. "CONDITIONAL" was true and was
          * understated in one specific way: it named four perturbations the
@@ -687,10 +877,10 @@ export const SECTION_COPY: readonly SectionCopy[] = [
          * why none of this licenses adding a capacity term to the engine.
          */
         {
-          label: "Ranking on one tissue",
-          state: "FULL ORDER NOT ROBUST",
+          label: "Tissue capacity",
+          state: "ASSUMED 1.0",
           detail:
-            "Tissue capacity is 1.0 for every compound; measured rat brain-slice values run 3.2 to 4184 (n = 33), assumed to carry to human tissue. One uniform value breaks the full order at 36.3 on glioblastoma and 5.28 on breast, both below the best constant of 39. Invariant to cell-state route, oxygen route, alpha and grid; not to drug-specific transport, and correcting the delivery law moves the glioblastoma top pick.",
+            "Every compound is given a capacity of 1.0; measured rat brain-slice values run 3.2 to 4184 (n = 33), assumed to carry to human tissue. A converged gradient cannot move with it — checked to one part in a billion — but anything read off a finite exposure window can, and the falloff shape is not protected the way the equilibrium quantities are.",
         },
         {
           label: "Close analogues",
@@ -736,16 +926,102 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     // it claims only verified properties of the SOFTWARE. See the data
     // provenance guardrail at the head of this file before editing this line.
     //
-    // "GET BACK A RANKING" WAS RE-READ AGAINST GUARDRAIL 1 ON 2026-08-21 AND
-    // DELIBERATELY LEFT STANDING. It describes what the pipeline emits, which
-    // is unchanged; it does not say the ordering is robust, and the clause that
-    // follows attaches the list — now headed by FULL ORDER NOT ROBUST — to it.
-    // The line to watch is "the same list, on your tissue, with your numbers in
-    // it": that is a promise the limits TRAVEL with the output, so it is the
-    // sentence that makes this beat honest rather than the one that needs
-    // fixing. Do not promote the ranking to "the output to trust" here to
-    // recover the phrase beat 05 gave up.
-    body: "Codon runs where your tissue already is: the solve is a single process on your own machine, and it sends no tissue or compound data anywhere. De-identified tissue only. Bring a section and a candidate series, and get back a ranking, a per-cell mechanism attribution of what killed each compound, and the list above attached to both — the same list, on your tissue, with your numbers in it.",
+    /*
+     * "GET BACK A RANKING" WAS LEFT STANDING ON 2026-08-21 AND IS GONE AS OF
+     * 2026-08-22, BECAUSE THE REASON IT WAS LEFT STANDING NO LONGER HOLDS. The
+     * note that used to sit here argued the phrase "describes what the pipeline
+     * emits, which is unchanged". As of 23e51f6 the pipeline does not emit it:
+     * ranking is out of the CLI, the API, the Studio, the protocol language and
+     * the reports. The sentence had become a promise of a feature that is not
+     * there, which is a worse defect than the overclaim it was cleared of. See
+     * the absolute prohibition at the head of this file.
+     *
+     * WHAT REPLACES IT IS THE PRODUCT'S ACTUAL OUTPUT, IN ITS ACTUAL ORDER: the
+     * per-cell verdict first, and the exposure map second and explicitly AS THE
+     * EVIDENCE FOR IT rather than as the thing being sold. That ordering is not
+     * a stylistic choice — it is what app/web/js/ui/reach.js puts on the panel
+     * and why, and a page that inverted it would sell the map and bury the
+     * finding.
+     *
+     * "The same list, on your tissue, with your numbers in it" survives in
+     * substance and is still the sentence that makes this beat honest: it is a
+     * promise that the limits TRAVEL with the output. As of this pass it is
+     * more than a promise here, because the limits are now literally below it.
+     */
+    body: "Codon runs where your tissue already is: the solve is a single process on your own machine, and it sends no tissue or compound data anywhere. De-identified tissue only. Bring a section and a compound, and get back a per-cell verdict — delivery or potency — the map that is the evidence for it, and the limits below attached to both, on your tissue, with your numbers in them.",
     align: "center",
+    /*
+     * WHY A SECOND LEDGER EXISTS, AND WHY IT IS HERE RATHER THAN ON BEAT 05.
+     * NOT because this is a good home for a limit. A limit belongs next to the
+     * thing it limits, and beat 05 is the limits beat — this is the hand-off.
+     * It is here because beat 05 is physically full and the alternative was to
+     * ship the page softer than the product, which is the one thing that is not
+     * allowed.
+     *
+     * THE MEASUREMENT, so that a future pass does not re-litigate it. Against a
+     * production `next start` build at 390x844, 240 scroll positions, worst
+     * case over every opacity: beat 05's bottom edge is 832.9px of 844. That is
+     * 11.1px of headroom and a ledger detail line is 13.83px, so beat 05 could
+     * not take ONE new row, let alone four. Nothing on beat 05 was compressed
+     * to make room and nothing was bought out of an existing caveat. The one
+     * row that changed there changed because its subject was withdrawn, and it
+     * came out 45 characters SHORTER, which was left as margin.
+     *
+     * EVERY ROW BELOW NAMES WHAT IT LIMITS, in its own first clause. That is
+     * the condition on parking a limit away from its claim: a reader must be
+     * able to connect it back without scrolling up to find out what it is
+     * about. Rows that could not satisfy that condition would not belong here.
+     *
+     * THE ORDER IS BY HOW BADLY A READER IS MISLED WITHOUT THE ROW, not by
+     * topic. The delivery law is first because it is the only limit on this
+     * page that can INVERT the verdict rather than bound it — a different
+     * source term and the answer changes, not just its error bar. The second
+     * and third rows are the two caveats beat 03's own sentence created and
+     * could not afford to carry; they are here in preference to the barrier row
+     * for that reason, because a caveat on a sentence this page states outranks
+     * a general property of the map.
+     *
+     * WHAT DID NOT FIT, RECORDED AS A KNOWN OMISSION RATHER THAN AN OVERSIGHT.
+     * The falloff SHAPE's measured movement under a capacity term is not a row
+     * anywhere; it is folded into beat 05's "Tissue capacity" row as the
+     * qualitative statement that the shape moves inside a six-hour window. It
+     * is fully disclosed in the app directly beside the figure it bounds, which
+     * is the right place for it. If this beat is ever given more room, the next
+     * thing it should buy is the same "what the map cannot see" row split into
+     * the two labelled quantities the commit message calls for — how much drug
+     * crosses the wall, and where it goes once in — rather than one map and a
+     * caveat.
+     *
+     * NO NUMBER BELOW IS QUOTED FROM A RUN. Every figure traces to a results/
+     * file: 12.8x / 10.5x to results/breast_kp_validation.md, ~14x and the
+     * direction of the error to results/kyle2004_penetration.md sec. 0 item 3
+     * (whose own words are "the model makes the drug look like it penetrates
+     * better than it does"), and 34 of 38 to results/synthesised_positions.md
+     * sec. 5. The barrier row and the shape statement are deliberately
+     * NUMBERLESS — see the citation guardrail at the head of this file.
+     */
+    ledger: {
+      caption: "What the answer above rests on",
+      rows: [
+        {
+          label: "The verdict's delivery law",
+          state: "CAN INVERT IT",
+          detail:
+            "The verdict and the map come from a one-way vascular leak with no path from tissue back to blood. It misses human microdialysis in opposite directions — 12.8× high on one drug, 10.5× low on another — so no constant fixes both, and correcting it moves the field's shape, not its scale.",
+        },
+        {
+          label: "“Arrives almost everywhere”",
+          state: "14× TOO SHALLOW",
+          detail:
+            "The one perivascular gradient this engine predicts out of sample is about 14× shallower than measured, and the error flatters the drug: a shallow map under-reports how much tumour goes untreated.",
+        },
+        {
+          label: "“Under-dosed”",
+          state: "NOT “RAISE THE DOSE”",
+          detail:
+            "Most of those cells are flagged resistant too, so more drug alone would not have killed them. And the model has never reached a delivery verdict on its own: the one it produced came from a compound whose barrier term is set to zero — an input, not a discovery.",
+        },
+      ],
+    },
   },
 ] as const;

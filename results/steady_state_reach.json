@@ -1,0 +1,333 @@
+{
+ "alpha": 22.223477711172563,
+ "stage": "capacity_convection",
+ "window_s": 21600.0,
+ "flagship": {
+  "dx_um": 12.0,
+  "repair": 2
+ },
+ "spread": {
+  "rows": [
+   {
+    "config": "dx12_repair2",
+    "dx_um": 12.0,
+    "repair": 2,
+    "shipped": true,
+    "drug": "temozolomide",
+    "steady_p90_over_p10": 2.0787283365724125,
+    "finite_p90_over_p10": 2.1106584343146793,
+    "n_tumor": 23812,
+    "steady_s": 3.371422290802002,
+    "finite_s": 191.1246931552887
+   },
+   {
+    "config": "dx12_repair2",
+    "dx_um": 12.0,
+    "repair": 2,
+    "shipped": true,
+    "drug": "doxorubicin",
+    "steady_p90_over_p10": 3.9267494724265877,
+    "finite_p90_over_p10": 3.942472241633886,
+    "n_tumor": 23812,
+    "steady_s": 4.0223329067230225,
+    "finite_s": 182.08974194526672
+   },
+   {
+    "config": "dx12_native",
+    "dx_um": 12.0,
+    "repair": 0,
+    "shipped": false,
+    "drug": "temozolomide",
+    "steady_p90_over_p10": 1.964305190916079,
+    "finite_p90_over_p10": 1.9944090080526955,
+    "n_tumor": 23812,
+    "steady_s": 2.6332900524139404,
+    "finite_s": 150.62469720840454
+   },
+   {
+    "config": "dx12_native",
+    "dx_um": 12.0,
+    "repair": 0,
+    "shipped": false,
+    "drug": "doxorubicin",
+    "steady_p90_over_p10": 3.7801313168898267,
+    "finite_p90_over_p10": 3.7965624962498574,
+    "n_tumor": 23812,
+    "steady_s": 2.425745964050293,
+    "finite_s": 147.1261601448059
+   },
+   {
+    "config": "dx16_repair2",
+    "dx_um": 16.0,
+    "repair": 2,
+    "shipped": false,
+    "drug": "temozolomide",
+    "steady_p90_over_p10": 2.1055891678902787,
+    "finite_p90_over_p10": 2.1335728146631476,
+    "n_tumor": 23812,
+    "steady_s": 1.3851730823516846,
+    "finite_s": 89.39499688148499
+   },
+   {
+    "config": "dx16_repair2",
+    "dx_um": 16.0,
+    "repair": 2,
+    "shipped": false,
+    "drug": "doxorubicin",
+    "steady_p90_over_p10": 3.9617491462420706,
+    "finite_p90_over_p10": 3.9774580050411528,
+    "n_tumor": 23812,
+    "steady_s": 1.4442148208618164,
+    "finite_s": 88.17735028266907
+   },
+   {
+    "config": "dx20_native",
+    "dx_um": 20.0,
+    "repair": 0,
+    "shipped": false,
+    "drug": "temozolomide",
+    "steady_p90_over_p10": 1.9560165036440746,
+    "finite_p90_over_p10": 1.9852031989261278,
+    "n_tumor": 23812,
+    "steady_s": 0.6113958358764648,
+    "finite_s": 47.296135902404785
+   },
+   {
+    "config": "dx20_native",
+    "dx_um": 20.0,
+    "repair": 0,
+    "shipped": false,
+    "drug": "doxorubicin",
+    "steady_p90_over_p10": 3.7673827969618507,
+    "finite_p90_over_p10": 3.7775804938475073,
+    "n_tumor": 23812,
+    "steady_s": 0.5924181938171387,
+    "finite_s": 44.549877882003784
+   },
+   {
+    "config": "dx30_native",
+    "dx_um": 30.0,
+    "repair": 0,
+    "shipped": false,
+    "drug": "temozolomide",
+    "steady_p90_over_p10": 1.9651938456335585,
+    "finite_p90_over_p10": 1.9935720609199155,
+    "n_tumor": 23812,
+    "steady_s": 0.19556903839111328,
+    "finite_s": 17.12522602081299
+   },
+   {
+    "config": "dx30_native",
+    "dx_um": 30.0,
+    "repair": 0,
+    "shipped": false,
+    "drug": "doxorubicin",
+    "steady_p90_over_p10": 3.811904601509818,
+    "finite_p90_over_p10": 3.8255118104067547,
+    "n_tumor": 23812,
+    "steady_s": 0.1981351375579834,
+    "finite_s": 13.996488094329834
+   }
+  ],
+  "steady_p90_over_p10": {
+   "spans": {
+    "temozolomide": {
+     "min": 1.9560165036440746,
+     "max": 2.1055891678902787,
+     "n": 5,
+     "shipped": 2.0787283365724125
+    },
+    "doxorubicin": {
+     "min": 3.7673827969618507,
+     "max": 3.9617491462420706,
+     "n": 5,
+     "shipped": 3.9267494724265877
+    }
+   },
+   "disjoint": true,
+   "gap": 1.661793629071572,
+   "worst_case_ratio": 1.789229757833826,
+   "shipped_ratio": 1.8890152230768897
+  },
+  "finite_p90_over_p10": {
+   "spans": {
+    "temozolomide": {
+     "min": 1.9852031989261278,
+     "max": 2.1335728146631476,
+     "n": 5,
+     "shipped": 2.1106584343146793
+    },
+    "doxorubicin": {
+     "min": 3.7775804938475073,
+     "max": 3.9774580050411528,
+     "n": 5,
+     "shipped": 3.942472241633886
+    }
+   },
+   "disjoint": true,
+   "gap": 1.6440076791843596,
+   "worst_case_ratio": 1.7705421009706288,
+   "shipped_ratio": 1.8678873746400317
+  }
+ },
+ "elapsed_s": 55.47083592414856,
+ "stages_run": [
+  "capacity_convection",
+  "pathology",
+  "spread"
+ ],
+ "pathology": {
+  "grid": [
+   {
+    "dx_um": 30.0,
+    "n_unknowns": 46070,
+    "solve_s": 0.2135009765625,
+    "rel_residual": 1.8348534699461373e-14,
+    "min_uM": 0.0,
+    "max_uM": 17.862058576724657
+   },
+   {
+    "dx_um": 20.0,
+    "n_unknowns": 103530,
+    "solve_s": 0.7442560195922852,
+    "rel_residual": 3.5490986122723483e-14,
+    "min_uM": 0.0,
+    "max_uM": 17.677668967081026
+   },
+   {
+    "dx_um": 16.0,
+    "n_unknowns": 161226,
+    "solve_s": 1.7048799991607666,
+    "rel_residual": 7.626437219127883e-14,
+    "min_uM": 0.0,
+    "max_uM": 17.81752767477657
+   },
+   {
+    "dx_um": 12.0,
+    "n_unknowns": 286200,
+    "solve_s": 3.5472450256347656,
+    "rel_residual": 1.866288163173984e-13,
+    "min_uM": 0.0,
+    "max_uM": 17.996576317334405
+   },
+   {
+    "dx_um": 8.0,
+    "n_unknowns": 642620,
+    "solve_s": 6.101922035217285,
+    "rel_residual": 3.9782201350056817e-13,
+    "min_uM": 0.0,
+    "max_uM": 18.36532000285705
+   }
+  ],
+  "clearance": [
+   {
+    "k_factor": 1.0,
+    "k_per_s": 0.0005007608329708451,
+    "L_um": 291.06720324706964,
+    "rel_residual": 1.866288163173984e-13,
+    "max_uM": 17.996576317334405,
+    "min_uM": 0.0
+   },
+   {
+    "k_factor": 0.01,
+    "k_per_s": 5.007608329708452e-06,
+    "L_um": 2910.6720324706966,
+    "rel_residual": 1.3814857803866748e-11,
+    "max_uM": 972.8673268249273,
+    "min_uM": 0.0
+   },
+   {
+    "k_factor": 0.0001,
+    "k_per_s": 5.007608329708451e-08,
+    "L_um": 29106.720324706966,
+    "rel_residual": 8.784933190764148e-10,
+    "max_uM": 97024.16700363607,
+    "min_uM": 0.0
+   },
+   {
+    "k_factor": 1e-06,
+    "k_per_s": 5.007608329708451e-10,
+    "L_um": 291067.2032470697,
+    "rel_residual": 9.340899817960003e-08,
+    "max_uM": 9702963.10619271,
+    "min_uM": 0.0
+   },
+   {
+    "k_factor": 1e-08,
+    "k_per_s": 5.0076083297084515e-12,
+    "L_um": 2910672.0324706966,
+    "rel_residual": 1.0153476535606112e-05,
+    "max_uM": 970305065.712947,
+    "min_uM": 0.0
+   }
+  ],
+  "k_shipping_per_s": 0.0005007608329708451,
+  "sparse_vasculature": [
+   {
+    "vascular_factor": 1.0,
+    "label": "full",
+    "null_reason": null,
+    "E_ref": 7.326115500523583,
+    "headline": 0.022388059701492536
+   },
+   {
+    "vascular_factor": 0.001,
+    "label": "0.1% of vessel density",
+    "null_reason": null,
+    "E_ref": 0.007326115500523584,
+    "headline": 0.022388059701492536
+   },
+   {
+    "vascular_factor": 0.0,
+    "label": "no vasculature at all",
+    "null_reason": "the perivascular reference exposure E_ref is 0.0: the distance-from-vessel profile has no usable first bin (a bin needs >= 30 grid points) or its mean AUC is not positive, so every reach ratio would be a division by it",
+    "E_ref": null,
+    "headline": null
+   }
+  ],
+  "non_negativity": [
+   {
+    "drug": "temozolomide",
+    "min_uM": 0.0
+   },
+   {
+    "drug": "doxorubicin",
+    "min_uM": 0.0
+   }
+  ]
+ },
+ "capacity_convection": {
+  "rows": [
+   {
+    "R": 39.0,
+    "a_conv_off": {
+     "falloff_absmove": 2.5479618415147343e-14,
+     "ladder_absmove": 0.0
+    },
+    "b_conv_on_published": {
+     "falloff_absmove": 1.2260100398228002,
+     "ladder_absmove": 0.2727272727272727
+    },
+    "c_conv_on_velocity_scaled": {
+     "falloff_absmove": 2.786659791809143e-14,
+     "ladder_absmove": 0.0
+    }
+   },
+   {
+    "R": 4184.0,
+    "a_conv_off": {
+     "falloff_absmove": 1.2212453270876722e-14,
+     "ladder_absmove": 0.0
+    },
+    "b_conv_on_published": {
+     "falloff_absmove": 4379.9505874532415,
+     "ladder_absmove": 0.24694708276797828
+    },
+    "c_conv_on_velocity_scaled": {
+     "falloff_absmove": 1.176836406102666e-14,
+     "ladder_absmove": 0.0
+    }
+   }
+  ]
+ }
+}

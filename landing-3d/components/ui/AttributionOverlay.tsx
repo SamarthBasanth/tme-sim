@@ -25,11 +25,38 @@ interface AttributionOverlayProps {
  * delivery law produced it) now travels with the value.
  *
  * PROVENANCE, and the reason the caption is not decoration. These are the real
- * shares from run r_00067 (app/runs/r_00067/result.json), computed under the
+ * shares from run r_00084 (app/runs/r_00084/result.json), computed under the
  * delivery law the engine currently SHIPS -- `PDEConfig.transvascular_exchange`
- * defaults to False. The corrected gradient-driven law gives 0.423 / 0.577 /
- * 0.000 on the same run; which law ships is an open decision. When it is made,
- * this component is the single place the number changes.
+ * defaults to False.
+ *
+ * RE-POINTED FROM r_00067 ON 2026-08-22, AND THE REASON IS THE ILLUSTRATIVE-
+ * EXAMPLE GUARDRAIL IN lib/copy.ts, NOT A NUMBER GOING STALE. r_00067 is
+ * PALBOCICLIB (0.172 / 0.825 / 0.003) and the overlay never said so. It sits
+ * directly beside beat 03, which now states a measured result about a
+ * DIFFERENT compound on the flagship section, and a reader has no way to tell
+ * the bar is not that sentence's illustration -- they will read 82.5% where the
+ * sentence says 99.8%, and conclude one of the two is wrong. The example must
+ * be at least as well supported as the claim it decorates, and the only way to
+ * satisfy that here is for the bar to BE the claim's own run.
+ *
+ * WHAT THE RE-POINT COST, RECORDED SO IT IS A KNOWN OMISSION. The old footnote
+ * carried "the corrected law gives 0.423 / 0.577 / 0.000 on the same run". No
+ * corrected-law counterpart has been measured for r_00084, and the r_00067 pair
+ * cannot be carried over -- it is a different compound, and it appears in no
+ * results/ file, so it fails the citation rule at the head of lib/copy.ts
+ * regardless. The disclosure itself did NOT go: beat 06's ledger now carries
+ * the delivery law as its first row, with the external anchor (12.8x high /
+ * 10.5x low against human microdialysis) that this footnote never had. That is
+ * a strictly stronger statement of the same limit, and it is sourced.
+ *
+ * THE NEAR-EMPTY BANDS ARE THE FINDING AND MUST NOT BE ROUNDED AWAY OR
+ * RE-BALANCED FOR LEGIBILITY. A bar that is 99.8% one colour is what "the drug
+ * arrives almost everywhere and is almost everywhere too weak" looks like. The
+ * resistance 0.000 is not a small number either: with the whole population
+ * below IC50 the exposure bands bind first by the documented precedence rule,
+ * so RESISTANT is exactly zero cells rather than nearly zero. If a future edit
+ * wants a more interesting bar it must find a run whose tissue is more
+ * interesting, not a rendering that makes this one look like it.
  *
  * Deliberately NOT shown: absolute kill fraction. It is not a defensible
  * output and it does not go on this page in any form. Shares of a decomposition
@@ -40,21 +67,21 @@ const BANDS = [
     key: "delivery",
     label: "Never arrived",
     sub: "delivery-limited",
-    value: 0.172,
+    value: 0.002,
     className: "attribution__seg--delivery",
   },
   {
     key: "dose",
     label: "Arrived too weak",
     sub: "dose-limited",
-    value: 0.825,
+    value: 0.998,
     className: "attribution__seg--dose",
   },
   {
     key: "resistance",
     label: "Resistant",
     sub: "cell state",
-    value: 0.003,
+    value: 0.0,
     className: "attribution__seg--resistance",
   },
 ] as const;
@@ -69,16 +96,17 @@ const AttributionOverlay = forwardRef<HTMLDivElement, AttributionOverlayProps>(
       >
         <div className="attribution__header">
           <span>Why they survived</span>
-          <span className="attribution__tag">Run r_00067</span>
+          <span className="attribution__tag">r_00084 · temozolomide</span>
         </div>
 
         {/* One bar, three segments, widths straight from the values -- no
-            rounding to "nice" numbers, and the resistance sliver stays a
-            sliver because that is the finding. */}
+            rounding to "nice" numbers, and the two near-empty bands render at
+            their real width (one hairline, one nothing) because that is the
+            finding. See the note above before "fixing" the look of this. */}
         <div
           className="attribution__bar"
           role="img"
-          aria-label="Delivery-limited 17.2 percent, dose-limited 82.5 percent, resistant 0.3 percent"
+          aria-label="Delivery-limited 0.2 percent, dose-limited 99.8 percent, resistant 0 percent"
         >
           {BANDS.map((b) => (
             <span
@@ -103,8 +131,8 @@ const AttributionOverlay = forwardRef<HTMLDivElement, AttributionOverlayProps>(
         </dl>
 
         <p className="attribution__footnote">
-          Shares of surviving tumor cells, one run. Under the shipped delivery
-          law; the corrected law gives 0.423 / 0.577 / 0.000.
+          Shares of surviving tumor cells, one compound, one section, one run.
+          Under the shipped delivery law — which 06 says can invert it.
         </p>
       </div>
     );

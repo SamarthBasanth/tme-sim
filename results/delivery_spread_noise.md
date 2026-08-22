@@ -67,6 +67,37 @@ half-distance readout was.** That is a real property of the metric and it is a
 large part of why it survives where the other did not: it is a statistic of a
 fixed cell population, not of a binned spatial reduction.
 
+> ### QUALIFIED 2026-08-22 — the table above is right; the sentence after it overstates
+>
+> The retracted inference is the one immediately above: *"it is a **large part
+> of why it survives** where the other did not."* The table is unaffected —
+> P90/P10 genuinely has no distance binning in it, and that row stays.
+>
+> What changed is that **binning was never the mechanism**, so being blind to it
+> was never the benefit this file claimed. `results/spatial_noise_decomposition.md`
+> ran the same log-linear estimator binned and unbinned with the model held
+> fixed: removing the binning stage entirely moves the central `L` by **0.5%**
+> and its span by **4%**. The axis that carries the half-distance's spread is
+> the bin *width* (18.37 µm against mask repair's 0.47 µm), and the mechanism is
+> what the **estimator** does with a bin average — taking its reference from the
+> first bin while measuring from zero, and carrying an additive background term
+> through that average.
+>
+> The same file also measured the obvious remedy and it fails: a binning-free
+> depth readout stabilises **by destroying the signal**, separating the
+> doxorubicin/daunorubicin pair 1.03× against the half-distance's 1.16×, with
+> its median variant exactly degenerate (54 of 108 paired cells tie to the last
+> digit). So "binning-free" is not a virtue on its own.
+>
+> **This does not withdraw P90/P10.** It withdraws one argument for it. Note
+> that a second argument was retracted the same day —
+> `app/web/js/ui/reach.js` claimed the viable-tumour denominator carried "~10×
+> grid sensitivity" where the measured figure is 0.6% (2,008 cells at
+> dx = 12 µm against 2,019 at dx = 30). **Two independent justifications for the
+> headline metric fell in one day**, which is worth recording plainly: the
+> metric may well still be the right choice, and the case made for it in this
+> repo is thinner than it reads.
+
 `delivery_metrics.tumor_cell_exposure` states the design intent — *"The tumor
 cell population is a FIXED set of measured Xenium cells, identical at every dx —
 which is what makes these statistics grid-comparable."* **That claim is now

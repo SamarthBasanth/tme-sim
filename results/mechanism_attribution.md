@@ -1,5 +1,37 @@
 # Mechanistic result visualisation — per-cell attribution
 
+> ## NUMBERS SUPERSEDED 2026-08-22 — the METHOD stands, the MEASUREMENTS do not
+>
+> **Last regenerated at `3f42f03` (2026-08-08). Two physics changes landed after
+> it and neither triggered a regeneration:** `d77d169` (2026-08-13, area-conserving
+> vessel source) and `fd2a9e7` (2026-08-14, two-route transport ON). Both move
+> `e_unit` for every drug, so both move every exposure and therefore every band
+> assignment in this file.
+>
+> **The disagreement this causes is not cosmetic — it flips the headline verdict.**
+> §3.2 here reports temozolomide on the flagship section as **97.10 % DELIVERY-limited**
+> with a median exposure shortfall of **17.9×**. The current engine reports the same
+> compound on the same section as **99.8 % DOSE-limited**
+> (`results/synthesised_positions.md` §5.2). A reader taking §3.2's verdict as
+> current would reach the opposite conclusion about what limits this drug.
+>
+> **What is unaffected:** the attribution METHOD — the six labels, the band
+> definitions, the reconciliation against `kill_fraction`, and the argument that a
+> per-cell mechanism is recoverable at all. That is what this file is for and none
+> of it depends on the numbers. The per-cell attribution is now the strongest
+> surviving output in the product, and it is strong because of the method
+> described here.
+>
+> **Where the current numbers live:** `results/synthesised_positions.md` §5.2 for
+> the flagship verdict, and the Studio's own "Delivery or dose" panel, which
+> recomputes live rather than quoting.
+>
+> Found on 2026-08-22 while sourcing a marketing claim. This is the tenth
+> instance of a results file outliving the physics it describes, and the first
+> that the 2026-08-21 banner sweep missed — that sweep looked for documents making
+> *reachability* claims, and this one makes a *measurement* claim, which is a
+> different shape and was not searched for.
+
 **What this adds.** A run used to return scalars: `kill_fraction`, therapeutic coverage,
 mean tumour AUC. Those say *how much* happened. They cannot say **why**, and the kill model
 already knows: `tmesim/cells/pkpd.py` computes a local exposure, a Hill term, a resistance

@@ -708,6 +708,7 @@ def test_no_unaccounted_reimplemented_solver():
     alt_homes = {
         "tmesim/molecular/immune_sink.py",       # transport_with_immune_sink
         "tmesim/validation/moncayo_explant.py",  # bath_diffusion
+        "app/server/reach.py",                   # steady_state_concentration
     }
     declared = {d.path for d in DECLARATIONS}
 

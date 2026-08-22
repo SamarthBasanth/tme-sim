@@ -141,7 +141,24 @@ def main(argv=None) -> int:
 
     import uvicorn
 
-    from .cache import RECON_CACHE, runs_dir
+    from .cache import DATA_ROOTS_VAR, RECON_CACHE, runs_dir
+
+    # SECURITY: same trade as the API key immediately above, for the same
+    # reason and by the same rule. POST /api/sections/scan resolves and reads
+    # an operator-supplied path; unset, it is UNCONFINED, which is the right
+    # default on loopback (bring-your-own-tissue points at directories outside
+    # this repo, and a data_cache/ default would break every existing local
+    # workflow) and the wrong one the moment the process is reachable.
+    #
+    # So: off loopback, and ONLY when the operator has expressed no preference,
+    # confine to the repo's own data_cache. Presence is tested, not truthiness
+    # -- an explicitly empty value means "confine to nothing", which
+    # confine_scan_path treats as fail-closed, and that is a deliberate choice
+    # this must not overwrite.
+    roots_generated = False
+    if not is_loopback and DATA_ROOTS_VAR not in os.environ:
+        os.environ[DATA_ROOTS_VAR] = os.path.join(root, "data_cache")
+        roots_generated = True
 
     print(f"Codon Studio backend")
     print(f"  repo        {root}")
@@ -179,6 +196,21 @@ def main(argv=None) -> int:
             print(f"              bound to {args.host}, which is not a "
                   "loopback address")
         print(_no_auth_warning(args.host), end="")
+
+    # Reported for the same reason the key is: the operator's one chance to
+    # notice that a capability is or is not confined is the line they are
+    # already reading. Deliberately OUTSIDE the key's if/else -- the scan path
+    # is governed independently of authentication, and nesting it under either
+    # branch would make it invisible in exactly one of the two configurations.
+    _roots = os.environ.get(DATA_ROOTS_VAR)
+    if _roots is not None:
+        _label = ("defaulted for this non-loopback bind" if roots_generated
+                  else f"set via {DATA_ROOTS_VAR}")
+        print(f"  tissue roots {_roots or 'NONE -- every scan is refused'}  "
+              f"[{_label}]")
+        if roots_generated:
+            print("              tissue outside that directory will be "
+                  f"REFUSED; set {DATA_ROOTS_VAR} to include yours")
 
     if args.reload:
         uvicorn.run("app.server.api:app", host=args.host, port=args.port,

@@ -541,6 +541,52 @@ class TestJobLifecycle:
         assert any("UPPER BOUND" in c for c in p["caveats"])
         assert any("NOT FOR CLINICAL USE" in c for c in p["caveats"])
 
+    def test_result_carries_the_current_claim_set(self, client):
+        """A run executed NOW is stamped, and is therefore not bannered.
+
+        The other half of tests/test_claim_set.py, which proves that a record
+        WITHOUT the stamp (all 65 runs already in app/runs/, r_00052 among
+        them) is bannered. This is the half that proves the banner is keyed to
+        the claim set and not to "is this run old" -- a run that is seconds old
+        and a run from last month get the same verdict if they carry the same
+        stamp, and opposite verdicts if they do not.
+        """
+        from app.server.jobs import (CLAIM_SET_LOG, CLAIM_SET_VERSION,
+                                     claim_set_stamp)
+
+        res = _run(client, _spec())
+        cs = res["provenance"]["claim_set"]
+        assert cs["version"] == CLAIM_SET_VERSION
+        assert cs["recorded"] is True
+        assert cs["superseded"] is False, (
+            "a run executed by this build is written against this build's "
+            "claims; bannering it would be false")
+        assert cs["warning"] is None and cs["changes"] == []
+
+        # The document ON DISK carries the stamp only. A stored verdict would
+        # be true when written and false after the next withdrawal.
+        with open(os.path.join(client._root, res["run_id"],
+                               "result.json")) as fh:
+            stored = json.load(fh)
+        assert stored["provenance"]["claim_set"] == claim_set_stamp()
+        assert "superseded" not in stored["provenance"]["claim_set"]
+        assert stored["provenance"]["claim_set"]["adopted"] == \
+            CLAIM_SET_LOG[-1]["adopted"]
+
+        # A stamp is only worth having if it is true. This section is
+        # hypoxia-blind, so it takes the "ABSOLUTE KILL MUST NOT BE QUOTED"
+        # caveat -- which, until the claim set landed, still closed by naming
+        # the CROSS-DRUG RANKING as "the defensible output". That claim was
+        # withdrawn on 2026-08-21, so a run stamped claim set 1 must not carry
+        # it: the stamp would be certifying a withdrawn claim as current.
+        cav = res["provenance"]["caveats"]
+        assert any("MUST NOT BE QUOTED" in c for c in cav), (
+            "the caveat this guards is missing; re-point the assertion below")
+        assert not any(
+            "RANKING is invariant across all three routes and is the "
+            "defensible output" in c for c in cav)
+        assert any("WHAT SURVIVES IS THE MAP" in c for c in cav)
+
     def test_reconstruction_only_run_nulls_drug_metrics_with_reasons(self, client):
         res = _run(client, _spec(drug=None))
         assert res["status"] == "done"

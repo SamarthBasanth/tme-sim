@@ -392,15 +392,28 @@ export function createReachPanel() {
      * published below as the evidence; what is gone is the practice of reading
      * one rung of it as the answer.
      *
-     * And it does NOT inherit the viable-tumour denominator. `exposure_percentiles`
-     * is computed over the TUMOUR cell set, which
-     * tmesim/validation/delivery_metrics.py::tumor_cell_exposure documents as
-     * "a FIXED set of measured Xenium cells, identical at every dx — which is
-     * what makes these statistics grid-comparable". The viable band is not:
-     * measured on this section it is 89% of tumour cells at dx = 30 um and
-     * 2,008 of 23,812 at dx = 12 um. Everything phrased as a fraction of VIABLE
-     * tumour carries that ~10x grid sensitivity in its denominator; this ratio
-     * does not carry it at all. */
+     * And its denominator is GUARANTEED grid-independent rather than merely
+     * observed to be. `exposure_percentiles` is computed over the TUMOUR cell
+     * set, which tmesim/validation/delivery_metrics.py::tumor_cell_exposure
+     * documents as "a FIXED set of measured Xenium cells, identical at every dx
+     * — which is what makes these statistics grid-comparable". That is a
+     * structural property: the cells are measured, so no grid can move them.
+     *
+     * CORRECTION 2026-08-22. This passage previously argued the stronger case
+     * that the viable band carries "~10x grid sensitivity", citing "89% of
+     * tumour cells at dx = 30 um" against 2,008 at dx = 12. The dx = 12 figure
+     * is right and the dx = 30 figure was wrong by a factor of ~10.5. Measured
+     * through reconstruct_real on this section, temozolomide, 6 h, convection
+     * ON: 2,008 of 23,812 at dx = 12 um (8.43%), 2,007 at dx = 15, 2,019 at
+     * dx = 30 (8.48%). Across a 2.5x change in grid the viable band moves by
+     * 12 cells out of ~2,010 — 0.6%, not 10x.
+     *
+     * So the contrast this paragraph used to draw does not exist, and the
+     * reason to prefer this ratio is the weaker but true one above: the viable
+     * band is a COMPUTED quantity that happens to be stable on this section,
+     * carrying no guarantee that it is stable on another, whereas a measured
+     * cell set cannot move by construction. Stability observed on one section
+     * is not stability. */
     const ex0 = run.extra_metrics || {};
     const p10 = ex0.E_p10_uM;
     const p90 = ex0.E_p90_uM;
@@ -565,6 +578,38 @@ export function createReachPanel() {
         + 'doxorubicin, which penetrates poorly. Read the falloff as compound-'
         + 'specific evidence in proportion to the penetration length reported '
         + 'in Metrics, and treat a short one as close to a vessel map.')));
+    }
+
+    /* ---- WHICH OBJECT THIS IS ------------------------------------------
+     * The payload has always known whether the map came from a converged
+     * steady state or from a finite exposure window; until now nothing put it
+     * on the screen. Those are different claims — "the reach this geometry
+     * permits" versus "the reach this exposure achieved" — and a panel that
+     * renders them identically invites the reader to carry a conclusion from
+     * one to the other.
+     *
+     * Three states, deliberately, because there are three. A record written
+     * before `window_mode` existed has the key ABSENT, which is NOT the same
+     * as finite_window: treating a missing key as the historical default is
+     * how a record ends up labelled with a claim nobody verified it makes.
+     * Absent is reported as unknown and says so. */
+    const wmode = reach.window_mode;
+    if (wmode === 'steady_state' || wmode === 'finite_window') {
+      const label = wmode === 'steady_state' ? 'STEADY STATE' : 'FINITE WINDOW';
+      const gist = wmode === 'steady_state'
+        ? 'the reach this geometry permits once transport has converged — no '
+          + 'exposure window enters the computation'
+        : 'the reach achieved over one finite exposure window, which is a '
+          + 'property of that window as well as of the geometry';
+      el.appendChild(h('div.caveat.info', h('span',
+        h('b', label + ' — '), gist,
+        reach.window_note ? '. ' + String(reach.window_note) : '.')));
+    } else {
+      el.appendChild(h('div.caveat', h('span',
+        h('b', 'Object not recorded. '),
+        'This run predates the field that says whether the map is a converged '
+        + 'steady state or a finite-window exposure, so which one it is cannot '
+        + 'be read off the record. It is not being assumed to be either.')));
     }
 
     /* ---- the invariance statement, verbatim from the backend ----------- */
