@@ -396,37 +396,61 @@ class TestARecordCanContradictItsOwnStamp:
         assert st["superseded"] is False and st["contradicted"] is False
         assert st["warning"] is None
 
-    def test_r_00090_is_the_live_specimen_and_is_marked(self):
-        """``app/runs/r_00090`` IS RETAINED DELIBERATELY. DO NOT DELETE IT.
+    def test_a_stored_record_that_contradicts_its_stamp_is_caught_end_to_end(
+            self, tmp_path):
+        """The compliance check, exercised through the REAL read path.
 
-        If you are tidying ``app/runs/``: this record looks wrong because it
-        IS wrong, and that is why it is kept. It must survive any future
-        cleanup of that directory.
+        WHY THIS IS SYNTHESISED RATHER THAN POINTED AT A LIVE RUN, 2026-08-22
+        --------------------------------------------------------------------
+        This assertion used to name ``app/runs/r_00090`` -- a genuine artefact
+        of a build that stamped a claim set it was not honouring, submitted
+        minutes before the emitter in ``execute_run`` was corrected. It carried
+        a comment saying DO NOT DELETE IT.
 
-        It was submitted through the Studio during this change, minutes before
-        the emitter in ``execute_run`` was corrected -- so it is a genuine
-        artefact of a build that stamped a claim set it was not honouring, and
-        it is the only one in existence. It is what proved that the era check
-        alone returns CLEAN for exactly the case this feature was built to
-        catch. ``r_00091`` is its clean twin: same spec, corrected build.
+        It was destroyed within hours, and not by anyone tidying. A Studio
+        server left running on pre-fix code was handed the next free run id,
+        which was ``r_00090``, and overwrote it. The record now carries no
+        stamp at all, so this test failed with ``assert None == 1``.
 
-        Deleting it would be the same move this whole feature refuses --
-        editing the record so the guard looks like it was always there. It is
-        skipped rather than failed where the store is absent, because
-        ``app/runs/`` is gitignored and a fresh checkout has no store at all.
+        The lesson is not "be more careful with app/runs/". It is that
+        **app/runs/ is a mutable, gitignored runtime directory and therefore
+        cannot hold a fixture** -- any run, from any process, at any code
+        version, can claim an id and overwrite one. A test whose subject can be
+        clobbered by unrelated work is not pinning anything.
+
+        So the specimen is now CONSTRUCTED: a record shaped exactly as the
+        store writes them, stamped with the CURRENT claim set, carrying a
+        sentence that claim set retired. That is the same object r_00090 was,
+        it goes through the same ``result_view`` read path, and nothing outside
+        this test can touch it.
+
+        It is deliberately end-to-end rather than a direct call to
+        :func:`claim_set_status` -- that is already covered functionally
+        elsewhere. What is pinned HERE is that the verdict survives the trip
+        through the manager and reaches a reader.
         """
-        path = os.path.join(REPO, "app", "runs", "r_00090", "result.json")
-        if not os.path.exists(path):
-            pytest.skip("app/runs/r_00090 is not present (gitignored store)")
-        mgr = JobManager(root=os.path.join(REPO, "app", "runs"),
-                         start_worker=False)
-        view = mgr.get("r_00090").result_view()
+        root = str(tmp_path)
+        rec = _legacy_record()
+        rec.setdefault("provenance", {})
+        # Stamped CURRENT, and dishonest about it: this is the whole case.
+        # The era check cannot catch this, because the version is the thing
+        # that is lying.
+        rec["provenance"]["claim_set"] = claim_set_stamp()
+        rec["provenance"]["caveats"] = [
+            "WHAT SURVIVES IS THE MAP: within this one compound on this one "
+            "section, the RELATIVE exposure between regions.",
+            RETIRED,
+        ]
+        _store(root, rec)
+
+        mgr = JobManager(root=root, start_worker=False)
+        view = mgr.get(rec["run_id"]).result_view()
         prov = view["provenance"]
         cs = prov["claim_set"]
 
         assert any(RETIRED in c for c in prov["caveats"]), (
-            "r_00090 is only a specimen while it still carries the retired "
-            "sentence; if it no longer does, the record was edited")
+            "the specimen is only a specimen while it still carries the "
+            "retired sentence")
         assert cs["version"] == CLAIM_SET_VERSION
         assert cs["superseded"] is False, (
             "and this is the point: the era check calls it clean")
@@ -434,11 +458,32 @@ class TestARecordCanContradictItsOwnStamp:
             "the compliance check is what catches it")
         assert cs["warning"] and "CONTRADICTS" in cs["warning"]
 
-        # Its clean twin, same spec, corrected build: no finding at all.
-        twin = os.path.join(REPO, "app", "runs", "r_00091", "result.json")
-        if os.path.exists(twin):
-            tcs = mgr.get("r_00091").result_view()["provenance"]["claim_set"]
-            assert tcs["superseded"] is False and tcs["contradicted"] is False
+    def test_the_real_store_is_read_but_never_depended_on(self):
+        """``app/runs/`` is inspected opportunistically and asserted on only
+        where it still supports the claim.
+
+        A real record that has drifted is INFORMATION, not a failure: the store
+        is gitignored, is rewritten by ordinary use, and a fresh checkout has
+        none of it. Anything load-bearing lives in the synthesised test above.
+        """
+        root = os.path.join(REPO, "app", "runs")
+        if not os.path.isdir(root):
+            pytest.skip("app/runs/ is not present (gitignored store)")
+        mgr = JobManager(root=root, start_worker=False)
+        for rid in ("r_00090", "r_00091", "r_00052"):
+            if not os.path.exists(os.path.join(root, rid, "result.json")):
+                continue
+            prov = mgr.get(rid).result_view().get("provenance") or {}
+            cs = prov.get("claim_set") or {}
+            carries = any(RETIRED in c for c in prov.get("caveats") or ())
+            # The one invariant that must hold of EVERY stored record, however
+            # it was produced: a record carrying the retired sentence is never
+            # presented as clean. Which of the two findings fires depends on
+            # whether it was stamped, and that is history, not a contract.
+            if carries:
+                assert cs.get("superseded") or cs.get("contradicted"), (
+                    f"{rid} carries the retired sentence and is marked by "
+                    "neither the era check nor the compliance check")
 
 
 # --------------------------------------------------------------------------- #
