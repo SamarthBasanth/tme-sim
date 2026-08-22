@@ -116,6 +116,25 @@ export function createHistoryPanel({ onOpen, onRefresh }) {
     onOpen && onOpen(id);
   }
 
+  /* The caveat union, lifted out of renderCompare so the cross-compound
+   * refusal path can render it too. A comparison that declines to subtract
+   * still owes the reader both runs' caveats — the refusal removes a number,
+   * never a disclosure. */
+  function renderCaveatDiff(A, B) {
+    const ca = (A.provenance && A.provenance.caveats) || [];
+    const cb = (B.provenance && B.provenance.caveats) || [];
+    const only = (x, other) => x.filter((c) => !other.includes(c));
+    const onlyA = only(ca, cb), onlyB = only(cb, ca);
+    if (!onlyA.length && !onlyB.length) {
+      cmpEl.appendChild(h('div.caveat.info', h('span',
+        ca.length ? 'Both runs carry the same caveats; the comparison inherits all of them.'
+          : 'Neither run reported caveats.')));
+      return;
+    }
+    for (const c of onlyA) cmpEl.appendChild(h('div.caveat', h('span', h('b', 'A only: '), c)));
+    for (const c of onlyB) cmpEl.appendChild(h('div.caveat', h('span', h('b', 'B only: '), c)));
+  }
+
   function renderCompare() {
     const A = runs.find((r) => r.run_id === aId) || null;
     const B = runs.find((r) => r.run_id === bId) || null;
@@ -164,7 +183,52 @@ export function createHistoryPanel({ onOpen, onRefresh }) {
     }
 
     /* --- metric comparison --------------------------------------------- */
+    /* CROSS-COMPOUND DELTAS ARE REFUSED, and the refusal is the panel's whole
+     * position on the repositioning. A/B stays — it is the right tool for one
+     * compound at two doses, on two meshes, under two routes, and none of that
+     * is affected by anything measured this week. What is affected is Δ between
+     * two DIFFERENT compounds: that is an ordering of two, and ordering
+     * compounds by predicted effect is exactly the claim that was withdrawn on
+     * 2026-08-21 (results/pk_ranking_robustness.md,
+     * results/capacity_ranking_robustness.md).
+     *
+     * The refusal is deliberately WHOLE-TABLE rather than per-metric. There is
+     * an argument that comparing TRANSPORT between two compounds — penetration
+     * depth rather than kill — is defensible, since a decay length is a shape
+     * quantity and survives both the plasma and the capacity failures. But it
+     * still rests on the unscored descriptor path
+     * (results/descriptor_falsification.md), and adjudicating metric-by-metric
+     * would smuggle a design decision into a removal pass. Suppress the table,
+     * state why, widen later on evidence. Reversible beats clever.
+     *
+     * Everything else on this panel survives untouched: the spec diff above,
+     * the caveat union below, and both runs' own numbers, which are still on
+     * screen in the run history table. Nothing is hidden — only the SUBTRACTION
+     * between two compounds is declined. */
+    const drugA = (A.spec && A.spec.drug) || null;
+    const drugB = (B.spec && B.spec.drug) || null;
+    const crossCompound = !!(drugA && drugB && drugA !== drugB);
     cmpEl.appendChild(h('div.hr-lbl', 'Metrics'));
+    if (crossCompound) {
+      cmpEl.appendChild(h('div.caveat.crit', h('span',
+        h('b', 'NO CROSS-COMPOUND DELTA. '),
+        `A is ${drugA} and B is ${drugB}, so the metric delta between them is `
+        + 'an ordering of two compounds by predicted effect. That claim was '
+        + 'measured and withdrawn: per-compound plasma exposure across the '
+        + 'compounds this product ranked spans 113x, while the published '
+        + 'ordering survives a spread of only 1.53x '
+        + '(results/pk_ranking_robustness.md), and the breast top-1 pick '
+        + 'changes under this repo’s own structural capacity rule '
+        + '(results/capacity_ranking_robustness.md). Both runs’ numbers '
+        + 'are unchanged and still on screen in the run history above; what is '
+        + 'declined is the subtraction between them. Compare one compound '
+        + 'against itself — two doses, two meshes, two routes — and '
+        + 'this table returns, because a per-compound scale factor cancels out '
+        + 'of a comparison that holds the compound fixed.')));
+      cmpEl.appendChild(h('div.hr-lbl', 'Caveats that differ'));
+      renderCaveatDiff(A, B);
+      return;
+    }
     const rows = Object.keys(METRICS).map((key) => {
       const m = METRICS[key];
       const va = A.metrics ? A.metrics[key] : null;
@@ -208,19 +272,8 @@ export function createHistoryPanel({ onOpen, onRefresh }) {
     cmpEl.appendChild(h('div.tblwrap.cmp-metrics', mTbl));
 
     /* --- caveats union -------------------------------------------------- */
-    const ca = (A.provenance && A.provenance.caveats) || [];
-    const cb = (B.provenance && B.provenance.caveats) || [];
-    const only = (x, other) => x.filter((c) => !other.includes(c));
-    const onlyA = only(ca, cb), onlyB = only(cb, ca);
     cmpEl.appendChild(h('div.hr-lbl', 'Caveats that differ'));
-    if (!onlyA.length && !onlyB.length) {
-      cmpEl.appendChild(h('div.caveat.info', h('span',
-        ca.length ? 'Both runs carry the same caveats; the comparison inherits all of them.'
-          : 'Neither run reported caveats.')));
-    } else {
-      for (const c of onlyA) cmpEl.appendChild(h('div.caveat', h('span', h('b', 'A only: '), c)));
-      for (const c of onlyB) cmpEl.appendChild(h('div.caveat', h('span', h('b', 'B only: '), c)));
-    }
+    renderCaveatDiff(A, B);
 
     /* --- deltas are conditional ---------------------------------------- */
     const anyAssumed = Object.keys(METRICS).some((k) =>

@@ -367,8 +367,14 @@ axis — naming the axis, the genes, and the fact that the state is then assigne
 on any panel carrying no hypoxia-response transcript, that **absolute kill must not be
 quoted from that section under any state route**, because no route clears the bar
 there and the kill moves up to 0.3252 absolute across the three
-(`results/cell_state_impact.md` §5). The cross-drug ranking is invariant across all
-three routes and is the defensible output.
+(`results/cell_state_impact.md` §5). What survives is the MAP: within one compound
+on one section, the RELATIVE exposure between regions, because a per-compound plasma
+factor is an exact linear rescale of the whole field (worst relative deviation
+1.41e-14 over a 5,200× span, `results/pk_ranking_robustness.md` §1.2) and therefore
+cancels out of a ratio between points. The absolute LEVEL does not survive, and
+neither does a comparison against another compound — that claim was measured and
+withdrawn on 2026-08-21 (`results/pk_ranking_robustness.md`,
+`results/capacity_ranking_robustness.md`).
 
 ### The advection CFL
 
@@ -458,10 +464,15 @@ output attached. It is the in-product form of `experiments/patient_report.py`.
   `experiments/patient_report.py` calls, asserted in the tests. Two
   implementations of an attribution would be two sciences.
 
-`sensitivity_mode` is forced to `uniform` and cannot be overridden: it is the
-only mode in which a cross-drug ranking is fair. `drug` and `resistance_off` are
-swept per arm. Any other `RunSpec` field may be passed in `spec_overrides`;
-overriding an owned field is a warning and is reported back as ignored.
+`sensitivity_mode` is forced to `uniform` and cannot be overridden. It used to be
+justified as "the only mode in which a cross-drug ranking is fair"; that
+comparison was withdrawn on 2026-08-21, and the setting is kept for the reason
+that outlives it — on a section carrying no measured resistance for this
+compound, a no-resistance upper bound is the honest reading and an estimate would
+not be. `resistance_off` is swept per arm (a report is two arms of ONE compound:
+the real run and the counterfactual that MEASURES the resistance term). Any other
+`RunSpec` field may be passed in `spec_overrides`; overriding an owned field is a
+warning and is reported back as ignored.
 
 **The document carries its own limits, prominently.** `build_limits()` returns
 the block that opens every rendering — the NOT FOR CLINICAL USE banner, the

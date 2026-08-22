@@ -13,8 +13,8 @@ Implements the grammar in ``PROTOCOL_LANGUAGE.md`` exactly::
     sweep       := "sweep" IDENT ("from" NUM "to" NUM UNIT
                                   ("step" NUM | "in" INT "steps") | NUM UNIT)
     run_stmt    := "run" IDENT "with" IDENT "on" IDENT NEWLINE run_opt* "end"
-    compare_stmt:= "compare" IDENT ("," IDENT)* "with" IDENT "on" IDENT
-                   NEWLINE run_opt* "end"
+    compare_stmt:= "compare" IDENT "with" IDENT "on" IDENT NEWLINE run_opt*
+                   "end"          # ONE compound; the runs come from a `sweep`
     expect_stmt := "expect" IDENT COMPARATOR NUM [UNIT]
     allow_stmt  := "allow" "runs" INT
 
@@ -40,7 +40,7 @@ from .errors import ParseError, TplError, UnitError, collect
 from .lexer import Token, tokenize
 from .units import DOSE_DIMENSIONS, UNITS, Quantity, is_unit, unit_def, units_for
 
-__all__ = ["parse", "Parser"]
+__all__ = ["parse", "Parser", "WITHDRAWN_RANK_BY"]
 
 #: Keywords that may begin a top-level statement (also the resync set).
 TOP_KEYWORDS = ("drug", "protocol", "sweep", "run", "compare", "expect", "allow")
@@ -48,6 +48,24 @@ TOP_KEYWORDS = ("drug", "protocol", "sweep", "run", "compare", "expect", "allow"
 #: Grammar words that can legitimately sit where a unit would go. A WORD in that
 #: position that is NOT one of these is a failed unit, and is reported as one.
 _UNIT_FOLLOWERS = frozenset({"over", "to", "step", "in", "steps", "end"})
+
+#: The refusal for ``rank by``, withdrawn from TPL on 2026-08-21. It is a
+#: REFUSAL and not a no-op: a program that asked for an ordering must be told
+#: the ordering is gone, not handed a run list with the ordering silently
+#: dropped. Shared with the editor stub (``app/web/js/protocol/stub.js``) so
+#: both halves of the language say the same sentence.
+WITHDRAWN_RANK_BY = (
+    "`rank by` has been WITHDRAWN from TPL (2026-08-21). Ordering compounds by "
+    "predicted effect is no longer an output of this repo, because the ordering "
+    "was measured and does not hold: results/pk_ranking_robustness.md — "
+    "per-compound plasma exposure spans 113.1x across the compounds the panel "
+    "ranked, and the published GBM order first breaks at a spread of only "
+    "1.53x; results/capacity_ranking_robustness.md — the breast top-1 pick "
+    "changes under this repo's own structural capacity rule. Report the metric "
+    "with `report <metric>` and read the map for ONE compound; use `compare` "
+    "for two or more RUNS of one compound (a dose ladder), not for two "
+    "compounds."
+)
 
 
 def parse(source: str) -> Tuple[A.Program, collect]:
@@ -633,7 +651,7 @@ class Parser:
                          drug=d.text, drug_col=d.col, protocol=p.text,
                          protocol_col=p.col, section=s.text, section_col=s.col)
         self.expect_newline("run")
-        node.options = self._run_body(f"run {d.text}", allow_rank=False)
+        node.options = self._run_body(f"run {d.text}")
         return node
 
     def compare_stmt(self) -> A.CompareStmt:
@@ -648,11 +666,10 @@ class Parser:
                 self.next()
                 continue
             break
-        if len(drugs) < 2:
-            raise self._fail(
-                self.peek(),
-                "compare: needs at least two drugs (`compare A, B with ...`); "
-                "use `run` for a single drug.", code="incomplete-compare")
+        # Arity is NOT checked here. `compare` now means "two or more runs of
+        # one compound", and whether a program plans two runs depends on the
+        # sweeps, which are a whole-program property. Both the multi-compound
+        # refusal and the one-run refusal therefore live in `executor.plan`.
         self.expect_keyword("with", "compare")
         p = self.expect_ident("compare: the protocol after `with`")
         self.expect_keyword("on", "compare")
@@ -662,10 +679,10 @@ class Parser:
                              protocol_col=p.col, section=s.text,
                              section_col=s.col)
         self.expect_newline("compare")
-        node.options = self._run_body("compare", allow_rank=True)
+        node.options = self._run_body("compare")
         return node
 
-    def _run_body(self, label: str, allow_rank: bool) -> A.RunOptions:
+    def _run_body(self, label: str) -> A.RunOptions:
         opts = A.RunOptions()
         seen: dict = {}
         while True:
@@ -686,8 +703,9 @@ class Parser:
             self.next()
             word = tok.text
             valid = ["dx", "state_mode", "sensitivity", "report"]
-            if allow_rank:
-                valid.append("rank by")
+            if word == "rank":
+                raise self._fail(tok, WITHDRAWN_RANK_BY,
+                                 code="withdrawn-ranking")
             if word in seen:
                 raise self._fail(
                     tok, f"{label}: `{word}` is given more than once (first on "
@@ -727,12 +745,6 @@ class Parser:
                         continue
                     break
                 self.expect_newline("report")
-            elif word == "rank" and allow_rank:
-                self.expect_keyword("by", f"{label}: `rank`")
-                m = self.expect_ident(f"{label}: rank by")
-                opts.rank_by = _metric(self, m)
-                opts.rank_by_line, opts.rank_by_col = m.line, m.col
-                self.expect_newline("rank by")
             else:
                 _unclosed_if_top_keyword(self, tok, label)
                 raise self._fail(

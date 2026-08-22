@@ -444,12 +444,16 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
           ? (d.reason
             || 'Compiled from a SMILES you supplied. Every transport parameter '
              + 'except molecular weight and TPSA is a prediction. Its absolute '
-             + 'kill, AUC and penetration depth are NOT defensible. Compare it '
-             + 'against other compounds on this section and read the ordering — '
-             + 'noting that diffusivity comes from a two-route model scoring '
+             + 'kill, AUC and penetration depth are NOT defensible, and neither '
+             + 'is setting it beside another compound — compound ordering was '
+             + 'measured and withdrawn. What it supports is a map: run it on '
+             + 'this section and read where it reaches relative to the '
+             + 'best-perfused tissue in that same run. Note that the shape of '
+             + 'that map rests on a diffusivity from a two-route model scoring '
              + 'R^2 = 0.718 blind against 71 measured compounds, which still '
              + 'recovers only about a quarter of the measured spread from one '
-             + 'cell line, so similar-mass analogues are separated weakly.')
+             + 'cell line, so a similar-mass analogue moves the gradient less '
+             + 'than it should.')
           : '',
       }, label + suffix));
     }

@@ -23,7 +23,9 @@ export const INDENT = '  ';
 /** Structural keywords: statement heads, block delimiters, connectors. */
 export const KEYWORDS = new Set([
   'drug', 'protocol', 'sweep', 'run', 'compare', 'expect', 'allow', 'end',
-  'from', 'with', 'on', 'over', 'to', 'step', 'in', 'steps', 'then', 'by',
+  // No `by`: its only use was `rank by`, withdrawn 2026-08-21 with the rest of
+  // compound ordering (PROTOCOL_LANGUAGE.md §5). Mirrors tmesim/protocol/lexer.py.
+  'from', 'with', 'on', 'over', 'to', 'step', 'in', 'steps', 'then',
   'smiles', 'library', 'file',
 ]);
 
@@ -34,8 +36,10 @@ export const FIELDS = new Set([
   'molecular_weight',
   // protocol block
   'route', 'dose', 'every', 'repeat', 'rest', 'cycles',
-  // run / compare block
-  'dx', 'state_mode', 'sensitivity', 'report', 'rank', 'runs',
+  // run / compare block. No `rank`: `rank by` was withdrawn from TPL on
+  // 2026-08-21 (PROTOCOL_LANGUAGE.md §5), so it must not highlight as a live
+  // option — the parser refuses it and the highlighter has to agree.
+  'dx', 'state_mode', 'sensitivity', 'report', 'runs',
 ]);
 
 /** Enumerated values and reportable metric names. */

@@ -84,8 +84,10 @@ dependencies = [
 [project.scripts]
 # `pip install -e .` registers this as a real command, e.g.:
 #   codon reconstruct --source xenium --dx 12
-#   codon compare-drugs --drugs temozolomide,cisplatin,doxorubicin
+#   codon simulate --source xenium --dx 30 --drug temozolomide
+#   codon sections
 #   codon studio
+# (`compare-drugs` was withdrawn 2026-08-21 with the cross-drug ranking claim.)
 # Equivalent to `python -m tmesim.cli ...` (tmesim/cli.py); see that module's
 # docstring and docs/QUICKSTART.md for the full command list.
 codon = "tmesim.cli:main"

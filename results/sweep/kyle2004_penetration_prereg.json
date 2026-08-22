@@ -1,0 +1,242 @@
+{
+ "_what": "PRE-REGISTRATION. The bar for 'does the Codon map reproduce a MEASURED tissue-penetration difference between two compounds'. Frozen before any concentration field was solved. Scoring stages assert live code against this file.",
+ "_rule": "Nothing is fitted to the measurement. No default, constant or shipped parameter is changed; calibrate_alpha() is asserted live at the shipped value. The source was chosen for dose parity and species purity (the two gates below) BEFORE any model output was inspected.",
+ "frozen_utc": "pre-solve",
+ "measurement": {
+  "citation": "Kyle AH, Huxham LA, Chiam ASJ, Sim DH, Minchinton AI. Direct assessment of drug penetration into tissue using a novel application of three-dimensional cell culture. Cancer Res 2004;64(17):6304-9.",
+  "pmid": "15342419",
+  "doi": "10.1158/0008-5472.CAN-04-1099",
+  "table": "Table 1",
+  "quantity": "ratio of near-side to far-side drug exposure across a multilayered cell culture",
+  "system": "HCT-116 human colorectal carcinoma multilayered cell culture (MCC), one-sided 1 h exposure with the far side sealed",
+  "thickness_um": 140.0,
+  "thickness_sd_um": 15.0,
+  "thickness_quote": "MCCs frozen immediately after exposure measured 140 +- 15 (SD) um in thickness",
+  "edge_window_um": 30.0,
+  "edge_window_quote": "the first 30 um of tissue on the near side and far side of MCCs",
+  "exposure_h": 1.0,
+  "concentration_uM": 10.0,
+  "gate1_dose_parity_quote": "The ratio of fluorescence on each side is calculated from data shown in Fig. 6 using the MCCs frozen immediately after exposure to 10 umol/L drug over 1 hour.",
+  "gate2_species_quote": "Only DOX, EPI, and DAU, which all possess the same fluorophore, could be examined. Emission intensities of the three drugs in aqueous solution were within 10% of each other.",
+  "sequestration_quote": "DOX appears to accumulate the least over the 1-hour exposure with EPI and DAU reaching ~1.5 and ~7 times higher levels, respectively, on the near sides.",
+  "near_side_accumulation_vs_dox": {
+   "doxorubicin": 1.0,
+   "epirubicin": 1.5,
+   "daunorubicin": 7.0,
+   "mitoxantrone": null
+  },
+  "far_side_indistinguishable_quote": "Differences in the effects of the drugs on the far sides of the cultures were found to be statistically indistinguishable, P > 0.05, except at the 10 umol/L x hour exposure, P < 0.005 (ANOVA), where the effect of EPI was significantly greater than DOX.",
+  "near_side_dominance_quote": "in both the effect-based assay and direct fluorescence assay, the drugs performed similarly on the far sides of the MCCs regardless of their differing lipophilicity, and it was only on the near sides that their effects could be differentiated.",
+  "n_underlying": "n = 4-6 (Fig. 3, SE bars); n for the fluorescence column is not stated in the paper",
+  "table1": {
+   "doxorubicin": {
+    "effect": 12.0,
+    "effect_kind": "~",
+    "fluor": 11.0,
+    "fluor_sd": 5.0
+   },
+   "epirubicin": {
+    "effect": 10.0,
+    "effect_kind": "~",
+    "fluor": 12.0,
+    "fluor_sd": 3.0
+   },
+   "daunorubicin": {
+    "effect": 30.0,
+    "effect_kind": "~",
+    "fluor": 50.0,
+    "fluor_sd": 15.0
+   },
+   "mitoxantrone": {
+    "effect": 30.0,
+    "effect_kind": ">",
+    "fluor": null,
+    "fluor_sd": null
+   }
+  }
+ },
+ "sources_rejected_and_why": {
+  "Tredan 2009 Cancer Res 69:940 (PMID 19176397), mitoxantrone vs AQ4N": {
+   "gate1_dose_parity": "FAIL. 1 vs 10 mg/mL in the multicellular culture and 40 vs 200 mg/kg in vivo, chosen verbatim 'to facilitate detection' \u2014 a 5-10x asymmetry.",
+   "gate2_quantity": "FAIL. The signal is AQ4N plus its reduced metabolite AQ4, which 'cannot be separated', and hypoxic bioreductive trapping plus stable AQ4-DNA intercalation inflate the apparent depth. Transport, activation and binding are one number.",
+   "also": "No penetration number of any kind is tabulated in the paper."
+  },
+  "Grantab 2006 Cancer Res 66:1033 (PMID 16424039), Table 2": {
+   "gate1_dose_parity": "FAIL, and stated outright: '25 umol/L paclitaxel, 5 umol/L doxorubicin, 10 umol/L methotrexate, and 77 umol/L 5-FU ... permit sensitive detection of the drug in compartment 2'. A 15.4-fold spread across the compared compounds.",
+   "gate2_quantity": "PASS in form (radiolabel in a receiving compartment, method-consistent across drugs) but the authors cap it: radiolabel 'might be associated with a metabolite; thus, this provides an upper limit'.",
+   "note": "Its dose-matched axis is CELL LINE, not drug. The epithelioid-vs-round contrast at fixed drug and dose is clean; the drug-vs-drug contrast is not dose-controlled. It is the right dataset for a different experiment."
+  },
+  "Tunggal 1999 Clin Cancer Res 5:1583 (PMID 10389947)": {
+   "gate1_dose_parity": "FAIL. ~9 uM doxorubicin, 10 uM methotrexate, 50 uM mitoxantrone, ~78 uM 5-FU \u2014 an 8.6-fold spread with no rationale given. The methotrexate concentration is also self-contradictory between Methods (10 uM) and the Fig. 4 legend (50 uM).",
+   "gate2_quantity": "FAIL for the headline pair. Doxorubicin was counted as radiolabel (parent plus any labelled metabolite) while mitoxantrone was quantified by HPLC at 600 nm (parent only) \u2014 two different measurands presented as one comparison.",
+   "also": "No numeric SD or SEM is printed anywhere in the paper, so it cannot supply a measurement-level noise floor."
+  }
+ },
+ "gates_applied_to_choose_the_source": {
+  "gate1_dose_parity": "PASS. All compared drugs at 10 umol/L. An earlier candidate (Tr\u00e9dan 2009 Cancer Res 69:940, mitoxantrone vs AQ4N, PMID 19176397) was REJECTED on this gate: 1 vs 10 mg/mL in vitro and 40 vs 200 mg/kg in vivo, chosen 'to facilitate detection'.",
+  "gate2_quantity_is_transport": "PASS. Parent-drug fluorescence, one shared fluorophore, emissions cross-calibrated within 10%. The same earlier candidate was REJECTED on this gate too: its signal was AQ4N plus its reduced metabolite AQ4, which 'cannot be separated', with hypoxic bioreductive trapping inflating apparent depth. Kyle's number DOES include cellular sequestration as well as diffusion; that is admissible here only because the engine models the same composite, L = sqrt(D_eff/k), and it is disclosed wherever the result is quoted."
+ },
+ "compounds": {
+  "doxorubicin": {
+   "smiles": "COc1cccc2c1C(=O)c1c(O)c3c(c(O)c1C2=O)CC(O)(C(=O)CO)CC3OC1CC(N)C(O)C(C)O1",
+   "provenance": "REUSED verbatim from tmesim/molecular/library.py::GBM_DRUGS.",
+   "measured": {
+    "effect": 12.0,
+    "effect_kind": "~",
+    "fluor": 11.0,
+    "fluor_sd": 5.0
+   }
+  },
+  "epirubicin": {
+   "smiles": "CC1C(C(CC(O1)OC2CC(CC3=C2C(=C4C(=C3O)C(=O)C5=C(C4=O)C(=CC=C5)OC)O)(C(=O)CO)O)N)O",
+   "provenance": "REUSED verbatim from tmesim/molecular/breast_library.py::BREAST_DRUGS.",
+   "measured": {
+    "effect": 10.0,
+    "effect_kind": "~",
+    "fluor": 12.0,
+    "fluor_sd": 3.0
+   }
+  },
+  "daunorubicin": {
+   "smiles": "CC1C(C(CC(O1)OC2CC(CC3=C2C(=C4C(=C3O)C(=O)C5=C(C4=O)C(=CC=C5)OC)O)(C(=O)C)O)N)O",
+   "provenance": "NEW to this repository. PubChem PUG-REST property endpoint, name lookup 'daunorubicin' -> CID 30323, ConnectivitySMILES. Returned MolecularFormula C27H29NO10, MolecularWeight 527.5, XLogP 1.8, HBondDonorCount 5, HBondAcceptorCount 11, TPSA 186.",
+   "measured": {
+    "effect": 30.0,
+    "effect_kind": "~",
+    "fluor": 50.0,
+    "fluor_sd": 15.0
+   }
+  },
+  "mitoxantrone": {
+   "smiles": "OCCNCCNc1ccc(NCCNCCO)c2c1C(=O)c1c(O)ccc(O)c1C2=O",
+   "provenance": "REUSED verbatim from tmesim/validation/calibration.py::MITOXANTRONE_SMILES.",
+   "measured": {
+    "effect": 30.0,
+    "effect_kind": ">",
+    "fluor": null,
+    "fluor_sd": null
+   }
+  }
+ },
+ "in_sample_disclosure": {
+  "doxorubicin": "IN-SAMPLE. calibrate_alpha() is fit on doxorubicin, pinning its penetration length to 64.92 um by construction. Its absolute agreement with Kyle 2004 is NOT evidence and is reported NOT TESTABLE, following scorecard.py::_run_perivascular_penetration.",
+  "epirubicin": "Out-of-sample as a fit, but the engine cannot distinguish it from doxorubicin (4'-epimer; descriptors are stereochemistry-blind), so its numbers are expected to be doxorubicin's. That is the point of criterion C0.",
+  "daunorubicin": "OUT-OF-SAMPLE. New to this repository. Nothing fit to it.",
+  "mitoxantrone": "OUT-OF-SAMPLE for this measurement. It carries a separate perivascular anchor in pk_anchors against Patel 2013's band, which is reported JOINTLY for three drugs and therefore contains no compound-to-compound contrast; nothing was fit to it."
+ },
+ "engine_state": {
+  "calibrate_alpha": 22.223477711172563,
+  "alpha_fit_on": "doxorubicin (Primeau 2005, PMID 16361566)",
+  "two_route": "ON (shipping default)",
+  "efflux": "OFF (shipping default)",
+  "intracellular_retardation": "OFF (shipping default)",
+  "section": "10x Xenium human GBM, hBrain 319-gene panel (data_cache/xenium_gbm), the repository's default",
+  "section_dx_um": 12.0,
+  "mcc_dx_um": 2.0
+ },
+ "arms": {
+  "A_mcc_analogue": "The apples-to-apples arm. A uniform slab of the measured thickness (140 um) with a one-sided planar source and a sealed far side \u2014 the same geometry Kyle's apparatus imposes \u2014 solved by the SAME frozen transport solver. Readout: the ratio of mean exposure over the near 30 um to mean exposure over the far 30 um, which is Table 1's quantity with no conversion and no assumption of exponentiality.",
+  "B_real_section_map": "The product's actual output. Both compounds on ONE reconstructed real tissue section, reduced to exposure vs distance-from-nearest-measured-endothelial-cell, with the model-free empirical half-distance and the C0*exp(-d/L)+floor fit.",
+  "C_noise_floor": "Every choice that differs between two runs for reasons unrelated to the compound: grid, tissue-mask repair, distance bin width, exposure vs final concentration, distance metric."
+ },
+ "criteria": {
+  "C0_epimer_control": {
+   "statement": "Doxorubicin and epirubicin are 4'-epimers. The engine's descriptors are stereochemistry-blind, so it MUST predict them identical \u2014 and Kyle Table 1 measures them as identical (11+-5 vs 12+-3; ~12 vs ~10). A model that separated them would predict a difference the measurement excludes.",
+   "bar": "relative difference in the engine's near:far ratio < 1e-6, AND the measured intervals overlap",
+   "note": "This is a control on the READOUT, not evidence of predictive power: agreeing by being blind is not the same as agreeing by being right, and the report must say so."
+  },
+  "C1_direction": {
+   "statement": "PRIMARY. The engine must place DAUNORUBICIN as the WORSE penetrator of the pair, which is what the measurement says by 4.5x on the primary column and 2.5x on the independent effect-based column.",
+   "bar": "near:far ratio(daunorubicin) > near:far ratio(doxorubicin) in arm A, AND empirical half-distance(daunorubicin) < half-distance(doxorubicin) in arm B. Both required.",
+   "why_this_can_fail": "The shipping two-route law consumes logP and HBD. Daunorubicin is MORE lipophilic (XLogP 1.8 vs 1.3) and has FEWER donors (5 vs 6), so the diffusivity term alone predicts the OPPOSITE of the measurement. Recovering the measured direction requires the uptake sink to overturn the engine's own transport term \u2014 and that sink is a structure-only prior that alpha_identifiability.md proves is unidentified for every drug but doxorubicin."
+  },
+  "C2_noise_floor": {
+   "statement": "The separation must be larger than the span produced by choices that differ between the two runs for reasons unrelated to the compound.",
+   "nuisance_axes": {
+    "arm_A": {
+     "dx_um": [
+      1.0,
+      2.0,
+      4.0
+     ],
+     "exposure_s": [
+      3600.0,
+      21600.0
+     ]
+    },
+    "arm_B": {
+     "distance_bin_width_um": [
+      5.0,
+      10.0,
+      20.0
+     ],
+     "arm": [
+      "dx12_repaired",
+      "dx12_native",
+      "dx30_native"
+     ],
+     "field": [
+      "auc",
+      "conc"
+     ],
+     "distance_metric": [
+      "primary",
+      "legacy"
+     ]
+    }
+   },
+   "bar": "the [min, max] interval of the readout over the full nuisance grid must be DISJOINT between doxorubicin and daunorubicin, in both arms"
+  },
+  "C3_magnitude": {
+   "statement": "The modelled fold-separation must agree with the measured fold-separation. Two bars are registered: a STRICT one set by the measurement's own SDs, and a LOOSE one set by the repository's declared order-of-magnitude factor.",
+   "measured": {
+    "central_fluorescence": 4.545454545454546,
+    "sd_interval": [
+     2.1875,
+     10.833333333333334
+    ],
+    "central_effect_based": 2.5,
+    "derivation": "central = 50/11; interval = (50-15)/(11+5) to (50+15)/(11-5), i.e. Table 1 fluorescence +- 1 SD combined in the worst-case direction. The effect-based column gives an independent 30/12."
+   },
+   "bar_strict": "R_sim inside the measurement's own +-1 SD interval",
+   "bar_loose": "R_sim within 3.0x of the central measured fold",
+   "note": "The loose bar is deliberately reported as weak: a 3x band around a 4.5x effect admits R_sim below 1.0, i.e. the wrong direction. C1 therefore carries the verdict and C3 qualifies it."
+  },
+  "C4_absolute_ratios": {
+   "statement": "Secondary and heavily qualified. Each compound's own modelled near:far ratio against its Table 1 value.",
+   "bar": "inside the measured +- 1 SD interval",
+   "not_evidence_for": [
+    "doxorubicin",
+    "epirubicin"
+   ],
+   "reason": "doxorubicin is the alpha fit and epirubicin is numerically doxorubicin; only daunorubicin's row is a prediction"
+  },
+  "C6_far_side_disclosure": {
+   "statement": "The paper's own ANOVA finds the far-side (post-transport) signal statistically INDISTINGUISHABLE across the four drugs, and attributes the whole near:far spread to near-side accumulation. The engine's far-side exposures are therefore REPORTED against that finding.",
+   "bar": "NOT SCOREABLE \u2014 the paper prints no numeric far-side values, only the ANOVA verdict. The engine's far-side spread across the four compounds is reported and the qualitative agreement stated. No number will be read off a figure to manufacture a bar.",
+   "why_it_still_matters": "If the engine reproduces the near:far ratio by predicting a large far-side DIFFERENCE, it is getting the right answer for a mechanism the measurement excludes."
+  },
+  "C7_near_side_accumulation": {
+   "statement": "The paper measures near-side accumulation relative to doxorubicin: EPI ~1.5x, DAU ~7x. The engine's near-side field is reported against those.",
+   "bar": "REGISTERED AS EXPECTED TO FAIL, before the run. The engine solves for FREE INTERSTITIAL concentration and represents cellular uptake as a LOSS term (k = clearance + alpha*uptake_proxy), not as a bound reservoir \u2014 intracellular retardation was built and REFUTED in results/intracellular_retardation.md and ships OFF. A stronger sink therefore LOWERS the engine's near-side concentration where the measurement RAISES total tissue drug. The engine has no mechanism to accumulate, so this row is expected to come out with the wrong sign.",
+   "why_the_ratio_test_survives_it": "A near:far RATIO is large for a high-uptake compound under BOTH descriptions \u2014 a store inflates the numerator, a sink steepens the gradient. So C1 and C3 remain legitimate even though C7 is expected to fail. This is registered in advance precisely so it cannot be discovered afterwards and presented as a nuance."
+  },
+  "C5_real_section_informativeness": {
+   "statement": "results/vessel_profile.md found the drug field on the reconstructed section largely inherits the shape of the vascular SOURCE field. If that confound is total here, arm B measures vessel geometry rather than transport and must be declared uninformative.",
+   "bar": "each compound's real-section half-distance must exceed the SOURCE NULL half-distance by at least 2.0x",
+   "if_it_fails": "arm B is reported UNINFORMATIVE, arm A carries C1, and the limitation is stated as a limitation of the map's spatial readout."
+  }
+ },
+ "registered_predictions_before_solving": {
+  "superseded_law": "The molecular-weight-only law of diffusivity_falsification.md predicts a 1.01x separation between doxorubicin and daunorubicin (543.5 vs 527.5 Da) against a measured 4.5x. It is registered as failing this test before it is run.",
+  "two_route_diffusivity_alone": "predicts daunorubicin FASTER, i.e. the WRONG direction",
+  "unknown": "whether the uptake sink overturns it, and whether any separation clears the noise floor"
+ },
+ "what_this_cannot_establish": [
+  "Anything about clinical response. Out of scope.",
+  "Absolute penetration depths. alpha is a gauge fit on doxorubicin and two_route_promotion.md \u00a78.3 records two external anchors now disagreeing about where the engine sits.",
+  "That the map is right for compounds unlike these. n = 4, one structural class, one section, one tumour type.",
+  "That Kyle's ratio is pure diffusion. It is diffusion against cellular sequestration, and the authors attribute the ranking mainly to the latter.",
+  "Anything from the doxorubicin or epirubicin rows taken alone."
+ ]
+}

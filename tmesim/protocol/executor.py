@@ -167,7 +167,6 @@ class RunPlan:
     state_mode: str = "oxygen"
     sensitivity_mode: str = "uniform"
     report: List[str] = field(default_factory=list)
-    rank_by: Optional[str] = None
     dose_conversion: Optional[DoseConversion] = None
     recon_key: Tuple = ()
     line: int = 0
@@ -207,7 +206,6 @@ class RunPlan:
             "state_mode": self.state_mode,
             "sensitivity_mode": self.sensitivity_mode,
             "report": list(self.report),
-            "rank_by": self.rank_by,
             "spec": self.spec(),
             "dose_conversion": (self.dose_conversion.to_dict()
                                 if self.dose_conversion else None),
@@ -393,6 +391,10 @@ def plan(source: str, compile_drugs: bool = True, check_budget: bool = True,
         section = stmt.section
         opts = stmt.options
 
+        if isinstance(stmt, A.CompareStmt) and not _check_compare(
+                stmt, drugs, len(combos), diags):
+            continue
+
         missing_drug = [d for d in drugs if d not in drug_defs]
         for d in missing_drug:
             if syntax_broken:
@@ -468,7 +470,6 @@ def plan(source: str, compile_drugs: bool = True, check_budget: bool = True,
                     section=section, dx_um=float(dx_um),
                     state_mode=state_mode, sensitivity_mode=sens_mode,
                     report=list(opts.report) or list(A.METRICS),
-                    rank_by=opts.rank_by,
                     dose_conversion=conv,
                     axes={k: str(v) for k, v in combo.items()},
                     recon_key=(section, round(float(dx_um), 6), VASCULAR_MODE,
@@ -494,6 +495,64 @@ def plan(source: str, compile_drugs: bool = True, check_budget: bool = True,
     if check_budget:
         _check_budget(out)
     return out
+
+
+#: Why ``compare A, B`` is refused. Ordering compounds by predicted effect was
+#: withdrawn on 2026-08-21; comparing RUNS of one compound was not, and the two
+#: sentences below are the whole distinction.
+WITHDRAWN_CROSS_COMPOUND = (
+    "ordering two different compounds by predicted effect has been WITHDRAWN "
+    "(2026-08-21). It was measured this week and it does not hold: "
+    "results/pk_ranking_robustness.md — per-compound plasma exposure spans "
+    "113.1x across the compounds the panel ranked, while the published GBM "
+    "order first breaks at a spread of only 1.53x; "
+    "results/capacity_ranking_robustness.md — the breast top-1 pick changes "
+    "under this repo's own structural capacity rule. `compare` now takes two or "
+    "more RUNS OF ONE COMPOUND on one section — a dose ladder, or any other "
+    "`sweep`. Run each compound in its own program if you need both maps; the "
+    "map for one compound is the product, the ordering between them is not."
+)
+
+
+def _check_compare(stmt: A.CompareStmt, drugs: List[str], n_combos: int,
+                   diags: collect) -> bool:
+    """Validate a ``compare``'s arity. ``True`` if it may be expanded.
+
+    Three outcomes, all at validation time, before anything runs:
+
+    * two or more DISTINCT compounds -> refused, :data:`WITHDRAWN_CROSS_COMPOUND`;
+    * one compound named more than once -> refused, it varies nothing;
+    * one compound and a single planned run -> refused, one run is not a
+      comparison (the old "needs at least two" refusal, moved onto runs).
+    """
+    cols = list(getattr(stmt, "drug_cols", []) or [])
+    distinct = list(dict.fromkeys(drugs))
+    if len(distinct) > 1:
+        diags.error(
+            f"compare {', '.join(distinct)}: " + WITHDRAWN_CROSS_COMPOUND,
+            node=stmt, code="withdrawn-ranking",
+            col=(cols[1] if len(cols) > 1 else 0) or stmt.col)
+        return False
+    if len(drugs) > 1:
+        diags.error(
+            f"compare {drugs[0]}, {drugs[0]}: {drugs[0]} is named "
+            f"{len(drugs)} times, so every run of this compare is the same "
+            "run. A compare over one compound varies a swept PARAMETER, not "
+            f"the compound — write `compare {drugs[0]} with ...` and add a "
+            "`sweep`.",
+            node=stmt, code="incomplete-compare",
+            col=(cols[1] if len(cols) > 1 else 0) or stmt.col)
+        return False
+    if n_combos < 2:
+        name = drugs[0] if drugs else "?"
+        diags.error(
+            f"compare {name}: this program plans only one run, and one run is "
+            "not a comparison. Add a `sweep` so there are two or more runs of "
+            f"{name} to put side by side (e.g. `sweep dose from 50 to 400 "
+            "mg/m2 step 50`), or use `run` for a single run.",
+            node=stmt, code="incomplete-compare", col=stmt.col)
+        return False
+    return True
 
 
 def _expand_sweep(sw: A.Sweep) -> List[Quantity]:
@@ -900,12 +959,13 @@ def execute_plan(p: Plan, log: Optional[Callable[[str], None]] = None,
         if on_progress:
             on_progress(grid)
 
-    ranking = _rank(p, rows)
+    # No `ranking` key. Ordering compounds by predicted effect was withdrawn on
+    # 2026-08-21 (PROTOCOL_LANGUAGE.md §5); `rows` carries each run's metrics
+    # and the caller reads the map, not a league table.
     return {
         "n_runs": len(p.runs),
         "grid": grid,
         "rows": rows,
-        "ranking": ranking,
         "sweep_axes": list(p.sweep_axes),
         "expects": list(p.expects),
         "diagnostics": p.diagnostics.to_dicts(),
@@ -952,24 +1012,20 @@ def _score_expectations(expects: List[Dict], metrics: Dict) -> List[Dict]:
     return out
 
 
-def _rank(p: Plan, rows: List[Dict]) -> Optional[Dict]:
-    """``rank by <metric>`` for a ``compare`` statement."""
-    metric = next((r.rank_by for r in p.runs if r.rank_by), None)
-    if not metric:
-        return None
-    key = A.METRICS[metric]
-    scored = [(r["drug"], r.get("metrics", {}).get(key) if r.get("metrics")
-               else None, r["index"]) for r in rows]
-    usable = [s for s in scored if s[1] is not None]
-    usable.sort(key=lambda s: s[1], reverse=True)
-    return {
-        "metric": metric,
-        "engine_key": key,
-        "order": [{"drug": d, "value": v, "run_index": i}
-                  for d, v, i in usable],
-        "unranked": [{"drug": d, "run_index": i}
-                     for d, v, i in scored if v is None],
-        "note": ("ranking is the defensible output of a section whose panel "
-                 "cannot support an absolute kill; it is invariant across the "
-                 "three state routes (results/cell_state_impact.md §3.3)."),
-    }
+# `_rank` lived here. It scored every row of a `compare` by one metric and
+# returned an order. It was DELETED on 2026-08-21 with the rest of `rank by`:
+# results/pk_ranking_robustness.md measured a 113.1x per-compound plasma
+# exposure spread against an order that first breaks at a spread of 1.53x, and
+# results/capacity_ranking_robustness.md moved the breast top-1 pick with this
+# repo's own structural capacity rule. Nothing replaces it — the product is the
+# single-compound map, and `compare` now puts runs of ONE compound side by side.
+#
+# Its `note` field is NOT lost with it. That note said two things: that ranking
+# was the defensible output (ranking justification — dies with the feature), and
+# that the section's panel cannot support an absolute kill, citing the state-route
+# sweep (results/cell_state_impact.md). The second is a DISCLOSURE and it now
+# reaches the same callers by a wider path: `resolve.check_capability` raises it
+# per run, in its rewritten form (relative-within-one-map, with the swept list
+# named), those diagnostics are collected into `Plan.diagnostics`, and the
+# `diagnostics` key of this function's result carries them whether or not a
+# `compare` was written. It used to fire only when a program asked for a rank.

@@ -1,8 +1,14 @@
 """The transvascular delivery law, and the disclosure that has to travel with it.
 
 Every delivery number this app renders — mean tumour AUC, therapeutic coverage,
-penetration length, kill fraction — and therefore every cross-drug RANKING built
-out of them, is produced under one of two source terms in the transport solve:
+penetration length, kill fraction — and therefore the SHAPE of every exposure
+map built out of them, is produced under one of two source terms in the
+transport solve. (This sentence used to say "every cross-drug RANKING built out
+of them". Compound ordering was withdrawn on 2026-08-21 after it was measured —
+results/pk_ranking_robustness.md, results/capacity_ranking_robustness.md — and
+the law matters MORE under the replacement claim, not less: a plasma or a
+capacity factor cancels out of a within-map ratio, and the source term does
+not.) The two terms are:
 
 * ``S = PS*Cp``          the historical ONE-WAY leak. No path from interstitium
                          back to blood, so the steady state is unbounded above.
@@ -11,11 +17,17 @@ out of them, is produced under one of two source terms in the transport solve:
                          construction.
 
 Which one is in force is :attr:`tmesim.core.PDEConfig.transvascular_exchange`,
-and the choice is NOT cosmetic: it re-weights the panel by permeability, which
+and the choice is NOT cosmetic: it re-weights delivery by permeability, which
 spans 47x across the GBM drug list, and it changes the top-1 GBM pick
 (cisplatin -> vincristine, ``results/transvascular_exchange_revalidation.md``
-§4.1). A user who reads a ranking off this Studio without being told which law
-produced it has been handed a decision-shaped number with a hidden branch in it.
+§4.1). That top-1 flip is now reported as EVIDENCE OF MAGNITUDE rather than as a
+consequence for a product output, because compound ordering was withdrawn on
+2026-08-21 (``results/pk_ranking_robustness.md``,
+``results/capacity_ranking_robustness.md``). The consequence that remains is
+sharper, not softer: the source term sets the SHAPE of the exposure field, and a
+shape is precisely what a within-map ratio does NOT cancel. A user who reads a
+map off this Studio without being told which law produced it has been handed a
+gradient with a hidden branch in it.
 
 **Everything here is READ FROM ``PDEConfig`` AT CALL TIME.** Nothing about the
 law — not the formula, not the word "default", not the direction of the caveat —
@@ -23,8 +35,8 @@ is hard-coded to today's shipped value. If the default flips, the disclosure
 rewrites itself rather than going quietly stale, which is the only version of
 this that stays true without someone remembering to come back.
 
-The external anchor and the ranking consequence are quoted verbatim from the
-repo's own measurements:
+The external anchor and the magnitude of the law's effect are quoted verbatim
+from the repo's own measurements:
 
 * ``results/breast_kp_validation.md`` — against human breast microdialysis the
   one-way leak puts 5-fluorouracil at 7.80x plasma where 0.61x was measured, and
@@ -57,11 +69,16 @@ _ANCHOR_MISS = (
     "both"
 )
 
-# The ranking consequence, measured on GBM.
-_RANK_FLIP = (
-    "the corrected law re-weights the panel by permeability (which spans 47x "
-    "across this drug list) and CHANGES THE TOP-1 GBM DRUG, cisplatin -> "
-    "vincristine, swapping 4 of 45 pairs"
+# How much the law moves the answer, measured on GBM. This used to be presented
+# as "the ranking consequence"; the ranking is withdrawn, and the measurement is
+# kept because it is the only external calibration of the law's MAGNITUDE that
+# this repo has. Read it as: the source term is large enough to reorder five
+# drugs, therefore it is large enough to retilt one map.
+_LAW_MAGNITUDE = (
+    "the corrected law re-weights delivery by permeability (which spans 47x "
+    "across this drug list) by enough to have CHANGED THE TOP-1 GBM DRUG, "
+    "cisplatin -> vincristine, swapping 4 of 45 pairs, back when this repo "
+    "still published an ordering"
 )
 
 
@@ -82,7 +99,7 @@ def delivery_law(in_effect: Optional[bool] = None) -> Dict:
     :param in_effect: the value actually used by the run being described. When
         ``None`` the shipped default is reported, which is what a surface that
         is not scoped to one run (the report limits block, the cross-specimen
-        ranking) can honestly say.
+        comparison) can honestly say.
     :returns: ``{transvascular_exchange, shipped_default, is_shipped_default,
         law, alternative_law, title, headline, caveat, reference}``.
 
@@ -90,8 +107,9 @@ def delivery_law(in_effect: Optional[bool] = None) -> Dict:
     ``splitCaveat()`` parses: a ``<subject>: <body>`` prefix under 88 characters
     and a single trailing parenthesis carrying the repo citations. It contains
     "MUST NOT", so it is counted and styled as a HARD STOP alongside the other
-    hard stops in the caveats panel — which is the correct severity. A ranking
-    read as law-independent is a wrong ranking, not a slightly qualified one.
+    hard stops in the caveats panel — which is the correct severity. A map read
+    as law-independent is a wrong map, not a slightly qualified one: the two
+    laws put the drug in different places, not merely at different levels.
     """
     shipped = _shipped_default()
     on = shipped if in_effect is None else bool(in_effect)
@@ -116,25 +134,29 @@ def delivery_law(in_effect: Optional[bool] = None) -> Dict:
     if on:
         title = f"DELIVERY LAW {law} (exchange)"
         body = (
-            f"every delivery number and every ranking here was produced by the "
-            f"gradient-driven EXCHANGE source {law} ({standing}), which is "
-            f"bounded by the plasma level by construction. The alternative "
-            f"one-way leak {other} is the form every stored reference result, "
-            f"calibration and regression in this repo was produced under, and "
-            f"the two laws DISAGREE on the ordering: {_RANK_FLIP}. Numbers here "
+            f"every delivery number and the SHAPE of every exposure map here "
+            f"was produced by the gradient-driven EXCHANGE source {law} "
+            f"({standing}), which is bounded by the plasma level by "
+            f"construction. The alternative one-way leak {other} is the form "
+            f"every stored reference result, calibration and regression in this "
+            f"repo was produced under, and the two laws DISAGREE about where "
+            f"the drug goes, not merely how much of it there is: "
+            f"{_LAW_MAGNITUDE}. A plasma or a tissue-capacity factor cancels "
+            f"out of a within-map ratio; this does not. Numbers and maps here "
             f"MUST NOT be compared against, or read as continuous with, any "
             f"result produced under the leak"
         )
     else:
         title = f"DELIVERY LAW {law} (one-way leak)"
         body = (
-            f"every delivery number and every ranking here was produced by the "
-            f"ONE-WAY vascular leak {law} ({standing}). It has no path from "
-            f"interstitium back to blood, so its steady state is unbounded "
-            f"above, and it MISSES ITS EXTERNAL ANCHOR IN BOTH DIRECTIONS: "
-            f"{_ANCHOR_MISS}. Correcting the form to {other} is not a rescale — "
-            f"{_RANK_FLIP}. The ordering shown here MUST NOT be read as "
-            f"law-independent"
+            f"every delivery number and the SHAPE of every exposure map here "
+            f"was produced by the ONE-WAY vascular leak {law} ({standing}). It "
+            f"has no path from interstitium back to blood, so its steady state "
+            f"is unbounded above, and it MISSES ITS EXTERNAL ANCHOR IN BOTH "
+            f"DIRECTIONS: {_ANCHOR_MISS}. Correcting the form to {other} is not "
+            f"a rescale — {_LAW_MAGNITUDE} — so it moves the gradient, which is "
+            f"the one thing a within-map ratio does not cancel. The map shown "
+            f"here MUST NOT be read as law-independent"
         )
 
     # Short enough for a table footnote or a one-line panel note, and it still

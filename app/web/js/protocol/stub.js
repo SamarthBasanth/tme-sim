@@ -47,7 +47,13 @@ const BARE_OK = new Set(['hill', 'binding', 'clearance', 'bbb_penetrance',
 const DRUG_FIELDS = new Set(['ic50', 'hill', 'diffusivity', 'binding', 'clearance',
   'bbb_penetrance', 'molecular_weight']);
 const PROTO_FIELDS = new Set(['route', 'dose', 'every', 'repeat', 'then', 'rest', 'cycles']);
-const RUN_FIELDS = new Set(['dx', 'state_mode', 'sensitivity', 'report', 'rank']);
+const RUN_FIELDS = new Set(['dx', 'state_mode', 'sensitivity', 'report']);
+// `rank` is NOT a run field any more. It is still recognised in runOpt() so the
+// refusal names the withdrawal instead of reading as a typo. Kept identical to
+// tmesim/protocol/parser.py:WITHDRAWN_RANK_BY — an editor that accepts what the
+// engine refuses (or the reverse) is worse than either rule on its own.
+const WITHDRAWN_RANK_BY = '`rank by` has been WITHDRAWN from TPL (2026-08-21). Ordering compounds by predicted effect is no longer an output of this repo, because the ordering was measured and does not hold: results/pk_ranking_robustness.md — per-compound plasma exposure spans 113.1x across the compounds the panel ranked, and the published GBM order first breaks at a spread of only 1.53x; results/capacity_ranking_robustness.md — the breast top-1 pick changes under this repo\'s own structural capacity rule. Report the metric with `report <metric>` and read the map for ONE compound; use `compare` for two or more RUNS of one compound (a dose ladder), not for two compounds.';
+const WITHDRAWN_CROSS_COMPOUND = 'ordering two different compounds by predicted effect has been WITHDRAWN (2026-08-21). It was measured and it does not hold: results/pk_ranking_robustness.md — per-compound plasma exposure spans 113.1x across the compounds the panel ranked, while the published GBM order first breaks at a spread of only 1.53x; results/capacity_ranking_robustness.md — the breast top-1 pick changes under this repo\'s own structural capacity rule. `compare` now takes two or more RUNS OF ONE COMPOUND on one section — a dose ladder, or any other `sweep`. Run each compound in its own program if you need both maps; the map for one compound is the product, the ordering between them is not.';
 const ROUTES = ['oral', 'iv', 'ip'];
 const STATE_MODES = ['oxygen', 'vessel_distance', 'markers'];
 const SENSITIVITIES = ['uniform', 'determinant'];
@@ -244,7 +250,9 @@ function parse(source) {
       break;
     }
     if (!drugs.length) { E(no, sig[1] || sig[0], `\`${kind}\` needs at least one drug name.`); return; }
-    if (kind === 'run' && drugs.length > 1) E(no, drugs[1].tok, 'use `compare A, B ...` for more than one drug.');
+    // Arity is checked in semantics(), not here: whether a `compare` plans two
+    // or more runs depends on the sweeps, which are a whole-program property.
+    if (kind === 'run' && drugs.length > 1) E(no, drugs[1].tok, '`run` takes ONE compound. ' + WITHDRAWN_CROSS_COMPOUND);
     if (!sig[i] || sig[i].v !== 'with') { E(no, sig[i] || sig[0], 'expected `with <protocol>`.'); return; }
     const proto = sig[i + 1];
     if (!proto || proto.t !== 'ident') { E(no, proto || sig[i], '`with` needs a protocol name.'); return; }
@@ -254,7 +262,7 @@ function parse(source) {
     const obj = {
       kind, line: no, drugs, protocol: proto.v, protoTok: proto,
       section: sec.v, sectionTok: sec,
-      opts: { dx: null, state_mode: null, sensitivity: null, report: [], rank: null },
+      opts: { dx: null, state_mode: null, sensitivity: null, report: [] },
     };
     prog.statements.push(obj);
     block = { kind, obj, line: no };
@@ -402,8 +410,9 @@ function parse(source) {
   }
 
   function runOpt(obj, sig, head, no) {
+    if (head.v === 'rank') { E(no, head, WITHDRAWN_RANK_BY, { code: 'withdrawn_ranking' }); return; }
     if (!RUN_FIELDS.has(head.v)) {
-      E(no, head, `\`${head.v}\` is not a run option. Allowed: dx, state_mode, sensitivity, report, rank by.`);
+      E(no, head, `\`${head.v}\` is not a run option. Allowed: dx, state_mode, sensitivity, report.`);
       return;
     }
     if (head.v === 'dx') {
@@ -421,13 +430,6 @@ function parse(source) {
       const v = sig[1];
       if (!v || !SENSITIVITIES.includes(v.v)) { E(no, v || head, `sensitivity must be one of ${SENSITIVITIES.join(' | ')}.`); return; }
       obj.opts.sensitivity = { value: v.v, line: no, tok: v };
-      return;
-    }
-    if (head.v === 'rank') {
-      if (!sig[1] || sig[1].v !== 'by') { E(no, sig[1] || head, 'the only rank form is `rank by <metric>`.'); return; }
-      const m = sig[2];
-      if (!m || !METRICS[m.v]) { E(no, m || sig[1], `rank by needs a metric: ${Object.keys(METRICS).join(', ')}.`); return; }
-      obj.opts.rank = { value: m.v, line: no };
       return;
     }
     // report a, b, c
@@ -511,8 +513,19 @@ function semantics(prog, cat, errors, warnings) {
     if (!s.opts.report.length) {
       W(s.line, null, 'no `report` list; the executor will report its default metric set.');
     }
-    if (s.kind === 'compare' && !s.opts.rank) {
-      W(s.line, null, '`compare` without `rank by <metric>` reports the runs but states no ordering.');
+    if (s.kind === 'compare') {
+      // Mirrors tmesim/protocol/executor.py:_check_compare, in the same order.
+      const distinct = [...new Set(s.drugs.map((d) => d.name))];
+      if (distinct.length > 1) {
+        E(s.line, s.drugs[1].tok, `compare ${distinct.join(', ')}: ${WITHDRAWN_CROSS_COMPOUND}`,
+          { code: 'withdrawn_ranking' });
+      } else if (s.drugs.length > 1) {
+        E(s.line, s.drugs[1].tok, `compare ${distinct[0]}, ${distinct[0]}: ${distinct[0]} is named ${s.drugs.length} times, so every run of this compare is the same run. A compare over one compound varies a swept PARAMETER, not the compound — write \`compare ${distinct[0]} with ...\` and add a \`sweep\`.`,
+          { code: 'incomplete_compare' });
+      } else if (plannedRuns(prog) < 2) {
+        E(s.line, null, `compare ${distinct[0]}: this program plans only one run, and one run is not a comparison. Add a \`sweep\` so there are two or more runs of ${distinct[0]} to put side by side (e.g. \`sweep dose from 50 to 400 mg/m2 step 50\`), or use \`run\` for a single run.`,
+          { code: 'incomplete_compare' });
+      }
     }
   }
 
@@ -528,6 +541,15 @@ function semantics(prog, cat, errors, warnings) {
 }
 
 /* --------------------------------------------------------- expansion ---- */
+
+/**
+ * Runs ONE statement expands to: the cross-product of the range sweeps. A fixed
+ * sweep is one point, so it does not turn a single run into a comparison.
+ * Used by semantics() to tell "compare over a dose ladder" from "compare that
+ * plans exactly one run".
+ */
+const plannedRuns = (prog) => prog.sweeps.reduce(
+  (n, sw) => n * (sw.kind === 'range' ? Math.max(1, axisValues(sw).length) : 1), 1);
 
 const axisValues = (sw) => {
   const out = [];
@@ -669,7 +691,6 @@ function expand(prog, cat) {
           spec,
           est_s,
           report: stmt.opts.report.length ? stmt.opts.report : Object.keys(METRICS),
-          rank: stmt.opts.rank ? stmt.opts.rank.value : null,
         });
       }
     }
@@ -701,7 +722,7 @@ function standingCaveats(prog, runs) {
     out.push('sensitivity uniform sets every cell to 1.0: kill and coverage are a NO-RESISTANCE UPPER BOUND, not an expected response. Differences BETWEEN cells of this sweep are differences between upper bounds.');
   }
   if (runs.some((r) => r.spec.section === 'xenium_319')) {
-    out.push('ABSOLUTE KILL IS NOT DEFENSIBLE ON xenium_319 UNDER ANY STATE ROUTE: the 319-gene panel carries no hypoxia-response transcript, so no cell-state route clears the bar and kill moves by up to 0.3252 absolute (1.77x) across routes. The RANKING across the swept axis is the defensible reading.');
+    out.push('ABSOLUTE KILL IS NOT DEFENSIBLE ON xenium_319 UNDER ANY STATE ROUTE: the 319-gene panel carries no hypoxia-response transcript, so no cell-state route clears the bar and kill moves by up to 0.3252 absolute (1.77x) across routes. What this grid supports is the RELATIVE reading within ONE compound on this one section — how the map changes from one point of the swept axis to the next, and how one region of a map stands against another. The absolute level does not, and neither does any comparison BETWEEN compounds: that was withdrawn on 2026-08-21 (results/pk_ranking_robustness.md, results/capacity_ranking_robustness.md).');
   }
   out.push('No section in this deployment carries a measured treatment-outcome label. Nothing on this grid has been scored against a real drug response.');
   return out;
@@ -775,7 +796,7 @@ export async function plan(source) {
     axes,
     runs: runs.map((r) => ({
       index: r.index, coords: r.coords, label: r.label, drug: r.drug,
-      params: r.params, spec: r.spec, est_s: r.est_s, report: r.report, rank: r.rank,
+      params: r.params, spec: r.spec, est_s: r.est_s, report: r.report,
     })),
     metrics: (runs[0] ? runs[0].report : Object.keys(METRICS)).map((k) => ({ key: k, ...METRICS[k] })),
     expects: prog.expects,

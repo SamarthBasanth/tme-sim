@@ -322,7 +322,9 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
             "n_runs": body.get("n_runs", len(grid)),
             "grid": grid,
             "rows": body.get("rows", []),
-            "ranking": body.get("ranking"),
+            # No `ranking` key: `rank by` and cross-compound ordering were
+            # withdrawn on 2026-08-21 (PROTOCOL_LANGUAGE.md §5). Each row
+            # carries its own metrics; nothing orders the rows for the caller.
             "sweep_axes": body.get("sweep_axes", []),
             "expects": body.get("expects", []),
             "diagnostics": body.get("diagnostics", []),

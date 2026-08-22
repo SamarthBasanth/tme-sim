@@ -79,13 +79,18 @@ export function describe(kind) {
  * Rendered as a permanent block under the run's own caveats.
  */
 export const STANDING_LIMITS = [
-  'ABSOLUTE KILL IS NOT DEFENSIBLE on any panel that cannot measure hypoxia. On such a section no state route clears the bar and kill moves by up to 0.3252 absolute (1.77x) purely with the choice of route. The cross-drug RANKING is invariant across routes and is the defensible output; the LEVEL is not.',
-  // The line above makes the ranking the product. This one names the case where
-  // the ranking is MEASURED to be wrong, so it has to sit immediately after it.
+  'ABSOLUTE KILL IS NOT DEFENSIBLE on any panel that cannot measure hypoxia. On such a section no state route clears the bar and kill moves by up to 0.3252 absolute (1.77x) purely with the choice of route. WHAT SURVIVES IS THE MAP, NOT THE LEVEL AND NOT A COMPARISON BETWEEN COMPOUNDS. Within one compound on one section the RELATIVE exposure between regions is the defensible reading, because the two scale factors that were measured to destroy the cross-compound ordering move every point of the map together and therefore cancel out of a ratio between points. A per-compound plasma factor is an exact linear rescale of the field: worst relative deviation 1.41e-14 over plasma factors 0.005 to 26, a 5,200x span, measured at the shipping configuration (results/pk_ranking_robustness.md sec. 1.2). The tissue-capacity term this engine omits is exactly invariant for converged gradient shape to 1e-9 (results/capacity_ranking_robustness.md sec. 2b), but it acts as a time rescale, so over a finite exposure window a region that has not converged still carries a residual. THOSE TWO ARE A LIST, NOT A GUARANTEE: they are the perturbations that were actually swept, and an axis absent from that list is untested rather than covered. Neither of them protects against error in the transport law itself, which moves the SHAPE of the gradient and not merely its level.',
+  // The line above used to end by naming the cross-drug RANKING as the product.
+  // That claim was withdrawn on 2026-08-21: it was measured and it does not hold
+  // (results/pk_ranking_robustness.md, results/capacity_ranking_robustness.md).
+  // It is REPLACED rather than dropped, because a limit that says "the level is
+  // not defensible" and then names nothing that is leaves a reader with no way
+  // to use the product at all. The line below names the one error class the
+  // replacement claim does NOT survive, so it has to sit immediately after it.
   // Phrased with "MUST NOT" deliberately: CV_HARD in inspect.js counts that as a
   // hard stop, and this is one. Numbers: results/diffusivity_falsification.md.
-  'TRANSPORT REPRODUCES ABOUT A QUARTER OF THE MEASURED SPREAD BETWEEN COMPOUNDS. D_eff comes from a two-route law -- paracellular between cells plus transcellular through their membranes -- so logP and hydrogen-bond donor count reach it through a membrane permeability. Scored BLIND and UNFITTED against 71 compounds measured by one method in one cell line (Pruijn 2008): R^2 = 0.718, 99% within 3x of measurement, and 24 of 31 exact-mass pairs ordered correctly. The MOLECULAR-WEIGHT-ONLY model this replaced was FALSIFIED on the same data -- R^2 = 0.022, flat by construction at identical mass (exactly 1.00x against a measured 3.7x), 0 of 31 pairs ordered. STILL NOT TRUE: it reproduces 8.3x of the measured 29.7x spread, so it UNDER-SEPARATES a congeneric series systematically; the whole test is ONE cell line; and the absolute value is not defensible. Read a ranking over a similar-mass series as a hypothesis worth testing, not as a transport measurement. Ranking compounds that differ substantially in mass remains the best-supported case. See results/two_route_promotion.md.',
-  'sensitivity_mode=uniform sets every cell to 1.0. Every kill number it produces is a NO-RESISTANCE UPPER BOUND, not an expected response. It is comparable across drugs precisely because it is the same assumption for all of them.',
+  'TRANSPORT REPRODUCES ABOUT A QUARTER OF THE MEASURED SPREAD BETWEEN COMPOUNDS. D_eff comes from a two-route law -- paracellular between cells plus transcellular through their membranes -- so logP and hydrogen-bond donor count reach it through a membrane permeability. Scored BLIND and UNFITTED against 71 compounds measured by one method in one cell line (Pruijn 2008): R^2 = 0.718, 99% within 3x of measurement, and 24 of 31 exact-mass pairs ordered correctly. The MOLECULAR-WEIGHT-ONLY model this replaced was FALSIFIED on the same data -- R^2 = 0.022, flat by construction at identical mass (exactly 1.00x against a measured 3.7x), 0 of 31 pairs ordered. STILL NOT TRUE: it reproduces 8.3x of the measured 29.7x spread, so it UNDER-SEPARATES a congeneric series systematically; the whole test is ONE cell line; and the absolute value is not defensible. THIS IS THE LIMIT ON THE SHAPE OF THE MAP, and it is the one the limit above does not cover. D_eff sets how steeply exposure falls with distance from a vessel, so an error here tilts the gradient rather than raising or lowering it, and unlike a plasma or a capacity factor it does NOT cancel out of a within-map ratio. The descriptor path that feeds this law has never been scored (results/descriptor_falsification.md). Read the falloff as the best available estimate of a shape, carrying an unquantified descriptor term; ordering COMPOUNDS by it, or by anything else here, is withdrawn. See results/two_route_promotion.md.',
+  'sensitivity_mode=uniform sets every cell to 1.0. Every kill number it produces is a NO-RESISTANCE UPPER BOUND, not an expected response. It was originally chosen because applying one assumption to every compound was what made a cross-compound comparison fair; that comparison has been withdrawn, and the setting is kept for the reason that outlives it -- on a section carrying no measured resistance for this compound, a ceiling is the honest reading and an estimate would not be. Read it as an upper bound on this one map, not as a prediction of response, and not as a number to set beside another compound.',
   'NOTHING IN THIS PROJECT HAS BEEN VALIDATED AGAINST A PATIENT OUTCOME. These sections carry no treatment-response label, so every number here is a prediction of the physical model that has never been scored. NOT FOR CLINICAL USE.',
 ];
 
@@ -155,6 +160,14 @@ export const METRICS = {
     base: 'computed',
     src: 'fraction of tumour cells whose exposure reaches 1x IC50',
   },
+  // ABSOLUTE, and that is why it is not the headline. Coverage compares an
+  // exposure to an IC50, so it reads BOTH the plasma level and the potency —
+  // the two per-compound quantities measured to be uncertain enough to break
+  // the cross-compound ordering (results/pk_ranking_robustness.md). Scaling the
+  // field scales the answer; tmesim/validation/delivery_metrics.py says so in
+  // its own docstring. It is kept because it is the number a pharmacologist
+  // asks for, and it is reported across the dose ladder rather than as one
+  // value so the reader can see it move.
   penetration_length_um: {
     label: 'Penetration length', unit: 'um', fmt: 'num1', better: 'higher',
     base: 'computed',
@@ -204,9 +217,11 @@ export function metricProvenance(key, run) {
   // The transvascular delivery law. Every metric in this table is an integral
   // of the same transport solve, and that solve's vascular source term is a
   // CHOSEN default — so by the escalation rule at the top of this file all four
-  // read `assumed`, not `computed`. This is the one perturbation measured to
-  // change the top-1 drug, which is the decision the panel exists to support,
-  // so it is stated on the metric and not left to the caveats list alone. The
+  // read `assumed`, not `computed`. It used to be stated here on the grounds
+  // that it changes the top-1 drug; that decision no longer exists. It is
+  // stated here now for a reason that outlives it: the law sets the SHAPE of
+  // the gradient, which is the one thing a within-map ratio does not cancel,
+  // so it is the perturbation the reach reading is most exposed to. The
   // text is the backend's, built from PDEConfig at run time
   // (app/server/delivery_law.py); nothing about the law is written here.
   if (prov.delivery_law && prov.delivery_law.caveat) {

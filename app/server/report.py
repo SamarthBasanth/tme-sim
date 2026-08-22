@@ -1,8 +1,37 @@
-"""Therapy reports — the deliverable the pipeline exists to produce.
+"""The SINGLE-COMPOUND MAP DOCUMENT — the deliverable the pipeline produces.
 
-A **report** is one ranked, mechanistically attributed drug panel simulated on
-ONE section, with the provenance of every input and the limits of the output
-attached to it. It is the in-product form of ``experiments/patient_report.py``.
+A **report** is ONE compound simulated on ONE real tissue: where the drug
+reaches, how much of the tumour it never reaches, and the provenance and limits
+of every number that says so. It is the artefact a customer keeps and shows a
+colleague.
+
+THE RANKED PANEL WAS WITHDRAWN ON 2026-08-21
+--------------------------------------------
+Until that date this module produced "one ranked, mechanistically attributed
+drug panel", and the ORDERING was named as its defensible output. That ordering
+was measured this week and it does not hold:
+
+* ``results/pk_ranking_robustness.md`` sec. 0 — per-compound plasma exposure
+  across the compounds the GBM panel ranks spans **113.1x**, while the published
+  GBM order first breaks at a per-compound spread of **1.53x**. A single
+  compound's own licensed dose range (irinotecan, 1,660 vs 3,392 ng/mL Cmax on
+  one FDA label table, a 2.04x span) contains a swap that needs only 1.961x. The
+  ordering was conditional on a quantity that varies by two orders of magnitude
+  between the very compounds being ordered.
+* ``results/capacity_ranking_robustness.md`` sec. 0 — under this repo's OWN
+  structural capacity rule the breast top-1 CHANGES (``vinorelbine`` ->
+  ``doxorubicin``), and no sampled per-compound capacity arm reaches
+  decision-grade on any panel. The measured spread of the capacity term the
+  engine assumes to be 1.0 for every compound is 1307.5x (n = 33 rat brain
+  slices, 3.2-4184 mL/g).
+
+So a report no longer ranks anything. It takes ONE drug. What survives, and what
+this document now says, is stated in the ``map_is_the_output`` limit and repeated
+in every disclosure on the page:
+
+    Within a single compound on a single tissue, the RELATIVE exposure between
+    regions is the defensible output. The absolute level is not, and comparison
+    BETWEEN compounds is not.
 
 How it is built
 ---------------
@@ -11,26 +40,42 @@ Nothing here simulates anything. A report is assembled out of RUNS:
 * every arm is a normal ``RunSpec`` submitted through the ordinary
   :class:`app.server.jobs.JobManager` queue, so it shares the single worker, the
   reconstruction cache, cancellation, on-disk persistence and ``/api/runs``;
-* each drug contributes TWO arms on the same reconstruction — the real run, and
-  the ``resistance_off=true`` counterfactual whose kill is the denominator of
-  ``rho`` in the attribution;
-* when every arm is ``done`` the report is assembled by
-  :func:`tmesim.report.attribution.attribute` — the SAME function
-  ``experiments/patient_report.py`` calls. The science is imported, not forked.
+* the one drug contributes TWO arms on the same reconstruction — the real run,
+  and the ``resistance_off=true`` counterfactual whose kill is the denominator of
+  ``rho``. That counterfactual is PER-COMPOUND: it compares this compound with
+  itself on this tissue, so nothing about it depended on the withdrawn ranking
+  and it is what MEASURES the resistance term rather than asserting it;
+* when both arms are ``done`` the report is assembled by
+  :func:`attribute_compound` below.
 
-Because all 2N arms share ``(section, dx, vascular_mode, oxygen_mode,
-state_mode)``, the expensive reconstruction is built once and every subsequent
-arm is a cache hit. That is the whole reason the report goes through the queue
-instead of around it.
+Because both arms share ``(section, dx, vascular_mode, oxygen_mode,
+state_mode)``, the expensive reconstruction is built once and the second arm is a
+cache hit. That is the whole reason the report goes through the queue instead of
+around it.
+
+Why the attribution is NOT ``tmesim.report.attribution``
+--------------------------------------------------------
+That module computes every term as a deviation from the PANEL MEAN
+(``delivery_i = log10 C_i - mean_j log10 C_j`` and so on). **At N = 1 every one of
+those terms is identically zero**, so ported unchanged it would print three
+zeros and call them an explanation. It is a ranking artefact, not a per-compound
+reading, and it could not be carried over. It is untouched and still used by
+``experiments/patient_report.py``; :func:`attribute_compound` here is a new,
+absolute, single-compound decomposition. See its docstring for why the
+replacement is strictly better than the thing it replaces.
 
 What it refuses to do
 ---------------------
-* It will not rank in ``sensitivity_mode='determinant'``. On a panel that
-  measures some drugs' determinants and not others that mode is not a ranking,
-  it is a measurement-coverage artifact (``results/real_drug_panel.md``).
+* It will not run in ``sensitivity_mode='determinant'``: on a section that
+  measures some compounds' determinants and not others, an estimate of intrinsic
+  resistance for THIS compound would be a measurement-coverage artifact rather
+  than a measurement (``results/real_drug_panel.md``).
 * It will not present an absolute kill without the interval and the state-route
   span that ``results/kill_calibration.md`` and ``results/cell_state_impact.md``
   measured for it.
+* It will not invent ``C_plasma``. If the run's ``plasma_mean_uM`` is missing or
+  non-finite the decomposition REFUSES with a stated reason and prints no
+  numbers, rather than substituting one.
 * It carries :data:`NOT_FOR_CLINICAL_USE` at the top AND the bottom of every
   rendering, and the limits block is the first section of the document, never a
   footnote.
@@ -60,24 +105,39 @@ from .delivery_law import delivery_law
 from .jobs import PDE_DT_S, JobManager, jsonable
 
 __all__ = [
-    "DEFAULT_PANEL",
+    "MAP_CLAIM",
     "NOT_FOR_CLINICAL_USE",
     "REPORT_SENSITIVITY_MODE",
+    "TERMS",
+    "TERM_LABEL",
     "Report",
     "ReportManager",
+    "attribute_compound",
     "build_limits",
     "render_html",
     "reports_dir",
 ]
 
-#: The five-drug GBM panel ``experiments/patient_report.py`` ranks, in its order.
-DEFAULT_PANEL: Sequence[str] = (
-    "temozolomide", "lomustine", "cisplatin", "methotrexate", "doxorubicin",
+#: The claim this document makes, stated once and quoted verbatim by the
+#: ``map_is_the_output`` limit, by the hero, and by every rewritten disclosure
+#: that used to talk about a ranking. One sentence, three clauses, and the two
+#: negative clauses are not optional trimming.
+MAP_CLAIM = (
+    "Within a single compound on a single tissue, the RELATIVE exposure between "
+    "regions is the defensible output. The absolute level is not, and comparison "
+    "BETWEEN compounds is not."
 )
 
-#: The ONLY per-cell sensitivity mode in which a cross-drug ranking is fair: it
-#: is identical for every drug, so it cancels out of the comparison. Forced, not
-#: defaulted — a report is a ranking.
+#: Forced, not defaulted, and it stays forced now that there is no ranking to be
+#: fair about. On a section carrying NO measured resistance determinant for this
+#: compound, per-cell sensitivity 1.0 is the honest reading: it asserts no
+#: intrinsic resistance, which makes every kill on the page an explicit
+#: no-intrinsic-resistance UPPER BOUND — a bound a reader can reason about. The
+#: alternative, 'determinant', would scale this compound by whichever determinant
+#: the panel happens to carry and leave it at 1.0 where the panel does not, so
+#: the number would move with MEASUREMENT COVERAGE rather than with
+#: pharmacology. An upper bound that says so is defensible; an estimate that
+#: silently encodes what the panel could see is not (results/real_drug_panel.md).
 REPORT_SENSITIVITY_MODE = "uniform"
 
 NOT_FOR_CLINICAL_USE = (
@@ -100,8 +160,12 @@ def reports_dir() -> str:
 # The limits block — mandatory, prominent, and derived from this repo's own
 # measurements rather than asserted.
 # --------------------------------------------------------------------------- #
-def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict]:
+def build_limits(section_id: str, spec: Dict, drug: Optional[str]) -> List[Dict]:
     """The limits that travel with EVERY report, in the order they are shown.
+
+    ``drug`` is the ONE compound this document is about. It used to be a panel;
+    the ranked panel was withdrawn on 2026-08-21 (see the module docstring), so
+    nothing here compares one compound against another any more.
 
     Each entry is ``{id, severity, title, body, source, applies}``. ``applies``
     is a property of this section and this spec, never a global switch: an item
@@ -126,49 +190,121 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
     })
 
     # 2 -------------------------------------------------------------------- #
+    # THE claim of this document, and the reason the ranked panel it replaced was
+    # withdrawn on 2026-08-21. Every other disclosure on this page that used to
+    # say "the ranking" now says this instead; none of them was shortened.
     limits.append({
-        "id": "ranking_is_the_output",
+        "id": "map_is_the_output",
         "severity": "critical",
         "applies": True,
-        "title": "The RANKING is the defensible output. The absolute kill is not.",
-        "source": "results/cell_state_impact.md §3.2, §3.3, §5",
+        "title": ("The relative exposure MAP is the defensible output. The "
+                  "absolute level is not, and a comparison BETWEEN compounds is "
+                  "not."),
+        "source": ("results/cell_state_impact.md §3.2, §3.3, §5; "
+                   "results/pk_ranking_robustness.md sec. 0, sec. 1.2; "
+                   "results/capacity_ranking_robustness.md sec. 0, sec. 2b; "
+                   "results/descriptor_falsification.md"),
         "body": (
-            "The cross-drug ordering below is INVARIANT across all three "
-            "cell-state routes ('oxygen', 'vessel_distance', 'markers') and "
-            "across the whole measured potency band. The absolute kill fraction "
-            "is not: with tissue, drug, transport and RNG held identical, kill "
-            "moves by up to 0.3252 absolute (1.77x relative) purely with the "
-            "choice of state route. Read the order. Do not read the level."
+            f"{MAP_CLAIM} "
+            "WHY THE ABSOLUTE LEVEL IS NOT. With tissue, drug, transport and RNG "
+            "held identical, kill moves by up to 0.3252 absolute (1.77x "
+            "relative) purely with the choice of cell-state route "
+            "('oxygen', 'vessel_distance', 'markers'). Read where the drug goes. "
+            "Do not read how much of the tumour it kills. "
+            "WHY A CROSS-COMPOUND COMPARISON IS NOT, AND WHY THIS PAGE NO LONGER "
+            "CARRIES ONE. This report used to rank a panel and to name that "
+            "ordering as its defensible output. THAT CLAIM IS WITHDRAWN as of "
+            "2026-08-21. Per-compound plasma exposure across the compounds the "
+            "GBM panel ranked spans 113.1x, while the published GBM order first "
+            "breaks at a per-compound spread of only 1.53x — and one FDA label "
+            "table for a single compound (irinotecan: Cmax 1,660 ng/mL at "
+            "125 mg/m2, 3,392 ng/mL at 340 mg/m2, a 2.04x span) already contains "
+            "more spread than the 1.961x a swap in that order needs. "
+            "Independently, under this repo's own structural tissue-capacity "
+            "rule the breast top-1 CHANGES (vinorelbine -> doxorubicin), and no "
+            "sampled per-compound capacity arm reached decision-grade on any "
+            "panel; the engine assumes that capacity term is exactly 1.0 for "
+            "every compound, and its measured spread is 1307.5x (n = 33, "
+            "3.2-4184 mL/g). "
+            "WHAT THE RELATIVE READING IS PROTECTED AGAINST, AT THE STRENGTH "
+            "EACH WAS ACTUALLY MEASURED — THE TWO ARE NOT THE SAME STRENGTH AND "
+            "THE DIFFERENCE MATTERS. (1) PLASMA / DOSE SCALE: EXACT for the "
+            "finite-window AUC field. The transport PDE is linear in C and "
+            "starts from C = 0, so the AUC field is exactly proportional to the "
+            "plasma level; measured at the shipping configuration (real Xenium "
+            "GBM section, dx = 12 um, dt = 10 s, convection ON, 6 h window) over "
+            "plasma factors 0.005 to 26 — a 5,200x span — the worst relative "
+            "deviation of the field from an exact rescale anywhere was 1.41e-14, "
+            "i.e. machine precision. A per-compound plasma factor therefore "
+            "moves every point of this map together and cancels exactly from a "
+            "ratio between two points. (2) TISSUE CAPACITY: EXACT FOR A "
+            "CONVERGED GRADIENT SHAPE ONLY, verified to 1e-9 — and NOT "
+            "unconditionally. In the source's own words, 'steady-state and "
+            "equilibrium-referenced outputs — penetration length, "
+            "interstitial:plasma ratio, converged gradient shape — are EXACTLY "
+            "invariant to tissue capacity ... The finite-window kill ranking is "
+            "not.' A capacity term R enters as dC/dt = (1/R)[...], a pure "
+            "rescale of TIME, so over a FINITE exposure window "
+            "AUC_R(x,T) = R * AUC_1(x,T/R): a region of this map that has NOT "
+            "converged within the window carries a residual, and the invariance "
+            "holds there only to the extent the field has converged. This report "
+            "runs a finite window. That is not asserted to be converged anywhere. "
+            "WHAT NEITHER INVARIANCE PROTECTS AGAINST. Error in the transport "
+            "LAW itself. A wrong effective diffusivity changes the SHAPE of the "
+            "gradient, not merely its level, so it is not a common factor and "
+            "nothing above divides it out — and that law's descriptor inputs "
+            "have never been scored "
+            "(results/descriptor_falsification.md). "
+            "THIS IS A LIST OF THE AXES THAT WERE SWEPT, NOT A COVERAGE CLAIM. "
+            "Exactly two perturbations were measured: plasma/dose scale, and "
+            "tissue capacity. An axis that does not appear in that list of two "
+            "is UNTESTED, not covered; silence about it here is silence, not a "
+            "pass."
         ),
     })
 
     # 2b ------------------------------------------------------------------- #
-    # Limit 2 says the ordering is invariant. It is — to the CELL-STATE route,
-    # which is a common-mode perturbation. It is NOT invariant to the
-    # transvascular delivery law, which is drug-specific and changes top-1 on
-    # GBM. Those two sentences have to sit next to each other or the first one
-    # reads as a broader guarantee than it is. The law is read from PDEConfig at
-    # call time (app/server/delivery_law.py), so this limit cannot describe a
-    # law the engine is no longer using.
+    # Limit 2 names two invariances the map DOES have (plasma scale exactly;
+    # tissue capacity for a converged shape). This one sits immediately beside it
+    # because those invariances are common-mode factors, and the delivery LAW is
+    # not: it sets the source term at the vessel wall, so changing it changes the
+    # SHAPE of the gradient this map is entirely made of, not merely its level.
+    # The two sentences have to sit next to each other or the first reads as a
+    # broader guarantee than it is. The law is read from PDEConfig at call time
+    # (app/server/delivery_law.py), so this limit cannot describe a law the
+    # engine is no longer using.
     law = delivery_law()
     limits.append({
         "id": "transvascular_delivery_law",
         "severity": "critical",
         "applies": True,
-        "title": law["title"] + " — the ranking above is LAW-DEPENDENT",
+        "title": (law["title"] + " — the MAP above is LAW-DEPENDENT, and the law "
+                  "is the one thing limit 2's invariances do NOT divide out"),
         "source": law["reference"],
-        "body": law["caveat"],
+        "body": (
+            law["caveat"]
+            + " HOW THIS BEARS ON THE MAP RATHER THAN ON A RANKING. This "
+            "document no longer ranks compounds, so the law's power to reorder a "
+            "panel is no longer the relevant harm; the relevant harm is narrower "
+            "and closer to home. The source term is what injects drug at the "
+            "vessel wall, so the choice of law sets the boundary condition of "
+            "the very gradient this page reads regions off. It is therefore NOT "
+            "a factor that multiplies every point of the map together, and "
+            "neither of the invariances in limit 2 removes it: it can move the "
+            "relative exposure between two regions of THIS tissue for THIS "
+            "compound, which is precisely the quantity this document offers as "
+            "defensible. Read every falloff, every reach ratio and every region "
+            "comparison below as conditional on the law named in this limit's "
+            "title."
+        ),
     })
 
-    # Limit 2c. The two limits above condition the ranking on things that are
-    # uncertain. This one names the case where the ranking is measured to be
+    # Limit 2c. The two limits above condition the map on things that are
+    # uncertain. This one names what the transport model is measured to get
     # WRONG, and it has to sit with them rather than in the numerics block at
-    # the bottom: a reader who is ranking a congeneric series is the reader most
-    # likely to stop after limit 2, and that reader is the one this concerns.
-    # The engine's only molecular input to diffusivity is molecular weight, so
-    # at matched MW its transport prediction is flat BY CONSTRUCTION and the
-    # ordering it produces over such a series is potency alone wearing a
-    # transport label. Scored blind, unfitted, on 71 compounds.
+    # the bottom: D_eff is the single input that sets how far this compound
+    # penetrates from a vessel, which is the shape of the map itself.
+    # Scored blind, unfitted, on 71 compounds.
     limits.append({
         "id": "diffusivity_two_route_partial",
         "severity": "critical",
@@ -202,12 +338,25 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
             "test is ONE cell line. And absolute transport remains wrong: the "
             "same drug's compiled D_eff misses its measured multicellular-layer "
             "band by 1.5x (49.3 um^2/s against a measured 74-130). "
-            "CONSEQUENCE FOR THIS PAGE: if the drugs ranked below are a "
-            "similar-mass series, read their ORDER as a hypothesis worth "
-            "testing rather than as a measurement, and read no absolute "
-            "delivery number from it at all. Across drugs that differ "
-            "substantially in mass the delivery term discriminates strongly, "
-            "and that remains the best-supported case."
+            "CONSEQUENCE FOR THIS PAGE, RESTATED FOR A SINGLE-COMPOUND MAP. "
+            "This limit used to end by telling a reader to treat the ORDER of a "
+            "similar-mass series as a hypothesis rather than a measurement. "
+            "There is no order on this page any more, and the consequence is "
+            "narrower but it is not smaller: D_eff is the one compound-specific "
+            "input that sets how far THIS compound travels from a vessel before "
+            "it is cleared, so it fixes the length scale of the gradient every "
+            "region comparison below is read off. The two-route model that "
+            "produces it is scored, blind and unfitted, at R^2 = 0.718 across "
+            "compounds, but the SAME compiled D_eff misses its own measured "
+            "multicellular-layer band by 1.5x (49.3 um^2/s against a measured "
+            "74-130), and the entire scoring set is ONE cell line. Read this "
+            "compound's absolute penetration length L and absolute D_eff as "
+            "carrying at least that 1.5x, and read the SHAPE of the falloff as "
+            "conditional on a length scale that has never been measured on this "
+            "tissue, this compound, or any 3-D specimen. This is exactly the "
+            "error limit 2 names as the one its plasma and capacity invariances "
+            "do NOT divide out: it changes the shape of the gradient, not just "
+            "its level."
         ),
     })
 
@@ -278,17 +427,31 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
         "title": f"sensitivity_mode='{REPORT_SENSITIVITY_MODE}' — every kill here is an UPPER BOUND",
         "source": "reconstruct.real_pipeline.apply_drug_sensitivity; results/real_drug_panel.md",
         "body": (
-            "Every drug carries per-cell sensitivity 1.0, so NO intrinsic "
-            "resistance is asserted for any of them. That is deliberate and it "
-            "is the only setting in which a cross-drug ranking is fair, because "
-            "an identical factor cancels out of the comparison. The price is "
-            "that every ABSOLUTE kill below is a no-intrinsic-resistance UPPER "
-            "BOUND. The alternative 'determinant' mode is NOT used here: it "
-            "scales doxorubicin (TOP2A) and cisplatin / lomustine / "
-            "methotrexate (MKI67 proxy) to ~0.585 while temozolomide keeps 1.0 "
-            "— because TMZ's determinant MGMT is absent from the panel — which "
-            "flatters TMZ ~1.7x for a measurement-coverage reason, not a "
-            "pharmacological one."
+            f"{drug or 'This compound'} carries per-cell sensitivity 1.0 "
+            "everywhere, so NO intrinsic resistance is asserted for it anywhere "
+            "on this section. That is deliberate and it is FORCED, not "
+            "defaulted. THE REASON IT IS FORCED HAS CHANGED, AND THE NEW REASON "
+            "IS THE ONE THAT OUTLIVES THE RANKING. It used to be justified as "
+            "'the only mode in which a cross-drug comparison is fair, because an "
+            "identical per-cell factor cancels out of it' — an argument about a "
+            "ranking, and this document no longer ranks. The reason it survives "
+            "is simpler and it applies to a single compound on a single tissue: "
+            "on a section that carries NO measured resistance determinant for "
+            "this compound, a no-resistance UPPER BOUND is the honest reading, "
+            "and an estimate would not be. A bound that declares itself a bound "
+            "can be reasoned about — the true kill is at or below it, and the "
+            "reader knows in which direction they are wrong. The alternative "
+            "'determinant' mode produces no such guarantee: it scales a compound "
+            "by whichever determinant this panel happens to carry (doxorubicin "
+            "by TOP2A, cisplatin / lomustine / methotrexate by an MKI67 proxy, "
+            "to ~0.585) and leaves a compound whose determinant is ABSENT from "
+            "the panel at 1.0 — temozolomide, whose determinant MGMT is on "
+            "neither Xenium panel, keeps 1.0 and is thereby flattered ~1.7x for "
+            "a MEASUREMENT-COVERAGE reason and not a pharmacological one. A "
+            "number that moves with what the panel could see, while looking like "
+            "a number about the drug, is worse than a bound. The price of the "
+            "bound is stated plainly: every ABSOLUTE kill below is a "
+            "no-intrinsic-resistance UPPER BOUND, not a prediction of kill."
         ),
     })
 
@@ -326,8 +489,16 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
             f"uncalibrated. This report ran oxygen_mode='{oxy_mode}'. The "
             "oxygen route's downstream effect on predicted kill is small and "
             "therapeutic coverage is oxygen-invariant by construction — so the "
-            "ranking does not rest on the oxygen field, and no absolute hypoxia "
-            "claim should rest on it either. AN EARLIER VERSION OF THIS LIMIT "
+            "EXPOSURE MAP that is this document's output does not rest on the "
+            "oxygen field at all, and no absolute hypoxia claim should rest on "
+            "it either. Two things on this page DO read the oxygen field and "
+            "must be read with this limit beside them: the RESISTANCE decade, "
+            "whose rho is measured by re-simulating this compound with the "
+            "hypoxic and quiescent kill penalties switched off, and the 'viable' "
+            "tumour-cell band the reach curve is taken over, which is the "
+            "engine's own oxygen banding. Both inherit the |rho| ~ 0.15 "
+            "association above, and neither is a measurement of this specimen's "
+            "oxygen tension. AN EARLIER VERSION OF THIS LIMIT "
             "DECLARED THE SOLVE FALSIFIED AS VALUE-ADD; that claim was "
             "backwards by its own quoted numbers and has been withdrawn."
         ),
@@ -344,9 +515,14 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
             f"The specimen {section_id!r} is an untreated resection "
             f"({section.get('accession') or 'open dataset'}). There is no "
             "paired, measured drug response for any drug on it, and there is NO "
-            "outcome-labelled section anywhere in this repository. The ranking "
-            "below has therefore never been scored: its accuracy is not 'good', "
-            "not 'bad', it is UNKNOWN. Potency additionally comes from GDSC "
+            "outcome-labelled section anywhere in this repository. THE MAP BELOW "
+            "HAS THEREFORE NEVER BEEN SCORED: not its shape, not its falloff "
+            "with distance from vessel, not the fraction of tumour it says the "
+            "drug never reached. Its accuracy is not 'good', not 'bad', it is "
+            "UNKNOWN — and note that withdrawing the ranking did not weaken this "
+            "limit by one word, because the thing that was missing was never a "
+            "second compound, it was a MEASUREMENT to compare against. Potency "
+            "additionally comes from GDSC "
             "cell-line viability screens or curated literature — dissociated "
             "cells in monolayer, carrying none of this tumour's 3-D "
             "architecture, stromal/immune context or heterogeneity."
@@ -426,10 +602,19 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
             "doxorubicin penetration measurement (a 40-50 um half-distance, "
             "converted to an e-folding length L = d_half/ln2 ~ 65 um) and "
             "revalidated out-of-sample on exactly one other drug, "
-            "mitoxantrone. Every drug's absolute penetration rides on that one "
-            "anchor, and the underlying binding proxy is a structure-based "
-            "ORDERING, not a first-principles rate. A drug it mis-ranks (active "
-            "transport, efflux, ion trapping) would be mis-predicted."
+            "mitoxantrone. This compound's absolute penetration rides on that "
+            "one anchor, and the underlying binding proxy is a structure-based "
+            "ORDERING of compounds, not a first-principles rate — so a compound "
+            "that proxy places wrongly (active transport, efflux, ion trapping) "
+            "gets the wrong alpha and therefore the wrong perivascular sink. "
+            "THIS IS A MAP-SHAPE RISK, NOT ONLY A LEVEL RISK, WHICH IS WHY IT "
+            "SURVIVES THE WITHDRAWAL OF THE RANKING UNCHANGED IN SEVERITY. "
+            "alpha sets how steeply exposure falls away from a vessel, so it "
+            "does not multiply the map by a constant — it re-shapes it, and "
+            "limit 2's plasma and capacity invariances do not divide it out. "
+            f"Read the falloff and the reach curve for "
+            f"{drug or 'this compound'} as resting on a single doxorubicin "
+            "measurement plus one out-of-sample compound."
         ),
     })
 
@@ -442,9 +627,18 @@ def build_limits(section_id: str, spec: Dict, drugs: Sequence[str]) -> List[Dict
         "source": "tmesim/sim/engine.py",
         "body": (
             "A single time-averaged sustained plasma level drives the transport "
-            f"solve at dt = {PDE_DT_S:g} s; it preserves total delivered drug "
-            "and the relative ranking, but it is not a time-resolved infusion "
-            "and no schedule optimisation should be read off it."
+            f"solve at dt = {PDE_DT_S:g} s. It preserves total delivered drug, "
+            "and — this is the part that matters for a map rather than for the "
+            "ranking this sentence used to be about — the plasma level enters "
+            "the solve as ONE MULTIPLICATIVE FACTOR on the source term, so it "
+            "scales every point of the exposure field together and cancels "
+            "exactly from a ratio between two points (limit 2, invariance 1: "
+            "worst relative deviation 1.41e-14 over plasma factors 0.005 to 26). "
+            "What it does NOT preserve is anything absolute or anything "
+            "time-dependent: it is not a time-resolved infusion, the absolute "
+            "exposure level and therefore the IC50 coverage move with it "
+            "one-for-one, and no schedule optimisation, no C_max reading and no "
+            "dosing inference should be read off it."
         ),
     })
     return limits
@@ -556,9 +750,9 @@ def _num(v, default=float("nan")) -> float:
     return f if math.isfinite(f) else default
 
 
-def _row_from_arms(drug: str, real: Dict, cf: Dict, mean_ecm: float,
-                   section_id: str) -> Dict:
-    """One panel row, built ONLY out of numbers the engine already produced."""
+def _compound_row(drug: str, real: Dict, cf: Dict, mean_ecm: float,
+                  section_id: str) -> Dict:
+    """The ONE compound's row, built only out of numbers the engine produced."""
     from tmesim.physics.diffusion import ALPHA_TORTUOSITY
 
     prov = real.get("provenance") or {}
@@ -573,11 +767,17 @@ def _row_from_arms(drug: str, real: Dict, cf: Dict, mean_ecm: float,
 
     return {
         "name": drug,
-        # --- the four inputs tmesim.report.attribution needs ---------------- #
+        # --- the inputs :func:`attribute_compound` reads --------------------- #
         "tumor_auc": _num(metrics.get("mean_tumor_auc"), 0.0),
         "ic50": _num(prov.get("ic50_uM"), float("nan")),
         "kill": _num(metrics.get("kill_fraction"), 0.0),
         "kill_no_resistance": _num(cf_metrics.get("kill_fraction"), 0.0),
+        # C_plasma. Read from the run's own extra_metrics, NEVER recomputed and
+        # never defaulted: if it is absent the decomposition refuses (see
+        # attribute_compound), because inventing the denominator of the DELIVERY
+        # term would invent the term.
+        "c_plasma_uM": _num(extra.get("plasma_mean_uM")),
+        "plasma_peak_uM": _num(extra.get("plasma_peak_uM")),
         # --- reported alongside --------------------------------------------- #
         "L_um": _num(extra.get("penetration_length_analytic_um")),
         "mw": _num(dp.get("molecular_weight")),
@@ -590,7 +790,17 @@ def _row_from_arms(drug: str, real: Dict, cf: Dict, mean_ecm: float,
         "pen": _num(extra.get("penetration_index")),
         "mean_auc": _num(extra.get("mean_tissue_auc")),
         "median_tumor_auc": _num(extra.get("median_tumor_auc")),
+        # The IC50 coverage LADDER, not one number. 1x IC50 acquired an authority
+        # it had not earned by being quoted alone; all three rungs were already
+        # computed by every run and only one of them was ever rendered.
+        "coverage_0_5x": _num(extra.get("therapeutic_coverage_0_5x")),
         "coverage_1x": _num(metrics.get("therapeutic_coverage_1x")),
+        "coverage_2x": _num(extra.get("therapeutic_coverage_2x")),
+        "E_p10_uM": _num(extra.get("E_p10_uM")),
+        "E_p50_uM": _num(extra.get("E_p50_uM")),
+        "E_p90_uM": _num(extra.get("E_p90_uM")),
+        "viable_tumor_fraction": _num(extra.get("viable_tumor_fraction")),
+        "hypoxic_tumor_fraction": _num(extra.get("hypoxic_tumor_fraction")),
         "penetration_length_fit_um": _num(metrics.get("penetration_length_um")),
         # --- provenance ------------------------------------------------------ #
         "provenance": {
@@ -613,80 +823,323 @@ def _row_from_arms(drug: str, real: Dict, cf: Dict, mean_ecm: float,
     }
 
 
-def assemble(section_id: str, spec_base: Dict, drugs: Sequence[str],
-             arms: Dict[str, Dict[str, Dict]]) -> Dict:
-    """Build the report body from completed run results.
+# --------------------------------------------------------------------------- #
+# The single-compound decomposition
+# --------------------------------------------------------------------------- #
+#: The three decades, keyed and labelled in the SAME vocabulary the per-cell
+#: mechanism attribution uses (``app/web/js/mechanism.js``: delivery / dose /
+#: resistance / chance, from ``tmesim.sim.mechanism.LABEL_LIMITER``). The
+#: document carries two attributions — this whole-tumour one and the per-cell
+#: one — and they must not use different words for the same idea. ``chance`` has
+#: no whole-tumour analogue and is deliberately absent rather than faked.
+TERMS: Sequence[str] = ("delivery_decades", "dose_decades", "resistance_decades")
 
-    ``arms`` maps ``drug -> {'real': RunResult, 'counterfactual': RunResult}``.
+TERM_LABEL: Dict[str, str] = {
+    "delivery_decades": "DELIVERY",
+    "dose_decades": "DOSE",
+    "resistance_decades": "RESISTANCE",
+}
+
+#: What each decade means, in one sentence, shipped in the payload beside it.
+TERM_MEANING: Dict[str, str] = {
+    "delivery_decades": (
+        "decades LOST getting from blood into this tumour's interstitium: "
+        "log10(C_tumor / C_plasma). Negative is the normal case and its "
+        "magnitude is the delivery deficit."
+    ),
+    "dose_decades": (
+        "decades of HEADROOM the plasma level has over this compound's own "
+        "potency: log10(C_plasma / IC50). This is the term the dose uncertainty "
+        "lands in, and it is quarantined here on purpose."
+    ),
+    "resistance_decades": (
+        "decades of kill LOST to this tumour's oxygen-driven resistance state: "
+        "log10(rho), where rho = kill / kill(resistance OFF) is MEASURED by the "
+        "counterfactual arm, not asserted."
+    ),
+}
+
+#: Written into the document beside the numbers. Every line of it is checkable
+#: against the run it describes.
+ATTRIBUTION_METHOD = (
+    "C_tumor  = (mean AUC at this tumour's TUMOR-cell positions) / T   [uM]\n"
+    "C_plasma = this run's own plasma mean (extra_metrics.plasma_mean_uM)  [uM]\n"
+    "drive    = C_tumor / IC50                                         [-]\n"
+    "rho      = kill / kill(resistance OFF)                            [-]\n"
+    "\n"
+    "DELIVERY  = log10(C_tumor  / C_plasma)   decades lost blood -> interstitium\n"
+    "DOSE      = log10(C_plasma / IC50)       decades of plasma headroom over IC50\n"
+    "RESISTANCE= log10(rho)                   decades of kill lost to O2 resistance\n"
+    "\n"
+    "  rho is MEASURED by a second simulation of THIS compound on THIS tissue\n"
+    "  with hypoxia_resistance=1 and quiescent_resistance=1 -- the\n"
+    "  resistance_off counterfactual arm -- never assumed.\n"
+    "\n"
+    "identity:  DELIVERY + DOSE  ==  log10(drive)\n"
+    "\n"
+    "Every term is an ABSOLUTE decade count referenced to a quantity from THIS\n"
+    "SAME RUN. Nothing is centred on a panel mean."
+)
+
+#: Why this decomposition replaced the panel-centred one, in the payload.
+ATTRIBUTION_RATIONALE = (
+    "This replaced tmesim.report.attribution's PANEL-CENTRED decomposition on "
+    "2026-08-21, and it is strictly better for three reasons that are worth "
+    "stating rather than assuming. (1) IT EXISTS AT N = 1. The old terms were "
+    "deviations from a panel mean (delivery_i = log10 C_i - mean_j log10 C_j and "
+    "so on), so on ONE compound every one of them is identically zero: ported "
+    "unchanged it would print three zeros and call them an explanation. (2) IT "
+    "DOES NOT DEPEND ON THE COMPANY THE COMPOUND KEPT. Every term here is an "
+    "absolute, physically interpretable decade count referenced to a quantity "
+    "from the SAME run — the run's own plasma mean, the compound's own IC50, the "
+    "compound's own resistance-off counterfactual. Panel-centring made a "
+    "compound's explanation move when a DIFFERENT compound was added to or "
+    "removed from the selection, which was never a defensible property of an "
+    "explanation. (3) IT QUARANTINES THE DOSE UNCERTAINTY IN ONE NAMED TERM "
+    "INSTEAD OF SMEARING IT ACROSS ALL THREE. DELIVERY is INVARIANT to the "
+    "plasma level: C_tumor is exactly linear in the plasma source (worst "
+    "relative deviation 1.41e-14 over plasma factors 0.005 to 26, a 5,200x span, "
+    "measured at the shipping configuration — results/pk_ranking_robustness.md "
+    "sec. 1.2), so rescaling the dose multiplies C_tumor and C_plasma by the "
+    "same factor and it cancels from log10(C_tumor / C_plasma) exactly. "
+    "RESISTANCE is a ratio of two kills of the same compound at the same dose, "
+    "so it does not move either. The entire dose uncertainty therefore lands in "
+    "DOSE and nowhere else — read that term as the uncertain one, and read "
+    "DELIVERY as the term that survives not knowing the dose. Saying that out "
+    "loud is the honest reading and it is a genuine improvement over a "
+    "decomposition in which the same uncertainty was spread invisibly over "
+    "three terms."
+)
+
+
+def attribute_compound(row: Dict, window_s: float) -> Dict:
+    """Decompose ONE compound's standing on ONE tissue into three decades.
+
+    Writes ``c_tumor_uM``, ``drive``, ``rho``, ``resistance_cost`` and the three
+    :data:`TERMS` onto ``row`` in place, and returns the method block that ships
+    with them.
+
+    The exact identity, asserted in ``tests/test_app_reports.py``::
+
+        DELIVERY + DOSE == log10(drive)
+
+    REFUSAL, NOT DEFAULTING. ``C_plasma`` is read from the run's own
+    ``extra_metrics.plasma_mean_uM`` (``app/server/jobs.py``) and is never
+    recomputed. If it is missing or non-finite this returns a ``null_reason`` and
+    writes NO decades, because the DELIVERY term is a ratio to that number and
+    substituting one would invent the answer. The same rule applies to the
+    exposure window, the IC50, ``C_tumor`` and the counterfactual kill; each
+    refuses on its own terms and says which one failed.
+
+    See :data:`ATTRIBUTION_RATIONALE` for why this is not
+    ``tmesim.report.attribution`` (which is untouched, still panel-centred, and
+    still what ``experiments/patient_report.py`` calls).
     """
-    from tmesim.report.attribution import TERM_LABEL, TERMS, attribute, gap_reason
+    block = {
+        "terms": list(TERMS),
+        "term_labels": dict(TERM_LABEL),
+        "term_meanings": dict(TERM_MEANING),
+        "method": ATTRIBUTION_METHOD,
+        "rationale": ATTRIBUTION_RATIONALE,
+        "implementation": "app.server.report.attribute_compound",
+        "panel_centred_implementation_not_used": (
+            "tmesim.report.attribution.attribute — panel-centred, identically "
+            "zero at N = 1, unchanged and still used by "
+            "experiments/patient_report.py"
+        ),
+        "null_reason": None,
+        "resistance_null_reason": None,
+    }
+    for key in ("c_tumor_uM", "drive", "rho", "resistance_cost",
+                "delivery_decades", "dose_decades", "resistance_decades",
+                "log10_drive"):
+        row[key] = None
 
-    first = arms[drugs[0]]["real"]
-    report = first.get("report") or {}
+    T = _num(window_s)
+    c_plasma = _num(row.get("c_plasma_uM"))
+    ic50 = _num(row.get("ic50"))
+    auc = _num(row.get("tumor_auc"))
+
+    if not (math.isfinite(T) and T > 0):
+        block["null_reason"] = (
+            f"the exposure window is {window_s!r}: a time-average of the AUC "
+            "field over a non-positive window is undefined, so C_tumor cannot "
+            "be formed and no decade is reported."
+        )
+        return block
+    if not (math.isfinite(c_plasma) and c_plasma > 0):
+        block["null_reason"] = (
+            f"this run reported plasma_mean_uM = {row.get('c_plasma_uM')!r}. "
+            "C_plasma is the reference of the DELIVERY term and the numerator "
+            "of the DOSE term, and it is read from the run's own extra_metrics "
+            "(app/server/jobs.py) rather than recomputed. It is NOT substituted: "
+            "a plausible plasma level chosen here would not be a measurement of "
+            "this run, it would be an invention, and both decades would inherit "
+            "it silently. No decade is reported."
+        )
+        return block
+    if not (math.isfinite(auc) and auc > 0):
+        block["null_reason"] = (
+            f"mean tumour-cell AUC is {row.get('tumor_auc')!r}, so C_tumor is "
+            "not a positive concentration and log10(C_tumor / C_plasma) is "
+            "undefined. This is the 'no TUMOR cells in this reconstruction' "
+            "case, and it refuses rather than reporting a floor."
+        )
+        return block
+    if not (math.isfinite(ic50) and ic50 > 0):
+        block["null_reason"] = (
+            f"this compound's IC50 resolved to {row.get('ic50')!r}, so the DOSE "
+            "decade log10(C_plasma / IC50) and the drive are undefined. No "
+            "potency was substituted."
+        )
+        return block
+
+    c_tumor = auc / T
+    drive = c_tumor / ic50
+    delivery = math.log10(c_tumor / c_plasma)
+    dose = math.log10(c_plasma / ic50)
+
+    row["c_tumor_uM"] = c_tumor
+    row["drive"] = drive
+    row["log10_drive"] = math.log10(drive)
+    row["delivery_decades"] = delivery
+    row["dose_decades"] = dose
+
+    kill = _num(row.get("kill"))
+    kill_off = _num(row.get("kill_no_resistance"))
+    if not (math.isfinite(kill_off) and kill_off > 0):
+        block["resistance_null_reason"] = (
+            f"the resistance-off counterfactual arm returned kill = "
+            f"{row.get('kill_no_resistance')!r}. rho = kill / kill(resistance "
+            "OFF) has no denominator, so the RESISTANCE decade is not reported. "
+            "It is MEASURED or it is absent; it is never assumed."
+        )
+        return block
+    if not math.isfinite(kill) or kill <= 0:
+        block["resistance_null_reason"] = (
+            f"the real arm returned kill = {row.get('kill')!r}. log10(rho) is "
+            "undefined at zero kill, so the RESISTANCE decade is not reported "
+            "rather than clamped to a floor. DELIVERY and DOSE are unaffected: "
+            "neither reads a kill."
+        )
+        return block
+
+    rho = kill / kill_off
+    row["rho"] = rho
+    row["resistance_cost"] = 1.0 - rho
+    row["resistance_decades"] = math.log10(rho)
+    return block
+
+
+def _mechanism_reading(real: Dict) -> Dict:
+    """The PER-CELL answer: how much of this tumour the drug never reached.
+
+    Read straight off ``tmesim.sim.mechanism``'s attribution as the run already
+    computed it (``app/server/jobs.py``), which reconciles bit-exactly with the
+    engine's own kill fraction or the run fails. Nothing is recomputed here.
+    """
+    mech = real.get("mechanism")
+    if not isinstance(mech, dict):
+        return {
+            "null_reason": (
+                "this run carries no per-cell mechanism attribution: "
+                + str(real.get("mechanism_reason")
+                      or "no reason was recorded by the run")
+                + ". The headline of this document is a per-cell fraction, so it "
+                "is not reported at all rather than approximated from a "
+                "whole-tumour average."
+            ),
+            "unreached_fraction_of_tumor": None,
+            "unreached_fraction_of_survivors": None,
+            "survival_breakdown": None,
+            "counts": None,
+            "n_tumor": None,
+            "n_survived": None,
+            "killed_fraction_of_tumor": None,
+            "limiter_vocabulary": dict(TERM_LABEL),
+        }
+    counts = mech.get("counts") or {}
+    n_tumor = _num(mech.get("n_tumor"), 0.0)
+    unreached = _num(counts.get("SURVIVED_UNREACHED"), float("nan"))
+    frac_tumor = (unreached / n_tumor
+                  if n_tumor > 0 and math.isfinite(unreached) else None)
+    breakdown = mech.get("survival_breakdown") or {}
+    return {
+        "null_reason": None,
+        "unreached_fraction_of_tumor": frac_tumor,
+        "unreached_fraction_of_survivors": breakdown.get("delivery"),
+        "survival_breakdown": breakdown,
+        "survival_breakdown_note": mech.get("survival_breakdown_note"),
+        "counts": counts,
+        "n_tumor": mech.get("n_tumor"),
+        "n_survived": mech.get("n_survived"),
+        "killed_fraction_of_tumor": mech.get("killed_fraction_of_tumor"),
+        "joint_limited": mech.get("joint_limited"),
+        "reconciliation": mech.get("reconciliation"),
+        "limiter_vocabulary": dict(TERM_LABEL),
+        "definition": (
+            "SURVIVED_UNREACHED is a TUMOR cell that survived because the drug "
+            "never arrived in quantity at its position — the delivery limiter of "
+            "tmesim.sim.mechanism, the same vocabulary the whole-tumour DELIVERY "
+            "decade above uses. The attribution reconciles bit-exactly with the "
+            "engine's own kill fraction or the run fails."
+        ),
+    }
+
+
+def assemble(section_id: str, spec_base: Dict, drug: str,
+             arms: Dict[str, Dict]) -> Dict:
+    """Build the report body from the two completed arms of ONE compound.
+
+    ``arms`` maps ``{'real': RunResult, 'counterfactual': RunResult}``. There is
+    no ranking, no sort and no rank: the ranked panel was withdrawn on
+    2026-08-21 (module docstring), and a rank over one row would be decoration.
+    """
+    real = arms["real"]
+    cf = arms.get("counterfactual") or {}
+    report = real.get("report") or {}
     mean_ecm = _num(report.get("mean_ecm_density"), 0.0)
     window_s = float(spec_base.get("total_time_s") or 0.0)
 
-    rows = [
-        _row_from_arms(d, arms[d]["real"], arms[d].get("counterfactual"),
-                       mean_ecm, section_id)
-        for d in drugs
-    ]
-    check = attribute(rows, window_s=window_s)
-    rows.sort(key=lambda r: r["kill"], reverse=True)
+    row = _compound_row(drug, real, cf, mean_ecm, section_id)
+    attribution = attribute_compound(row, window_s=window_s)
 
-    for i, r in enumerate(rows, start=1):
-        r["rank"] = i
-        if i < len(rows):
-            r["gap_reason"] = gap_reason(r, rows[i])
-        elif len(rows) > 1:
-            r["gap_reason"] = gap_reason(rows[i - 2], r, from_below=True)
-        else:
-            r["gap_reason"] = None
+    # The scale-free under-reached curve, CONSUMED from the run, never
+    # re-implemented here: app/server/reach.py owns it and app/server/jobs.py
+    # attaches it to every drug run. A build whose runs predate it degrades with
+    # a stated reason rather than with a silently missing section.
+    reach = real.get("reach")
+    if isinstance(reach, dict):
+        reach_reason = reach.get("null_reason")
+    else:
+        reach = None
+        reach_reason = (
+            "this run carries no 'reach' block. The scale-free under-reached "
+            "curve is produced by app.server.reach.compute_reach and attached by "
+            "app/server/jobs.py; a run made before that landed has none, and no "
+            "substitute is computed here — a second implementation of the same "
+            "curve is exactly how two numbers that must agree stop agreeing."
+        )
 
-    sp = check["spearman_total_vs_kill"]
-    check["faithful"] = (
-        "faithful" if (sp is not None and math.isfinite(sp) and sp >= 0.9)
-        else "partially faithful" if (sp is not None and math.isfinite(sp) and sp >= 0.5)
-        else "NOT faithful"
-    )
-
-    # The union of every arm's own caveats, de-duplicated, order preserved.
+    # The union of both arms' own caveats, de-duplicated, order preserved.
     seen, caveats = set(), []
-    for d in drugs:
-        for arm in ("real", "counterfactual"):
-            run = arms[d].get(arm) or {}
-            for c in ((run.get("provenance") or {}).get("caveats") or []):
-                if c not in seen:
-                    seen.add(c)
-                    caveats.append(c)
+    for arm in ("real", "counterfactual"):
+        run = arms.get(arm) or {}
+        for c in ((run.get("provenance") or {}).get("caveats") or []):
+            if c not in seen:
+                seen.add(c)
+                caveats.append(c)
 
     return {
-        "ranking": jsonable(rows),
-        "attribution": {
-            "terms": list(TERMS),
-            "term_labels": dict(TERM_LABEL),
-            "check": jsonable(check),
-            "method": (
-                "C_tumor_i = (mean AUC at this tumour's TUMOR-cell positions) / T   [uM]\n"
-                "drive_i   = C_tumor_i / IC50_i                                     [-]\n"
-                "\n"
-                "delivery_i = log10 C_tumor_i - mean_j log10 C_tumor_j\n"
-                "potency_i  = -( log10 IC50_i - mean_j log10 IC50_j )\n"
-                "o2resist_i = log10 rho_i     - mean_j log10 rho_j\n"
-                "\n"
-                "  rho_i = kill_i / kill_i(resistance OFF)   <- MEASURED by a second\n"
-                "                                              simulation of the same drug\n"
-                "                                              on the same tissue with\n"
-                "                                              hypoxia_resistance=1 and\n"
-                "                                              quiescent_resistance=1\n"
-                "\n"
-                "identity:  delivery_i + potency_i  ==  log10 drive_i - mean_j log10 drive_j"
-            ),
-            "implementation": "tmesim.report.attribution.attribute",
-        },
+        "compound": jsonable(row),
+        "attribution": jsonable(attribution),
+        "mechanism": jsonable(_mechanism_reading(real)),
+        "reach": jsonable(reach),
+        "reach_reason": reach_reason,
         "microenvironment": jsonable(report),
         "caveats": caveats,
         "window_s": window_s,
+        "map_claim": MAP_CLAIM,
     }
 
 
@@ -694,14 +1147,14 @@ def assemble(section_id: str, spec_base: Dict, drugs: Sequence[str],
 # Report objects
 # --------------------------------------------------------------------------- #
 class Report:
-    """One therapy report: its spec, its arms, its status, its document."""
+    """One single-compound map document: its spec, its two arms, its status."""
 
-    def __init__(self, report_id: str, section: str, drugs: Sequence[str],
+    def __init__(self, report_id: str, section: str, drug: Optional[str],
                  spec_base: Dict, spec_overrides: Dict,
                  label: Optional[str] = None):
         self.report_id = report_id
         self.section = section
-        self.drugs = list(drugs)
+        self.drug = drug
         self.spec_base = spec_base
         self.spec_overrides = dict(spec_overrides or {})
         self.label = label
@@ -710,45 +1163,55 @@ class Report:
         self.status = "queued"
         self.error: Optional[str] = None
         self.warnings: List[str] = []
-        #: drug -> {'real': run_id, 'counterfactual': run_id}
-        self.arms: Dict[str, Dict[str, str]] = {}
+        #: ``{'real': run_id, 'counterfactual': run_id}`` — flat, because there
+        #: is one compound. It was ``drug -> {arm -> run_id}`` while this was a
+        #: panel; :meth:`ReportManager._restore` flattens the old shape.
+        self.arms: Dict[str, str] = {}
         self.body: Optional[Dict] = None
 
     # -- views ------------------------------------------------------------- #
     @property
     def run_ids(self) -> List[str]:
-        out: List[str] = []
-        for d in self.drugs:
-            for arm in ("real", "counterfactual"):
-                rid = self.arms.get(d, {}).get(arm)
-                if rid:
-                    out.append(rid)
-        return out
+        return [rid for rid in (self.arms.get("real"),
+                                self.arms.get("counterfactual")) if rid]
 
     def summary_view(self, progress: Optional[Dict] = None) -> Dict:
-        best = None
-        if self.body and self.body.get("ranking"):
-            top = self.body["ranking"][0]
-            best = {"drug": top["name"], "kill": top["kill"],
-                    "dominant": top.get("dominant")}
+        # The list-row headline. It is deliberately NOT a kill and NOT a rank:
+        # ``top_ranked`` was removed with the ranking on 2026-08-21. What a row
+        # carries instead is the per-cell reading this document leads with — the
+        # fraction of tumour cells the compound never reached — which is
+        # per-compound, per-cell, and on the real tissue.
+        headline = None
+        if self.body:
+            mech = self.body.get("mechanism") or {}
+            headline = {
+                "drug": self.drug,
+                "unreached_fraction_of_tumor":
+                    mech.get("unreached_fraction_of_tumor"),
+                "unreached_null_reason": mech.get("null_reason"),
+            }
         return {
             "report_id": self.report_id,
             "label": self.label,
             "status": self.status,
             "section": self.section,
-            "drugs": self.drugs,
+            "drug": self.drug,
             "n_runs": len(self.run_ids),
             "created_at": self.created_at,
             "finished_at": self.finished_at,
             "runtime_s": (round(self.finished_at - self.created_at, 3)
                           if self.finished_at else None),
             "progress": progress,
-            "top_ranked": best,
-            # ``top_ranked`` is a RANKING, read straight off the list without
-            # opening the document, so the law that produced it travels with the
-            # SUMMARY and not only with the full view's limits block. Read from
+            "headline": headline,
+            # Every number in ``headline`` is read off an exposure field whose
+            # SHAPE the delivery law sets, and a list row is read without opening
+            # the document — so the law travels with the SUMMARY and not only
+            # with the full view's limits block. It is re-parented here rather
+            # than deleted with the ranking it used to qualify. Read from
             # PDEConfig at call time (app/server/delivery_law.py).
             "delivery_law": delivery_law(),
+            # Likewise the claim itself: a summary consumer meets it too.
+            "map_claim": MAP_CLAIM,
             "error": self.error,
             "not_for_clinical_use": True,
         }
@@ -763,16 +1226,19 @@ class Report:
             "warnings": self.warnings,
             "sensitivity_mode": REPORT_SENSITIVITY_MODE,
             "not_for_clinical_use_text": NOT_FOR_CLINICAL_USE,
-            "limits": build_limits(self.section, self.spec_base, self.drugs),
+            "limits": build_limits(self.section, self.spec_base, self.drug),
             "section_detail": _safe_section(self.section),
             "generator": "app/server/report.py (POST /api/reports)",
-            "attribution_implementation": "tmesim.report.attribution.attribute",
+            "attribution_implementation": "app.server.report.attribute_compound",
         })
         if self.body:
             out.update(self.body)
         else:
-            out.setdefault("ranking", [])
+            out.setdefault("compound", None)
             out.setdefault("attribution", None)
+            out.setdefault("mechanism", None)
+            out.setdefault("reach", None)
+            out.setdefault("reach_reason", None)
             out.setdefault("microenvironment", None)
             out.setdefault("caveats", [])
         return out
@@ -829,18 +1295,48 @@ class ReportManager:
                     doc = json.load(fh)
             except Exception:  # noqa: BLE001 - skip an unreadable report
                 continue
+            # A document persisted before 2026-08-21 has ``drugs[]`` and a
+            # nested ``arms`` map, because it was a panel. It is restored, not
+            # skipped — a stored artefact does not stop existing when the
+            # product's claim changes — but it is restored as what it is: the
+            # first compound of that panel, with a warning that says so, so a
+            # reader is never shown a withdrawn ranking as a current document.
+            drug = doc.get("drug")
+            legacy = None
+            if not drug:
+                panel = doc.get("drugs") or []
+                drug = panel[0] if panel else None
+                if panel:
+                    legacy = (
+                        f"RESTORED FROM A WITHDRAWN PANEL DOCUMENT. This report "
+                        f"was created as a {len(panel)}-compound RANKING "
+                        f"({list(panel)}) before the cross-compound ranking was "
+                        "withdrawn on 2026-08-21 "
+                        "(results/pk_ranking_robustness.md, "
+                        "results/capacity_ranking_robustness.md). Its ranking is "
+                        "NOT re-rendered and must not be read. Only its first "
+                        f"compound ({drug!r}) is carried forward as this "
+                        "document's subject; re-run it to obtain a "
+                        "single-compound map."
+                    )
             rep = Report(doc.get("report_id", name), doc.get("section", ""),
-                         doc.get("drugs") or [], doc.get("spec_base") or {},
+                         drug, doc.get("spec_base") or {},
                          doc.get("spec_overrides") or {}, doc.get("label"))
             rep.status = doc.get("status", "done")
             rep.created_at = doc.get("created_at") or rep.created_at
             rep.finished_at = doc.get("finished_at")
             rep.error = doc.get("error")
-            rep.warnings = doc.get("warnings") or []
-            rep.arms = doc.get("arms") or {}
+            rep.warnings = list(doc.get("warnings") or [])
+            if legacy:
+                rep.warnings.append(legacy)
+            arms = doc.get("arms") or {}
+            if drug and isinstance(arms.get(drug), dict):
+                arms = arms[drug]          # flatten the old drug -> arm nesting
+            rep.arms = {k: v for k, v in arms.items() if isinstance(v, str)}
             rep.body = {k: doc[k] for k in
-                        ("ranking", "attribution", "microenvironment",
-                         "caveats", "window_s") if k in doc}
+                        ("compound", "attribution", "mechanism", "reach",
+                         "reach_reason", "microenvironment", "caveats",
+                         "window_s", "map_claim") if k in doc}
             with self._lock:
                 self._reports[rep.report_id] = rep
                 self._order.append(rep.report_id)
@@ -870,28 +1366,29 @@ class ReportManager:
         return os.path.join(self._dir(report_id), "report.html")
 
     # -- submission --------------------------------------------------------- #
-    def submit(self, section: str, drugs: Sequence[str], spec_overrides: Dict,
+    def submit(self, section: str, drug: str, spec_overrides: Dict,
                base_spec: Dict, label: Optional[str] = None,
                warnings: Optional[List[str]] = None) -> Report:
-        """Enqueue 2 x len(drugs) arms and return the (queued) report."""
+        """Enqueue the compound's TWO arms and return the (queued) report."""
         with self._lock:
             self._counter += 1
             report_id = f"rep_{self._counter:05d}"
-            rep = Report(report_id, section, drugs, base_spec, spec_overrides,
+            rep = Report(report_id, section, drug, base_spec, spec_overrides,
                          label)
             rep.warnings = list(warnings or [])
 
-        # Every arm is enqueued BEFORE the report becomes visible. A report that
+        # BOTH arms are enqueued BEFORE the report becomes visible. A report that
         # is half-registered would look, to :meth:`refresh`, like a report whose
-        # missing drugs have no pending arms — i.e. finished — and would be
-        # assembled from an incomplete panel. A partial panel is not a ranking.
-        for drug in rep.drugs:
-            real = dict(base_spec, drug=drug, resistance_off=False)
-            cf = dict(base_spec, drug=drug, resistance_off=True)
-            rep.arms[drug] = {
-                "real": self.jobs.submit(real).run_id,
-                "counterfactual": self.jobs.submit(cf).run_id,
-            }
+        # missing arm has nothing pending — i.e. finished — and would be
+        # assembled without its counterfactual. Without the counterfactual there
+        # is no rho, and the RESISTANCE decade would be missing rather than
+        # measured.
+        real = dict(base_spec, drug=drug, resistance_off=False)
+        cf = dict(base_spec, drug=drug, resistance_off=True)
+        rep.arms = {
+            "real": self.jobs.submit(real).run_id,
+            "counterfactual": self.jobs.submit(cf).run_id,
+        }
         rep.status = "running"
         with self._lock:
             self._reports[report_id] = rep
@@ -957,57 +1454,57 @@ class ReportManager:
     def _refresh_locked(self, rep: Report) -> Report:
         if rep.status in TERMINAL:      # another poll got there first
             return rep
-        # Defensive: never assemble a panel whose arms are not all registered.
-        expected = {(d, a) for d in rep.drugs
-                    for a in ("real", "counterfactual")}
-        have = {(d, a) for d, m in (rep.arms or {}).items() for a in m}
-        if have != expected:
+        # Defensive: never assemble before BOTH arms are registered.
+        drug = rep.drug
+        if not drug or set(rep.arms or {}) != {"real", "counterfactual"}:
             return rep
 
-        arms: Dict[str, Dict[str, Dict]] = {}
+        arms: Dict[str, Dict] = {}
         pending = 0
-        for drug in rep.drugs:
-            arms[drug] = {}
-            for arm, rid in (rep.arms.get(drug) or {}).items():
-                job = self.jobs.get(rid)
-                if job is None:
-                    rep.status = "failed"
-                    rep.error = (
-                        f"arm {arm!r} for {drug!r} (run {rid}) is missing from "
-                        "the job queue; the report cannot be assembled"
-                    )
-                    rep.finished_at = time.time()
-                    self._persist(rep)
-                    return rep
-                if job.status == "failed":
-                    rep.status = "failed"
-                    rep.error = (
-                        f"arm {arm!r} for {drug!r} (run {rid}) FAILED: "
-                        f"{job.error}"
-                    )
-                    rep.finished_at = time.time()
-                    self._persist(rep)
-                    return rep
-                if job.status == "cancelled":
-                    rep.status = "cancelled"
-                    rep.error = (
-                        f"arm {arm!r} for {drug!r} (run {rid}) was cancelled; "
-                        "a partial panel is not a ranking, so no report was "
-                        "assembled"
-                    )
-                    rep.finished_at = time.time()
-                    self._persist(rep)
-                    return rep
-                if job.status != "done":
-                    pending += 1
-                    continue
-                arms[drug][arm] = job.result_view()
+        for arm in ("real", "counterfactual"):
+            rid = rep.arms[arm]
+            job = self.jobs.get(rid)
+            if job is None:
+                rep.status = "failed"
+                rep.error = (
+                    f"arm {arm!r} for {drug!r} (run {rid}) is missing from "
+                    "the job queue; the report cannot be assembled"
+                )
+                rep.finished_at = time.time()
+                self._persist(rep)
+                return rep
+            if job.status == "failed":
+                rep.status = "failed"
+                rep.error = (
+                    f"arm {arm!r} for {drug!r} (run {rid}) FAILED: "
+                    f"{job.error}"
+                )
+                rep.finished_at = time.time()
+                self._persist(rep)
+                return rep
+            if job.status == "cancelled":
+                rep.status = "cancelled"
+                rep.error = (
+                    f"arm {arm!r} for {drug!r} (run {rid}) was cancelled. "
+                    "Both arms are required and no report was assembled: "
+                    "without the resistance-off counterfactual there is no "
+                    "denominator for rho, so the RESISTANCE decade would be "
+                    "asserted rather than measured, and this document does not "
+                    "assert it."
+                )
+                rep.finished_at = time.time()
+                self._persist(rep)
+                return rep
+            if job.status != "done":
+                pending += 1
+                continue
+            arms[arm] = job.result_view()
         if pending:
             rep.status = "running"
             return rep
 
         try:
-            rep.body = assemble(rep.section, rep.spec_base, rep.drugs, arms)
+            rep.body = assemble(rep.section, rep.spec_base, drug, arms)
             rep.status = "done"
         except Exception as exc:  # noqa: BLE001 - surfaced, never swallowed
             rep.status = "failed"
@@ -1310,10 +1807,13 @@ table.tbl td {
 }
 table.tbl td.num, table.tbl th.num { text-align: right; }
 table.tbl tbody tr:nth-child(even) td { background: var(--bg-1); }
+/* `tr.top` survives the ranking: it no longer marks rank 1 (there are no ranks)
+   but the row of the reach ladder the headline is READ OFF, so a reader can see
+   that the headline is one point on a curve rather than a constant. The two
+   rules that styled a rank NUMBER (`td.rank`, `.rank`) are genuinely orphaned
+   and are removed; nothing else lost styling with them. */
 table.tbl tbody tr.top td { background: var(--accent-bg); }
-table.tbl tbody tr.top td.rank { color: var(--accent); }
 table.tbl td .u { color: var(--fg-3); font-size: var(--fs-micro); margin-left: 3px; }
-.rank { font-family: var(--font-mono); color: var(--fg-2); }
 .drug { color: var(--fg-0); font-weight: 600; white-space: nowrap; }
 
 /* ---- bars (inline, no images) ------------------------------------------
@@ -1331,7 +1831,10 @@ table.tbl td .u { color: var(--fg-3); font-size: var(--fs-micro); margin-left: 3
 .bar > i.neg { background: var(--fg-2); }
 .bar > u { position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1px;
   background: var(--line-2); }
-/* The ranking's own magnitude bar: unsigned, zero-anchored, one direction. */
+/* The unsigned magnitude bar: zero-anchored, one direction. It carried the
+   ranking's kill-as-a-fraction-of-top bar; it now carries the reach ladder's
+   F(x) and the exposure falloff, both of which are fractions in [0, 1] and are
+   the reason it is zero-anchored rather than centred. */
 .mag { position: relative; display: inline-block; vertical-align: middle;
   height: 9px; width: 108px; background: var(--bg-3); }
 .mag > i { position: absolute; top: 0; bottom: 0; left: 0; display: block;
@@ -1499,14 +2002,12 @@ def _bar(value: float, span: float = 2.0) -> str:
     return f'<span class="bar"><u></u><i class="{cls}" style="{style}"></i></span>'
 
 
-def _md_bold(text: str) -> str:
-    """Escape, then promote the attribution helpers' ``**x**`` to <b>x</b>."""
-    out = _esc(text)
-    parts = out.split("**")
-    if len(parts) % 2 == 0:  # unbalanced — leave it escaped and literal
-        return out
-    return "".join(p if i % 2 == 0 else f"<b>{p}</b>"
-                   for i, p in enumerate(parts))
+# ``_md_bold`` used to live here. It existed for exactly one caller: the "Rank
+# gap" bullet, which rendered ``tmesim.report.attribution.gap_reason``'s ``**x**``
+# markers. That bullet was a statement about an adjacent RANK and went with the
+# ranking on 2026-08-21, and no other string in this document contains ``**``.
+# It is removed as genuinely orphaned code, not as a disclosure: nothing it
+# rendered was a caveat, and no text lost its emphasis.
 
 
 #: The severity words as the document prints them. Same three values
@@ -1591,77 +2092,182 @@ def _banner(where: str) -> str:
     )
 
 
-def _ranking_table(rows: Sequence[Dict]) -> str:
-    """The ranked panel.
+def _exposure_table(row: Dict) -> str:
+    """The exposure map's summary for the ONE compound.
 
-    The ``pen. index`` column that used to sit here is GONE. ``penetration_index
-    = mean(AUC)/p99(AUC)`` is a scale-invariant SHAPE statistic — it is
-    unchanged when the whole exposure field is multiplied by any constant — so
-    on real tissue it reports the vascular geometry of the section, which every
-    drug in the panel shares (results/delivery_metrics.md §4: it spans 0.3044 to
-    0.5107 across a panel whose delivered exposure spans 158x). Its failure mode
-    used to be on display in this very table: temozolomide carries the HIGHEST
-    penetration index of the GBM panel (0.5107) while ranking LAST. Its
-    replacement, ``therapeutic_coverage`` at 1x IC50, was already computed and
-    stored for every row and simply never rendered; it scales with delivered
-    dose, it knows the drug's IC50, and on the same panel its separation
-    (across-drug spread / grid drift) is 67.7 against 15.2 for the index.
+    This replaced the ranked-panel table on 2026-08-21. It is a KEY-VALUE
+    reading of one compound rather than a comparison of several, and every line
+    of it is a number the run already produced.
+
+    The ``pen. index`` column the ranked table used to carry is still GONE, and
+    the reason is a methodology disclosure rather than a ranking artefact, so it
+    is restated in the section prose below rather than lost with its host table:
+    ``penetration_index = mean(AUC)/p99(AUC)`` is a scale-invariant SHAPE
+    statistic — unchanged when the whole exposure field is multiplied by any
+    constant — so on real tissue it reports the vascular geometry of the section
+    and not the compound (results/delivery_metrics.md §4: it spans 0.3044 to
+    0.5107 across a panel whose delivered exposure spans 158x, and temozolomide
+    held the HIGHEST index of the GBM panel while killing least). It is retained
+    below as a labelled tissue-geometry statistic, not as a delivery number.
     """
     # The column-group row answers, structurally, the question a reader of a
     # simulation output has to be able to answer before trusting any cell: which
     # of these did the model PRODUCE, and which was it HANDED? Left to prose it
     # is answered nowhere; left to the reader it is answered wrongly.
-    group = (
-        "<tr class='grp'><th colspan='2'></th>"
-        "<th class='g' colspan='4'>computed by this run</th>"
-        "<th class='g' colspan='5'>inputs it was given</th>"
-        "<th class='g'>attribution</th></tr>"
+    prov = row.get("provenance") or {}
+    ic50 = prov.get("ic50") or {}
+    kind = ic50.get("provenance_kind") or "assumed"
+    rows_spec = [
+        ("computed", "mean tumour-cell exposure",
+         f"{_sig(row.get('tumor_auc'))} <span class='u'>uM.s</span>",
+         "mean AUC at this tumour's own TUMOR-cell positions"),
+        ("computed", "time-averaged C_tumor",
+         f"{_sig(row.get('c_tumor_uM'))} <span class='u'>uM</span>",
+         "that exposure divided by the window — the concentration the tumour "
+         "cells actually saw"),
+        ("computed", "median tumour-cell exposure",
+         f"{_sig(row.get('median_tumor_auc'))} <span class='u'>uM.s</span>",
+         "half the tumour cells sat below this"),
+        ("computed", "p10 / p50 / p90 exposure",
+         f"{_sig(row.get('E_p10_uM'))} / {_sig(row.get('E_p50_uM'))} / "
+         f"{_sig(row.get('E_p90_uM'))} <span class='u'>uM</span>",
+         "the SPREAD across the tumour — this is the relative reading, and it "
+         "is the defensible one"),
+        ("computed", "fitted penetration length",
+         f"{_fmt(row.get('penetration_length_fit_um'), 0)} <span class='u'>um</span>",
+         "exp+floor fit of AUC against distance from the nearest vessel"),
+        ("computed", "tissue-geometry index (retired as a delivery metric)",
+         _fmt(row.get("pen"), 4),
+         "penetration_index = mean(AUC)/p99(AUC): scale-INVARIANT, so it "
+         "reports this section's vascular geometry and not this compound "
+         "(results/delivery_metrics.md §4). Retained labelled, never read as "
+         "delivery"),
+        ("computed", "viable / hypoxic tumour fraction",
+         f"{_fmt(row.get('viable_tumor_fraction'), 4)} / "
+         f"{_fmt(row.get('hypoxic_tumor_fraction'), 4)}",
+         "the engine's own oxygen banding; the reach curve is taken over the "
+         "viable set"),
+        ("assumed", "plasma mean C_plasma",
+         f"{_sig(row.get('c_plasma_uM'))} <span class='u'>uM</span>",
+         "the single sustained level the transport solve was driven at — one "
+         "multiplicative factor on the source term"),
+        ("assumed", "IC50",
+         f"{_sig(row.get('ic50'))} <span class='u'>uM</span>",
+         _esc(ic50.get("source") or "") + " — " + _esc(ic50.get("note") or "")),
+        ("assumed", "D_eff / analytic L",
+         f"{_fmt(row.get('d_eff'), 0)} <span class='u'>um2/s</span> / "
+         f"{_fmt(row.get('L_um'), 0)} <span class='u'>um</span>",
+         "the length scale of the falloff, compiled from descriptors that have "
+         "never been scored on 3-D tissue"),
+    ]
+    head = ("<tr><th>provenance</th><th>quantity</th><th class='num'>value</th>"
+            "<th>what it is</th></tr>")
+    body = "".join(
+        f"<tr><td><span class='chip {k}'>{k}</span></td>"
+        f"<td class='drug'>{_esc(label)}</td>"
+        f"<td class='num'>{value}</td><td>{what}</td></tr>"
+        for k, label, value, what in rows_spec)
+    ic_row = (
+        f"<tr><td><span class='chip {_esc(kind)}'>{_esc(kind)}</span></td>"
+        f"<td class='drug'>IC50 provenance</td>"
+        f"<td class='num'>n = {_esc(ic50.get('n_cell_lines'))}</td>"
+        f"<td>{_esc(ic50.get('confidence'))} — {_esc(ic50.get('source'))}</td></tr>"
     )
-    head = (
-        "<tr><th class='num'>#</th><th>drug</th><th class='num'>predicted kill</th>"
-        "<th>ranked by kill</th>"
-        "<th class='num'>tumour-cell AUC</th>"
-        "<th class='num'>coverage @1x IC50</th>"
-        "<th class='num'>IC50</th>"
-        "<th>IC50 source</th><th class='num'>BBB</th><th class='num'>D_eff</th>"
-        "<th class='num'>L</th>"
-        "<th>dominant driver</th></tr>"
-    )
-    kills = [k for k in (_num(r.get("kill"), 0.0) for r in rows) if k > 0]
-    top_kill = max(kills) if kills else 0.0
-    body = []
-    for r in rows:
-        prov = r.get("provenance") or {}
-        ic50 = prov.get("ic50") or {}
-        kind = ic50.get("provenance_kind") or "assumed"
-        k = _num(r.get("kill"), 0.0)
-        frac = (max(0.0, k) / top_kill * 100.0) if top_kill > 0 else 0.0
-        body.append(
-            "<tr class='{cls}'>"
-            "<td class='num rank'>{rank}</td>"
-            "<td class='drug'>{name}</td>"
-            "<td class='num'><b>{kill}</b></td>"
-            "<td><span class='mag'><i style='width:{frac:.2f}%'></i></span></td>"
-            "<td class='num'>{auc}<span class='u'>uM.s</span></td>"
-            "<td class='num'>{cov}</td>"
-            "<td class='num'>{ic}<span class='u'>uM</span></td>"
-            "<td><span class='chip {kind}'>{kind}</span> {src}</td>"
-            "<td class='num'>{bbb}</td>"
-            "<td class='num'>{deff}<span class='u'>um2/s</span></td>"
-            "<td class='num'>{L}<span class='u'>um</span></td>"
-            "<td>{dom}</td></tr>".format(
-                cls="top" if r.get("rank") == 1 else "",
-                rank=r.get("rank"), name=_esc(r.get("name")),
-                kill=_fmt(r.get("kill")), frac=frac,
-                auc=_sig(r.get("tumor_auc")),
-                ic=_sig(r.get("ic50")), kind=_esc(kind),
-                src=_esc(ic50.get("source")), bbb=_fmt(r.get("bbb"), 3),
-                deff=_fmt(r.get("d_eff"), 0), L=_fmt(r.get("L_um"), 0),
-                cov=_fmt(r.get("coverage_1x"), 4), dom=_esc(r.get("dominant")),
-            )
+    return (f"<div class='tblwrap'><table class='tbl'><thead>{head}</thead>"
+            f"<tbody>{body}{ic_row}</tbody></table></div>")
+
+
+def _coverage_table(row: Dict) -> str:
+    """The IC50 coverage LADDER, never one number.
+
+    All three rungs were computed by every run and only ``1x`` was ever
+    rendered. ``1x IC50`` acquired an authority it had not earned by being quoted
+    alone; the ladder is printed so the threshold is visibly a choice — the same
+    argument ``app/server/reach.py`` makes about its own ``x = 0.1``.
+    """
+    head = ("<tr><th>threshold</th><th class='num'>fraction of tumour cells "
+            "covered</th><th>reading</th></tr>")
+    rungs = [
+        ("0.5x IC50", row.get("coverage_0_5x"),
+         "a half-potency threshold — the most generous of the three"),
+        ("1x IC50", row.get("coverage_1x"),
+         "the rung this document used to quote alone; it is one point on a "
+         "ladder, not a standard"),
+        ("2x IC50", row.get("coverage_2x"),
+         "a twice-potency threshold — the most demanding of the three"),
+    ]
+    body = "".join(
+        f"<tr><td class='drug'>{_esc(label)}</td>"
+        f"<td class='num'><b>{_fmt(v, 4)}</b></td><td>{_esc(note)}</td></tr>"
+        for label, v, note in rungs)
+    return (f"<div class='tblwrap'><table class='tbl'><thead>{head}</thead>"
+            f"<tbody>{body}</tbody></table></div>")
+
+
+def _reach_block(reach: Optional[Dict], reason: Optional[str]) -> str:
+    """The scale-free under-reached reading, CONSUMED from ``app/server/reach.py``.
+
+    Not re-implemented here. If the block is absent or refused, the refusal is
+    printed with its reason: a missing section that says nothing is
+    indistinguishable from a section whose answer was zero.
+    """
+    if not isinstance(reach, dict) or reach.get("null_reason") or reason:
+        why = (reason or (reach or {}).get("null_reason")
+               or "no reason was recorded")
+        return (
+            '<div class="limit warn"><div class="lm sev-warn">WARNING'
+            '<span class="lid">reach</span></div><div>'
+            '<span class="lt">The scale-free under-reached curve is NOT '
+            'available for this run</span>'
+            f'<div class="lb">{_esc(why)}</div>'
+            '<span class="ls">app/server/reach.py &middot; no substitute '
+            'number was computed, and no absolute exposure figure elsewhere on '
+            'this page should be read in its place</span></div></div>'
         )
-    return (f"<div class='tblwrap'><table class='tbl'><thead>{group}{head}</thead>"
-            f"<tbody>{''.join(body)}</tbody></table></div>")
+    curve = reach.get("curve") or {}
+    xs = curve.get("x") or []
+    fs = curve.get("under_reached_fraction") or []
+    head = ("<tr><th class='num'>reach ratio x</th>"
+            "<th class='num'>F(x) — fraction of viable tumour cells below it</th>"
+            "<th>&nbsp;</th></tr>")
+    hx = reach.get("headline_x")
+    body = "".join(
+        "<tr class='{cls}'><td class='num'>{x}</td><td class='num'><b>{f}</b></td>"
+        "<td><span class='mag'><i style='width:{w:.2f}%'></i></span></td></tr>".format(
+            cls="top" if (isinstance(hx, (int, float))
+                          and abs(_num(x, -1) - float(hx)) < 1e-12) else "",
+            x=_sig(x), f=_fmt(f, 4), w=max(0.0, min(1.0, _num(f, 0.0))) * 100.0)
+        for x, f in zip(xs, fs))
+    falloff = reach.get("falloff") or {}
+    d = falloff.get("distance_um") or []
+    n = falloff.get("normalised_mean_auc") or []
+    c = falloff.get("count") or []
+    fhead = ("<tr><th class='num'>distance from nearest vessel</th>"
+             "<th class='num'>mean AUC / E_ref</th>"
+             "<th class='num'>grid points in bin</th><th>&nbsp;</th></tr>")
+    fbody = "".join(
+        "<tr><td class='num'>{d}<span class='u'>um</span></td>"
+        "<td class='num'><b>{v}</b></td><td class='num'>{c}</td>"
+        "<td><span class='mag'><i style='width:{w:.2f}%'></i></span></td></tr>".format(
+            d=_fmt(dd, 0), v=_fmt(vv, 4), c=_esc(cc),
+            w=max(0.0, min(1.0, _num(vv, 0.0))) * 100.0)
+        for dd, vv, cc in zip(d, n, c))
+    return (
+        f"<div class='tblwrap'><table class='tbl'><thead>{head}</thead>"
+        f"<tbody>{body}</tbody></table></div>"
+        f"<p><b>Exposure falloff with distance from the nearest vessel</b>, in the "
+        f"SAME bins that produced the reference E_ref = "
+        f"{_sig(reach.get('E_ref_uM_s'))} uM.s, each divided by it. This is the "
+        f"relative reading, and it is the one this document offers as "
+        f"defensible.</p>"
+        f"<div class='tblwrap'><table class='tbl'><thead>{fhead}</thead>"
+        f"<tbody>{fbody}</tbody></table></div>"
+        f"<p><b>The threshold is a convention.</b> {_esc(reach.get('convention'))}</p>"
+        f"<p><b>What the ratio is and is not protected against.</b> "
+        f"{_esc(reach.get('scale_invariance'))}</p>"
+        f"<p><b>Which cells this is over.</b> {_esc(reach.get('viable_definition'))} "
+        f"E_ref itself is {_esc(reach.get('E_ref_source'))}.</p>"
+    )
 
 
 def _provenance_key() -> str:
@@ -1683,81 +2289,126 @@ def _provenance_key() -> str:
     )
 
 
-def _attribution_table(rows: Sequence[Dict]) -> str:
-    head = (
-        "<tr><th class='num'>#</th><th>drug</th><th class='num'>delivery</th>"
-        "<th class='num'>potency</th><th class='num'>O2-resist.</th>"
-        "<th class='num'>net</th><th>net (decades vs panel mean)</th>"
-        "<th class='num'>rho</th><th class='num'>O2 cost</th></tr>"
-    )
+def _decades(v) -> str:
+    """A signed decade count, or an em dash where the term was REFUSED.
+
+    Never ``+0.00`` for an absent term: a refusal that renders as a zero is a
+    refusal a reader will read as a measurement.
+    """
+    f = _num(v)
+    return f"{f:+.2f}" if math.isfinite(f) else "—"
+
+
+def _attribution_table(row: Dict, attribution: Dict) -> str:
+    """The three absolute decades for the ONE compound.
+
+    Each row states what the term IS, so the number and its meaning arrive
+    together. Nothing here is centred on a panel mean — see
+    :func:`attribute_compound`.
+    """
+    head = ("<tr><th>term</th><th class='num'>decades</th>"
+            "<th>magnitude</th><th>what it measures</th></tr>")
+    meanings = attribution.get("term_meanings") or TERM_MEANING
+    labels = attribution.get("term_labels") or TERM_LABEL
     body = []
-    for r in rows:
+    for key in (attribution.get("terms") or TERMS):
+        v = row.get(key)
         body.append(
-            "<tr><td class='num rank'>{rank}</td><td class='drug'>{name}</td>"
-            "<td class='num'>{d}</td><td class='num'>{p}</td>"
-            "<td class='num'>{h}</td><td class='num'><b>{t}</b></td>"
-            "<td>{bar}</td><td class='num'>{rho}</td>"
-            "<td class='num'>{cost}<span class='u'>%</span></td></tr>".format(
-                rank=r.get("rank"), name=_esc(r.get("name")),
-                d=f"{r.get('delivery_decades', 0):+.2f}",
-                p=f"{r.get('potency_decades', 0):+.2f}",
-                h=f"{r.get('hypoxia_decades', 0):+.2f}",
-                t=f"{r.get('total_decades', 0):+.2f}",
-                bar=_bar(r.get("total_decades")),
-                rho=_fmt(r.get("rho"), 4),
-                cost=_fmt((r.get("hypoxia_cost") or 0) * 100, 1),
-            )
-        )
+            "<tr><td class='drug'>{label}</td><td class='num'><b>{d}</b></td>"
+            "<td>{bar}</td><td>{what}</td></tr>".format(
+                label=_esc(labels.get(key, key)), d=_decades(v),
+                bar=_bar(v) if math.isfinite(_num(v)) else "",
+                what=_esc(meanings.get(key, ""))))
+    ident = (
+        "<tr><td class='drug'>DELIVERY + DOSE</td>"
+        f"<td class='num'><b>{_decades((_num(row.get('delivery_decades'), 0.0)) + (_num(row.get('dose_decades'), 0.0)) if (math.isfinite(_num(row.get('delivery_decades'))) and math.isfinite(_num(row.get('dose_decades')))) else float('nan'))}</b></td>"
+        f"<td>{_bar(row.get('log10_drive'))}</td>"
+        f"<td>= log10(drive), exactly. drive = C_tumor / IC50 = "
+        f"{_sig(row.get('drive'))}, i.e. log10 = {_decades(row.get('log10_drive'))}. "
+        "This identity is asserted in tests/test_app_reports.py.</td></tr>"
+    )
+    rho_row = (
+        "<tr><td class='drug'>rho (measured)</td>"
+        f"<td class='num'><b>{_fmt(row.get('rho'), 4)}</b></td><td></td>"
+        f"<td>kill {_fmt(row.get('kill'))} / kill(resistance OFF) "
+        f"{_fmt(row.get('kill_no_resistance'))} — this tumour's oxygen-driven "
+        f"resistance state costs this compound "
+        f"{_fmt((_num(row.get('resistance_cost'), 0.0)) * 100, 1)}% of the kill "
+        "it would otherwise achieve</td></tr>"
+    )
     return (f"<div class='tblwrap'><table class='tbl'><thead>{head}</thead>"
-            f"<tbody>{''.join(body)}</tbody></table></div>")
+            f"<tbody>{''.join(body)}{ident}{rho_row}</tbody></table></div>")
 
 
-def _drug_cards(rows: Sequence[Dict], window_s: float) -> str:
-    out = []
+def _compound_card(r: Dict, window_s: float) -> str:
+    """ONE card, for the one compound.
+
+    ``#{rank}``, the "percentile of this panel" figures on the delivery and
+    potency bullets, and the "Rank gap" bullet are GONE: each of them was a
+    statement about other compounds, and there are none. Everything that was
+    genuinely per-compound is kept — L_um, D_eff, the IC50 provenance, the rho
+    counterfactual, MGMT status and the transport parameters — because none of it
+    ever depended on the panel.
+    """
+    prov = r.get("provenance") or {}
+    ic50 = prov.get("ic50") or {}
+    mgmt = prov.get("mgmt") or {}
+    mgmt_cls = "crit" if str(mgmt.get("state", "")).startswith("unmodelled") \
+        else "measured" if mgmt.get("state") == "modelled" else "assumed"
+    ub = prov.get("sensitivity_upper_bound")
     window = _window_label(window_s)
-    for r in rows:
-        prov = r.get("provenance") or {}
-        ic50 = prov.get("ic50") or {}
-        mgmt = prov.get("mgmt") or {}
-        mgmt_cls = "crit" if str(mgmt.get("state", "")).startswith("unmodelled") \
-            else "measured" if mgmt.get("state") == "modelled" else "assumed"
-        ub = prov.get("sensitivity_upper_bound")
-        out.append(f"""
+    L = _num(r.get("L_um"))
+    l_ratio = (f"{L / 45.0:.1f}x the calibrated ~45 um perivascular boundary "
+               "layer" if math.isfinite(L) else
+               "no analytic penetration length was produced for this compound")
+    return f"""
 <div class="card">
   <div class="ch">
-    <span class="rank">#{r.get('rank')}</span>
     <span class="n">{_esc(r.get('name'))}</span>
-    <span class="chip accent">{_esc(r.get('dominant'))}</span>
     <span class="chip {'crit' if ub else 'computed'}">
       {'kill = UPPER BOUND' if ub else 'kill = computed'}</span>
+    <span class="chip crit">RELATIVE EXPOSURE ONLY</span>
     <span class="chip {mgmt_cls}">MGMT: {_esc(mgmt.get('state'))}</span>
   </div>
   <ul class="pts">
-    <li><b>Delivery {r.get('delivery_decades', 0):+.2f} decades.</b>
-      Mean exposure at this tumour's own TUMOR-cell positions is
-      <span class="mono">{_sig(r.get('tumor_auc'))} uM.s</span> over the
-      {window} window (time-averaged C = {_sig(r.get('c_tumor_uM'))} uM),
-      the {_fmt(r.get('exposure_pct'), 0)}th percentile of this panel.
+    <li><b>DELIVERY {_decades(r.get('delivery_decades'))} decades</b> —
+      log10(C_tumor / C_plasma), the decades LOST getting from blood into this
+      tumour's interstitium. Mean exposure at this tumour's own TUMOR-cell
+      positions is <span class="mono">{_sig(r.get('tumor_auc'))} uM.s</span> over
+      the {window} window, i.e. a time-averaged
+      <span class="mono">C_tumor = {_sig(r.get('c_tumor_uM'))} uM</span> against
+      a plasma mean of
+      <span class="mono">C_plasma = {_sig(r.get('c_plasma_uM'))} uM</span>.
+      This term does NOT move when the dose moves: both numbers are exactly
+      linear in the plasma level, so the factor cancels from the ratio.
       D_eff = {_fmt(r.get('d_eff'), 0)} um2/s and BBB penetrance
       {_fmt(r.get('bbb'), 3)} give an analytic penetration length
-      L = {_fmt(r.get('L_um'), 0)} um
-      ({_fmt((r.get('L_um') or 0) / 45.0, 1)}x the calibrated ~45 um
-      perivascular boundary layer).</li>
-    <li><b>Potency {r.get('potency_decades', 0):+.2f} decades.</b>
-      IC50 = {_sig(r.get('ic50'))} uM —
+      L = {_fmt(r.get('L_um'), 0)} um ({_esc(l_ratio)}).</li>
+    <li><b>DOSE {_decades(r.get('dose_decades'))} decades</b> —
+      log10(C_plasma / IC50), the decades of headroom the plasma level has over
+      this compound's own potency. IC50 = {_sig(r.get('ic50'))} uM —
       <span class="chip {_esc(ic50.get('provenance_kind') or 'assumed')}">{_esc(ic50.get('provenance_kind'))}</span>
-      {_esc(ic50.get('source'))} — the {_fmt(r.get('potency_pct'), 0)}th
-      percentile of the panel. {_esc(ic50.get('note'))}</li>
-    <li><b>O2-resistance {r.get('hypoxia_decades', 0):+.2f} decades.</b>
-      COUNTERFACTUAL, not asserted: re-simulating this same drug on this same
-      tissue with the hypoxic AND quiescent kill penalties switched off
-      (run <span class="mono">{_esc(prov.get('counterfactual_run_id'))}</span>)
+      {_esc(ic50.get('source'))}. {_esc(ic50.get('note'))}
+      <b>This is where the dose uncertainty lands, and the decomposition puts it
+      here on purpose.</b> The plasma level is a single sustained
+      Stage-0 simplification and the IC50 is a monolayer cell-line number; both
+      uncertainties are quarantined in this one term instead of being smeared
+      across all three.</li>
+    <li><b>RESISTANCE {_decades(r.get('resistance_decades'))} decades</b> —
+      log10(rho). COUNTERFACTUAL, not asserted: re-simulating this same compound
+      on this same tissue with the hypoxic AND quiescent kill penalties switched
+      off (run <span class="mono">{_esc(prov.get('counterfactual_run_id'))}</span>)
       moves the predicted kill from {_fmt(r.get('kill'))} to
-      {_fmt(r.get('kill_no_resistance'))}, so
-      rho = {_fmt(r.get('rho'), 4)} and this tumour's oxygen-driven resistance
-      state costs this drug {_fmt((r.get('hypoxia_cost') or 0) * 100, 1)}% of
-      the kill it would otherwise achieve.</li>
-    <li><b>Rank gap.</b> {_md_bold(r.get('gap_reason') or 'single-drug panel: no adjacent rank to compare against.')}</li>
+      {_fmt(r.get('kill_no_resistance'))}, so rho = {_fmt(r.get('rho'), 4)} and
+      this tumour's oxygen-driven resistance state costs this compound
+      {_fmt((_num(r.get('resistance_cost'), 0.0)) * 100, 1)}% of the kill it
+      would otherwise achieve. That is a comparison of this compound with
+      ITSELF, which is why it survived the withdrawal of the panel unchanged.</li>
+    <li><b>The identity.</b> DELIVERY + DOSE = log10(drive) exactly, where
+      drive = C_tumor / IC50 = {_sig(r.get('drive'))}. Both terms are absolute
+      decade counts referenced to quantities from THIS run; neither is centred on
+      a panel mean, and neither moves if a different compound is or is not
+      simulated.</li>
   </ul>
   <dl class="kv">
     <dt>run</dt><dd>{_esc(prov.get('run_id'))} (real) ·
@@ -1773,9 +2424,11 @@ def _drug_cards(rows: Sequence[Dict], window_s: float) -> str:
     <dt>transport</dt><dd>MW {_fmt(r.get('mw'), 0)} Da · D {_fmt(r.get('diffusivity'), 0)}
       um2/s · binding {_sig(r.get('binding'))} 1/s ·
       clearance {_sig(r.get('clearance'))} 1/s · hill {_fmt(r.get('hill'), 2)}</dd>
+    <dt>plasma</dt><dd>mean {_sig(r.get('c_plasma_uM'))} uM · peak
+      {_sig(r.get('plasma_peak_uM'))} uM — read from this run's own
+      extra_metrics, never recomputed here</dd>
   </dl>
-</div>""")
-    return "\n".join(out)
+</div>"""
 
 
 def render_html(doc: Dict) -> str:
@@ -1787,15 +2440,17 @@ def render_html(doc: Dict) -> str:
     ``url(...)``, no webfont, no external script and no fetch of any kind — the
     Studio's own ``tokens.css`` is inlined and every graphic is a styled element.
     """
-    rows = doc.get("ranking") or []
+    row = doc.get("compound") or None
     limits = doc.get("limits") or []
     attribution = doc.get("attribution") or {}
-    check = attribution.get("check") or {}
+    mech = doc.get("mechanism") or {}
+    reach = doc.get("reach")
+    reach_reason = doc.get("reach_reason")
     micro = doc.get("microenvironment") or {}
     spec = doc.get("spec_base") or {}
     section = doc.get("section_detail") or {}
     window_s = float(doc.get("window_s") or 0.0)
-    best = rows[0] if rows else None
+    drug_name = (row or {}).get("name") or doc.get("drug")
 
     # Three named groups, not sixteen undifferentiated fields. Auditing a number
     # on this page means knowing whether the field beside it describes the
@@ -1837,77 +2492,139 @@ def render_html(doc: Dict) -> str:
             "</span>" for k, v in items) + "</div></div>"
         for label, items in meta_groups)
 
-    # The hero names the top of a RANKING, which is the defensible output — but
-    # it may not name it as settled while limit 2b on this same page says the
-    # ordering is law-dependent. The law is the one stored with this document
-    # (read from PDEConfig when the runs were made), falling back to the shipped
-    # default for a document that predates it. See app/server/delivery_law.py.
+    # The hero used to name the top of a RANKING. That ranking was withdrawn on
+    # 2026-08-21, so the hero now leads with the PER-CELL mechanism reading — the
+    # fraction of tumour cells the compound never reached. That number is
+    # per-compound, per-cell, computed on the real tissue, and it reconciles
+    # bit-exactly with the engine's own kill fraction; it is the answer this
+    # product has, not a supporting figure for one.
+    #
+    # The delivery-law disclosure is NOT deleted with the ranking it used to
+    # qualify. It is re-parented: the law sets the source term at the vessel
+    # wall, so it conditions the SHAPE of the map, which is a stronger reason to
+    # keep it in the hero than the one it had before. The law is the one stored
+    # with this document (read from PDEConfig when the runs were made), falling
+    # back to the shipped default for a document that predates it. See
+    # app/server/delivery_law.py.
     law = doc.get("delivery_law")
     if not isinstance(law, dict):
         law = delivery_law()
-    # The law limit is on this same page; the hero's condition used to cite it
-    # as "limit 2b", which named nothing a reader could find. It now links to
-    # the limit's own anchor — an in-page fragment, not an external reference.
+    # The law limit is on this same page; the hero's condition links to the
+    # limit's own anchor — an in-page fragment, not an external reference.
     law_ref = "#lim-transvascular_delivery_law"
+    map_ref = "#lim-map_is_the_output"
     headline = ""
-    if best:
+    if row:
+        unreached = mech.get("unreached_fraction_of_tumor")
+        if unreached is None:
+            lead = (
+                '<div class="pn">How much of this tumour '
+                f'{_esc(drug_name)} never reached: <b>NOT REPORTED</b>'
+                '<span class="under">'
+                + _esc(mech.get("null_reason") or
+                       "the per-cell mechanism attribution is unavailable for "
+                       "this run, and no whole-tumour average is substituted "
+                       "for it")
+                + "</span></div>")
+        else:
+            lead = (
+                '<div class="pn">'
+                f'<b>{_fmt(_num(unreached) * 100, 1)}% of this tumour\'s cells '
+                f'were never reached</b> by {_esc(drug_name)}'
+                '<span class="under">SURVIVED_UNREACHED — per-cell, on this '
+                'measured tissue: cells that survived because the drug never '
+                'arrived in quantity at their position, not because they '
+                'resisted it. This is the answer. '
+                f'{_fmt(_num(mech.get("unreached_fraction_of_survivors"), 0.0) * 100, 1)}% '
+                'of all SURVIVING tumour cells are in this bucket.</span></div>')
         headline = f"""
 <div class="hero">
   <div class="pick">
     <div class="eyebrow">the finding</div>
     <div>
-      <div class="pn">Top of this ranking, under {_esc(law.get('law'))}:
-        <b>{_esc(best.get('name'))}</b>
-        <span class="under">predicted kill {_fmt(best.get('kill'))} — read the
-          ORDER, not this level</span></div>
+      {lead}
       <div class="pchips">
+        <span class="chip crit">RELATIVE EXPOSURE ONLY</span>
         <span class="chip crit">UPPER BOUND</span>
         <span class="chip crit">LAW-DEPENDENT</span>
         <span class="chip crit">NOT A RECOMMENDATION</span>
-        <span class="chip accent">{_esc(best.get('dominant'))}</span>
       </div>
-      <div class="pfacts">L = {_fmt(best.get('L_um'), 0)} um &middot;
-        IC50 {_sig(best.get('ic50'))} uM
-        ({_esc(((best.get('provenance') or {}).get('ic50') or {}).get('source'))})
-        &middot; tumour-cell exposure {_sig(best.get('tumor_auc'))} uM.s</div>
+      <div class="pfacts">DELIVERY {_decades(row.get('delivery_decades'))} dec
+        &middot; DOSE {_decades(row.get('dose_decades'))} dec
+        &middot; RESISTANCE {_decades(row.get('resistance_decades'))} dec
+        &middot; L = {_fmt(row.get('L_um'), 0)} um
+        &middot; IC50 {_sig(row.get('ic50'))} uM
+        ({_esc(((row.get('provenance') or {}).get('ic50') or {}).get('source'))})
+        &middot; tumour-cell exposure {_sig(row.get('tumor_auc'))} uM.s</div>
     </div>
   </div>
   <div class="cond">
-    <div class="cl">what it is not</div>
+    <div class="cl">what this document claims</div>
     <div>
+      <p><b>{_esc(MAP_CLAIM)}</b> Read WHERE the drug went, relative to
+         elsewhere in this same tissue. Do not read how much of the tumour it
+         killed, and do not compare any number on this page with a number from a
+         different compound (<a href="{map_ref}">see the map limit above</a>).</p>
       <p><b>This is a model output, not a recommendation.</b> It has never been
-         checked against a measured response for this tissue or any other. The
-         ORDER is the claim; the LEVEL is not. Treat it as a hypothesis to test
-         in the lab, nothing more.</p>
+         checked against a measured response for this tissue or any other.
+         Treat it as a hypothesis to test in the lab, nothing more.</p>
     </div>
   </div>
   <div class="cond">
-    <div class="cl">the condition on the order</div>
+    <div class="cl">what was measured, and how far</div>
     <div>
-      <p><b>The order carries a condition — read this with the name above.</b>
-         Every delivery number here was produced under
-         <span class="mono">{_esc(law.get('law'))}</span>; under the alternative
-         source term <span class="mono">{_esc(law.get('alternative_law'))}</span>
-         the panel is re-weighted by permeability (which spans 47x across this
-         drug list) and <b>the top-1 GBM pick changes, cisplatin &rarr;
-         vincristine</b>, swapping 4 of 45 pairs (<a href="{law_ref}">see the
-         delivery-law limit above</a>;
-         results/transvascular_exchange_revalidation.md §4.1).</p>
-      <p>Independently of the law, results/ranking_robustness.md §8 concludes
-         that until an ex-vivo potency readout exists on this patient's own
-         cells, <b>"the reportable output of this pipeline for the top of the
-         panel is a SET, not a winner"</b> — P(cisplatin = rank 1) is 0.931
-         under that report's declared priors and falls to 0.587 in its stress
-         scenario. So: this is the top of the ranking one law and one set of
-         priors produced, not this specimen's drug.</p>
+      <p><b>Two perturbations were swept, at two DIFFERENT strengths, and that
+         list is not a coverage claim.</b> The plasma / dose scale is EXACT for
+         this finite-window exposure field — worst relative deviation 1.41e-14
+         over plasma factors 0.005 to 26, a 5,200x span, measured at the shipping
+         configuration (results/pk_ranking_robustness.md sec. 1.2) — so a
+         per-compound plasma factor moves every point of this map together and
+         cancels from a ratio between points. Tissue capacity is EXACT FOR A
+         CONVERGED GRADIENT SHAPE ONLY, verified to 1e-9
+         (results/capacity_ranking_robustness.md sec. 2b); a capacity term acts
+         as a pure rescale of time, so over a FINITE window a region that has not
+         converged carries a residual. <b>Those are the only two axes that were
+         swept. An axis absent from that list is UNTESTED, not covered.</b></p>
+      <p><b>Neither protects against error in the transport law itself.</b>
+         Every exposure number here was produced under
+         <span class="mono">{_esc(law.get('law'))}</span>; the alternative source
+         term <span class="mono">{_esc(law.get('alternative_law'))}</span>
+         re-weights delivery by permeability, which spans <b>47x</b> across this
+         engine's GBM compound list — enough that on the panel this document used
+         to rank it moved the top-1 pick outright, <b>cisplatin &rarr;
+         vincristine</b>, swapping 4 of 45 pairs. That swap is quoted here as
+         EVIDENCE OF THE LAW'S LEVERAGE and not as a comparison: it is how large
+         a re-shaping of delivery the choice of source term is worth. A wrong
+         effective diffusivity does the same thing to the SHAPE of the gradient
+         rather than to its level, which is exactly what the two invariances
+         above cannot divide out (<a href="{law_ref}">see the delivery-law limit
+         above</a>; results/transvascular_exchange_revalidation.md §4.1). That
+         law's descriptor inputs have never been scored
+         (results/descriptor_falsification.md).</p>
+    </div>
+  </div>
+  <div class="cond">
+    <div class="cl">the potency readout that is still missing</div>
+    <div>
+      <p><b>Until an ex-vivo potency readout exists on this specimen's own
+         cells, everything on this page that reads an IC50 is not
+         decision-grade.</b> That is the DOSE decade and the whole IC50 coverage
+         ladder — not the exposure map, which reads no potency at all. This
+         sentence used to appear here as a caveat on a RANKING, in
+         results/ranking_robustness.md §8's words: <b>"the reportable output of
+         this pipeline for the top of the panel is a SET, not a winner"</b>,
+         with P(cisplatin = rank 1) at 0.931 under that report's declared priors
+         falling to <b>0.587</b> in its stress scenario — and the measurement it
+         named as the fix was a patient-specific potency readout. The ranking is
+         gone; the missing measurement is not, and it lands on exactly the terms
+         named above. A per-compound IC50 is still a monolayer cell-line number
+         carrying none of this tumour's 3-D architecture.</p>
     </div>
   </div>
 </div>"""
 
     caveat_items = "".join(f"<li>{_esc(c)}</li>" for c in (doc.get("caveats") or []))
     warn_items = "".join(f"<li>{_esc(c)}</li>" for c in (doc.get("warnings") or []))
-
-    sp = check.get("spearman_total_vs_kill")
 
     # Section 05 renders micro["patient_id"] under the label "specimen id". The
     # divergence is deliberate: the field name is load-bearing across the engine
@@ -1918,11 +2635,16 @@ def render_html(doc: Dict) -> str:
     body = f"""
 <div class="doc">
 <header class="hd">
-  <div class="kicker">tmesim · simulated compound ranking</div>
-  <h1>Simulated compound ranking — {_esc(section.get('label') or doc.get('section'))}</h1>
-  <div class="sub">A ranked, mechanistically attributed drug panel simulated on
-    one measured specimen. Every number below is a prediction; the sections are
-    ordered so that the limits on it are read first.</div>
+  <div class="kicker">tmesim · single-compound exposure map</div>
+  <h1>Where {_esc(drug_name or 'this compound')} reaches in
+    {_esc(section.get('label') or doc.get('section'))} — and how much of the
+    tumour it never reaches</h1>
+  <div class="sub">ONE compound, ONE measured specimen: the exposure map, the
+    fraction of tumour cells the drug never reached, and the provenance and
+    limits of every number that says so. Every number below is a prediction; the
+    sections are ordered so that the limits on it are read first. This document
+    ranked a drug panel until 2026-08-21; that ranking is WITHDRAWN and the
+    reason is limit 2.</div>
   <div class="metagrid">{meta}</div>
 </header>
 
@@ -1936,58 +2658,91 @@ def render_html(doc: Dict) -> str:
 </section>
 
 <section class="sec">
-<h2><span class="sn">02</span><span class="st">Ranked panel</span></h2>
+<h2><span class="sn">02</span><span class="st">The single-compound reading — where the drug went</span></h2>
 <div class="full">{headline}</div>
 {_provenance_key()}
-<div class="full">{_ranking_table(rows)}</div>
-<p>All {len(rows)} drugs were simulated on the <b>same</b> reconstruction, with
-the same {_window_label(window_s)} exposure window, the same seed
-({_esc(((rows[0].get('provenance') if rows else {}) or {}).get('seed'))}) and the
-same compilation pipeline (<span class="mono">calibrate_alpha &rarr;
-calibrated_drugparams &rarr; apply_barrier_to_drugparams</span>), so every
-difference is attributable to that drug's own physics and potency on identical
-tissue. Ranked by predicted kill fraction; the bar is that kill as a fraction of
-the top row's, and like every level on this page it is the centre of a wide
-interval.</p>
-<p><b>On the delivery column.</b>
-<span class="mono">coverage @1x IC50</span> is
-<span class="mono">therapeutic_coverage</span> — the fraction of this section's
-tumour cells whose time-averaged exposure exceeds that drug's own IC50 over the
-{_window_label(window_s)} window. It replaces the
-<span class="mono">pen. index</span> column earlier versions of this report
-printed. <span class="mono">penetration_index = mean(AUC)/p99(AUC)</span> is a
+<div class="full">{_exposure_table(row or {})}</div>
+<p>{_esc(drug_name or 'This compound')} was simulated on ONE reconstruction of
+this specimen, over a {_window_label(window_s)} exposure window, at seed
+{_esc(((row or {}).get('provenance') or {}).get('seed'))}, through the
+standard compilation pipeline (<span class="mono">calibrate_alpha &rarr;
+calibrated_drugparams &rarr; apply_barrier_to_drugparams</span>). The
+counterfactual arm reused the SAME reconstruction, so the two arms differ in
+exactly one setting and rho is a ratio rather than a comparison of two tissues.
+Every level in the table above is the centre of a wide interval — see limit
+"Where absolute kill IS defensible, it is an INTERVAL".</p>
+
+<h3>How much of the tumour is UNDER-REACHED — the scale-free reading</h3>
+<p>This is the reading that survives not knowing the dose. It is a RATIO between
+two points of one map — each viable tumour cell's exposure over the perivascular
+reference exposure <span class="mono">E_ref</span> — so a factor that multiplies
+every point of the map divides out of it, at the two strengths the hero states
+and the map limit cites. It is computed by
+<span class="mono">app.server.reach.compute_reach</span> and consumed here; this
+document does not re-implement it, because a second implementation of a number
+that must agree is how two numbers stop agreeing.</p>
+<div class="full">{_reach_block(reach, reach_reason)}</div>
+
+<h3>IC50 coverage across the dose ladder</h3>
+<p><b>Not one number.</b> <span class="mono">therapeutic_coverage</span> is the
+fraction of this section's tumour cells whose time-averaged exposure exceeds a
+multiple of this compound's own IC50 over the {_window_label(window_s)} window.
+All three rungs were already computed by every run and only
+<span class="mono">1x</span> was ever printed, which gave that rung an authority
+it had not earned. <b>Coverage is an ABSOLUTE quantity and is therefore not
+protected by anything in limit 2:</b> it reads the plasma level and the IC50,
+which are exactly the two inputs the robustness studies measured as uncertain
+(per-compound plasma exposure spans 113.1x across the compounds the GBM panel
+ranked, results/pk_ranking_robustness.md sec. 0). Rescale the dose and every
+number in this table moves; the reach curve above does not. Read the ladder, and
+prefer the curve.</p>
+<div class="full">{_coverage_table(row or {})}</div>
+<p><b>On the retired penetration index.</b> The exposure table above still
+carries <span class="mono">penetration_index = mean(AUC)/p99(AUC)</span>, but
+labelled as a TISSUE-GEOMETRY statistic and never as a delivery number. It is a
 scale-invariant SHAPE statistic: multiply the whole exposure field by any
-constant and it does not move, so on real tissue it reports the section's
-vascular geometry, which every drug here shares. It was retired for that reason
-(results/delivery_metrics.md §4) and the panel demonstrates why — temozolomide
-holds the HIGHEST penetration index of the GBM panel while ranking LAST.
-Coverage is not exempt from anything else on this page: it is a delivery number
-like the others, so it is produced under the delivery law named above and it
-carries the same mesh term as everything else.</p>
+constant and it does not move, so on real tissue it reports this section's
+vascular geometry rather than this compound. It was retired as a delivery metric
+for that reason (results/delivery_metrics.md §4) and the withdrawn GBM panel
+demonstrated why — temozolomide held the HIGHEST penetration index of that panel
+while killing least. Neither it nor coverage is exempt from anything else on this
+page: both are produced under the delivery law named in the hero, and both carry
+the same unquantified mesh term as everything else.</p>
 </section>
 
 <section class="sec">
-<h2><span class="sn">03</span><span class="st">Why each drug ranks where it does</span></h2>
-<p>Each drug's standing is decomposed into three <b>exactly additive log10
-terms</b> ("decades"), each centred on the panel mean so <span class="mono">+</span>
-reads as an advantage over the panel and <span class="mono">−</span> as a penalty.
-Nothing is asserted: the O2-resistance term comes from a real counterfactual
-simulation, which is why every drug here was simulated twice.</p>
+<h2><span class="sn">03</span><span class="st">Why this compound did what it did on this tissue</span></h2>
+<p>Three <b>absolute log10 terms</b> ("decades"), each referenced to a quantity
+from <b>this same run</b> — never to a panel mean, and never to whichever other
+compounds happened to be selected. <span class="mono">DELIVERY + DOSE</span> is
+exactly <span class="mono">log10(drive)</span>. Nothing is asserted: the
+RESISTANCE term comes from a real counterfactual simulation of this compound
+against itself, which is why it was simulated twice.</p>
 <div class="full"><pre class="code">{_esc(attribution.get('method'))}</pre>
-{_attribution_table(rows)}</div>
-<p><b>Is the attribution itself faithful?</b> Spearman rank correlation across
-the panel between the net attribution and the simulated kill:
-<span class="mono hl">rho = {_fmt(sp, 3)}</span> &rarr;
-{_esc(check.get('faithful'))}. Component-wise, rho(delivery, kill) =
-{_fmt(check.get('spearman_delivery_vs_kill'), 3)} and rho(potency, kill) =
-{_fmt(check.get('spearman_potency_vs_kill'), 3)}. With only {len(rows)} drugs a
-single rho is a weak statistic — it is reported to be checkable, not because it
-is powerful.</p>
+{_attribution_table(row or {}, attribution)}</div>
+{('<div class="limit critical"><div class="lm sev-critical">CRITICAL'
+  '<span class="lid">attribution</span></div><div>'
+  '<span class="lt">The decomposition REFUSED — no decade is reported</span>'
+  f'<div class="lb">{_esc(attribution.get("null_reason"))}</div>'
+  '<span class="ls">app.server.report.attribute_compound &middot; nothing was '
+  'substituted for the missing quantity</span></div></div>')
+ if attribution.get('null_reason') else ''}
+{('<div class="limit warn"><div class="lm sev-warn">WARNING'
+  '<span class="lid">rho</span></div><div>'
+  '<span class="lt">The RESISTANCE decade was not reported</span>'
+  f'<div class="lb">{_esc(attribution.get("resistance_null_reason"))}</div>'
+  '<span class="ls">app.server.report.attribute_compound &middot; DELIVERY and '
+  'DOSE are unaffected: neither reads a kill</span></div></div>')
+ if attribution.get('resistance_null_reason') else ''}
+<p><b>Why this decomposition, and not the one this report used to print.</b>
+{_esc(attribution.get('rationale'))}</p>
 </section>
 
 <section class="sec">
-<h2><span class="sn">04</span><span class="st">Per-drug reading and provenance</span></h2>
-<div class="full">{_drug_cards(rows, window_s)}</div>
+<h2><span class="sn">04</span><span class="st">This compound's reading and provenance</span></h2>
+<div class="full">{_compound_card(row, window_s) if row else
+  '<p>No compound block was assembled for this document, so there is nothing to '
+  'report here. The limits above still apply in full.</p>'}</div>
 </section>
 
 <section class="sec">
@@ -2018,21 +2773,49 @@ is powerful.</p>
 <section class="sec">
 <h2><span class="sn">07</span><span class="st">What would have to be true for this to be trustworthy</span></h2>
 <ul class="pts">
-  <li><b>A tissue with a paired, measured drug response.</b> Everything here is
-    unfalsifiable until a tumour with a known outcome runs through the identical
-    pipeline and the predicted ranking is scored against the observed one.</li>
+  <li><b>A SPATIALLY RESOLVED drug measurement on tissue like this — this is the
+    experiment that would falsify the map claim, and it is not the one this
+    section used to name.</b> It used to ask for a tumour with a known outcome so
+    that "the predicted ranking is scored against the observed one". There is no
+    predicted ranking any more, and an outcome label would not test this document
+    anyway: the claim is about relative exposure BETWEEN REGIONS of one specimen,
+    so the falsifying measurement is a measurement of drug concentration at known
+    distances from known vessels in the same tissue — mass-spectrometry imaging,
+    a labelled-compound penetration profile, or an equivalent. Score the measured
+    falloff against the predicted falloff. If the predicted normalised exposure
+    at 100 um from a vessel is materially wrong relative to the perivascular
+    value, THE MAP CLAIM IS FALSE, and the two invariances in limit 2 do not
+    save it — they protect the ratio against a dose factor and a capacity term,
+    not against a wrong gradient.</li>
+  <li><b>A scored transport law.</b> The delivery law and the effective
+    diffusivity set the SHAPE of the gradient, which is the entire claim. The
+    law's descriptor inputs have never been scored
+    (results/descriptor_falsification.md), and the compiled D_eff misses its own
+    measured multicellular-layer band by 1.5x. Scoring those against 3-D
+    penetration data would test the map claim more directly than any outcome
+    label could.</li>
   <li><b>A potency measurement in context.</b> Cell-line IC50 must be replaced by
     (or at minimum reconciled with) a 3-D / organoid / patient-derived
-    measurement from tissue resembling this one.</li>
+    measurement from tissue resembling this one. This falsifies the DOSE decade
+    and the coverage ladder — the absolute parts — not the map.</li>
   <li><b>More than one penetration anchor.</b> alpha rides on a single
-    doxorubicin measurement; independent per-drug perivascular-distance data
-    would test whether the ordering transfers outside the strongly-bound
-    class.</li>
+    doxorubicin measurement; independent per-compound perivascular-distance data
+    would test whether the predicted falloff transfers outside the
+    strongly-bound class. alpha re-shapes the gradient rather than scaling it, so
+    this is a test OF the map claim and not merely of its level.</li>
   <li><b>A measured per-cell sensitivity</b>, replacing today's explicit
-    assumption (uniform 1.0).</li>
+    assumption (uniform 1.0), which is what makes every kill on this page an
+    upper bound rather than a prediction.</li>
   <li><b>A panel that can measure cell state.</b> Until hypoxia and
     proliferation are measurable on the section itself, the absolute kill has no
-    defensible level under any state route.</li>
+    defensible level under any state route — and the RESISTANCE decade and the
+    "viable" band the reach curve is taken over both inherit that.</li>
+  <li><b>A converged window, or a measurement of how far from converged this one
+    is.</b> The tissue-capacity invariance in limit 2 is exact for a CONVERGED
+    gradient shape and carries a residual over a finite window. Nothing on this
+    page asserts that this window converged anywhere in this tissue, and
+    measuring that residual would turn a conditional invariance into an
+    unconditional one or refute it.</li>
 </ul>
 </section>
 
@@ -2043,7 +2826,7 @@ is powerful.</p>
   attribution: {_esc(doc.get('attribution_implementation'))} ·
   runs: {_esc(', '.join(doc.get('run_ids') or []))} ·
   deterministic (seed
-  {_esc(((rows[0].get('provenance') if rows else {}) or {}).get('seed'))}).
+  {_esc(((row or {}).get('provenance') or {}).get('seed'))}).
   Self-contained document: no external stylesheet, font, image, script or
   network request.
 </div>
@@ -2055,14 +2838,16 @@ is powerful.</p>
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         '<meta name="color-scheme" content="dark light">\n'
         '<meta name="robots" content="noindex">\n'
-        # Matches the <h1> ("Simulated compound ranking"). It read "tmesim
-        # therapy report" until 2026-08-15 — two renames stale, and naming a
-        # deliverable a "therapy report" is the implication this product does
-        # not make. NOT FOR CLINICAL USE stays IN the title on purpose: this
-        # document travels off a USB stick, and the browser tab is the one part
-        # of it that survives a screenshot of the window frame.
-        f"<title>Codon simulated compound ranking {_esc(doc.get('report_id'))} — "
-        f"{_esc(doc.get('section'))} — NOT FOR CLINICAL USE</title>\n"
+        # Matches the <h1>. It read "tmesim therapy report" until 2026-08-15 and
+        # "simulated compound ranking" until 2026-08-21; naming a deliverable a
+        # "therapy report" is an implication this product does not make, and
+        # naming it a ranking is a claim this product has withdrawn. NOT FOR
+        # CLINICAL USE stays IN the title on purpose: this document travels off a
+        # USB stick, and the browser tab is the one part of it that survives a
+        # screenshot of the window frame.
+        f"<title>Codon exposure map {_esc(doc.get('report_id'))} — "
+        f"{_esc(drug_name or 'no compound')} on {_esc(doc.get('section'))} — "
+        f"NOT FOR CLINICAL USE</title>\n"
         f"<style>\n{_tokens_css()}\n{_DOC_CSS}\n{_print_css()}\n</style>\n"
         "</head><body>\n" + body + "\n</body></html>\n"
     )

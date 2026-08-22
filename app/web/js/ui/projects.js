@@ -4,21 +4,33 @@
 //
 // WHY THE COMPARISON IS LAID OUT THIS WAY
 // ---------------------------------------
+// WHAT CHANGED: this view used to open on "2. RANKING — THE PRIMARY RESULT", a
+// per-compound column table, a Kendall tau-b pairwise agreement table and a
+// RANKING AGREES / DISAGREES verdict. All of it is gone. Ordering compounds by
+// predicted effect is withdrawn: per-compound plasma exposure spans 113.1x
+// across the compounds the GBM panel ranks and the published ordering breaks at
+// a spread of only 1.53x (results/pk_ranking_robustness.md), and the breast
+// top-1 pick changes under this repo's own structural capacity rule
+// (results/capacity_ranking_robustness.md). Comparing runs did NOT go with it —
+// the same compound on two specimens is a different question and a legitimate
+// one, so that is the only comparison the page now draws.
+//
 // The order on screen is the order the evidence supports, and it is not
 // negotiable by the reader:
 //
 //   1. SPECIMENS      — what each panel can and cannot support. A number is
-//                       never shown above its own capability verdict.
-//   2. RANKING        — THE PRIMARY RESULT, and the only one two real patients
-//                       have been shown to agree on (heldout_patient.md §3.3;
-//                       cell_state_impact.md §3.3 found it invariant across all
-//                       three cell-state routes as well).
-//   3. ABSOLUTE KILL  — shown, but struck through and blocked wherever the
-//                       backend says `comparable: false`. Absolute kill moves
-//                       0.3252 absolute (1.77x) with the state route ALONE, and
-//                       a panel with no hypoxia-response transcript cannot pin
-//                       it down under any route (cell_state_impact.md §5).
-//   4. COMPOSITION    — where a user actually sees that patient B is more
+//                       never shown above its own capability verdict. With (3),
+//                       this is the primary result of a comparison now: the
+//                       capability contrast and the tissue contrast.
+//   2. SAME COMPOUND, — one row per compound both specimens ran at an identical
+//      TWO SPECIMENS    RunSpec: that compound's own value on each side. Shown,
+//                       but blocked wherever the backend says
+//                       `comparable: false`. Absolute kill moves 0.3252
+//                       absolute (1.77x) with the state route ALONE, and a panel
+//                       with no hypoxia-response transcript cannot pin it down
+//                       under any route (cell_state_impact.md §5). Two DIFFERENT
+//                       compounds are never placed on one axis here.
+//   3. COMPOSITION    — where a user actually sees that patient B is more
 //                       vascularised than patient A, with the two rows that
 //                       moved in OPPOSITE directions on the real pair
 //                       (endothelial fraction 0.43x, areal density 2.67x —
@@ -77,8 +89,14 @@ export function createProjectsPanel({ store }) {
   const railEl = h('div.proj-rail');
   const mainEl = h('div.proj-main');
   const titleEl = h('span.mono.strong.proj-title', { title: '' }, NULL_GLYPH);
+  // Was "rank by". It no longer selects anything about an ordering — there is
+  // none — so it is relabelled to what it actually does: pick which metric the
+  // same-compound cross-specimen rows are featured on. Every row carries all
+  // four whatever is chosen, so this changes a column, never a conclusion.
   const metricSel = h('select.inp.sm', {
-    title: 'Which metric the RANKING is taken over',
+    title: 'Which metric the same-compound cross-specimen rows are read on. '
+      + 'It selects a column, not a conclusion: every row carries all four '
+      + 'metrics regardless, and no metric produces an ordering of compounds.',
     onchange: (e) => { metric = e.target.value; refreshComparison(); },
   }, Object.keys(METRIC_LABEL).map((k) =>
     h('option', { value: k, selected: k === metric }, METRIC_LABEL[k])));
@@ -90,7 +108,7 @@ export function createProjectsPanel({ store }) {
       h('span.vrule'),
       h('span.lbl', 'project'), titleEl,
       h('span.grow'),
-      h('span.lbl', 'rank by'), metricSel,
+      h('span.lbl', 'read on'), metricSel,
       h('button.btn.ghost.sm', { onclick: () => reload(), title: 'GET /api/projects' }, 'refresh'),
       h('button.btn.ghost.sm', { id: 'proj-close', onclick: () => dlg.close() }, 'close')),
     h('div.proj-body', railEl, h('div.proj-div'), mainEl));
@@ -192,7 +210,7 @@ export function createProjectsPanel({ store }) {
     const label = project ? `${project.id} · ${project.name}` : NULL_GLYPH;
     titleEl.textContent = label;
     // The head row truncates this with an ellipsis (a long project name plus
-    // the rank-by control and the refresh/close buttons do not all fit on
+    // the read-on control and the refresh/close buttons do not all fit on
     // one --h-head line at the dialog's min width) — the full name is still
     // one hover away.
     titleEl.title = project ? label : '';
@@ -392,9 +410,11 @@ export function createProjectsPanel({ store }) {
     if (!project) {
       mainEl.appendChild(h('div.notice',
         h('h3', 'No project selected'),
-        h('p', 'Create a project, add two sections as specimens, and attach the ' +
-          'same drug panel to each. The comparison then answers the question ' +
-          'this whole product is for: do two patients agree?')));
+        h('p', 'Create a project, add two sections as specimens, and run the ' +
+          'SAME compound at the SAME spec on each. The comparison then puts ' +
+          'that one compound side by side across the two specimens, and the ' +
+          'two tissues side by side under it. It does not order compounds ' +
+          'against each other.')));
       return;
     }
     if (!comparison) {
@@ -409,13 +429,18 @@ export function createProjectsPanel({ store }) {
       return s ? s.label : sid;
     };
 
-    /* 0. headline */
-    const agrees = c.ranking && c.ranking.agrees;
+    /* 0. headline — what this comparison established. Never an ordering: the
+       tag and its severity are the backend's, so the browser cannot upgrade a
+       "not comparable" into a finding. */
     mainEl.appendChild(h('div.verdict',
-      { class: agrees === true ? 'ok' : agrees === false ? 'crit' : 'info' },
-      h('div.verdict-tag', agrees === true ? 'RANKING AGREES'
-        : agrees === false ? 'RANKING DISAGREES' : 'NOT EVALUABLE'),
+      { class: c.headline_level === 'ok' ? 'ok'
+        : c.headline_level === 'crit' ? 'crit' : 'info' },
+      h('div.verdict-tag', c.headline_tag || 'NOT EVALUABLE'),
       h('div.verdict-body', c.headline)));
+    if (c.compares) {
+      mainEl.appendChild(h('div.caveat.crit', h('span',
+        h('b', 'WHAT THIS COMPARES: '), c.compares)));
+    }
 
     /* 1. specimens */
     mainEl.appendChild(h('div.hr-lbl', '1 · Specimens — what each panel can support'));
@@ -455,64 +480,27 @@ export function createProjectsPanel({ store }) {
       mainEl.appendChild(h('div.caveat.crit', h('span', p)));
     }
 
-    /* 2. ranking — the primary result */
-    const rk = c.ranking || {};
-    mainEl.appendChild(h('div.hr-lbl', `2 · Ranking by ${METRIC_LABEL[c.metric] || c.metric} — THE PRIMARY RESULT`));
-    if (!rk.drugs || rk.drugs.length < 2) {
-      mainEl.appendChild(h('div.caveat', h('span', rk.verdict || 'not evaluable')));
-    } else {
-      mainEl.appendChild(h('div.tblwrap', h('table.tbl.zebra',
-        h('thead', h('tr',
-          h('th', 'specimen'),
-          ...rk.drugs.map((d) => h('th.right', d)),
-          h('th', 'order'))),
-        h('tbody', rk.specimens.map((sid) => {
-          const blk = rk.by_specimen[sid] || { order: [], values: {} };
-          return h('tr',
-            h('td', h('span.mono.strong', sid), ' ', label(sid)),
-            ...rk.drugs.map((d) => h('td.right.num',
-              fmtBy(metricFmt(c.metric), blk.values[d]),
-              h('span.unit', METRIC_UNIT[c.metric] || ''))),
-            h('td.mono.rank', blk.order.join(' > ')));
-        })))));
-      mainEl.appendChild(h('div.tblwrap', h('table.tbl',
-        h('thead', h('tr', h('th', 'pair'), h('th', 'agrees'),
-          h('th.right', 'Kendall tau-b'), h('th.right', 'discordant'),
-          h('th', 'swapped drugs'))),
-        h('tbody', (rk.pairwise || []).map((p) => h('tr',
-          h('td.mono', `${p.a} vs ${p.b}`),
-          h('td', p.agrees
-            ? h('span.chip.st-done', 'yes') : h('span.chip.st-failed', 'no')),
-          h('td.right.num', p.kendall_tau_b === null ? NULL_GLYPH : num(p.kendall_tau_b, 3)),
-          h('td.right.num', int(p.discordant_pairs)),
-          h('td.mono', (p.swapped || []).length
-            ? p.swapped.map((s) => s.join(' ↔ ')).join('; ') : NULL_GLYPH)))))));
-      mainEl.appendChild(h('div.caveat.info', h('span', rk.verdict)));
-    }
-    // The verdict above is about agreement BETWEEN specimens, and it cites the
-    // invariances this repo has measured — cell-state route, section. Those are
-    // common-mode. The transvascular delivery law is not: it is drug-specific,
-    // and it changes the top-1 GBM pick. Without this line, "RANKING AGREES"
-    // reads as a broader guarantee than the evidence supports. Backend text,
-    // read from PDEConfig at request time (app/server/delivery_law.py).
-    if (rk.delivery_law && rk.delivery_law.caveat) {
-      mainEl.appendChild(h('div.caveat.crit', { title: rk.delivery_law.caveat },
-        h('span', h('b', 'LAW-DEPENDENT: '), rk.delivery_law.caveat)));
-    }
-
-    /* 3. absolute kill — flagged */
+    /* 2. the same compound on two specimens — flagged */
     mainEl.appendChild(h('div.hr-lbl',
-      `3 · Absolute ${METRIC_LABEL[c.metric] || c.metric} — read ONLY where comparable`));
+      `2 · Same compound, two specimens · ${METRIC_LABEL[c.metric] || c.metric} — read ONLY where comparable`));
     if (!(c.kill || []).length) {
       mainEl.appendChild(h('div.caveat.info', h('span',
-        'No drug is matched across two specimens at an identical RunSpec. Two ' +
-        'runs are matched only when everything but the section and the drug is ' +
-        'the same — same mesh, same modes, same PK, same window.')));
+        'No compound is matched across two specimens at an identical RunSpec. ' +
+        'Two runs are matched only when everything but the section and the ' +
+        'compound is the same — same mesh, same modes, same PK, same window.')));
     } else {
       const ref = c.kill[0].reference;
+      // Each ROW holds the compound fixed and varies the specimen. Rows are not
+      // an ordering and must never be read down the column as one: the backend
+      // emits them alphabetically by compound, not by value.
+      mainEl.appendChild(h('div.caveat.info', h('span',
+        'One row per compound, sorted by NAME. Each row compares that compound ' +
+        'against ITSELF on the other specimen; the Δ and the ratio are ' +
+        'cross-specimen. Rows are not ranked against each other and reading ' +
+        'down a column as an ordering is exactly the output that was withdrawn.')));
       mainEl.appendChild(h('div.tblwrap', h('table.tbl.zebra',
         h('thead', h('tr',
-          h('th', 'drug'),
+          h('th', 'compound'),
           ...sids.map((sid) => h('th.right', { title: label(sid) }, sid)),
           h('th.right', 'Δ abs'), h('th.right', 'ratio'),
           h('th', 'comparable'))),
@@ -547,10 +535,21 @@ export function createProjectsPanel({ store }) {
           `deltas and ratios are against ${ref} · ${label(ref)}`));
       }
     }
+    // The transvascular delivery law produced every delivery number above. It
+    // is compound-specific — it changes the top-1 GBM pick — so it does not
+    // cancel between two specimens the way a common-mode perturbation does, and
+    // it does not cancel out of an absolute level either. This caveat used to
+    // hang under the ranking table; the ranking is gone and the disclosure is
+    // not. Backend text, read from PDEConfig at request time
+    // (app/server/delivery_law.py).
+    if (c.delivery_law && c.delivery_law.caveat) {
+      mainEl.appendChild(h('div.caveat.crit', { title: c.delivery_law.caveat },
+        h('span', h('b', 'LAW-DEPENDENT: '), c.delivery_law.caveat)));
+    }
 
-    /* 4. composition */
+    /* 3. composition */
     const comp = c.composition || { rows: [] };
-    mainEl.appendChild(h('div.hr-lbl', '4 · Composition — the tissue difference'));
+    mainEl.appendChild(h('div.hr-lbl', '3 · Composition — the tissue difference'));
     if (!comp.rows.length) {
       mainEl.appendChild(h('div.caveat.info', h('span',
         'No completed run on any specimen yet, so there is no reconstruction ' +
@@ -596,7 +595,7 @@ export function createProjectsPanel({ store }) {
       mainEl.appendChild(h('div.hr-lbl', 'Matched sets — the RunSpec signatures compared'));
       mainEl.appendChild(h('div.tblwrap', h('table.tbl',
         h('thead', h('tr', h('th', 'signature'), h('th', 'specimens'),
-          h('th', 'drugs'), h('th.right', 'matched'))),
+          h('th', 'compounds'), h('th.right', 'matched'))),
         h('tbody', c.matched_sets.map((ms) => h('tr',
           h('td.mono', { style: { fontSize: 'var(--fs-micro)' } },
             ms.is_primary ? h('b', 'PRIMARY · ') : null, ms.signature),

@@ -320,7 +320,7 @@ export function validateSpec(spec) {
     W('state_mode', 'state_mode=markers on the 319-gene panel: it carries NO hypoxia-response transcript, so HYPOXIC is UNMEASURED and assigned to no cell — that is NOT "computed and found to be zero". Proliferation detection is 13x below the published Ki-67 range, so the per-cell call falls back to a neighbourhood ENRICHMENT rule whose level is not an index.');
   }
   if (spec.section === 'xenium_319' && spec.drug) {
-    W('state_mode', 'ABSOLUTE KILL SHOULD NOT BE QUOTED FROM THIS SECTION UNDER ANY state_mode: no state route clears the bar on this panel and kill moves up to 0.3252 absolute (1.77x) across routes. The cross-drug RANKING is invariant and is the defensible output.');
+    W('state_mode', 'ABSOLUTE KILL SHOULD NOT BE QUOTED FROM THIS SECTION UNDER ANY state_mode: no state route clears the bar on this panel and kill moves up to 0.3252 absolute (1.77x) across routes. What is defensible is the MAP: within this one compound on this one section, the RELATIVE exposure between regions, because a per-compound plasma factor is an exact linear rescale of the whole field and cancels from a ratio between points. The absolute level does not survive, and neither does a comparison against another compound.');
   }
   if (spec.sensitivity_mode === 'determinant' && spec.drug && !['temozolomide', 'lomustine', 'carmustine'].includes(spec.drug)) {
     W('sensitivity_mode', `no determinant gene on panel for "${spec.drug}"; will fall back to uniform 1.0`);
@@ -381,6 +381,72 @@ function metricsFor(spec, rng) {
     mean_tumor_auc: auc,
     therapeutic_coverage_1x: Math.max(0.002, Math.min(0.99, kill * (1.9 + rng() * 0.7))),
     penetration_length_um: 60 + bbb * 380 * (0.85 + rng() * 0.3),
+  };
+}
+
+/* The `reach` block, in the shape app/server/reach.py returns.
+ *
+ * SYNTHETIC, like everything else in this file, and it must stay contract-
+ * shaped for the same reason the rest of it does: the Reach section is now the
+ * product's primary answer, and a stub that omits it would let the panel's
+ * empty state ship untested. Two properties of the real thing are reproduced
+ * exactly rather than approximated, because they are the properties the panel
+ * asserts in prose: the curve is monotone non-decreasing in the threshold, and
+ * the first falloff bin is 1.0 by construction. The headline is PICKED OFF the
+ * ladder rather than computed separately, so the number and the chart cannot
+ * disagree here any more than they can in the backend. */
+const REACH_LADDER = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0];
+const REACH_HEADLINE_X = 0.1;
+
+function reachFor(spec, rng) {
+  if (!spec.drug) {
+    return {
+      null_reason: 'requires a drug; this RunSpec has drug=null '
+        + '(reconstruction-only run), so there is no exposure field and no '
+        + 'reach ratio to take',
+      headline_under_reached_fraction: null, headline_x: REACH_HEADLINE_X,
+      curve: null, falloff: null, E_ref_uM_s: null,
+    };
+  }
+  const d = DRUGS.find((x) => x.name === spec.drug) || DRUGS[0];
+  // A decay length drives both curves, so they stay consistent with each other.
+  const L = 60 + d.bbb_penetrance * 380 * (0.85 + rng() * 0.3);
+  const bins = [];
+  for (let i = 0; i < 14; i += 1) bins.push(i * 10 + 5);
+  const fall = bins.map((dist) => Math.exp(-(dist - bins[0]) / L));
+  // F(x) = fraction of tissue whose normalised exposure is below x, read off
+  // the same exponential — monotone in x by construction.
+  const F = REACH_LADDER.map((x) => {
+    const dCut = -L * Math.log(Math.min(1, x));
+    const frac = 1 - Math.exp(-dCut / (L * 2.2));
+    return Math.max(0, Math.min(1, 1 - frac));
+  }).map((v, i, arr) => (i ? Math.max(v, arr[i - 1]) : v));
+  return {
+    null_reason: null,
+    headline_under_reached_fraction: F[REACH_LADDER.indexOf(REACH_HEADLINE_X)],
+    headline_x: REACH_HEADLINE_X,
+    curve: { x: REACH_LADDER.slice(), under_reached_fraction: F },
+    falloff: {
+      distance_um: bins, normalised_mean_auc: fall,
+      count: bins.map(() => 200), bin_um: 10.0, min_bin_count: 30,
+    },
+    E_ref_uM_s: 1e5 * (0.7 + rng() * 0.6),
+    E_ref_source: 'SYNTHETIC — js/mock.js fabricated this from a seeded PRNG '
+      + 'against the shape of app/server/reach.py. The real value is the '
+      + 'perivascular mean of penetration_length_fit(...)["drug"]',
+    n_viable: 20000, n_tumor: 24000,
+    viable_definition: 'SYNTHETIC placeholder for the engine’s viable '
+      + 'tumour band; the real definition comes from delivery_metrics.',
+    convention: 'The 0.1 threshold is a REPORTING CONVENTION, not a physical '
+      + 'constant. The whole curve is published so that the choice of '
+      + 'threshold is visible as a choice.',
+    scale_invariance: 'SYNTHETIC RUN — this reach block was fabricated by '
+      + 'js/mock.js and is not a result. In a real run this field carries the '
+      + 'measured invariances of the within-map ratio and must be read there.',
+    penetration_fit_error: null,
+    units: { E_ref: 'uM.s', reach_ratio: 'dimensionless',
+      under_reached_fraction: 'fraction of viable tumour cells',
+      distance_um: 'um', normalised_mean_auc: 'dimensionless' },
   };
 }
 
@@ -465,7 +531,7 @@ function provenanceFor(spec, rng) {
     caveats.push(`state_mode=${spec.state_mode}: sim.engine re-bands cells.state from its own oxygen solve before the kill, so this route changed the REPORTED band occupancies and their provenance, not this run's kill_fraction.`);
   }
   if (spec.section === 'xenium_319') {
-    caveats.push('ABSOLUTE KILL MUST NOT BE QUOTED FROM THIS SECTION UNDER ANY STATE ROUTE: its panel measures no hypoxia, so no route clears the bar and kill moves up to 0.3252 absolute across routes. The cross-drug ranking is invariant and is the defensible output.');
+    caveats.push('ABSOLUTE KILL MUST NOT BE QUOTED FROM THIS SECTION UNDER ANY STATE ROUTE: its panel measures no hypoxia, so no route clears the bar and kill moves up to 0.3252 absolute across routes. What is defensible is the MAP: within this one compound on this one section, the RELATIVE exposure between regions. The absolute level is not, and a comparison against another compound is not — that claim was measured and withdrawn (results/pk_ranking_robustness.md, results/capacity_ranking_robustness.md).');
   }
   if (spec.vascular_mode === 'kde') {
     caveats.push('vascular_mode=kde did not converge under grid refinement in the held-out check; discrete vessels are the production default.');
@@ -481,8 +547,8 @@ function provenanceFor(spec, rng) {
     ic50_uM: d ? d.ic50_uM : null,
     ic50_source: d ? d.ic50_source : null,
     sensitivity_note: spec.sensitivity_mode === 'uniform'
-      ? 'uniform 1.0 across all cells (drug-agnostic reconstruction default) — comparable across drugs, absolute values are upper bounds'
-      : 'per-cell determinant expression scaled to [0,1]; comparability across drugs is NOT guaranteed',
+      ? 'uniform 1.0 across all cells (drug-agnostic reconstruction default) — every kill number is a no-resistance upper bound on this one map, not an expected response and not a number to set beside another compound'
+      : 'per-cell determinant expression scaled to [0,1]; the resulting kill is conditional on a determinant this panel may not measure for this compound',
     caveats,
   };
 }
@@ -550,6 +616,7 @@ function tick(run) {
     run.runtime_s = run._dur / 1000 * 4.1;
     run.report = reportFor(run.spec);
     run.metrics = metricsFor(run.spec, run._rng);
+    run.reach = reachFor(run.spec, run._rng);
     run.provenance = provenanceFor(run.spec, run._rng);
     run._log.push('[done] wrote results');
   }
@@ -586,16 +653,30 @@ export function cancelRun(id) {
 function publicRun(r) {
   return {
     run_id: r.run_id, spec: r.spec, status: r.status, report: r.report,
-    metrics: r.metrics, provenance: r.provenance, runtime_s: r.runtime_s,
-    error: r.error, created_at: r.created_at,
+    metrics: r.metrics, reach: r.reach, provenance: r.provenance,
+    runtime_s: r.runtime_s, error: r.error, created_at: r.created_at,
   };
 }
 
-/** Two finished runs so history + comparison have content on first paint. */
+/** Two finished runs so history + comparison have content on first paint.
+ *
+ * BOTH ARMS ARE THE SAME COMPOUND, and that is deliberate. The seed used to be
+ * temozolomide vs lomustine, which made the shipped demo of the comparison
+ * panel a two-DRUG comparison — the one reading this product no longer
+ * supports. The legitimate use of A/B is a single compound under two
+ * conditions, so the demo now varies the dose and the mesh and holds the drug
+ * fixed. A shipped example teaches people what the tool is for.
+ */
 export function seedHistory() {
   if (runs.length) return;
   const a = { ...DEFAULT_SPEC, drug: 'temozolomide' };
-  const b = { ...DEFAULT_SPEC, drug: 'lomustine', oxygen_mode: 'vessel_distance', dx_um: 15.0 };
+  const b = {
+    ...DEFAULT_SPEC,
+    drug: 'temozolomide',
+    dx_um: 15.0,
+    pk: { ...(DEFAULT_SPEC.pk || {}) },
+  };
+  if (b.pk && typeof b.pk.plasma_peak === 'number') b.pk.plasma_peak = b.pk.plasma_peak * 2;
   for (const spec of [a, b]) {
     const { run_id } = createRun(spec);
     const r = runs.find((x) => x.run_id === run_id);

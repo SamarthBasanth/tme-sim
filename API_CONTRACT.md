@@ -241,9 +241,19 @@ still returns 200 — a rejected script is a normal answer, not a transport erro
 runs are serialised on one worker and a dose sweep on one specimen **reconstructs once**.
 
 `GET /api/protocol/runs/{id}` → `{run_id, status, stage, progress, elapsed_s, error,
-source, n_runs, grid[], rows[], ranking, sweep_axes[], expects[], diagnostics[],
+source, n_runs, grid[], rows[], sweep_axes[], expects[], diagnostics[],
 reconstructions, plan, log_tail[]}`. **409** if `{id}` is a `RunSpec` run rather than a
-protocol run. `grid` is the progress grid and fills in live:
+protocol run.
+
+> **2026-08-21 — `ranking` removed from this payload.** It carried the `rank by` order of a
+> multi-compound `compare`. Both are withdrawn from TPL (`PROTOCOL_LANGUAGE.md` §5): a
+> `compare` now names ONE compound and its runs come from a `sweep`, so there is no
+> cross-compound order to return. `rows[]` still carries every run's metrics, and the
+> defensibility disclosure that used to ride on `ranking.note` is now in `diagnostics[]`,
+> emitted per run whether or not a `compare` was written. Each entry of `plan.runs[]` also
+> loses its `rank` field for the same reason.
+
+`grid` is the progress grid and fills in live:
 
 ```jsonc
 { "index": 0, "label": "...", "axes": {"dose": "150 mg/m2"},

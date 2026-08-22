@@ -244,7 +244,8 @@ def editor_plan(body: Dict, plan) -> Dict:
         entry["params"] = dict(run.axes)
         entry["est_s"] = round(per_run, 1)
         entry["report"] = list(run.report)
-        entry["rank"] = run.rank_by
+        # No `rank` field. `rank by` was withdrawn from TPL on 2026-08-21
+        # (PROTOCOL_LANGUAGE.md §5) and the planner has no ordering to project.
     return body
 
 

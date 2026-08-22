@@ -7,7 +7,7 @@ module directly — both are equivalent::
     codon reconstruct --source xenium --dx 12
     python -m tmesim.cli reconstruct --source xenium --dx 12
 
-    codon compare-drugs --drugs temozolomide,cisplatin,doxorubicin
+    codon simulate --source xenium --dx 12 --drug temozolomide
     codon studio
 
 The pre-rename name ``vivum`` is still registered as an alias console script and
@@ -26,13 +26,13 @@ Subcommands
     Reconstruct a real microenvironment, compile a REAL calibrated drug
     (calibrated_drugparams -> binding-site barrier), run the mechanistic
     transport+kill simulation, print kill fraction / penetration, save a figure.
-``compare-drugs``
-    Reconstruct a real microenvironment ONCE and simulate several drugs on the
-    SAME reconstruction, printing (and optionally saving) a comparison table.
-    Works for any drug in the molecular library — GBM
-    (:data:`tmesim.molecular.library.GBM_DRUGS`) by default, or breast
-    (:data:`tmesim.molecular.breast_library.BREAST_DRUGS`) via ``--library breast``
-    — so a newly added drug is picked up automatically, with no CLI change.
+    ONE tissue, ONE compound — this is the product. Within a single map the
+    per-compound scale factors are common to every voxel and cancel exactly, so
+    the RELATIVE exposure between regions of that section survives; ordering one
+    compound against another does not, and there is no longer a command that
+    does it (see the ``compare-drugs`` removal note in ``docs/QUICKSTART.md``,
+    ``results/pk_ranking_robustness.md`` and
+    ``results/capacity_ranking_robustness.md``).
 ``molecules``
     List the library GBM drugs with structure-derived descriptors (no simulation).
 ``molecular-run``
@@ -87,11 +87,8 @@ Design notes
 from __future__ import annotations
 
 import argparse
-import csv
-import json
 import os
 import sys
-import textwrap
 from typing import List, Optional
 
 # Fast default simulated-exposure window (seconds) for the CLI. The library
@@ -103,9 +100,11 @@ _FAST_SAVE_EVERY = 200        # snapshot cadence (PDE steps)
 _DEFAULT_DRUG = "temozolomide"
 
 # The open breast Xenium section (Janesick et al. 2023, PMID 38114474) used by
-# ``experiments/breast_drug_panel.py``. Only used as the ``--sample`` default
-# when ``--library breast`` is selected and the caller did not pass ``--sample``
-# explicitly — the Xenium loader's own default sample is the GBM section.
+# ``experiments/breast_drug_panel.py``. There is no longer a ``--library``
+# switch that resolves it implicitly (it belonged to the removed
+# ``compare-drugs`` command), so it is named here as the path to pass to
+# ``--sample`` when you want the breast section instead of the GBM default —
+# the Xenium loader's own default sample is the GBM section.
 _BREAST_SAMPLE_PATH = os.path.join(
     "data_cache", "xenium_breast_janesick", "rep1"
 )
@@ -252,415 +251,6 @@ def cmd_simulate(args: argparse.Namespace) -> int:
     print(f"  {os.path.abspath(micro_png)}")
     print(f"  {os.path.abspath(sim_png)}")
     return 0
-
-
-# --------------------------------------------------------------------------- #
-# compare-drugs
-# --------------------------------------------------------------------------- #
-def _compile_drug_for_comparison(name: str, alpha: float, library: str):
-    """Compile ONE drug through the calibrated real-data pipeline, for either
-    library.
-
-    ``library='gbm'`` — ``tmesim.molecular.library.get_molecule`` +
-    ``validation.calibration.calibrated_drugparams(name, alpha)``: the exact
-    calls ``experiments/real_drug_panel.py`` and this module's own
-    ``_compile_real_drug`` make.
-
-    ``library='breast'`` — doxorubicin is REUSED VERBATIM from the GBM branch
-    (same molecule, same calibrated physics; it is not breast-specific).
-    Every other breast drug is compiled from
-    ``tmesim.molecular.breast_library.get_molecule_breast`` with a REAL
-    GDSC2-breast IC50 (``tmesim.molecular.potency_breast.resolve_ic50``), then
-    calibrated through the SAME ``calibrated_drugparams`` call (which accepts
-    an already-built ``DrugParams`` and applies the identical alpha-scaled
-    perivascular-sink calibration a library-name lookup would). This is the
-    identical composition ``experiments/breast_drug_panel.py::compile_breast_drug``
-    uses; no calibration code is duplicated here.
-
-    Returns ``(molecule, DrugParams)``. Raises on an unknown / uncompilable
-    drug name — the caller decides whether that is fatal for the whole run.
-    """
-    from tmesim.molecular.binding_site_barrier import apply_barrier_to_drugparams
-    from tmesim.molecular.library import get_molecule as get_molecule_gbm
-    from tmesim.validation.calibration import calibrated_drugparams
-
-    key = name.strip().lower()
-    if library == "gbm" or key == "doxorubicin":
-        dp = calibrated_drugparams(key, alpha)
-        mol = get_molecule_gbm(key)
-    else:
-        from tmesim.molecular.breast_library import get_molecule_breast
-        from tmesim.molecular.compile_drug import molecule_to_drugparams
-        from tmesim.molecular.potency_breast import resolve_ic50 as resolve_ic50_breast
-        from tmesim.validation.pk_reality import DEFAULT_ECM
-
-        mol = get_molecule_breast(key)
-        ic50_info = resolve_ic50_breast(key)
-        dp_uncal = molecule_to_drugparams(
-            mol, ecm_reference=DEFAULT_ECM, ic50=ic50_info["ic50_uM"]
-        )
-        dp = calibrated_drugparams(dp_uncal, alpha)
-    dp = apply_barrier_to_drugparams(dp, mol)
-    return mol, dp
-
-
-def _wrap(text: str, indent: str = "  ") -> str:
-    """Wrap a long disclosure for a terminal without truncating a word of it."""
-    return textwrap.fill(str(text), width=86, subsequent_indent=indent)
-
-
-def _delivery_law_note(transvascular_exchange: bool) -> Optional[dict]:
-    """The transvascular delivery-law disclosure for a run, or ``None``.
-
-    ``compare-drugs`` prints a RANKING, and the ranking is not law-independent:
-    the two source terms disagree on top-1 for GBM. The Studio has carried this
-    disclosure on every one of its surfaces for a while; this command — the one
-    the README calls the core use case — did not.
-
-    There is exactly ONE implementation of the disclosure
-    (``app/server/delivery_law.py``) and it is a RUNTIME read of ``PDEConfig``,
-    so it cannot go stale. It is imported rather than restated here precisely so
-    that no second copy of the claim can drift from the first. That module
-    imports nothing but ``typing`` at module scope, so this does not pull in the
-    optional ``[app]`` extra; if the ``app`` package is genuinely absent, the
-    caller says so loudly instead of quietly printing nothing.
-    """
-    _ensure_repo_root_on_path()
-    try:
-        from app.server.delivery_law import delivery_law
-    except Exception:  # noqa: BLE001 — absence is reported, never swallowed
-        return None
-    return delivery_law(bool(transvascular_exchange))
-
-
-def _coverage_at_1x_ic50(micro, result, dp) -> float:
-    """``therapeutic_coverage`` at 1x IC50 — the headline delivery metric.
-
-    Same code path ``validation.delivery_metrics.compute_all`` uses (it calls
-    exactly these three functions); the expensive distance transform behind
-    ``penetration_length_fit`` is not needed for coverage and is not run.
-
-    This is what replaced ``penetration_index`` in this command's output.
-    ``penetration_index = mean(AUC)/p99(AUC)`` is a scale-invariant SHAPE
-    statistic — multiply the exposure field by any constant and it is unchanged
-    — so on real tissue it reports the section's vascular geometry, shared by
-    every drug (``results/delivery_metrics.md`` §4). It was retired there, and
-    this table used to demonstrate exactly why: temozolomide carried the highest
-    penetration index of the panel while ranking last.
-    """
-    from tmesim.validation.delivery_metrics import (
-        exposure_window_s,
-        therapeutic_coverage,
-        tumor_cell_exposure,
-    )
-
-    exp = tumor_cell_exposure(micro, result)
-    cov = therapeutic_coverage(exp["auc_uM_s"], float(dp.ic50),
-                               exposure_window_s(result))
-    return float(cov["coverage_1x"])
-
-
-def cmd_compare_drugs(args: argparse.Namespace) -> int:
-    """Reconstruct a real microenvironment ONCE and simulate several drugs on
-    that SAME reconstruction, so every kill/exposure difference is attributable
-    to drug physics rather than to re-reconstructing the tissue. Prints a
-    comparison table, sorted by predicted kill fraction, and optionally saves
-    it as CSV.
-
-    This is a thin orchestration wrapper: no science is reimplemented here —
-    every number comes from the same ``reconstruct_real`` / ``calibrate_alpha``
-    / ``calibrated_drugparams`` / ``simulate_response`` calls the underlying
-    experiment scripts (``experiments/real_drug_panel.py``,
-    ``experiments/breast_drug_panel.py``) use.
-    """
-    from tmesim.core import PDEConfig, SimConfig
-    from tmesim.reconstruct.real_pipeline import (
-        reconstruct_real,
-        reconstruction_report,
-    )
-    from tmesim.sim.engine import simulate_response
-    from tmesim.validation.calibration import calibrate_alpha
-
-    library = args.library
-    sample = args.sample
-    if library == "breast" and sample is None:
-        sample = _BREAST_SAMPLE_PATH
-        if not os.path.isdir(sample):
-            print(f"[compare-drugs] --library breast needs the Janesick breast "
-                  f"Xenium cache at {sample!r}, which is not present. Pass "
-                  f"--sample <path> to point at your own cache, or see "
-                  f"docs/QUICKSTART.md for how this one was downloaded.")
-            return 1
-
-    # --- the two conditions every number below is contingent on ------------- #
-    # Printed BEFORE the reconstruction, not after the table, because they are
-    # conditions on the whole run rather than footnotes to it.
-    #
-    # (1) The exposure window. Three surfaces ship three different defaults —
-    #     this CLI's fast window, the Studio's, and the library's PDEConfig —
-    #     and AUC, coverage and kill all scale with it, so two numbers taken
-    #     from two surfaces are not comparable. They are deliberately NOT
-    #     silently harmonised here: raising this command's window to the library
-    #     default would multiply every quickstart run's cost ~24x, and lowering
-    #     the others would change what the Studio has already published. Instead
-    #     each surface states the window it used, which is the honest version of
-    #     the same fix (``cmd_simulate`` and ``cmd_molecular_run`` already did;
-    #     this command did not).
-    # (2) The transvascular delivery law, read from PDEConfig at call time.
-    probe = _build_sim_config(args.seed, total_time=args.total_time)
-    window_s = float(probe.pde.total_time)
-    exchange = bool(getattr(probe.pde, "transvascular_exchange", False))
-    library_window_s = float(PDEConfig().total_time)
-    law = _delivery_law_note(exchange)
-
-    print(f"\n[compare-drugs] EXPOSURE WINDOW = {window_s:.0f} s "
-          f"({window_s / 3600.0:.2f} h) — "
-          + ("this CLI's fast default (--total-time to change it)"
-             if args.total_time is None else "set by --total-time")
-          + f". The library default (core.config.PDEConfig.total_time) is "
-            f"{library_window_s:.0f} s and the Studio submits a different one "
-            f"again; exposure, coverage and kill ALL scale with the window, so "
-            f"numbers taken from two surfaces are not comparable unless the "
-            f"window matches.")
-
-    if law is not None:
-        print("\n[compare-drugs] " + _wrap(law["headline"]))
-        print("[compare-drugs] " + _wrap(law["caveat"]))
-    else:
-        print(f"\n[compare-drugs] WARNING: the delivery-law disclosure could "
-              f"not be loaded (app/server/delivery_law.py is not importable "
-              f"from here). This run uses "
-              f"PDEConfig.transvascular_exchange={exchange!r}. The two source "
-              f"terms disagree on the top-1 GBM drug, so the ranking below is "
-              f"LAW-DEPENDENT and you are reading it without its disclosure.")
-
-    print(f"\n[compare-drugs] reconstructing REAL microenvironment "
-          f"(source={args.source}, sample={sample}, dx={args.dx} um) — once, "
-          f"reused for every drug ...")
-    micro = reconstruct_real(source=args.source, sample=sample, dx_um=args.dx)
-    report = reconstruction_report(micro)
-    _print_report(report)
-
-    if args.drugs:
-        drug_names = [d.strip().lower() for d in args.drugs.split(",") if d.strip()]
-    else:
-        if library == "breast":
-            from tmesim.molecular.breast_library import BREAST_DRUGS as _LIB
-        else:
-            from tmesim.molecular.library import GBM_DRUGS as _LIB
-        drug_names = sorted(_LIB)
-    if not drug_names:
-        print("[compare-drugs] no drugs to compare (empty --drugs list).")
-        return 1
-
-    alpha = calibrate_alpha()
-    print(f"\n[compare-drugs] alpha = {alpha:.4f} "
-          "(perivascular-sink constant, fit once on doxorubicin, shared by "
-          "every drug below) ...")
-
-    rows: List[dict] = []
-    for name in drug_names:
-        print(f"  compiling + simulating {name:16s} ...", end="", flush=True)
-        try:
-            mol, dp = _compile_drug_for_comparison(name, alpha, library)
-            cfg = _build_sim_config(args.seed, total_time=args.total_time)
-            cfg.drug = dp
-            if args.plasma is not None:
-                cfg.pk.plasma_peak = float(args.plasma)
-            result = simulate_response(micro, cfg)
-        except Exception as exc:
-            # A drug library is actively growing (see docs/QUICKSTART.md); one
-            # bad or not-yet-wired entry should not sink the whole comparison.
-            print(f" SKIPPED ({type(exc).__name__}: {exc})")
-            continue
-        rows.append(dict(
-            drug=name,
-            mw=float(mol.get("mw")) if mol.get("mw") is not None else float("nan"),
-            ic50_uM=float(dp.ic50),
-            bbb_penetrance=float(dp.bbb_penetrance),
-            diffusivity_um2_s=float(dp.diffusivity),
-            kill_fraction=float(result.kill_fraction),
-            # therapeutic_coverage @1x IC50 REPLACES penetration_index here, in
-            # the printed table and in the CSV. See _coverage_at_1x_ic50 for
-            # why the index is not carried under any name: it is retired, and
-            # this is the export most likely to end up in a slide.
-            therapeutic_coverage_1x=_coverage_at_1x_ic50(micro, result, dp),
-            mean_auc_uM_s=float(result.extras.get("mean_auc", float("nan"))),
-        ))
-        print(f" kill={rows[-1]['kill_fraction']:.4f}  "
-              f"ic50={rows[-1]['ic50_uM']:.3g} uM  "
-              f"mean_auc={rows[-1]['mean_auc_uM_s']:.3g}")
-
-    if not rows:
-        print("\n[compare-drugs] every requested drug failed to compile/simulate; "
-              "nothing to report.")
-        return 1
-
-    rows.sort(key=lambda r: r["kill_fraction"], reverse=True)
-    cols = ["drug", "mw", "ic50_uM", "bbb_penetrance", "diffusivity_um2_s",
-            "kill_fraction", "therapeutic_coverage_1x", "mean_auc_uM_s"]
-    print("\n=== drug comparison (sorted by predicted kill_fraction, best first) ===")
-    print("PREDICTIONS on a real reconstructed section, not validated clinical "
-          "outcomes — see docs/QUICKSTART.md.")
-    hdr = f"{'drug':16s} {'MW':>8s} {'IC50(uM)':>9s} {'bbb':>6s} " \
-          f"{'D_eff':>8s} {'cov@IC50':>9s} {'mean_auc':>10s} {'kill':>7s}"
-    print(hdr); print("-" * len(hdr))
-    for r in rows:
-        print(f"{r['drug']:16s} {r['mw']:8.0f} {r['ic50_uM']:9.3g} "
-              f"{r['bbb_penetrance']:6.3f} {r['diffusivity_um2_s']:8.1f} "
-              f"{r['therapeutic_coverage_1x']:9.4f} {r['mean_auc_uM_s']:10.3g} "
-              f"{r['kill_fraction']:7.4f}")
-    print(f"\ncov@IC50 = therapeutic_coverage at 1x IC50: the fraction of this "
-          f"section's tumour cells whose time-averaged exposure exceeds that "
-          f"drug's own IC50 over the {window_s:.0f} s window. It replaces the "
-          f"pen_idx column this table used to print — penetration_index is a "
-          f"scale-invariant shape statistic that reports the section's vascular "
-          f"geometry rather than the drug's delivery, and it is retired "
-          f"(results/delivery_metrics.md §4).")
-    if law is not None:
-        print("\n" + _wrap("RANKING CONDITION — " + law["headline"], indent=""))
-
-    if args.csv:
-        prov = _comparison_provenance(
-            args=args, sample=sample, library=library, alpha=alpha,
-            window_s=window_s, report=report, law=law, exchange=exchange,
-            n_drugs=len(rows))
-        os.makedirs(os.path.dirname(os.path.abspath(args.csv)) or ".", exist_ok=True)
-        with open(args.csv, "w", newline="") as fh:
-            # A comment block FIRST, so the provenance cannot be separated from
-            # the numbers by copying the file. `pandas.read_csv(..., comment='#')`
-            # and every `#`-aware reader skip it; the sidecar below exists for
-            # readers that do not.
-            for line in _provenance_comment_lines(prov):
-                fh.write(f"# {line}\n" if line else "#\n")
-            writer = csv.DictWriter(fh, fieldnames=cols)
-            writer.writeheader()
-            writer.writerows(rows)
-        side = os.path.abspath(args.csv) + ".provenance.json"
-        with open(side, "w") as fh:
-            json.dump(prov, fh, indent=1, sort_keys=True)
-        print(f"\n[compare-drugs] comparison table written: {os.path.abspath(args.csv)}")
-        print(f"[compare-drugs] it opens with a `#` provenance header — section, "
-              f"dx, window, alpha, delivery law, sensitivity mode and NOT FOR "
-              f"CLINICAL USE — so read it with "
-              f"pandas.read_csv(path, comment='#'). The same block, "
-              f"machine-readable, is in: {side}")
-
-    return 0
-
-
-def _comparison_provenance(*, args, sample, library, alpha, window_s, report,
-                           law, exchange, n_drugs) -> dict:
-    """Everything a reader needs to know what a comparison CSV actually is.
-
-    The exported CSV used to carry eight columns and nothing else: no section,
-    no ``dx``, no exposure window, no ``alpha``, no delivery law, no sensitivity
-    mode and no "not for clinical use". It is the only machine-readable export
-    in the product and therefore the artefact most likely to become a slide, so
-    everything the run knows about its own conditions travels inside it.
-
-    Every value here is READ from the run — the reconstruction report, the
-    config actually used, the calibrated alpha — never restated from memory.
-    """
-    sens = (report or {}).get("sensitivity") or {}
-    return {
-        "not_for_clinical_use": (
-            "NOT FOR CLINICAL USE. Every number in this file is a PREDICTION of "
-            "a physical model, not a measurement of a patient. Nothing here has "
-            "been validated against a treatment outcome. Do not use it to "
-            "select, rank, exclude or dose any therapy for any patient."
-        ),
-        "generator": "tmesim.cli cmd_compare_drugs (codon compare-drugs)",
-        "section_source": (report or {}).get("source", args.source),
-        "sample_path": sample,
-        "patient_id": (report or {}).get("patient_id"),
-        "library": library,
-        "n_drugs": int(n_drugs),
-        "dx_um": (report or {}).get("dx_um", args.dx),
-        "grid": list((report or {}).get("grid") or []),
-        "n_cells": (report or {}).get("n_cells"),
-        "n_tumor": (report or {}).get("n_tumor"),
-        "exposure_window_s": float(window_s),
-        "plasma_peak_uM_override": (float(args.plasma)
-                                    if args.plasma is not None else None),
-        "seed": int(args.seed),
-        "alpha": float(alpha),
-        "alpha_source": ("validation.calibration.calibrate_alpha — ONE "
-                         "doxorubicin penetration measurement (PMID 16361566), "
-                         "shared by every drug in this file"),
-        "oxygen_mode": (report or {}).get("oxygen_mode"),
-        "state_mode": (report or {}).get("state_mode"),
-        "sensitivity_mode": sens.get("mode") or "uniform 1.0 (reconstruction default)",
-        "sensitivity_is_upper_bound": bool(sens.get("upper_bound", True)),
-        "transvascular_exchange": bool(exchange),
-        "delivery_law": (law or {}).get("law"),
-        "delivery_law_caveat": (
-            (law or {}).get("caveat")
-            or (f"UNAVAILABLE — app/server/delivery_law.py was not importable "
-                f"when this file was written. The run used "
-                f"PDEConfig.transvascular_exchange={bool(exchange)}, and the two "
-                f"source terms disagree on the top-1 GBM drug, so this ranking "
-                f"is LAW-DEPENDENT.")
-        ),
-        "retired_metric_note": (
-            "penetration_index is NOT in this file. It is mean(AUC)/p99(AUC), a "
-            "scale-invariant shape statistic that reports the section's "
-            "vascular geometry rather than a drug's delivery, and it is retired "
-            "(results/delivery_metrics.md section 4). The column "
-            "therapeutic_coverage_1x replaces it."
-        ),
-        "what_is_defensible": (
-            "The ORDER, under the delivery law named above. It is strongest "
-            "between compounds that differ substantially in mass and WEAKER "
-            "between similar-mass analogues — see diffusivity_model below, "
-            "which now separates such compounds rather than being flat, but "
-            "reproduces only about a quarter of the measured spread. The "
-            "absolute kill_fraction is not defensible: it is a "
-            "no-intrinsic-resistance UPPER BOUND and, where it has been "
-            "interval-propagated at all, the interval spans ~30x "
-            "(results/kill_calibration.md section 5.1)."
-        ),
-        # The single most load-bearing caveat on this export, because the
-        # comparison a real compound series asks for -- rank these analogues --
-        # is exactly the one the transport model has been measured to fail.
-        "diffusivity_model": (
-            "The diffusivity_um2_s column comes from a two-route tissue "
-            "transport model — paracellular between cells plus transcellular "
-            "through membranes — so it consumes molecular weight, logP AND "
-            "hydrogen-bond donor count. Measured blind against 71 compounds in "
-            "multicellular layers (Pruijn 2008, doi 10.1071/CH08240) it reaches "
-            "R^2 = 0.718 with 99 % of compounds within 3x of measurement and 24 "
-            "of 31 exact-mass pairs ordered correctly. The MOLECULAR-WEIGHT-ONLY "
-            "model this replaced reached R^2 = 0.022, was flat by construction "
-            "at matched mass, and ordered 0 of 31 "
-            "(results/diffusivity_falsification.md). WHAT IS STILL NOT TRUE: it "
-            "reproduces 8.3x of the measured 29.7x spread — about a QUARTER — "
-            "so it under-separates a congeneric series systematically; the whole "
-            "test is ONE cell line; and the ABSOLUTE value in this column is not "
-            "defensible, the same drug's compiled D_eff missing its measured "
-            "multicellular-layer band by 1.5x. Full result: "
-            "results/two_route_promotion.md."
-        ),
-    }
-
-
-def _provenance_comment_lines(prov: dict) -> List[str]:
-    """The provenance block as `#`-comment lines, wrapped for a terminal."""
-    out: List[str] = ["NOT FOR CLINICAL USE — see not_for_clinical_use below.",
-                      ""]
-    for key, value in prov.items():
-        if value is None or value == []:
-            value = "—"
-        text = f"{key}: {value}"
-        out.extend(textwrap.wrap(text, width=94, subsequent_indent="    ")
-                   or [text])
-        out.append("")
-    out.extend(textwrap.wrap(
-        "--- data below: one row per drug, header row next. Every line above "
-        "starts with '#'; read with pandas.read_csv(path, comment='#') or skip "
-        "'#' lines. The same block is in <this file>.provenance.json.",
-        width=94, subsequent_indent="    "))
-    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -1308,8 +898,14 @@ def cmd_ingest(args: argparse.Namespace) -> int:
             print("[ingest] NOTE: this section is INSPECT-ONLY — "
                   "reconstruct_real has no route for its platform.")
         else:
-            print(f"[ingest] run it:  codon compare-drugs --source "
-                  f"{sec.get('platform')} --sample {sec.get('sample')}")
+            print(f"[ingest] run it:  codon simulate --source "
+                  f"{sec.get('platform')} --sample {sec.get('sample')} "
+                  f"--drug {_DEFAULT_DRUG}")
+            print("[ingest] that maps ONE compound on THIS section: where it "
+                  "reaches, and how much of the tumour it never reaches. "
+                  "Change --drug to map a different compound on the same "
+                  "tissue; the two maps are not a ranking of the two "
+                  "compounds.")
         print("[ingest] the Studio picks up sections registered by another "
               "process on RESTART, not live.")
         return 0
@@ -1527,7 +1123,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(
         dest="command",
-        metavar="{reconstruct,simulate,compare-drugs,validate,ingest,"
+        metavar="{reconstruct,simulate,validate,ingest,"
                  "molecules,molecular-run,acquire,sections,studio}")
     sub.required = True
 
@@ -1555,33 +1151,16 @@ def build_parser() -> argparse.ArgumentParser:
                        help="PDE exposure window in seconds (default: fast CLI window)")
     p_sim.set_defaults(func=cmd_simulate)
 
-    # compare-drugs
-    p_cmp = sub.add_parser(
-        "compare-drugs",
-        help="reconstruct ONE real section and compare several drugs on it",
-        description="Reconstruct a real microenvironment once and simulate "
-                    "several drugs on that SAME reconstruction, printing (and "
-                    "optionally saving) a comparison table sorted by predicted "
-                    "kill fraction. Works for any drug in the molecular "
-                    "library, so a newly added drug needs no CLI change.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    _add_real_source_args(p_cmp)
-    p_cmp.add_argument("--library", choices=["gbm", "breast"], default="gbm",
-                       help="which molecular drug library to draw the default "
-                            "drug list from, and how to compile a requested "
-                            "drug that is not in GBM_DRUGS")
-    p_cmp.add_argument("--drugs", default=None,
-                       help="comma-separated drug names to compare (case-"
-                            "insensitive). Default: every drug in the selected "
-                            "--library (GBM_DRUGS or BREAST_DRUGS)")
-    p_cmp.add_argument("--plasma", dest="plasma", type=float, default=None,
-                       help="override PK plasma_peak (uM), shared by every drug")
-    p_cmp.add_argument("--total-time", dest="total_time", type=float, default=None,
-                       help="PDE exposure window in seconds (default: fast CLI window)")
-    p_cmp.add_argument("--csv", default=None,
-                       help="path to write the comparison table as CSV "
-                            "(default: print only, do not save)")
-    p_cmp.set_defaults(func=cmd_compare_drugs)
+    # NOTE (2026-08-21): `compare-drugs` was REMOVED, not renamed. It
+    # reconstructed one section and printed several compounds ranked against
+    # each other. That cross-compound ordering was measured and does not hold:
+    # results/pk_ranking_robustness.md (per-compound plasma exposure spans
+    # 113.1x across the retained compounds and the published GBM order first
+    # breaks at a spread of 1.53x) and results/capacity_ranking_robustness.md
+    # (the breast top-1 pick changes from vinorelbine to doxorubicin under this
+    # repo's own structural binding-capacity rule). Within ONE map the
+    # per-compound scale factors are common to every voxel and cancel exactly,
+    # so `simulate` — one tissue, one compound — is what remains.
 
     # validate
     p_val = sub.add_parser(

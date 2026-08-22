@@ -3,10 +3,14 @@
 // what each compiled field actually is.
 //
 // The shipped library has twelve molecules. A researcher's own series is the
-// reason they are here at all: they want to rank THEIR compounds on THEIR
-// section. That is the one claim this project defends, so the feature is worth
-// building. What is NOT worth building is a compiled compound that looks
-// authoritative and is not.
+// reason they are here at all: they want to see where THEIR compound reaches on
+// THEIR section, and how much of the tumour it never reaches. That is the claim
+// this project defends. It used to say "rank THEIR compounds", and that was
+// withdrawn on 2026-08-21 when the ordering was measured and did not hold
+// (results/pk_ranking_robustness.md, results/capacity_ranking_robustness.md).
+// The feature is unchanged and is worth more, not less, under the new claim:
+// one compiled compound produces one map. What is NOT worth building is a
+// compiled compound that looks authoritative and is not.
 //
 // Three rules this panel is built to, in order:
 //
@@ -129,13 +133,15 @@ export function createCompoundPanel({ onChanged }) {
           lineHeight: 'var(--lh-body)',
         },
       },
-      'Compile one of your own molecules and compare it against the others on '
-      + 'this section. Everything the compiler derives from a structure is a '
+      'Compile one of your own molecules and run it on this section to see '
+      + 'where it reaches. Everything the compiler derives from a structure is a '
       + 'prediction, and the table below says which — read it before you use the '
       + 'result. In particular: diffusivity is a function of molecular weight '
       + 'alone, and that has been measured against 71 compounds and refuted, so '
       + 'a series of similar-mass analogues is the one case this model is known '
-      + 'not to resolve.'),
+      + 'not to resolve. Diffusivity sets the SHAPE of the map, which is the one '
+      + 'thing a within-map ratio does not cancel, so that limit reaches the '
+      + 'result rather than sitting beside it.'),
       formEl),
     controlsEl,
     h('div.sect-body', { style: { padding: '0' } }, outEl),
@@ -342,7 +348,9 @@ export function createCompoundPanel({ onChanged }) {
       if (persist) {
         toast('info', `Compound ${doc.name} added`,
           'It is in the drug picker now. Its absolute kill, AUC and penetration '
-          + 'are still not defensible outputs — rank it, do not quote it.', 9000);
+          + 'are still not defensible outputs — read where it reaches inside one '
+          + 'run, do not quote a level and do not set it beside another '
+          + 'compound.', 9000);
         await refreshStored();
         if (onChanged) onChanged(doc);
       }

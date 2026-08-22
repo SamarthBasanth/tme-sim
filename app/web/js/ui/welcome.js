@@ -53,8 +53,12 @@ const STEPS = [
         'No number in this Studio has been validated against a patient ' +
         'outcome: these sections carry no treatment-response label, so every ' +
         'result is a prediction of the physical model that has never been ' +
-        'scored against one. The ranking across compounds is the defensible ' +
-        'output; the absolute numbers are not. NOT FOR CLINICAL USE.'),
+        'scored against one. What this Studio defends is the MAP: for one ' +
+        'compound on one section, where the drug reaches and how much of the ' +
+        'tumour it does not, read as exposure relative to the best-perfused ' +
+        'tissue in that same map. The absolute level is not defensible, and ' +
+        'ordering one compound against another is not either — that claim was ' +
+        'measured and withdrawn. NOT FOR CLINICAL USE.'),
     ],
   },
   {
@@ -123,13 +127,15 @@ const STEPS = [
       // The tour previously stopped at "it populates", which leaves a new
       // user staring at six numbers with no idea which one is the answer.
       // Naming the reading order is the actual skill being taught, and it
-      // doubles as the product's central claim: the ranking is the output.
+      // doubles as the product's central claim: the map is the output.
       h('p',
         'When it lands, read it in this order: the ', h('b', 'MECHANISM'),
         ' breakdown first — it tells you ', h('b', 'why'),
-        ' a compound did or did not work, which is the question this tool ' +
-        'answers. The metrics above it are supporting detail, and the ' +
-        'absolute values among them are not defensible on their own.'),
+        ' this compound did or did not work on this tissue, per cell, which ' +
+        'is the question this tool answers. Cells the drug never reached are ' +
+        'counted separately from cells it reached and under-dosed, and from ' +
+        'cells that resisted it. The metrics above it are supporting detail, ' +
+        'and the absolute values among them are not defensible on their own.'),
       h('p',
         'You can leave and come back: a run in flight is picked up again ' +
         'when you reload, and the run history at the bottom reopens any ' +

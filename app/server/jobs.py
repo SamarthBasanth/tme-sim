@@ -291,8 +291,13 @@ def execute_run(spec: Dict, ctx: _Ctx,
     from tmesim.validation import delivery_metrics
     from tmesim.validation.calibration import calibrate_alpha, calibrated_drugparams
     from tmesim.validation.pk_reality import penetration_length_um
+    from tmesim.validation.vessel_profile import (
+        direct_vessel_distance_um,
+        endothelial_xy,
+    )
 
     from .compounds import user_compound_caveats, user_drugparams
+    from .reach import compute_reach, null_reach
 
     section = spec["section"]
     dx_um = float(spec["dx_um"])
@@ -493,7 +498,9 @@ def execute_run(spec: Dict, ctx: _Ctx,
             "validation.calibration.calibrated_drugparams",
             "molecular.binding_site_barrier.apply_barrier_to_drugparams",
             "sim.engine.simulate_response",
+            "validation.vessel_profile.direct_vessel_distance_um",
             "validation.delivery_metrics.compute_all",
+            "app.server.reach.compute_reach",
         ],
     }
 
@@ -527,6 +534,14 @@ def execute_run(spec: Dict, ctx: _Ctx,
             "report": jsonable(report),
             "metrics": {k: None for k in metric_reasons},
             "metric_reasons": metric_reasons,
+            # The reach map is a property of a DRUG's exposure field, so a
+            # reconstruction-only run has none. It is still returned, carrying
+            # the refusal, so a consumer never has to distinguish "key absent"
+            # from "quantity undefined".
+            "reach": jsonable(null_reach(
+                "requires a drug; this RunSpec has drug=null "
+                "(reconstruction-only run), so there is no exposure field and "
+                "no reach ratio to take")),
             "provenance": jsonable(provenance),
             "drug_params": None,
             "mechanism": None,
@@ -710,11 +725,36 @@ def execute_run(spec: Dict, ctx: _Ctx,
 
     # --- 5. metrics -------------------------------------------------------- #
     ctx.stage("metrics")
-    dm = delivery_metrics.compute_all(micro, res, dp)
+    # The distance-from-nearest-endothelial-cell transform is the expensive part
+    # of both the penetration length and the reach map, and it is pure geometry:
+    # one map, computed ONCE and handed to both, so adding the reach map does not
+    # double the cost of a run. This is the SAME call
+    # ``penetration_length_fit`` makes internally when it is given nothing
+    # (``vessel_profile.direct_vessel_distance_um``, the PRIMARY metric), so the
+    # numbers are unchanged — including its refusal when a section has no
+    # endothelial cells to measure to, which now surfaces from here instead of
+    # from inside compute_all, with the same type and the same message.
+    dist = direct_vessel_distance_um(micro.domain, endothelial_xy(micro.cells))
+    dm = delivery_metrics.compute_all(micro, res, dp, distance_um=dist)
     head = dm["headline"]
     ctx.log(f"delivery_metrics: coverage_1x={head['therapeutic_coverage_1x_ic50']} "
             f"mean_tumor_auc={head['mean_tumor_auc_uM_s']} "
             f"L={head['penetration_length_L_um']}")
+
+    # The SCALE-FREE reading of that same map: a ratio inside one map, which the
+    # per-compound plasma factor and the tissue-capacity term both divide out of
+    # (at the strengths app/server/reach.py states and cites). It reuses the
+    # distance map above AND the perivascular mean compute_all just computed, so
+    # the reach number and the penetration length cannot drift apart.
+    reach = compute_reach(micro, res, distance_um=dist,
+                          penetration=dm["penetration_length"])
+    if reach["null_reason"]:
+        ctx.log(f"reach: undefined — {reach['null_reason']}")
+    else:
+        ctx.log(f"reach: F(x={reach['headline_x']:g})="
+                f"{reach['headline_under_reached_fraction']:.4f} of "
+                f"{reach['n_viable']} viable tumour cells; "
+                f"E_ref={reach['E_ref_uM_s']:.4g} uM*s")
 
     metrics = {
         "kill_fraction": _metric(
@@ -900,6 +940,7 @@ def execute_run(spec: Dict, ctx: _Ctx,
         "metrics": metrics,
         "metric_reasons": metric_reasons,
         "extra_metrics": jsonable(extra_metrics),
+        "reach": jsonable(reach),
         "provenance": jsonable(provenance),
         "drug_params": jsonable(drug_params),
         "mechanism": mechanism_block,
@@ -1226,7 +1267,8 @@ class JobManager:
             job.error = stored.get("error")
             job.body = {k: v for k, v in stored.items()
                         if k in ("report", "metrics", "metric_reasons",
-                                 "extra_metrics", "provenance", "drug_params",
+                                 "extra_metrics", "reach", "provenance",
+                                 "drug_params",
                                  "mechanism", "mechanism_reason", "timelapse",
                                  # a TPL sweep's grid, rows and provenance —
                                  # without this a restored protocol run would

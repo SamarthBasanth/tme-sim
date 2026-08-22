@@ -10,19 +10,31 @@ Three things, in rising order of what they would cost if they broke:
    section can never be filed under a specimen (that would silently corrupt every
    comparison built on the project).
 3. **The comparison's capability-aware flagging** — the part that carries the
-   scientific claim. Rank agreement is the primary result; an absolute-kill
-   delta is refused unless BOTH panels can support a measured cell state AND both
-   runs used one. This is ``results/cell_state_impact.md`` §5 (a panel with no
-   hypoxia-response transcript cannot support an absolute kill under any route,
-   because kill moves 0.3252 absolute / 1.77x with the route alone) applied to
-   the two-patient case ``results/heldout_patient.md`` §3.3/§3.5 measured: the
-   ranking replicated, the absolute kills did not.
+   scientific claim. Every comparison is SAME-COMPOUND: one compound's own value
+   on specimen A against that same compound's value on specimen B, plus the
+   tissue contrast between them. An absolute-kill delta is refused unless BOTH
+   panels can support a measured cell state AND both runs used one. This is
+   ``results/cell_state_impact.md`` §5 (a panel with no hypoxia-response
+   transcript cannot support an absolute kill under any route, because kill
+   moves 0.3252 absolute / 1.77x with the route alone) applied to the
+   two-specimen case ``results/heldout_patient.md`` §3.5 measured: the absolute
+   kills did not travel.
+
+**Rank agreement used to be item 3's primary result and is WITHDRAWN.** The
+tests below no longer assert that a cross-compound ordering agrees, because
+``compare_project`` no longer computes one: ``results/pk_ranking_robustness.md``
+measures per-compound plasma exposure spanning 113.1x across the compounds the
+GBM panel ranks with the published ordering breaking at a spread of 1.53x, and
+``results/capacity_ranking_robustness.md`` moves the breast top-1 pick under this
+repo's own structural capacity rule. Every assertion that guarded the ranking was
+CONVERTED to the same-compound contract rather than dropped — the matching rules
+those tests pinned down (which runs pair, which are excluded, which compounds are
+common to both specimens) are all still load-bearing.
 
 The comparison tests build their run payloads by hand rather than simulating, so
 the FLAGGING LOGIC is tested exhaustively and in milliseconds. The end-to-end
-path (real sections, real runs, real ranking) is exercised by
-``test_compare_on_two_real_sections``, which is skipped unless both sections are
-cached.
+path (real sections, real runs) is exercised over HTTP by ``TestRoutes``, which
+is skipped unless both sections are cached.
 """
 from __future__ import annotations
 
@@ -387,23 +399,34 @@ class TestMatching:
             dict(a, pk=dict(a["pk"], future_pk_knob=3.0)))
 
     def test_runs_at_a_different_mesh_are_not_matched(self):
+        """Converted from an assertion on ``ranking.agrees is None``: the same
+        pair of runs is still unmatched, and the document still says so — now on
+        the headline, which is the only verdict left."""
         runs_a = [_fake_run("a1", SECTION_A, "cisplatin", 0.37),
                   _fake_run("a2", SECTION_A, "temozolomide", 0.01)]
         runs_b = [_fake_run("b1", SECTION_B, "cisplatin", 0.31, dx=12.0),
                   _fake_run("b2", SECTION_B, "temozolomide", 0.02, dx=12.0)]
         project, resolve = _project(runs_a, runs_b)
         doc = compare_project(project, resolve)
-        assert doc["ranking"]["agrees"] is None
-        assert "NOT EVALUABLE" in doc["ranking"]["verdict"]
+        assert doc["headline_tag"] == "NOT EVALUABLE"
+        assert "NOT EVALUABLE" in doc["headline"]
         assert doc["kill"] == []
+        assert "ranking" not in doc
 
 
 # --------------------------------------------------------------------------- #
-# 5. The comparison — ranking is the primary result
+# 5. The comparison — the SAME compound across specimens
+#
+# Was "5. The comparison — ranking is the primary result". Every test in this
+# class guarded a cross-compound ordering; each one has been converted to the
+# contract that replaced it (the same compound on two specimens), because the
+# MATCHING rules they pinned down did not change when the ordering went away.
 # --------------------------------------------------------------------------- #
-class TestRanking:
-    #: The ordering results/heldout_patient.md §3.3 found identical on both
-    #: sections, restricted to the three drugs this study runs.
+class TestSameCompoundAcrossSpecimens:
+    #: Three compounds run on both sections. These were the values whose
+    #: ORDERING results/heldout_patient.md §3.3 found identical; the ordering is
+    #: no longer computed or asserted, and the values are kept only because they
+    #: are real and exercise the matching.
     _A = [("cisplatin", 0.3699), ("doxorubicin", 0.2165), ("temozolomide", 0.0147)]
     _B = [("cisplatin", 0.3162), ("doxorubicin", 0.2284), ("temozolomide", 0.0274)]
 
@@ -417,41 +440,92 @@ class TestRanking:
         project, resolve = _project(runs_a, runs_b, **kw)
         return compare_project(project, resolve)
 
-    def test_ranking_agreement_is_detected_and_is_the_headline(self):
+    def test_the_matched_compounds_are_the_headline(self):
+        """Converted from ``test_ranking_agreement_is_detected_and_is_the_headline``.
+        One assertion per line of the old contract, restated on the new one."""
         doc = self._doc()
-        rk = doc["ranking"]
-        assert rk["agrees"] is True
-        assert rk["drugs"] == ["cisplatin", "doxorubicin", "temozolomide"]
-        assert (rk["by_specimen"]["s_00001"]["order"]
-                == rk["by_specimen"]["s_00002"]["order"]
-                == ["cisplatin", "doxorubicin", "temozolomide"])
-        assert rk["pairwise"][0]["kendall_tau_b"] == 1.0
-        assert rk["pairwise"][0]["swapped"] == []
-        assert doc["headline"].startswith("RANKING AGREES")
-        assert doc["reading_order"][1].startswith("ranking")
+        # was: rk["agrees"] is True -> there is no agreement verdict to give
+        assert "ranking" not in doc
+        # ...and the tag is about COMPARABILITY, not agreement. Specimen A's
+        # panel carries no hypoxia transcript in this fixture, so the absolute
+        # levels are blocked while the matching itself succeeded.
+        assert doc["headline_tag"] == "SAME COMPOUND · NOT COMPARABLE"
+        # was: rk["drugs"] == [...] -> one row per compound matched on both
+        assert [r["drug"] for r in doc["kill"]] == [
+            "cisplatin", "doxorubicin", "temozolomide"]
+        # was: the two specimens' ORDERS are equal -> every row holds the
+        # compound fixed and carries both specimens, which is the whole contract
+        for row in doc["kill"]:
+            assert row["compound"] == row["drug"]
+            assert row["varies"] == "specimen"
+            assert set(row["metrics"]["kill_fraction"]["values"]) == {
+                "s_00001", "s_00002"}
+        # was: kendall_tau_b == 1.0 -> the matched-set count, which is what that
+        # statistic was computed over
+        assert doc["matched_sets"][0]["n_matched_drugs"] == 3
+        assert doc["matched_sets"][0]["is_primary"] is True
+        # was: swapped == [] -> no cross-compound quantity is emitted at all
+        assert all("swapped" not in r and "kendall_tau_b" not in r
+                   for r in doc["kill"])
+        # was: headline startswith "RANKING AGREES"
+        assert doc["headline"].startswith("3 compounds matched across 2 specimens")
+        assert "No ordering of compounds is computed" in doc["headline"]
+        # was: reading_order[1].startswith("ranking")
+        assert doc["reading_order"][1].startswith("kill")
+        assert not any("ranking" in entry for entry in doc["reading_order"])
 
-    def test_a_swap_is_detected_and_named(self):
+    def test_reordering_the_values_changes_no_verdict_because_there_is_none(self):
+        """Converted from ``test_a_swap_is_detected_and_named``. The same input
+        that used to be reported as a rank SWAP now produces exactly what it
+        should: each compound compared against itself across the two specimens,
+        and no statement about how the compounds sit relative to each other."""
         swapped = [("doxorubicin", 0.40), ("cisplatin", 0.30),
                    ("temozolomide", 0.03)]
-        rk = self._doc(b=swapped)["ranking"]
-        assert rk["agrees"] is False
-        pw = rk["pairwise"][0]
-        assert pw["agrees"] is False
-        assert sorted(pw["swapped"][0]) == ["cisplatin", "doxorubicin"]
-        assert pw["discordant_pairs"] == 1
-        assert "DISAGREES" in rk["verdict"]
+        doc = self._doc(b=swapped)
+        # was: rk["agrees"] is False
+        assert "ranking" not in doc
+        assert doc["headline_tag"] == "SAME COMPOUND · NOT COMPARABLE"
+        rows = {r["drug"]: r for r in doc["kill"]}
+        # was: pw["agrees"] is False -> the two compounds that "swapped" moved in
+        # OPPOSITE cross-specimen directions, which is a same-compound fact and
+        # is still reported, per compound, as its own ratio
+        assert rows["doxorubicin"]["metrics"]["kill_fraction"]["ratio"]["s_00002"] \
+            == pytest.approx(0.40 / 0.2165)
+        assert rows["cisplatin"]["metrics"]["kill_fraction"]["ratio"]["s_00002"] \
+            == pytest.approx(0.30 / 0.3699)
+        # was: sorted(pw["swapped"][0]) == ["cisplatin", "doxorubicin"]
+        assert sorted(rows) == ["cisplatin", "doxorubicin", "temozolomide"]
+        # was: pw["discordant_pairs"] == 1 -> no pair of DIFFERENT compounds is
+        # placed on one axis anywhere in the document
+        assert all(len({r["compound"]}) == 1 for r in doc["kill"])
+        # was: "DISAGREES" in rk["verdict"]
+        assert "DISAGREE" not in doc["headline"]
+        assert "RANKING" not in doc["headline"]
 
-    def test_ranking_uses_only_the_drugs_both_specimens_ran(self):
-        rk = self._doc(b=self._B + [("lomustine", 0.22)])["ranking"]
-        assert "lomustine" not in rk["drugs"]
-        assert rk["agrees"] is True
+    def test_only_the_compounds_both_specimens_ran_are_compared(self):
+        """Converted from ``test_ranking_uses_only_the_drugs_both_specimens_ran``.
+        Same matching rule, now guarding the same-compound rows."""
+        doc = self._doc(b=self._B + [("lomustine", 0.22)])
+        drugs = [r["drug"] for r in doc["kill"]]
+        assert "lomustine" not in drugs
+        assert drugs == ["cisplatin", "doxorubicin", "temozolomide"]
 
-    def test_one_drug_is_not_a_ranking(self):
-        rk = self._doc(a=[("cisplatin", 0.37)], b=[("cisplatin", 0.31)])["ranking"]
-        assert rk["agrees"] is None
-        assert "at least 2" in rk["verdict"]
+    def test_one_compound_on_both_specimens_is_still_a_comparison(self):
+        """Converted from ``test_one_drug_is_not_a_ranking``. One compound was
+        the case a ranking could NOT be taken over; it is exactly the case the
+        product is now for, so the assertion flips from refusal to acceptance."""
+        doc = self._doc(a=[("cisplatin", 0.37)], b=[("cisplatin", 0.31)])
+        # was: rk["agrees"] is None
+        assert doc["headline_tag"] != "NOT EVALUABLE"
+        assert [r["drug"] for r in doc["kill"]] == ["cisplatin"]
+        # was: "at least 2" in rk["verdict"]
+        assert "1 compound matched across 2 specimens" in doc["headline"]
 
-    def test_a_queued_run_is_not_ranked(self):
+    def test_a_queued_run_is_excluded_from_the_comparison(self):
+        """Converted from ``test_a_queued_run_is_not_ranked``. A run that has
+        not finished has no metrics to compare, so it is dropped from the
+        matched set and named in ``runs_not_done`` — unchanged behaviour, new
+        name for the block it is excluded from."""
         runs_a = [_fake_run("a0", SECTION_A, "cisplatin", 0.37),
                   _fake_run("a1", SECTION_A, "temozolomide", None,
                             status="queued")]
@@ -459,8 +533,27 @@ class TestRanking:
                   _fake_run("b1", SECTION_B, "temozolomide", 0.03)]
         project, resolve = _project(runs_a, runs_b)
         doc = compare_project(project, resolve)
-        assert doc["ranking"]["drugs"] == ["cisplatin"]
+        assert [r["drug"] for r in doc["kill"]] == ["cisplatin"]
         assert doc["specimens"][0]["runs_not_done"][0]["status"] == "queued"
+
+    def test_the_withdrawn_ordering_is_cited_where_it_was_withdrawn(self):
+        """New, and the reason the class above can be trusted: the document
+        states what it compares and names both measurements that took the
+        ordering away, so the removal is on screen rather than only in git."""
+        doc = self._doc()
+        assert "SAME compound across specimens" in doc["compares"]
+        assert "results/pk_ranking_robustness.md" in doc["compares"]
+        assert "results/capacity_ranking_robustness.md" in doc["compares"]
+        claim = " ".join(doc["kill"][0]["caveats"])
+        assert "RELATIVE exposure between regions is the defensible output" in claim
+        assert "comparison BETWEEN compounds is not" in claim
+        # the two invariances, at their two DIFFERENT strengths
+        assert "1.41e-14" in claim and "5,200x span" in claim
+        assert "1e-9" in claim and "only where the field has converged" in claim
+        # ...and the limit that stops it being read as a general guarantee
+        assert "NEITHER INVARIANCE PROTECTS AGAINST ERROR IN THE TRANSPORT LAW" in claim
+        assert "results/descriptor_falsification.md" in claim
+        assert "A LIST" in claim and "UNSWEPT" in claim
 
     def test_a_missing_run_is_reported_not_swallowed(self):
         project, resolve = _project(
@@ -550,6 +643,8 @@ class TestKillComparability:
             assert "uncalibrated" in joined          # oxygen level
             assert "NOT FOR CLINICAL USE" in joined
         assert "NOT-COMPARABLE" not in doc["headline"]
+        assert doc["headline_tag"] == "SAME COMPOUND · MATCHED"
+        assert doc["headline_level"] == "ok"
 
 
 # --------------------------------------------------------------------------- #
@@ -710,10 +805,19 @@ class TestRoutes:
         doc = client.get(f"/api/projects/{pid}/compare")
         assert doc.status_code == 200, doc.text
         body = doc.json()
-        assert body["ranking"]["agrees"] is None
+        # was: body["ranking"]["agrees"] is None — one specimen, no run, so
+        # nothing is matched and the route says so on the headline instead.
+        assert "ranking" not in body
+        assert body["headline_tag"] == "NOT EVALUABLE"
         assert body["specimens"][0]["labels"]
         assert client.get(f"/api/projects/{pid}/compare",
                           params={"metric": "nope"}).status_code == 400
+        # ``metric`` still selects a column, so a valid one is still accepted and
+        # is echoed back on the document it produced.
+        ok = client.get(f"/api/projects/{pid}/compare",
+                        params={"metric": "penetration_length_um"})
+        assert ok.status_code == 200, ok.text
+        assert ok.json()["metric"] == "penetration_length_um"
 
     def test_section_capability_route(self, client):
         a = client.get(f"/api/sections/{SECTION_A}/capability").json()

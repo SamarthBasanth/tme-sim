@@ -374,7 +374,26 @@ class TestValidate:
             v = validate_spec(_spec(state_mode=mode))
             assert any("ABSOLUTE KILL" in w for w in v["warnings"]), mode
             hit = next(w for w in v["warnings"] if "ABSOLUTE KILL" in w)
-            assert "RANKING" in hit          # what IS defensible
+            # CONVERTED 2026-08-21, not weakened. This line was
+            # `assert "RANKING" in hit  # what IS defensible`. Compound ordering
+            # was measured and withdrawn (results/pk_ranking_robustness.md,
+            # results/capacity_ranking_robustness.md), so a warning that still
+            # named it would be pointing a reader at a retired output. The
+            # CONTRACT is unchanged and is the reason the assertion existed: a
+            # warning that says what is NOT defensible must also say what IS,
+            # or it leaves the reader with no usable output at all. Only the
+            # answer moved -- from the cross-drug ranking to the within-map
+            # relative reading -- so the assertion moved with it and got
+            # stricter rather than looser.
+            assert "MAP" in hit, mode                    # what IS defensible
+            assert "RELATIVE" in hit, mode               # ... and in what sense
+            assert "another compound" in hit, mode       # ... and what is not
+            # The withdrawal is CITED at the point of use, not just recorded in
+            # a results file, so a reader meeting this warning can check it.
+            assert "pk_ranking_robustness.md" in hit, mode
+            assert "capacity_ranking_robustness.md" in hit, mode
+            # Unchanged from the original assertion: the measured size of the
+            # swing this warning exists to report.
             assert "0.3252" in hit           # the measured size of the swing
 
     def test_absolute_kill_warning_is_not_raised_without_a_drug(self):

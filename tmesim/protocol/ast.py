@@ -70,7 +70,10 @@ SWEEPABLE: Dict[str, Dict] = {
     "dx": {"dimension": "length", "target": "run.dx_um"},
 }
 
-#: ``report`` / ``expect`` / ``rank by`` metric names -> the RunResult key.
+#: ``report`` / ``expect`` metric names -> the RunResult key. Both are
+#: single-run constructs: a metric is reported for a run, or asserted about a
+#: run. Ordering COMPOUNDS by one of these was withdrawn on 2026-08-21 (see
+#: ``PROTOCOL_LANGUAGE.md`` §5), so no construct here orders anything.
 METRICS: Dict[str, str] = {
     "kill": "kill_fraction",
     "coverage": "therapeutic_coverage_1x",
@@ -286,8 +289,9 @@ class Sweep(Node):
 # --------------------------------------------------------------------------- #
 @dataclass
 class RunOptions(Node):
-    """The ``run`` / ``compare`` body: ``dx``, ``state_mode``, ``sensitivity``,
-    ``report``, and (``compare`` only) ``rank by``."""
+    """The ``run`` / ``compare`` body: ``dx``, ``state_mode``, ``sensitivity``
+    and ``report``. Identical for both statements — ``compare`` has no option
+    ``run`` lacks, because the withdrawn ``rank by`` was the only one."""
 
     dx: Optional[Quantity] = None
     state_mode: Optional[str] = None
@@ -298,15 +302,12 @@ class RunOptions(Node):
     sensitivity_col: int = 0
     report: List[str] = field(default_factory=list)
     report_line: int = 0
-    rank_by: Optional[str] = None
-    rank_by_line: int = 0
-    rank_by_col: int = 0
 
     def to_dict(self) -> Dict:
         return {"kind": "RunOptions", "dx": _q(self.dx),
                 "state_mode": self.state_mode,
                 "sensitivity": self.sensitivity, "report": list(self.report),
-                "rank_by": self.rank_by, **self.pos()}
+                **self.pos()}
 
 
 @dataclass
@@ -333,7 +334,14 @@ class RunStmt(Node):
 
 @dataclass
 class CompareStmt(Node):
-    """``compare A, B with PROTOCOL on SECTION ... end`` — an N-drug run."""
+    """``compare DRUG with PROTOCOL on SECTION ... end`` — two or more RUNS of
+    ONE compound, put side by side on one section.
+
+    The comma list is still PARSED so that a program written against the old
+    N-compound form gets a diagnostic that names what happened rather than a
+    bare syntax error. Two or more distinct compounds is refused in
+    :func:`tmesim.protocol.executor.plan`; see ``PROTOCOL_LANGUAGE.md`` §5.
+    """
 
     drugs: List[str] = field(default_factory=list)
     drug_cols: List[int] = field(default_factory=list)

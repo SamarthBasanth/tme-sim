@@ -815,8 +815,13 @@ def check_capability(section_id: str, state_mode: str,
                     "(results/cell_state_impact.md §1.3, §5): kill moves by up "
                     "to 0.3252 absolute purely with the choice of route. "
                     "Refusing. Use 'oxygen' (the shipping default) and read the "
-                    "RANKING and the coverage map, which are the defensible "
-                    "outputs of this section.",
+                    "coverage MAP of ONE compound. Within a single compound on "
+                    "a single tissue the RELATIVE exposure between regions is "
+                    "the defensible output; the absolute level is not, and "
+                    "comparison BETWEEN compounds is not — compound ordering "
+                    "was withdrawn on 2026-08-21 "
+                    "(results/pk_ranking_robustness.md, "
+                    "results/capacity_ranking_robustness.md).",
                     code="capability", line=line, col=col)
             if not prolif:
                 diags.error(
@@ -852,16 +857,73 @@ def check_capability(section_id: str, state_mode: str,
         diags.warn(
             f"ABSOLUTE KILL MUST NOT BE QUOTED FROM {section_id!r} UNDER ANY "
             "STATE ROUTE. Its panel carries no hypoxia-response transcript, so "
-            "no route clears the bar (results/cell_state_impact.md §5). The "
-            "cross-drug RANKING is invariant across routes and is the "
-            "defensible output.",
+            "no route clears the bar (results/cell_state_impact.md §5). What "
+            "IS defensible is narrower and does not cross compounds: WITHIN "
+            "ONE COMPOUND ON THIS ONE TISSUE, the RELATIVE exposure between "
+            "regions of the map — this region against that one, in the same "
+            "run — is the reading this section supports. The absolute level is "
+            "not, and the comparison BETWEEN compounds is not: compound "
+            "ordering was withdrawn on 2026-08-21 "
+            "(results/pk_ranking_robustness.md, "
+            "results/capacity_ranking_robustness.md). "
+            "TWO MEASURED INVARIANCES hold that ratio up, and they hold it to "
+            "DIFFERENT strengths, which is why they are stated apart. (1) A "
+            "per-compound plasma factor is an exact linear rescale of the "
+            "whole AUC field — worst relative deviation 1.41e-14 over plasma "
+            "factors 0.005 to 26, a 5,200x span, at the shipping "
+            "configuration (results/pk_ranking_robustness.md §1.2) — so dose "
+            "scale divides out of a within-map ratio exactly, finite window "
+            "and all. (2) The tissue-capacity term this engine omits enters as "
+            "a pure time rescale: it leaves the CONVERGED gradient shape, the "
+            "penetration length and every steady-state number exactly unmoved "
+            "(1e-9, results/capacity_ranking_robustness.md §2b) — but NOT a "
+            "finite-window quantity, and this run's window is finite, so an "
+            "unconverged map carries a residual capacity dependence the 1e-9 "
+            "does not cover. "
+            "NEITHER INVARIANCE PROTECTS THE TRANSPORT LAW ITSELF. Both are "
+            "invariances to SCALE. A wrong effective diffusivity changes the "
+            "SHAPE of the gradient and not merely its level, and a ratio "
+            "between two regions is precisely what shape moves; the descriptor "
+            "path feeding that law is UNSCORED — the shipping engine feeds the "
+            "two-route law RDKit descriptors that have never been scored "
+            "against measurement (results/descriptor_falsification.md). "
+            "The perturbations ACTUALLY SWEPT are: the three cell-state routes "
+            "(results/cell_state_impact.md), a uniform and a per-compound "
+            "tissue capacity across the measured 3.2-4184 range "
+            "(results/capacity_ranking_robustness.md), and the per-compound "
+            "plasma factor (results/pk_ranking_robustness.md). That is a LIST, "
+            "not a general claim of invariance: an axis absent from it was not "
+            "swept, and silence about it is not coverage.",
             code="caveat", line=line, col=col)
 
     if sensitivity_mode == "uniform":
         diags.warn(
-            "sensitivity uniform: every drug is an equal NO-INTRINSIC-RESISTANCE "
-            "UPPER BOUND. The ranking is unconfounded; the absolute kill is not "
-            "a prediction of response.",
+            "sensitivity uniform: every cell is an equal "
+            "NO-INTRINSIC-RESISTANCE UPPER BOUND, so the absolute kill is not "
+            "a prediction of response. What the flat sensitivity buys is "
+            "narrower than the wording it replaces claimed. It removes a "
+            "per-cell confound from the comparison of REGIONS WITHIN ONE "
+            "COMPOUND'S MAP on this one tissue — the relative exposure between "
+            "regions, which is the defensible output. It buys nothing for the "
+            "comparison BETWEEN compounds, which was withdrawn on 2026-08-21: "
+            "results/pk_ranking_robustness.md measures a 113.1x per-compound "
+            "plasma exposure spread against a published GBM order that first "
+            "breaks at a spread of 1.53x, and "
+            "results/capacity_ranking_robustness.md moves the breast top-1 "
+            "pick under this repo's own structural capacity rule. A within-map "
+            "ratio is invariant to the dose/plasma SCALE exactly (1.41e-14 "
+            "over a 5,200x span of plasma factors, "
+            "results/pk_ranking_robustness.md §1.2) and to the omitted tissue "
+            "capacity where the field has CONVERGED (1e-9, "
+            "results/capacity_ranking_robustness.md §2b) — capacity is a time "
+            "rescale, so over a finite unconverged window that invariance is "
+            "not exact. It is NOT invariant to error in the transport law: a "
+            "wrong effective diffusivity moves the SHAPE of the gradient, and "
+            "the descriptor inputs to that law are unscored "
+            "(results/descriptor_falsification.md). Those axes, plus the three "
+            "cell-state routes (results/cell_state_impact.md), are the "
+            "perturbations that were swept; the list is a list, and an axis "
+            "not on it was not tested.",
             code="caveat", line=line, col=col)
     elif sensitivity_mode == "determinant" and rec.get("source") != "xenium":
         diags.error(

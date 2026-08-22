@@ -9,47 +9,76 @@ This module adds the missing layer, and only that layer:
   captured at the moment it is added, from the section's own panel — plus the
   list of ``run_id``s that belong to it. Runs are **associated, never copied**:
   ``app/runs/`` remains the single store, and a specimen holds ids into it.
-* ``compare_project`` answers the question the whole product is for: *do two
-  patients agree?*
+* ``compare_project`` compares the matched runs of a project **one compound at a
+  time**: the same compound on specimen A against the same compound on specimen
+  B, plus the tissue contrast between the two specimens. It emits no ordering.
 
 Everything is persisted as one JSON document per project under
 ``app/projects/<project_id>/project.json`` (gitignored, like ``app/runs/``), so
 a study survives a restart.
 
-Why the comparison is shaped the way it is
-------------------------------------------
+What this module compares, and what it withdrew
+-----------------------------------------------
 
-``results/heldout_patient.md`` ran the identical frozen pipeline on two real GBM
-sections and found a hard asymmetry, restated in its §6.5 as *"the response layer
-travels; the reconstruction layer does not"*:
+**Rank agreement was the primary result of this module and has been WITHDRAWN.**
+Until 2026-08 ``compare_project`` returned a ``ranking`` block — a per-compound
+ordering per specimen, a Kendall tau-b between specimens, and a
+``RANKING AGREES / DISAGREES`` verdict — on the strength of
+``results/heldout_patient.md`` §3.3 (the kill ordering replicated on two real GBM
+sections) and ``results/cell_state_impact.md`` §3.3 (the ordering was invariant
+across all three cell-state routes). Two later measurements took that away:
 
-* The **cross-drug kill RANKING replicates exactly** (cisplatin > doxorubicin >
-  lomustine > methotrexate > temozolomide on both sections, §3.3).
-* **Absolute kills do not travel.** §3.5 names two mechanisms, neither of them a
-  drug property: the absolute oxygen level is uncalibrated on both sections
-  (``OxygenConfig.consumption`` was never fitted to a measured tension), and the
-  ECM field is a max-normalised KDE over *whichever matrix markers the panel
-  happens to carry* — 11 genes on one section, 3 on the other — so the two have
-  no common absolute scale even on identical tissue. Its §5 table therefore
-  labels the ECM row "NOT comparable as biology".
-* Both external reconstruction validations **failed** on the second patient: the
+* ``results/pk_ranking_robustness.md`` — per-compound plasma exposure across the
+  compounds the GBM panel ranks spans **113.1x**, and the published GBM ordering
+  first breaks at a spread of only **1.53x**. A swap in the published order sits
+  inside a single compound's own licensed dose range (irinotecan's FDA label
+  publishes a 2.04x Cmax span; ``irinotecan > temozolomide`` needs 1.961x to
+  reverse). The ordering the module presented was an ordering at roughly 9x
+  supratherapeutic exposure.
+* ``results/capacity_ranking_robustness.md`` — the engine assumes a tissue
+  capacity of exactly 1.0 for every compound, against a measured rat brain-slice
+  spread of 3.2 - 4184 mL/g. Under this repo's own structural per-compound
+  capacity rule the **breast top-1 pick changes** (``vinorelbine`` ->
+  ``doxorubicin``), and the full uniform-capacity order breaks at R = 36.3 on
+  GBM and R = 5.28 on breast.
+
+Ordering compounds by predicted effect is therefore gone from this module.
+**Comparison of runs stays**, because it is a different question: the same
+compound on two specimens is a legitimate comparison and nothing above touches
+it — a per-compound plasma factor and a per-compound capacity term are the SAME
+factor on both sides of a same-compound comparison. What survives is stated in
+full by :data:`RELATIVE_EXPOSURE_CLAIM`, :data:`RELATIVE_EXPOSURE_BASIS` and
+:data:`RELATIVE_EXPOSURE_LIMITS` below, and every surface that used to say "the
+ranking is the defensible output" now says that instead.
+
+The rest of the shape is unchanged and still earned:
+
+* ``results/heldout_patient.md`` §6.5 — *"the response layer travels; the
+  reconstruction layer does not"*. **Absolute kills do not travel.** Its §3.5
+  names two mechanisms, neither of them a drug property: the absolute oxygen
+  level is uncalibrated on both sections (``OxygenConfig.consumption`` was never
+  fitted to a measured tension), and the ECM field is a max-normalised KDE over
+  *whichever matrix markers the panel happens to carry* — 11 genes on one
+  section, 3 on the other — so the two have no common absolute scale even on
+  identical tissue. Its §5 table labels the ECM row "NOT comparable as biology".
+  Both external reconstruction validations **failed** on the second patient: the
   ENDOTHELIAL fraction (9.74% -> 4.18% against a volume-EM 8.0% anchor) and the
   vascular area fraction (2.50% -> 5.79% against a measured 2.1 +/- 0.3%).
+* ``results/cell_state_impact.md`` supplies the capability rule. Its §3.2
+  measures absolute kill moving by up to **0.3252 absolute (1.77x relative)**
+  purely with the choice of cell-state route, with tissue, compound, transport
+  and RNG held identical. Its §5 conclusion is that a panel carrying no
+  hypoxia-response transcript cannot support an absolute kill under *any* route
+  — the default route's HYPOXIC band is empty for a bookkeeping reason, the
+  marker route declares hypoxia UNMEASURED, and the vessel-distance route is a
+  geometric proxy.
 
-``results/cell_state_impact.md`` supplies the capability rule. Its §3.2 measures
-absolute kill moving by up to **0.3252 absolute (1.77x relative, i.e. 77%)**
-purely with the choice of cell-state route, with tissue, drug, transport and RNG
-held identical, while §3.3 finds the ranking **INVARIANT** across all three
-routes. Its §5 conclusion is that a panel carrying no hypoxia-response
-transcript cannot support an absolute kill under *any* route — the default
-route's HYPOXIC band is empty for a bookkeeping reason, the marker route
-declares hypoxia UNMEASURED, and the vessel-distance route is a geometric proxy.
-
-So this module makes **rank agreement the primary result**, and refuses to
-present a cross-specimen absolute-kill delta as a finding unless *both*
-specimens' panels can support a measured cell state *and* both runs actually
-used a measured route. A measured kill is never silently differenced against an
-assumed one.
+So this module refuses to present a cross-specimen absolute-kill delta as a
+finding unless *both* specimens' panels can support a measured cell state *and*
+both runs actually used a measured route. A measured kill is never silently
+differenced against an assumed one. The primary result of a comparison is now
+the specimen capability contrast and the composition contrast — what each panel
+can support, and how the two tissues differ — not an ordering.
 """
 from __future__ import annotations
 
@@ -81,6 +110,10 @@ __all__ = [
     "capability_report",
     "spec_signature",
     "compare_project",
+    "RELATIVE_EXPOSURE_CLAIM",
+    "RELATIVE_EXPOSURE_BASIS",
+    "RELATIVE_EXPOSURE_LIMITS",
+    "RELATIVE_EXPOSURE_FULL",
 ]
 
 PROJECT_ID_RE = re.compile(r"^p_\d{5}$")
@@ -91,6 +124,69 @@ SPECIMEN_ID_RE = re.compile(r"^s_\d{5}$")
 #: §3.2 (kill across the three state routes, everything else held identical).
 STATE_ROUTE_KILL_SWING_ABS = 0.3252
 STATE_ROUTE_KILL_SWING_REL = 1.77
+
+#: The claim that REPLACED "the cross-drug ranking is the defensible output"
+#: when rank agreement was withdrawn (see the module docstring). One constant,
+#: so the sentence cannot drift between the capability report, the comparison
+#: headline and the browser.
+RELATIVE_EXPOSURE_CLAIM = (
+    "Within a single compound on a single tissue, the RELATIVE exposure between "
+    "regions is the defensible output. The absolute level is not, and comparison "
+    "BETWEEN compounds is not."
+)
+
+#: Why the first half of that sentence stands — stated at the two DIFFERENT
+#: strengths the two measurements actually support. They are not interchangeable
+#: and must not be written as if they were: one is exact for the finite-window
+#: field, the other only for a converged one.
+RELATIVE_EXPOSURE_BASIS = (
+    "It rests on two measured invariances, and they are NOT equally strong. "
+    "(1) PLASMA/DOSE SCALE — EXACT for the finite-window field. A per-compound "
+    "plasma factor is an exact linear rescale of the whole AUC field: worst "
+    "relative deviation 1.41e-14 over plasma factors 0.005 to 26, a 5,200x span, "
+    "measured at the shipping configuration on real Xenium GBM tissue "
+    "(results/pk_ranking_robustness.md sec. 1.2). "
+    "(2) TISSUE CAPACITY — EXACT only for a CONVERGED field. The omitted "
+    "capacity term divides the transport coefficient and the sink together, so "
+    "the steady-state field, the penetration length and the interstitial:plasma "
+    "ratio are exactly invariant to it, verified to 1e-9 "
+    "(results/capacity_ranking_robustness.md sec. 2b). But it enters as a pure "
+    "time rescale, so over a FINITE exposure window a between-region ratio is "
+    "capacity-invariant only where the field has converged — the same document "
+    "measures the finite-window kill ranking moving under it. So a within-map "
+    "ratio is structurally blind to a per-compound dose factor always, and to a "
+    "per-compound capacity term where the map has converged, and only that far."
+)
+
+#: What the claim does NOT cover. Not optional: an invariance to two SCALE
+#: factors says nothing about the law that sets the SHAPE, and a ratio is a
+#: shape quantity.
+RELATIVE_EXPOSURE_LIMITS = (
+    "NEITHER INVARIANCE PROTECTS AGAINST ERROR IN THE TRANSPORT LAW ITSELF. A "
+    "wrong effective diffusivity changes the SHAPE of the gradient, not just its "
+    "level, so a within-map ratio is fully exposed to it — and the descriptor "
+    "path feeding that law is UNSCORED. The published R^2 = 0.718 was obtained "
+    "by feeding the law the source paper's own measured logP and hydrogen-bond "
+    "donor columns; the shipping engine feeds it RDKit's Crippen logP and "
+    "Lipinski donor count instead, which miss by RMS 1.62 log units on the 5 of "
+    "71 compounds the engine can even be run on, and propagating that error "
+    "collapses the score to about 0.27 (results/descriptor_falsification.md "
+    "sec. 0). Finally, the perturbations that have been swept against an "
+    "ordering or a verdict are A LIST, and a list is all it is: per-compound "
+    "IC50, transvascular delivery law, delivery source geometry, tissue "
+    "capacity, anchor compound, section x cell-state route, calibration alpha, "
+    "ECM tortuosity, KDE bandwidth, endothelial typing threshold, oxygen level, "
+    "cell-state route and exposure unit (results/axis_inventory.md sec. 2). "
+    "Every axis not named there is UNSWEPT, and silence about an unswept axis is "
+    "not evidence about it."
+)
+
+#: The whole disclosure, in the order it has to be read.
+RELATIVE_EXPOSURE_FULL = " ".join((
+    RELATIVE_EXPOSURE_CLAIM,
+    RELATIVE_EXPOSURE_BASIS,
+    RELATIVE_EXPOSURE_LIMITS,
+))
 
 
 class ProjectError(Exception):
@@ -126,8 +222,40 @@ def capability_report(section_id: str) -> Dict:
     ``results/cell_state_impact.md`` §5 arrives at: with no hypoxia gene, the
     'oxygen' default's band is empty for a bookkeeping reason, 'markers' declares
     hypoxia UNMEASURED, and 'vessel_distance' is a geometric proxy — so NO route
-    clears the bar and the 0.3252-absolute swing (§3.2) is unresolved. The
-    cross-drug RANKING is invariant across all three routes and is what survives.
+    clears the bar and the 0.3252-absolute swing (§3.2) is unresolved.
+
+    What survives when the level does not, verbatim from
+    :data:`RELATIVE_EXPOSURE_FULL` (this text replaced "the cross-drug RANKING is
+    invariant across all three routes and is what survives", withdrawn 2026-08 —
+    see the module docstring): *Within a single compound on a single tissue, the
+    RELATIVE exposure between regions is the defensible output. The absolute
+    level is not, and comparison BETWEEN compounds is not.* It rests on two
+    measured invariances, and they are NOT equally strong. (1) PLASMA/DOSE SCALE
+    — EXACT for the finite-window field: a per-compound plasma factor is an exact
+    linear rescale of the whole AUC field, worst relative deviation 1.41e-14 over
+    plasma factors 0.005 to 26, a 5,200x span, measured at the shipping
+    configuration on real Xenium GBM tissue
+    (``results/pk_ranking_robustness.md`` sec. 1.2). (2) TISSUE CAPACITY — EXACT
+    only for a CONVERGED field: the omitted capacity term divides the transport
+    coefficient and the sink together, so the steady-state field, the penetration
+    length and the interstitial:plasma ratio are exactly invariant to it, verified
+    to 1e-9 (``results/capacity_ranking_robustness.md`` sec. 2b) — but it enters
+    as a pure time rescale, so over a FINITE exposure window a between-region
+    ratio is capacity-invariant only where the field has converged, and that same
+    document measures the finite-window kill ranking moving under it. NEITHER
+    INVARIANCE PROTECTS AGAINST ERROR IN THE TRANSPORT LAW ITSELF: a wrong
+    effective diffusivity changes the SHAPE of the gradient, not just its level,
+    so a within-map ratio is fully exposed to it — and the descriptor path
+    feeding that law is UNSCORED, missing the measured columns by RMS 1.62 log
+    units on the 5 of 71 compounds the engine can even be run on and collapsing
+    the published R^2 = 0.718 to about 0.27
+    (``results/descriptor_falsification.md`` sec. 0). The perturbations swept
+    against an ordering or a verdict are A LIST — per-compound IC50, transvascular
+    delivery law, delivery source geometry, tissue capacity, anchor compound,
+    section x cell-state route, calibration alpha, ECM tortuosity, KDE bandwidth,
+    endothelial typing threshold, oxygen level, cell-state route and exposure
+    unit (``results/axis_inventory.md`` sec. 2) — and every axis not named there
+    is UNSWEPT, with silence about an unswept axis being no evidence about it.
 
     Note what this does NOT claim: a gene being ON the panel says nothing about
     its detection RATE, which is a property of the count matrix and is only
@@ -240,9 +368,8 @@ def capability_report(section_id: str) -> Dict:
             "UNMEASURED, and 'vessel_distance' is a geometric proxy. Kill moves "
             f"by up to {STATE_ROUTE_KILL_SWING_ABS} absolute "
             f"({STATE_ROUTE_KILL_SWING_REL}x relative) purely with the choice of "
-            "route, with tissue, drug, transport and RNG held identical. The "
-            "CROSS-DRUG RANKING is invariant across all three routes and is the "
-            "defensible output; the level is not."
+            "route, with tissue, compound, transport and RNG held identical. "
+            + RELATIVE_EXPOSURE_FULL
         )
     else:
         absolute_ok = True
@@ -598,7 +725,11 @@ PROJECT_STORE = ProjectStore()
 # --------------------------------------------------------------------------- #
 #: Every RunSpec field EXCEPT ``section`` and ``drug``. Two runs match when this
 #: signature is equal: same mesh, same modes, same PK, same window — so the only
-#: thing that differs between the two sides of a comparison is the patient.
+#: thing that differs between the two sides of a comparison is the SPECIMEN.
+#: ``drug`` sits outside the signature and is carried alongside it as the row
+#: key (see ``spec_signature`` and the ``{signature: {drug: {specimen: run}}}``
+#: grouping in ``compare_project``), which is what makes a comparison
+#: same-compound by construction.
 _SPEC_MATCH_FIELDS: Sequence[Tuple[str, object]] = (
     ("dx_um", None),
     ("sensitivity_mode", "uniform"),
@@ -620,6 +751,9 @@ _PK_MATCH_FIELDS = ("plasma_peak", "half_life_s", "n_doses", "dose_interval_s")
 #: live example: it is the COUNTERFACTUAL arm (resistance multipliers set to 1),
 #: and matching it against a normal arm would difference a prediction against a
 #: what-if.
+#:
+#: ``drug`` is in here for a reason that CHANGED when cross-compound ordering was
+#: withdrawn, and the hashing did not change with it — see ``spec_signature``.
 _SPEC_IGNORED = frozenset({"section", "drug", "pk"})
 
 
@@ -632,12 +766,29 @@ def _round(v):
 def spec_signature(spec: Dict) -> str:
     """Canonical string for everything in a RunSpec except section and drug.
 
-    Two runs with the same signature differ only in *which patient* and *which
-    drug* — which is exactly the pair of axes a cross-specimen therapy panel
-    varies. Anything else differing (a different mesh, a different state route,
-    a different exposure window, a counterfactual arm) makes the two runs
-    incomparable, and grouping by this signature is what stops them being
-    compared anyway.
+    **What it is for now.** It identifies the EXPERIMENT — the mesh, the modes,
+    the PK, the exposure window, the arm — and nothing about the tissue or the
+    compound. That is what a comparison needs to be legitimate: anything else
+    differing (a different mesh, a different state route, a different exposure
+    window, a counterfactual arm) makes two runs incomparable, and grouping by
+    this signature is what stops them being compared anyway.
+
+    **Why ``drug`` is still excluded, restated.** It used to be excluded so runs
+    differing only in patient+drug could be matched into one cross-compound
+    ranking. That ranking is gone (see the module docstring), so this is no
+    longer a matching requirement: ``compare_project`` groups
+    ``{signature: {drug: {specimen: run}}}`` and every comparison it emits is
+    within one ``drug`` key. Excluding ``drug`` from the signature is what lets
+    the compound be that row key rather than being smeared into the match key —
+    one signature names one experiment, and the whole compound set run under it
+    hangs off it. **The hashing is unchanged and must stay unchanged**: this
+    string is the stable identity of a matched set, it is returned to clients in
+    ``matched_sets[].signature``, and moving ``drug`` into it would silently
+    resignature every set in every existing study.
+
+    Two runs with the same signature therefore differ only in *which specimen*
+    and *which compound*, and the compound is pinned equal before anything is
+    differenced.
 
     Fails CLOSED on an unrecognised field: any RunSpec key that is not
     ``section``, ``drug`` or ``pk`` enters the signature even if this module has
@@ -672,154 +823,6 @@ def _drug_of(run: Dict) -> Optional[str]:
 
 
 # --------------------------------------------------------------------------- #
-# Ranking
-# --------------------------------------------------------------------------- #
-def _order(values: Dict[str, float]) -> List[str]:
-    """Drugs ordered by value, descending; ties broken by name so the string
-    form is stable. Ties are reported separately — they are not hidden here."""
-    return sorted(values, key=lambda d: (-values[d], d))
-
-
-def _kendall(a: Dict[str, float], b: Dict[str, float],
-             drugs: Sequence[str]) -> Dict:
-    """Kendall tau-b over the drugs common to both, plus the discordant pairs.
-
-    Written out rather than imported so the discordant pairs — the *useful*
-    output when a ranking disagrees, because they name which two drugs swapped —
-    fall out of the same pass.
-    """
-    conc = disc = tie_a = tie_b = 0
-    discordant: List[List[str]] = []
-    for i in range(len(drugs)):
-        for j in range(i + 1, len(drugs)):
-            x, y = drugs[i], drugs[j]
-            da = a[x] - a[y]
-            db = b[x] - b[y]
-            if da == 0 and db == 0:
-                tie_a += 1
-                tie_b += 1
-                continue
-            if da == 0:
-                tie_a += 1
-                continue
-            if db == 0:
-                tie_b += 1
-                continue
-            if (da > 0) == (db > 0):
-                conc += 1
-            else:
-                disc += 1
-                discordant.append([x, y])
-    n0 = conc + disc
-    denom = ((n0 + tie_a) * (n0 + tie_b)) ** 0.5
-    tau = ((conc - disc) / denom) if denom > 0 else None
-    return {
-        "kendall_tau_b": tau,
-        "concordant_pairs": conc,
-        "discordant_pairs": disc,
-        "ties": {"a": tie_a, "b": tie_b},
-        "swapped": discordant,
-    }
-
-
-def _rank_block(specimen_values: Dict[str, Dict[str, float]],
-                specimen_order: Sequence[str],
-                metric: str) -> Dict:
-    """The PRIMARY result: does the drug ranking agree across specimens?
-
-    Restricted to the drugs every compared specimen has a run for — ranking a
-    5-drug panel against a 3-drug one is not a disagreement, it is a different
-    question, and mixing them would manufacture one.
-    """
-    sids = [s for s in specimen_order if specimen_values.get(s)]
-    common = None
-    for s in sids:
-        keys = set(specimen_values[s])
-        common = keys if common is None else (common & keys)
-    common_drugs = sorted(common or set())
-
-    by_specimen = {
-        s: {
-            "order": _order({d: specimen_values[s][d] for d in common_drugs}),
-            "values": {d: specimen_values[s][d] for d in common_drugs},
-        }
-        for s in sids
-    }
-
-    # Which transvascular delivery law produced every value in this block. Read
-    # from PDEConfig at call time, never cached, because the ordering below is
-    # law-dependent: it is invariant to the COMMON-MODE perturbations the
-    # verdict cites (cell-state route, section) and NOT to this one, which is
-    # drug-specific and changes top-1 on GBM. See app/server/delivery_law.py.
-    law = delivery_law()
-
-    if len(sids) < 2 or len(common_drugs) < 2:
-        return {
-            "metric": metric,
-            "specimens": sids,
-            "drugs": common_drugs,
-            "by_specimen": by_specimen,
-            "delivery_law": law,
-            "agrees": None,
-            "pairwise": [],
-            "verdict": (
-                "RANKING NOT EVALUABLE: a rank comparison needs at least 2 "
-                f"specimens with at least 2 drugs in common, and this project has "
-                f"{len(sids)} specimen(s) with {len(common_drugs)} common drug(s) "
-                "at a matched RunSpec. Run the same drugs at the same spec on "
-                "both specimens."
-            ),
-            "reason": "insufficient matched runs",
-        }
-
-    pairwise = []
-    all_agree = True
-    for i in range(len(sids)):
-        for j in range(i + 1, len(sids)):
-            a, b = sids[i], sids[j]
-            k = _kendall(by_specimen[a]["values"], by_specimen[b]["values"],
-                         common_drugs)
-            agrees = by_specimen[a]["order"] == by_specimen[b]["order"]
-            all_agree = all_agree and agrees
-            pairwise.append({
-                "a": a, "b": b, "agrees": agrees,
-                "order_a": by_specimen[a]["order"],
-                "order_b": by_specimen[b]["order"],
-                **k,
-            })
-
-    verdict = (
-        "RANKING AGREES across every specimen pair. This is the primary result "
-        "of a cross-patient comparison and the one the evidence supports: "
-        "results/heldout_patient.md §3.3 found the kill ordering IDENTICAL on "
-        "two real GBM sections, and results/cell_state_impact.md §3.3 found it "
-        "INVARIANT across all three cell-state routes. The absolute levels did "
-        "NOT travel in either study — read the kill table below with its "
-        "comparability flags, not as a difference between two patients."
-        if all_agree else
-        "RANKING DISAGREES on at least one specimen pair. The swapped drug pairs "
-        "are listed per pair. A disagreement here is a real finding — it is the "
-        "one quantity results/heldout_patient.md §3.3 and "
-        "results/cell_state_impact.md §3.3 both found to be invariant, so a "
-        "swap means either a genuine patient difference in delivery x potency or "
-        "a pair of drugs whose predicted kills are close enough that the order "
-        "is not resolved. Check the margin between the swapped drugs before "
-        "reading it as biology."
-    )
-    return {
-        "metric": metric,
-        "specimens": sids,
-        "drugs": common_drugs,
-        "by_specimen": by_specimen,
-        "delivery_law": law,
-        "agrees": all_agree,
-        "pairwise": pairwise,
-        "verdict": verdict,
-        "reason": None,
-    }
-
-
-# --------------------------------------------------------------------------- #
 # Comparability of an ABSOLUTE number across specimens
 # --------------------------------------------------------------------------- #
 def _run_state_measured(run: Dict) -> bool:
@@ -831,15 +834,31 @@ def _run_state_measured(run: Dict) -> bool:
 
 
 def _kill_comparability(entries: List[Dict]) -> Dict:
-    """Is an absolute kill difference between these specimens readable at all?
+    """Is an absolute difference between these specimens readable at all?
 
-    ``entries`` are ``{specimen, capability, run}`` for one matched drug. The
-    verdict is ``False`` unless EVERY specimen's panel can support a measured
+    ``entries`` are ``{specimen, capability, run}`` for ONE compound — the caller
+    builds them from a single ``drug`` key, so every entry here is the same
+    compound on a different specimen and this function never sees two compounds
+    at once. That is the only comparison the module makes: cross-compound
+    ordering was withdrawn (module docstring), cross-specimen comparison of one
+    compound was not.
+
+    The verdict is ``False`` unless EVERY specimen's panel can support a measured
     cell state AND every run actually used a measured route — the rule from
     ``results/cell_state_impact.md`` §5, and the reason
     ``results/heldout_patient.md`` §3.5 gives for refusing to compare absolute
     kills between its two sections.
     """
+    drugs = {_drug_of(e["run"]) for e in entries}
+    if len(drugs) > 1:  # pragma: no cover - the caller groups by drug
+        raise ProjectError(
+            f"_kill_comparability was handed more than one compound {sorted(drugs)}. "
+            "Only the SAME compound may be compared across specimens; ordering "
+            "two different compounds by predicted effect is withdrawn "
+            "(results/pk_ranking_robustness.md, "
+            "results/capacity_ranking_robustness.md).",
+            status=500,
+        )
     blockers: List[str] = []
     caveats: List[str] = []
 
@@ -904,9 +923,11 @@ def _kill_comparability(entries: List[Dict]) -> Dict:
         "neither section carries a drug-response outcome label, so no kill here "
         "has ever been scored against a measured response. NOT FOR CLINICAL USE."
     )
+    caveats.append(RELATIVE_EXPOSURE_FULL)
 
     return {
         "comparable": not blockers,
+        "compound": sorted(drugs)[0] if drugs else None,
         "blockers": blockers,
         "caveats": caveats,
         "state_measured": measured,
@@ -1141,10 +1162,74 @@ def _composition_rows(entries: List[Dict]) -> List[Dict]:
 # --------------------------------------------------------------------------- #
 # The comparison
 # --------------------------------------------------------------------------- #
+#: The metrics a cross-specimen row may be read on. Every row carries all four;
+#: ``metric`` picks which one is the FEATURED column. It used to pick which
+#: metric a cross-compound ranking was taken over — there is no ranking now, so
+#: it selects the metric the SAME-COMPOUND cross-specimen rows report, and
+#: nothing else. It cannot change which rows exist or whether they are readable.
 _HEADLINE_METRICS = (
     "kill_fraction", "mean_tumor_auc", "therapeutic_coverage_1x",
     "penetration_length_um",
 )
+
+
+def _headline_block(spec_views: List[Dict], kill_rows: List[Dict],
+                    composition_rows: List[Dict], any_incomparable: bool,
+                    metric: str) -> Dict:
+    """What this comparison actually established — never an ordering.
+
+    Returns ``{tag, level, text}``. The old headline was ``_rank_block``'s
+    ``RANKING AGREES / DISAGREES`` verdict; that block is gone (module
+    docstring), so this states the two things a cross-specimen comparison still
+    supports: which compounds were matched SAME-COMPOUND across which specimens,
+    and how much of the tissue contrast is flagged readable.
+    """
+    n_matched = len(kill_rows)
+    compared = sorted({sid for row in kill_rows for sid in (row.get("runs") or {})})
+    n_comp = len(composition_rows)
+    n_readable = sum(1 for r in composition_rows if r.get("comparable"))
+    with_runs = [s for s in spec_views if s.get("n_runs_done")]
+
+    if not kill_rows:
+        return {
+            "tag": "NOT EVALUABLE",
+            "level": "info",
+            "text": (
+                "SAME-COMPOUND COMPARISON NOT EVALUABLE: no compound is matched "
+                "across two specimens at an identical RunSpec. This project has "
+                f"{len(spec_views)} specimen(s), {len(with_runs)} of them with a "
+                "completed run. Two runs are matched only when everything but "
+                "the section and the compound is identical — same mesh, same "
+                "modes, same PK, same exposure window, same arm. Run the SAME "
+                "compound at the SAME spec on both specimens. "
+                f"The tissue contrast below is still readable: {n_readable} of "
+                f"{n_comp} composition row(s) are flagged comparable. "
+                + RELATIVE_EXPOSURE_CLAIM
+            ),
+        }
+
+    plural = "" if n_matched == 1 else "s"
+    text = (
+        f"{n_matched} compound{plural} matched across {len(compared)} specimens "
+        f"at one identical RunSpec, and every comparison below is "
+        f"SAME-COMPOUND: one compound's value on one specimen against THAT SAME "
+        f"COMPOUND's value on the other, read on {metric}. No ordering of "
+        "compounds is computed anywhere in this document. The primary result of "
+        "a cross-specimen comparison is the specimen capability contrast — what "
+        "each panel can and cannot support — together with the composition "
+        f"contrast, of which {n_readable} of {n_comp} row(s) are flagged "
+        "comparable. " + RELATIVE_EXPOSURE_CLAIM
+    )
+    if any_incomparable:
+        return {
+            "tag": "SAME COMPOUND · NOT COMPARABLE",
+            "level": "crit",
+            "text": text + (
+                "  ABSOLUTE KILLS ARE FLAGGED NOT-COMPARABLE for at least one "
+                "compound; see the blockers on each row."
+            ),
+        }
+    return {"tag": "SAME COMPOUND · MATCHED", "level": "ok", "text": text}
 
 
 def compare_project(project: Dict,
@@ -1155,17 +1240,25 @@ def compare_project(project: Dict,
     ``resolve_run`` maps a ``run_id`` to its ``RunResult`` view (or ``None``).
     Runs are looked up, never duplicated.
 
+    **Same compound, two specimens.** Every comparison this returns holds the
+    compound fixed and varies the specimen. Ordering two different compounds by
+    predicted effect was withdrawn (module docstring: ``pk_ranking_robustness``
+    and ``capacity_ranking_robustness``), and there is no ``ranking`` key.
+
     The returned document is ordered the way it must be read:
 
     1. ``specimens`` — every specimen with its capability verdict and the routes
        its panel CANNOT support, so no number below is read without knowing what
        produced it.
-    2. ``ranking`` — **the primary result.** Does the drug ordering agree?
-    3. ``kill`` — the matched per-drug absolute values and their deltas, each
-       carrying a ``comparable`` flag that is ``False`` unless both specimens'
-       panels support a measured cell state and both runs used one.
-    4. ``composition`` — cell-type fractions, vascular statistics and measured
+    2. ``kill`` — one row per compound matched on two or more specimens: that
+       compound's own absolute values side by side with their delta and ratio,
+       each row carrying a ``comparable`` flag that is ``False`` unless both
+       specimens' panels support a measured cell state and both runs used one.
+    3. ``composition`` — cell-type fractions, vascular statistics and measured
        state fractions, each with provenance and its own comparability verdict.
+
+    ``metric`` selects which of ``_HEADLINE_METRICS`` the rows in (2) are
+    featured on. It does not decide which rows exist.
     """
     if metric not in _HEADLINE_METRICS:
         raise ProjectError(
@@ -1233,7 +1326,7 @@ def compare_project(project: Dict,
         for run in runs:
             drug = _drug_of(run)
             if drug is None:
-                continue  # a reconstruction-only run has no drug to rank
+                continue  # a reconstruction-only run has no compound to compare
             sig = spec_signature(run.get("spec") or {})
             slot = groups.setdefault(sig, {}).setdefault(drug, {})
             prev = slot.get(sid)
@@ -1262,18 +1355,12 @@ def compare_project(project: Dict,
             "n_matched_drugs": sum(1 for d in drugs.values() if len(d) >= 2),
         })
 
-    # --- ranking (PRIMARY) --------------------------------------------------- #
-    values: Dict[str, Dict[str, float]] = {}
-    if primary_sig:
-        for drug, per_spec in groups[primary_sig].items():
-            for sid, run in per_spec.items():
-                v = (run.get("metrics") or {}).get(metric)
-                if isinstance(v, (int, float)) and not isinstance(v, bool):
-                    values.setdefault(sid, {})[drug] = float(v)
-    ranking = _rank_block(values, order, metric)
-    ranking["signature"] = primary_sig
-
-    # --- absolute per-drug table (SECONDARY, flagged) ------------------------ #
+    # --- SAME COMPOUND, TWO SPECIMENS ---------------------------------------- #
+    # One row per compound that BOTH (or all) specimens ran at the primary
+    # signature. The compound is fixed inside a row and the specimen varies; two
+    # different compounds are never placed on the same axis. Rows are still
+    # flagged, because an absolute level does not travel between sections even
+    # when the compound does (results/heldout_patient.md §3.5).
     kill_rows = []
     any_incomparable = False
     if primary_sig:
@@ -1311,6 +1398,8 @@ def compare_project(project: Dict,
                 }
             kill_rows.append({
                 "drug": drug,
+                "compound": drug,     # the axis held FIXED in this row
+                "varies": "specimen",  # ...and the axis that varies
                 "reference": ref,
                 "runs": {e["specimen"]["id"]: e["run"]["run_id"] for e in entries},
                 "metrics": per_metric,
@@ -1355,30 +1444,49 @@ def compare_project(project: Dict,
         ),
     }
 
-    headline = ranking["verdict"]
-    if any_incomparable:
-        headline += (
-            "  ABSOLUTE KILLS ARE FLAGGED NOT-COMPARABLE for at least one drug; "
-            "see the blockers on each row."
-        )
+    head = _headline_block(spec_views, kill_rows, composition["rows"],
+                           any_incomparable, metric)
+
+    # The transvascular delivery law that produced every delivery number above.
+    # It used to hang off the ranking block; the ranking is gone and the
+    # disclosure is not, so it moves to the top level of the document. Read from
+    # PDEConfig at call time, never cached (app/server/delivery_law.py).
+    law = delivery_law()
 
     return {
         "project_id": project.get("id"),
         "name": project.get("name"),
         "metric": metric,
+        "metric_means": (
+            "which metric the SAME-COMPOUND cross-specimen rows are featured on. "
+            "It selects a column, not a conclusion: every row carries all of "
+            f"{list(_HEADLINE_METRICS)} regardless, and no metric produces an "
+            "ordering of compounds."
+        ),
         "generated_at": time.time(),
         "specimens": spec_views,
         "matched_sets": matched_sets,
         "primary_signature": primary_sig,
-        "ranking": ranking,
+        "delivery_law": law,
         "kill": kill_rows,
         "composition": composition,
-        "headline": headline,
+        "headline": head["text"],
+        "headline_tag": head["tag"],
+        "headline_level": head["level"],
+        "compares": (
+            "the SAME compound across specimens, and the tissue between them. "
+            "Ordering two different compounds by predicted effect was withdrawn "
+            "(results/pk_ranking_robustness.md: per-compound plasma exposure "
+            "spans 113.1x across the compounds the GBM panel ranks and the "
+            "published ordering breaks at 1.53x; "
+            "results/capacity_ranking_robustness.md: the breast top-1 pick "
+            "changes under this repo's own structural capacity rule)."
+        ),
         "problems": problems,
         "reading_order": [
             "specimens — what each panel can and cannot support",
-            "ranking — THE PRIMARY RESULT: does the drug ordering agree?",
-            "kill — absolute values, only readable where comparable is true",
+            "kill — the SAME compound on two specimens: its own values side by "
+            "side, only readable where comparable is true",
             "composition — tissue differences, each with its own verdict",
         ],
     }

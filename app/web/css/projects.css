@@ -6,9 +6,12 @@
    Same house rules as the rest of the workstation: square corners, dense
    tabular data, monospace for every number, one accent, semantic colour
    reserved for state. The only new idea is `.verdict` — the comparison has a
-   single primary result (does the ranking agree?) and it gets the one piece of
-   large type on the page, because a reader who takes nothing else away must
-   take that away.
+   single headline and it gets the one piece of large type on the page, because
+   a reader who takes nothing else away must take that away. That headline used
+   to be "does the compound ranking agree?"; the ranking block was withdrawn
+   (see js/ui/projects.js), and the headline is now what the comparison holds
+   fixed and what it varies. `.verdict` and its three severities are unchanged
+   and still carry it.
    ============================================================================ */
 
 /* Surface, border, backdrop and elevation all come from the shared `dialog`
@@ -158,7 +161,12 @@
 .proj-main tr.blocked td .num,
 .proj-main tr.blocked td.num { color: var(--fg-2); }
 
-.proj-main .rank { color: var(--fg-0); letter-spacing: 0.01em; }
+/* `.proj-main .rank` lived here to style the ranked-order cell (`td.mono.rank`,
+   "cisplatin > doxorubicin > ..."). That cell and the table around it are gone
+   with the ranking block; the rule is orphaned and removed. Nothing else in the
+   app uses a `.rank` CLASS — js/ui/editor.js's `d.rank` is a JS property on a
+   diagnostic, not a selector. `.verdict*` above is NOT orphaned: the headline
+   still uses it, as does every `.caveat` severity. */
 .proj-main .tblwrap { margin-bottom: var(--sp-2); }
 .proj-main .caveat { border-bottom-color: var(--line-1); }
 .proj-main .hint {

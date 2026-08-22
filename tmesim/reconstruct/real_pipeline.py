@@ -1141,10 +1141,17 @@ def apply_drug_sensitivity(
             "mean": 1.0, "std": 0.0, "min": 1.0, "max": 1.0,
             "is_uniform": True,
             "upper_bound": True,
+            # Was: "COMPARABLE across drugs ... the RANKING is not confounded by
+            # sensitivity." Withdrawn 2026-08-21 with the cross-drug ranking
+            # itself; the property is real but it is a property of a claim this
+            # product no longer makes. What survives is the UPPER-BOUND reading,
+            # which is what a single-compound verdict actually rests on.
             "comparability": (
-                "COMPARABLE across drugs. Every drug is an equal "
-                "no-intrinsic-resistance upper bound, so absolute kills are upper "
-                "bounds but the RANKING is not confounded by sensitivity."
+                "UNIFORM, so this run's kill is an equal no-intrinsic-resistance "
+                "UPPER BOUND: the model is told every cell is fully sensitive, so "
+                "a survival attributed to exposure is not being rescued by an "
+                "unmodelled resistance term. Absolute kills are ceilings, not "
+                "estimates."
             ),
         }
         if mgmt is not None:
@@ -1227,9 +1234,9 @@ def reconstruction_report(micro: Microenvironment) -> Dict:
         "upper_bound": (applied.get("upper_bound") if applied else True),
         "comparability": (
             applied.get("comparability") if applied else
-            "COMPARABLE across drugs — the reconstruction default is uniform 1.0 "
-            "for every drug, so sensitivity cancels out of any ranking (and every "
-            "absolute kill is an equal no-resistance upper bound)."
+            "UNIFORM — the reconstruction default is 1.0 for every cell, so this "
+            "run's absolute kill is a no-resistance UPPER BOUND. Ranking language "
+            "withdrawn 2026-08-21 with the cross-drug claim itself."
         ),
         "model": (
             f"mode={applied.get('mode')} ({applied['drug']} -> "

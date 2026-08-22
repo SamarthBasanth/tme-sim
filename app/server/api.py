@@ -62,7 +62,10 @@ GET/DELETE   /api/compounds/{id}                 recompile one from its stored
 ===========  ==================================  ==================================
 
 A stored compound's name becomes a legal ``RunSpec.drug`` (see ``_known_drugs``),
-which is the whole point: a researcher ranks THEIR series on THEIR section.
+which is the whole point: a researcher maps THEIR compound on THEIR section and
+reads where it reaches. (This line said "ranks THEIR series" until 2026-08-21;
+compound ordering was measured and withdrawn - see
+``results/pk_ranking_robustness.md`` and ``results/capacity_ranking_robustness.md``.)
 
 The static front end in ``app/web/`` is mounted last, at ``/``, so it can never
 shadow an ``/api`` route.
@@ -108,7 +111,7 @@ from .projects import (
     compare_project,
 )
 from .report import (
-    DEFAULT_PANEL,
+    MAP_CLAIM,
     REPORT_SENSITIVITY_MODE,
     ReportManager,
     render_html,
@@ -395,8 +398,10 @@ def _known_drugs() -> List[str]:
 #: default is 43,200 s (``core.config.PDEConfig.total_time``). Exposure, coverage
 #: and kill all scale with the window, so numbers from two surfaces are not
 #: comparable unless the window matches. They are not silently harmonised: each
-#: surface states the window it used instead (the report's meta block, and
-#: ``compare-drugs`` since ``results/export_honesty.md``). This value is the 6 h
+#: surface states the window it used instead (the report's meta block; the
+#: ``compare-drugs`` CLI command did the same from ``results/export_honesty.md``
+#: until it was removed on 2026-08-21 with the rest of the ranking). This is 6 h,
+#: the
 #: window ``experiments/patient_report.py`` runs.
 STUDIO_DEFAULT_TOTAL_TIME_S = 3600.0 * 6
 
@@ -537,10 +542,15 @@ def validate_spec(spec: Dict) -> Dict:
         )
     elif sens_mode == "determinant":
         warnings.append(
-            "sensitivity_mode='determinant' is NOT comparable across drugs: a "
-            "drug whose determinant is on the panel is scaled down while a drug "
-            "whose determinant is absent keeps 1.0. Use 'uniform' for any "
-            "cross-drug ranking."
+            "sensitivity_mode='determinant' scales a compound down when its "
+            "determinant is on the panel and leaves it at 1.0 when the "
+            "determinant is absent, so the kill it produces is conditional on "
+            "measurement COVERAGE rather than on biology. Use 'uniform' unless "
+            "you specifically want that conditioning, and read the result as an "
+            "upper bound on this one map either way. (This warning used to end "
+            "'use uniform for any cross-drug ranking'; compound ordering was "
+            "withdrawn on 2026-08-21 - results/pk_ranking_robustness.md, "
+            "results/capacity_ranking_robustness.md.)"
         )
 
     vasc_mode = spec.get("vascular_mode", "discrete")
@@ -1130,9 +1140,16 @@ def _validate_state_mode(spec: Dict, section_id, source,
             "mesh, 'markers' falls back to a neighbourhood rule whose level moves "
             "8.79x with the window radius, and 'vessel_distance' is a geometric "
             "proxy. Kill moves up to 0.3252 absolute (1.77x) across the three "
-            "routes with everything else identical. The CROSS-DRUG RANKING is "
-            "INVARIANT across all three and is the defensible output; the level "
-            "is not (results/cell_state_impact.md §3.2, §3.3, §5)."
+            "routes with everything else identical. WHAT SURVIVES IS THE MAP: "
+            "within this one compound on this one section, the RELATIVE "
+            "exposure between regions, because a per-compound plasma factor is "
+            "an exact linear rescale of the whole field (1.41e-14 over a 5,200x "
+            "span, results/pk_ranking_robustness.md §1.2) and so cancels from a "
+            "ratio between points. The LEVEL does not survive, and neither does "
+            "a comparison against another compound - that claim was withdrawn "
+            "on 2026-08-21 (results/pk_ranking_robustness.md, "
+            "results/capacity_ranking_robustness.md). "
+            "(results/cell_state_impact.md §3.2, §3.3, §5)."
         )
 
 
@@ -1217,21 +1234,26 @@ def _validate_cfl(section_id, dx, vasc_mode, oxy_mode, state_mode,
 # --------------------------------------------------------------------------- #
 # Report requests
 # --------------------------------------------------------------------------- #
-_REPORT_KEYS = {"section", "drugs", "spec_overrides", "label"}
+_REPORT_KEYS = {"section", "drug", "spec_overrides", "label"}
 
 #: RunSpec fields a report OWNS and will not let a caller override, with the
-#: reason each one is fixed. ``drug`` and ``resistance_off`` are swept per arm;
-#: ``sensitivity_mode`` is what makes the ranking a ranking.
+#: reason each one is fixed. ``drug`` is the report's single subject and is
+#: selected by the top-level ``drug`` field; ``resistance_off`` is swept across
+#: the two arms; ``sensitivity_mode`` is forced because an upper bound that says
+#: so is defensible and an estimate is not.
 _REPORT_FIXED = {
-    "drug": "a report sweeps the whole panel; drugs[] selects it",
-    "resistance_off": ("both arms are generated per drug — the real run and the "
-                       "resistance-off counterfactual the attribution needs"),
+    "drug": ("a report is about ONE compound and the top-level 'drug' field "
+             "selects it; spec_overrides.drug would let the two disagree"),
+    "resistance_off": ("both arms are generated for that one compound — the "
+                       "real run and the resistance-off counterfactual that "
+                       "MEASURES rho for the RESISTANCE decade"),
     "sensitivity_mode": (
-        f"forced to {REPORT_SENSITIVITY_MODE!r}: it is the only mode in which a "
-        "cross-drug ranking is fair, because an identical per-cell factor "
-        "cancels out of the comparison. 'determinant' scales some drugs by "
-        "their measured determinant and leaves others at 1.0, which is a "
-        "measurement-coverage artifact, not a ranking "
+        f"forced to {REPORT_SENSITIVITY_MODE!r}: on a section carrying no "
+        "measured resistance determinant for this compound, a no-resistance "
+        "UPPER BOUND is the honest reading and an estimate is not. "
+        "'determinant' scales a compound by whichever determinant the panel "
+        "happens to carry and leaves it at 1.0 where the panel does not, so the "
+        "number moves with measurement coverage rather than with pharmacology "
         "(results/real_drug_panel.md)."
     ),
 }
@@ -1239,18 +1261,25 @@ _REPORT_FIXED = {
 
 def validate_report_request(body: Dict) -> Dict:
     """``POST /api/reports`` body -> ``{ok, errors[], warnings[], section,
-    drugs[], base_spec}``.
+    drug, base_spec}``.
+
+    The body takes a single ``drug``. It took a ``drugs[]`` panel until
+    2026-08-21, when the cross-compound ranking was withdrawn
+    (``results/pk_ranking_robustness.md``,
+    ``results/capacity_ranking_robustness.md``): one compound is now the ONLY
+    legal shape, and a ``drugs[]`` array is rejected with that reason rather than
+    silently truncated to its first element.
 
     ``base_spec`` is a full, already-``validate_spec``-clean RunSpec with
-    ``drug=null``; the manager clones it per arm. Every arm therefore shares one
-    reconstruction cache key by construction.
+    ``drug=null``; the manager clones it for each of the two arms, which
+    therefore share one reconstruction cache key by construction.
     """
     errors: List[str] = []
     warnings: List[str] = []
     if not isinstance(body, dict):
         return {"ok": False, "errors": [
             f"report request must be a JSON object, got {type(body).__name__}"],
-            "warnings": [], "section": None, "drugs": [], "base_spec": None}
+            "warnings": [], "section": None, "drug": None, "base_spec": None}
 
     unknown = sorted(set(body) - _REPORT_KEYS)
     if unknown:
@@ -1266,39 +1295,39 @@ def validate_report_request(body: Dict) -> Dict:
         errors.append(f"section: unknown id {section!r}. Known ids: "
                       f"{sorted(all_sections())}")
 
-    raw_drugs = body.get("drugs")
-    if raw_drugs is None:
-        drugs = list(DEFAULT_PANEL)
-        warnings.append(
-            f"drugs[] not supplied: defaulting to the {len(DEFAULT_PANEL)}-drug "
-            f"panel {list(DEFAULT_PANEL)} that experiments/patient_report.py "
-            "ranks.")
-    elif not isinstance(raw_drugs, list) or not raw_drugs:
-        errors.append("drugs: expected a non-empty array of drug names")
-        drugs = []
+    # ``drugs[]`` is REJECTED rather than truncated. A caller who sends a panel
+    # is asking for a ranking, and this endpoint no longer produces one; quietly
+    # keeping the first element would return a document that answers a different
+    # question from the one that was asked, under the name of the one that was.
+    drug = None
+    raw = body.get("drug")
+    if "drugs" in body:
+        errors.append(
+            "drugs[]: a report is about ONE compound and no longer takes a "
+            "panel. The cross-compound ranking was withdrawn on 2026-08-21 — "
+            "per-compound plasma exposure across the compounds the GBM panel "
+            "ranked spans 113.1x while the order breaks at 1.53x "
+            "(results/pk_ranking_robustness.md sec. 0), and the breast top-1 "
+            "changes under this repo's own structural capacity rule "
+            "(results/capacity_ranking_robustness.md sec. 0). Send "
+            "{'drug': '<name>'}. Your list is not truncated to its first "
+            "element, because that would answer a different question under the "
+            "name of the one you asked.")
+    if raw is None:
+        if "drugs" not in body:
+            errors.append(
+                "drug: required, a single drug name string. Available: "
+                f"{_known_drugs()}")
+    elif not isinstance(raw, str) or not raw.strip():
+        errors.append(f"drug: expected a single drug name string, got "
+                      f"{type(raw).__name__} ({raw!r})")
     else:
         known = _known_drugs()
-        drugs, seen = [], set()
-        for d in raw_drugs:
-            if not isinstance(d, str):
-                errors.append(f"drugs: expected drug names, got "
-                              f"{type(d).__name__} ({d!r})")
-                continue
-            name = d.strip().lower()
-            if name not in known:
-                errors.append(f"drugs: unknown drug {d!r}. Available: {known}")
-                continue
-            if name in seen:
-                warnings.append(f"drugs: {name!r} listed more than once; the "
-                                "duplicate was dropped.")
-                continue
-            seen.add(name)
-            drugs.append(name)
-        if len(drugs) == 1:
-            warnings.append(
-                "a one-drug panel has no ranking and no panel mean, so every "
-                "attribution term is 0 by construction. The attribution is a "
-                "CROSS-drug decomposition; use two or more drugs.")
+        name = raw.strip().lower()
+        if name not in known:
+            errors.append(f"drug: unknown drug {raw!r}. Available: {known}")
+        else:
+            drug = name
 
     overrides = body.get("spec_overrides") or {}
     if not isinstance(overrides, dict):
@@ -1318,10 +1347,10 @@ def validate_report_request(body: Dict) -> Dict:
     base["drug"] = None
     base["resistance_off"] = False
 
-    # Validate the spec the arms will actually run, with a real drug in it, so
-    # a report can never enqueue 2N runs that /api/validate would have refused.
-    if drugs and not errors:
-        probe = dict(base, drug=drugs[0])
+    # Validate the spec the arms will actually run, with the real drug in it, so
+    # a report can never enqueue two runs that /api/validate would have refused.
+    if drug and not errors:
+        probe = dict(base, drug=drug)
         verdict = validate_spec(probe)
         errors.extend(verdict["errors"])
         for w in verdict["warnings"]:
@@ -1329,7 +1358,8 @@ def validate_report_request(body: Dict) -> Dict:
                 warnings.append(w)
 
     return {"ok": not errors, "errors": errors, "warnings": warnings,
-            "section": section, "drugs": drugs, "base_spec": base}
+            "section": section, "drug": drug, "base_spec": base,
+            "map_claim": MAP_CLAIM}
 
 
 # --------------------------------------------------------------------------- #
@@ -1361,8 +1391,23 @@ SPOT_SPATIAL_REFUSAL = (
     "they sit - it synthesises 12 pseudo-cells per spot at the spot centroid "
     "with uniform jitter. The per-cell attenuation spread and the "
     "immune-neighbourhood structure ratio would measure that jitter, not the "
-    "tissue (results/immune_sink_impact.md §5.6). The cross-drug RANKING on "
-    "this section is unaffected and remains the defensible output."
+    "tissue (results/immune_sink_impact.md §5.6). THE DELIVERY MAP IS INVALID "
+    "HERE TOO, AND FOR THE SAME REASON. The exposure field is solved on the "
+    "grid, but its SOURCE is a density over ENDOTHELIAL CELL POSITIONS, and on "
+    "a spot section those positions are synthesised exactly like every other "
+    "cell's. The falloff curve bins by distance to the nearest endothelial "
+    "cell (validation.vessel_profile.direct_vessel_distance_um), the "
+    "perivascular reference is the first bin of that curve, and the delivery "
+    "spread is a percentile ratio over the resulting field - so all three "
+    "measure the 12-pseudo-cells-per-spot synthesis, not this tissue's "
+    "vascular architecture. Read NOTHING on this section as a statement about "
+    "where its vessels are. (An earlier version of this sentence, written on "
+    "2026-08-21, claimed the exposure map and its falloff DID survive this "
+    "refusal because they are solved on the grid. That was wrong: it confused "
+    "where the PDE is discretised with where its source term comes from. The "
+    "same sentence previously named the cross-drug RANKING as what survived, "
+    "which was withdrawn the same day - results/pk_ranking_robustness.md, "
+    "results/capacity_ranking_robustness.md.)"
 )
 
 
@@ -1921,6 +1966,21 @@ def create_app(manager: Optional[JobManager] = None,
         project_id: str,
         metric: str = Query("kill_fraction"),
     ) -> Dict:
+        """Compare the matched runs of a project — the SAME compound across
+        specimens, plus the tissue contrast between them.
+
+        ``metric`` selects which of ``projects._HEADLINE_METRICS`` the
+        same-compound cross-specimen rows are FEATURED on. It used to choose
+        which metric a cross-compound ranking was taken over; that ranking was
+        withdrawn (``results/pk_ranking_robustness.md``,
+        ``results/capacity_ranking_robustness.md``) and the response carries no
+        ``ranking`` key. Every row in ``kill`` carries all four metrics whatever
+        is passed here, so this parameter changes which column is emphasised and
+        can never change which rows exist, whether a row is comparable, or what
+        the headline concludes. An unknown value is a 400 rather than a silent
+        fallback: a caller asking for a metric this build does not have is
+        asking about numbers that are not on screen.
+        """
         with _project_errors():
             project = store.get(project_id)
             return jsonable(compare_project(project, _run_view, metric=metric))
@@ -1940,12 +2000,18 @@ def create_app(manager: Optional[JobManager] = None,
     # ------------------------------------------------------------------ #
     @app.post("/api/reports", status_code=202)
     async def post_report(request: Request) -> Dict:
-        """``{section, drugs[], spec_overrides}`` -> ``{report_id}``.
+        """``{section, drug, spec_overrides}`` -> ``{report_id}``.
 
-        Enqueues 2 x len(drugs) ordinary runs (the real arm and the
-        resistance-off counterfactual for each drug) on the SAME reconstruction
-        key, so the expensive reconstruction is built once and every later arm
-        is a cache hit. Returns immediately; poll ``GET /api/reports/{id}``.
+        Enqueues exactly TWO ordinary runs of that one compound — the real arm
+        and the ``resistance_off`` counterfactual that measures rho — on the SAME
+        reconstruction key, so the expensive reconstruction is built once and the
+        second arm is a cache hit. Returns immediately; poll
+        ``GET /api/reports/{id}``.
+
+        The body took a ``drugs[]`` panel until 2026-08-21. The cross-compound
+        ranking was withdrawn (``results/pk_ranking_robustness.md``,
+        ``results/capacity_ranking_robustness.md``) and one compound is now the
+        only legal shape; a panel is a 400 with that reason, never a truncation.
         """
         body = await _body(request)
         verdict = validate_report_request(body)
@@ -1955,13 +2021,16 @@ def create_app(manager: Optional[JobManager] = None,
                 **{k: v for k, v in verdict.items() if k != "base_spec"},
             })
         rep = reports.submit(
-            section=verdict["section"], drugs=verdict["drugs"],
+            section=verdict["section"], drug=verdict["drug"],
             spec_overrides=body.get("spec_overrides") or {},
             base_spec=verdict["base_spec"], label=body.get("label"),
             warnings=verdict["warnings"],
         )
         return {"report_id": rep.report_id, "status": rep.status,
-                "run_ids": rep.run_ids, "warnings": verdict["warnings"]}
+                "run_ids": rep.run_ids, "warnings": verdict["warnings"],
+                # The claim the document will make, on the acknowledgement, so a
+                # caller that never opens the HTML still meets it.
+                "map_claim": MAP_CLAIM}
 
     @app.get("/api/reports")
     def get_reports(limit: int = Query(200, ge=1, le=5000)) -> List[Dict]:

@@ -353,9 +353,11 @@
 .ptpl-item:hover { background: var(--bg-2); }
 .ptpl-item .t { font-size: var(--fs-sm); color: var(--fg-0); }
 /* The one-line description of each starter program — the sentence a first-time
-   user reads to choose one, and one of them states the product's own thesis
-   ("The ranking is the defensible output"). A sentence, so it takes the
-   disclosure floor; see tokens.css --fs-disclosure. */
+   user reads to choose one, and one of them states the product's own thesis.
+   That thesis used to be "the ranking is the defensible output"; compound
+   ordering was withdrawn on 2026-08-21 and it is now the within-map relative
+   reading. Either way it is a SENTENCE, so it takes the disclosure floor; see
+   tokens.css --fs-disclosure. */
 .ptpl-item .n {
   grid-column: 1 / -1;
   font-size: var(--fs-disclosure);

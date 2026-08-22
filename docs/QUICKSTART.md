@@ -75,12 +75,32 @@ codon --help
 
 ```
 usage: codon [-h] [--seed SEED]
-             {reconstruct,simulate,compare-drugs,validate,ingest,molecules,molecular-run,acquire,sections,studio}
+             {reconstruct,simulate,validate,ingest,molecules,molecular-run,acquire,sections,studio}
              ...
 ```
 
 (`python -m tmesim.cli --help` is the exact same tool, if you prefer running
 it as a module instead of the installed script.)
+
+> **2026-08-21 — `compare-drugs` was REMOVED from that list.** It is not
+> renamed and there is no replacement flag: the command reconstructed one
+> section and printed several compounds *ranked against each other*, and that
+> cross-compound ordering was measured and does not hold.
+> [`results/pk_ranking_robustness.md`](../results/pk_ranking_robustness.md)
+> drove the shipping panels at realistic per-compound plasma dosing: exposure
+> across the retained compounds spans **113.1×**, the published GBM order first
+> breaks at a spread of **1.53×**, and one swap
+> (`irinotecan > temozolomide`, needing **1.961×**) sits inside a single
+> compound's own licensed dose range as published in one FDA label table
+> (**2.04×**). [`results/capacity_ranking_robustness.md`](../results/capacity_ranking_robustness.md)
+> then changed the **top-1 pick** of the shipping breast 10-drug panel from
+> `vinorelbine` to `doxorubicin` using this repository's *own* structural
+> binding-capacity rule. What survives is the **single-compound map**: one real
+> tissue, one compound, where the drug reaches and how much of the tumour it
+> never reaches. Within one map every per-compound scale factor is common to
+> every voxel and cancels exactly, so *relative* exposure between regions of
+> that section is still readable; putting two compounds in an order is not. Use
+> `codon simulate` (§2b) for one compound at a time.
 
 ---
 
@@ -173,30 +193,56 @@ grid-converged"* is retracted (README "What is retracted";
 `results/grid_convergence_gbm.md` §0, `results/grid_convergence_breast.md`).
 Neither panel is in an asymptotic regime; 12 µm is a production choice.
 
-### 2b. Compare several drugs on that same section
+### 2b. Map one compound on that same section
 
 ```bash
-codon compare-drugs --dx 30 --drugs temozolomide,cisplatin,doxorubicin --csv results/my_comparison.csv
+codon simulate --dx 30 --drug temozolomide
 ```
 
 ```
-=== drug comparison (sorted by predicted kill_fraction, best first) ===
-PREDICTIONS on a real reconstructed section, not validated clinical outcomes — see docs/QUICKSTART.md.
-drug                   MW  IC50(uM)    bbb    D_eff  pen_idx   mean_auc    kill
--------------------------------------------------------------------------------
-cisplatin             298      24.6  0.858    236.2    0.375   2.02e+05  0.4174
-doxorubicin           544       0.5  0.021    184.7    0.225   1.34e+03  0.2573
-temozolomide          194       606  0.125    278.0    0.472   7.48e+04  0.0210
+[simulate] compiling REAL calibrated drug 'temozolomide' (calibrated_drugparams -> binding-site barrier) ...
+  drug             : temozolomide
+  effective_D      :       42.425 um^2/s
+  ic50 / hill      : 606.047 uM / 1.200
+  binding+clearance: 4.428e-04 + 5.794e-05 1/s
+  bbb_penetrance   : 0.125
+
+[simulate] running transport+kill simulation (total_time=1800s) ...
+
+=== simulate results ===
+  patient_id          : xenium-gbm-real
+  drug (molecule)     : temozolomide
+  predicted_response  : 0.064  (= kill fraction)
+  kill_fraction       : 0.064
+  viable_tumor_frac   : 0.936
+  penetration_index   : 0.432
 ```
 
-The tissue section is reconstructed **once** and reused for every drug, so
-every difference in the table is attributable to that drug's own parameters
-(diffusivity, real GDSC/literature IC50, BBB penetrance, perivascular-sink
-transport calibrated once on doxorubicin) on identical tissue — the same
-methodology `experiments/real_drug_panel.py` uses, just wrapped in a CLI.
+(copied from an actual run on this repository's cached `xenium_319` section at
+`--dx 30`, seed 0, the CLI's 1,800 s exposure window, on 2026-08-21. Your
+numbers will differ if any of those four differ.)
 
-> **The `D_eff` column comes from a two-route transport model, and it recovers
-> about a quarter of the measured compound-to-compound spread.** `logP` and
+It also writes two figures — `results/simulate_xenium_microenvironment.png`
+(the reconstructed tissue) and `results/simulate_xenium_temozolomide.png` (the
+map) — and `--out <dir>` puts them somewhere else.
+
+**This is the product: one real tissue, one compound.** The map answers where
+that compound reaches in *this* section and how much of the tumour it never
+reaches; `penetration_index` and the viable-tumour fraction are the two
+summary numbers on it. Everything about the tissue (vascular geometry, ECM,
+oxygen, cell positions) is measured from the section, and everything about the
+compound comes from the same `calibrated_drugparams` → binding-site-barrier
+path `experiments/real_drug_panel.py` uses — nothing is reimplemented in the
+CLI.
+
+Re-run with a different `--drug` and you get a second map on the same tissue.
+**Two maps are two maps; they are not a ranking of the two compounds** — see
+the 2026-08-21 removal note in §1 for the measurements that retired the
+cross-compound ordering, and read the closing caveats in this section for what
+a single map does and does not license.
+
+> **The `effective_D` line comes from a two-route transport model, and it
+> recovers about a quarter of the measured compound-to-compound spread.** `logP` and
 > hydrogen-bond donor count now reach transport through a membrane permeability.
 > Scored blind and unfitted against 71 compounds measured in one cell line
 > (Pruijn 2008): **R² = 0.718**, 99 % within 3× of measurement, **24 of 31**
@@ -205,9 +251,18 @@ methodology `experiments/real_drug_panel.py` uses, just wrapped in a CLI.
 > matched mass (exactly 1.00× against a measured 3.7×), **0 of 31** pairs
 > ordered. **What is still not true:** it reproduces 8.3× of the measured 29.7×
 > spread, so it *under-separates* similar-mass analogues rather than resolving
-> them, and the whole test is one cell line. **Read a ranking over such a series
-> as a hypothesis worth testing, not as a transport measurement.** Ranking
-> compounds that differ substantially in mass remains the best-supported case.
+> them, and the whole test is one cell line. **This under-separation is part of
+> why there is no longer a command that ranks compounds at all.** It was the
+> mildest version of the problem: the cross-compound ordering itself was then
+> measured directly and failed, at realistic per-compound dosing and under this
+> repository's own capacity rule (§1's 2026-08-21 removal note,
+> [`../results/pk_ranking_robustness.md`](../results/pk_ranking_robustness.md),
+> [`../results/capacity_ranking_robustness.md`](../results/capacity_ranking_robustness.md)).
+> **Read `effective_D` as one compound's transport coefficient on this tissue,
+> carrying the error bar described in this box — not as a number that licenses
+> placing that compound above or below another one.** Even the case that used
+> to be called best-supported, compounds differing substantially in mass, is no
+> longer offered as a ranking by this tool.
 >
 > **And a second thing that is not true yet.** That R² = 0.718 was scored with
 > Pruijn's own *measured* `logP₇.₄` and hydrogen-bond-donor columns as the model's
@@ -229,43 +284,51 @@ methodology `experiments/real_drug_panel.py` uses, just wrapped in a CLI.
 > comes from Abraham LSER coefficients rather than from fitting. See
 > `results/two_route_promotion.md` §1 and §4.)
 
-Drop `--drugs` and it compares **every** drug currently in the molecular
-library instead of a fixed list:
+`--drug` takes any name in `tmesim.molecular.library.GBM_DRUGS`, and that
+library is actively growing (new agents are added on an ongoing basis). Ask it
+what it currently holds rather than trusting a list baked into this document:
 
 ```bash
-codon compare-drugs --dx 30
+codon molecules
 ```
 
-(this runs one simulation per library drug on the same reconstructed section
-— about 2 minutes for the 11 drugs in the library at the time of writing; add
-`--drugs` to run only the ones you care about, as in 2b, if you want it
-faster.)
+There is **no** "run the whole panel" flag any more. If you want maps for
+several compounds, run `codon simulate` once per compound and read each map on
+its own terms; the tool will not put them in an order for you, and §1's
+2026-08-21 note says why.
 
-`tmesim.molecular.library.GBM_DRUGS` is actively growing (new agents are
-being added on an ongoing basis), which is exactly why `compare-drugs` reads
-the list at run time rather than the CLI hardcoding today's names — a newly
-added drug is comparable with no CLI change. For breast tissue, pass
-`--library breast`, which draws its default list from
-`tmesim.molecular.breast_library.BREAST_DRUGS` and reconstructs the open
-Janesick et al. 2023 breast Xenium section instead:
+For breast tissue, point `--sample` at the open Janesick et al. 2023 breast
+Xenium section instead of the GBM default:
 
 ```bash
-codon compare-drugs --library breast --dx 30
+codon simulate --source xenium --sample data_cache/xenium_breast_janesick/rep1 --dx 30 --drug doxorubicin
 ```
 
-A drug that fails to compile or simulate (for instance, one whose potency
-data is still being wired up) is skipped with a printed reason rather than
-aborting the whole comparison — useful precisely because these libraries
-change over time.
+**A real gap to know about:** `simulate` compiles from `GBM_DRUGS` only, so the
+eight compounds that live solely in `tmesim.molecular.breast_library`
+(`BREAST_DRUGS`: 5-fluorouracil, cyclophosphamide, docetaxel, epirubicin,
+paclitaxel, palbociclib, tamoxifen, vinorelbine — checked against the module on
+2026-08-21) have **no CLI path** now that `compare-drugs` is gone; it was the
+only command that compiled them. Doxorubicin is in both libraries, which is why
+the example above works. `experiments/breast_drug_panel.py` still compiles the
+breast-only set in Python if you need it. A compound that will not compile
+fails the run with a printed reason rather than being silently substituted.
 
-Read the honesty caveats before quoting any number from this table: it is a
+Read the honesty caveats before quoting any number from this map: it is a
 **prediction** on a real, **untreated** tissue section, not a validated clinical
 outcome — there is no paired measured drug response to check it against. The
 transport physics is **not** validated either: its input coefficients are
-externally testable and the engine currently misses them (see the `D_eff` box
-above, and `codon validate`). What is defensible here is the **order**, not the
-level, and not over a similar-mass series. See
-[`results/real_drug_panel.md`](../results/real_drug_panel.md) and the
+externally testable and the engine currently misses them (see the `effective_D`
+box above, and `codon validate`). What is defensible here is the **relative**
+exposure *within this one map* — which regions of this section this compound
+reaches and which it does not — because every per-compound scale factor is
+common to every voxel of a single run and cancels exactly out of that
+comparison. What is **not** defensible: the absolute `kill_fraction` (a
+no-intrinsic-resistance upper bound), and any ordering of this compound against
+another compound, which was measured and does not hold — see §1's 2026-08-21
+removal note, [`results/pk_ranking_robustness.md`](../results/pk_ranking_robustness.md)
+and [`results/capacity_ranking_robustness.md`](../results/capacity_ranking_robustness.md).
+See [`results/real_drug_panel.md`](../results/real_drug_panel.md) and the
 README's "Five corrections" section for what is and is not defensible to
 quote.
 
@@ -671,7 +734,7 @@ micro = reconstruct_real(
   other auto-fetchable section. The Visium sections, `gse324268`, the breast
   section and HGCC are **not** auto-fetchable and `codon sections` prints the
   exact commands for each. Until then, `reconstruct` / `simulate` /
-  `compare-drugs` raise a clear file-not-found error naming the missing path
+  `molecular-run` raise a clear file-not-found error naming the missing path
   rather than silently substituting synthetic data — there is no synthetic
   fallback anywhere in this codebase.
 * **`codon validate` exits 1 on a healthy install.** Several external anchors
@@ -682,15 +745,17 @@ micro = reconstruct_real(
   deliberately left out.
 * **`--sample` is a cache directory path, not a dataset name**, and its
   default depends on `--source`: for `xenium` it is the 319-gene GBM section;
-  for `visium` it is `10x_parent_gbm`. Passing `--library breast` to
-  `compare-drugs` without `--sample` now resolves the breast Xenium cache
-  automatically; every other command needs `--sample <path>` spelled out for
-  a non-default section (see `codon reconstruct --help`).
+  for `visium` it is `10x_parent_gbm`. There is no longer any switch that
+  resolves a non-default section for you: `--library breast` was the only one,
+  and it belonged to the removed `compare-drugs` (§1, 2026-08-21). **Every**
+  command now needs `--sample <path>` spelled out for a non-default section —
+  the breast Xenium cache is `data_cache/xenium_breast_janesick/rep1` (see
+  `codon reconstruct --help`).
 * **The molecular drug libraries are moving targets.** `GBM_DRUGS` and
-  `BREAST_DRUGS` are both under active extension. `codon molecules` and
-  `codon compare-drugs` (no `--drugs`) always read the current list rather
-  than a value baked into this document — trust the command's own output over
-  any specific drug name mentioned here.
+  `BREAST_DRUGS` are both under active extension. `codon molecules` always
+  reads the current `GBM_DRUGS` rather than a value baked into this document —
+  trust the command's own output over any specific drug name mentioned here.
+  `BREAST_DRUGS` has no CLI reader at all now (§2b).
 * **Absolute kill fractions are predictions, not validated outcomes.** Every
   open spatial section this simulator ships with is an *untreated* resection
   — there is no paired measured drug response to check a predicted kill
@@ -710,5 +775,6 @@ micro = reconstruct_real(
 | Where did every byte of data come from? | [`docs/DATA_INVENTORY.md`](DATA_INVENTORY.md) |
 | What is the model, mathematically? | [`docs/MATHEMATICAL_MODEL.md`](MATHEMATICAL_MODEL.md) |
 | How do the pieces fit together? | [`docs/architecture.md`](architecture.md) |
-| How should I compare drugs correctly? | [`results/delivery_metrics.md`](../results/delivery_metrics.md) |
+| How should I read a single compound's delivery map? | [`results/delivery_metrics.md`](../results/delivery_metrics.md) |
+| Why can't I rank two compounds any more? | [`results/pk_ranking_robustness.md`](../results/pk_ranking_robustness.md), [`results/capacity_ranking_robustness.md`](../results/capacity_ranking_robustness.md) |
 | My whole team needs to reach Studio, not just my machine | [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) |

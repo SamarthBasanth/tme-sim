@@ -21,6 +21,7 @@ import { RAMP_NAMES, RAMP_META } from '../gl/ramps.js';
 import { METRICS, metricProvenance, reportProvenance, fieldProvenance, chip, STANDING_LIMITS } from './provenance.js';
 import { auto, num, int, pct, sci, dur, NULL_GLYPH } from '../util/fmt.js';
 import { railGroup, railNav } from './rail.js';
+import { createReachPanel } from './reach.js';
 
 const CHAN_VARS = ['--ch-tumor', '--ch-stromal', '--ch-immune', '--ch-endothelial', '--ch-necrotic'];
 
@@ -299,6 +300,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   /* --------------------------------------------------------- metrics -- */
 
   const metricsEl = h('div');
+  const reachPanel = createReachPanel();
   const provEl = h('dl.kv');
   const caveatsEl = h('div.caveats');
   const tallyEl = h('span.cv-tally');
@@ -309,6 +311,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   }, NULL_GLYPH);
 
   function renderRun(run) {
+    reachPanel.render(run && run.status === 'done' ? run : null);
     headRunEl.textContent = (run && run.run_id) || NULL_GLYPH;
     headRunEl.title = run
       ? `Every number in this rail was produced by ${run.run_id}.`
@@ -444,10 +447,12 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
         provEl.appendChild(h('dd', {
           title: pv.sensitivity_note,
           style: {
-            // The sensitivity note is where "COMPARABLE across drugs ...
-            // absolute kills are upper bounds" is stated — the product's own
-            // thesis about which of its outputs is defensible. It is prose
-            // stating a limit, so it takes the disclosure floor.
+            // The sensitivity note is where the upper-bound reading of every
+            // kill number is stated — the product's own thesis about which of
+            // its outputs is defensible. It used to say "COMPARABLE across
+            // drugs"; that comparison was measured and withdrawn on
+            // 2026-08-21, and the note now says what survives it. Either way
+            // it is prose stating a limit, so it takes the disclosure floor.
             fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-disclosure)',
             whiteSpace: 'normal', textAlign: 'left', justifyContent: 'flex-start',
             lineHeight: 'var(--lh-body)', padding: '3px 0',
@@ -577,6 +582,16 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       h('details.sect', { open: true },
         h('summary', 'Metrics', h('span.hint', 'provenance on every value')),
         h('div.sect-body', errorEl, metricsEl)),
+
+      // REACH sits between Metrics and Mechanism because that is the order the
+      // questions are asked in. Metrics says WHAT the run produced; Reach says
+      // WHERE the drug got to and how much of the tumour it did not get to;
+      // Mechanism says WHY each surviving cell survived. Reach is the section
+      // that replaced the ranked drug panel as the product's answer, so it sits
+      // high, is open by default, and is never collapsed to make room.
+      h('details.sect', { open: true, id: 'sect-reach' },
+        h('summary', 'Delivery or dose', h('span.hint', 'the discrimination')),
+        h('div.sect-body', reachPanel.el)),
 
       // Was a floating card over the stage's top-right quarter. It lives here
       // now, DIRECTLY under Metrics, because it is the decomposition of the

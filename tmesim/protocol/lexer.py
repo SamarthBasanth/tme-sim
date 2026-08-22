@@ -40,8 +40,13 @@ KEYWORDS = frozenset({
     "protocol", "route", "dose", "over", "every", "repeat", "then", "rest",
     "cycles", "sweep", "to", "step", "in", "steps",
     "run", "with", "on", "compare", "expect", "allow", "runs",
-    "ic50", "gdsc", "report", "dx", "state_mode", "sensitivity", "rank", "by",
+    "ic50", "gdsc", "report", "dx", "state_mode", "sensitivity",
 })
+# `rank` and `by` were in this set until 2026-08-21. `rank by` was withdrawn
+# from TPL (PROTOCOL_LANGUAGE.md §5) and `by` had no other use, so neither word
+# carries grammar meaning any more and neither must highlight as live syntax.
+# `tokenize` does not read this set — the parser still recognises the WORD
+# `rank` in a run body so it can refuse it by name rather than as a typo.
 
 COMPARATORS = (">=", "<=", "==", "!=", ">", "<")
 

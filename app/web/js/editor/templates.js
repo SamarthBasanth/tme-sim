@@ -105,33 +105,46 @@ expect kill > 0.05
 
   {
     id: 'compare',
-    label: 'Two-drug comparison',
-    note: 'Ranking two alkylators on one specimen. The ranking is the defensible output.',
-    runs: 2,
-    source: `# Two drugs, one schedule, one specimen.
-# Cross-drug RANKING is the defensible output on this section; the absolute
-# kill is not, because the panel cannot support cell state (see the caveats
-# attached to every result).
+    label: 'Dose ladder · one compound',
+    note: 'Four doses of one compound on one specimen. Comparing RUNS is legitimate; ordering COMPOUNDS is not.',
+    runs: 4,
+    source: `# \`compare\` = two or more RUNS OF ONE COMPOUND on one specimen. Here: four
+# doses of temozolomide, same schedule, same section, same grid.
+#
+# What this program answers: how the map for THIS compound moves as the dose
+# moves, and how one region of that map stands against another. Within one
+# compound on one tissue the RELATIVE reading is the defensible output.
+#
+# The ABSOLUTE kill is not, and that limit is unchanged by any of this: the
+# 319-gene panel carries no hypoxia-response transcript, so no cell-state route
+# clears the bar (results/cell_state_impact.md §5, and the caveats attached to
+# every result). Nor is a within-map ratio invariant to error in the transport
+# law itself — it is invariant to dose SCALE, not to a wrong diffusivity.
+#
+# What it does NOT answer, and what TPL will refuse to express: which of two
+# COMPOUNDS is better. \`compare TMZ, CCNU ...\` and \`rank by\` were withdrawn
+# on 2026-08-21 — per-compound plasma exposure spans 113.1x across the panel
+# while the published order first breaks at a spread of 1.53x
+# (results/pk_ranking_robustness.md), and the breast top-1 pick changes under
+# this repo's own structural capacity rule
+# (results/capacity_ranking_robustness.md).
 
 drug TMZ from library "temozolomide"
   ic50 from gdsc
 end
 
-drug CCNU from library "lomustine"
-  ic50 from gdsc
-end
-
 protocol adjuvant
   route oral
-  dose 150 mg/m2
+  dose 150 mg/m2                  # overridden by the sweep below
   every 24 h
   repeat 5
 end
 
-compare TMZ, CCNU with adjuvant on xenium_319
-  dx 12 um
-  sensitivity uniform
-  rank by coverage
+sweep dose from 100 to 400 mg/m2 step 100
+sweep dx 12 um                    # a fixed override, NOT a sweep axis
+
+compare TMZ with adjuvant on xenium_319
+  sensitivity uniform             # NO-RESISTANCE UPPER BOUND, not an expected response
   report coverage, kill, mean_auc, penetration_length
 end
 `,

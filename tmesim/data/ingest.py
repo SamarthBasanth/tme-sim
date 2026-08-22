@@ -1600,9 +1600,21 @@ def capability_report(
             "spread (p90/p10) and the immune-neighbourhood structure ratio "
             "would therefore measure that jitter, not the tissue - "
             "results/immune_sink_impact.md §5.6 declares the statistic INVALID "
-            "on spot data and the generator refuses to compute it there. The "
-            "cross-drug RANKING on this section remains defensible; the "
-            "spatial spread does not.",
+            "on spot data and the generator refuses to compute it there. THE "
+            "DELIVERY MAP IS INVALID HERE TOO, AND FOR THE SAME REASON: the "
+            "exposure field is solved on the grid, but its SOURCE is a density "
+            "over ENDOTHELIAL CELL POSITIONS, and on a spot section those are "
+            "synthesised like every other cell's. The falloff bins by distance "
+            "to the nearest endothelial cell, the perivascular reference is "
+            "that curve's first bin, and the delivery spread is a percentile "
+            "ratio over the same field - so all three measure the synthesis, "
+            "not this tissue's vascular architecture. (An earlier version of "
+            "this sentence, written 2026-08-21, claimed the map survived "
+            "because it is solved on the grid; that confused where the PDE is "
+            "discretised with where its source comes from. The same sentence "
+            "previously named the cross-drug RANKING as what survived, which "
+            "was withdrawn the same day - results/pk_ranking_robustness.md, "
+            "results/capacity_ranking_robustness.md.)",
             "platform")
     else:
         cap("spatial_spread", True,

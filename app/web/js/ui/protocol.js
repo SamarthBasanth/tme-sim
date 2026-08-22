@@ -730,26 +730,23 @@ export function createProtocolWorkspace() {
   /* ======================================================== results ===== */
 
   /**
-   * Dimensions of the result grid. A swept parameter is a dimension; so is the
-   * drug, when a `compare` produced more than one. Everything downstream — the
-   * curve, the heatmap, the axis labels — is built from this one list.
+   * Dimensions of the result grid: the swept parameters, and nothing else.
+   * Everything downstream — the curve, the heatmap, the axis labels — is built
+   * from this one list.
+   *
+   * The drug USED to be a dimension here, promoted whenever a `compare` yielded
+   * more than one. It cannot any more: a `compare` over two distinct compounds
+   * is refused at validation time (2026-08-21, PROTOCOL_LANGUAGE.md §5), so
+   * every sweep on this grid is one compound and a drug dimension could only
+   * ever hold one value. A one-valued axis is not an axis.
    */
   function dimsOf(sw) {
     const axes = sw.axes || [];
-    const drugs = [...new Set(sw.runs.map((r) => r.drug).filter(Boolean))];
-    const dims = axes.map((a, i) => ({
+    return axes.map((a, i) => ({
       name: a.name, unit: a.unit, values: a.values, numeric: true,
       indexOf: (r) => (r.coords ? r.coords[i] : 0),
       label: (v) => `${num(v, Math.abs(v) >= 100 ? 0 : 2)}`,
     }));
-    if (drugs.length > 1) {
-      dims.push({
-        name: 'drug', unit: null, values: drugs, numeric: false,
-        indexOf: (r) => drugs.indexOf(r.drug),
-        label: (v) => String(v),
-      });
-    }
-    return dims;
   }
 
   function renderResults(sw) {

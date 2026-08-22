@@ -216,9 +216,60 @@ class TestParserErrors:
         assert prog.expects[0].comparator == ">"
         assert prog.expects[1].value.unit == "%"
 
-    def test_compare_needs_two_drugs(self):
+    def test_compare_needs_two_runs(self):
+        # WAS `test_compare_needs_two_drugs`. The refusal survives with its code
+        # intact, but it now counts RUNS, not drugs: `compare` is two or more
+        # runs of ONE compound, so a compare with no sweep plans one run and one
+        # run is not a comparison.
         src = STUPP + "compare TMZ with stupp_adjuvant on xenium_319\n  end\n"
-        assert first_error(src)["code"] == "incomplete-compare"
+        d = first_error(src)
+        assert d["code"] == "incomplete-compare"
+        assert "only one run" in d["message"]
+        assert "sweep" in d["message"]
+
+    def test_compare_refuses_two_distinct_compounds_and_cites_the_evidence(self):
+        src = (STUPP + 'drug CIS from library "cisplatin"\nend\n'
+               "compare TMZ, CIS with stupp_adjuvant on xenium_319\n  end\n")
+        d = first_error(src)
+        assert d["code"] == "withdrawn-ranking"
+        assert "WITHDRAWN" in d["message"]
+        # The refusal must carry its evidence, not just its verdict.
+        assert "results/pk_ranking_robustness.md" in d["message"]
+        assert "results/capacity_ranking_robustness.md" in d["message"]
+
+    def test_compare_refuses_one_compound_named_twice(self):
+        src = (STUPP + "sweep dose from 50 to 100 mg/m2 step 25\n"
+               "compare TMZ, TMZ with stupp_adjuvant on xenium_319\n  end\n")
+        d = first_error(src)
+        assert d["code"] == "incomplete-compare"
+        assert "named 2 times" in d["message"]
+
+    def test_rank_by_is_refused_at_validation_and_names_the_withdrawal(self):
+        src = STUPP + ("sweep dose from 50 to 100 mg/m2 step 25\n"
+                       "compare TMZ with stupp_adjuvant on xenium_319\n"
+                       "  dx 30 um\n  rank by coverage\nend\n")
+        errs = errors(src)
+        d = next(e for e in errs if e["code"] == "withdrawn-ranking")
+        assert "rank by" in d["message"] and "WITHDRAWN" in d["message"]
+        assert "results/pk_ranking_robustness.md" in d["message"]
+        assert "results/capacity_ranking_robustness.md" in d["message"]
+        # Positioned, like every other refusal.
+        assert d["line"] == next(i for i, ln in enumerate(src.split("\n"), 1)
+                                 if ln.strip().startswith("rank by"))
+
+    def test_rank_by_is_not_a_silent_no_op(self):
+        src = STUPP + ("sweep dose from 50 to 100 mg/m2 step 25\n"
+                       "compare TMZ with stupp_adjuvant on xenium_319\n"
+                       "  dx 30 um\n  rank by coverage\nend\n")
+        assert validate_source(src)["ok"] is False
+
+    def test_run_options_carry_no_ranking_field(self):
+        # The AST field is gone, so nothing downstream can resurrect an order.
+        prog, diags = parse(STUPP)
+        assert diags.ok
+        opts = prog.runs[0].options.to_dict()
+        assert "rank_by" not in opts
+        assert set(opts) >= {"dx", "state_mode", "sensitivity", "report"}
 
 
 # --------------------------------------------------------------------------- #
@@ -424,16 +475,32 @@ class TestSweepExpansion:
                     "sweep every from 12 to 24 h in 2 steps\n")
         assert v["n_runs"] == 8               # 4 x 2
 
-    def test_a_compare_multiplies_by_the_drug_count(self):
+    def test_a_compare_over_one_compound_plans_the_whole_sweep(self):
+        # WAS `test_a_compare_multiplies_by_the_drug_count`, which planned
+        # 3 dose points x 2 drugs = 6. The drug factor is gone: a compare names
+        # one compound and the runs come from the sweep alone.
+        src = (f'drug TMZ from smiles "{TMZ_SMILES}"\nend\n'
+               'protocol p\n  route iv\n  dose 75 mg/m2\nend\n'
+               'sweep dose from 50 to 100 mg/m2 step 25\n'
+               'compare TMZ with p on xenium_319\n  dx 30 um\nend\n')
+        p = plan(src, compile_drugs=False)
+        assert p.ok, p.diagnostics.to_dicts()
+        assert p.n_runs == 3                  # 3 dose points x 1 compound
+        assert {r.drug_alias for r in p.runs} == {"TMZ"}
+
+    def test_a_compare_over_two_compounds_plans_nothing(self):
+        # The other half of the old multiply-by-drug-count test: the two-drug
+        # program that used to plan 6 runs now plans 0 and refuses.
         src = (f'drug TMZ from smiles "{TMZ_SMILES}"\nend\n'
                'drug CIS from library "cisplatin"\nend\n'
                'protocol p\n  route iv\n  dose 75 mg/m2\nend\n'
                'sweep dose from 50 to 100 mg/m2 step 25\n'
-               'compare TMZ, CIS with p on xenium_319\n  dx 30 um\n'
-               '  rank by coverage\nend\n')
+               'compare TMZ, CIS with p on xenium_319\n  dx 30 um\nend\n')
         p = plan(src, compile_drugs=False)
-        assert p.ok, p.diagnostics.to_dicts()
-        assert p.n_runs == 6                  # 3 dose points x 2 drugs
+        assert not p.ok
+        assert p.n_runs == 0
+        codes = [d["code"] for d in p.diagnostics.to_dicts()]
+        assert "withdrawn-ranking" in codes
 
     def test_the_cross_product_shares_one_reconstruction(self):
         p = plan(STUPP.replace(
