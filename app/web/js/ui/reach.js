@@ -56,6 +56,8 @@
 
 import { h, clear } from '../util/dom.js';
 import { pct, num, sci, NULL_GLYPH } from '../util/fmt.js';
+import { doseInputBlock, doseFraming } from './doseinput.js';
+import { jointLimitedCaveat } from './verdict.js';
 
 /* Chart geometry. The rail is ~347 px wide, so these are drawn into a viewBox
  * and scaled by CSS rather than sized in pixels. */
@@ -173,12 +175,21 @@ function prose(...kids) {
   }, ...kids);
 }
 
+/* An in-panel label, and it is an `<h4>` rather than a styled `<div>`.
+ *
+ * This panel is the longest thing on the rail and it has four of these —
+ * delivery evidence, the two charts, potency evidence. They were divs, so the
+ * only heading structure inside ~14,000 characters was the section title above
+ * them, and a screen-reader user had no way to jump from the verdict to the
+ * potency table. h4 because the section title is h3 (js/ui/rail.js::sectTitle).
+ * Every visual property is still set here, so nothing moves. */
 function microLabel(text) {
-  return h('div', {
+  return h('h4', {
     style: {
       fontSize: 'var(--fs-micro)', color: 'var(--fg-2)',
       fontFamily: 'var(--font-mono)', letterSpacing: 'var(--tr-wide)',
       textTransform: 'uppercase', margin: 'var(--sp-4) 0 var(--sp-2)',
+      fontWeight: '400',
     },
   }, text);
 }
@@ -300,6 +311,362 @@ export function splitAxes(s) {
 const fmtRatio = (v) => String(v);
 const fmtFrac = (v) => (Number.isFinite(v) ? pct(v, 1) + '%' : NULL_GLYPH);
 
+/**
+ * THE VERDICT — is this a delivery problem or a dose problem — and the three
+ * things that qualify it: the exposure shortfall, how much of the answer was
+ * an input, and the joint-limited counterfactual.
+ *
+ * EXTRACTED FROM render() 2026-08-22, verbatim. It depends on `run` alone,
+ * which is now readable off the signature rather than by tracing ~90 lines
+ * upward through a closure. See renderFalloff below for the character-exact
+ * losslessness check that licences moving a block of caveats at all.
+ */
+function renderVerdict(el, run) {
+  /* ---- THE VERDICT: is this a delivery problem or a dose problem? ----- *
+   * This is the answer the panel exists to give, and it is the first thing
+   * on it. It is read straight off the per-cell mechanism attribution, which
+   * is per-compound by construction and reconciles bit-exactly with
+   * kill_fraction, so nothing here is a second opinion about the same
+   * numbers — it is a restatement of the engine's own labels.
+   *
+   * Why the verdict and not the reach number leads: measured on the flagship
+   * Xenium GBM section at dx = 12 um, the under-reached fraction at 0.1x is
+   * 0.05% — the drug gets essentially everywhere — while 99.8% of surviving
+   * tumour cells are DOSE-limited. A panel that led with "0.0% under-reached"
+   * would have buried its own finding. */
+  const mech = run.mechanism || null;
+  const bd = (mech && mech.survival_breakdown) || null;
+  if (bd) {
+    const entries = Object.entries(bd).filter(([, v]) => Number.isFinite(v) && v > 0);
+    entries.sort((a, b) => b[1] - a[1]);
+    const [topKey, topVal] = entries[0] || [null, null];
+    const LABEL = {
+      delivery: 'DELIVERY-LIMITED', dose: 'DOSE-LIMITED',
+      resistance: 'RESISTANCE-LIMITED', chance: 'CHANCE',
+      unattributed: 'UNATTRIBUTED',
+    };
+    const MEANING = {
+      delivery: 'the drug did not arrive in a pharmacologically meaningful '
+        + 'amount. This is the case the exposure map below is evidence FOR.',
+      dose: 'the drug arrived and stayed below IC50. The exposure map below '
+        + 'is what rules delivery OUT — it is the reason this reads as a '
+        + 'potency finding rather than an unresolved one.',
+      resistance: 'exposure was adequate and the cell state suppressed the '
+        + 'kill anyway.',
+      chance: 'exposure and biology were both adequate; the cell drew above '
+        + 'its kill probability.',
+      unattributed: 'not explained by the model’s own bands. A non-zero share '
+        + 'here is itself the finding.',
+    };
+    if (topKey) {
+      el.appendChild(h('div', {
+        style: { display: 'flex', alignItems: 'baseline', gap: 'var(--sp-4)',
+                 margin: '0 0 var(--sp-3)' },
+      },
+      h('span', { style: { fontSize: 'var(--fs-xl)', fontFamily: 'var(--font-mono)',
+                           color: 'var(--fg-0)', fontWeight: '600' } },
+      fmtFrac(topVal)),
+      h('span', { style: { fontSize: 'var(--fs-disclosure)', color: 'var(--fg-1)',
+                           lineHeight: 'var(--lh-body)' } },
+      h('b', LABEL[topKey] || topKey.toUpperCase()), ' — ',
+      `${fmtFrac(topVal)} of SURVIVING tumour cells. `,
+      MEANING[topKey] || '')));
+    }
+    const fold = mech.exposure_shortfall_fold;
+    if (Number.isFinite(fold)) {
+      el.appendChild(prose(
+        `The median tumour cell would need ${num(fold, 2)}x its exposure to `
+        + 'reach IC50. Above 1 the median cell is short of drug; below 1 it is '
+        + 'already past the half-effect point and something else is holding '
+        + 'the kill down. This is an ABSOLUTE quantity — it reads the potency '
+        + '— and is stated here because the verdict it supports would be '
+        + 'unreadable without it, not because it is protected by anything in '
+        + 'the invariances below.'));
+    }
+    /* ---- HOW MUCH OF THIS VERDICT WAS AN INPUT? ---------------------
+     * Compact form, directly beside the verdict, because that is the number
+     * it qualifies. The full separation — what the map added versus what the
+     * spec fixed — is under `The finding`, which is the section immediately
+     * above this one on the same rail and is never collapsed.
+     *
+     * The panel above this one already refuses the structurally identical
+     * case for bbb_penetrance = 0 (see the null_reason branch). This is that
+     * refusal extended to the dose axis, and it too picks no threshold: it
+     * prints plasma_peak / IC50 and says what follows by arithmetic below 1.
+     * js/ui/doseinput.js carries the argument. */
+    el.append(...doseInputBlock(run, {
+      compact: true,
+      pointTo: 'What the map added on top of that ratio — the spread across '
+        + 'this tissue — is separated out under The finding, above.',
+    }));
+
+    // AUTHORED IN js/ui/verdict.js. This panel used to paraphrase the same
+    // caveat independently and WITHOUT the cell count that finding.js
+    // printed, so the identical limit was weaker here than three sections
+    // up. The lead is still this panel's own wording; the body is not.
+    const jlCaveat = jointLimitedCaveat(run, {
+      lead: 'DOSE IS NOT A CLEAN COUNTERFACTUAL HERE. ',
+    });
+    if (jlCaveat) el.appendChild(jlCaveat);
+  }
+}
+
+/**
+ * Delivery heterogeneity — P90/P10 of tumour-cell exposure — and the caveat
+ * that it cannot see a permeability barrier.
+ *
+ * EXTRACTED FROM render() 2026-08-22, verbatim; depends on `run` alone.
+ */
+function renderSpread(el, run) {
+  /* ---- delivery heterogeneity, the headline of this half ------------- *
+   * P90/P10 over tumour-cell exposure. It is a ratio of two percentiles of
+   * ONE field, so it is scale-free for exactly the same reason the reach
+   * ratio is, and it carries signal even where the reach headline does not.
+   * That is not hypothetical: measured on the flagship Xenium GBM section at
+   * dx = 12 um, the under-reached fraction at 0.1x is 0.05% — the drug gets
+   * essentially everywhere — while this ratio is a legible 2.0x.
+   *
+   * It also needs NO CONVENTION. There was a single-threshold headline here
+   * (F at 0.1x) and it was removed rather than retuned: any threshold chosen
+   * now would be chosen knowing what the field does, which is post-hoc
+   * selection wearing a convention's clothes. The full F(x) ladder is still
+   * published below as the evidence; what is gone is the practice of reading
+   * one rung of it as the answer.
+   *
+   * And its denominator is GUARANTEED grid-independent rather than merely
+   * observed to be. `exposure_percentiles` is computed over the TUMOUR cell
+   * set, which tmesim/validation/delivery_metrics.py::tumor_cell_exposure
+   * documents as "a FIXED set of measured Xenium cells, identical at every dx
+   * — which is what makes these statistics grid-comparable". That is a
+   * structural property: the cells are measured, so no grid can move them.
+   *
+   * CORRECTION 2026-08-22. This passage previously argued the stronger case
+   * that the viable band carries "~10x grid sensitivity", citing "89% of
+   * tumour cells at dx = 30 um" against 2,008 at dx = 12. The dx = 12 figure
+   * is right and the dx = 30 figure was wrong by a factor of ~10.5. Measured
+   * through reconstruct_real on this section, temozolomide, 6 h, convection
+   * ON: 2,008 of 23,812 at dx = 12 um (8.43%), 2,007 at dx = 15, 2,019 at
+   * dx = 30 (8.48%). Across a 2.5x change in grid the viable band moves by
+   * 12 cells out of ~2,010 — 0.6%, not 10x.
+   *
+   * So the contrast this paragraph used to draw does not exist, and the
+   * reason to prefer this ratio is the weaker but true one above: the viable
+   * band is a COMPUTED quantity that happens to be stable on this section,
+   * carrying no guarantee that it is stable on another, whereas a measured
+   * cell set cannot move by construction. Stability observed on one section
+   * is not stability. */
+  const ex0 = run.extra_metrics || {};
+  const p10 = ex0.E_p10_uM;
+  const p90 = ex0.E_p90_uM;
+  if (Number.isFinite(p10) && Number.isFinite(p90) && p10 > 0) {
+    el.appendChild(h('div', {
+      style: { display: 'flex', alignItems: 'baseline', gap: 'var(--sp-4)',
+               margin: '0 0 var(--sp-3)' },
+    },
+    h('span', { style: { fontSize: 'var(--fs-lg)', fontFamily: 'var(--font-mono)',
+                         color: 'var(--fg-0)' } }, num(p90 / p10, 2) + 'x'),
+    h('span', { style: { fontSize: 'var(--fs-disclosure)', color: 'var(--fg-1)',
+                         lineHeight: 'var(--lh-body)' } },
+    h('b', term('DELIVERY SPREAD')), ' — the best-perfused tenth of tumour cells '
+      + 'receives this many times the exposure of the worst-perfused tenth. A '
+      + 'ratio of two percentiles of one field: no dose, no potency, no '
+      + 'threshold to choose, and computed over the tumour cell set rather '
+      + 'than the viable band, so it does not move with the grid the way a '
+      + '"fraction of viable tumour" does.')));
+    // THIS MAP CANNOT SEE A PERMEABILITY BARRIER, and it is the first thing a
+    // reader will assume it does. bbb_penetrance is a pure global multiplier
+    // on the source term, so it divides out of every within-map ratio —
+    // verified bit-identical at bbb = 0.1 and bbb = 1.0. Scale-freedom is why
+    // this figure works, and the barrier is a scale; the two cannot both be
+    // had. It also explains the bevacizumab case structurally rather than as
+    // an edge case: bbb = 0 is the one point where the quantity this metric
+    // is blind to becomes the entire answer.
+    el.appendChild(h('div.caveat.crit', h('span',
+      h('b', 'THIS IS NOT A PERMEABILITY FINDING. '),
+      'The reach ratio is EXACTLY invariant to transvascular penetrance — '
+      + 'verified bit-identical at bbb_penetrance 0.1 and 1.0 — because '
+      + 'penetrance multiplies every point of the map equally and therefore '
+      + 'divides out of a ratio between points. That is the same property '
+      + 'that makes this number immune to the dose, and it cannot be had '
+      + 'selectively. So the delivery evidence here depends on the compound '
+      + 'ONLY through its penetration length, L = sqrt(D_eff/k). It says how '
+      + 'STEEPLY exposure falls away from a vessel; it says nothing about how '
+      + 'much crosses the vessel wall in the first place. Do not read it as a '
+      + 'brain-penetration or barrier result.')));
+  }
+}
+
+/**
+ * The exposure-versus-vessel-distance figure, and the three limits on it.
+ *
+ * EXTRACTED FROM render() 2026-08-22, verbatim. render() was ~660 lines in one
+ * closure and every block in it read as though it might depend on the ones
+ * above; this one depends on `reach` and nothing else, which is now visible in
+ * its signature instead of having to be established by reading upward.
+ *
+ * The move is text-identical and was checked that way: the panel's rendered
+ * innerText is compared character-for-character across eight payload shapes
+ * before and after. That check is the only licence for touching a function
+ * whose output is mostly caveats — a refactor that drops a sentence is a
+ * disclosure silently shortened, and this repo may not do that.
+ */
+function renderFalloff(el, reach) {
+  /* ---- falloff ------------------------------------------------------- */
+  const fall = reach.falloff || {};
+  const fd = fall.distance_um || [];
+  const fv = fall.normalised_mean_auc || [];
+  if (fd.length && fv.length === fd.length) {
+    el.appendChild(microLabel('exposure vs vessel distance'));
+    el.appendChild(lineChart({
+      xs: fd, ys: fv,
+      xLabel: 'distance', yLabel: 'exposure / reference',
+      fmtX: (v) => num(v, 0) + 'um', fmtY: (v) => num(v, 2),
+      markIndex: 0, yMax: Math.max(1, ...fv.filter(Number.isFinite)),
+    }));
+    el.appendChild(prose(
+      'Each bin is the mean exposure over tissue at that distance from the '
+      + 'nearest endothelial cell, divided by the perivascular reference, so '
+      + 'the first bin is 1.00 by construction. This curve is the SHAPE of '
+      + 'the map, and the shape is the one thing a within-map ratio does not '
+      + 'protect: it is set by the effective diffusivity, whose descriptor '
+      + 'inputs have never been scored '
+      + '(results/descriptor_falsification.md). Read it as the best available '
+      + 'estimate of a gradient, not as a measured profile.'));
+    // THE SCOPE LIMIT ON THIS HALF OF THE PANEL, and it is not symmetric.
+    // The obvious objection to any delivery map is "isn't this just showing
+    // me where my vessels aren't?" — the field inherits the shape of the
+    // vascular source wherever the penetration length is SHORT compared with
+    // vessel spacing. Measured against the KDE source null on this section,
+    // the excess over the null is ~7.9x for a long-penetration compound and
+    // only 1.34x for doxorubicin, a short-L one. So this curve is strong
+    // evidence for compounds that penetrate far and WEAK evidence for
+    // compounds that do not — and the weak case is the one where a customer
+    // is most likely to suspect they are looking at their own angiogram.
+    // Stated here rather than only in a results file, because a scope limit
+    // that lives away from the figure it limits does not get read.
+    // THE CAPACITY RESIDUAL, and it is the largest limit on this figure —
+    // larger than the descriptor gap and larger than the source-null one.
+    // Measured on the flagship section: the normalised falloff moves 0.3772
+    // ABSOLUTE at capacity R = 39 (the best-available constant), on a curve
+    // whose entire range is 1.0 to 0.51, with the fitted penetration length
+    // collapsing 279.7 -> 76.7 um. Those three figures reproduced to four
+    // significant figures on re-measurement (0.37723, 1.0 -> 0.51284,
+    // 279.715 -> 76.740) and are the solid part of this block.
+    // What did NOT survive is the asymmetry that used to be drawn from them
+    // -- the ladder is not the safe counterpart, it moves 0.4021 over the
+    // same range. The real asymmetry is BETWEEN RUNGS, not between the
+    // ladder and the curve. See the dated correction below.
+    /* CORRECTED 2026-08-22. This caveat previously read "THE SHAPE IS NOT
+     * CAPACITY-INVARIANT — the ladder above nearly is, and this is not",
+     * and printed the two figures side by side on that basis. The asymmetry
+     * does not exist: measured on the flagship at R = 39 the falloff moves
+     * 0.3772 and the whole 7-rung ladder moves 0.4021. They move by the SAME
+     * amount. What is nearly immune is the bottom four rungs (x <= 0.1,
+     * which include the headline); the top rung F(1.0) goes 0.4056 -> 0.8077
+     * and is plotted on the same chart the caveat was reassuring about.
+     * It also asserted the 6 h window "has not converged", citing 0.01302
+     * decaying as 281/T. That was measuring the ESTIMATOR: any AUC-based
+     * ratio carries an O(1/T) tail however converged the field is, and the
+     * field is converged to 1.112e-05 at 6 h.
+     * Sources: results/reach_invariances_measure.md, steady_state_reach.md. */
+    el.appendChild(h('div.caveat.crit', h('span',
+      reach.window_mode === 'steady_state'
+        ? [h('b', 'CAPACITY CANNOT REACH THIS FIGURE. '),
+           'A tissue-capacity term R multiplies the TIME DERIVATIVE and '
+           + 'nothing else, and a converged steady state has no time '
+           + 'derivative — so R is absent from this map by inspection, not '
+           + 'small. Measured across R = 1 to 4184: this curve moves at most '
+           + '4.5e-14 and the ladder above moves exactly 0.000e+00, which is '
+           + 'float64 round-off and an unmoved threshold count, not a '
+           + 'residual. This is the one limit that a finite-window reading '
+           + 'of the same field DOES carry — there, at R = 39, this curve '
+           + 'moves 0.3772 and the ladder 0.4021.']
+        : [h('b', 'THIS SHAPE AND THE LADDER ABOVE ARE BOTH '
+             + 'CAPACITY-SENSITIVE, BY ABOUT THE SAME AMOUNT. '),
+           'The engine assigns every compound a tissue capacity of 1.0; '
+           + 'measured values span 3.2 to 4184 mL/g (n = 33, best available '
+           + 'constant 39). Capacity rescales TIME, so over a finite window '
+           + 'it changes the shape the field has reached. At R = 39 this '
+           + 'curve moves 0.3772 absolute on a curve whose entire range is '
+           + '1.0 to 0.51, the fitted penetration length collapses from '
+           + '279.7 to 76.7 um, and the ladder above moves 0.4021 — the same '
+           + 'size. Do not read one as solid because the other is flagged. '
+           + 'The exception is the BOTTOM of the ladder: F(0.1) and below, '
+           + 'which include the headline, are bit-identical out to R = 80. '
+           + 'The movement is almost entirely in the top rung F(1.0), '
+           + '0.4056 to 0.8077, which is on this chart.'])));
+    el.appendChild(h('div.caveat', h('span',
+      h('b', 'HOW MUCH OF THIS IS THE VASCULATURE? '),
+      'Where a compound’s penetration length is short compared with the '
+      + 'spacing between vessels, the exposure field largely inherits the '
+      + 'SHAPE of the vascular source, and this curve then says more about '
+      + 'the tissue’s vessels than about the compound. Scored against the '
+      + 'source null on this section, the excess over vasculature-alone runs '
+      + 'about 7.9x for a long-penetration compound but only 1.34x for '
+      + 'doxorubicin, which penetrates poorly. Read the falloff as compound-'
+      + 'specific evidence in proportion to the penetration length reported '
+      + 'in Metrics, and treat a short one as close to a vessel map.')));
+  }
+}
+
+/**
+ * The demoted absolute reading: therapeutic coverage, as a ladder.
+ *
+ * EXTRACTED FROM render() 2026-08-22, verbatim — see renderFalloff above for
+ * the losslessness check that licences the move. Depends on `run` alone.
+ */
+function renderPotency(el, run) {
+  /* ---- the demoted absolute reading ---------------------------------- */
+  const ex = run.extra_metrics || {};
+  const cov = [
+    ['0.5x IC50', ex.therapeutic_coverage_0_5x],
+    ['1x IC50', run.metrics ? run.metrics.therapeutic_coverage_1x : null],
+    ['2x IC50', ex.therapeutic_coverage_2x],
+  ].filter(([, v]) => v !== undefined);
+  if (cov.length) {
+    el.appendChild(microLabel('potency evidence'));
+    el.appendChild(h('div.tblwrap', h('table.tbl.zebra',
+      h('thead', h('tr', h('th', 'threshold'), h('th.right', 'of tumour above it'))),
+      h('tbody', cov.map(([k, v]) => h('tr',
+        h('td.mono', k),
+        h('td.right.num.mono', fmtFrac(v))))))));
+    el.appendChild(h('div.caveat', h('span',
+      h('b', 'ABSOLUTE, and shown as a ladder for that reason. '),
+      'Coverage compares an exposure to an IC50, so unlike everything above '
+      + 'it, it reads both the plasma level and the potency — the two '
+      + 'per-compound quantities whose spread withdrew the cross-compound '
+      + 'ordering (results/pk_ranking_robustness.md). Scaling the exposure '
+      + 'field scales this answer, which is exactly what the ratios above are '
+      + 'immune to. It is shown across three thresholds rather than at one so '
+      + 'that its movement is visible; a single coverage number looks settled '
+      + 'and is not.')));
+    /* AND WHERE THE LADDER STARTS FROM. This table is the one place on the
+     * rail where `therapeutic_coverage_1x` is printed, and it is the number a
+     * reader is most likely to quote — "0.0% of the tumour reached IC50" is a
+     * complete sentence and reads as a result. On the shipped default it is
+     * also the number most constrained by the spec: the entered plasma peak
+     * is under IC50, so under a plasma-bounded source term every row of this
+     * table at 1x and above is 0.0% for every tissue.
+     *
+     * One sentence, not the block: the ratio is stated in full beside the
+     * verdict at the top of this panel and again under The finding. What this
+     * adds is the pointer at the exact figure it governs, which is three
+     * screens below both of them. */
+    const framing = doseFraming(run);
+    if (framing && framing.ratio < 1) {
+      el.appendChild(h('div.caveat.crit', h('span',
+        h('b', 'THIS LADDER STARTS BELOW ITS OWN TOP RUNG BY INPUT. '),
+        `plasma_peak / IC50 for this run is ${num(framing.ratio, 3)} `
+        + `(${num(framing.peak_uM, 3)} uM entered against an IC50 of `
+        + `${num(framing.ic50_uM, 3)} uM), so the entered peak is `
+        + `${num(framing.foldUnder, 3)}x under the half-effect concentration `
+        + 'before any transport happens. Do not read the 1x and 2x rows as '
+        + 'measurements of this tissue without that ratio attached — stated '
+        + 'in full beside the verdict at the top of this panel.')));
+    }
+  }
+}
+
 export function createReachPanel() {
   const el = h('div');
 
@@ -372,79 +739,7 @@ export function createReachPanel() {
 
     const x = reach.headline_x;
 
-    /* ---- THE VERDICT: is this a delivery problem or a dose problem? ----- *
-     * This is the answer the panel exists to give, and it is the first thing
-     * on it. It is read straight off the per-cell mechanism attribution, which
-     * is per-compound by construction and reconciles bit-exactly with
-     * kill_fraction, so nothing here is a second opinion about the same
-     * numbers — it is a restatement of the engine's own labels.
-     *
-     * Why the verdict and not the reach number leads: measured on the flagship
-     * Xenium GBM section at dx = 12 um, the under-reached fraction at 0.1x is
-     * 0.05% — the drug gets essentially everywhere — while 99.8% of surviving
-     * tumour cells are DOSE-limited. A panel that led with "0.0% under-reached"
-     * would have buried its own finding. */
-    const mech = run.mechanism || null;
-    const bd = (mech && mech.survival_breakdown) || null;
-    if (bd) {
-      const entries = Object.entries(bd).filter(([, v]) => Number.isFinite(v) && v > 0);
-      entries.sort((a, b) => b[1] - a[1]);
-      const [topKey, topVal] = entries[0] || [null, null];
-      const LABEL = {
-        delivery: 'DELIVERY-LIMITED', dose: 'DOSE-LIMITED',
-        resistance: 'RESISTANCE-LIMITED', chance: 'CHANCE',
-        unattributed: 'UNATTRIBUTED',
-      };
-      const MEANING = {
-        delivery: 'the drug did not arrive in a pharmacologically meaningful '
-          + 'amount. This is the case the exposure map below is evidence FOR.',
-        dose: 'the drug arrived and stayed below IC50. The exposure map below '
-          + 'is what rules delivery OUT — it is the reason this reads as a '
-          + 'potency finding rather than an unresolved one.',
-        resistance: 'exposure was adequate and the cell state suppressed the '
-          + 'kill anyway.',
-        chance: 'exposure and biology were both adequate; the cell drew above '
-          + 'its kill probability.',
-        unattributed: 'not explained by the model’s own bands. A non-zero share '
-          + 'here is itself the finding.',
-      };
-      if (topKey) {
-        el.appendChild(h('div', {
-          style: { display: 'flex', alignItems: 'baseline', gap: 'var(--sp-4)',
-                   margin: '0 0 var(--sp-3)' },
-        },
-        h('span', { style: { fontSize: 'var(--fs-xl)', fontFamily: 'var(--font-mono)',
-                             color: 'var(--fg-0)', fontWeight: '600' } },
-        fmtFrac(topVal)),
-        h('span', { style: { fontSize: 'var(--fs-disclosure)', color: 'var(--fg-1)',
-                             lineHeight: 'var(--lh-body)' } },
-        h('b', LABEL[topKey] || topKey.toUpperCase()), ' — ',
-        `${fmtFrac(topVal)} of SURVIVING tumour cells. `,
-        MEANING[topKey] || '')));
-      }
-      const fold = mech.exposure_shortfall_fold;
-      if (Number.isFinite(fold)) {
-        el.appendChild(prose(
-          `The median tumour cell would need ${num(fold, 2)}x its exposure to `
-          + 'reach IC50. Above 1 the median cell is short of drug; below 1 it is '
-          + 'already past the half-effect point and something else is holding '
-          + 'the kill down. This is an ABSOLUTE quantity — it reads the potency '
-          + '— and is stated here because the verdict it supports would be '
-          + 'unreadable without it, not because it is protected by anything in '
-          + 'the invariances below.'));
-      }
-      const joint = mech.joint_limited;
-      if (joint && Number.isFinite(joint.fraction_of_exposure_limited)) {
-        el.appendChild(h('div.caveat', h('span',
-          h('b', 'DOSE IS NOT A CLEAN COUNTERFACTUAL HERE. '),
-          `${fmtFrac(joint.fraction_of_exposure_limited)} of the exposure-limited `
-          + 'survivals are ALSO at or below the resistance threshold. They are '
-          + 'labelled by their exposure band because below IC50 the exposure is '
-          + 'the binding constraint, but raising the dose alone would not have '
-          + 'killed them. Read the verdict as "exposure is the first thing in '
-          + 'the way", not as "more drug would fix it".')));
-      }
-    }
+    renderVerdict(el, run);
 
     /* ---- DELIVERY EVIDENCE — the half that rules delivery in or out ----- */
     el.appendChild(microLabel('delivery evidence'));
@@ -555,82 +850,7 @@ export function createReachPanel() {
         + 'the cells sit and are unaffected by this.')));
     }
 
-    /* ---- delivery heterogeneity, the headline of this half ------------- *
-     * P90/P10 over tumour-cell exposure. It is a ratio of two percentiles of
-     * ONE field, so it is scale-free for exactly the same reason the reach
-     * ratio is, and it carries signal even where the reach headline does not.
-     * That is not hypothetical: measured on the flagship Xenium GBM section at
-     * dx = 12 um, the under-reached fraction at 0.1x is 0.05% — the drug gets
-     * essentially everywhere — while this ratio is a legible 2.0x.
-     *
-     * It also needs NO CONVENTION. There was a single-threshold headline here
-     * (F at 0.1x) and it was removed rather than retuned: any threshold chosen
-     * now would be chosen knowing what the field does, which is post-hoc
-     * selection wearing a convention's clothes. The full F(x) ladder is still
-     * published below as the evidence; what is gone is the practice of reading
-     * one rung of it as the answer.
-     *
-     * And its denominator is GUARANTEED grid-independent rather than merely
-     * observed to be. `exposure_percentiles` is computed over the TUMOUR cell
-     * set, which tmesim/validation/delivery_metrics.py::tumor_cell_exposure
-     * documents as "a FIXED set of measured Xenium cells, identical at every dx
-     * — which is what makes these statistics grid-comparable". That is a
-     * structural property: the cells are measured, so no grid can move them.
-     *
-     * CORRECTION 2026-08-22. This passage previously argued the stronger case
-     * that the viable band carries "~10x grid sensitivity", citing "89% of
-     * tumour cells at dx = 30 um" against 2,008 at dx = 12. The dx = 12 figure
-     * is right and the dx = 30 figure was wrong by a factor of ~10.5. Measured
-     * through reconstruct_real on this section, temozolomide, 6 h, convection
-     * ON: 2,008 of 23,812 at dx = 12 um (8.43%), 2,007 at dx = 15, 2,019 at
-     * dx = 30 (8.48%). Across a 2.5x change in grid the viable band moves by
-     * 12 cells out of ~2,010 — 0.6%, not 10x.
-     *
-     * So the contrast this paragraph used to draw does not exist, and the
-     * reason to prefer this ratio is the weaker but true one above: the viable
-     * band is a COMPUTED quantity that happens to be stable on this section,
-     * carrying no guarantee that it is stable on another, whereas a measured
-     * cell set cannot move by construction. Stability observed on one section
-     * is not stability. */
-    const ex0 = run.extra_metrics || {};
-    const p10 = ex0.E_p10_uM;
-    const p90 = ex0.E_p90_uM;
-    if (Number.isFinite(p10) && Number.isFinite(p90) && p10 > 0) {
-      el.appendChild(h('div', {
-        style: { display: 'flex', alignItems: 'baseline', gap: 'var(--sp-4)',
-                 margin: '0 0 var(--sp-3)' },
-      },
-      h('span', { style: { fontSize: 'var(--fs-lg)', fontFamily: 'var(--font-mono)',
-                           color: 'var(--fg-0)' } }, num(p90 / p10, 2) + 'x'),
-      h('span', { style: { fontSize: 'var(--fs-disclosure)', color: 'var(--fg-1)',
-                           lineHeight: 'var(--lh-body)' } },
-      h('b', term('DELIVERY SPREAD')), ' — the best-perfused tenth of tumour cells '
-        + 'receives this many times the exposure of the worst-perfused tenth. A '
-        + 'ratio of two percentiles of one field: no dose, no potency, no '
-        + 'threshold to choose, and computed over the tumour cell set rather '
-        + 'than the viable band, so it does not move with the grid the way a '
-        + '"fraction of viable tumour" does.')));
-      // THIS MAP CANNOT SEE A PERMEABILITY BARRIER, and it is the first thing a
-      // reader will assume it does. bbb_penetrance is a pure global multiplier
-      // on the source term, so it divides out of every within-map ratio —
-      // verified bit-identical at bbb = 0.1 and bbb = 1.0. Scale-freedom is why
-      // this figure works, and the barrier is a scale; the two cannot both be
-      // had. It also explains the bevacizumab case structurally rather than as
-      // an edge case: bbb = 0 is the one point where the quantity this metric
-      // is blind to becomes the entire answer.
-      el.appendChild(h('div.caveat.crit', h('span',
-        h('b', 'THIS IS NOT A PERMEABILITY FINDING. '),
-        'The reach ratio is EXACTLY invariant to transvascular penetrance — '
-        + 'verified bit-identical at bbb_penetrance 0.1 and 1.0 — because '
-        + 'penetrance multiplies every point of the map equally and therefore '
-        + 'divides out of a ratio between points. That is the same property '
-        + 'that makes this number immune to the dose, and it cannot be had '
-        + 'selectively. So the delivery evidence here depends on the compound '
-        + 'ONLY through its penetration length, L = sqrt(D_eff/k). It says how '
-        + 'STEEPLY exposure falls away from a vessel; it says nothing about how '
-        + 'much crosses the vessel wall in the first place. Do not read it as a '
-        + 'brain-penetration or barrier result.')));
-    }
+    renderSpread(el, run);
 
     /* THE REFERENCE EXPOSURE, in that order: what it is, then where it came
      * from. This paragraph used to OPEN on the backend's `E_ref_source`
@@ -762,102 +982,7 @@ export function createReachPanel() {
            + 'ladder 0.9427, both worse than the cross-compound ordering this '
            + 'product withdrew. Read the rung you are using, not the ladder.'])));
 
-    /* ---- falloff ------------------------------------------------------- */
-    const fall = reach.falloff || {};
-    const fd = fall.distance_um || [];
-    const fv = fall.normalised_mean_auc || [];
-    if (fd.length && fv.length === fd.length) {
-      el.appendChild(microLabel('exposure vs vessel distance'));
-      el.appendChild(lineChart({
-        xs: fd, ys: fv,
-        xLabel: 'distance', yLabel: 'exposure / reference',
-        fmtX: (v) => num(v, 0) + 'um', fmtY: (v) => num(v, 2),
-        markIndex: 0, yMax: Math.max(1, ...fv.filter(Number.isFinite)),
-      }));
-      el.appendChild(prose(
-        'Each bin is the mean exposure over tissue at that distance from the '
-        + 'nearest endothelial cell, divided by the perivascular reference, so '
-        + 'the first bin is 1.00 by construction. This curve is the SHAPE of '
-        + 'the map, and the shape is the one thing a within-map ratio does not '
-        + 'protect: it is set by the effective diffusivity, whose descriptor '
-        + 'inputs have never been scored '
-        + '(results/descriptor_falsification.md). Read it as the best available '
-        + 'estimate of a gradient, not as a measured profile.'));
-      // THE SCOPE LIMIT ON THIS HALF OF THE PANEL, and it is not symmetric.
-      // The obvious objection to any delivery map is "isn't this just showing
-      // me where my vessels aren't?" — the field inherits the shape of the
-      // vascular source wherever the penetration length is SHORT compared with
-      // vessel spacing. Measured against the KDE source null on this section,
-      // the excess over the null is ~7.9x for a long-penetration compound and
-      // only 1.34x for doxorubicin, a short-L one. So this curve is strong
-      // evidence for compounds that penetrate far and WEAK evidence for
-      // compounds that do not — and the weak case is the one where a customer
-      // is most likely to suspect they are looking at their own angiogram.
-      // Stated here rather than only in a results file, because a scope limit
-      // that lives away from the figure it limits does not get read.
-      // THE CAPACITY RESIDUAL, and it is the largest limit on this figure —
-      // larger than the descriptor gap and larger than the source-null one.
-      // Measured on the flagship section: the normalised falloff moves 0.3772
-      // ABSOLUTE at capacity R = 39 (the best-available constant), on a curve
-      // whose entire range is 1.0 to 0.51, with the fitted penetration length
-      // collapsing 279.7 -> 76.7 um. Those three figures reproduced to four
-      // significant figures on re-measurement (0.37723, 1.0 -> 0.51284,
-      // 279.715 -> 76.740) and are the solid part of this block.
-      // What did NOT survive is the asymmetry that used to be drawn from them
-      // -- the ladder is not the safe counterpart, it moves 0.4021 over the
-      // same range. The real asymmetry is BETWEEN RUNGS, not between the
-      // ladder and the curve. See the dated correction below.
-      /* CORRECTED 2026-08-22. This caveat previously read "THE SHAPE IS NOT
-       * CAPACITY-INVARIANT — the ladder above nearly is, and this is not",
-       * and printed the two figures side by side on that basis. The asymmetry
-       * does not exist: measured on the flagship at R = 39 the falloff moves
-       * 0.3772 and the whole 7-rung ladder moves 0.4021. They move by the SAME
-       * amount. What is nearly immune is the bottom four rungs (x <= 0.1,
-       * which include the headline); the top rung F(1.0) goes 0.4056 -> 0.8077
-       * and is plotted on the same chart the caveat was reassuring about.
-       * It also asserted the 6 h window "has not converged", citing 0.01302
-       * decaying as 281/T. That was measuring the ESTIMATOR: any AUC-based
-       * ratio carries an O(1/T) tail however converged the field is, and the
-       * field is converged to 1.112e-05 at 6 h.
-       * Sources: results/reach_invariances_measure.md, steady_state_reach.md. */
-      el.appendChild(h('div.caveat.crit', h('span',
-        reach.window_mode === 'steady_state'
-          ? [h('b', 'CAPACITY CANNOT REACH THIS FIGURE. '),
-             'A tissue-capacity term R multiplies the TIME DERIVATIVE and '
-             + 'nothing else, and a converged steady state has no time '
-             + 'derivative — so R is absent from this map by inspection, not '
-             + 'small. Measured across R = 1 to 4184: this curve moves at most '
-             + '4.5e-14 and the ladder above moves exactly 0.000e+00, which is '
-             + 'float64 round-off and an unmoved threshold count, not a '
-             + 'residual. This is the one limit that a finite-window reading '
-             + 'of the same field DOES carry — there, at R = 39, this curve '
-             + 'moves 0.3772 and the ladder 0.4021.']
-          : [h('b', 'THIS SHAPE AND THE LADDER ABOVE ARE BOTH '
-               + 'CAPACITY-SENSITIVE, BY ABOUT THE SAME AMOUNT. '),
-             'The engine assigns every compound a tissue capacity of 1.0; '
-             + 'measured values span 3.2 to 4184 mL/g (n = 33, best available '
-             + 'constant 39). Capacity rescales TIME, so over a finite window '
-             + 'it changes the shape the field has reached. At R = 39 this '
-             + 'curve moves 0.3772 absolute on a curve whose entire range is '
-             + '1.0 to 0.51, the fitted penetration length collapses from '
-             + '279.7 to 76.7 um, and the ladder above moves 0.4021 — the same '
-             + 'size. Do not read one as solid because the other is flagged. '
-             + 'The exception is the BOTTOM of the ladder: F(0.1) and below, '
-             + 'which include the headline, are bit-identical out to R = 80. '
-             + 'The movement is almost entirely in the top rung F(1.0), '
-             + '0.4056 to 0.8077, which is on this chart.'])));
-      el.appendChild(h('div.caveat', h('span',
-        h('b', 'HOW MUCH OF THIS IS THE VASCULATURE? '),
-        'Where a compound’s penetration length is short compared with the '
-        + 'spacing between vessels, the exposure field largely inherits the '
-        + 'SHAPE of the vascular source, and this curve then says more about '
-        + 'the tissue’s vessels than about the compound. Scored against the '
-        + 'source null on this section, the excess over vasculature-alone runs '
-        + 'about 7.9x for a long-penetration compound but only 1.34x for '
-        + 'doxorubicin, which penetrates poorly. Read the falloff as compound-'
-        + 'specific evidence in proportion to the penetration length reported '
-        + 'in Metrics, and treat a short one as close to a vessel map.')));
-    }
+    renderFalloff(el, reach);
 
     /* ---- the invariance statement, from the backend --------------------
      * RESTRUCTURED, NOT REDUCED, 2026-08-22.
@@ -907,31 +1032,7 @@ export function createReachPanel() {
         + 'this refusal applies to.')));
     }
 
-    /* ---- the demoted absolute reading ---------------------------------- */
-    const ex = run.extra_metrics || {};
-    const cov = [
-      ['0.5x IC50', ex.therapeutic_coverage_0_5x],
-      ['1x IC50', run.metrics ? run.metrics.therapeutic_coverage_1x : null],
-      ['2x IC50', ex.therapeutic_coverage_2x],
-    ].filter(([, v]) => v !== undefined);
-    if (cov.length) {
-      el.appendChild(microLabel('potency evidence'));
-      el.appendChild(h('div.tblwrap', h('table.tbl.zebra',
-        h('thead', h('tr', h('th', 'threshold'), h('th.right', 'of tumour above it'))),
-        h('tbody', cov.map(([k, v]) => h('tr',
-          h('td.mono', k),
-          h('td.right.num.mono', fmtFrac(v))))))));
-      el.appendChild(h('div.caveat', h('span',
-        h('b', 'ABSOLUTE, and shown as a ladder for that reason. '),
-        'Coverage compares an exposure to an IC50, so unlike everything above '
-        + 'it, it reads both the plasma level and the potency — the two '
-        + 'per-compound quantities whose spread withdrew the cross-compound '
-        + 'ordering (results/pk_ranking_robustness.md). Scaling the exposure '
-        + 'field scales this answer, which is exactly what the ratios above are '
-        + 'immune to. It is shown across three thresholds rather than at one so '
-        + 'that its movement is visible; a single coverage number looks settled '
-        + 'and is not.')));
-    }
+    renderPotency(el, run);
   }
 
   return { el, render };

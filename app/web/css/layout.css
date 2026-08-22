@@ -428,9 +428,16 @@
   color: var(--fg-1);
   white-space: nowrap;
 }
+/* --fg-3 is the DISABLED/PLACEHOLDER token, and a hint is neither: on the READ
+   rail it carries "what this run says, in cells" and "the discrimination",
+   which are the only words telling a first-time reader what the section under
+   them is for. Measured at --fs-micro it scored 2.65:1 in light and 2.51:1 in
+   dark — the worst two readings anywhere on that rail, in BOTH themes. It is
+   --fg-2 now (5.32 light / 5.24 dark). Nothing else about the hint changes: it
+   is still the quietest thing in the header row, and still truncates. */
 .panel-head .hint {
   font-size: var(--fs-micro);
-  color: var(--fg-3);
+  color: var(--fg-2);
   font-family: var(--font-mono);
   /* A panel-head is a fixed `--h-head` row (see tokens.css 3.3): it does not
      grow for a second line. A hint that runs out of room must truncate, not
@@ -493,7 +500,7 @@
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--fg-3);
+  color: var(--fg-2);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -602,6 +609,30 @@
   user-select: none;
 }
 .rail-group:first-child > .rg-head { border-top: 0; }
+/* ------------------------------------------------------- heading shells ---
+   The rail had NO heading elements at all — measured 2026-08-22, zero matches
+   for h1..h6 over ~30,000 characters of disclosure in one scroller — so there
+   was no heading list to navigate it by and the only route to "Delivery or
+   dose" was to read from the top. Group headers are <h2> and section titles
+   are <h3> now (js/ui/rail.js::railGroup, ::sectTitle).
+
+   These two rules exist ONLY so that adding the elements changes nothing on
+   screen: a heading brings a UA font-size, weight and margin, and every one of
+   those is already set by the flex row it sits in. `font: inherit` also resets
+   the UA margin, and `letter-spacing`/`text-transform` are re-inherited because
+   the shorthand does not carry them. Pixel-identical in both themes. */
+.rail-group > .rg-head .rg-h,
+.sect > summary .sect-h {
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .rail-group > .rg-head .rg-note {
   margin-left: auto;
   font-family: var(--font-mono);

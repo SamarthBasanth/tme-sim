@@ -31,8 +31,35 @@ import { h } from '../util/dom.js';
  */
 export function railGroup(id, title, note, ...sections) {
   return h('section.rail-group', { id: 'rg-' + id, 'aria-label': title },
-    h('div.rg-head', h('span', title), note ? h('span.rg-note', note) : null),
+    // <h2>, not <span>. See sectTitle() below for why the rail had no heading
+    // structure at all and what that cost a screen-reader user.
+    h('div.rg-head', h('h2.rg-h', title), note ? h('span.rg-note', note) : null),
     ...sections);
+}
+
+/**
+ * A section title, as an actual heading.
+ *
+ * MEASURED 2026-08-22, on the READ rail with a finished run loaded: zero
+ * elements matching `h1,h2,h3,h4,h5,h6`. Every group name was a `<span>` and
+ * every section title a bare text node inside a `<summary>`, over roughly
+ * 30,000 characters of disclosure in one scroller. A screen-reader user had no
+ * heading list, so the only way to find "Delivery or dose" was to read from the
+ * top — and the whole argument for this rail is that the limits sit next to the
+ * numbers they qualify, which is a spatial claim that only pays off if you can
+ * get to the place.
+ *
+ * `<h3>` INSIDE the `<summary>`, never `role="heading"` ON it: the summary's
+ * own role is what makes the section expandable, and overwriting it would trade
+ * one affordance for the other. The HTML content model for `<summary>` is
+ * "phrasing content, optionally intermixed with heading content", so this is
+ * the sanctioned shape rather than a trick.
+ *
+ * Levels: group header h2, section title h3, in-panel label h4 (see
+ * js/ui/reach.js::microLabel). The page's h1 is the app title in index.html.
+ */
+export function sectTitle(text) {
+  return h('h3.sect-h', text);
 }
 
 /**

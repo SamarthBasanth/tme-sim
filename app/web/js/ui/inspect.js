@@ -20,7 +20,7 @@ import { FIELD_NAMES, fieldMeta } from '../fields.js';
 import { RAMP_NAMES, RAMP_META } from '../gl/ramps.js';
 import { METRICS, metricProvenance, reportProvenance, fieldProvenance, chip, STANDING_LIMITS, claimSetNotice, claimSetEraLabel } from './provenance.js';
 import { auto, num, int, pct, sci, dur, NULL_GLYPH } from '../util/fmt.js';
-import { railGroup, railNav } from './rail.js';
+import { railGroup, railNav, sectTitle } from './rail.js';
 import { createReachPanel } from './reach.js';
 import { createFindingPanel } from './finding.js';
 
@@ -650,7 +650,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     `${what} is unavailable without WebGL2.`);
 
   const mechSect = h('details.sect', { open: true, id: 'sect-mech' },
-    h('summary', 'Mechanism', h('span.hint', 'reconciles with kill_fraction')),
+    h('summary', sectTitle('Mechanism'), h('span.hint', 'reconciles with kill_fraction')),
     h('div.sect-body', mechanismEl || na('Mechanism')));
 
   const railBody = h('div.rail-body',
@@ -664,11 +664,11 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       // would refute it, which is the whole reason this claim replaced a
       // compound ranking. js/ui/finding.js carries the full argument.
       h('details.sect', { open: true, id: 'sect-finding' },
-        h('summary', 'The finding', h('span.hint', 'what this run says, in cells')),
+        h('summary', sectTitle('The finding'), h('span.hint', 'what this run says, in cells')),
         h('div.sect-body', findingPanel.el)),
 
       h('details.sect', { open: true },
-        h('summary', 'Metrics', h('span.hint', 'provenance on every value')),
+        h('summary', sectTitle('Metrics'), h('span.hint', 'provenance on every value')),
         h('div.sect-body', errorEl, metricsEl)),
 
       // REACH sits between Metrics and Mechanism because that is the order the
@@ -678,7 +678,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       // that replaced the ranked drug panel as the product's answer, so it sits
       // high, is open by default, and is never collapsed to make room.
       h('details.sect', { open: true, id: 'sect-reach' },
-        h('summary', 'Delivery or dose', h('span.hint', 'the discrimination')),
+        h('summary', sectTitle('Delivery or dose'), h('span.hint', 'the discrimination')),
         h('div.sect-body', reachPanel.el)),
 
       // Was a floating card over the stage's top-right quarter. It lives here
@@ -690,25 +690,25 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       mechSect,
 
       h('details.sect', { open: true },
-        h('summary', 'Caveats', tallyEl, h('span.hint', 'not collapsible for a reason')),
+        h('summary', sectTitle('Caveats'), tallyEl, h('span.hint', 'not collapsible for a reason')),
         h('div.sect-body', { style: { padding: '0' } }, caveatsEl)),
 
       h('details.sect', { open: true },
-        h('summary', 'Provenance', h('span.hint', 'RunResult.provenance')),
+        h('summary', sectTitle('Provenance'), h('span.hint', 'RunResult.provenance')),
         h('div.sect-body', provEl)),
 
       h('details.sect', { open: true },
-        h('summary', 'Reconstruction report', h('span.hint', 'RunResult.report')),
+        h('summary', sectTitle('Reconstruction report'), h('span.hint', 'RunResult.report')),
         h('div.sect-body', reportEl))),
 
     /* ---- VIEW: how is the picture being drawn -------------------------- */
     railGroup('view', 'View', 'display only — never the run',
       h('details.sect', { open: true },
-        h('summary', 'Channels', h('span.hint', 'cell type')),
+        h('summary', sectTitle('Channels'), h('span.hint', 'cell type')),
         h('div.sect-body', chanHead, chanList)),
 
       h('details.sect', { open: true },
-        h('summary', 'Field overlay', h('span.hint', '/field/{name}')),
+        h('summary', sectTitle('Field overlay'), h('span.hint', '/field/{name}')),
         h('div.sect-body',
           h('div.fgrid',
             h('label.lbl', { for: 'f-overlay' }, 'Field'), fieldSel,
@@ -723,11 +723,11 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
           fieldNote)),
 
       h('details.sect', { open: true },
-        h('summary', 'Window / level', h('span.hint', 'transfer function')),
+        h('summary', sectTitle('Window / level'), h('span.hint', 'transfer function')),
         h('div.sect-body', windowLevelEl || na('Window / level'))),
 
       h('details.sect', { open: false },
-        h('summary', 'Render', h('span.hint', 'WebGL2')),
+        h('summary', sectTitle('Render'), h('span.hint', 'WebGL2')),
         h('div.sect-body',
           h('div.fgrid',
             h('label.lbl', { for: 'r-size' }, 'Point size'),
@@ -757,17 +757,17 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     /* ---- MEASURE: what did I measure on it ----------------------------- */
     railGroup('measure', 'Measure', 'drawn on the specimen',
       h('details.sect', { open: true },
-        h('summary', 'Line profile', h('span.hint', 'L · drag')),
+        h('summary', sectTitle('Line profile'), h('span.hint', 'L · drag')),
         h('div.sect-body.tool-body', profileEl || na('Line profile'))),
 
       h('details.sect', { open: true },
-        h('summary', 'Regions', h('span.hint', 'R · drag')),
+        h('summary', sectTitle('Regions'), h('span.hint', 'R · drag')),
         h('div.sect-body.tool-body', regionEl || na('Regions'))),
 
       // Distance had a toolbar button and a shortcut but no panel, no read-out
       // and no clear. Every tool with a stage gesture has a home here now.
       h('details.sect', { open: true },
-        h('summary', 'Distance', h('span.hint', 'M · drag')),
+        h('summary', sectTitle('Distance'), h('span.hint', 'M · drag')),
         h('div.sect-body.tool-body', distanceEl || na('Distance')))),
   );
 

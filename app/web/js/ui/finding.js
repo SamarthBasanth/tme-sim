@@ -48,6 +48,8 @@
 
 import { h, clear } from '../util/dom.js';
 import { int, pct, num, NULL_GLYPH } from '../util/fmt.js';
+import { doseInputBlock } from './doseinput.js';
+import { jointLimitedCaveat } from './verdict.js';
 
 /** The limiter buckets, in the words a reader who has not read this repo can
  *  check. Keys are `mechanism.survival_breakdown` keys — see
@@ -233,6 +235,28 @@ export function createFindingPanel() {
       }, para(h('b', `This is ${p.verdict}. `), p.gist)));
     }
 
+    /* ---- HOW MUCH OF THAT SENTENCE WAS AN INPUT? ------------------------
+     * Added 2026-08-22, and it goes DIRECTLY under the verdict because it is
+     * about that sentence and nothing else.
+     *
+     * The shipped default RunSpec carries plasma_peak = 50 uM against a
+     * temozolomide IC50 of 606 uM, so the ratio the whole potency half of this
+     * panel turns on is 0.083 — fixed in the spec, before any tissue is read —
+     * and therapeutic_coverage_1x comes back 0.0. The panel then reported the
+     * compound as dose-limited without once saying what dose it was given. A
+     * reader's first question is the right one: you told it the peak was 12x
+     * under IC50 and it told you the dose was too low; what did the tissue
+     * contribute?
+     *
+     * js/ui/reach.js has answered the structurally identical question for
+     * bevacizumab since the panel was written — bbb_penetrance = 0 gives an
+     * identically zero source term and it says THIS IS AN INPUT, NOT A
+     * FINDING. That branch fires only on bbb == 0. This is the same treatment
+     * on the dose axis, and it deliberately picks NO threshold: it prints the
+     * ratio. js/ui/doseinput.js carries the full argument for why a cut chosen
+     * now would be post-hoc selection. */
+    el.append(...doseInputBlock(run));
+
     /* ---- THE VERDICT'S OWN SENSITIVITY, stated beside it -----------------
      * Added 2026-08-22, and it is the most important caveat on this panel
      * because it is about THIS SENTENCE rather than about a number below it.
@@ -313,20 +337,14 @@ export function createFindingPanel() {
      * changes what the sentence directly above it means, and a limit that
      * lives a thousand words away from the number it limits does not get
      * read. Nothing is removed from Caveats to pay for this. */
-    const joint = mech.joint_limited;
-    if (joint && Number.isFinite(joint.fraction_of_exposure_limited)
-        && Number.isFinite(joint.count)) {
-      el.appendChild(h('div.caveat', h('span',
-        h('b', '"TOO WEAK" IS NOT "MORE WOULD WORK". '),
-        `${int(joint.count)} of those survivors — `
-        + `${pct(joint.fraction_of_exposure_limited, 1)}% of the exposure-limited `
-        + 'ones — are also at or below the modelled resistance threshold. They '
-        + 'are counted under their exposure band because below the half-effect '
-        + 'concentration the exposure is the binding constraint, but raising '
-        + 'the dose alone would not have killed them. Read the verdict as '
-        + '"exposure is the first thing in the way", never as "more drug would '
-        + 'fix it".')));
-    }
+    // AUTHORED IN js/ui/verdict.js, not here, and rendered identically by the
+    // reach panel. It used to be written out twice — once here with the cell
+    // count and once in reach.js WITHOUT it — so the same caveat was materially
+    // weaker on one of the two screens that states the claim it qualifies. The
+    // caveat still appears beside every number it qualifies; what stopped being
+    // duplicated is the wording, not the disclosure.
+    const jlCaveat = jointLimitedCaveat(run);
+    if (jlCaveat) el.appendChild(jlCaveat);
     if (mech.exposure_axis_note) {
       el.appendChild(h('div.caveat', h('span',
         h('b', 'THESE TWO LABELS ARE ONE AXIS, NOT TWO MECHANISMS. '),

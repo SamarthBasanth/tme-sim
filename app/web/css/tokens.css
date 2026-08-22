@@ -232,7 +232,16 @@
 
   --fg-0:     hsl(208 15% 93%);   /* primary text + numbers */
   --fg-1:     hsl(208 10% 73%);   /* secondary */
-  --fg-2:     hsl(208  8% 53%);   /* labels, units, captions */
+  /* RAISED 53% -> 56% 2026-08-22, measured, not eyeballed. At 53% this token
+     scored 4.34:1 against --bg-2, under the 4.5:1 WCAG AA floor for the
+     --fs-micro sizes it is mostly used at, and --fs-micro is 9.5px. At 56% it
+     is 5.64 / 5.24 / 4.81 against --bg-0 / --bg-1 / --bg-2.
+     THE RESIDUAL, STATED RATHER THAN ROUNDED AWAY: on --bg-3 (4.21) and --bg-4
+     (3.50) it still misses. Those are the input, hover and selected-row
+     surfaces; raising far enough to clear --bg-4 washes the token out against
+     the panel body it is mostly read on, which is the surface that matters for
+     the disclosure text. Fix that pair by darkening the row, not the caption. */
+  --fg-2:     hsl(208  8% 56%);   /* labels, units, captions */
   --fg-3:     hsl(208  8% 38%);   /* disabled, placeholder */
 
   --accent:      hsl(191 72% 54%);
@@ -367,7 +376,7 @@
 
   --fg-0:     hsl(213 28% 13%);
   --fg-1:     hsl(213 13% 33%);
-  --fg-2:     hsl(213 10% 47%);
+  --fg-2:     hsl(213 10% 41%);  /* 47% scored 4.27 on --bg-1 and 3.71 on --bg-0; 41% is 5.32 / 4.63 */
   --fg-3:     hsl(213  9% 63%);
 
   --accent:      hsl(197 88% 30%);
@@ -447,7 +456,7 @@
 
     --fg-0:     hsl(213 28% 13%);
     --fg-1:     hsl(213 13% 33%);
-    --fg-2:     hsl(213 10% 47%);
+    --fg-2:     hsl(213 10% 41%);  /* 47% scored 4.27 on --bg-1 and 3.71 on --bg-0; 41% is 5.32 / 4.63 */
     --fg-3:     hsl(213  9% 63%);
 
     --accent:      hsl(197 88% 30%);
