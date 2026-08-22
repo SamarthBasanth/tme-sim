@@ -201,8 +201,8 @@ jobs:
             # cleanly and can simulate NOTHING -- fine for the local deploy that
             # bind-mounts the host cache, useless for a hosted one.
             #
-            # The GUARD'S PURPOSE IS UNCHANGED and still matters: catch a
-            # .dockerignore regression that bakes the OPERATOR'S LOCAL 5.3 GB
+            # THE PURPOSE OF THIS GUARD IS UNCHANGED and still matters: catch a
+            # .dockerignore regression that bakes the LOCAL 5.3 GB operator
             # cache -- possibly including unpublished tissue -- into a layer.
             # "Empty" was a proxy for that. The real property is: nothing is in
             # here except what the build deliberately DOWNLOADED FROM SOURCE.
