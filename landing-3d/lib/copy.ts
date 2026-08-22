@@ -100,6 +100,43 @@
  * claim — which is exactly the outcome an unnamed axis is most likely to
  * produce, since nobody chose it in the first place.
  *
+ * AN ILLUSTRATIVE EXAMPLE MUST BE CHECKED AGAINST THE SAME DEFENCES AS THE
+ * HEADLINE VERDICT. Every row on this page has two halves — the registered
+ * verdict, and the vivid particular that makes it land — and only the first
+ * has ever been audited, on the reasoning that the example is not the claim.
+ * That is backwards. The example is the part a reader retains, so it is the
+ * part most likely to be repeated, and it must be at least as well supported
+ * as the sentence it is decorating. Run the standing objections at it before
+ * it ships, not only at the verdict.
+ *
+ * The example that failed this test, kept here so the failure mode cannot
+ * drift back: beat 05's ranking row illustrated a capacity-driven ranking
+ * failure with a named compound swap (`vinorelbine` -> `doxorubicin` on the
+ * breast panel). The standing objection to the whole result was that the
+ * capacity rule partly re-applies a per-compound ordering the engine already
+ * carries. Run against the VERDICT that objection fails, and fails on its own
+ * terms: the arms that break the order are uniform, they have no per-compound
+ * content, and nothing can be double-counted out of them. Run against the
+ * EXAMPLE it lands squarely — the correlation is +0.780 on that panel
+ * specifically, and residualising restores `vinorelbine`. So the verdict
+ * survived scrutiny that its own illustration did not, and every reader who
+ * carried away the compound pair rather than the threshold carried away the
+ * weaker half of the row. The objection was not even new: it was already on
+ * file (capacity_ranking_robustness.md sec. 6.2 raised it and explicitly left
+ * it open). Nobody had thought to point it at the example.
+ *
+ * TWO OPERATIONAL RULES FALL OUT OF THAT, AND THE SECOND IS THE ONE THAT GETS
+ * SKIPPED. First: prefer the illustration the objection cannot reach. A
+ * threshold from an arm with no per-compound content (36.3, 5.28) is not
+ * merely safer than a pair of drug names, it is a sharper fact — it says the
+ * order breaks BELOW the constant the measurement itself recommends, which no
+ * compound pair can say. Second, and this is the half a defensive page drops:
+ * a correction that only ever runs downhill is not honesty, it is flinching.
+ * When a retraction frees room, the room goes to the disclosure that costs us
+ * most, not back into prose — here it bought the rat-brain-slice provenance
+ * of the swept range, which makes that range look LESS transferable to the
+ * human panels the row is about. See results/uptake_proxy_double_count.md.
+ *
  * Two guardrails narrowed by measurement, both of which read as weaker than
  * the obvious marketing line and must not drift back to it:
  *
@@ -125,10 +162,63 @@
  *    bottom of the measured range. The mechanism is not a coincidence and is
  *    worth knowing before editing this: attenuation depends on k*T/R, so a
  *    uniform R still reorders a panel whose drugs differ in k by 27x.
- *    AND THE TOP PICK MOVES TOO, on a NAMED assignment rather than a sampling
- *    tail: on the breast panel this repo's own structural K_b rule
- *    (two_route.binding_capacity_from_logp) replaces `vinorelbine` with
- *    `doxorubicin`, as does its access-limited variant.
+ *    THE NAMED TOP-PICK SWAP WAS RETRACTED ON 2026-08-21 AND MUST NOT COME
+ *    BACK IN ANY FORM. It read: "AND THE TOP PICK MOVES TOO, on a NAMED
+ *    assignment rather than a sampling tail: on the breast panel this repo's
+ *    own structural K_b rule (two_route.binding_capacity_from_logp) replaces
+ *    `vinorelbine` with `doxorubicin`, as does its access-limited variant."
+ *    WHY IT WENT: the engine ALREADY carries a per-compound quantity that its
+ *    own docstring calls a capacity ordering — `validation.calibration.
+ *    uptake_proxy`, which `alpha` multiplies into every compiled drug's
+ *    `binding` — and on the BREAST panel specifically it is strongly
+ *    correlated with the structural K_b rule: Spearman +0.780 (p = 0.008),
+ *    Pearson on logs +0.741 (p = 0.014), R^2 0.549. So applying that rule on
+ *    top of the shipping engine partly applied the same per-compound ordering
+ *    twice. Strip the component the proxy already predicts and `vinorelbine`
+ *    comes back as breast top-1 (panel spread 874.7x -> 141.1x), and the GBM
+ *    10-drug FULL published order comes back too. Both named findings are
+ *    substantially double-counted and are discounted. Note the earlier
+ *    Spearman of +0.333 (p = 0.35) quoted in capacity_ranking_robustness.md
+ *    sec. 6.2 was the GBM panel ONLY, and quoting it alone understated the
+ *    overlap exactly where the swap happened.
+ *    WHY THE VERDICT IS UNCHANGED, AND THIS IS THE HALF THAT MUST BE CARRIED
+ *    WITH EQUAL FORCE — the retraction reaches the illustration and nothing
+ *    else:
+ *      (i) THE UNIFORM ARMS HAVE NO PER-COMPOUND CONTENT AT ALL, so no overlap
+ *          of any strength can shrink them. 36.3 and 5.28 stand exactly as
+ *          written above, and they are what FULL ORDER NOT ROBUST rests on.
+ *     (ii) PUSHED TO ITS LIMIT THE DEFENCE MAKES THE RESULT WORSE. Give every
+ *          compound a capacity exactly proportional to `uptake_proxy` — the
+ *          maximal double-count, where none of the per-compound shape can be
+ *          new physics — and the published order breaks at a geometric-mean
+ *          capacity of 14.7 on GBM 10-drug (against 36.3 uniform) and 10 on
+ *          GBM 5-drug (against 435 uniform). Only breast is more benign (7.57
+ *          un-clipped against 5.28). The mechanism: R_i proportional to k_i
+ *          makes k*T/R the same for every compound, so attenuation FLATTENS
+ *          from its shipping range of 0.9075-0.9965, and flattening reorders.
+ *    (iii) THE SAMPLED ARMS BARELY MOVE and nothing crosses any bar.
+ *          P(full published order) 0.0047 -> 0.0055, 0.2002 -> 0.2397, 0.0006
+ *          -> 0.0000; P(top pick) 0.730 -> 0.765, 0.584 -> 0.566, 0.797 ->
+ *          0.792, all three still failing the decision-grade bar. This is the
+ *          capacity-side top-1 evidence that SURVIVES, and it is weaker than
+ *          the named swap was — a sampling result, not a named assignment —
+ *          which is why beat 05 leans on the delivery-law top-1 change
+ *          instead and does not print these three numbers.
+ *    ALSO ESTABLISHED THERE, AND IT IS NOT A POINT IN THE ENGINE'S FAVOUR:
+ *    `uptake_proxy` reaches the solver at one place, `physics/diffusion.py:315
+ *    k = clearance + binding`, as an irreversible first-order SINK with no
+ *    bound pool. Measured on the shipped solver, x10 on `binding` moves the
+ *    steady state to 0.1089x while a capacity of 10 leaves it at
+ *    0.999999999998x. They are different operators, so the double-count does
+ *    not net out; the engine is using a capacity ORDERING to set a quantity
+ *    (penetration length) a real capacity cannot touch, while the real
+ *    capacity slot `s_eff` stays pinned at 1.0.
+ *    NOT CLAIMABLE FROM ANY OF IT: that `uptake_proxy` agrees, or disagrees,
+ *    with measured tissue capacity. Exactly 1 of the 35 rat brain-slice
+ *    compounds is on either shipping panel (`docetaxel`) and the frozen
+ *    dataset has no SMILES column, so n = 1 and there is no test. The two
+ *    access-limited variants were NOT re-tested.
+ *    See results/uptake_proxy_double_count.md sec. 0, 3.1, 3.2, 3.3, 4.1.
  *    WHAT CAN NO LONGER BE WRITTEN IN ANY FORM: "the compound ranking is
  *    robust"; "the absolute values may be off but the ranking holds"; "our top
  *    pick is robust" without the qualification below. The middle one is the
@@ -505,16 +595,22 @@ export const SECTION_COPY: readonly SectionCopy[] = [
      * 808.7. There is no second paragraph to spend, and the next edit that
      * needs a line has nothing left to sell.
      *
-     * WHAT DID NOT FIT, RECORDED SO IT IS A KNOWN OMISSION AND NOT AN OVERSIGHT.
-     * The 3.2-4184 range in the first row is measured in RAT BRAIN SLICES
-     * (`Vu,brain`, n = 33), and applying it to a human breast panel is itself an
-     * assumption — results/capacity_ranking_robustness.md sec. 8 says so about
-     * its own docetaxel value. Naming that provenance in the row costs one
-     * line and there is not one. It is not a self-serving omission: an
-     * unqualified "measured values run 3.2 to 4184" makes the swept range look
-     * MORE authoritative and therefore the model look WORSE, so the direction
-     * is against us. If the layout ever yields a line here, this is what it
-     * buys first.
+     * WHAT DID NOT FIT, RECORDED SO IT IS A KNOWN OMISSION AND NOT AN OVERSIGHT
+     * — AND IT IS NOW PAID FOR, 2026-08-21. The 3.2-4184 range in the first row
+     * is measured in RAT BRAIN SLICES (`Vu,brain`, n = 33), and applying it to a
+     * human breast panel is itself an assumption — results/
+     * capacity_ranking_robustness.md sec. 8 says so about its own docetaxel
+     * value. Naming that provenance cost one line the row did not have. It was
+     * never a self-serving omission: an unqualified "measured values run 3.2 to
+     * 4184" makes the swept range look MORE authoritative and therefore the
+     * model look WORSE, so the direction was against us, which is exactly why
+     * this was registered as the first thing any spare room should buy.
+     * Retracting the vinorelbine/doxorubicin example freed it, and the row now
+     * reads "measured rat brain-slice values run 3.2 to 4184 (n = 33), assumed
+     * to carry to human tissue". Measured at 390x844 the detail is 6 lines
+     * before and after (83.0px, section bottom unchanged at 808.7) and at
+     * 1512x950 it went 5 lines to 4. The margin is still SPENT: the next
+     * addition here has nothing left to sell.
      */
     // The lead is now one line and it is about the METHOD, not about which
     // output to trust. That is a deliberate demotion: after the capacity
@@ -548,9 +644,43 @@ export const SECTION_COPY: readonly SectionCopy[] = [
          * the published order exactly. Writing a flat "NOT ROBUST" would be
          * more pessimistic than the evidence, which is its own kind of
          * dishonesty on a page whose argument is that it reports what it
-         * measures. What the detail must therefore never lose is the other
-         * half — the top pick DOES change on breast under a named rule — since
-         * "full order" alone would let a reader keep the top-1 claim whole.
+         * measures.
+         *
+         * THE EXAMPLE CHANGED ON 2026-08-21; THE VERDICT DID NOT. The detail
+         * used to close its middle sentence with "our own structural rule swaps
+         * breast's top pick, vinorelbine for doxorubicin". That swap turned out
+         * to be substantially double-counted — on the BREAST panel the
+         * structural rule and the per-compound sink the engine already applies
+         * are strongly correlated (Spearman +0.780, p = 0.008), and removing
+         * what the engine already accounts for puts `vinorelbine` back on top.
+         * The named pair is therefore GONE from the page and must not return in
+         * any form, qualified or not: it was the vivid half of the row, so a
+         * reader carried it away in place of the thresholds, and it was the
+         * half that did not survive. See the ILLUSTRATIVE EXAMPLE guardrail at
+         * the head of this file, which this row is the case study for.
+         *
+         * WHY THE ROW IS NOT WEAKER FOR IT, and why nothing else moved. The
+         * example was never what the verdict rested on. 36.3 and 5.28 come from
+         * a UNIFORM capacity — one value for every compound, so no per-compound
+         * ordering to double-count — and no correlation of any strength can
+         * reach an arm with no per-compound content. Both are still below the
+         * best-fitting constant of 39, which is a sharper fact than a pair of
+         * drug names: it says the failure happens at the very value the
+         * measurement recommends. The line the retraction freed on desktop went
+         * to the rat-brain-slice provenance this file had registered below as
+         * the first thing any spare room should buy — a disclosure that makes
+         * the swept range look LESS transferable, i.e. the correction did not
+         * only run downhill.
+         *
+         * WHAT THE ROW NOW LEANS ON FOR THE TOP PICK, since the named breast
+         * swap is gone and "full order" alone would let a reader keep the top-1
+         * claim whole: the final clause, "correcting the delivery law moves the
+         * glioblastoma top pick", which is a different result on a different
+         * axis (results/transvascular_exchange_revalidation.md) and is untouched
+         * by any of this. That clause is now load-bearing — do NOT drop it to
+         * shorten this row. Guardrail 1 records the capacity-side top-1
+         * evidence that also survives (the sampled arms) and why it did not fit
+         * here.
          *
          * See guardrail 1 at the head of this file for sec. 9's condition
          * verbatim, for the three figures that were circulated wrong, and for
@@ -560,7 +690,7 @@ export const SECTION_COPY: readonly SectionCopy[] = [
           label: "Ranking on one tissue",
           state: "FULL ORDER NOT ROBUST",
           detail:
-            "Tissue capacity is 1.0 for every compound; measured values run 3.2 to 4184. One uniform value breaks the full order at 36.3 on glioblastoma and 5.28 on breast, below the best constant of 39; our own structural rule swaps breast's top pick, vinorelbine for doxorubicin. Invariant to cell-state route, oxygen route, alpha and grid; not to drug-specific transport, and correcting the delivery law moves the glioblastoma top pick.",
+            "Tissue capacity is 1.0 for every compound; measured rat brain-slice values run 3.2 to 4184 (n = 33), assumed to carry to human tissue. One uniform value breaks the full order at 36.3 on glioblastoma and 5.28 on breast, both below the best constant of 39. Invariant to cell-state route, oxygen route, alpha and grid; not to drug-specific transport, and correcting the delivery law moves the glioblastoma top pick.",
         },
         {
           label: "Close analogues",

@@ -1,0 +1,1163 @@
+{
+ "role": {
+  "frozen": {
+   "alpha": 22.223477711172563,
+   "phi": 0.7892,
+   "s_eff_shipping": 1.0
+  },
+  "static": {
+   "uptake_proxy_returns": "drug.binding",
+   "drug_binding_source": "molecular.binding.tissue_binding_rate(descriptors)",
+   "tissue_binding_rate_inputs": [
+    "logp",
+    "hbd"
+   ],
+   "tissue_binding_rate_form": "score=(logP-2.5)/2.5+(HBD-2)/4 ; rate=1e-5*(5e-3/1e-5)**sigmoid(score)",
+   "tissue_binding_rate_band_per_s": [
+    1e-05,
+    0.005
+   ],
+   "enters_physics_at": "physics/diffusion.py:315  k = clearance + binding",
+   "functional_form_in_pde": "-k*C   (first-order removal, no return path)",
+   "has_bound_pool": false,
+   "docstring_excerpt": "First-order tissue retention/binding rate, 1/s (feeds DrugParams.binding). Heuristic (lipophilic + H-bond donors stick to tissue) ------------------------------------------------------ Non-specific tissue binding (to membrane lipids, ECM, i"
+  },
+  "steady_state_probe": {
+   "k_base_per_s": 0.0011,
+   "shipping_C_ss": 236.08305219100495,
+   "capacity_x10_C_ss": 236.0830521904573,
+   "capacity_x10_ratio": 0.9999999999976802,
+   "binding_x10_C_ss": 25.712015585163023,
+   "binding_x10_ratio": 0.10891089108912615
+  },
+  "verdict_role": "SINK. `binding` is a first-order removal term with no return path; multiplying it moves the equilibrium concentration. A capacity does not."
+ },
+ "overlap": {
+  "frozen": {
+   "alpha": 22.223477711172563,
+   "phi": 0.7892,
+   "s_eff_shipping": 1.0
+  },
+  "panels": {
+   "gbm": {
+    "drugs": [
+     "temozolomide",
+     "lomustine",
+     "carmustine",
+     "procarbazine",
+     "cisplatin",
+     "methotrexate",
+     "etoposide",
+     "vincristine",
+     "irinotecan",
+     "doxorubicin"
+    ],
+    "uptake_proxy_per_s": {
+     "temozolomide": 1.9925862685523823e-05,
+     "lomustine": 0.00013060763370764013,
+     "carmustine": 6.98485487538089e-05,
+     "procarbazine": 0.0001344485815441596,
+     "cisplatin": 5.8612927714932856e-05,
+     "methotrexate": 0.00017918232799416463,
+     "etoposide": 0.00016046186268621815,
+     "vincristine": 0.0005992743036788552,
+     "irinotecan": 0.0004045845661250811,
+     "doxorubicin": 0.00022374580379867353
+    },
+    "K_b_rule": {
+     "temozolomide": 13.886284571614034,
+     "lomustine": 30.65851286878145,
+     "carmustine": 13.957631911941588,
+     "procarbazine": 13.195379497992466,
+     "cisplatin": 9.698684078523925,
+     "methotrexate": 9.86364290423993,
+     "etoposide": 15.477945923857712,
+     "vincristine": 125.2308536499551,
+     "irinotecan": 281.85078257917115,
+     "doxorubicin": 9.353563199676122
+    },
+    "k_eff_per_s": {
+     "temozolomide": 0.0005007608329708451,
+     "lomustine": 0.0030111137150904605,
+     "carmustine": 0.0016452528680029287,
+     "procarbazine": 0.003078928884705309,
+     "cisplatin": 0.0013785805317205642,
+     "methotrexate": 0.004051516416008092,
+     "etoposide": 0.003640864755199843,
+     "vincristine": 0.013407340433828465,
+     "irinotecan": 0.009105412865364575,
+     "doxorubicin": 0.005035489904182864
+    },
+    "logp": {
+     "temozolomide": -2.078,
+     "lomustine": 2.251,
+     "carmustine": 1.157,
+     "procarbazine": 1.049,
+     "cisplatin": 0.195,
+     "methotrexate": 0.268,
+     "etoposide": 1.339,
+     "vincristine": 3.518,
+     "irinotecan": 4.091,
+     "doxorubicin": 0.001
+    },
+    "proxy_spread": 30.075199911631888,
+    "k_spread": 26.773939875223938,
+    "K_b_spread": 30.132985319319868,
+    "proxy_vs_Kb": {
+     "n": 10,
+     "spearman": 0.33333333333333326,
+     "spearman_p": 0.34659350708733405,
+     "pearson_log": 0.6303251784253061,
+     "pearson_log_p": 0.05074894903954019,
+     "r2_log": 0.397309830556894,
+     "loglog_slope": 0.75994873715155,
+     "loglog_intercept": 9.89103216124768
+    },
+    "k_vs_Kb": {
+     "n": 10,
+     "spearman": 0.33333333333333326,
+     "spearman_p": 0.34659350708733405,
+     "pearson_log": 0.6386648409911175,
+     "pearson_log_p": 0.04685895711275627,
+     "r2_log": 0.4078927791182094,
+     "loglog_slope": 0.7966240916306154,
+     "loglog_intercept": 7.717144782816398
+    },
+    "proxy_vs_k": {
+     "n": 10,
+     "spearman": 0.9999999999999999,
+     "spearman_p": 6.646897422032013e-64,
+     "pearson_log": 0.9999126490950618,
+     "pearson_log_p": 2.5468429640602327e-16,
+     "r2_log": 0.9998253058203043,
+     "loglog_slope": 0.966498705831081,
+     "loglog_intercept": 2.840451706729627
+    }
+   },
+   "breast": {
+    "drugs": [
+     "doxorubicin",
+     "paclitaxel",
+     "cyclophosphamide",
+     "tamoxifen",
+     "docetaxel",
+     "epirubicin",
+     "5-fluorouracil",
+     "vinorelbine",
+     "cisplatin",
+     "palbociclib"
+    ],
+    "uptake_proxy_per_s": {
+     "doxorubicin": 0.00022374580379867353,
+     "paclitaxel": 0.0009335330425414968,
+     "cyclophosphamide": 0.00010501596072209342,
+     "tamoxifen": 0.0008278347638525657,
+     "docetaxel": 0.0010032296076040845,
+     "epirubicin": 0.00022374580379867353,
+     "5-fluorouracil": 3.7098091170763216e-05,
+     "vinorelbine": 0.0008312248250831149,
+     "cisplatin": 5.8612927714932856e-05,
+     "palbociclib": 0.0002984654763309177
+    },
+    "K_b_rule": {
+     "doxorubicin": 9.353563199676122,
+     "paclitaxel": 168.3356595840244,
+     "cyclophosphamide": 22.526765856478963,
+     "tamoxifen": 9145.072756829672,
+     "docetaxel": 90.05694555875311,
+     "epirubicin": 9.353563199676122,
+     "5-fluorouracil": 9.189542719418379,
+     "vinorelbine": 825.4013312755986,
+     "cisplatin": 9.698684078523925,
+     "palbociclib": 63.53707899204948
+    },
+    "k_eff_per_s": {
+     "doxorubicin": 0.005035489904182864,
+     "paclitaxel": 0.020837027664735296,
+     "cyclophosphamide": 0.0024346021199461595,
+     "tamoxifen": 0.01857159687369659,
+     "docetaxel": 0.022382139770696974,
+     "epirubicin": 0.005035489904182864,
+     "5-fluorouracil": 0.0008973750255831713,
+     "vinorelbine": 0.01858406502233288,
+     "cisplatin": 0.0013785805317205642,
+     "palbociclib": 0.006738195485894778
+    },
+    "logp": {
+     "doxorubicin": 0.001,
+     "paclitaxel": 3.736,
+     "cyclophosphamide": 1.884,
+     "tamoxifen": 5.996,
+     "docetaxel": 3.26,
+     "epirubicin": 0.001,
+     "5-fluorouracil": -0.798,
+     "vinorelbine": 4.754,
+     "cisplatin": 0.195,
+     "palbociclib": 2.966
+    },
+    "proxy_spread": 27.042620683263717,
+    "k_spread": 24.941790369251294,
+    "K_b_spread": 995.1608078936574,
+    "proxy_vs_Kb": {
+     "n": 10,
+     "spearman": 0.7804878048780488,
+     "spearman_p": 0.007719373490712739,
+     "pearson_log": 0.7406301700575988,
+     "pearson_log_p": 0.014278389591739403,
+     "r2_log": 0.5485330487995477,
+     "loglog_slope": 1.4220928205525916,
+     "loglog_intercept": 15.845225306455893
+    },
+    "k_vs_Kb": {
+     "n": 10,
+     "spearman": 0.7804878048780488,
+     "spearman_p": 0.007719373490712739,
+     "pearson_log": 0.7441639666797102,
+     "pearson_log_p": 0.013579360536565261,
+     "r2_log": 0.5537800093044808,
+     "loglog_slope": 1.459257061905856,
+     "loglog_intercept": 11.588743142027393
+    },
+    "proxy_vs_k": {
+     "n": 10,
+     "spearman": 1.0,
+     "spearman_p": 0.0,
+     "pearson_log": 0.9999570071631626,
+     "pearson_log_p": 1.4946519099669948e-17,
+     "r2_log": 0.9999140161747092,
+     "loglog_slope": 0.9791398043283451,
+     "loglog_intercept": 2.954714807706896
+    }
+   }
+  },
+  "measured_overlap": {
+   "n_measured_rat_scoreable_compounds": 35,
+   "n_engine_panel_compounds": 18,
+   "overlapping_compounds": [
+    "docetaxel"
+   ],
+   "n_overlap": 1,
+   "detail": {
+    "docetaxel": {
+     "measured_Vu_brain": [
+      777.0
+     ],
+     "uptake_proxy_per_s": 0.0010032296076040845,
+     "logp": 3.26,
+     "K_b_rule": 90.05694555875311
+    }
+   },
+   "why_not_more": "The frozen brain-slice dataset carries NO SMILES column (recorded in results/brain_slice_anchor.md sec. 4.2, where B-S9 was declared NOT COMPUTABLE for exactly this reason), 23 of its 33 retained rows are radiolabelled PET tracers, and `uptake_proxy` is a function of RDKit-computed Crippen logP and HBD -- it cannot be evaluated without a structure. Sourcing structures now would be a curation step taken after the measured column was read; that report declined it and this one declines it too. No proxy value for a measured compound is estimated, guessed or substituted here."
+  }
+ },
+ "residual": {
+  "frozen": {
+   "alpha": 22.223477711172563,
+   "phi": 0.7892,
+   "s_eff_shipping": 1.0
+  },
+  "gbm10": {
+   "panel": [
+    "temozolomide",
+    "lomustine",
+    "carmustine",
+    "procarbazine",
+    "cisplatin",
+    "methotrexate",
+    "etoposide",
+    "vincristine",
+    "irinotecan",
+    "doxorubicin"
+   ],
+   "base_order": [
+    "vincristine",
+    "cisplatin",
+    "carmustine",
+    "doxorubicin",
+    "lomustine",
+    "etoposide",
+    "irinotecan",
+    "procarbazine",
+    "methotrexate",
+    "temozolomide"
+   ],
+   "reproduction_of_published_named_arms": {
+    "shipping": {
+     "order": [
+      "vincristine",
+      "cisplatin",
+      "carmustine",
+      "doxorubicin",
+      "lomustine",
+      "etoposide",
+      "irinotecan",
+      "procarbazine",
+      "methotrexate",
+      "temozolomide"
+     ],
+     "top1": "vincristine",
+     "matches_shipping": true,
+     "any_clipped": false
+    },
+    "uniform_39": {
+     "order": [
+      "vincristine",
+      "cisplatin",
+      "carmustine",
+      "doxorubicin",
+      "lomustine",
+      "irinotecan",
+      "etoposide",
+      "procarbazine",
+      "methotrexate",
+      "temozolomide"
+     ],
+     "top1": "vincristine",
+     "matches_shipping": false,
+     "any_clipped": false
+    },
+    "structural_K_b": {
+     "order": [
+      "vincristine",
+      "cisplatin",
+      "carmustine",
+      "doxorubicin",
+      "lomustine",
+      "etoposide",
+      "procarbazine",
+      "irinotecan",
+      "methotrexate",
+      "temozolomide"
+     ],
+     "top1": "vincristine",
+     "matches_shipping": false,
+     "any_clipped": false
+    }
+   },
+   "proportional_to_proxy": {
+    "geomean_normalised": true,
+    "c_grid_lo": 1.0,
+    "c_grid_hi": 4184.0,
+    "c_min_without_clipping": 6.846960556715757,
+    "full_order_breaks_at_c": 14.682126106682897,
+    "full_order_breaks_at_c_noclip": 14.682126106682897,
+    "top1_changes_at_c_noclip": 53.38924385875947,
+    "break_point_involved_clipping": false,
+    "top1_changes_at_c": 53.38924385875947,
+    "order_at_c39": [
+     "vincristine",
+     "cisplatin",
+     "carmustine",
+     "lomustine",
+     "doxorubicin",
+     "etoposide",
+     "irinotecan",
+     "procarbazine",
+     "methotrexate",
+     "temozolomide"
+    ],
+    "matches_at_c39": false,
+    "n_distinct_orders": 9
+   },
+   "structural_residual": {
+    "loglog_fit_s_eff_on_proxy": {
+     "n": 10,
+     "spearman": 0.33333333333333326,
+     "spearman_p": 0.34659350708733405,
+     "pearson_log": 0.633140553967602,
+     "pearson_log_p": 0.049412590983139076,
+     "r2_log": 0.40086696107840203,
+     "loglog_slope": 0.7360985799989885,
+     "loglog_intercept": 9.51907150588092
+    },
+    "s_eff_full": {
+     "temozolomide": 11.959055783917798,
+     "lomustine": 25.19569835604232,
+     "carmustine": 12.015363104904303,
+     "procarbazine": 11.413793499815656,
+     "cisplatin": 8.654201474771083,
+     "methotrexate": 8.784386980026154,
+     "etoposide": 13.215194923108506,
+     "vincristine": 99.83218970054457,
+     "irinotecan": 223.43663761148187,
+     "doxorubicin": 8.381832077184397
+    },
+    "s_eff_residual": {
+     "temozolomide": 49.28396665096305,
+     "lomustine": 26.017934558406452,
+     "carmustine": 19.668132963492152,
+     "procarbazine": 11.537472168078516,
+     "cisplatin": 16.11823299267231,
+     "methotrexate": 7.187402245346042,
+     "etoposide": 11.727633119125114,
+     "vincristine": 33.587073581349365,
+     "irinotecan": 100.37981822166925,
+     "doxorubicin": 5.823654224379082
+    },
+    "spread_full": 26.657255305756273,
+    "spread_residual": 17.23656906027448,
+    "order_full": [
+     "vincristine",
+     "cisplatin",
+     "carmustine",
+     "doxorubicin",
+     "lomustine",
+     "etoposide",
+     "procarbazine",
+     "irinotecan",
+     "methotrexate",
+     "temozolomide"
+    ],
+    "order_residual": [
+     "vincristine",
+     "cisplatin",
+     "carmustine",
+     "doxorubicin",
+     "lomustine",
+     "etoposide",
+     "irinotecan",
+     "procarbazine",
+     "methotrexate",
+     "temozolomide"
+    ],
+    "top1_full": "vincristine",
+    "top1_residual": "vincristine",
+    "full_matches_shipping": false,
+    "residual_matches_shipping": true,
+    "any_clipped_full": false,
+    "any_clipped_residual": false
+   },
+   "monte_carlo": {
+    "per_compound_empirical": {
+     "p_rank1": {
+      "temozolomide": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      },
+      "lomustine": {
+       "p": 0.0124,
+       "ci90": [
+        0.011525,
+        0.013325
+       ]
+      },
+      "carmustine": {
+       "p": 0.1061,
+       "ci90": [
+        0.10355,
+        0.1086
+       ]
+      },
+      "procarbazine": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      },
+      "cisplatin": {
+       "p": 0.132375,
+       "ci90": [
+        0.1296,
+        0.13515
+       ]
+      },
+      "methotrexate": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      },
+      "etoposide": {
+       "p": 0.0001,
+       "ci90": [
+        2.5e-05,
+        0.000175
+       ]
+      },
+      "vincristine": {
+       "p": 0.729925,
+       "ci90": [
+        0.7263,
+        0.73360125
+       ]
+      },
+      "irinotecan": {
+       "p": 7.5e-05,
+       "ci90": [
+        0.0,
+        0.00015
+       ]
+      },
+      "doxorubicin": {
+       "p": 0.019025,
+       "ci90": [
+        0.01785,
+        0.020125
+       ]
+      }
+     },
+     "p_full_order": 0.0047,
+     "p_full_order_ci90": [
+      0.00415,
+      0.005275
+     ],
+     "geo_spread_of_applied_R": 5.979053750827737
+    },
+    "per_compound_empirical_RESIDUAL": {
+     "p_rank1": {
+      "temozolomide": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      },
+      "lomustine": {
+       "p": 0.013525,
+       "ci90": [
+        0.01255,
+        0.014475
+       ]
+      },
+      "carmustine": {
+       "p": 0.09095,
+       "ci90": [
+        0.088625,
+        0.09335
+       ]
+      },
+      "procarbazine": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      },
+      "cisplatin": {
+       "p": 0.10605,
+       "ci90": [
+        0.103525,
+        0.1086
+       ]
+      },
+      "methotrexate": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      },
+      "etoposide": {
+       "p": 0.00015,
+       "ci90": [
+        5e-05,
+        0.00025
+       ]
+      },
+      "vincristine": {
+       "p": 0.765075,
+       "ci90": [
+        0.76172375,
+        0.768575
+       ]
+      },
+      "irinotecan": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      },
+      "doxorubicin": {
+       "p": 0.02425,
+       "ci90": [
+        0.02297375,
+        0.025525
+       ]
+      }
+     },
+     "p_full_order": 0.005475,
+     "p_full_order_ci90": [
+      0.004875,
+      0.0061
+     ],
+     "geo_spread_of_applied_R": 5.35519904304917
+    },
+    "residual_fraction_of_values_clipped_to_grid": 0.01054,
+    "log_spread_shrink_factor": 0.8956599599573426
+   },
+   "uniform_arm_unreachable_by_the_defence": {
+    "full_order_stable_up_to_R": 36.26478338750565,
+    "top1_stable_up_to_R": null,
+    "note": "a UNIFORM capacity carries no per-compound ordering at all, so no amount of overlap between uptake_proxy and capacity can reduce it"
+   }
+  },
+  "gbm5": {
+   "panel": [
+    "cisplatin",
+    "doxorubicin",
+    "lomustine",
+    "methotrexate",
+    "temozolomide"
+   ],
+   "base_order": [
+    "cisplatin",
+    "doxorubicin",
+    "lomustine",
+    "methotrexate",
+    "temozolomide"
+   ],
+   "reproduction_of_published_named_arms": {
+    "shipping": {
+     "order": [
+      "cisplatin",
+      "doxorubicin",
+      "lomustine",
+      "methotrexate",
+      "temozolomide"
+     ],
+     "top1": "cisplatin",
+     "matches_shipping": true,
+     "any_clipped": false
+    },
+    "uniform_39": {
+     "order": [
+      "cisplatin",
+      "doxorubicin",
+      "lomustine",
+      "methotrexate",
+      "temozolomide"
+     ],
+     "top1": "cisplatin",
+     "matches_shipping": true,
+     "any_clipped": false
+    },
+    "structural_K_b": {
+     "order": [
+      "cisplatin",
+      "doxorubicin",
+      "lomustine",
+      "methotrexate",
+      "temozolomide"
+     ],
+     "top1": "cisplatin",
+     "matches_shipping": true,
+     "any_clipped": false
+    }
+   },
+   "proportional_to_proxy": {
+    "geomean_normalised": true,
+    "c_grid_lo": 1.0,
+    "c_grid_hi": 4184.0,
+    "c_min_without_clipping": 4.548505283159086,
+    "full_order_breaks_at_c": 10.002413728645596,
+    "full_order_breaks_at_c_noclip": 10.002413728645596,
+    "top1_changes_at_c_noclip": null,
+    "break_point_involved_clipping": false,
+    "top1_changes_at_c": null,
+    "order_at_c39": [
+     "cisplatin",
+     "lomustine",
+     "doxorubicin",
+     "methotrexate",
+     "temozolomide"
+    ],
+    "matches_at_c39": false,
+    "n_distinct_orders": 4
+   },
+   "structural_residual": {
+    "loglog_fit_s_eff_on_proxy": {
+     "n": 5,
+     "spearman": -0.49999999999999994,
+     "spearman_p": 0.39100221895577053,
+     "pearson_log": -0.06419607127507732,
+     "pearson_log_p": 0.9183191997190218,
+     "r2_log": 0.004121135567154807,
+     "loglog_slope": -0.03031770610970168,
+     "loglog_intercept": 2.1508316611041147
+    },
+    "s_eff_full": {
+     "cisplatin": 8.654201474771083,
+     "doxorubicin": 8.381832077184397,
+     "lomustine": 25.19569835604232,
+     "methotrexate": 8.784386980026154,
+     "temozolomide": 11.959055783917798
+    },
+    "s_eff_residual": {
+     "cisplatin": 8.540594247551617,
+     "doxorubicin": 8.614651589609963,
+     "lomustine": 25.476355269635803,
+     "methotrexate": 8.967797308160865,
+     "temozolomide": 11.422254215933068
+    },
+    "spread_full": 3.0059893975477965,
+    "spread_residual": 2.982972206757072,
+    "order_full": [
+     "cisplatin",
+     "doxorubicin",
+     "lomustine",
+     "methotrexate",
+     "temozolomide"
+    ],
+    "order_residual": [
+     "cisplatin",
+     "doxorubicin",
+     "lomustine",
+     "methotrexate",
+     "temozolomide"
+    ],
+    "top1_full": "cisplatin",
+    "top1_residual": "cisplatin",
+    "full_matches_shipping": true,
+    "residual_matches_shipping": true,
+    "any_clipped_full": false,
+    "any_clipped_residual": false
+   },
+   "monte_carlo": {
+    "per_compound_empirical": {
+     "p_rank1": {
+      "cisplatin": {
+       "p": 0.5837,
+       "ci90": [
+        0.57964875,
+        0.587875
+       ]
+      },
+      "doxorubicin": {
+       "p": 0.24655,
+       "ci90": [
+        0.24295,
+        0.25007625
+       ]
+      },
+      "lomustine": {
+       "p": 0.167425,
+       "ci90": [
+        0.16435,
+        0.170475
+       ]
+      },
+      "methotrexate": {
+       "p": 0.002275,
+       "ci90": [
+        0.0019,
+        0.002675
+       ]
+      },
+      "temozolomide": {
+       "p": 5e-05,
+       "ci90": [
+        0.0,
+        0.0001
+       ]
+      }
+     },
+     "p_full_order": 0.200175,
+     "p_full_order_ci90": [
+      0.1969,
+      0.20335124999999998
+     ],
+     "geo_spread_of_applied_R": 5.129571569335463
+    },
+    "per_compound_empirical_RESIDUAL": {
+     "p_rank1": {
+      "cisplatin": {
+       "p": 0.56615,
+       "ci90": [
+        0.562075,
+        0.570375
+       ]
+      },
+      "doxorubicin": {
+       "p": 0.24095,
+       "ci90": [
+        0.23742375,
+        0.24455
+       ]
+      },
+      "lomustine": {
+       "p": 0.191475,
+       "ci90": [
+        0.188275,
+        0.1947
+       ]
+      },
+      "methotrexate": {
+       "p": 0.001425,
+       "ci90": [
+        0.001125,
+        0.00175
+       ]
+      },
+      "temozolomide": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "p_full_order": 0.239725,
+     "p_full_order_ci90": [
+      0.236275,
+      0.243125
+     ],
+     "geo_spread_of_applied_R": 3.9949942011947317
+    },
+    "residual_fraction_of_values_clipped_to_grid": 0.007495,
+    "log_spread_shrink_factor": 0.778816348928003
+   },
+   "uniform_arm_unreachable_by_the_defence": {
+    "full_order_stable_up_to_R": 434.59393265174134,
+    "top1_stable_up_to_R": 434.59393265174134,
+    "note": "a UNIFORM capacity carries no per-compound ordering at all, so no amount of overlap between uptake_proxy and capacity can reduce it"
+   }
+  },
+  "breast10": {
+   "panel": [
+    "doxorubicin",
+    "paclitaxel",
+    "cyclophosphamide",
+    "tamoxifen",
+    "docetaxel",
+    "epirubicin",
+    "5-fluorouracil",
+    "vinorelbine",
+    "cisplatin",
+    "palbociclib"
+   ],
+   "base_order": [
+    "vinorelbine",
+    "cisplatin",
+    "paclitaxel",
+    "doxorubicin",
+    "docetaxel",
+    "epirubicin",
+    "5-fluorouracil",
+    "cyclophosphamide",
+    "palbociclib",
+    "tamoxifen"
+   ],
+   "reproduction_of_published_named_arms": {
+    "shipping": {
+     "order": [
+      "vinorelbine",
+      "cisplatin",
+      "paclitaxel",
+      "doxorubicin",
+      "docetaxel",
+      "epirubicin",
+      "5-fluorouracil",
+      "cyclophosphamide",
+      "palbociclib",
+      "tamoxifen"
+     ],
+     "top1": "vinorelbine",
+     "matches_shipping": true,
+     "any_clipped": false
+    },
+    "uniform_39": {
+     "order": [
+      "vinorelbine",
+      "paclitaxel",
+      "docetaxel",
+      "doxorubicin",
+      "epirubicin",
+      "cisplatin",
+      "cyclophosphamide",
+      "palbociclib",
+      "5-fluorouracil",
+      "tamoxifen"
+     ],
+     "top1": "vinorelbine",
+     "matches_shipping": false,
+     "any_clipped": false
+    },
+    "structural_K_b": {
+     "order": [
+      "doxorubicin",
+      "cisplatin",
+      "docetaxel",
+      "paclitaxel",
+      "epirubicin",
+      "vinorelbine",
+      "5-fluorouracil",
+      "cyclophosphamide",
+      "palbociclib",
+      "tamoxifen"
+     ],
+     "top1": "doxorubicin",
+     "matches_shipping": false,
+     "any_clipped": true
+    }
+   },
+   "proportional_to_proxy": {
+    "geomean_normalised": true,
+    "c_grid_lo": 1.0,
+    "c_grid_hi": 4184.0,
+    "c_min_without_clipping": 7.326019577645006,
+    "full_order_breaks_at_c": 3.162659281150215,
+    "full_order_breaks_at_c_noclip": 7.566237828405572,
+    "top1_changes_at_c_noclip": null,
+    "break_point_involved_clipping": true,
+    "top1_changes_at_c": null,
+    "order_at_c39": [
+     "vinorelbine",
+     "cisplatin",
+     "doxorubicin",
+     "paclitaxel",
+     "docetaxel",
+     "5-fluorouracil",
+     "epirubicin",
+     "cyclophosphamide",
+     "palbociclib",
+     "tamoxifen"
+    ],
+    "matches_at_c39": false,
+    "n_distinct_orders": 8
+   },
+   "structural_residual": {
+    "loglog_fit_s_eff_on_proxy": {
+     "n": 10,
+     "spearman": 0.7804878048780488,
+     "spearman_p": 0.007719373490712739,
+     "pearson_log": 0.7355196273574574,
+     "pearson_log_p": 0.015333202636328147,
+     "r2_log": 0.540989122228053,
+     "loglog_slope": 1.3824931525666522,
+     "loglog_intercept": 15.343722756669072
+    },
+    "s_eff_full": {
+     "doxorubicin": 8.381832077184397,
+     "paclitaxel": 133.85050254371205,
+     "cyclophosphamide": 18.778123613933197,
+     "tamoxifen": 7218.2914196899765,
+     "docetaxel": 72.07294143496796,
+     "epirubicin": 8.381832077184397,
+     "5-fluorouracil": 8.252387114164986,
+     "vinorelbine": 652.4067306427024,
+     "cisplatin": 8.654201474771083,
+     "palbociclib": 51.14346274052546
+    },
+    "s_eff_residual": {
+     "doxorubicin": 10.967581756012422,
+     "paclitaxel": 24.306813241233602,
+     "cyclophosphamide": 69.91535242372898,
+     "tamoxifen": 1547.708846056859,
+     "docetaxel": 11.84810271546015,
+     "epirubicin": 10.967581756012422,
+     "5-fluorouracil": 129.49523368729533,
+     "vinorelbine": 139.09758018455156,
+     "cisplatin": 72.15728675641863,
+     "palbociclib": 44.93222872746959
+    },
+    "spread_full": 874.6913250470262,
+    "spread_residual": 141.11669103432087,
+    "order_full": [
+     "doxorubicin",
+     "cisplatin",
+     "docetaxel",
+     "paclitaxel",
+     "epirubicin",
+     "vinorelbine",
+     "5-fluorouracil",
+     "cyclophosphamide",
+     "palbociclib",
+     "tamoxifen"
+    ],
+    "order_residual": [
+     "vinorelbine",
+     "paclitaxel",
+     "doxorubicin",
+     "docetaxel",
+     "epirubicin",
+     "cisplatin",
+     "palbociclib",
+     "cyclophosphamide",
+     "5-fluorouracil",
+     "tamoxifen"
+    ],
+    "top1_full": "doxorubicin",
+    "top1_residual": "vinorelbine",
+    "full_matches_shipping": false,
+    "residual_matches_shipping": false,
+    "any_clipped_full": true,
+    "any_clipped_residual": false
+   },
+   "monte_carlo": {
+    "per_compound_empirical": {
+     "p_rank1": {
+      "doxorubicin": {
+       "p": 0.0361,
+       "ci90": [
+        0.03455,
+        0.03765
+       ]
+      },
+      "paclitaxel": {
+       "p": 0.099525,
+       "ci90": [
+        0.09704875,
+        0.10195
+       ]
+      },
+      "cyclophosphamide": {
+       "p": 0.000125,
+       "ci90": [
+        5e-05,
+        0.000225
+       ]
+      },
+      "tamoxifen": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      },
+      "docetaxel": {
+       "p": 0.026075,
+       "ci90": [
+        0.02475,
+        0.0274
+       ]
+      },
+      "epirubicin": {
+       "p": 0.002725,
+       "ci90": [
+        0.0023,
+        0.00315
+       ]
+      },
+      "5-fluorouracil": {
+       "p": 0.000175,
+       "ci90": [
+        7.5e-05,
+        0.0003
+       ]
+      },
+      "vinorelbine": {
+       "p": 0.797325,
+       "ci90": [
+        0.79405,
+        0.8007
+       ]
+      },
+      "cisplatin": {
+       "p": 0.037925,
+       "ci90": [
+        0.036325,
+        0.039475
+       ]
+      },
+      "palbociclib": {
+       "p": 2.5e-05,
+       "ci90": [
+        0.0,
+        7.5e-05
+       ]
+      }
+     },
+     "p_full_order": 0.000575,
+     "p_full_order_ci90": [
+      0.000375,
+      0.000775
+     ],
+     "geo_spread_of_applied_R": 5.979053750827737
+    },
+    "per_compound_empirical_RESIDUAL": {
+     "p_rank1": {
+      "doxorubicin": {
+       "p": 0.034275,
+       "ci90": [
+        0.032825,
+        0.035775
+       ]
+      },
+      "paclitaxel": {
+       "p": 0.12465,
+       "ci90": [
+        0.12194875000000001,
+        0.127375
+       ]
+      },
+      "cyclophosphamide": {
+       "p": 5e-05,
+       "ci90": [
+        0.0,
+        0.0001
+       ]
+      },
+      "tamoxifen": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      },
+      "docetaxel": {
+       "p": 0.0318,
+       "ci90": [
+        0.030375,
+        0.03325
+       ]
+      },
+      "epirubicin": {
+       "p": 0.00135,
+       "ci90": [
+        0.00105,
+        0.001675
+       ]
+      },
+      "5-fluorouracil": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      },
+      "vinorelbine": {
+       "p": 0.79245,
+       "ci90": [
+        0.7891,
+        0.795875
+       ]
+      },
+      "cisplatin": {
+       "p": 0.015425,
+       "ci90": [
+        0.014425,
+        0.01645
+       ]
+      },
+      "palbociclib": {
+       "p": 0.0,
+       "ci90": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "p_full_order": 0.0,
+     "p_full_order_ci90": [
+      0.0,
+      0.0
+     ],
+     "geo_spread_of_applied_R": 5.3460715964716945
+    },
+    "residual_fraction_of_values_clipped_to_grid": 0.0099875,
+    "log_spread_shrink_factor": 0.8941333895403745
+   },
+   "uniform_arm_unreachable_by_the_defence": {
+    "full_order_stable_up_to_R": 5.280660066089381,
+    "top1_stable_up_to_R": null,
+    "note": "a UNIFORM capacity carries no per-compound ordering at all, so no amount of overlap between uptake_proxy and capacity can reduce it"
+   }
+  }
+ }
+}
