@@ -739,6 +739,83 @@ class TestARunExecutedNowIsNotBannered:
             f"only {checked} JavaScript sources scanned; the glob is wrong "
             "and this guard has gone blind")
 
+    def test_no_live_string_tells_a_user_to_READ_a_ranking(self):
+        """The withdrawn ACT, not the withdrawn sentence.
+
+        WHY A SECOND GUARD. ``test_no_live_string_anywhere_repeats_a_retired_claim``
+        matches ``CLAIM_SET_LOG[*]["retired_text"]`` exactly. That is the right
+        design for a retracted *statement* -- it is keyed to the log, so the
+        next withdrawal inherits it for free -- and it is blind to a PARAPHRASE.
+
+        Demonstrated, not hypothetical: ``validate_spec``'s self-compiled
+        compound warning said *"Run it alongside other compounds on this same
+        section and read the RANKING -- but note how strong that ranking is"*,
+        and was reachable in the Studio by selecting the shipped ``ACME-101``
+        compound. It survived the 2026-08-21 withdrawal and both existing
+        guards for a full day, because it never contained the retired sentence
+        -- it contained the retired *instruction*, in its own words. It was
+        worse than a stale claim: it told the user to go and do the withdrawn
+        thing.
+
+        So this guard is keyed to the ACT. The product may explain what a
+        ranking was, may say it is withdrawn, and may quote what it used to
+        claim. It may not instruct a reader to obtain one and read it.
+
+        The phrase list is deliberately short and imperative-shaped. It is not
+        an attempt at paraphrase detection in general -- that is not
+        achievable here -- it is a tripwire on the specific construction that
+        got through. Retraction wording nearby keeps a quotation legal.
+        """
+        forbidden = (
+            "read the RANKING", "read the ranking",
+            "read the ORDERING", "read the ordering",
+            "and read the order",
+            "rank the compounds", "rank them",
+            "compare the ranking", "read off the ranking",
+        )
+        # Retraction wording, AND NEGATION. The negation half was added after
+        # this guard's first run fired on
+        # ``byo.py``'s "the model CANNOT rank them, and it says so rather than
+        # inventing a difference" -- which is the honest refusal, the exact
+        # behaviour the product wants, and the opposite of an instruction.
+        # A guard that fires on the sentence describing the correct behaviour
+        # trains people to sprinkle markers to silence it, which is worse than
+        # not having it. So: a sentence that says the model cannot produce an
+        # ordering is not telling anyone to read one.
+        markers = ("withdraw", "WITHDRAW", "retire", "RETIRE", "no longer",
+                   "superseded", "SUPERSEDED", "DO NOT", "never", "NEVER",
+                   "2026-08-21", "was measured and",
+                   "cannot", "can not", "unable", "does not rank",
+                   "refuses", "rather than inventing")
+        # The withdrawn act is ranking COMPOUNDS. "Ranking" on its own is an
+        # ordinary English word this codebase uses correctly elsewhere -- this
+        # guard's first run fired on
+        # ``ranking_robustness.py``'s "read the RANKING of the swings, not
+        # their third decimal", which orders SENSITIVITY VARIABLES by swing
+        # magnitude and has nothing to do with compounds. Requiring compound
+        # context is what makes this a tripwire on the withdrawn claim rather
+        # than a ban on a word.
+        subject = ("compound", "COMPOUND", "drug", "DRUG")
+        checked = 0
+        for path in _python_sources():
+            checked += 1
+            for lineno, text in _live_string_literals(path):
+                for phrase in forbidden:
+                    at = text.find(phrase)
+                    if at < 0:
+                        continue
+                    window = text[max(0, at - 500):at + 500]
+                    if not any(s in window for s in subject):
+                        continue
+                    assert any(m in window for m in markers), (
+                        f"{os.path.relpath(path, REPO)}:{lineno} instructs a "
+                        f"user to READ A CROSS-COMPOUND RANKING:\n"
+                        f"  ...{phrase}...\n"
+                        "That ordering was withdrawn on 2026-08-21. Explaining "
+                        "it or quoting the withdrawn claim is fine; telling "
+                        "someone to go and obtain one is not.")
+        assert checked > 50, f"only {checked} sources scanned; the glob is wrong"
+
     def test_execute_run_stamps_the_provenance_it_writes(self):
         """Source-level, so it holds without a cached section.
 

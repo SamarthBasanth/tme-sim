@@ -167,12 +167,20 @@ _PROTEIN_LETTERS = set("ACDEFGHIKLMNPQRSTVWY")
 # docs and the screen.
 # --------------------------------------------------------------------------- #
 CAN_CONCLUDE: Tuple[str, ...] = (
-    "Compare this compound against others on the SAME tissue section with the "
-    "same RunSpec, and read the ORDERING rather than the levels. "
-    "sensitivity_mode='uniform' makes the per-cell sensitivity term identical "
-    "for every compound, so it cancels out and the comparison isolates delivery "
-    "x potency. Note what this ordering is: a statement about THIS MODEL's "
-    "inputs, not a validated prediction -- see the transport limit below.",
+    "Read this compound against ITSELF on one tissue section: the RELATIVE "
+    "exposure between regions of its own map. A per-compound plasma factor is "
+    "an exact linear rescale of the whole field, so it cancels from a ratio "
+    "between two points of the same map -- which is why a within-map reading "
+    "survives the uncertainties an absolute level does not. "
+    "DO NOT read an ORDERING across compounds. This entry said to do exactly "
+    "that until 2026-08-22, and the cross-compound ranking was measured and "
+    "WITHDRAWN on 2026-08-21 (results/pk_ranking_robustness.md, "
+    "results/capacity_ranking_robustness.md): per-compound plasma exposure "
+    "spans 113.1x across the retained compounds, and there is no per-compound "
+    "tissue-capacity term at all. sensitivity_mode='uniform' does make the "
+    "per-cell sensitivity term identical for every compound, so it genuinely "
+    "cancels -- but cancelling the sensitivity term does not rescue an "
+    "ordering that the plasma and capacity terms already broke.",
     "See WHICH property separates it from another compound -- its diffusivity, "
     "its BBB penetrance, its loss rate, its IC50 -- because each is reported "
     "separately and each is a stated function of what you supplied. A difference "

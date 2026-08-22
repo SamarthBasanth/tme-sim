@@ -737,10 +737,20 @@ def validate_spec(spec: Dict) -> Dict:
                         "and its logP is an RDKit Crippen prediction that cannot "
                         "see stereochemistry. Its kill_fraction, mean_tumor_auc "
                         "and penetration_length_um are NOT defensible as "
-                        "absolute numbers. Run it alongside other compounds on "
-                        "this same section and read the RANKING -- but note "
-                        "how strong that ranking is: against 71 measured "
-                        "compounds the shipping two-route transport model "
+                        "absolute numbers. DO NOT run it alongside other "
+                        "compounds and read the ordering: the cross-compound "
+                        "RANKING was measured and WITHDRAWN on 2026-08-21 "
+                        "(results/pk_ranking_robustness.md, "
+                        "results/capacity_ranking_robustness.md), and this "
+                        "warning told you to do exactly that until "
+                        "2026-08-22. What IS readable is this compound "
+                        "against ITSELF on this one section: the RELATIVE "
+                        "exposure between regions of the same map, because a "
+                        "per-compound plasma factor is an exact linear "
+                        "rescale of the whole field and cancels from a ratio "
+                        "between points. On how far the structure-to-"
+                        "transport step can be trusted at all: against 71 "
+                        "measured compounds the shipping two-route model "
                         "reaches R^2 = 0.718 blind "
                         "(results/two_route_promotion.md), which is a large "
                         "improvement on the molecular-weight-only model it "
@@ -750,6 +760,14 @@ def validate_spec(spec: Dict) -> Dict:
                         "similar-mass series is separated weakly rather than "
                         "not at all."
                     )
+    else:
+        # PERFECTLY INVERTED until 2026-08-22: this sat INSIDE the
+        # `if drug is not None:` branch above, so it fired on every run that
+        # HAD a drug -- announcing "drug is null" as the second thing a
+        # first-time user read, contradicting the RunSpec editor two panels
+        # left -- and was silent in the one case it exists for. A warning that
+        # is wrong whenever it appears and absent whenever it applies is worse
+        # than no warning: it teaches the reader to discount the whole list.
         warnings.append(
             "drug is null: this is a reconstruction-only run. kill_fraction, "
             "mean_tumor_auc, therapeutic_coverage_1x and penetration_length_um "
