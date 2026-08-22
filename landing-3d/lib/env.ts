@@ -68,5 +68,25 @@ if (!RAW && process.env.NODE_ENV === "production") {
   );
 }
 
-/** Where the Studio is hosted. Localhost only ever in development. */
-export const STUDIO_URL = RAW ?? "http://localhost:8000";
+/**
+ * Where the Studio is hosted. Localhost only ever in development.
+ *
+ * READS `process.env` DIRECTLY RATHER THAN `RAW`, AND THAT IS LOad-BEARING.
+ * Next inlines `process.env.NEXT_PUBLIC_STUDIO_URL` as a string literal at
+ * build time, so in a production build this whole expression folds to the real
+ * URL and the localhost fallback is dead-code-eliminated -- it never reaches
+ * the bundle.
+ *
+ * Writing `RAW ?? "..."` instead broke that, because `RAW` is also referenced
+ * inside the throw messages above and the minifier could no longer prove the
+ * fallback unreachable. The literal survived into
+ * `.next/static/chunks/*.js`, and `scripts/audit-origins.mjs` correctly failed
+ * the build with "1 undeclared external host: localhost".
+ *
+ * Which is the joke worth leaving in the file: the guard written to keep
+ * localhost out of production was the thing that put localhost into the
+ * production bundle. The origin audit caught it; a grep for
+ * "Compiled successfully" did not.
+ */
+export const STUDIO_URL =
+  process.env.NEXT_PUBLIC_STUDIO_URL ?? "http://localhost:8000";
