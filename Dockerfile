@@ -175,4 +175,11 @@ ENTRYPOINT ["python", "-m", "app.server"]
 # boundary is the publish spec on `docker run` (-p 127.0.0.1:8000:8000 keeps it
 # host-local). Binding 127.0.0.1 here would make the container unreachable
 # through any published port. See the header for the API-key consequence.
-CMD ["--host", "0.0.0.0", "--port", "8000"]
+# NO --port HERE, DELIBERATELY. An explicit flag would override the $PORT the
+# host assigns (app/server/__main__.py defaults --port from it), and a container
+# that ignores $PORT does not fail loudly -- the platform routes to the port it
+# chose, nothing listens there, and every request hangs. With the flag dropped:
+# unset PORT still binds 8000, matching EXPOSE above and every documented
+# `docker run -p 8000:8000` in docs/DEPLOYMENT.md, while a host that sets PORT
+# is honoured.
+CMD ["--host", "0.0.0.0"]

@@ -82,7 +82,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--host", default="127.0.0.1",
                    help="bind address (default 127.0.0.1, local only)")
-    p.add_argument("--port", type=int, default=8000, help="bind port")
+    # PORT is the convention every container host uses to tell a process where
+    # to listen -- Render, Heroku, Cloud Run and Fly all set it and route to it.
+    # Ignoring it does not produce an error: the host routes to the port IT
+    # assigned, nothing is listening there, and every request HANGS until it
+    # times out. DNS resolves, the build is green, the dashboard looks alive,
+    # and the service answers nothing. That is what a hosted deploy of this
+    # image did before 2026-08-22.
+    #
+    # Precedence is explicit > host-assigned > local default, so `--port 9000`
+    # still wins and an unset PORT still gives 8000 exactly as before.
+    p.add_argument("--port", type=int,
+                   default=int(os.environ.get("PORT") or 8000),
+                   help="bind port (default: $PORT if the host sets one, else "
+                        "8000)")
     p.add_argument("--reload", action="store_true",
                    help="uvicorn autoreload (development)")
     p.add_argument("--log-level", default="info",
