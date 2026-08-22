@@ -1567,7 +1567,26 @@ def create_app(manager: Optional[JobManager] = None,
             # state is authenticated by default rather than exposed by
             # default. OPTIONS stays exempt -- a CORS preflight cannot carry
             # the header.
-            needs_key = (
+            # /healthz is the ONE exempt path, and it is exempt because a
+            # platform health checker cannot carry a key. Render probes the
+            # configured path every ~10 s with no headers; pointed at
+            # /api/health it got 401 forever, concluded the service never came
+            # up, and killed a container that was serving correctly on the port
+            # it had already detected. The log read "401 Unauthorized" a hundred
+            # times and then "Timed Out" -- a healthy process, failed by its own
+            # health check.
+            #
+            # It is safe to exempt because of what it returns: a literal
+            # {"ok": true} and nothing else. NOT /api/health, which reports the
+            # runs directory, run counts and cache statistics -- that stays
+            # behind the key. Liveness is not a data route, and this one is
+            # incapable of becoming one.
+            # GET/HEAD only, so the fail-closed rule below is untouched: a POST
+            # to /healthz still needs the key like any other state-changing
+            # request.
+            is_liveness = (route_path == "/healthz"
+                           and request.method in ("GET", "HEAD"))
+            needs_key = not is_liveness and (
                 route_path.startswith("/api/")
                 or request.method not in ("GET", "HEAD", "OPTIONS")
             )
@@ -1589,6 +1608,23 @@ def create_app(manager: Optional[JobManager] = None,
     app.state.reports = reports
 
     # ----------------------------------------------------------------- #
+    @app.get("/healthz")
+    def healthz() -> Dict:
+        """Liveness, for a platform health checker. NOT ``/api/health``.
+
+        Deliberately outside ``/api/`` and deliberately empty of information:
+        a platform probe cannot send an ``X-API-Key`` header, so this route is
+        exempt from the gate, and the only safe thing for an ungated route to
+        say is that the process is answering.
+
+        ``/api/health`` stays behind the key and keeps reporting the runs
+        directory, run counts and cache statistics. Point a health check at
+        THIS one; pointing it at that one returns 401 to a checker that cannot
+        authenticate, and the platform then kills a container that was serving
+        perfectly well.
+        """
+        return {"ok": True}
+
     @app.get("/api/sections")
     def get_sections() -> List[Dict]:
         return jsonable([_with_caveats(s) for s in list_sections()])
