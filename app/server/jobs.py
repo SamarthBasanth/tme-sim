@@ -1003,7 +1003,8 @@ def execute_run(spec: Dict, ctx: _Ctx,
         ctx.log(f"reach: F(x={reach['headline_x']:g})="
                 f"{reach['headline_under_reached_fraction']:.4f} of "
                 f"{reach['n_viable']} viable tumour cells; "
-                f"E_ref={reach['E_ref_uM_s']:.4g} uM*s")
+                f"E_ref={reach['E_ref_uM_s']:.4g} "
+                f"{reach.get('E_ref_units') or 'uM*s'}")
 
     metrics = {
         "kill_fraction": _metric(

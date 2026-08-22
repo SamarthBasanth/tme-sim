@@ -808,8 +808,43 @@ class TestSteadyDisclosure:
         assert "THIS WINDOW IS NOT CONVERGED" not in s
         assert "ESTIMATOR" in s
         assert "manufactures one" in s
-        # and its own measured residuals are still pinned
-        assert "0.3772" in s and "0.0011" in s and "0.80" in s
+        # The falloff residual REPRODUCED on re-measurement (0.37723 against a
+        # shipped 0.3772, results/reach_invariances_measure.md), so it is still
+        # a live claim and is pinned as one.
+        assert "0.3772" in s
+
+    def test_the_refuted_ladder_numbers_appear_ONLY_AS_RETRACTED(self, reach):
+        """0.0011 and 0.80 were REFUTED on 2026-08-22 and must never again read
+        as claims.
+
+        This test exists because the obvious version of it is vacuous. An
+        earlier revision here asserted `"0.0011" in s` under the comment "the
+        ladder, over R = 1..39". That assertion still PASSES against the
+        corrected note — because the string survives inside the sentence that
+        RETRACTS it — so it would have gone on being green while asserting the
+        opposite of the truth, and would equally have stayed green if someone
+        later restored 0.0011 as a live bound. A substring check cannot tell a
+        claim from its retraction, so the retraction itself is what gets pinned.
+        """
+        s = reach["scale_invariance"]
+        # The numbers are still present: a refuted claim is retracted, never
+        # deleted, or the next reader re-derives it from the old document.
+        assert "0.0011" in s and "0.80" in s
+        # But ONLY inside the retraction, and the retraction has to be findable
+        # from the numbers themselves rather than sitting elsewhere in a long
+        # disclosure.
+        i = s.index("0.0011")
+        j = s.index("0.80")
+        span = s[min(i, j) - 200:max(i, j) + 400]
+        assert "a previous version of this note said" in span
+        assert "no arm and no reading reproduces any of those three" in span
+        assert "reach_invariances_measure.md" in span
+        # And the replacement measurement, which is what a reader should carry
+        # away instead: the HEADLINE rung is bit-identical while the WHOLE
+        # ladder moves 0.4021, i.e. the retracted single number understated the
+        # ladder by 365x by reporting the best rung as if it were all of them.
+        assert "0.4021" in s
+        assert "365x" in s
 
 
 # --------------------------------------------------------------------------- #
@@ -908,13 +943,27 @@ class TestReportingConvention:
         # the product is not in.
         assert "BOUNDED RESIDUAL" in s          # not an invariance, at this window
         assert "REGIME CLAIM WAS NOT" in s      # correct physics, wrong regime
-        # The measured residual, at both readings, because they differ by an
-        # order of magnitude and the panel must not present them as equal.
-        assert "0.0011" in s                    # the ladder, over R = 1..39
-        assert "0.3772" in s                    # the falloff SHAPE, at R = 39
-        assert "0.80" in s                      # the ladder past the bound
-        # The window is NOT converged, with the decay law that says so.
+        # The falloff SHAPE residual at R = 39. Still a live claim: re-measured
+        # 2026-08-22 at 0.37723 against the shipped 0.3772
+        # (results/reach_invariances_measure.md).
+        assert "0.3772" in s
+        # 0.0011 and 0.80 were REFUTED on the same day and are asserted by
+        # test_the_refuted_ladder_numbers_appear_ONLY_AS_RETRACTED instead.
+        # They are deliberately NOT asserted here as bare substrings: this test
+        # would pass either way, because the strings survive inside the
+        # retraction, and a check that cannot fail when its subject is inverted
+        # is not a check. Their replacement IS asserted, because that is the
+        # number a reader should leave with.
+        assert "0.4021" in s                    # the WHOLE ladder, R = 1 to 39
+        # The superseded convergence claim, kept so it can be found and
+        # recognised as superseded. CORRECTED 2026-08-22: this pair used to be
+        # asserted under the comment "the window is NOT converged, with the
+        # decay law that says so", which is the claim the note now RETRACTS —
+        # 281/T was measuring the AUC estimator, and the field at that same
+        # window is converged to 1.112e-05. The strings stay; what they mean
+        # here does not.
         assert "0.01302" in s and "281/T" in s
+        assert "ESTIMATOR" in s
 
     def test_the_disclosure_names_the_permeability_blindness(self, reach):
         """The map is EXACTLY invariant to bbb_penetrance, so it cannot see a
@@ -1089,6 +1138,16 @@ class TestRunWiring:
             assert 0.0 <= reach["headline_under_reached_fraction"] <= 1.0
             assert reach["curve"]["x"] == [float(v) for v in REACH_LADDER]
             assert reach["convention"] == CONVENTION_NOTE
+            # THE PRODUCTION PATH PRODUCES THE STEADY-STATE OBJECT. Asserted
+            # here rather than inferred from the fact that jobs.py passes a
+            # drug: `steady = drug is not None` means one argument is the whole
+            # cutover, and a change to that call would flip which object the
+            # product emits without touching this module at all.
+            assert reach["window_mode"] == "steady_state"
+            assert reach["window_s"] is None
+            assert reach["E_ref_units"] == "uM"
+            assert reach["window_note"] == STEADY_STATE_NOTE
+            assert reach["scale_invariance"] == STEADY_SCALE_INVARIANCE_NOTE
             run_id = job.run_id
         finally:
             manager.shutdown()
@@ -1099,8 +1158,29 @@ class TestRunWiring:
             back = restarted.get(run_id)
             assert back is not None
             assert back.result_view()["reach"] == reach
+            # WHICH OBJECT IT IS reaches the STORED record, not only the live
+            # response. A run's window_mode is a fact about that run in the same
+            # category as its claim-set stamp, and a record that does not carry
+            # it is a record that was true about a configuration nobody wrote
+            # down — which is the defect this field exists to close.
+            restored = back.result_view()["reach"]
+            assert restored["window_mode"] == "steady_state"
+            assert restored["window_note"] == STEADY_STATE_NOTE
         finally:
             restarted.shutdown()
+
+    def test_a_record_written_before_window_mode_existed_is_not_assumed(self):
+        """Runs stored before 2026-08-22 have no ``window_mode``. They PREDATE
+        the field and are silent about it, which is not the same as saying
+        ``finite_window`` — so a reader must distinguish ABSENT from either
+        value rather than defaulting a missing key to the historical
+        behaviour. This pins the distinction as a contract; ``WINDOW_MODES``
+        deliberately does not contain a value meaning 'unrecorded'."""
+        legacy = {"null_reason": None, "headline_x": HEADLINE_X}
+        assert "window_mode" not in legacy
+        assert legacy.get("window_mode") is None
+        assert None not in WINDOW_MODES
+        assert "unrecorded" not in WINDOW_MODES
 
     def test_a_reconstruction_only_run_refuses_rather_than_omitting(
             self, tmp_path):

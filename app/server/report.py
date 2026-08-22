@@ -2286,7 +2286,16 @@ def _reach_block(reach: Optional[Dict], reason: Optional[str]) -> str:
         f"<tbody>{body}</tbody></table></div>"
         f"<p><b>Exposure falloff with distance from the nearest vessel</b>, in the "
         f"SAME bins that produced the reference E_ref = "
-        f"{_sig(reach.get('E_ref_uM_s'))} uM.s, each divided by it. This is the "
+        f"{_sig(reach.get('E_ref_uM_s'))} "
+        # READ the unit, never hard-code it: E_ref is an AUC (uM*s) over a
+        # finite window and a CONCENTRATION (uM) on the steady map, and
+        # app/server/reach.py says so at its definition. A document that
+        # printed the wrong one would be wrong about a physical quantity while
+        # looking perfectly well-formed. A record with no E_ref_units predates
+        # steady mode entirely, so uM*s is the correct reading for it -- that
+        # is an inference about a era that could not have produced the other
+        # value, not a default.
+        f"{reach.get('E_ref_units') or 'uM*s'}, each divided by it. This is the "
         f"relative reading, and it is the one this document offers as "
         f"defensible.</p>"
         f"<div class='tblwrap'><table class='tbl'><thead>{fhead}</thead>"

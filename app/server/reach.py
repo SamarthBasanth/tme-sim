@@ -32,9 +32,17 @@ reasons. All four are in ``results/steady_state_reach.md``:
    ``dt`` cancelled. :func:`steady_state_concentration` solves it once, using
    the engine's own ``L``. There is no window and no ``dt`` in the answer, so
    there is no convergence criterion to defend.
-2. It is **cheaper than what it replaces**, which inverts the obvious prior. One
-   factorisation and one triangular solve against one factorisation and 2,160
-   triangular solves.
+2. Obtaining the field that way is **cheaper than marching to it**, which
+   inverts the obvious prior: one factorisation and one triangular solve
+   against one factorisation and 2,160 triangular solves — 0.90 s against
+   43.70 s at the shipping grid. **This is not a performance win for the
+   product and must not be quoted as one.** The run still marches
+   (``simulate_response`` is required for ``kill_fraction``, for
+   ``delivery_metrics`` and for the oxygen field this map's own viable band
+   reads), so the steady solve is computed IN ADDITION and *adds* 1.854 s,
+   **+4.2 %**, to a run at dx = 12. What the cost measurement decided was
+   whether the route was shippable at all; it is, with room to spare
+   (``results/steady_state_reach.md`` sec. 2.2).
 3. A capacity term ``R`` multiplies the TIME DERIVATIVE and nothing else, so it
    is **absent from the steady problem by inspection**. The finite-window
    residual it removes is large and measured.
@@ -577,9 +585,19 @@ def steady_state_concentration(
     ---------------------------------------------------
     The time march pays one sparse factorisation AND ``total_time/dt`` triangular
     solves (2,160 of them at the shipping 6 h / 10 s). This pays the SAME ONE
-    factorisation and a SINGLE triangular solve. It is therefore strictly less
-    work than the finite-window field it replaces, not more. Measured at the
-    shipping configuration in ``results/steady_state_reach.md`` sec. 2.
+    factorisation and a SINGLE triangular solve — 0.90 s against 43.70 s at the
+    shipping grid, and more accurate as well (the march's agreement with its own
+    fixed point floors at 1.99e-13 and stops improving past ~24 h of simulated
+    time, because that is backward-Euler error at ``dt`` and more time does not
+    remove it).
+
+    **Beware the obvious misreading.** That ratio is about THE FIELD. A run is
+    not 48x faster; a run still marches, because ``kill_fraction``,
+    ``delivery_metrics`` and the oxygen field all need it. This is computed in
+    addition, and adds +4.2 % to a run at dx = 12. See
+    ``results/steady_state_reach.md`` sec. 2 and 2.2 — 2.2 exists because the
+    first draft of that file quoted the ratio in a way that invited exactly this
+    error.
 
     Non-tissue cells
     ----------------

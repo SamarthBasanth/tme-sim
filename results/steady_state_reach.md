@@ -23,7 +23,8 @@ exchange term.
 | question | answer |
 |---|---|
 | numerical route | **one sparse linear solve** — the exact fixed point of the shipped stepper, no window, no `dt` |
-| cost at the shipping config | **3.37 s** against **191.1 s** for the 6 h march it replaces — **57× cheaper** |
+| cost of the map's own field | **0.90 s** against **43.70 s** for a 6 h march of the same field — **48.6×** |
+| cost added to a RUN | **+1.854 s**, i.e. **+4.2 %**. The run still marches; see §2 before quoting the 48.6× |
 | does `P90/P10` still discriminate? | **YES.** Disjoint, and marginally *wider*: worst-case dox/tmz **1.789×** steady vs **1.771×** finite |
 | capacity residual at `R = 39` | **0.3731 → 2.548e-14** (falloff); ladder **exactly 0.000e+00** at every `R` |
 | was the shipping window unconverged? | **NO.** Field converged to **1.112e-05** at 6 h. `281/T` was measuring the estimator |
@@ -107,13 +108,20 @@ so setting `c_new = c` cancels every `dt` and leaves the linear system
 `(K − L + Adv) c = S`. The march pays **one factorisation + 2,160 triangular
 solves**; the direct solve pays **one factorisation + one triangular solve**.
 
-Measured in one process, same reconstruction, same compiled drug, dx = 12,
-repair 2, convection ON:
+**Read §2.2 before quoting any ratio from this section.** The 48.6× is real and
+it is about the FIELD. It is not a statement about how long a run takes, and the
+difference matters.
 
-| compound | **steady solve** | **6 h march (the object replaced)** | speed-up |
+Measured on an **idle machine** (best of 3; an earlier draft of this file quoted
+3.37 s / 191.1 s, which were taken with two other heavy jobs on the box and were
+inflated by roughly 4× on both sides — the ratio survived, the absolute numbers
+did not, and they are corrected here). Same reconstruction, same compiled drug,
+dx = 12, repair 2, convection ON:
+
+| compound | **steady solve** | **6 h march of the same field** | ratio |
 |---|---:|---:|---:|
-| temozolomide | **3.37 s** | **191.1 s** | **56.7×** |
-| doxorubicin | **4.02 s** | **182.1 s** | **45.3×** |
+| temozolomide | **0.90 s** | **43.70 s** | **48.6×** |
+| doxorubicin | **0.94 s** | **45.20 s** | **48.1×** |
 
 At every grid, with the linear system's own residual `‖Ac − S‖∞ / ‖S‖∞`:
 
@@ -147,6 +155,40 @@ what one solve returns, at any cost.
 **That also disposes of the "long fixed window" route.** It is dominated on
 every axis — slower, and bounded away from the answer by a floor a longer window
 cannot cross.
+
+### 2.2 The steady map does NOT make a run faster. It makes it slightly slower.
+
+This is the correction that matters most in this file, because the 48.6× above
+invites exactly the wrong reading.
+
+**The run still marches.** `simulate_response` is required for `kill_fraction`,
+for `delivery_metrics`, and for the oxygen field that defines this map's own
+viable band. The steady solve does not replace it — it is computed **in
+addition** to it. So switching the reach map to steady state does not save a run
+191 s, or 43 s, or anything. It **costs** a run:
+
+| dx | unknowns | run's `simulate_response` | `compute_reach` finite | `compute_reach` steady | added |
+|---:|---:|---:|---:|---:|---:|
+| 30 | 46,070 | 4.30 s | 0.004 s | 0.127 s | **+0.123 s (+2.9 %)** |
+| **12** | **286,200** | **44.10 s** | **0.014 s** | **1.867 s** | **+1.854 s (+4.2 %)** |
+
+The steady figure includes the `solve_ifp` call `compute_reach` makes when it is
+not handed a velocity, and the extra `penetration_length_fit` on the steady field
+that §6 forces.
+
+So the defensible sentences are:
+
+* **TRUE:** obtaining this field by a direct solve is ~48× cheaper than
+  obtaining it by a 6 h march, and *more accurate* (§2.1).
+* **TRUE:** the steady reach map adds **4.2 %** to a run at the shipping grid.
+* **FALSE:** "runs got 48× faster", or any framing in which steady state is a
+  performance win for the product. It is a **correctness** win that happens to
+  be cheap enough not to matter.
+
+The reason the cost question was ever load-bearing is that it decided whether
+the route was shippable at all — a route that made a run take twenty minutes
+would have been ruled out regardless of its invariance properties. +4.2 % clears
+that bar with room to spare. That is the whole claim.
 
 ---
 
@@ -332,21 +374,37 @@ It is worth naming as a trade rather than filing under "steady state is better".
 a wire contract to fix a unit label is the worse trade. The payload therefore
 carries the true unit in **`E_ref_units`** and in **`units['E_ref']`**.
 
-Two sites hard-code the string instead of reading it, and are wrong in
-steady-state mode:
+Two sites hard-coded the string instead of reading it. **Both were fixed on
+2026-08-22** and now read `reach['E_ref_units']` with a fallback of `uM*s`:
 
-* `app/server/report.py` — the reach prose renders `... uM.s` literally beside
-  `reach['E_ref_uM_s']`.
-* `app/server/jobs.py` — the `ctx.log` line formats `E_ref={...:.4g} uM*s`.
+* `app/server/report.py:2298` — the reach prose.
+* `app/server/jobs.py:1007` — the `ctx.log` line.
 
-Neither is in this change's territory. Both are named in the handoff.
+The fallback is the right shape and is worth spelling out: a record with **no**
+`E_ref_units` predates steady mode entirely, so `uM*s` is the correct reading
+*for that record*. The fallback is era-correct, not a default.
 
-`window_s` is `None` in steady-state mode — correct, there is no window — and a
-consumer must render that as *not applicable* rather than as a blank where a
-number used to be. Records written before 2026-08-22 carry `window_mode: None`:
-they **predate the field and are silent about it**, which is not the same as
-saying `finite_window`. Anything reading the key must distinguish *absent* from
-*finite_window*.
+### `window_s` needed no consumer fix, and the reason is a hazard
+
+**Nothing renders the reach payload's `window_s`.** Checked rather than assumed,
+because `report.py` has a field of *the same name* which is a **different
+quantity** — the run's `total_time_s` (`report.py:1103`, used by
+`attribute_compound` and `_compound_card`). That one still exists and is still
+correct, because the run still marches (§2.2).
+
+So there is no blank to render, and the absence is communicated through
+`window_mode` in words instead. The hazard is worth recording: two fields with
+one name, one of which is legitimately `None` in steady mode and one of which
+must never be, is exactly the setup in which someone later "fixes" the wrong
+one.
+
+### Records written before the field existed
+
+Runs stored before 2026-08-22 carry no `window_mode`. They **predate the field
+and are silent about it**, which is not the same as saying `finite_window`.
+Anything reading the key must distinguish *absent* from either value —
+`WINDOW_MODES` deliberately contains no value meaning "unrecorded", so absence
+cannot be round-tripped into a claim.
 
 ---
 
@@ -486,7 +544,10 @@ but it is not free, and one thing genuinely got worse.**
 
 * The capacity residual is *removed*, not reduced: ladder exactly 0.000e+00,
   falloff 1e-14 round-off, against 0.3731 and 0.3569 at `R = 39` (§4).
-* It is **57× cheaper** (§2). The expensive object became the cheap one.
+* Obtaining the field costs **48.6×** less than marching to it, and the map
+  adds only **+4.2 %** to a run (§2, §2.2) — cheap enough that the
+  interactivity constraint never binds. It is NOT a performance win for the
+  product and must not be sold as one.
 * The march has an **accuracy ceiling** at 1.99e-13 that no window length
   crosses; the direct solve does not (§2.1). Neither alternative route —
   integrate-to-tolerance, or a long fixed window — could have reached this.
