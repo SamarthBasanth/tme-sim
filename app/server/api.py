@@ -152,7 +152,26 @@ _LARGE_GRID_CELLS = 1_500_000
 #: several fields are allocated per solve. One POST could OOM the box.
 #: 40 M voxels is ~320 MB per float64 field: expensive but survivable, and far
 #: beyond any dx a real section needs.
-_MAX_GRID_CELLS = 40_000_000
+#:
+#: OVERRIDABLE, because 40 M is the "no request should ever ask for this"
+#: ceiling and NOT the "this machine can afford it" one. Those are different
+#: numbers and only the operator knows the second.
+#:
+#: Measured on a 512 MB instance (Render's free tier), flagship Xenium GBM,
+#: real container, no bind mount: dx = 30 um is 46,070 voxels and peaks at
+#: 220 MiB -- comfortable. dx = 12 um is 286,200 voxels, ~0.7 % of the ceiling
+#: below, and the container is OOM-KILLED. Not the run failing: the PROCESS
+#: dies, status=exited, and /healthz stops answering, so one ordinary request
+#: takes the service down for everyone. A ceiling that only catches 20 GB
+#: allocations does not catch that, because 286,200 voxels is a perfectly
+#: reasonable ask on a machine with room for it.
+#:
+#: So a constrained host sets TMESIM_MAX_GRID_CELLS to what it can actually
+#: afford and gets a 400 with a reason instead of a dead container. 100_000
+#: permits dx >= ~20 um on this section and refuses dx = 12.
+_DEFAULT_MAX_GRID_CELLS = 40_000_000
+_MAX_GRID_CELLS = int(
+    os.environ.get("TMESIM_MAX_GRID_CELLS") or _DEFAULT_MAX_GRID_CELLS)
 
 #: Hard floor on dx_um for the case where the section extent is unknown and
 #: the voxel ceiling above cannot be evaluated. 0.5 um is well below a cell
@@ -674,11 +693,25 @@ def validate_spec(spec: Dict) -> Dict:
                     # An ERROR, not a warning. `ok = not errors`, and
                     # POST /api/runs only refuses when ok is False, so a
                     # warning here would have let the allocation proceed.
+                    # Size the units to the grid. The original message always
+                    # said GB, which reads as "0.0 GB" for the case an operator
+                    # actually hits -- a lowered TMESIM_MAX_GRID_CELLS on a
+                    # small instance, where the grid is megabytes and the
+                    # refusal is about the WHOLE SOLVE not fitting, not about
+                    # one array. A refusal that quotes an absurd number invites
+                    # the reader to dismiss it.
+                    field_b = n_cells_grid * 8
+                    field = (f"{field_b / 1e9:,.1f} GB" if field_b >= 1e9
+                             else f"{field_b / 1e6:,.1f} MB")
+                    tuned = _MAX_GRID_CELLS != _DEFAULT_MAX_GRID_CELLS
                     errors.append(
                         f"dx_um = {dx:g} um on this section gives a grid of "
                         f"~{n_cells_grid:,.0f} voxels, above the "
-                        f"{_MAX_GRID_CELLS:,} ceiling — one float64 field "
-                        f"alone would be {n_cells_grid * 8 / 1e9:,.1f} GB. "
+                        f"{_MAX_GRID_CELLS:,} ceiling"
+                        + (" this server is configured with "
+                           "(TMESIM_MAX_GRID_CELLS)" if tuned else "")
+                        + f" — one float64 field alone would be {field}, and a "
+                        "solve allocates several plus the cell population. "
                         "Use a coarser dx_um."
                     )
                 elif n_cells_grid > _LARGE_GRID_CELLS:
