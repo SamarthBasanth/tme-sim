@@ -27,6 +27,24 @@ import * as mock from './mock.js';
 const RETRY_MS = 400;
 const TIMEOUT_MS = 30000;
 
+/** Boot probe budget. MUCH longer than TIMEOUT_MS, and measured rather than
+ *  guessed.
+ *
+ *  `GET /api/sections` is the first call the app makes and by far the most
+ *  expensive: it enumerates every registered section, reads each one's
+ *  metadata off disk and builds its caveat list, and only then is the result
+ *  warm. On a small hosted instance that is not a fast call. Measured in the
+ *  real image pinned to 0.1 CPU -- what a Render free instance actually gets --
+ *  the FIRST call took 12.7 s and the second 0.08 s. Slower hardware, or a
+ *  container still waking from a spin-down, pushes the first one past 30 s.
+ *
+ *  When it did, the app aborted, could not tell "we stopped waiting" from "the
+ *  server is gone", declared the backend unreachable and switched the whole
+ *  Studio to synthetic data -- against a server that was healthy and answering.
+ *  A cold start is the NORMAL state of a free instance, so 30 s was not a
+ *  timeout, it was a guarantee of a fabricated session on every visit. */
+const PROBE_TIMEOUT_MS = 120000;
+
 export class ApiError extends Error {
   constructor(message, { status = 0, path = '', payload = null, cause = null } = {}) {
     super(message);
@@ -188,7 +206,30 @@ function fromMock(method, path, opts) {
 /** Probe the real backend once at boot. */
 export async function probe() {
   try {
-    const secs = await rawFetch('GET', '/api/sections');
+    // Two attempts on the long budget, because the expensive part of this
+    // route is a ONE-TIME warm-up: measured at 0.1 CPU the first call is
+    // ~12.7 s and the second ~0.08 s. If the first attempt is killed by a
+    // cold start, the second is answering a server that has now done the
+    // work -- so a retry here is not hope, it is the shape of the cost.
+    let secs;
+    let lastErr;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        secs = await rawFetch('GET', '/api/sections',
+                              { timeoutMs: PROBE_TIMEOUT_MS });
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        // A 401 is a definite answer from a live server. Do not retry it and
+        // do not let it reach the stub fallback -- it means "wrong key", and
+        // the gate below is the correct response.
+        if (e instanceof ApiError && e.status === 401) throw e;
+        if (attempt === 0 && e && e.name === 'AbortError') continue;
+        throw e;
+      }
+    }
+    if (lastErr) throw lastErr;
     api.reachable = true;
     api.authRequired = false;
     setStub(false);
@@ -205,10 +246,20 @@ export async function probe() {
       api.authRequired = true;
       return { live: false, authRequired: true, sections: [] };
     }
+    // SAY WHICH FAILURE IT WAS. "unreachable" and "did not answer in time" send
+    // an operator to completely different places -- one to DNS and the service
+    // status, the other to instance size and cold starts -- and this code used
+    // to print the first for both. It printed "backend unreachable" against a
+    // server that was up, answering, and merely slow.
     api.reachable = false;
     api.authRequired = false;
     mock.seedHistory();
-    setStub(true, err instanceof ApiError && err.status ? `backend ${err.status}` : 'backend unreachable');
+    const timedOut = err && err.name === 'AbortError';
+    setStub(true, timedOut
+      ? `backend did not answer within ${PROBE_TIMEOUT_MS / 1000}s `
+        + '(cold start, or an instance too small for this section)'
+      : (err instanceof ApiError && err.status
+         ? `backend ${err.status}` : 'backend unreachable'));
     return { live: false, sections: await fromMock('GET', '/api/sections', {}) };
   }
 }
