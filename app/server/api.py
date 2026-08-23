@@ -1617,7 +1617,19 @@ def create_app(manager: Optional[JobManager] = None,
             # GET/HEAD only, so the fail-closed rule below is untouched: a POST
             # to /healthz still needs the key like any other state-changing
             # request.
-            is_liveness = (route_path == "/healthz"
+            # /api/health is exempt TOO, and only because reality insisted.
+            # /healthz exists and is the right path to probe -- but a platform
+            # health check is configured in a DASHBOARD, and the one already
+            # pointed at /api/health kept 401ing and killing a container that
+            # was serving correctly. Telling the operator to go and change a
+            # setting is not a fix when the code can simply stop being wrong.
+            #
+            # Safe because of what the endpoint DOES when unauthenticated: see
+            # the handler, which returns a bare {"ok": true} to an anonymous
+            # caller and the runs directory / counts / cache statistics only to
+            # one holding the key. The route is exempt from the GATE; the DATA
+            # is not.
+            is_liveness = (route_path in ("/healthz", "/api/health")
                            and request.method in ("GET", "HEAD"))
             needs_key = not is_liveness and (
                 route_path.startswith("/api/")
@@ -2193,7 +2205,28 @@ def create_app(manager: Optional[JobManager] = None,
                            "inside simulate_response finishes that solve first")}
 
     @app.get("/api/health")
-    def health() -> Dict:
+    def health(request: Request) -> Dict:
+        """Liveness to anyone; diagnostics only to a caller holding the key.
+
+        THE GATE EXEMPTS THIS ROUTE, SO THE HANDLER HAS TO DO THE WITHHOLDING.
+        A platform health checker cannot send ``X-API-Key``, and pointing one
+        at a 401 means the platform kills a container that is serving fine --
+        measured, twice, on this project. So an anonymous GET gets exactly
+        ``{"ok": true}``: enough to prove the process answers, and nothing a
+        stranger can learn from.
+
+        The rest -- the runs directory, run counts, the projects root, cache
+        statistics, the solver timestep -- is real operational detail about a
+        machine, and it still requires the key. ``/healthz`` remains the route
+        to prefer for a probe; this one is exempt because a dashboard somewhere
+        is already pointed at it and being right in the repo beats being right
+        in an argument.
+        """
+        api_key = os.environ.get("TMESIM_STUDIO_API_KEY", "").strip()
+        if api_key and not secrets.compare_digest(
+                request.headers.get("x-api-key", ""), api_key):
+            return {"ok": True}
+
         by_status: Dict[str, int] = {}
         for j in jobs.list():
             by_status[j.status] = by_status.get(j.status, 0) + 1

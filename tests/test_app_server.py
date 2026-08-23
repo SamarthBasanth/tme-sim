@@ -931,6 +931,53 @@ class TestApiKeyAuth:
         app = create_app(manager)
         return TestClient(app), manager
 
+    def test_a_platform_health_check_gets_200_and_nothing_else(
+            self, monkeypatch, tmp_path):
+        """Liveness answers an anonymous probe; diagnostics do not.
+
+        WHY THIS EXISTS. A platform health checker cannot send an API key.
+        Render was configured to probe ``/api/health``, got 401 every 10 s, and
+        killed a container that was serving correctly on a port it had already
+        detected -- the log read "401 Unauthorized" a hundred times and then
+        "Timed Out". Adding ``/healthz`` did not fix it, because the path to
+        probe lives in a dashboard, not in this repo.
+
+        So both liveness routes answer an anonymous GET, and ``/api/health``
+        WITHHOLDS ITS PAYLOAD instead: the runs directory, run counts, projects
+        root, cache statistics and solver timestep are operational detail about
+        a machine and still need the key. Exempting a route from the gate and
+        exempting its DATA are different things, and only the first is done
+        here.
+        """
+        client, manager = self._make_client(monkeypatch, "secret-123", tmp_path)
+        try:
+            with client:
+                # Liveness, unauthenticated: 200, and literally nothing else.
+                for path in ("/healthz", "/api/health"):
+                    r = client.get(path)
+                    assert r.status_code == 200, path
+                    assert r.json() == {"ok": True}, (
+                        f"{path} leaked detail to an anonymous caller: "
+                        f"{r.json()}")
+
+                # With the key, /api/health is the full diagnostic again.
+                r = client.get("/api/health", headers={"X-API-Key": "secret-123"})
+                assert r.status_code == 200
+                body = r.json()
+                for k in ("runs_dir", "runs", "reconstruction_cache"):
+                    assert k in body, f"authenticated /api/health lost {k}"
+
+                # And nothing else opened up. A real data route and a
+                # state-changing one both still refuse.
+                assert client.get("/api/sections").status_code == 401
+                assert client.post(
+                    "/api/sections/scan", json={"path": "/etc"}
+                ).status_code == 401
+                # POST to a liveness path is not a read, so it is not exempt.
+                assert client.post("/healthz").status_code == 401
+        finally:
+            manager.shutdown()
+
     def test_no_key_configured_leaves_api_open(self, monkeypatch, tmp_path):
         client, manager = self._make_client(monkeypatch, None, tmp_path)
         try:
