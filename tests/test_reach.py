@@ -50,6 +50,7 @@ from tmesim.core import (  # noqa: E402
 from tmesim.sim.engine import simulate_response  # noqa: E402
 from tmesim.validation.delivery_metrics import penetration_length_fit  # noqa: E402
 from tmesim.validation.vessel_profile import (  # noqa: E402
+    MIN_BIN_COUNT,
     direct_vessel_distance_um,
     endothelial_xy,
 )
@@ -996,6 +997,66 @@ def _assert_refused(out):
 
 
 class TestRefusals:
+
+    def test_a_headline_over_a_handful_of_cells_is_refused(self, monkeypatch):
+        """A fraction over a few cells is a COUNT WEARING A PERCENTAGE.
+
+        FOUND IN PRODUCTION, 2026-08-23, by running the shipped pipeline off the
+        flagship section for the first time. `xenium_io` -- same platform, same
+        disease, same config -- reported **n_viable = 1** and returned a
+        clean-looking ladder with `F(0.1) = 0.0` and no caveat anywhere. Over one
+        cell that is not a fraction: it means "this one cell was not below 0.1x".
+        `F = counts / n_viable`, so the entire ladder had resolution 1.0 and could
+        only ever read 0 or 1.
+
+        Refusing at `n_viable == 0` was not enough, because 1 is not 0 and looks
+        like data. The floor is BORROWED rather than invented --
+        `vessel_profile.MIN_BIN_COUNT`, which already gates `E_ref` (a distance
+        bin is unusable below it) -- so the denominator of the headline is held
+        to the same standard as the denominator of the reference it is divided
+        by. Refusal rather than a caveat, because that is what this module does
+        everywhere else it cannot stand behind a number.
+        """
+        import app.server.reach as R
+
+        monkeypatch.setattr(R, "tumor_cell_exposure", lambda micro, res: {
+            "n_tumor": 5, "auc_uM_s": np.array([1., 2., 3., 4., 5.]),
+            "tumor_mask": np.ones(5, bool)})
+        monkeypatch.setattr(R, "_sample_at_cells",
+                            lambda f, m, mask: np.array([9., 0., 0., 0., 0.]))
+
+        class _R:
+            fields = {"oxygen": np.zeros((2, 2))}
+
+        out = compute_reach(object(), _R(), convection=False)
+        _assert_refused(out)
+        assert out["n_viable"] == 1
+        assert "COUNT, not a" in out["null_reason"], out["null_reason"]
+
+    def test_the_thin_population_floor_is_the_repos_own_constant(
+            self, monkeypatch):
+        """Just below MIN_BIN_COUNT refuses, and names it.
+
+        Pinned separately so the floor cannot drift to a number someone picked
+        after seeing data -- the whole point is that it is the value this
+        repository already uses for 'enough samples for a mean'.
+        """
+        import app.server.reach as R
+        n = MIN_BIN_COUNT - 1
+
+        monkeypatch.setattr(R, "tumor_cell_exposure", lambda micro, res: {
+            "n_tumor": 100, "auc_uM_s": np.arange(100.) + 1.,
+            "tumor_mask": np.ones(100, bool)})
+        monkeypatch.setattr(R, "_sample_at_cells",
+                            lambda f, m, mask: np.array([9.] * n + [0.] * (100 - n)))
+
+        class _R:
+            fields = {"oxygen": np.zeros((2, 2))}
+
+        out = compute_reach(object(), _R(), convection=False)
+        _assert_refused(out)
+        assert str(MIN_BIN_COUNT) in out["null_reason"]
+        assert out["n_viable"] == n
 
     def test_no_tumour_cells(self, real_micro, real_result, distance_um):
         out = compute_reach(_retyped(real_micro, CellType.ENDOTHELIAL),

@@ -890,6 +890,38 @@ def compute_reach(
             "population is undefined; it is not fallen back to all tumour cells",
             n_tumor=n_tumor, n_viable=0, steady=steady,
             hypoxia_threshold=float(hypoxia_threshold))
+    # A FRACTION OVER A HANDFUL OF CELLS IS A COUNT WEARING A PERCENTAGE.
+    # `F = counts / n_viable`, so the whole ladder has resolution 1/n_viable and
+    # can only ever land on k/n_viable. Refusing at zero was not enough: found
+    # 2026-08-23 by running the shipped pipeline off the flagship section for the
+    # first time, `xenium_io` reported n_viable = 1 and returned a clean-looking
+    # F(x) with F(0.1) = 0.0 and no caveat anywhere. Over one cell that value is
+    # not a fraction at all -- it means "this one cell was not below 0.1x" -- and
+    # nothing on the panel said so.
+    #
+    # The floor is BORROWED, not invented. vessel_profile.MIN_BIN_COUNT = 30 is
+    # this repository's own existing answer to "how many samples before a mean
+    # means anything", and it already gates E_ref: a distance bin is unusable
+    # below it. The denominator of the headline is held to the same standard as
+    # the denominator of the reference it is divided by, which is the only
+    # consistent choice available.
+    #
+    # Refusal rather than a caveat, because this product refuses when it cannot
+    # stand behind a number: E_ref refuses on a thin first bin, the map refuses
+    # with no endothelium, and a percentage computed over 12 cells is the same
+    # kind of thing.
+    if n_viable < MIN_BIN_COUNT:
+        return null_reach(
+            f"only {n_viable} VIABLE tumour cell"
+            f"{'s' if n_viable != 1 else ''} in this reconstruction, below the "
+            f"{MIN_BIN_COUNT} this repository requires before a mean over a "
+            "sample is reported (vessel_profile.MIN_BIN_COUNT, the same floor "
+            "that gates the perivascular reference this ratio is divided by). "
+            f"F(x) = counts / {n_viable}, so every rung could only land on a "
+            f"multiple of {1.0 / n_viable:.3g} — that is a COUNT, not a "
+            "fraction, and it is refused rather than reported with a caveat",
+            n_tumor=n_tumor, n_viable=n_viable, steady=steady,
+            hypoxia_threshold=float(hypoxia_threshold))
 
     # --- 2b. WHICH FIELD this is a map of ----------------------------------- #
     # The two modes differ HERE and only here: every reduction below is the
