@@ -11,17 +11,42 @@ glioblastoma section (**40,887 measured cells**) and a breast carcinoma section
 (**167,780 measured cells**).
 
 **Who it is for.** Pharma, biotech and academic *research* users asking a
-transport question: on this tissue architecture, which of these compounds
-actually reaches the cells, and is the limit delivery or potency? A compound that
-never arrives and a compound that arrives too weak look identical in a survival
-curve and need opposite fixes; Vivum separates them.
+transport question about ONE compound on ONE tissue: when this compound failed
+here, did the drug never arrive, or did it arrive and stay too weak? Those two
+look identical in a survival curve and need opposite fixes; Vivum separates
+them, cell by cell.
 
-**The single output this project will defend is the *relative* comparison of
-compounds on *one* tissue section.** Everything absolute has been tested against
-external measurement and essentially all of it has failed. Both halves of that
-sentence are documented below, with a pointer to the measurement behind each.
+**The single output this project will defend is a RATIO INSIDE ONE MAP: the
+relative exposure between REGIONS of one section, for one compound.** A
+per-compound plasma factor is an exact linear rescale of the whole field, so it
+cancels from a ratio between two points of the same map — which is why a
+within-map reading survives uncertainties that an absolute level does not.
+Everything absolute has been tested against external measurement and essentially
+all of it has failed. Both halves of that sentence are documented below, with a
+pointer to the measurement behind each.
 
-> ### Read this before you rank a compound series
+> **This sentence used to read "the relative comparison of COMPOUNDS on one
+> tissue section", and that claim was withdrawn on 2026-08-21.** The
+> cross-compound ordering was measured and does not hold: per-compound plasma
+> exposure spans **113.1×** across the retained compounds
+> (`results/pk_ranking_robustness.md`), and there is no per-compound
+> tissue-capacity term at all (`results/capacity_ranking_robustness.md`). The
+> prohibition is absolute rather than conditional — there is no dx, no section
+> and no compound set for which this product will order one compound against
+> another. `compare-drugs` was removed with the claim.
+>
+> What replaced it is smaller and checkable: *"this compound reached the tissue
+> and was still short of its own IC50"* can be refuted by a bench measurement on
+> the same block. *"Cisplatin outranks temozolomide"* was only ever checkable
+> against an outcome nobody has.
+
+> ### How far the structure → transport step can be trusted
+>
+> *(This block was headed "Read this before you rank a compound series" until
+> 2026-08-22. The measurements in it are unchanged and still matter — they bound
+> how much of a compound's transport the model can infer from its structure.
+> What is gone is the conclusion it used to draw, because ordering one compound
+> against another is no longer something this product does at all.)*
 >
 > The shipped transport model derives a compound's tissue diffusivity from its
 > **molecular weight, its logP and its hydrogen-bond donor count**, through a
@@ -48,10 +73,13 @@ sentence are documented below, with a pointer to the measurement behind each.
 > its measured multicellular-layer band by 1.5× (49.3 µm²/s against a measured
 > 74–130), having previously missed it by 2.2× in the other direction.
 >
-> **So: read the order over a similar-mass series as a hypothesis worth testing,
-> not as a measurement.** Ranking compounds that differ substantially in mass
-> *and* in the properties below remains the best-supported case, and no absolute
-> transport number is defensible in either.
+> **So: a compound you supply is compiled from its structure, and that
+> compilation is worth about a quarter of the measured spread.** Treat the
+> transport parameters it produces as an input you are handing the model, not as
+> a measurement it made — which is exactly how the Studio labels them. Nothing
+> here licenses ordering one compound against another; that is withdrawn, and it
+> was withdrawn for reasons (plasma exposure, tissue capacity) that this score
+> does not touch and could not fix.
 > → [`results/two_route_promotion.md`](results/two_route_promotion.md)
 
 > ### What Vivum does not do
@@ -270,6 +298,13 @@ the exposure unit moves decision probabilities by ≤ 0.004).
 [`results/oxygen_level_shift.md`](results/oxygen_level_shift.md) §4,
 [`results/ranking_robustness.md`](results/ranking_robustness.md).
 It is **not** invariant to drug-specific transport parameters — see *retracted*.
+**And the subject of this row no longer exists.** Cross-drug ranking was
+withdrawn on 2026-08-21; these invariances were measured and are kept because
+they are true and because deleting a measurement to tidy a list is how a record
+stops being one. They are **not** a licence to rank — an ordering can be
+perfectly invariant to the six perturbations above and still be destroyed by the
+two that withdrew it (per-compound plasma exposure spanning 113.1×, and no
+per-compound tissue-capacity term at all).
 
 **5. The solver's internal numerics.** Mass is conserved on the real irregular
 tissue mask to **~4e-14** (the round-off floor), concentrations never go negative,
