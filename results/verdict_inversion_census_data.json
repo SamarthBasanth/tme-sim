@@ -1,0 +1,1793 @@
+{
+ "alpha_asserted": 22.223477711172563,
+ "shipped_defaults": {
+  "PDEConfig.transvascular_exchange": false,
+  "transvascular.SPLIT_DEFAULT": false,
+  "drugs.PS_SCALE_S_INV": 1.0
+ },
+ "config": "10x Xenium human GBM flagship section, dx = 12 um, repair = 1, dt = 10 s, 6 h window, convection ON, PKConfig(plasma_peak=50 uM, half_life=14400 s, n_doses=1)",
+ "reproduce": {
+  "alpha": 22.223477711172563,
+  "config": "10x Xenium human GBM flagship section, dx = 12 um, repair = 1, dt = 10 s, 6 h window, convection ON, PKConfig(plasma_peak=50 uM, half_life=14400 s, n_doses=1)",
+  "tol": 1e-12,
+  "compounds": {
+   "doxorubicin": {
+    "OFF": {
+     "kill_fraction": 0.04581723500755919,
+     "n_tumor": 23812,
+     "n_survived": 22721,
+     "counts": {
+      "KILLED": 1091,
+      "SURVIVED_UNREACHED": 8735,
+      "SURVIVED_UNDERDOSED": 13986,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.38444610712556665,
+      "dose": 0.6155538928744333,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.6155538928744333,
+     "unreached_fraction_of_tumor": 0.3668318494876533,
+     "mean_auc": 48715.972566414035,
+     "max_auc": 506333.24354705604,
+     "solve_s": 62.9252450466156
+    },
+    "ON": {
+     "kill_fraction": 0.03913992944733746,
+     "n_tumor": 23812,
+     "n_survived": 22880,
+     "counts": {
+      "KILLED": 932,
+      "SURVIVED_UNREACHED": 11368,
+      "SURVIVED_UNDERDOSED": 11512,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.49685314685314685,
+      "dose": 0.5031468531468531,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.5031468531468531,
+     "unreached_fraction_of_tumor": 0.4774063497396271,
+     "mean_auc": 40790.40650770557,
+     "max_auc": 307013.64642669243,
+     "solve_s": 54.47747468948364
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 2757,
+     "fraction_changed": 0.06742974539584709,
+     "transitions": {
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 2598,
+      "KILLED->SURVIVED_UNDERDOSED": 124,
+      "KILLED->SURVIVED_UNREACHED": 35
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 8735,
+     "n_dose": 13986,
+     "n_exposure_limited": 22721,
+     "n_survived": 22721,
+     "delivery_share_of_survivors": 0.38444610712556665,
+     "delivery_share_of_exposure_limited": 0.38444610712556665,
+     "distance_from_even_share": 0.11555389287443335,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 2626,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.11557589894810968
+    },
+    "margin_ON": {
+     "n_delivery": 11368,
+     "n_dose": 11512,
+     "n_exposure_limited": 22880,
+     "n_survived": 22880,
+     "delivery_share_of_survivors": 0.49685314685314685,
+     "delivery_share_of_exposure_limited": 0.49685314685314685,
+     "distance_from_even_share": 0.0031468531468531458,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 73,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.0031905594405594404
+    },
+    "bbb_penetrance": 0.020567870235594195,
+    "ic50_uM": 25.0,
+    "diffusivity_um2_s": 27.92558262333494,
+    "k_loss_s_inv": 0.005035489904182864,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.8373107290857508,
+    "dominant_limiter_inverts": false,
+    "delivery_dose_verdict_OFF": "dose",
+    "delivery_dose_verdict_ON": "dose",
+    "delivery_dose_verdict_inverts": false,
+    "delivery_dose_verdict_defined": true,
+    "reproduction": {
+     "OFF.delivery": {
+      "got": 0.38444610712556665,
+      "published": 0.38444610712556665,
+      "abs_delta": 0.0
+     },
+     "OFF.dose": {
+      "got": 0.6155538928744333,
+      "published": 0.6155538928744333,
+      "abs_delta": 0.0
+     },
+     "ON.delivery": {
+      "got": 0.49685314685314685,
+      "published": 0.49685314685314685,
+      "abs_delta": 0.0
+     },
+     "ON.dose": {
+      "got": 0.5031468531468531,
+      "published": 0.5031468531468531,
+      "abs_delta": 0.0
+     }
+    }
+   },
+   "daunorubicin": {
+    "OFF": {
+     "kill_fraction": 0.044263396606752936,
+     "n_tumor": 23812,
+     "n_survived": 22758,
+     "counts": {
+      "KILLED": 1054,
+      "SURVIVED_UNREACHED": 9759,
+      "SURVIVED_UNDERDOSED": 12999,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.42881624044292116,
+      "dose": 0.5711837595570788,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.5711837595570788,
+     "unreached_fraction_of_tumor": 0.40983537712077944,
+     "mean_auc": 47046.97942135444,
+     "max_auc": 523479.5196631237,
+     "solve_s": 52.338460206985474
+    },
+    "ON": {
+     "kill_fraction": 0.037502099781622666,
+     "n_tumor": 23812,
+     "n_survived": 22919,
+     "counts": {
+      "KILLED": 893,
+      "SURVIVED_UNREACHED": 12403,
+      "SURVIVED_UNDERDOSED": 10516,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.5411667175705747,
+      "dose": 0.4588332824294254,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "delivery",
+     "dominant_share": 0.5411667175705747,
+     "unreached_fraction_of_tumor": 0.5208718293297497,
+     "mean_auc": 39108.60765140582,
+     "max_auc": 310678.9842206494,
+     "solve_s": 8178.939445018768
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 2766,
+     "fraction_changed": 0.06764986426003375,
+     "transitions": {
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 2605,
+      "KILLED->SURVIVED_UNDERDOSED": 122,
+      "KILLED->SURVIVED_UNREACHED": 39
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 9759,
+     "n_dose": 12999,
+     "n_exposure_limited": 22758,
+     "n_survived": 22758,
+     "delivery_share_of_survivors": 0.42881624044292116,
+     "delivery_share_of_exposure_limited": 0.42881624044292116,
+     "distance_from_even_share": 0.07118375955707884,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 1621,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.07122770014939801
+    },
+    "margin_ON": {
+     "n_delivery": 12403,
+     "n_dose": 10516,
+     "n_exposure_limited": 22919,
+     "n_survived": 22919,
+     "delivery_share_of_survivors": 0.5411667175705747,
+     "delivery_share_of_exposure_limited": 0.5411667175705747,
+     "distance_from_even_share": 0.04116671757057466,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 944,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.041188533531131374
+    },
+    "bbb_penetrance": 0.025424049536715655,
+    "ic50_uM": 25.0,
+    "diffusivity_um2_s": 28.272776930855475,
+    "k_loss_s_inv": 0.006458385048131851,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.8312671319692542,
+    "dominant_limiter_inverts": true,
+    "delivery_dose_verdict_OFF": "dose",
+    "delivery_dose_verdict_ON": "delivery",
+    "delivery_dose_verdict_inverts": true,
+    "delivery_dose_verdict_defined": true,
+    "reproduction": {
+     "OFF.delivery": {
+      "got": 0.42881624044292116,
+      "published": 0.42881624044292116,
+      "abs_delta": 0.0
+     },
+     "OFF.dose": {
+      "got": 0.5711837595570788,
+      "published": 0.5711837595570788,
+      "abs_delta": 0.0
+     },
+     "ON.delivery": {
+      "got": 0.5411667175705747,
+      "published": 0.5411667175705747,
+      "abs_delta": 0.0
+     },
+     "ON.dose": {
+      "got": 0.4588332824294254,
+      "published": 0.4588332824294254,
+      "abs_delta": 0.0
+     }
+    }
+   }
+  },
+  "worst_abs_delta": 0.0
+ },
+ "census": {
+  "alpha": 22.223477711172563,
+  "config": "10x Xenium human GBM flagship section, dx = 12 um, repair = 1, dt = 10 s, 6 h window, convection ON, PKConfig(plasma_peak=50 uM, half_life=14400 s, n_doses=1)",
+  "library_source": "sorted(set(molecular.library.GBM_DRUGS) | {'palbociclib'}) \u2014 app/server/api.py::_known_drugs before user compounds",
+  "n_compounds": 13,
+  "compounds": {
+   "bevacizumab": {
+    "OFF": {
+     "kill_fraction": 0.0,
+     "n_tumor": 23812,
+     "n_survived": 23812,
+     "counts": {
+      "KILLED": 0,
+      "SURVIVED_UNREACHED": 23812,
+      "SURVIVED_UNDERDOSED": 0,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 1.0,
+      "dose": 0.0,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "delivery",
+     "dominant_share": 1.0,
+     "unreached_fraction_of_tumor": 1.0,
+     "mean_auc": 0.0,
+     "max_auc": 0.0,
+     "solve_s": 8311.677091121674
+    },
+    "ON": {
+     "kill_fraction": 0.0,
+     "n_tumor": 23812,
+     "n_survived": 23812,
+     "counts": {
+      "KILLED": 0,
+      "SURVIVED_UNREACHED": 23812,
+      "SURVIVED_UNDERDOSED": 0,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 1.0,
+      "dose": 0.0,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "delivery",
+     "dominant_share": 1.0,
+     "unreached_fraction_of_tumor": 1.0,
+     "mean_auc": 0.0,
+     "max_auc": 0.0,
+     "solve_s": 7700.778287887573
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 0,
+     "fraction_changed": 0.0,
+     "transitions": {}
+    },
+    "margin_OFF": {
+     "n_delivery": 23812,
+     "n_dose": 0,
+     "n_exposure_limited": 23812,
+     "n_survived": 23812,
+     "delivery_share_of_survivors": 1.0,
+     "delivery_share_of_exposure_limited": 1.0,
+     "distance_from_even_share": 0.5,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 11907,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.5000419956324542
+    },
+    "margin_ON": {
+     "n_delivery": 23812,
+     "n_dose": 0,
+     "n_exposure_limited": 23812,
+     "n_survived": 23812,
+     "delivery_share_of_survivors": 1.0,
+     "delivery_share_of_exposure_limited": 1.0,
+     "distance_from_even_share": 0.5,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 11907,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.5000419956324542
+    },
+    "bbb_penetrance": 0.0,
+    "ic50_uM": 25.0,
+    "diffusivity_um2_s": 3.597777441832083,
+    "k_loss_s_inv": 0.030409183276843447,
+    "degenerate_zero_source": true,
+    "arms_bit_identical": true,
+    "mean_auc_ratio_on_over_off": null,
+    "dominant_limiter_inverts": false,
+    "delivery_dose_verdict_OFF": "delivery",
+    "delivery_dose_verdict_ON": "delivery",
+    "delivery_dose_verdict_inverts": false,
+    "delivery_dose_verdict_defined": true
+   },
+   "carmustine": {
+    "OFF": {
+     "kill_fraction": 0.5123887115739962,
+     "n_tumor": 23812,
+     "n_survived": 11611,
+     "counts": {
+      "KILLED": 12201,
+      "SURVIVED_UNREACHED": 140,
+      "SURVIVED_UNDERDOSED": 0,
+      "SURVIVED_RESISTANT": 11413,
+      "SURVIVED_STOCHASTIC": 58,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.012057531651020584,
+      "dose": 0.0,
+      "resistance": 0.9829472052364138,
+      "chance": 0.00499526311256567,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.9829472052364138,
+     "unreached_fraction_of_tumor": 0.005879388543591466,
+     "mean_auc": 6791442.843182883,
+     "max_auc": 25621712.677709907,
+     "solve_s": 55.3758909702301
+    },
+    "ON": {
+     "kill_fraction": 0.25222576852007395,
+     "n_tumor": 23812,
+     "n_survived": 17806,
+     "counts": {
+      "KILLED": 6006,
+      "SURVIVED_UNREACHED": 140,
+      "SURVIVED_UNDERDOSED": 17230,
+      "SURVIVED_RESISTANT": 394,
+      "SURVIVED_STOCHASTIC": 42,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.007862518252274514,
+      "dose": 0.9676513534763563,
+      "resistance": 0.022127372795686846,
+      "chance": 0.0023587554756823543,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.9676513534763563,
+     "unreached_fraction_of_tumor": 0.005879388543591466,
+     "mean_auc": 422793.9527090407,
+     "max_auc": 675537.7831265838,
+     "solve_s": 48.70619583129883
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 17402,
+     "fraction_changed": 0.4256120527306968,
+     "transitions": {
+      "KILLED->SURVIVED_UNDERDOSED": 6023,
+      "SURVIVED_RESISTANT->SURVIVED_UNDERDOSED": 11150,
+      "KILLED->SURVIVED_RESISTANT": 131,
+      "SURVIVED_STOCHASTIC->SURVIVED_UNDERDOSED": 57,
+      "KILLED->SURVIVED_STOCHASTIC": 41
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 140,
+     "n_dose": 0,
+     "n_exposure_limited": 140,
+     "n_survived": 11611,
+     "delivery_share_of_survivors": 0.012057531651020584,
+     "delivery_share_of_exposure_limited": 1.0,
+     "distance_from_even_share": 0.5,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 71,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.5071428571428571
+    },
+    "margin_ON": {
+     "n_delivery": 140,
+     "n_dose": 17230,
+     "n_exposure_limited": 17370,
+     "n_survived": 17806,
+     "delivery_share_of_survivors": 0.007862518252274514,
+     "delivery_share_of_exposure_limited": 0.008059873344847437,
+     "distance_from_even_share": 0.4919401266551526,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 8546,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.49199769717904435
+    },
+    "bbb_penetrance": 0.9551190730480774,
+    "ic50_uM": 30.0,
+    "diffusivity_um2_s": 190.8315777329365,
+    "k_loss_s_inv": 0.0016452528680029287,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.062253921953187456,
+    "dominant_limiter_inverts": true,
+    "delivery_dose_verdict_OFF": "delivery",
+    "delivery_dose_verdict_ON": "dose",
+    "delivery_dose_verdict_inverts": true,
+    "delivery_dose_verdict_defined": true
+   },
+   "cisplatin": {
+    "OFF": {
+     "kill_fraction": 0.5167982529816899,
+     "n_tumor": 23812,
+     "n_survived": 11506,
+     "counts": {
+      "KILLED": 12306,
+      "SURVIVED_UNREACHED": 140,
+      "SURVIVED_UNDERDOSED": 0,
+      "SURVIVED_RESISTANT": 11325,
+      "SURVIVED_STOCHASTIC": 41,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.012167564748826699,
+      "dose": 0.0,
+      "resistance": 0.9842690770033026,
+      "chance": 0.0035633582478706762,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.9842690770033026,
+     "unreached_fraction_of_tumor": 0.005879388543591466,
+     "mean_auc": 7237530.912485865,
+     "max_auc": 43085732.29538577,
+     "solve_s": 50.16880488395691
+    },
+    "ON": {
+     "kill_fraction": 0.27213169830337647,
+     "n_tumor": 23812,
+     "n_survived": 17332,
+     "counts": {
+      "KILLED": 6480,
+      "SURVIVED_UNREACHED": 140,
+      "SURVIVED_UNDERDOSED": 4342,
+      "SURVIVED_RESISTANT": 12101,
+      "SURVIVED_STOCHASTIC": 749,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.008077544426494346,
+      "dose": 0.2505192707131318,
+      "resistance": 0.6981883221786291,
+      "chance": 0.04321486268174475,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.6981883221786291,
+     "unreached_fraction_of_tumor": 0.005879388543591466,
+     "mean_auc": 393913.8023802187,
+     "max_auc": 720919.0214131861,
+     "solve_s": 52.47545599937439
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 8761,
+     "fraction_changed": 0.21427348545992614,
+     "transitions": {
+      "KILLED->SURVIVED_STOCHASTIC": 710,
+      "KILLED->SURVIVED_RESISTANT": 3709,
+      "KILLED->SURVIVED_UNDERDOSED": 1407,
+      "SURVIVED_RESISTANT->SURVIVED_UNDERDOSED": 2933,
+      "SURVIVED_STOCHASTIC->SURVIVED_UNDERDOSED": 2
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 140,
+     "n_dose": 0,
+     "n_exposure_limited": 140,
+     "n_survived": 11506,
+     "delivery_share_of_survivors": 0.012167564748826699,
+     "delivery_share_of_exposure_limited": 1.0,
+     "distance_from_even_share": 0.5,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 71,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.5071428571428571
+    },
+    "margin_ON": {
+     "n_delivery": 140,
+     "n_dose": 4342,
+     "n_exposure_limited": 4482,
+     "n_survived": 17332,
+     "delivery_share_of_survivors": 0.008077544426494346,
+     "delivery_share_of_exposure_limited": 0.031236055332440876,
+     "distance_from_even_share": 0.4687639446675591,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 2102,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.46898705934850515
+    },
+    "bbb_penetrance": 0.8576798963736021,
+    "ic50_uM": 24.550285905059777,
+    "diffusivity_um2_s": 38.66961416320903,
+    "k_loss_s_inv": 0.0013785805317205642,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.05442654506672382,
+    "dominant_limiter_inverts": false,
+    "delivery_dose_verdict_OFF": "delivery",
+    "delivery_dose_verdict_ON": "dose",
+    "delivery_dose_verdict_inverts": true,
+    "delivery_dose_verdict_defined": true
+   },
+   "doxorubicin": {
+    "OFF": {
+     "kill_fraction": 0.4678313455400638,
+     "n_tumor": 23812,
+     "n_survived": 12672,
+     "counts": {
+      "KILLED": 11140,
+      "SURVIVED_UNREACHED": 142,
+      "SURVIVED_UNDERDOSED": 34,
+      "SURVIVED_RESISTANT": 12350,
+      "SURVIVED_STOCHASTIC": 146,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.01120580808080808,
+      "dose": 0.002683080808080808,
+      "resistance": 0.9745896464646465,
+      "chance": 0.011521464646464646,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.9745896464646465,
+     "unreached_fraction_of_tumor": 0.005963379808499916,
+     "mean_auc": 48715.972566414035,
+     "max_auc": 506333.24354705604,
+     "solve_s": 54.70611906051636
+    },
+    "ON": {
+     "kill_fraction": 0.45733243742650764,
+     "n_tumor": 23812,
+     "n_survived": 12922,
+     "counts": {
+      "KILLED": 10890,
+      "SURVIVED_UNREACHED": 142,
+      "SURVIVED_UNDERDOSED": 42,
+      "SURVIVED_RESISTANT": 12559,
+      "SURVIVED_STOCHASTIC": 179,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.01098901098901099,
+      "dose": 0.0032502708559046588,
+      "resistance": 0.971908373316824,
+      "chance": 0.013852344838260332,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.971908373316824,
+     "unreached_fraction_of_tumor": 0.005963379808499916,
+     "mean_auc": 40790.40650770557,
+     "max_auc": 307013.64642669243,
+     "solve_s": 54.18308782577515
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 257,
+     "fraction_changed": 0.006285616455107981,
+     "transitions": {
+      "KILLED->SURVIVED_RESISTANT": 216,
+      "KILLED->SURVIVED_STOCHASTIC": 33,
+      "SURVIVED_RESISTANT->SURVIVED_UNDERDOSED": 7,
+      "KILLED->SURVIVED_UNDERDOSED": 1
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 142,
+     "n_dose": 34,
+     "n_exposure_limited": 176,
+     "n_survived": 12672,
+     "delivery_share_of_survivors": 0.01120580808080808,
+     "delivery_share_of_exposure_limited": 0.8068181818181818,
+     "distance_from_even_share": 0.30681818181818177,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 55,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.3125
+    },
+    "margin_ON": {
+     "n_delivery": 142,
+     "n_dose": 42,
+     "n_exposure_limited": 184,
+     "n_survived": 12922,
+     "delivery_share_of_survivors": 0.01098901098901099,
+     "delivery_share_of_exposure_limited": 0.7717391304347826,
+     "distance_from_even_share": 0.2717391304347826,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 51,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.27717391304347827
+    },
+    "bbb_penetrance": 0.020567870235594195,
+    "ic50_uM": 0.5,
+    "diffusivity_um2_s": 27.92558262333494,
+    "k_loss_s_inv": 0.005035489904182864,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.8373107290857508,
+    "dominant_limiter_inverts": false,
+    "delivery_dose_verdict_OFF": "delivery",
+    "delivery_dose_verdict_ON": "delivery",
+    "delivery_dose_verdict_inverts": false,
+    "delivery_dose_verdict_defined": true
+   },
+   "etoposide": {
+    "OFF": {
+     "kill_fraction": 0.3296237191332101,
+     "n_tumor": 23812,
+     "n_survived": 15963,
+     "counts": {
+      "KILLED": 7849,
+      "SURVIVED_UNREACHED": 148,
+      "SURVIVED_UNDERDOSED": 3179,
+      "SURVIVED_RESISTANT": 12140,
+      "SURVIVED_STOCHASTIC": 496,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.009271440205475162,
+      "dose": 0.19914802981895632,
+      "resistance": 0.7605086763139761,
+      "chance": 0.031071853661592434,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.7605086763139761,
+     "unreached_fraction_of_tumor": 0.006215353603225265,
+     "mean_auc": 127225.27902338386,
+     "max_auc": 1184691.8491872735,
+     "solve_s": 51.12289619445801
+    },
+    "ON": {
+     "kill_fraction": 0.2809087854863094,
+     "n_tumor": 23812,
+     "n_survived": 17123,
+     "counts": {
+      "KILLED": 6689,
+      "SURVIVED_UNREACHED": 153,
+      "SURVIVED_UNDERDOSED": 6964,
+      "SURVIVED_RESISTANT": 9429,
+      "SURVIVED_STOCHASTIC": 577,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.008935350113881912,
+      "dose": 0.40670443263446826,
+      "resistance": 0.5506628511358991,
+      "chance": 0.03369736611575074,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.5506628511358991,
+     "unreached_fraction_of_tumor": 0.006425331765496389,
+     "mean_auc": 88184.0871242732,
+     "max_auc": 472500.9297850628,
+     "solve_s": 50.464277029037476
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 4594,
+     "fraction_changed": 0.11235845134150219,
+     "transitions": {
+      "KILLED->SURVIVED_STOCHASTIC": 133,
+      "KILLED->SURVIVED_RESISTANT": 666,
+      "SURVIVED_RESISTANT->SURVIVED_UNDERDOSED": 3377,
+      "KILLED->SURVIVED_UNDERDOSED": 361,
+      "SURVIVED_STOCHASTIC->SURVIVED_UNDERDOSED": 52,
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 5
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 148,
+     "n_dose": 3179,
+     "n_exposure_limited": 3327,
+     "n_survived": 15963,
+     "delivery_share_of_survivors": 0.009271440205475162,
+     "delivery_share_of_exposure_limited": 0.04448452058911933,
+     "distance_from_even_share": 0.45551547941088066,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 1516,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.4556657649534115
+    },
+    "margin_ON": {
+     "n_delivery": 153,
+     "n_dose": 6964,
+     "n_exposure_limited": 7117,
+     "n_survived": 17123,
+     "delivery_share_of_survivors": 0.008935350113881912,
+     "delivery_share_of_exposure_limited": 0.021497822116060137,
+     "distance_from_even_share": 0.47850217788393984,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 3406,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.47857243220458057
+    },
+    "bbb_penetrance": 0.038976330830128955,
+    "ic50_uM": 5.0,
+    "diffusivity_um2_s": 28.515702771215338,
+    "k_loss_s_inv": 0.003640864755199843,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.693133375703307,
+    "dominant_limiter_inverts": false,
+    "delivery_dose_verdict_OFF": "dose",
+    "delivery_dose_verdict_ON": "dose",
+    "delivery_dose_verdict_inverts": false,
+    "delivery_dose_verdict_defined": true
+   },
+   "irinotecan": {
+    "OFF": {
+     "kill_fraction": 0.2774231479926088,
+     "n_tumor": 23812,
+     "n_survived": 17206,
+     "counts": {
+      "KILLED": 6606,
+      "SURVIVED_UNREACHED": 142,
+      "SURVIVED_UNDERDOSED": 7668,
+      "SURVIVED_RESISTANT": 8822,
+      "SURVIVED_STOCHASTIC": 574,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.008252935022666512,
+      "dose": 0.44565849122399165,
+      "resistance": 0.5127281180983377,
+      "chance": 0.03336045565500407,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.5127281180983377,
+     "unreached_fraction_of_tumor": 0.005963379808499916,
+     "mean_auc": 198495.96473539836,
+     "max_auc": 1400264.9491850615,
+     "solve_s": 51.61524987220764
+    },
+    "ON": {
+     "kill_fraction": 0.2150176381656308,
+     "n_tumor": 23812,
+     "n_survived": 18692,
+     "counts": {
+      "KILLED": 5120,
+      "SURVIVED_UNREACHED": 147,
+      "SURVIVED_UNDERDOSED": 16596,
+      "SURVIVED_RESISTANT": 1731,
+      "SURVIVED_STOCHASTIC": 218,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.007864326984806335,
+      "dose": 0.8878664669377274,
+      "resistance": 0.09260646265782153,
+      "chance": 0.011662743419644768,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.8878664669377274,
+     "unreached_fraction_of_tumor": 0.00617335797077104,
+     "mean_auc": 125664.69851359799,
+     "max_auc": 485943.2619147187,
+     "solve_s": 47.58504009246826
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 9198,
+     "fraction_changed": 0.22496147919876733,
+     "transitions": {
+      "SURVIVED_STOCHASTIC->SURVIVED_UNDERDOSED": 435,
+      "SURVIVED_RESISTANT->SURVIVED_UNDERDOSED": 7272,
+      "KILLED->SURVIVED_UNDERDOSED": 1226,
+      "KILLED->SURVIVED_RESISTANT": 181,
+      "KILLED->SURVIVED_STOCHASTIC": 79,
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 5
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 142,
+     "n_dose": 7668,
+     "n_exposure_limited": 7810,
+     "n_survived": 17206,
+     "delivery_share_of_survivors": 0.008252935022666512,
+     "delivery_share_of_exposure_limited": 0.01818181818181818,
+     "distance_from_even_share": 0.4818181818181818,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 3764,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.48194622279129323
+    },
+    "margin_ON": {
+     "n_delivery": 147,
+     "n_dose": 16596,
+     "n_exposure_limited": 16743,
+     "n_survived": 18692,
+     "delivery_share_of_survivors": 0.007864326984806335,
+     "delivery_share_of_exposure_limited": 0.008779788568356926,
+     "distance_from_even_share": 0.4912202114316431,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 8225,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.4912500746580661
+    },
+    "bbb_penetrance": 0.1509140051361586,
+    "ic50_uM": 11.581766407272376,
+    "diffusivity_um2_s": 164.47118615470805,
+    "k_loss_s_inv": 0.009105412865364575,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.6330843988748747,
+    "dominant_limiter_inverts": true,
+    "delivery_dose_verdict_OFF": "dose",
+    "delivery_dose_verdict_ON": "dose",
+    "delivery_dose_verdict_inverts": false,
+    "delivery_dose_verdict_defined": true
+   },
+   "lomustine": {
+    "OFF": {
+     "kill_fraction": 0.4631278347051907,
+     "n_tumor": 23812,
+     "n_survived": 12784,
+     "counts": {
+      "KILLED": 11028,
+      "SURVIVED_UNREACHED": 140,
+      "SURVIVED_UNDERDOSED": 0,
+      "SURVIVED_RESISTANT": 12464,
+      "SURVIVED_STOCHASTIC": 180,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.01095118898623279,
+      "dose": 0.0,
+      "resistance": 0.9749687108886108,
+      "chance": 0.014080100125156446,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.9749687108886108,
+     "unreached_fraction_of_tumor": 0.005879388543591466,
+     "mean_auc": 3831102.4338620496,
+     "max_auc": 16604817.33832291,
+     "solve_s": 42.05946207046509
+    },
+    "ON": {
+     "kill_fraction": 0.16676465647572647,
+     "n_tumor": 23812,
+     "n_survived": 19841,
+     "counts": {
+      "KILLED": 3971,
+      "SURVIVED_UNREACHED": 140,
+      "SURVIVED_UNDERDOSED": 19701,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.007056095962905095,
+      "dose": 0.9929439040370949,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.9929439040370949,
+     "unreached_fraction_of_tumor": 0.005879388543591466,
+     "mean_auc": 392936.7476544729,
+     "max_auc": 667510.5525983401,
+     "solve_s": 44.2525839805603
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 19701,
+     "fraction_changed": 0.48184019370460046,
+     "transitions": {
+      "KILLED->SURVIVED_UNDERDOSED": 7057,
+      "SURVIVED_RESISTANT->SURVIVED_UNDERDOSED": 12464,
+      "SURVIVED_STOCHASTIC->SURVIVED_UNDERDOSED": 180
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 140,
+     "n_dose": 0,
+     "n_exposure_limited": 140,
+     "n_survived": 12784,
+     "delivery_share_of_survivors": 0.01095118898623279,
+     "delivery_share_of_exposure_limited": 1.0,
+     "distance_from_even_share": 0.5,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 71,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.5071428571428571
+    },
+    "margin_ON": {
+     "n_delivery": 140,
+     "n_dose": 19701,
+     "n_exposure_limited": 19841,
+     "n_survived": 19841,
+     "delivery_share_of_survivors": 0.007056095962905095,
+     "delivery_share_of_exposure_limited": 0.007056095962905095,
+     "distance_from_even_share": 0.4929439040370949,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 9781,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.49296910437981956
+    },
+    "bbb_penetrance": 0.9732974962235796,
+    "ic50_uM": 50.0,
+    "diffusivity_um2_s": 222.55577990239047,
+    "k_loss_s_inv": 0.0030111137150904605,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.10256492861726019,
+    "dominant_limiter_inverts": true,
+    "delivery_dose_verdict_OFF": "delivery",
+    "delivery_dose_verdict_ON": "dose",
+    "delivery_dose_verdict_inverts": true,
+    "delivery_dose_verdict_defined": true
+   },
+   "methotrexate": {
+    "OFF": {
+     "kill_fraction": 0.12628086678985384,
+     "n_tumor": 23812,
+     "n_survived": 20805,
+     "counts": {
+      "KILLED": 3007,
+      "SURVIVED_UNREACHED": 286,
+      "SURVIVED_UNDERDOSED": 20249,
+      "SURVIVED_RESISTANT": 256,
+      "SURVIVED_STOCHASTIC": 14,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.013746695505888008,
+      "dose": 0.9732756548906513,
+      "resistance": 0.012304734438836819,
+      "chance": 0.0006729151646238885,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.9732756548906513,
+     "unreached_fraction_of_tumor": 0.012010750881908281,
+     "mean_auc": 66106.60166209747,
+     "max_auc": 625685.7510480889,
+     "solve_s": 43.64667510986328
+    },
+    "ON": {
+     "kill_fraction": 0.10377120779438942,
+     "n_tumor": 23812,
+     "n_survived": 21341,
+     "counts": {
+      "KILLED": 2471,
+      "SURVIVED_UNREACHED": 462,
+      "SURVIVED_UNDERDOSED": 20826,
+      "SURVIVED_RESISTANT": 51,
+      "SURVIVED_STOCHASTIC": 2,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.021648470081064616,
+      "dose": 0.9758680474204583,
+      "resistance": 0.0023897661777798605,
+      "chance": 9.371632069724943e-05,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.9758680474204583,
+     "unreached_fraction_of_tumor": 0.01940198219385184,
+     "mean_auc": 53313.22294244058,
+     "max_auc": 348331.5733426468,
+     "solve_s": 44.314032793045044
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 933,
+     "fraction_changed": 0.022818988920683837,
+     "transitions": {
+      "KILLED->SURVIVED_UNDERDOSED": 532,
+      "SURVIVED_STOCHASTIC->SURVIVED_UNDERDOSED": 12,
+      "SURVIVED_RESISTANT->SURVIVED_UNDERDOSED": 209,
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 176,
+      "KILLED->SURVIVED_RESISTANT": 4
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 286,
+     "n_dose": 20249,
+     "n_exposure_limited": 20535,
+     "n_survived": 20805,
+     "delivery_share_of_survivors": 0.013746695505888008,
+     "delivery_share_of_exposure_limited": 0.013927440954467981,
+     "distance_from_even_share": 0.48607255904553204,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 9982,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.4860969077185293
+    },
+    "margin_ON": {
+     "n_delivery": 462,
+     "n_dose": 20826,
+     "n_exposure_limited": 21288,
+     "n_survived": 21341,
+     "delivery_share_of_survivors": 0.021648470081064616,
+     "delivery_share_of_exposure_limited": 0.021702367531003384,
+     "distance_from_even_share": 0.4782976324689966,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 10183,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.4783446072904923
+    },
+    "bbb_penetrance": 0.022507057604689518,
+    "ic50_uM": 12.000040202611336,
+    "diffusivity_um2_s": 30.060519376028456,
+    "k_loss_s_inv": 0.004051516416008092,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.8064735079705053,
+    "dominant_limiter_inverts": false,
+    "delivery_dose_verdict_OFF": "dose",
+    "delivery_dose_verdict_ON": "dose",
+    "delivery_dose_verdict_inverts": false,
+    "delivery_dose_verdict_defined": true
+   },
+   "palbociclib": {
+    "OFF": {
+     "kill_fraction": 0.29968083319334793,
+     "n_tumor": 23812,
+     "n_survived": 16676,
+     "counts": {
+      "KILLED": 7136,
+      "SURVIVED_UNREACHED": 140,
+      "SURVIVED_UNDERDOSED": 4512,
+      "SURVIVED_RESISTANT": 11428,
+      "SURVIVED_STOCHASTIC": 596,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.008395298632765651,
+      "dose": 0.27056848165027586,
+      "resistance": 0.6852962341088991,
+      "chance": 0.03573998560805949,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.6852962341088991,
+     "unreached_fraction_of_tumor": 0.005879388543591466,
+     "mean_auc": 1026817.797338334,
+     "max_auc": 6445606.589490667,
+     "solve_s": 43.39378905296326
+    },
+    "ON": {
+     "kill_fraction": 0.12203930791197715,
+     "n_tumor": 23812,
+     "n_survived": 20906,
+     "counts": {
+      "KILLED": 2906,
+      "SURVIVED_UNREACHED": 151,
+      "SURVIVED_UNDERDOSED": 20755,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.007222806849708218,
+      "dose": 0.9927771931502918,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.9927771931502918,
+     "unreached_fraction_of_tumor": 0.006341340500587939,
+     "mean_auc": 279675.0471505714,
+     "max_auc": 635642.1078115505,
+     "solve_s": 43.871254682540894
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 16265,
+     "fraction_changed": 0.39780370288844863,
+     "transitions": {
+      "KILLED->SURVIVED_UNDERDOSED": 4230,
+      "SURVIVED_STOCHASTIC->SURVIVED_UNDERDOSED": 596,
+      "SURVIVED_RESISTANT->SURVIVED_UNDERDOSED": 11428,
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 11
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 140,
+     "n_dose": 4512,
+     "n_exposure_limited": 4652,
+     "n_survived": 16676,
+     "delivery_share_of_survivors": 0.008395298632765651,
+     "delivery_share_of_exposure_limited": 0.03009458297506449,
+     "distance_from_even_share": 0.4699054170249355,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 2187,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.47012037833190023
+    },
+    "margin_ON": {
+     "n_delivery": 151,
+     "n_dose": 20755,
+     "n_exposure_limited": 20906,
+     "n_survived": 20906,
+     "delivery_share_of_survivors": 0.007222806849708218,
+     "delivery_share_of_exposure_limited": 0.007222806849708218,
+     "distance_from_even_share": 0.4927771931502918,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 10303,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.4928250263082369
+    },
+    "bbb_penetrance": 0.578756414591833,
+    "ic50_uM": 52.186247378767696,
+    "diffusivity_um2_s": 167.63608545065017,
+    "k_loss_s_inv": 0.006738195485894778,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.2723706658333457,
+    "dominant_limiter_inverts": true,
+    "delivery_dose_verdict_OFF": "dose",
+    "delivery_dose_verdict_ON": "dose",
+    "delivery_dose_verdict_inverts": false,
+    "delivery_dose_verdict_defined": true
+   },
+   "procarbazine": {
+    "OFF": {
+     "kill_fraction": 0.15080631614312112,
+     "n_tumor": 23812,
+     "n_survived": 20221,
+     "counts": {
+      "KILLED": 3591,
+      "SURVIVED_UNREACHED": 174,
+      "SURVIVED_UNDERDOSED": 19650,
+      "SURVIVED_RESISTANT": 372,
+      "SURVIVED_STOCHASTIC": 25,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.008604915681717026,
+      "dose": 0.971762029573216,
+      "resistance": 0.018396716285050196,
+      "chance": 0.0012363384600168142,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.971762029573216,
+     "unreached_fraction_of_tumor": 0.007307240047035108,
+     "mean_auc": 3407436.2498269863,
+     "max_auc": 26308196.833178442,
+     "solve_s": 44.63198494911194
+    },
+    "ON": {
+     "kill_fraction": 0.013018646060809713,
+     "n_tumor": 23812,
+     "n_survived": 23502,
+     "counts": {
+      "KILLED": 310,
+      "SURVIVED_UNREACHED": 23502,
+      "SURVIVED_UNDERDOSED": 0,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 1.0,
+      "dose": 0.0,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "delivery",
+     "dominant_share": 1.0,
+     "unreached_fraction_of_tumor": 0.9869813539391903,
+     "mean_auc": 332049.06943877845,
+     "max_auc": 706312.7625804051,
+     "solve_s": 42.704657793045044
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 23328,
+     "fraction_changed": 0.5705480959718248,
+     "transitions": {
+      "KILLED->SURVIVED_UNREACHED": 3281,
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 19650,
+      "SURVIVED_RESISTANT->SURVIVED_UNREACHED": 372,
+      "SURVIVED_STOCHASTIC->SURVIVED_UNREACHED": 25
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 174,
+     "n_dose": 19650,
+     "n_exposure_limited": 19824,
+     "n_survived": 20221,
+     "delivery_share_of_survivors": 0.008604915681717026,
+     "delivery_share_of_exposure_limited": 0.008777239709443099,
+     "distance_from_even_share": 0.4912227602905569,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 9739,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.491273204196933
+    },
+    "margin_ON": {
+     "n_delivery": 23502,
+     "n_dose": 0,
+     "n_exposure_limited": 23502,
+     "n_survived": 23502,
+     "delivery_share_of_survivors": 1.0,
+     "delivery_share_of_exposure_limited": 1.0,
+     "distance_from_even_share": 0.5,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 11752,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.5000425495702493
+    },
+    "bbb_penetrance": 0.8848562120299905,
+    "ic50_uM": 500.0,
+    "diffusivity_um2_s": 41.09530680541963,
+    "k_loss_s_inv": 0.003078928884705309,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.09744835855861965,
+    "dominant_limiter_inverts": true,
+    "delivery_dose_verdict_OFF": "dose",
+    "delivery_dose_verdict_ON": "delivery",
+    "delivery_dose_verdict_inverts": true,
+    "delivery_dose_verdict_defined": true
+   },
+   "ribociclib": {
+    "OFF": {
+     "kill_fraction": 0.3669998320174702,
+     "n_tumor": 23812,
+     "n_survived": 15073,
+     "counts": {
+      "KILLED": 8739,
+      "SURVIVED_UNREACHED": 140,
+      "SURVIVED_UNDERDOSED": 274,
+      "SURVIVED_RESISTANT": 14246,
+      "SURVIVED_STOCHASTIC": 413,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.00928813109533603,
+      "dose": 0.018178199429443376,
+      "resistance": 0.9451336827439794,
+      "chance": 0.02739998673124129,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.9451336827439794,
+     "unreached_fraction_of_tumor": 0.005879388543591466,
+     "mean_auc": 1572138.5012323088,
+     "max_auc": 9585165.60164938,
+     "solve_s": 44.20883512496948
+    },
+    "ON": {
+     "kill_fraction": 0.14043339492692763,
+     "n_tumor": 23812,
+     "n_survived": 20468,
+     "counts": {
+      "KILLED": 3344,
+      "SURVIVED_UNREACHED": 146,
+      "SURVIVED_UNDERDOSED": 20322,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.007133085792456518,
+      "dose": 0.9928669142075435,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.9928669142075435,
+     "unreached_fraction_of_tumor": 0.006131362338316815,
+     "mean_auc": 315042.2540368277,
+     "max_auc": 652787.0769239207,
+     "solve_s": 44.64108395576477
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 20059,
+     "fraction_changed": 0.4905960329689143,
+     "transitions": {
+      "KILLED->SURVIVED_UNDERDOSED": 5394,
+      "SURVIVED_RESISTANT->SURVIVED_UNDERDOSED": 14246,
+      "SURVIVED_STOCHASTIC->SURVIVED_UNDERDOSED": 413,
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 5,
+      "KILLED->SURVIVED_UNREACHED": 1
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 140,
+     "n_dose": 274,
+     "n_exposure_limited": 414,
+     "n_survived": 15073,
+     "delivery_share_of_survivors": 0.00928813109533603,
+     "delivery_share_of_exposure_limited": 0.33816425120772947,
+     "distance_from_even_share": 0.16183574879227053,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 68,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.1642512077294686
+    },
+    "margin_ON": {
+     "n_delivery": 146,
+     "n_dose": 20322,
+     "n_exposure_limited": 20468,
+     "n_survived": 20468,
+     "delivery_share_of_survivors": 0.007133085792456518,
+     "delivery_share_of_exposure_limited": 0.007133085792456518,
+     "distance_from_even_share": 0.49286691420754347,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 10089,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.4929157709595466
+    },
+    "bbb_penetrance": 0.7995183083447064,
+    "ic50_uM": 50.042017373304844,
+    "diffusivity_um2_s": 163.7300730248994,
+    "k_loss_s_inv": 0.006075060633586194,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.20039090308511892,
+    "dominant_limiter_inverts": true,
+    "delivery_dose_verdict_OFF": "dose",
+    "delivery_dose_verdict_ON": "dose",
+    "delivery_dose_verdict_inverts": false,
+    "delivery_dose_verdict_defined": true
+   },
+   "temozolomide": {
+    "OFF": {
+     "kill_fraction": 0.10683688896354782,
+     "n_tumor": 23812,
+     "n_survived": 21268,
+     "counts": {
+      "KILLED": 2544,
+      "SURVIVED_UNREACHED": 150,
+      "SURVIVED_UNDERDOSED": 21118,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.00705284935113786,
+      "dose": 0.9929471506488622,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "dose",
+     "dominant_share": 0.9929471506488622,
+     "unreached_fraction_of_tumor": 0.006299344868133714,
+     "mean_auc": 2735049.332861138,
+     "max_auc": 11363598.506222347,
+     "solve_s": 43.41658020019531
+    },
+    "ON": {
+     "kill_fraction": 0.012094742146816717,
+     "n_tumor": 23812,
+     "n_survived": 23524,
+     "counts": {
+      "KILLED": 288,
+      "SURVIVED_UNREACHED": 23524,
+      "SURVIVED_UNDERDOSED": 0,
+      "SURVIVED_RESISTANT": 0,
+      "SURVIVED_STOCHASTIC": 0,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 1.0,
+      "dose": 0.0,
+      "resistance": 0.0,
+      "chance": 0.0,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "delivery",
+     "dominant_share": 1.0,
+     "unreached_fraction_of_tumor": 0.9879052578531833,
+     "mean_auc": 383094.1554564118,
+     "max_auc": 703362.2496813986,
+     "solve_s": 43.06178593635559
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 23374,
+     "fraction_changed": 0.5716731479443344,
+     "transitions": {
+      "KILLED->SURVIVED_UNREACHED": 2256,
+      "SURVIVED_UNDERDOSED->SURVIVED_UNREACHED": 21118
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 150,
+     "n_dose": 21118,
+     "n_exposure_limited": 21268,
+     "n_survived": 21268,
+     "delivery_share_of_survivors": 0.00705284935113786,
+     "delivery_share_of_exposure_limited": 0.00705284935113786,
+     "distance_from_even_share": 0.49294715064886213,
+     "delivery_dose_verdict": "dose",
+     "cells_to_flip": 10485,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.4929941696445364
+    },
+    "margin_ON": {
+     "n_delivery": 23524,
+     "n_dose": 0,
+     "n_exposure_limited": 23524,
+     "n_survived": 23524,
+     "delivery_share_of_survivors": 1.0,
+     "delivery_share_of_exposure_limited": 1.0,
+     "distance_from_even_share": 0.5,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 11763,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.5000425097772487
+    },
+    "bbb_penetrance": 0.12537158358322562,
+    "ic50_uM": 606.0466722391783,
+    "diffusivity_um2_s": 42.42451626119539,
+    "k_loss_s_inv": 0.0005007608329708451,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.14006846269776663,
+    "dominant_limiter_inverts": true,
+    "delivery_dose_verdict_OFF": "dose",
+    "delivery_dose_verdict_ON": "delivery",
+    "delivery_dose_verdict_inverts": true,
+    "delivery_dose_verdict_defined": true
+   },
+   "vincristine": {
+    "OFF": {
+     "kill_fraction": 0.5212077943893836,
+     "n_tumor": 23812,
+     "n_survived": 11401,
+     "counts": {
+      "KILLED": 12411,
+      "SURVIVED_UNREACHED": 140,
+      "SURVIVED_UNDERDOSED": 4,
+      "SURVIVED_RESISTANT": 11225,
+      "SURVIVED_STOCHASTIC": 32,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.01227962459433383,
+      "dose": 0.00035084641698096656,
+      "resistance": 0.9845627576528375,
+      "chance": 0.0028067713358477324,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.9845627576528375,
+     "unreached_fraction_of_tumor": 0.005879388543591466,
+     "mean_auc": 20525.628840827845,
+     "max_auc": 202602.4463759091,
+     "solve_s": 44.04171085357666
+    },
+    "ON": {
+     "kill_fraction": 0.5201159079455737,
+     "n_tumor": 23812,
+     "n_survived": 11427,
+     "counts": {
+      "KILLED": 12385,
+      "SURVIVED_UNREACHED": 140,
+      "SURVIVED_UNDERDOSED": 5,
+      "SURVIVED_RESISTANT": 11248,
+      "SURVIVED_STOCHASTIC": 34,
+      "UNATTRIBUTED": 0,
+      "ALREADY_DEAD": 0,
+      "NOT_TUMOR": 17075
+     },
+     "survival_breakdown": {
+      "delivery": 0.012251684606633412,
+      "dose": 0.00043756016452262185,
+      "resistance": 0.9843353461100901,
+      "chance": 0.002975409118753829,
+      "unattributed": 0.0
+     },
+     "dominant_limiter": "resistance",
+     "dominant_share": 0.9843353461100901,
+     "unreached_fraction_of_tumor": 0.005879388543591466,
+     "mean_auc": 19034.381286517244,
+     "max_auc": 160336.26086975116,
+     "solve_s": 45.01896810531616
+    },
+    "per_cell": {
+     "n_cells": 40887,
+     "n_changed": 27,
+     "fraction_changed": 0.0006603565925599824,
+     "transitions": {
+      "KILLED->SURVIVED_RESISTANT": 24,
+      "KILLED->SURVIVED_STOCHASTIC": 2,
+      "SURVIVED_RESISTANT->SURVIVED_UNDERDOSED": 1
+     }
+    },
+    "margin_OFF": {
+     "n_delivery": 140,
+     "n_dose": 4,
+     "n_exposure_limited": 144,
+     "n_survived": 11401,
+     "delivery_share_of_survivors": 0.01227962459433383,
+     "delivery_share_of_exposure_limited": 0.9722222222222222,
+     "distance_from_even_share": 0.4722222222222222,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 69,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.4791666666666667
+    },
+    "margin_ON": {
+     "n_delivery": 140,
+     "n_dose": 5,
+     "n_exposure_limited": 145,
+     "n_survived": 11427,
+     "delivery_share_of_survivors": 0.012251684606633412,
+     "delivery_share_of_exposure_limited": 0.9655172413793104,
+     "distance_from_even_share": 0.4655172413793104,
+     "delivery_dose_verdict": "delivery",
+     "cells_to_flip": 68,
+     "cells_to_flip_as_fraction_of_exposure_limited": 0.4689655172413793
+    },
+    "bbb_penetrance": 0.022940644056664503,
+    "ic50_uM": 0.05,
+    "diffusivity_um2_s": 100.37372923348208,
+    "k_loss_s_inv": 0.013407340433828465,
+    "degenerate_zero_source": false,
+    "arms_bit_identical": false,
+    "mean_auc_ratio_on_over_off": 0.9273470466666367,
+    "dominant_limiter_inverts": false,
+    "delivery_dose_verdict_OFF": "delivery",
+    "delivery_dose_verdict_ON": "delivery",
+    "delivery_dose_verdict_inverts": false,
+    "delivery_dose_verdict_defined": true
+   }
+  },
+  "degenerate_zero_source": [
+   "bevacizumab"
+  ],
+  "scored_compounds": [
+   "carmustine",
+   "cisplatin",
+   "doxorubicin",
+   "etoposide",
+   "irinotecan",
+   "lomustine",
+   "methotrexate",
+   "palbociclib",
+   "procarbazine",
+   "ribociclib",
+   "temozolomide",
+   "vincristine"
+  ],
+  "n_scored": 12,
+  "dominant_limiter_inverting_compounds": [
+   "carmustine",
+   "irinotecan",
+   "lomustine",
+   "palbociclib",
+   "procarbazine",
+   "ribociclib",
+   "temozolomide"
+  ],
+  "n_dominant_limiter_inverting": 7,
+  "dominant_limiter_inversion_rate": 0.5833333333333334,
+  "delivery_dose_scored_compounds": [
+   "carmustine",
+   "cisplatin",
+   "doxorubicin",
+   "etoposide",
+   "irinotecan",
+   "lomustine",
+   "methotrexate",
+   "palbociclib",
+   "procarbazine",
+   "ribociclib",
+   "temozolomide",
+   "vincristine"
+  ],
+  "delivery_dose_undefined_compounds": [],
+  "n_delivery_dose_scored": 12,
+  "delivery_dose_inverting_compounds": [
+   "carmustine",
+   "cisplatin",
+   "lomustine",
+   "procarbazine",
+   "temozolomide"
+  ],
+  "n_delivery_dose_inverting": 5,
+  "delivery_dose_inversion_rate": 0.4166666666666667,
+  "near_even_band": 0.05,
+  "near_miss_compounds": [],
+  "not_robust_compounds": [
+   "carmustine",
+   "cisplatin",
+   "lomustine",
+   "procarbazine",
+   "temozolomide"
+  ],
+  "n_not_robust": 5,
+  "not_robust_rate": 0.4166666666666667,
+  "near_even": {
+   "carmustine": {
+    "closest_distance_from_even": 0.4919401266551526,
+    "closest_cells_to_flip": 71,
+    "inverts": true
+   },
+   "cisplatin": {
+    "closest_distance_from_even": 0.4687639446675591,
+    "closest_cells_to_flip": 71,
+    "inverts": true
+   },
+   "doxorubicin": {
+    "closest_distance_from_even": 0.2717391304347826,
+    "closest_cells_to_flip": 51,
+    "inverts": false
+   },
+   "etoposide": {
+    "closest_distance_from_even": 0.45551547941088066,
+    "closest_cells_to_flip": 1516,
+    "inverts": false
+   },
+   "irinotecan": {
+    "closest_distance_from_even": 0.4818181818181818,
+    "closest_cells_to_flip": 3764,
+    "inverts": false
+   },
+   "lomustine": {
+    "closest_distance_from_even": 0.4929439040370949,
+    "closest_cells_to_flip": 71,
+    "inverts": true
+   },
+   "methotrexate": {
+    "closest_distance_from_even": 0.4782976324689966,
+    "closest_cells_to_flip": 9982,
+    "inverts": false
+   },
+   "palbociclib": {
+    "closest_distance_from_even": 0.4699054170249355,
+    "closest_cells_to_flip": 2187,
+    "inverts": false
+   },
+   "procarbazine": {
+    "closest_distance_from_even": 0.4912227602905569,
+    "closest_cells_to_flip": 9739,
+    "inverts": true
+   },
+   "ribociclib": {
+    "closest_distance_from_even": 0.16183574879227053,
+    "closest_cells_to_flip": 68,
+    "inverts": false
+   },
+   "temozolomide": {
+    "closest_distance_from_even": 0.49294715064886213,
+    "closest_cells_to_flip": 10485,
+    "inverts": true
+   },
+   "vincristine": {
+    "closest_distance_from_even": 0.4655172413793104,
+    "closest_cells_to_flip": 68,
+    "inverts": false
+   }
+  },
+  "panel_churn": {
+   "bevacizumab": 0.0,
+   "carmustine": 0.4256120527306968,
+   "cisplatin": 0.21427348545992614,
+   "doxorubicin": 0.006285616455107981,
+   "etoposide": 0.11235845134150219,
+   "irinotecan": 0.22496147919876733,
+   "lomustine": 0.48184019370460046,
+   "methotrexate": 0.022818988920683837,
+   "palbociclib": 0.39780370288844863,
+   "procarbazine": 0.5705480959718248,
+   "ribociclib": 0.4905960329689143,
+   "temozolomide": 0.5716731479443344,
+   "vincristine": 0.0006603565925599824
+  },
+  "max_churn_fraction": 0.5716731479443344,
+  "total_cells_changed": 143899
+ },
+ "checks": [
+  "A ok \u2014 the split strictly reduced exposure on all 12 live-source compounds; an inert flag would have tied them.",
+  "B ok \u2014 reproduces \u00a74.2's doxorubicin and daunorubicin delivery:dose splits to 0.000e+00.",
+  "C ok \u2014 143,899 label changes counted between the arms across the panel, each reconciling with its transition matrix.",
+  "D ok \u2014 1 zero-source compound(s) ['bevacizumab'] detected by value, bit-identical across the arms, delivery share exactly 1.0, and excluded from the inversion denominator."
+ ],
+ "microenvironment_build_s": 2.663395881652832,
+ "runtime_s": 25502.49360370636
+}
