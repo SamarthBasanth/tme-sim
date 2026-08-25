@@ -14,6 +14,18 @@
    ========================================================================== */
 
 :root {
+  /*
+   * The page commits to ONE ground, and this is what makes that deliberate
+   * rather than accidental. Every colour below is a dark-ground value and
+   * there is no `prefers-color-scheme` branch anywhere in this file — the
+   * subject is a viridis-ramped point cloud whose low end IS the background,
+   * and inverting that would throw away the bottom third of the ramp. Saying
+   * so here is what stops the browser painting its own light-mode furniture
+   * (scrollbars, form controls, the canvas before first paint) around a page
+   * that is black in every other respect.
+   */
+  color-scheme: dark;
+
   --bg: #07080a;
   --bg-panel: rgba(16, 18, 21, 0.72);
   --ink: #f3f5f6;
@@ -828,6 +840,33 @@ body::after {
  * them read that way rather than as two unrelated cards. They sit on opposite
  * sides because each is placed opposite its section's copy.
  */
+/*
+ * SQUARE, AND ON A GAP RHYTHM. Two changes, one argument.
+ *
+ * (1) THE RADIUS IS GONE. These were the only 10px-rounded, shadowed cards on
+ *     a page whose own most successful device is explicitly "mono, hairline
+ *     rules, no card, no radius, no shadow" — see the header above `.specimen`
+ *     and the docstring on SectionLedger, which says it borrows that register
+ *     deliberately. So the page was shipping two design languages: the ledger
+ *     and the specimen read as figure captions in a paper, and these two read
+ *     as dashboard widgets bolted on beside them. Side by side in the
+ *     reduced-motion layout — where a ledger and a panel sit in facing columns
+ *     of the same grid — the mismatch is the first thing the eye catches.
+ *     Squaring them costs nothing and makes the whole page one object.
+ *
+ *     The backdrop blur STAYS. It is not decoration here: these float over an
+ *     additively-blended point cloud, and it is the only thing guaranteeing
+ *     the readout is legible against whatever the scene is doing underneath.
+ *     A radius was never doing that job.
+ *
+ * (2) THE INTERNAL RHYTHM IS A `gap`, NOT FOUR MARGINS. Every child used to
+ *     carry its own margin-top/bottom (0.9rem on the header, 0.95rem on the
+ *     rows, 0.85-0.9rem on the footnote), which meant the spacing between any
+ *     two of them was whichever margin happened to be larger, and adding or
+ *     removing a block silently changed the block above it. One `gap` on the
+ *     column states the rhythm once. The children's margins are zeroed at
+ *     their own rules rather than here, so each still reads correctly alone.
+ */
 .metric-overlay,
 .attribution {
   position: absolute;
@@ -836,10 +875,13 @@ body::after {
   width: min(19rem, 84vw);
   padding: 1.1rem 1.25rem 1rem;
   border: 1px solid var(--hairline);
-  border-radius: 10px;
+  border-radius: 2px;
   background: var(--bg-panel);
   backdrop-filter: blur(14px);
   will-change: opacity, transform;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
 }
 
 .metric-overlay {
@@ -870,12 +912,24 @@ body::after {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-dim);
-  margin-bottom: 0.9rem;
+  /* Spacing is the panel column's `gap`; the rule is what separates the
+     masthead from the readout, the same way `.specimen` and every
+     `.ledger__row` separate one band from the next. */
+  margin-bottom: 0;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--hairline);
 }
 
+/*
+ * The run identifier. It was a 999px pill, which is the one shape on this page
+ * that means "button" (`.cta-button`) — so a string nobody can click was
+ * wearing the affordance of the only two things that can be. Squared to 2px it
+ * reads as what it is: a field on an instrument, boxed because it is a
+ * separate value from the label beside it.
+ */
 .attribution__tag {
   padding: 0.15rem 0.45rem;
-  border-radius: 999px;
+  border-radius: 2px;
   border: 1px solid var(--hairline);
   color: var(--ink-faint);
   letter-spacing: 0.03em;
@@ -885,10 +939,19 @@ body::after {
 /* Segment widths come straight from the values. The resistance sliver is
    meant to be nearly invisible -- that it is 0.3% and not 30% is the finding,
    so it is not given a minimum width to make it "readable". */
+/*
+ * A DISTRIBUTION STRIP, NOT A PROGRESS BAR. At 999px with one segment holding
+ * 99.8% of the width, this rendered as a full, round-ended yellow pill — the
+ * exact shape of a completed download. It is not a proportion of anything
+ * being filled; it is three shares of one population, and a squared strip with
+ * butted segments is how that is drawn. The radius was also the reason the
+ * 0.3% resistance sliver disappeared entirely: rounded ends eat the first and
+ * last few pixels, which are the only pixels that sliver has.
+ */
 .attribution__bar {
   display: flex;
   height: 6px;
-  border-radius: 999px;
+  border-radius: 0;
   overflow: hidden;
   background: var(--hairline);
 }
@@ -914,7 +977,8 @@ body::after {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin: 0.95rem 0 0;
+  /* Spacing is the panel column's `gap`. */
+  margin: 0;
 }
 
 .attribution__row {
@@ -932,10 +996,13 @@ body::after {
   color: var(--ink-dim);
 }
 
+/* Square, for the reason `.specimen__swatch` is square and states outright:
+   these are classes, not points on a chart. The two legends on this page now
+   draw a category key the same way. */
 .attribution__swatch {
   width: 7px;
   height: 7px;
-  border-radius: 2px;
+  border-radius: 0;
   flex: none;
   transform: translateY(-1px);
 }
@@ -955,10 +1022,34 @@ body::after {
   color: var(--ink);
 }
 
-.attribution__footnote {
-  margin: 0.9rem 0 0;
+/*
+ * THIS SELECTOR CARRIES ITS OWN BLOCK FOR SPECIFICITY, AND THE BUG IT FIXES
+ * WAS MEASURED, NOT SUSPECTED.
+ *
+ * Both panel footnotes are <p>. Bare `.attribution__footnote` is (0,1,0) and
+ * loses to `.reduced-motion-section p` (0,1,1), so in the reduced-motion
+ * experience — and ONLY there — these rendered at 16.64px against the 10.4px
+ * intended, a 60% overshoot, italic, at body leading. Measured on the built
+ * page at 1512x950 with `prefers-reduced-motion: reduce`.
+ *
+ * The consequence is not cosmetic. The footnote is the caveat: "one compound,
+ * one section, one run", "spot platforms estimate them". Set at body size it
+ * was LARGER than the numbers it qualifies and roughly doubled the panel's
+ * height, which is why the attribution card overran its own column there. A
+ * page arguing that its limits are legible cannot render the same panel two
+ * different ways depending on which experience you were served.
+ *
+ * `.attribution .attribution__footnote` is (0,2,0) and wins in both, without
+ * `!important` — the same fix, for the same reason, that `.ledger
+ * .ledger__caption` already carries. `.specimen__note` solved this with
+ * `!important`; these two were simply missed when it was.
+ */
+.attribution .attribution__footnote {
+  /* Spacing is the panel column's `gap`. */
+  margin: 0;
   font-size: 0.65rem;
   line-height: 1.45;
+  max-width: none;
   color: var(--ink-faint);
   font-style: italic;
 }
@@ -973,12 +1064,16 @@ body::after {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-faint);
-  margin-bottom: 0.75rem;
+  /* Matches `.attribution__header`: the two panels are one device appearing
+     twice, so they take the same masthead rule and the same column gap. */
+  margin-bottom: 0;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--hairline);
 }
 
 .metric-overlay__tag {
   padding: 0.15rem 0.45rem;
-  border-radius: 999px;
+  border-radius: 2px;
   border: 1px solid var(--hairline);
   color: var(--ink-dim);
   letter-spacing: 0.03em;
@@ -1015,11 +1110,15 @@ body::after {
   color: var(--ink);
 }
 
+/* Squared, for the reason `.attribution__bar` is squared: a round-ended bar
+   is the shape of something filling up, and these are two readings on a shared
+   scale. Butted ends also mean the 0.43 and the 0.86 can be compared by eye
+   against the same left edge, which is the entire point of drawing them. */
 .metric-overlay__bar {
   display: inline-block;
   width: 4.5rem;
   height: 3px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--hairline);
   overflow: hidden;
 }
@@ -1033,8 +1132,11 @@ body::after {
 
 /* The headline spread is the conclusion of the two bars above it, so it gets
    a rule to sit under rather than being a third identical row. */
+/* The margin-top this used to carry ADDED to `.metric-overlay__grid`'s own
+   0.55rem `gap` — two declarations describing one space, which is how a gap
+   silently becomes 0.7rem. The padding stays: that one is the distance from
+   the rule to the text, which is a different measurement and belongs here. */
 .metric-overlay__row--total {
-  margin-top: 0.15rem;
   padding-top: 0.6rem;
   border-top: 1px solid var(--hairline);
 }
@@ -1051,7 +1153,9 @@ body::after {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  margin: 0.6rem 0 0;
+  /* Spacing is the panel column's `gap`; the left rule is what marks these as
+     subordinate to the reading above, and it does that at any distance. */
+  margin: 0;
   padding-left: 0.75rem;
   border-left: 1px solid var(--hairline);
 }
@@ -1076,10 +1180,16 @@ body::after {
   color: var(--ink-dim);
 }
 
-.metric-overlay__footnote {
-  margin: 0.85rem 0 0;
+/* Specificity, for the reason set out in full above
+   `.attribution .attribution__footnote`: bare `.metric-overlay__footnote` is
+   (0,1,0) and lost to `.reduced-motion-section p`, so this rendered at 16.64px
+   instead of 10.4px in the reduced-motion experience alone. */
+.metric-overlay .metric-overlay__footnote {
+  /* Spacing is the panel column's `gap`. */
+  margin: 0;
   font-size: 0.65rem;
   line-height: 1.45;
+  max-width: none;
   color: var(--ink-faint);
   font-style: italic;
 }
@@ -1184,7 +1294,11 @@ body::after {
   transform: translateY(0);
   background: rgba(7, 8, 10, 0.68);
   backdrop-filter: blur(6px);
-  border-radius: 0 4px 4px 0;
+  /* Square, like the two panels and the ledger. This one is a callout pinned
+     to a coordinate in the scene, so a rounded corner reads as a tooltip —
+     something the interface is saying — rather than as a label on the
+     specimen, which is what it is. */
+  border-radius: 0;
   box-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
 }
 
@@ -1193,7 +1307,7 @@ body::after {
   border-right: 2px solid var(--accent);
   align-items: flex-end;
   text-align: right;
-  border-radius: 4px 0 0 4px;
+  border-radius: 0;
 }
 
 .annotation-label__title {
@@ -1207,6 +1321,9 @@ body::after {
 .annotation-label__detail {
   font-family: var(--font-mono);
   font-size: 0.6rem;
+  /* Carries a measured quantity ("250 um mean"), and the camera moves this
+     label every frame — tabular figures keep it from breathing as it goes. */
+  font-variant-numeric: tabular-nums;
   color: rgba(243, 245, 246, 0.72);
 }
 
@@ -1258,6 +1375,11 @@ body::after {
   font-family: var(--font-mono);
   font-size: 0.64rem;
   letter-spacing: 0.03em;
+  /* This string counts ("Loading model - 47%"), so it is the one place on the
+     page where a digit is replaced several times a second. Redundant on a
+     monospace, stated for the same reason `.specimen__facts dd` states it: if
+     the fallback face is ever reached the label must still not twitch. */
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
 }
 
@@ -1280,6 +1402,37 @@ body::after {
   height: 88svh;
   min-height: 32rem;
   overflow: hidden;
+}
+
+/*
+ * THE HANDOFF. This stage clips at `overflow: hidden` at 88svh, so the point
+ * cloud simply stopped at a horizontal line and the specimen caption began
+ * underneath it — the tissue read as a cropped image pasted above the copy
+ * rather than as the thing the copy is about. The pinned experience never has
+ * this problem because its scene is the full viewport and the beats travel
+ * over it.
+ *
+ * A short fall to the page's own ground over the last few rem lets the
+ * specimen dissolve into the page instead of being cut off by it. It is the
+ * same device the narrative scrims use — a falloff to `--bg`, no new hue, no
+ * new hard edge — and it sits above the canvas and below the copy, so it can
+ * never touch a word or a control.
+ *
+ * NOT A DECORATIVE GRADIENT: it exists to remove an edge, and it is short
+ * enough (6rem of an ~740px stage) that the tissue keeps the frame it is the
+ * subject of. `pointer-events: none` because the canvas underneath is the
+ * thing a visitor should be able to reach.
+ */
+.reduced-motion-experience__stage::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6rem;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(7, 8, 10, 0) 0%, var(--bg) 100%);
 }
 
 /*
@@ -1467,11 +1620,45 @@ body::after {
   margin-top: 0.5rem;
 }
 
+/*
+ * IN THIS EXPERIENCE THE PANELS SHED THE CARD ENTIRELY, AND THE REASON IS THAT
+ * THE CARD WAS ONLY EVER A CONTRAST GUARANTEE.
+ *
+ * Everything that makes these look like cards in the pinned experience — the
+ * translucent fill, the 14px backdrop blur, the 1px frame — exists for one
+ * job: they float over 40,887 additively blended cells, and without a ground
+ * of their own the readout is set on whatever the scene happens to be doing.
+ * That is a real requirement and it is why the blur survives the squaring
+ * above.
+ *
+ * NONE OF IT APPLIES HERE. This fallback renders the scene ONCE, in the hero
+ * stage, and never again — the same fact the `--paired` block above is built
+ * on. From beat 02 down there is nothing behind these but flat `--bg`. So the
+ * frame was guarding against a background that is not there, and the cost was
+ * visible: in the two-column layout a bordered, filled, blurred card sits in
+ * one column facing a ledger that is explicitly "no card, no radius, no
+ * shadow" in the other. Two design languages, one spread, and the mismatch is
+ * the first thing the eye catches at 1512x950.
+ *
+ * Stripped, what is left is exactly the ledger's own construction: a mono
+ * masthead, a hairline under it, ruled rows, a small caveat at the bottom. The
+ * two instruments become the same instrument, which is what they always
+ * claimed to be. The padding goes with the frame so the readout sets on the
+ * column's own left edge, level with the ledger opposite and with the copy.
+ *
+ * The pinned experience is untouched: it keeps the fill, the blur and the
+ * frame, because there it is still floating over the specimen.
+ */
 .reduced-motion-section__metric .metric-overlay,
 .reduced-motion-section__metric .attribution {
   position: static;
   width: 100%;
   max-width: 22rem;
+  border: none;
+  border-radius: 0;
+  background: none;
+  backdrop-filter: none;
+  padding: 0;
 }
 
 /*
@@ -1666,7 +1853,15 @@ body::after {
    * possible lines. Beat 03 (--right, so the LEFT is bare) lost "scored blind
    * against 71 measured compounds ... it recovers only about a quarter of
    * their measured spread" — the clause lib/copy.ts requires to travel in the
-   * same sentence as the claim. Beat 04 (--left, so the RIGHT is bare) lost
+   * same sentence as the claim.
+   *
+   *   (THAT WORDING IS THE 2026-08 ONE AND IS QUOTED AS IT WAS, NOT AS IT IS.
+   *   Beat 03 now reads "scored unfitted on 68 measured compounds"; the "0.718
+   *   blind on 71" form was withdrawn and lib/copy.ts keeps it quoted at the
+   *   top of the file so it cannot drift back. The incident above happened to
+   *   the old sentence, so rewriting it would misdescribe what was measured —
+   *   but a reader should not go looking in copy.ts for a clause that is no
+   *   longer there, which is why this note exists rather than an edit.) Beat 04 (--left, so the RIGHT is bare) lost
    * "1.08-1.21x — smaller, and measured", the number that beat exists to
    * state. Beat 02 lost the PMID on the 41x FAIL row, and beat 05 lost the
    * verdict "1.08-1.21x, NOT 2.0x" on the spatial-spread row.
@@ -1815,6 +2010,16 @@ body::after {
 /* radius, no shadow. It should read as a figure caption in a paper.      */
 /* --------------------------------------------------------------------- */
 
+/*
+ * ONE RHYTHM, SET ONCE. The four blocks used to space themselves with three
+ * different margins (0.7rem under the id, 1.05rem under the facts, 1.05rem
+ * under the legend), which is three numbers describing one relationship and
+ * an invitation for a fourth block to be added at a fourth value. The stated
+ * goal of this element is that "facts and legend both sit on one baseline
+ * grid so the block reads as a single instrument readout rather than three
+ * stacked lists" — a uniform `gap` is what that sentence actually asks for,
+ * and it moves the block's overall height by under a pixel.
+ */
 .specimen {
   margin: 2.6rem 0 0;
   padding-top: 1.15rem;
@@ -1822,6 +2027,9 @@ body::after {
   max-width: 32rem;
   font-family: var(--font-mono, ui-monospace, "SFMono-Regular", Menlo, monospace);
   text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
 }
 
 .specimen__id {
@@ -1837,7 +2045,8 @@ body::after {
   display: flex;
   flex-wrap: wrap;
   gap: 0 2rem;
-  margin: 0.7rem 0 0;
+  /* Spacing is the block's `gap`. */
+  margin: 0;
 }
 
 .specimen__facts div {
@@ -1868,7 +2077,8 @@ body::after {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem 1.1rem;
-  margin: 1.05rem 0 0;
+  /* Spacing is the block's `gap`. */
+  margin: 0;
   padding: 0;
   list-style: none;
   font-size: 0.72rem;
@@ -1894,10 +2104,19 @@ body::after {
   color: var(--ink-faint);
 }
 
-.specimen__note {
-  /* overrides .narrative-section p, which is sized for body copy */
-  margin: 1.05rem 0 0;
-  font-size: 0.63rem !important;
+/*
+ * Specificity rather than `!important`. This is a <p>, so bare
+ * `.specimen__note` (0,1,0) loses to `.narrative-section p` and
+ * `.reduced-motion-section p` (both 0,1,1) and the note would set at body
+ * size. `!important` was the original answer; `.specimen .specimen__note` is
+ * (0,2,0), wins in both experiences on the cascade alone, and matches how
+ * `.ledger .ledger__caption` and the two panel footnotes solve the identical
+ * problem. One technique, four places.
+ */
+.specimen .specimen__note {
+  /* Spacing is the block's `gap`. */
+  margin: 0;
+  font-size: 0.63rem;
   line-height: 1.5;
   color: var(--ink-faint);
   max-width: 30rem;
@@ -1933,13 +2152,38 @@ body::after {
  * (0,1,1) and `.reduced-motion-section p` (0,1,1). `.ledger .ledger__caption`
  * is (0,2,0) and wins in both experiences without !important.
  */
+/*
+ * SET IN INK, NOT IN THE ACCENT, AND THE REASON IS A COLLISION THAT ONLY
+ * SHOWS UP IN ONE LAYOUT.
+ *
+ * The accent's job on this page is to say WHERE YOU ARE: it is the colour of
+ * `.narrative-section__kicker`, the six-beat position indicator, and of the
+ * progress rail that tracks the same thing. This caption was taking the same
+ * colour at almost the same size in the same case, which made it a second
+ * eyebrow.
+ *
+ * Harmless in the pinned experience, where a headline and a paragraph sit
+ * between them. Not harmless in the reduced-motion `--paired` grid, which
+ * deliberately lines the ledger caption up with the beat's eyebrow on ONE
+ * baseline so the two columns read as a spread (see the `--paired` block
+ * above). Measured at 1512x950 under `prefers-reduced-motion`, beat 02 put
+ * "02 - TRANSPORT PHYSICS" and "INTERSTITIAL PRESSURE - REGISTERED AGAINST
+ * WICK-IN-NEEDLE" at the same y, in the same cyan, in the same mono, at the
+ * same size — two section markers, one beat.
+ *
+ * Dropping the accent keeps the alignment doing the job it was built for
+ * while making the pair legible as what it is: a position marker on the left,
+ * the name of an instrument on the right. Nothing else about the caption
+ * changes — same face, same case, same tracking — so it still reads as a mono
+ * label and not as prose.
+ */
 .ledger .ledger__caption {
   font-family: var(--font-mono);
   font-size: 0.58rem;
   line-height: 1.45;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--ink-dim);
   margin: 0 0 0.15rem;
   max-width: none;
 }
@@ -1991,13 +2235,40 @@ body::after {
  * verdict is "1.08-1.21x, NOT 2.0x", and a wide mono breaking it across two
  * lines would put a number on a line of its own where it reads as a heading.
  */
+/*
+ * THE VERDICT WAS THE SMALLEST TEXT IN ITS OWN ROW. Measured on the built page:
+ * label 15.20px, detail 11.92px, verdict 9.36px. So on the block this page
+ * exists to show — a product listing its own registered failures — the payload
+ * was set smaller than the sentence explaining it, and a reader scanning the
+ * column was reading the least legible thing in it. That is a hierarchy
+ * inversion, not a subtlety: "FAIL - 41x LOW" and "NOT DEFENSIBLE" are the
+ * finding, and the evidence line under them is the footnote to it.
+ *
+ * Raised to sit level with the detail rather than beneath it, and given the
+ * weight that a wide mono needs at this size to hold against a 600-weight
+ * display label on the same baseline. Tracking comes down a touch because
+ * tracking that reads as deliberate at 9px reads as loose at 11.
+ *
+ * NOTHING ELSE ABOUT THIS COLUMN CHANGES, AND THE THING THAT MOST MATTERS IS
+ * STILL TRUE: no colour. Severity is carried by mono, uppercase, weight and a
+ * hairline rule and by nothing else. A red/amber/green chip would render a
+ * registered limit as an exception to a working product, and on this page the
+ * limits ARE the product surface. See SectionLedger.tsx.
+ *
+ * The row does not get taller on desktop: the verdict shares the label's
+ * baseline in an `auto` track, and at 11px its ascent and descent both sit
+ * inside the 15.2px label's, so the row box is unchanged. The narrow layout,
+ * where the verdict drops onto its own line and height IS at stake, keeps a
+ * smaller value in the 820px query below.
+ */
 .ledger__state {
   margin: 0;
   grid-column: 2;
   justify-self: end;
   font-family: var(--font-mono);
-  font-size: 0.585rem;
-  letter-spacing: 0.055em;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.045em;
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -2124,11 +2395,36 @@ body::after {
     grid-template-columns: 1fr;
   }
 
+  /*
+   * THE SIZE STAYS PUT HERE, AND THE MEASUREMENT IS WHY.
+   *
+   * The desktop rule above raises the verdict because there it is free: it
+   * shares the label's baseline in an `auto` track and the row box does not
+   * move. Measured at 1512x950, every one of the six beats came out at exactly
+   * the same bottom edge before and after — 0px on all six.
+   *
+   * At this width the verdict drops onto its own LINE, so it pays for its size
+   * in height once per row. Measured at 390x844, taking it to 0.64rem moved
+   * beat 02 by +5px, beat 05 by +8px and beat 06 by +2px — and beat 06 already
+   * sets to 811px against a budget of roughly 805 (the arrival transform
+   * translates a beat by up to 26px while it fades in, and `.scroll-pin` clips
+   * silently, so a row that does not fit does not degrade — it disappears).
+   * Buying a legibility improvement with a clipped disclosure is the exact
+   * trade this page is not allowed to make.
+   *
+   * So the narrow layout takes the half of the fix that is free. COLOUR costs
+   * no pixels: the verdict comes up from `--ink-dim` to full `--ink`, which is
+   * what it is set in at every other width, and stops the payload being the
+   * faintest thing in its own row. Stacking already gives it a line of its own,
+   * which is the prominence the desktop row was buying with size.
+   */
   .ledger__state {
     grid-column: 1;
     justify-self: start;
     margin-top: 0.16rem;
-    color: var(--ink-dim);
+    font-size: 0.585rem;
+    letter-spacing: 0.055em;
+    color: var(--ink);
   }
 }
 
