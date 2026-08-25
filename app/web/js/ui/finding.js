@@ -281,26 +281,41 @@ export function createFindingPanel() {
     const jl = mech.joint_limited;
     if (jl) {
       el.appendChild(h('div.caveat.crit', h('span',
-        h('b', 'THIS VERDICT CAN REVERSE, AND IT DOES ON ONE SHIPPED '
-          + 'COMPOUND. '),
+        h('b', 'THIS VERDICT REVERSES FOR 7 OF THE 12 SHIPPED COMPOUNDS. '),
         'The transport law has no transvascular exchange resistance — drug '
         + 'crosses the vessel wall without one, a term the engine ships '
-        + 'switched OFF. Measured on this section at the shipped parameters, '
-        + 'with nothing scaled: for DAUNORUBICIN the dominant limiter flips '
-        + 'from DOSE (delivery 0.429 / dose 0.571) to DELIVERY '
-        + '(0.541 / 0.459) when that term is switched on. Opposite readings, '
-        + 'same tissue, same inputs. DOXORUBICIN does not flip but lands at '
-        + '0.497 / 0.503, one cell away from it. Between 3.4% and 6.8% of '
-        + 'cells change their per-cell label, almost all of them in the same '
-        + 'direction: dose-limited becoming delivery-limited. ',
-        h('b', 'So read a near-even split as undecided, not as a finding. '),
-        'The term is not switched on because doing so needs a per-compound '
-        + 'wall permeability and a tissue surface-to-volume ratio that are '
-        + 'not measured here — that would replace an incomplete law with an '
-        + 'unvalidated one. There is also a physical bound this law does not '
-        + 'respect: tissue exposure rises exactly in proportion to entry '
-        + 'without limit, so nothing stops it exceeding the plasma level it '
-        + 'came from. See results/permeability_split.md.')));
+        + 'switched OFF. Switching it on at the shipped parameters, nothing '
+        + 'scaled, flips the dominant limiter for '
+        + '58% of the panel (7 of 12; bevacizumab excluded, its source is '
+        + 'identically zero). Up to 57% of tumour cells change their per-cell '
+        + 'label. ',
+        h('b', 'TEMOZOLOMIDE IS ONE OF THEM — it flips DOSE to DELIVERY, with '
+          + '57.2% of its cells relabelled. '),
+        'That is the compound this Studio opens on, so if this run is '
+        + 'temozolomide the verdict above is one of the unstable ones.',
+        h('br'), h('br'),
+        h('b', 'WHICH ONES CAN BE TRUSTED, AND THE RULE IS MECHANICAL. '),
+        'A verdict is stable exactly where the missing term would not have '
+        + 'mattered much: every compound that inverts loses most of its '
+        + 'exposure under the split (0.06 to 0.63 of the original), and every '
+        + 'compound that holds keeps most of it (0.69 to 0.93). On this '
+        + 'section the stable ones are VINCRISTINE, DOXORUBICIN, METHOTREXATE '
+        + 'and ETOPOSIDE. Read a near-even split as undecided, not as a '
+        + 'finding.',
+        h('br'), h('br'),
+        'Neither arm is the truth. The term is not switched on because doing '
+        + 'so needs a per-compound wall permeability and a tissue '
+        + 'surface-to-volume ratio that are not measured here — the implied '
+        + 'value spans 0.0206 to 0.102 um/s entirely on a vessel radius nobody '
+        + 'has measured, which would replace an incomplete law with an '
+        + 'unvalidated one. What the census establishes is not that the other '
+        + 'answer is right, but that for most of the panel this answer is NOT '
+        + 'DETERMINED BY THE DATA: two defensible treatments of the same '
+        + 'missing physics disagree. There is also a physical bound this law '
+        + 'does not respect: tissue exposure rises exactly in proportion to '
+        + 'entry without limit, so nothing stops it exceeding the plasma level '
+        + 'it came from. See results/verdict_inversion_census.md and '
+        + 'results/permeability_split.md.')));
     }
 
     /* ---- WHAT WOULD REFUTE IT -------------------------------------------
