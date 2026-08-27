@@ -12,7 +12,7 @@ import { h } from '../util/dom.js';
 import { setApiKey } from '../api.js';
 
 /**
- * @param {(key: string) => Promise<boolean>} onSubmit - try the key against
+ * @param {(key: string, remember: boolean) => Promise<boolean>} onSubmit - try the key against
  *   the real backend; resolve true if it worked (the gate then removes
  *   itself), false if the server still rejects it (shows an inline error).
  */
@@ -24,6 +24,10 @@ export function createApiKeyGate({ onSubmit }) {
     placeholder: 'X-API-Key value',
     style: { width: '100%', marginTop: 'var(--sp-4)' },
   });
+  // Default ON. The key was already persisted unconditionally before this
+  // existed, so the checkbox does not change the default behaviour -- it makes
+  // the behaviour VISIBLE and gives a shared or public machine a way out.
+  const remember = h('input', { type: 'checkbox', checked: true });
   const error = h('div.gate-error', { style: { display: 'none' } });
   const submitBtn = h('button.btn.primary', { type: 'submit' }, 'Connect');
 
@@ -35,7 +39,7 @@ export function createApiKeyGate({ onSubmit }) {
     submitBtn.textContent = 'Connecting…';
     error.style.display = 'none';
     try {
-      const ok = await onSubmit(key);
+      const ok = await onSubmit(key, remember.checked);
       if (!ok) {
         error.textContent = 'That key was rejected by the server. Check it and try again.';
         error.style.display = '';
@@ -50,10 +54,22 @@ export function createApiKeyGate({ onSubmit }) {
 
   const form = h('form.gate-card.notice', { onsubmit: submit },
     h('h3', 'Access key required'),
-    h('p', 'This Studio backend requires an API key on every request. ' +
-      'Enter the key you were given (printed once, at server start, next ' +
-      'to "api key" — see docs/DEPLOYMENT.md if you don’t have it).'),
+    h('p', 'This is a private deployment. Every /api/ request needs a key, '
+      + 'so that whoever runs this instance is not paying for anyone who '
+      + 'finds the URL.'),
+    h('p', { style: { color: 'var(--fg-2)' } },
+      'If someone shared this Studio with you, ask them for the key — there '
+      + 'is no self-service sign-up. If you are running it yourself, it is '
+      + 'the TMESIM_STUDIO_API_KEY you set on the host; with none set, the '
+      + 'server generates one and prints it once at startup next to '
+      + '"api key".'),
     input,
+    h('label.gate-remember', { style: { display: 'flex', gap: 'var(--sp-2)',
+                                        alignItems: 'center',
+                                        marginTop: 'var(--sp-3)',
+                                        fontSize: 'var(--fs-xs)',
+                                        color: 'var(--fg-2)' } },
+      remember, 'Stay signed in on this browser'),
     error,
     h('div.btn-row', { style: { marginTop: 'var(--sp-5)' } }, submitBtn),
   );
@@ -81,11 +97,13 @@ export async function ensureAuthenticated(probeFn) {
 
   await new Promise((resolve) => {
     const gate = createApiKeyGate({
-      onSubmit: async (key) => {
-        setApiKey(key);
+      onSubmit: async (key, remember) => {
+        setApiKey(key, remember !== false);
         const retry = await probeFn();
         if (retry.authRequired) {
-          setApiKey(''); // don't leave a confirmed-wrong key sitting in storage
+          // Confirmed wrong by the server. Clear it from BOTH stores so a
+          // reload does not silently retry a key already known to be rejected.
+          setApiKey('');
           return false;
         }
         gate.remove();

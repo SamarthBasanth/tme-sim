@@ -71,18 +71,32 @@ export const api = {
    * when this is true and clears it once a working key is stored. */
   authRequired: false,
   apiKey: (() => {
-    try { return localStorage.getItem(API_KEY_STORAGE) || ''; }
+    // localStorage first (stay signed in), then sessionStorage (this tab only).
+    try { return localStorage.getItem(API_KEY_STORAGE)
+                 || sessionStorage.getItem(API_KEY_STORAGE) || ''; }
     catch { return ''; }
   })(),
 };
 
 /** Persist a new key (or clear with '') and use it on every subsequent call. */
-export function setApiKey(key) {
+export function setApiKey(key, persist = true) {
   api.apiKey = key || '';
   try {
-    if (api.apiKey) localStorage.setItem(API_KEY_STORAGE, api.apiKey);
-    else localStorage.removeItem(API_KEY_STORAGE);
-  } catch { /* localStorage unavailable (private mode, etc.) -- key still works this session */ }
+    // `persist === false` is the shared/public-machine case: the key works for
+    // this tab and is gone when it closes. It is written to sessionStorage
+    // rather than nowhere so a RELOAD does not re-prompt -- re-entering a key
+    // on every refresh is what trains people to pick short ones.
+    if (api.apiKey && persist) {
+      localStorage.setItem(API_KEY_STORAGE, api.apiKey);
+      sessionStorage.removeItem(API_KEY_STORAGE);
+    } else if (api.apiKey) {
+      sessionStorage.setItem(API_KEY_STORAGE, api.apiKey);
+      localStorage.removeItem(API_KEY_STORAGE);
+    } else {
+      localStorage.removeItem(API_KEY_STORAGE);
+      sessionStorage.removeItem(API_KEY_STORAGE);
+    }
+  } catch { /* storage unavailable (private mode, etc.) -- key still works this session */ }
 }
 
 function setStub(on, why) {

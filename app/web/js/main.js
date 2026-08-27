@@ -263,9 +263,24 @@ async function boot() {
   const probe = await api.probe();
   paintBackendState(api.api);
   if (!probe.live) {
+    // TWO DIFFERENT FAILURES, TWO DIFFERENT REMEDIES. This toast used to say
+    // "start the server with ./.venv/bin/python -m app.server and reload" for
+    // both -- advice for a laptop, shown to whoever opened a hosted URL. On a
+    // free instance the overwhelmingly common cause is a container waking from
+    // a spin-down, where the remedy is to WAIT, and telling that reader to run
+    // a shell command is worse than saying nothing.
+    const why = api.api.stubReason || '';
+    const timedOut = /did not answer/.test(why);
     toast('warn',
-      'Backend unreachable — running on STUB DATA',
-      'Every number on screen is synthesised by js/mock.js against API_CONTRACT.md. Start the server with ./.venv/bin/python -m app.server and reload.',
+      timedOut
+        ? 'Server did not answer in time — showing STUB DATA'
+        : 'Backend unreachable — showing STUB DATA',
+      'Every number on screen is synthesised by js/mock.js and is NOT a '
+      + 'result. ' + (timedOut
+        ? 'This instance sleeps when idle and can take up to a minute to wake. '
+          + 'Reload in a moment and it should connect.'
+        : 'If you are running Studio locally, start it with '
+          + './.venv/bin/python -m app.server and reload.'),
       0);
   }
 
