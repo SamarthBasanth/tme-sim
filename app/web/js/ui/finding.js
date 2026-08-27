@@ -49,6 +49,7 @@
 import { h, clear } from '../util/dom.js';
 import { int, pct, num, NULL_GLYPH } from '../util/fmt.js';
 import { doseInputBlock } from './doseinput.js';
+import { MECH } from '../mechanism.js';
 import { jointLimitedCaveat } from './verdict.js';
 
 /** The limiter buckets, in the words a reader who has not read this repo can
@@ -96,9 +97,20 @@ const SURVIVAL_PHRASE = {
   },
 };
 
+/** The mechanism label each survival bucket colours the tissue by. Keyed on the
+ *  SURVIVAL_PHRASE `count` name so the mapping cannot drift from the labels the
+ *  engine actually emits (tmesim/sim/mechanism.py::LABEL_LIMITER). */
+const COUNT_TO_MECH = {
+  SURVIVED_UNREACHED: MECH.SURVIVED_UNREACHED,
+  SURVIVED_UNDERDOSED: MECH.SURVIVED_UNDERDOSED,
+  SURVIVED_RESISTANT: MECH.SURVIVED_RESISTANT,
+  SURVIVED_STOCHASTIC: MECH.SURVIVED_STOCHASTIC,
+  UNATTRIBUTED: MECH.UNATTRIBUTED,
+};
+
 /** One count / share / sentence row. */
-function row(n, share, text, emphasis) {
-  return h('div', {
+function row(n, share, text, emphasis, isolate) {
+  const node = h('div', {
     style: {
       display: 'grid',
       gridTemplateColumns: 'minmax(0, 5.5em) minmax(0, 4em) minmax(0, 1fr)',
@@ -128,6 +140,33 @@ function row(n, share, text, emphasis) {
       lineHeight: 'var(--lh-body)',
     },
   }, text));
+
+  // THE CLAIM IS A CONTROL. Until 2026-08-27 this panel stated the product's
+  // central finding — "21,094 of 21,140 surviving tumour cells had drug arrive
+  // and stay too weak" — as text, with no affordance of any kind: zero buttons,
+  // zero handlers, zero pointer cursors in the whole file. Meanwhile the viewer
+  // could already colour every cell by exactly that label, and isolate one
+  // bucket, behind a `colour by: mech` control in the top bar that a first-time
+  // reader has no reason to find.
+  //
+  // So the number and the picture of the number were one click apart, and
+  // nothing suggested the click. Clicking a row now colours the tissue by
+  // mechanism and shows ONLY that bucket, which turns the sentence into a map
+  // of where those cells are — the thing a reader actually wants next and the
+  // only way to see that the finding is spatially structured rather than
+  // uniform.
+  if (isolate) {
+    node.tabIndex = 0;
+    node.setAttribute('role', 'button');
+    node.style.cursor = 'pointer';
+    node.title = 'Show only these cells in the tissue view';
+    node.addEventListener('click', isolate);
+    node.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); isolate(); }
+    });
+    node.classList.add('finding-row--actionable');
+  }
+  return node;
 }
 
 function para(...kids) {
@@ -139,7 +178,7 @@ function para(...kids) {
   }, ...kids);
 }
 
-export function createFindingPanel() {
+export function createFindingPanel({ onIsolate } = {}) {
   const el = h('div');
 
   function empty(msg) {
@@ -207,7 +246,11 @@ export function createFindingPanel() {
       .sort((a, b) => b[1] - a[1]);
     entries.forEach(([k, v], i) => {
       const p = SURVIVAL_PHRASE[k];
-      el.appendChild(row(counts[p.count], v, p.lead, i === 0));
+      const code = COUNT_TO_MECH[p.count];
+      const act = (onIsolate && code !== undefined && counts[p.count])
+        ? () => onIsolate(code)
+        : null;
+      el.appendChild(row(counts[p.count], v, p.lead, i === 0, act));
     });
     // The rows above are shares of SURVIVORS and sum to 1 by construction. The
     // backend says so in its own words; quoting it keeps the denominator from

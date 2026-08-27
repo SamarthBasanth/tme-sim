@@ -156,6 +156,23 @@ async function boot() {
     regionEl: tools ? tools.regionEl : null,
     distanceEl: tools ? tools.distanceEl : null,
     mechanismEl: mechLegend ? mechLegend.node : null,
+    // Clicking a survival row on THE FINDING takes the reader from the claim
+    // to the picture of it: colour by mechanism, and show ONLY that bucket.
+    // Routed through setColourMode rather than straight at the viewer so the
+    // top-bar control, the mechanism legend and the stage all agree about what
+    // is being displayed -- a picture that disagrees with its own legend is
+    // worse than no picture.
+    onIsolateMechanism: (code) => {
+      if (!viewer || !viewer.labels) return;
+      setColourMode(COLOR_MODE.LABEL);
+      if (viewer.colorMode !== COLOR_MODE.LABEL) return;   // refused (no labels)
+      for (let i = 0; i < viewer.labelVis.length; i += 1) {
+        viewer.setLabelVisible(i, i === code);
+      }
+      if (mechLegend && mechLegend.refresh) mechLegend.refresh();
+      viewer.dirty = true;
+      tickOverlays();
+    },
   });
   // The tracked job's poll payload is already in the store (spec.js `poll`);
   // this is the only subscriber, and it exists so the top bar tells the truth

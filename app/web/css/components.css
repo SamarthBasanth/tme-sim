@@ -1582,3 +1582,53 @@ html[data-mode="stub"] .scalebar .txt::after {
   z-index: 1001;
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
 }
+
+/* THE FINDING's survival rows, when they are controls.
+ *
+ * Added 2026-08-27. finding.js states the product's central claim -- how many
+ * surviving tumour cells had drug arrive and stay too weak, versus how many
+ * were never reached -- and until now it had no affordance of any kind: no
+ * button, no handler, no pointer anywhere in the file. The viewer could already
+ * colour every cell by exactly that label and isolate one bucket, behind a
+ * `colour by: mech` control in the top bar that a first-time reader has no
+ * reason to find. The number and the picture of the number were one click
+ * apart and nothing suggested the click.
+ *
+ * The affordance is deliberately quiet: a hairline on the left that appears on
+ * hover, and the row's own text brightening. No button chrome, no radius, no
+ * fill -- this rail is a readout, and a row that looks like a button reads as
+ * an action the reader must take rather than an option they may take. The
+ * class is only applied when a handler is actually attached (finding.js), so a
+ * zero-count bucket -- which isolates to an empty picture -- never invites a
+ * click it cannot honour. */
+.finding-row--actionable {
+  position: relative;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+.finding-row--actionable::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.finding-row--actionable:hover::before,
+.finding-row--actionable:focus-visible::before {
+  opacity: 1;
+}
+.finding-row--actionable:hover,
+.finding-row--actionable:focus-visible {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.finding-row--actionable:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .finding-row--actionable,
+  .finding-row--actionable::before { transition: none; }
+}

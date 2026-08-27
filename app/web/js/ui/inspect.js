@@ -147,7 +147,7 @@ export function caveatNode(text, n, extra) {
 }
 
 export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
-  windowLevelEl, profileEl, regionEl, distanceEl, mechanismEl }) {
+  windowLevelEl, profileEl, regionEl, distanceEl, mechanismEl, onIsolateMechanism }) {
   /* ------------------------------------------------------- channels ---- */
   const chanList = h('div');
   const chanRows = [];
@@ -301,7 +301,14 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   /* --------------------------------------------------------- metrics -- */
 
   const metricsEl = h('div');
-  const findingPanel = createFindingPanel();
+  // Clicking a survival row on THE FINDING isolates that bucket in the tissue
+  // view. The callback is supplied by main.js rather than done here, because
+  // switching colour mode also has to sync the top-bar control -- doing it
+  // directly on the viewer would leave the picture and the control disagreeing
+  // about what is on screen.
+  const findingPanel = createFindingPanel({
+    onIsolate: onIsolateMechanism || null,
+  });
   const reachPanel = createReachPanel();
   const provEl = h('dl.kv');
   const caveatsEl = h('div.caveats');
