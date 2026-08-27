@@ -88,9 +88,37 @@ export function createMechanismLegend(viewer, { onToggle } = {}) {
     // No 'mechanism' word here any more: the section's own <summary> says it
     // one line above, and a card that repeats its container's title is how a
     // rail ends up with two headings per section.
+    // SHOW ALL, and it only exists when something is hidden.
+    //
+    // Rows here toggle one category at a time, which was fine while toggling
+    // was the only way to hide anything -- you turned one off, you turned it
+    // back on. Then THE FINDING gained a click that ISOLATES a category
+    // (finding.js -> main.js onIsolateMechanism), which turns six rows off at
+    // once. Getting back meant clicking all six. A one-click action that takes
+    // six clicks to undo is a trap, and the undo belongs on the legend that
+    // owns the visibility state rather than on the panel that triggered it.
+    //
+    // Rendered only when at least one category is hidden, so it is absent in
+    // the ordinary case and cannot read as a control the reader has to think
+    // about before they have hidden anything.
+    const anyHidden = Array.prototype.some.call(
+      viewer.labelVis, (v, i) => i < MECH_META.length && !v);
+    const showAll = h('button.btn.ghost.tiny', {
+      type: 'button',
+      title: 'Show every category again',
+      onclick: () => {
+        for (let i = 0; i < viewer.labelVis.length; i += 1) {
+          viewer.setLabelVisible(i, true);
+        }
+        render();
+        if (onToggle) onToggle(null, true);
+      },
+    }, 'show all');
+
     fill(title,
       headline,
       h('span.grow'),
+      anyHidden ? showAll : null,
       h('span.mono', { style: { color: 'var(--fg-2)' } },
         `${int(nTumor)} tumour cells`));
 

@@ -322,9 +322,22 @@ export function createFindingPanel({ onIsolate } = {}) {
      * law known to be incomplete for one that is unvalidated, which is not
      * progress — it would only move the uncertainty somewhere less visible. */
     const jl = mech.joint_limited;
+    const vstab = (run.extra_metrics || {}).verdict_stability || null;
     if (jl) {
       el.appendChild(h('div.caveat.crit', h('span',
-        h('b', 'THIS VERDICT REVERSES FOR 7 OF THE 12 SHIPPED COMPOUNDS. '),
+        // Lead with THIS run's compound when the backend scored it. A reader
+        // looking at a temozolomide run was previously told the rate for the
+        // panel and left to work out which side they were on -- while the
+        // answer was known, measured, and now travels with the run
+        // (extra_metrics.verdict_stability). Absent means NOT SCORED, and is
+        // rendered as the general rate rather than as reassurance.
+        vstab && vstab.stable === false
+          ? h('b', `THIS VERDICT REVERSES FOR ${String(vstab.compound).toUpperCase()} `
+              + '— THE COMPOUND IN THIS RUN. ')
+          : (vstab && vstab.stable === true
+             ? h('b', `THIS VERDICT HOLDS FOR ${String(vstab.compound).toUpperCase()} `
+                 + '— but it reverses for 7 of the 12 shipped compounds. ')
+             : h('b', 'THIS VERDICT REVERSES FOR 7 OF THE 12 SHIPPED COMPOUNDS. ')),
         'The transport law has no transvascular exchange resistance — drug '
         + 'crosses the vessel wall without one, a term the engine ships '
         + 'switched OFF. Switching it on at the shipped parameters, nothing '
@@ -332,10 +345,12 @@ export function createFindingPanel({ onIsolate } = {}) {
         + '58% of the panel (7 of 12; bevacizumab excluded, its source is '
         + 'identically zero). Up to 57% of tumour cells change their per-cell '
         + 'label. ',
-        h('b', 'TEMOZOLOMIDE IS ONE OF THEM — it flips DOSE to DELIVERY, with '
-          + '57.2% of its cells relabelled. '),
-        'That is the compound this Studio opens on, so if this run is '
-        + 'temozolomide the verdict above is one of the unstable ones.',
+        vstab
+          ? vstab.note + ' Measured on ' + vstab.measured_on + '; see '
+            + vstab.source + '.'
+          : 'This run\u2019s compound was not one of the twelve scored, so '
+            + 'nothing here says which side it falls on — absence from that '
+            + 'census is not evidence of stability.',
         h('br'), h('br'),
         h('b', 'WHICH ONES CAN BE TRUSTED, AND THE RULE IS MECHANICAL. '),
         'A verdict is stable exactly where the missing term would not have '

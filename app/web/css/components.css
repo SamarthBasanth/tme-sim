@@ -1632,3 +1632,19 @@ html[data-mode="stub"] .scalebar .txt::after {
   .finding-row--actionable,
   .finding-row--actionable::before { transition: none; }
 }
+
+/* A button that has to sit INSIDE a heading row without becoming the heading.
+ *
+ * Added 2026-08-27 for the mechanism legend's "show all", which appears in the
+ * title row beside the kill percentage and only while a category is hidden. At
+ * the full control height it out-weighed the headline it sits next to, which
+ * inverts the row: the reset is a recovery affordance, not the point of the
+ * card. Sized to the row's own type instead of to the control grid, and left
+ * on .ghost so it carries no fill until hovered. */
+.btn.tiny {
+  height: auto;
+  padding: 2px var(--sp-3);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+}

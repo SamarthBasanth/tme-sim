@@ -193,6 +193,71 @@ CLAIM_SET_LOG = (
 )
 
 
+#: Which compounds' delivery/dose verdict SURVIVES the transvascular exchange
+#: term the transport law does not have.
+#:
+#: results/verdict_inversion_census.md measured the whole shipped library on the
+#: flagship section, exchange OFF vs ON at the shipped PS with nothing scaled.
+#: The dominant limiter INVERTS for 7 of the 12 scored compounds -- 58.3 % --
+#: including temozolomide, which is the compound the Studio opens on.
+#:
+#: The rule is mechanical rather than a list of names: a verdict holds exactly
+#: where the missing term would not have mattered much. Every compound that
+#: inverts loses most of its exposure under the split (mean AUC ON/OFF
+#: 0.062-0.633); every compound that holds keeps most of it (0.693-0.927).
+#: These four are the ones that held.
+#:
+#: Kept HERE and not in the browser because it is a measured result, not a
+#: display choice: a client-side list has no provenance, cannot be asserted
+#: against, and would not survive into result.json with the run it describes.
+VERDICT_STABLE_COMPOUNDS: frozenset = frozenset({
+    "vincristine", "doxorubicin", "methotrexate", "etoposide",
+})
+
+#: Measured on the flagship only. Naming the section stops the flag being read
+#: as a property of the compound anywhere.
+VERDICT_STABILITY_SECTION = "xenium_319"
+
+
+def verdict_stability(drug_name) -> Dict:
+    """Is THIS compound's delivery/dose verdict robust to the missing term?
+
+    Returns ``None`` for a compound the census did not score, rather than
+    guessing: the census covered one library on one section, and absence from
+    it is not evidence of stability.
+    """
+    if not drug_name:
+        return None
+    key = str(drug_name).strip().lower()
+    if key not in _CENSUS_SCORED:
+        return None
+    stable = key in VERDICT_STABLE_COMPOUNDS
+    return {
+        "compound": key,
+        "stable": stable,
+        "measured_on": VERDICT_STABILITY_SECTION,
+        "source": "results/verdict_inversion_census.md",
+        "note": (
+            f"{key} KEEPS its delivery/dose verdict when the missing "
+            "transvascular exchange term is switched on."
+            if stable else
+            f"{key} REVERSES its delivery/dose verdict when the missing "
+            "transvascular exchange term is switched on, so the verdict above "
+            "is one of the unstable ones."
+        ),
+    }
+
+
+#: The 12 compounds the census actually scored. bevacizumab is excluded by
+#: value, not by name: bbb_penetrance = 0 makes its source identically zero and
+#: both arms bit-identical, so its verdict is an INPUT rather than a finding.
+_CENSUS_SCORED: frozenset = frozenset({
+    "carmustine", "cisplatin", "doxorubicin", "etoposide", "irinotecan",
+    "lomustine", "methotrexate", "palbociclib", "procarbazine", "ribociclib",
+    "temozolomide", "vincristine",
+})
+
+
 def claim_set_stamp() -> Dict:
     """The stamp written into a run executing NOW, beside its caveats.
 
@@ -1076,6 +1141,10 @@ def execute_run(spec: Dict, ctx: _Ctx,
         # the two read ~5.96 (mean) and ~3.71 (peak) -- both above 1, so that
         # run does violate it; on a short window they can sit below 1 while the
         # law is exactly as unbounded. Quote the peak one.
+        # Whether THIS compound's verdict survives the term the model lacks.
+        # None when the census did not score it -- absence is not evidence of
+        # stability, and a missing flag must not render as a reassuring one.
+        "verdict_stability": verdict_stability(drug_name),
         "plasma_peak_over_ic50": (
             float(res.extras["plasma_peak"]) / float(dp.ic50)
             if float(dp.ic50) > 0 else None),
