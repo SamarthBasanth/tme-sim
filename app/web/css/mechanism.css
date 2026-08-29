@@ -113,6 +113,9 @@
 .mechleg .m-note b { color: var(--fg-1); font-weight: 600; }
 .mechleg .m-bad { color: var(--crit); }
 .mechleg .m-ok  { color: var(--ok); }
+/* Neither green nor red: in stub mode the reconciliation passes by
+   construction, so it must not wear the colour that means "checked". */
+.mechleg .m-note-syn { color: var(--synthetic); }
 
 /* the delivery / dose / resistance / chance roll-up */
 .mechleg .m-bar {

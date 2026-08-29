@@ -656,8 +656,15 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   const na = (what) => h('div.dim', { style: { padding: 'var(--sp-4) var(--sp-5)' } },
     `${what} is unavailable without WebGL2.`);
 
+  // The hint is a LABEL for the section, and it was the one hint on this rail
+  // that stated a RESULT: on a run with no attribution the header read
+  // "reconciles with kill_fraction" directly above a body reading "this run
+  // carries no per-cell attribution", so the summary asserted an audit of
+  // something that does not exist. It now says what the section IS; whether
+  // the reconciliation holds is the legend's own last line, which is where a
+  // reader can see the number it holds against.
   const mechSect = h('details.sect', { open: true, id: 'sect-mech' },
-    h('summary', sectTitle('Mechanism'), h('span.hint', 'reconciles with kill_fraction')),
+    h('summary', sectTitle('Mechanism'), h('span.hint', 'why each survivor survived')),
     h('div.sect-body', mechanismEl || na('Mechanism')));
 
   const railBody = h('div.rail-body',

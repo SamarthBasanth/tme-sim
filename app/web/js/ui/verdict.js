@@ -33,6 +33,7 @@
 
 import { h } from '../util/dom.js';
 import { int, pct } from '../util/fmt.js';
+import { isSynthetic } from './provenance.js';
 
 /**
  * "Too weak" is not "more would work".
@@ -73,7 +74,11 @@ export function jointLimitedCaveat(run, opts) {
           fontSize: 'var(--fs-disclosure)', color: 'var(--fg-2)',
           lineHeight: 'var(--lh-body)', margin: 'var(--sp-2) 0 0',
         },
-        title: 'The backend\'s own wording for this limit, verbatim.',
-      }, 'backend · ' + String(jl.note))
+        title: isSynthetic()
+          ? 'js/mock.js\'s wording for this limit. There is no backend in this '
+            + 'session; against a live one this line is the backend\'s own '
+            + 'sentence, verbatim.'
+          : 'The backend\'s own wording for this limit, verbatim.',
+      }, (isSynthetic() ? 'js/mock.js · ' : 'backend · ') + String(jl.note))
       : null));
 }

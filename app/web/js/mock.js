@@ -358,11 +358,464 @@ export function validateSpec(spec) {
   return { ok: errors.length === 0, errors, warnings };
 }
 
+/* ------------------------------------------- verdict stability --------- */
+//
+// A MIRROR OF app/server/jobs.py::verdict_stability, AND IT HAS TO BE ONE.
+//
+// THE FINDING prints, directly under its verdict sentence, whether that
+// verdict survives the transvascular exchange term the transport law does not
+// have. When extra_metrics.verdict_stability is absent the panel falls back to
+// "this run's compound was not one of the twelve scored" -- which on the
+// hosted demo told every visitor that TEMOZOLOMIDE, the compound the Studio
+// opens on and one the census scored as REVERSING, had not been looked at.
+// The panel's most important caveat read as an absence of evidence when the
+// evidence exists and says the opposite.
+//
+// Three tiers, same as the server: the delivery/dose verdict inverts (5 of
+// 12), it holds while the four-way dominant limiter inverts (3 of 12), or both
+// hold (4 of 12). tests/test_verdict_stability.py asserts THESE lists and the
+// Python ones against results/verdict_inversion_census_data.json, so the copy
+// here cannot drift from the copy there or from the run that measured either.
+const VERDICT_REVERSING = ['carmustine', 'cisplatin', 'lomustine', 'procarbazine', 'temozolomide'];
+const VERDICT_LIMITER_ONLY = ['irinotecan', 'palbociclib', 'ribociclib'];
+const VERDICT_STABLE = ['doxorubicin', 'etoposide', 'methotrexate', 'vincristine'];
+const VERDICT_SECTION = 'xenium_319';
+
+function verdictStability(drugName) {
+  if (!drugName) return null;
+  const key = String(drugName).trim().toLowerCase();
+  const reverses = VERDICT_REVERSING.includes(key);
+  const limiterOnly = VERDICT_LIMITER_ONLY.includes(key);
+  const holds = VERDICT_STABLE.includes(key);
+  // Absent from all three means the census did not score it, and absence is
+  // not evidence of stability — so it stays null and the panel says so.
+  if (!reverses && !limiterOnly && !holds) return null;
+  const verdict = reverses ? 'reverses' : limiterOnly ? 'holds_with_caveat' : 'holds';
+  const note = reverses
+    ? `${key} REVERSES its delivery/dose verdict when the missing `
+      + 'transvascular exchange term is switched on, so the verdict above is '
+      + 'one of the unstable ones.'
+    : limiterOnly
+      ? `${key} KEEPS its delivery/dose verdict when the missing `
+        + 'transvascular exchange term is switched on -- but its four-way '
+        + 'dominant limiter does NOT, so the label under the sentence changes '
+        + 'even though the sentence does not.'
+      : `${key} KEEPS its delivery/dose verdict when the missing `
+        + 'transvascular exchange term is switched on, and keeps most of its '
+        + 'exposure under the split.';
+  return {
+    compound: key,
+    stable: verdict === 'holds',
+    verdict,
+    delivery_dose_verdict_inverts: reverses,
+    dominant_limiter_inverts: reverses || limiterOnly,
+    measured_on: VERDICT_SECTION,
+    source: 'results/verdict_inversion_census.md',
+    note,
+  };
+}
+
+/* ------------------------------------------- mechanism attribution ----- */
+//
+// WHY THE STUB HAS TO CARRY THIS AT ALL
+// -------------------------------------
+// THE FINDING (js/ui/finding.js) leads the READ rail and states the product's
+// central claim. It reads `run.mechanism`, and this file did not synthesise
+// one -- so on every hosted instance whose backend is asleep, and on every
+// offline read, the product's headline panel rendered as an apology and told
+// the reader it was "a backend omission". There is no backend in stub mode.
+// The panel, its click-to-isolate, the legend's SHOW ALL and the verdict's own
+// reversal caveat were all unreachable on the demo that most people see.
+//
+// The reach block one section down already carries the same argument in its
+// own comment -- "a stub that omits it would let the panel's empty state ship
+// untested" -- and THE FINDING sits above reach in the rail.
+//
+// WHAT MAKES IT HONEST RATHER THAN JUST PRESENT
+// ---------------------------------------------
+// 1. THE LABEL ARRAY IS THE SOURCE OF TRUTH. Labels are assigned per cell
+//    first; every count, every share, and kill_fraction itself are then TALLIED
+//    off that array. Nothing is planned and then hoped for, so the legend's
+//    reconciliation cannot fail the way it can when a float is picked and
+//    integers are fitted to it afterwards. Same rule the reach ladder already
+//    follows ("the headline is PICKED OFF the ladder").
+// 2. LEVEL AND SHAPE COME FROM THE RUN, NOT FROM A DIE. The exposure falls off
+//    exponentially with distance from the vessel skeleton at this run's OWN
+//    penetration_length_um; its level is solved so the share at or above IC50
+//    equals therapeutic_coverage_1x, and the kill rate so the mean kill
+//    probability equals kill_fraction. So the delivery/dose split moves with
+//    the COMPOUND -- a short-penetration compound leaves UNREACHED cells out in
+//    the infiltrative margin, a freely-penetrating one leaves UNDERDOSED cells
+//    everywhere -- rather than being one fixed picture wearing different
+//    labels, and the two metrics printed beside the breakdown are readings of
+//    the same label array rather than independent draws.
+// 3. IT IS STILL SYNTHETIC AND SAYS SO. js/ui/finding.js and js/ui/mechanism.js
+//    both check isSynthetic() and mark the panel; the reconciliation's own
+//    `method` string says that in stub mode both sides of the comparison are
+//    the same arithmetic and it audits nothing.
+//
+// Codes, band thresholds and wording are mirrored from tmesim/sim/mechanism.py
+// and tmesim/core/config.py; that module is the authority and this is a
+// stand-in that has to stay contract-shaped.
+
+const MECH_LABELS = [
+  'KILLED', 'SURVIVED_UNREACHED', 'SURVIVED_UNDERDOSED', 'SURVIVED_RESISTANT',
+  'SURVIVED_STOCHASTIC', 'UNATTRIBUTED', 'ALREADY_DEAD', 'NOT_TUMOR',
+];
+const M_KILLED = 0, M_UNREACHED = 1, M_UNDERDOSED = 2, M_RESISTANT = 3,
+  M_STOCHASTIC = 4, M_UNATTRIBUTED = 5, M_NOT_TUMOR = 7;
+
+const MECH_LIMITER = {
+  SURVIVED_UNREACHED: 'delivery',
+  SURVIVED_UNDERDOSED: 'dose',
+  SURVIVED_RESISTANT: 'resistance',
+  SURVIVED_STOCHASTIC: 'chance',
+  UNATTRIBUTED: 'unattributed',
+};
+
+// Verbatim from tmesim.sim.mechanism.LABEL_DESCRIPTION: the legend shows these
+// as row tooltips and a stub that paraphrased them would teach the wrong
+// vocabulary.
+const MECH_DESCRIPTION = {
+  KILLED: "killed by the drug (the engine's own Bernoulli outcome)",
+  SURVIVED_UNREACHED: 'DELIVERY-limited: local exposure E/IC50 below the '
+    + 'unreached band — the drug never arrived in a pharmacologically '
+    + 'meaningful amount',
+  SURVIVED_UNDERDOSED: 'DOSE-limited: drug arrived but E stayed below IC50, so '
+    + 'the Hill term never reached half of its ceiling',
+  SURVIVED_RESISTANT: 'RESISTANCE-limited: exposure was adequate, but '
+    + "sensitivity x state suppressed the kill probability by at least the "
+    + "model's own mildest resistance penalty",
+  SURVIVED_STOCHASTIC: 'CHANCE: exposure and biology both adequate; the cell '
+    + 'drew above its kill probability',
+  UNATTRIBUTED: 'not explained by the bands above — reported, never reassigned',
+  ALREADY_DEAD: 'tumour cell already DEAD before the drug was applied; counted '
+    + 'in kill_fraction but not killed by the drug',
+  NOT_TUMOR: 'non-tumour cell; kill_fraction is a tumour-only quantity',
+};
+
+// hill 1.2 is the shipped per-compound value in tmesim/core/config.py; the two
+// resistance floors are PDConfig's, and resistant_modulation resolves to
+// max(hypoxia 0.35, quiescent 0.5). stochastic_min_p_kill is then
+// f(adequate_ratio) * resistant_modulation = 0.5 * 0.5 at hill 1.2.
+const MECH_HILL = 1.2;
+const MECH_THRESHOLDS = {
+  unreached_ratio: 0.1,
+  adequate_ratio: 1.0,
+  resistant_modulation: 0.5,
+};
+
+const hillP = (ratio) => {
+  if (!(ratio > 0)) return 0;
+  const r = Math.pow(ratio, MECH_HILL);
+  return r / (1 + r);
+};
+
+/* Distance from every grid cell to the nearest vessel node, in um.
+ *
+ * Two-pass chamfer over the same grid buildField uses, seeded at the vessel
+ * skeleton, so the attribution and the AUC overlay are shapes of the SAME
+ * vasculature. A per-cell scan against every vessel node would be O(n * nv) and
+ * the phantom section is 850k cells. */
+const distCache = new Map();
+
+function vesselDistance(sectionId, dx) {
+  const key = `${sectionId}|${dx}`;
+  if (distCache.has(key)) return distCache.get(key);
+  const g = buildGeometry(sectionId);
+  const [EX, EY] = g.extent;
+  const cols = Math.max(8, Math.min(768, Math.round(EX / dx)));
+  const rows = Math.max(8, Math.min(768, Math.round(EY / dx)));
+  const cw = EX / cols, ch = EY / rows;            // cell size in um
+  const BIG = 1e9;
+  const d = new Float32Array(rows * cols).fill(BIG);
+  for (let k = 0; k < g.vx.length; k++) {
+    const ci = Math.min(cols - 1, Math.max(0, Math.round(g.vx[k] / cw)));
+    const ri = Math.min(rows - 1, Math.max(0, Math.round(g.vy[k] / ch)));
+    d[ri * cols + ci] = 0;
+  }
+  const diag = Math.hypot(cw, ch);
+  const relax = (i, j, w) => { const v = d[j] + w; if (v < d[i]) d[i] = v; };
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      if (r > 0) relax(i, i - cols, ch);
+      if (c > 0) relax(i, i - 1, cw);
+      if (r > 0 && c > 0) relax(i, i - cols - 1, diag);
+      if (r > 0 && c < cols - 1) relax(i, i - cols + 1, diag);
+    }
+  }
+  for (let r = rows - 1; r >= 0; r--) {
+    for (let c = cols - 1; c >= 0; c--) {
+      const i = r * cols + c;
+      if (r < rows - 1) relax(i, i + cols, ch);
+      if (c < cols - 1) relax(i, i + 1, cw);
+      if (r < rows - 1 && c < cols - 1) relax(i, i + cols + 1, diag);
+      if (r < rows - 1 && c > 0) relax(i, i + cols - 1, diag);
+    }
+  }
+  const out = { rows, cols, cw, ch, dist: d };
+  distCache.set(key, out);
+  return out;
+}
+
+/**
+ * Per-cell labels plus the aggregate block, in the shape
+ * tmesim.sim.mechanism.attribute() returns (minus `labels`, which travels as
+ * the binary half of TMSM).
+ *
+ * @returns {null|{labels: Uint8Array, aggregate: object, kill_fraction: number}}
+ */
+function mechanismFor(spec, rng, targets) {
+  if (!spec.drug) return null;
+  const g = buildGeometry(spec.section);
+  const vd = vesselDistance(spec.section, spec.dx_um);
+  const d = DRUGS.find((x) => x.name === spec.drug) || DRUGS[0];
+
+  // TWO SCALARS, TWO TARGETS, AND NEITHER IS INVENTED HERE.
+  //
+  //   SHAPE  the exposure falls off exponentially with distance from the
+  //          vessel skeleton at this run's own penetration_length_um. That is
+  //          what makes the delivery/dose split a property of the COMPOUND: a
+  //          poorly-penetrating one leaves UNREACHED cells out in the
+  //          infiltrative margin, a freely-penetrating one leaves UNDERDOSED
+  //          cells everywhere.
+  //   LEVEL  solved so the share of tumour cells at or above IC50 equals
+  //          therapeutic_coverage_1x -- the number the METRICS block prints
+  //          two lines under this breakdown, and whose own definition is
+  //          "fraction of tumour cells whose exposure reaches 1x IC50". A
+  //          panel that showed a coverage figure its own attribution
+  //          contradicted would be self-refuting on one screen.
+  //   RATE   solved so the mean kill probability equals kill_fraction, the
+  //          engine's max_kill_rate standing in for everything between an
+  //          exposure and a dead cell that this stub does not model.
+  //
+  // Both solves are bisections on a monotone quantity, so neither needs a
+  // derivative and neither can wander: the level only ever raises coverage,
+  // the rate only ever raises kill.
+  const L = Math.max(20, targets.penetration_length_um || 120);
+  const coverTarget = Math.max(0, Math.min(0.999, targets.therapeutic_coverage_1x || 0));
+  const killTarget = Math.max(0, Math.min(0.999, targets.kill_fraction || 0));
+
+  const [EX, EY] = g.extent;
+  const sx = vd.cols / EX, sy = vd.rows / EY;
+  const falloff = (i2) => {
+    const c = Math.min(vd.cols - 1, Math.max(0, Math.round(g.x[i2] * sx)));
+    const r = Math.min(vd.rows - 1, Math.max(0, Math.round(g.y[i2] * sy)));
+    return Math.exp(-vd.dist[r * vd.cols + c] / L);
+  };
+
+  const tumour = [];
+  for (let i2 = 0; i2 < g.n; i2++) if (g.type[i2] === 0) tumour.push(i2);
+  // Both solves are for ONE scalar each, so they run on a subsample: the
+  // phantom section is 850k cells and a 60-step bisection over all of them
+  // buys no precision the tally would keep.
+  const stride = Math.max(1, Math.ceil(tumour.length / 20000));
+  const sample = [];
+  for (let k = 0; k < tumour.length; k += stride) sample.push(falloff(tumour[k]));
+
+  const bisect = (fn, want) => {
+    let lo = -8, hi = 8;
+    for (let it = 0; it < 60; it++) {
+      const mid = (lo + hi) / 2;
+      if (fn(Math.pow(10, mid)) < want) lo = mid; else hi = mid;
+    }
+    return Math.pow(10, (lo + hi) / 2);
+  };
+  const coverAt = (lv) => {
+    if (!sample.length) return 0;
+    let n2 = 0;
+    for (let k = 0; k < sample.length; k++) if (lv * sample[k] >= MECH_THRESHOLDS.adequate_ratio) n2 += 1;
+    return n2 / sample.length;
+  };
+  const level = coverTarget > 0 ? bisect(coverAt, coverTarget) : Math.pow(10, -8);
+
+  const killAt = (rate) => {
+    if (!sample.length) return 0;
+    let acc = 0;
+    for (let k = 0; k < sample.length; k++) acc += hillP(level * sample[k]) * Math.min(1, rate);
+    return acc / sample.length;
+  };
+  const maxKillRate = Math.min(1, bisect(killAt, killTarget));
+
+  // DERIVED from this run, exactly as tmesim.sim.mechanism.MechanismThresholds
+  // .resolve() derives it: f(adequate_ratio) * resistant_modulation, times the
+  // run's own kill rate. Hardcoding the max_kill_rate = 1 value (0.25) would
+  // put every adequately-exposed survivor of a low-rate run into UNATTRIBUTED,
+  // which the legend paints as an alarm — and it would be the stub's own
+  // arithmetic setting the alarm off, not anything about the run.
+  const stochasticFloor = hillP(MECH_THRESHOLDS.adequate_ratio)
+    * MECH_THRESHOLDS.resistant_modulation * maxKillRate;
+
+  // sensitivity x state. `uniform` sets every cell to 1.0 — which is why no
+  // cell can be RESISTANCE-limited under it, exactly as in the real rule
+  // (modulation must be BELOW 1.0, not merely at or under the threshold).
+  const uniform = spec.sensitivity_mode === 'uniform';
+
+  /* --- the labels, then the tally ------------------------------------- */
+  const labels = new Uint8Array(g.n).fill(M_NOT_TUMOR);
+  const ratios = new Float64Array(tumour.length);
+  const mods = new Float64Array(tumour.length);
+  let nAdequate = 0;
+  for (let k = 0; k < tumour.length; k++) {
+    const i2 = tumour[k];
+    const ratio = level * falloff(i2);
+    ratios[k] = ratio;
+    if (ratio >= MECH_THRESHOLDS.adequate_ratio) nAdequate += 1;
+    const modulation = uniform ? 1.0 : Math.max(0.08, Math.min(1, 0.791 + gauss(rng) * 0.22));
+    mods[k] = modulation;
+    const p = hillP(ratio) * modulation * maxKillRate;
+    if (rng() < p) { labels[i2] = M_KILLED; continue; }
+    if (ratio < MECH_THRESHOLDS.unreached_ratio) labels[i2] = M_UNREACHED;
+    else if (ratio < MECH_THRESHOLDS.adequate_ratio) labels[i2] = M_UNDERDOSED;
+    else if (modulation < 1 && modulation <= MECH_THRESHOLDS.resistant_modulation) labels[i2] = M_RESISTANT;
+    else if (p >= stochasticFloor) labels[i2] = M_STOCHASTIC;
+    else labels[i2] = M_UNATTRIBUTED;
+  }
+
+  const counts = {};
+  MECH_LABELS.forEach((nm) => { counts[nm] = 0; });
+  for (let i = 0; i < labels.length; i++) counts[MECH_LABELS[labels[i]]] += 1;
+
+  // The engine's own arithmetic, on the tally above, in the same order:
+  // integer counts, one true division, one subtraction from 1.0. The value
+  // that ships as metrics.kill_fraction IS this one, so the reconciliation is
+  // an identity here rather than a check — see `method` below.
+  const nTumor = counts.KILLED + counts.SURVIVED_UNREACHED
+    + counts.SURVIVED_UNDERDOSED + counts.SURVIVED_RESISTANT
+    + counts.SURVIVED_STOCHASTIC + counts.UNATTRIBUTED + counts.ALREADY_DEAD;
+  const nDead = counts.KILLED + counts.ALREADY_DEAD;
+  const viable = nTumor === 0 ? 0.0 : (nTumor - nDead) / nTumor;
+  const killFraction = 1.0 - viable;
+
+  const nSurvived = nTumor - nDead;
+  const survival = {};
+  Object.entries(MECH_LIMITER).forEach(([nm, lim]) => {
+    survival[lim] = nSurvived ? counts[nm] / nSurvived : 0.0;
+  });
+
+  const sorted = Float64Array.from(ratios).sort();
+  const q = (f) => (sorted.length
+    ? sorted[Math.min(sorted.length - 1, Math.max(0, Math.round(f * (sorted.length - 1))))]
+    : null);
+  const median = q(0.5);
+
+  // Exposure-limited survivals that would ALSO have survived a dose increase.
+  // Zero under `uniform` by construction, because nothing is suppressed there.
+  let joint = 0, expLimited = 0;
+  for (let k = 0; k < tumour.length; k++) {
+    const lab = labels[tumour[k]];
+    if (lab !== M_UNREACHED && lab !== M_UNDERDOSED) continue;
+    expLimited += 1;
+    // The same predicate the RESISTANT band uses, applied to a cell the
+    // exposure band already claimed: below 1.0 AND at or under the threshold.
+    if (mods[k] < 1 && mods[k] <= MECH_THRESHOLDS.resistant_modulation) joint += 1;
+  }
+
+  const aggregate = {
+    label_names: MECH_LABELS.slice(),
+    label_descriptions: { ...MECH_DESCRIPTION },
+    counts,
+    n_cells: g.n,
+    n_tumor: nTumor,
+    n_survived: nSurvived,
+    killed_fraction_of_tumor: nTumor ? counts.KILLED / nTumor : 0.0,
+    survival_breakdown: survival,
+    survival_breakdown_note: 'fractions of SURVIVING tumour cells, so they sum '
+      + "to 1. 'delivery' = SURVIVED_UNREACHED, 'dose' = SURVIVED_UNDERDOSED, "
+      + "'resistance' = SURVIVED_RESISTANT, 'chance' = SURVIVED_STOCHASTIC.",
+    joint_limited: {
+      count: joint,
+      fraction_of_exposure_limited: expLimited ? joint / expLimited : 0.0,
+      note: 'exposure-limited survivals that are ALSO at or below the '
+        + 'resistance threshold. They are labelled by their exposure band '
+        + '(documented precedence: below IC50 the exposure is the binding '
+        + 'constraint), but raising the dose alone would not have killed them. '
+        + 'Reported so the delivery/dose share is not read as a clean '
+        + 'counterfactual.',
+    },
+    exposure_ratio_percentiles_tumor: {
+      p05: q(0.05), p50: median, p95: q(0.95),
+      max: sorted.length ? sorted[sorted.length - 1] : null,
+    },
+    exposure_shortfall_fold: median > 0 ? MECH_THRESHOLDS.adequate_ratio / median : null,
+    exposure_shortfall_note: 'adequate_ratio / median(E/IC50) over tumour '
+      + 'cells: the fold change in exposure the median tumour cell would need '
+      + 'to reach IC50. Above 1 the median cell is short of drug; below 1 it '
+      + 'is already past the half-effect point and something else is holding '
+      + 'the kill down.',
+    exposure_axis_note: 'UNREACHED and UNDERDOSED are two bands on ONE axis, '
+      + 'E/IC50, not two independent mechanisms. The kill model reaches p_hill '
+      + 'through that ratio alone, so it cannot separate "too little drug '
+      + 'arrived" from "the drug is too weak" — and neither can this '
+      + 'attribution. Read the split as a statement about how far short the '
+      + 'exposure fell, not about which upstream term caused it. SYNTHETIC '
+      + 'RUN — these labels were fabricated by js/mock.js and are not a '
+      + 'result.',
+    thresholds: { ...MECH_THRESHOLDS, stochastic_min_p_kill: stochasticFloor },
+    reconciliation: {
+      n_tumor: nTumor,
+      n_killed: counts.KILLED,
+      n_already_dead: counts.ALREADY_DEAD,
+      kill_fraction_from_labels: killFraction,
+      kill_fraction_from_engine: killFraction,
+      bit_exact: true,
+      abs_difference: 0,
+      // Said in the payload as well as on screen. In a real run the two sides
+      // are computed independently and == is a genuine audit. Here there is no
+      // engine: the same tally produced both, so this line is an identity and
+      // establishes nothing about anything.
+      method: 'STUB (js/mock.js): both sides are the same tally of the same '
+        + 'fabricated label array, so this comparison is an identity and NOT '
+        + 'an audit. The real check is 1.0 - (n_tumor - (KILLED + '
+        + 'ALREADY_DEAD)) / n_tumor against the engine, compared with == (not '
+        + 'allclose).',
+    },
+    synthetic: true,
+  };
+  return {
+    labels,
+    aggregate,
+    kill_fraction: killFraction,
+    // Tallied, not the target: the share of tumour cells the label pass found
+    // at or above IC50. The bisection lands close, the tally is what ships.
+    coverage_1x: nTumor ? nAdequate / nTumor : 0,
+  };
+}
+
+// TMSM: magic(4) | version u32 | n_cells u32 | n_labels u32 | json_len u32
+//       | aggregate json | label u8[n_cells]
+export function encodeTMSM(labels, aggregate) {
+  const body = new TextEncoder().encode(JSON.stringify(aggregate));
+  const header = 20;
+  const buf = new ArrayBuffer(header + body.length + labels.length);
+  const dv = new DataView(buf);
+  const u8 = new Uint8Array(buf);
+  u8[0] = 0x54; u8[1] = 0x4D; u8[2] = 0x53; u8[3] = 0x4D;
+  dv.setUint32(4, 1, true);
+  dv.setUint32(8, labels.length, true);
+  dv.setUint32(12, (aggregate.label_names || []).length, true);
+  dv.setUint32(16, body.length, true);
+  u8.set(body, header);
+  u8.set(labels, header + body.length);
+  return buf;
+}
+
 /* ---------------------------------------------------------- run store -- */
 
 let seq = 7;
 const runs = [];
 
+/* The values here are TARGETS for the attribution, not the shipped answer.
+ *
+ * mechanismFor() calibrates its exposure field to `kill_fraction` and
+ * `therapeutic_coverage_1x`, then tick() overwrites both with what its label
+ * tally actually produced. The legend reconciles the per-cell labels against
+ * kill_fraction with `==`, and the panel prints coverage two lines under a
+ * breakdown of the same cells: a number drawn here and labels drawn there
+ * would agree only by accident, and the demo would ship both the red DOES NOT
+ * RECONCILE line the real backend refuses to emit and a coverage figure its
+ * own attribution contradicts. */
 function metricsFor(spec, rng) {
   if (!spec.drug) {
     return {
@@ -584,6 +1037,9 @@ export function createRun(spec) {
     report: null,
     metrics: null,
     provenance: null,
+    mechanism: null,
+    mechanism_reason: null,
+    extra_metrics: null,
     runtime_s: null,
     error: null,
     created_at: Date.now() / 1000,
@@ -616,6 +1072,23 @@ function tick(run) {
     run.runtime_s = run._dur / 1000 * 4.1;
     run.report = reportFor(run.spec);
     run.metrics = metricsFor(run.spec, run._rng);
+    // The attribution calibrates to those two targets and then REPLACES them
+    // with what its own tally gave, so the breakdown, the kill fraction and
+    // the coverage figure on screen are three readings of one label array
+    // rather than three independent draws that happen to sit near each other.
+    run._mech = mechanismFor(run.spec, run._rng, run.metrics);
+    run.mechanism = run._mech ? run._mech.aggregate : null;
+    run.mechanism_reason = run._mech ? null
+      : 'reconstruction-only run: no compound was given, so there is no kill '
+        + 'to attribute';
+    if (run._mech) {
+      run.metrics.kill_fraction = run._mech.kill_fraction;
+      run.metrics.therapeutic_coverage_1x = run._mech.coverage_1x;
+    }
+    // A MEASURED result about the compound, not about this run, so it does not
+    // depend on anything synthesised above and is not synthesised itself: the
+    // same three tiers app/server/jobs.py emits, from the same census.
+    run.extra_metrics = { verdict_stability: verdictStability(run.spec.drug) };
     run.reach = reachFor(run.spec, run._rng);
     run.provenance = provenanceFor(run.spec, run._rng);
     run._log.push('[done] wrote results');
@@ -654,6 +1127,9 @@ function publicRun(r) {
   return {
     run_id: r.run_id, spec: r.spec, status: r.status, report: r.report,
     metrics: r.metrics, reach: r.reach, provenance: r.provenance,
+    mechanism: r.mechanism || null,
+    mechanism_reason: r.mechanism_reason || null,
+    extra_metrics: r.extra_metrics || null,
     runtime_s: r.runtime_s, error: r.error, created_at: r.created_at,
   };
 }
@@ -709,6 +1185,24 @@ export function handle(method, path, body) {
   if (m && method === 'GET') {
     const r = getRun(m[1]);
     return { buffer: encodeTMSG(buildGeometry(r.spec.section)) };
+  }
+
+  m = /^\/api\/runs\/([^/]+)\/mechanism$/.exec(p);
+  if (m && method === 'GET') {
+    const r = runs.find((x) => x.run_id === m[1]);
+    if (!r) { const e = new Error('no such run'); e.status = 404; throw e; }
+    tick(r);
+    // 404 with the run's OWN reason, the same shape app/server/api.py returns
+    // for a run with nothing to attribute — main.js surfaces `detail.reason`
+    // verbatim rather than inventing a message.
+    if (!r._mech) {
+      const e = new Error('no mechanism attribution');
+      e.status = 404;
+      e.payload = { detail: { reason: r.mechanism_reason
+        || 'this run carries no per-cell mechanism attribution' } };
+      throw e;
+    }
+    return { buffer: encodeTMSM(r._mech.labels, r._mech.aggregate) };
   }
 
   m = /^\/api\/runs\/([^/]+)\/field\/([^/]+)$/.exec(p);

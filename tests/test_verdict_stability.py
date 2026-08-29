@@ -65,15 +65,38 @@ CENSUS_JSON = (pathlib.Path(__file__).resolve().parents[1]
 FINDING_JS = (pathlib.Path(__file__).resolve().parents[1]
               / "app" / "web" / "js" / "ui" / "finding.js")
 
+MOCK_JS = (pathlib.Path(__file__).resolve().parents[1]
+           / "app" / "web" / "js" / "mock.js")
+
+
+def _fold(text):
+    """Join adjacent JS string literals so an assertion is about the sentence a
+    reader sees, not about where the source happens to wrap. Quote-quote and
+    backtick-quote seams both, since a template literal continued as a plain
+    string is a seam a fold that misses it stops asserting across."""
+    return re.sub(r"[`']\s*\+\s*[`']", "", text)
+
+
+@pytest.fixture(scope="module")
+def mock_src():
+    return _fold(MOCK_JS.read_text())
+
+
+@pytest.fixture(scope="module")
+def stub_tiers():
+    src = MOCK_JS.read_text()
+    out = {}
+    for const in ("VERDICT_REVERSING", "VERDICT_LIMITER_ONLY", "VERDICT_STABLE"):
+        m = re.search(rf"const {const} = \[([^\]]*)\];", src)
+        assert m, f"js/mock.js no longer defines {const}"
+        out[const] = {w.strip().strip("'\"") for w in m.group(1).split(",")
+                      if w.strip()}
+    return out
+
 
 @pytest.fixture(scope="module")
 def prose():
-    """finding.js with JS string concatenation folded away, so an assertion is
-    about the sentence a reader sees and not about where the source wraps."""
-    # Adjacent literals are joined whether the pair is quote-quote or
-    # backtick-quote -- the tier lead is a template literal continued as a
-    # plain string, and a fold that misses that seam silently stops asserting.
-    return re.sub(r"[`']\s*\+\s*[`']", "", FINDING_JS.read_text())
+    return _fold(FINDING_JS.read_text())
 
 
 @pytest.fixture(scope="module")
@@ -322,3 +345,66 @@ class TestThePanelProseNamesTheSameTiers:
             "compounds this answer is NOT DETERMINED BY THE DATA" in prose
         assert f"and for {len(VERDICT_LIMITER_ONLY_COMPOUNDS)} more the " \
             "limiter under it is not" in prose
+
+
+class TestTheStubCarriesTheSameTiers:
+    """js/mock.js answers for the server when no backend does, and THE FINDING
+    reads verdict_stability off the run it returns. Without it the hosted demo
+    told every visitor that TEMOZOLOMIDE -- the compound the Studio opens on,
+    and one this census scored as REVERSING -- was not among the twelve scored,
+    so the panel's most important caveat read as an absence of evidence while
+    the evidence existed and said the opposite.
+
+    The stub therefore carries the tiers as literals, for the same reason
+    app/server/jobs.py does: it cannot read results/ at runtime. That is a
+    second hand-carried copy of a measured result, so it is pinned here against
+    the census AND against the Python, and neither can move without the other.
+    """
+
+    @pytest.mark.parametrize("js_name,py_tier", [
+        ("VERDICT_REVERSING", "reversing"),
+        ("VERDICT_LIMITER_ONLY", "limiter_only"),
+        ("VERDICT_STABLE", "stable"),
+    ])
+    def test_each_stub_tier_matches_the_server(self, stub_tiers, js_name, py_tier):
+        expected = {"reversing": VERDICT_REVERSING_COMPOUNDS,
+                    "limiter_only": VERDICT_LIMITER_ONLY_COMPOUNDS,
+                    "stable": VERDICT_STABLE_COMPOUNDS}[py_tier]
+        assert stub_tiers[js_name] == set(expected)
+
+    def test_the_stub_tiers_partition_the_census_scored_set(self, stub_tiers, census):
+        union = set().union(*stub_tiers.values())
+        assert union == set(census["scored_compounds"])
+        assert sum(len(v) for v in stub_tiers.values()) == len(union), (
+            "a compound is in two stub tiers at once")
+
+    def test_every_compound_the_stub_offers_is_scored_or_returns_null(self, mock_src):
+        """A drug in the stub catalogue that no tier names renders as NOT
+        SCORED. That is the correct rendering -- absence from the census is not
+        evidence of stability -- but it should be a fact about the census, not
+        an artefact of the stub catalogue drifting away from it."""
+        m = re.search(r"export const DRUGS = \[(.*?)\n\];", mock_src, re.S)
+        assert m, "js/mock.js no longer defines DRUGS"
+        offered = set(re.findall(r"name: '([a-z]+)'", m.group(1)))
+        assert offered, "no compounds parsed out of the stub catalogue"
+        scored = (set(VERDICT_REVERSING_COMPOUNDS)
+                  | set(VERDICT_LIMITER_ONLY_COMPOUNDS)
+                  | set(VERDICT_STABLE_COMPOUNDS))
+        assert offered <= scored, (
+            f"the stub offers compounds the census never scored: "
+            f"{sorted(offered - scored)}")
+
+    def test_the_stub_note_wording_matches_the_server(self, mock_src):
+        """The note is rendered verbatim on the panel. Two copies of a sentence
+        is how the joint-limited caveat drifted before (test_first_session
+        section 6), so the phrases that carry its meaning are pinned."""
+        for name, phrase in (
+                ("reverses", "REVERSES its delivery/dose verdict"),
+                ("holds_with_caveat", "four-way dominant limiter does NOT"),
+                ("holds", "keeps most of its exposure under the split")):
+            assert phrase in mock_src, f"the stub's {name} note has drifted"
+            sample = {"reverses": "temozolomide",
+                      "holds_with_caveat": "irinotecan",
+                      "holds": "doxorubicin"}[name]
+            assert phrase in verdict_stability(sample)["note"], (
+                f"the server's {name} note has drifted from the stub's")

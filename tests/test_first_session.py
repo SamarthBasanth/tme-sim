@@ -677,8 +677,13 @@ def test_joint_limited_caveat_is_identical_on_both_panels(page, web_server, reac
         assert "92.7%" in text, f"{name}: the joint-limited share is missing"
         assert body in text, f"{name}: the joint-limited body has drifted"
         assert "more drug would fix it" in text, f"{name}: the consequence is gone"
-    # And the backend's own wording, which neither panel used to print.
-    assert "backend ·" in finding and "backend ·" in reach
+    # And the payload's own wording, which neither panel used to print. The
+    # label names its SOURCE, and this harness has no backend -- main.js booted
+    # against a static server, got a 404, and latched the session synthetic --
+    # so both panels must attribute the sentence to js/mock.js. A panel still
+    # crediting "backend ·" here would be naming a server that never answered.
+    assert "js/mock.js ·" in finding and "js/mock.js ·" in reach
+    assert "backend ·" not in finding and "backend ·" not in reach
 
 
 # --------------------------------------------------------------------------- #
@@ -906,3 +911,292 @@ def test_the_two_rates_are_named_as_two_different_claims(page, web_server):
     assert "reverses THIS delivery/dose verdict for 5 of the 12 scored" in text
     assert "four-way dominant limiter printed below it for 7 of 12" in text
     assert "two counts of two different claims" in text
+
+
+# --------------------------------------------------------------------------- #
+# 10. the demo everyone sees has a finding in it, and it is marked as fabricated
+# --------------------------------------------------------------------------- #
+#
+# THE FINDING leads the READ rail and states the product's central claim. It
+# reads `run.mechanism`, and js/mock.js synthesised no mechanism at all -- so on
+# every hosted instance whose backend was asleep, and on every offline read, the
+# headline panel rendered an apology reading "That is a backend omission". There
+# is no backend in stub mode to have omitted anything, and the panel, its
+# click-to-isolate, the legend's SHOW ALL and the verdict's own reversal caveat
+# were all unreachable on the demo most people meet first.
+#
+# These tests drive js/mock.js the way api.js does and then render the real
+# panels off what it returns, so they pin the payload and the reading of it
+# together. `page` boots index.html against a static server: the backend 404s,
+# main.js latches the session synthetic, and that is the state under test.
+_MOCK_RUN_JS = """async ([base]) => {
+  const mock = await import(base + '/js/mock.js');
+  mock.seedHistory();
+  const runs = mock.listRuns().filter((r) => r.status === 'done');
+  return runs[0] || null;
+}"""
+
+
+@pytest.fixture(scope="module")
+def stub_run(page, web_server):
+    r = page.evaluate(_MOCK_RUN_JS, [web_server])
+    assert r is not None, "js/mock.js seeded no finished run"
+    return r
+
+
+def test_the_stub_run_carries_a_mechanism_attribution(stub_run):
+    """Without this the product's headline panel is empty on the demo."""
+    mech = stub_run.get("mechanism")
+    assert mech, "js/mock.js produced a run with no mechanism block"
+    for key in ("counts", "survival_breakdown", "n_tumor", "n_survived",
+                "joint_limited", "thresholds", "reconciliation",
+                "label_descriptions", "exposure_axis_note"):
+        assert key in mech, f"the aggregate is missing {key}"
+
+
+def test_the_stub_attribution_reconciles_by_construction(stub_run):
+    """The labels are tallied and kill_fraction is read OFF that tally, so the
+    legend's `==` check cannot fail. A drawn float and drawn labels would agree
+    only by accident, and the demo would ship the red DOES NOT RECONCILE line
+    that the real backend refuses to emit at all."""
+    mech = stub_run["mechanism"]
+    c = mech["counts"]
+    tumour_labels = ("KILLED", "SURVIVED_UNREACHED", "SURVIVED_UNDERDOSED",
+                     "SURVIVED_RESISTANT", "SURVIVED_STOCHASTIC",
+                     "UNATTRIBUTED", "ALREADY_DEAD")
+    assert sum(c[k] for k in tumour_labels) == mech["n_tumor"]
+    assert c["NOT_TUMOR"] + mech["n_tumor"] == mech["n_cells"]
+
+    n_dead = c["KILLED"] + c["ALREADY_DEAD"]
+    assert mech["n_survived"] == mech["n_tumor"] - n_dead
+    # The engine's own arithmetic, in its own order: integer counts, one true
+    # division, one subtraction from 1.0 (tmesim/sim/mechanism.py::reconcile).
+    rebuilt = 1.0 - (mech["n_tumor"] - n_dead) / mech["n_tumor"]
+    assert stub_run["metrics"]["kill_fraction"] == rebuilt
+    assert mech["reconciliation"]["kill_fraction_from_labels"] == rebuilt
+    assert mech["reconciliation"]["bit_exact"] is True
+    # ...and the payload says, in the field the UI shows on hover, that this is
+    # an identity rather than an audit.
+    assert "STUB" in mech["reconciliation"]["method"]
+    assert "NOT" in mech["reconciliation"]["method"]
+
+
+def test_the_shares_are_a_tally_and_the_split_is_not_degenerate(stub_run):
+    mech = stub_run["mechanism"]
+    c, n_surv = mech["counts"], mech["n_survived"]
+    for name, limiter in (("SURVIVED_UNREACHED", "delivery"),
+                          ("SURVIVED_UNDERDOSED", "dose"),
+                          ("SURVIVED_RESISTANT", "resistance"),
+                          ("SURVIVED_STOCHASTIC", "chance")):
+        assert mech["survival_breakdown"][limiter] == c[name] / n_surv
+    assert sum(mech["survival_breakdown"].values()) == pytest.approx(1.0)
+    # A demo that puts 100% of survivors in one bucket teaches nothing and
+    # makes the click-to-isolate on the other rows a control that does nothing.
+    assert c["SURVIVED_UNREACHED"] > 0 and c["SURVIVED_UNDERDOSED"] > 0
+
+
+def test_coverage_agrees_with_the_attribution_it_is_printed_beside(stub_run):
+    """METRICS prints "Coverage @ 1x IC50" two lines under this breakdown, and
+    its own definition is the fraction of tumour cells whose exposure reaches
+    1x IC50 -- which is the same population the bands above split. A panel
+    showing a coverage figure its own attribution contradicted would be
+    self-refuting on one screen, so the shipped value is the tally's."""
+    mech = stub_run["mechanism"]
+    c, n = mech["counts"], mech["n_tumor"]
+    cover = stub_run["metrics"]["therapeutic_coverage_1x"]
+
+    # The labels BRACKET it, and cannot pin it: a killed cell may sit on either
+    # side of IC50 (p_kill is positive below it), so the killed count is the
+    # slack between these two bounds rather than a third term.
+    below = c["SURVIVED_UNREACHED"] + c["SURVIVED_UNDERDOSED"]
+    above = c["SURVIVED_RESISTANT"] + c["SURVIVED_STOCHASTIC"] + c["UNATTRIBUTED"]
+    assert cover >= above / n, "cells the bands called adequately exposed are not counted as covered"
+    assert 1.0 - cover >= below / n, "cells the bands called short of drug are counted as covered"
+
+    # And the run's own exposure percentiles, which are the same ratios the
+    # bands were cut from, have to put the 1x line where coverage says it is.
+    pct_ = mech["exposure_ratio_percentiles_tumor"]
+    adequate_ratio = mech["thresholds"]["adequate_ratio"]
+    assert (pct_["p95"] >= adequate_ratio) == (cover >= 0.05)
+    assert (pct_["p50"] >= adequate_ratio) == (cover >= 0.50)
+
+
+def test_uniform_sensitivity_cannot_produce_a_resistance_limited_cell(stub_run):
+    """`uniform` sets every cell's modulation to 1.0, and the real rule needs it
+    BELOW 1.0 — not merely at or under the threshold. UNATTRIBUTED is empty for
+    the same kind of reason: its floor is DERIVED from this run's own kill rate,
+    exactly as MechanismThresholds.resolve() derives it."""
+    assert stub_run["spec"]["sensitivity_mode"] == "uniform"
+    assert stub_run["mechanism"]["counts"]["SURVIVED_RESISTANT"] == 0
+    assert stub_run["mechanism"]["counts"]["UNATTRIBUTED"] == 0
+    assert stub_run["mechanism"]["joint_limited"]["count"] == 0
+
+
+def test_the_mechanism_payload_decodes_through_the_production_path(
+        page, web_server, stub_run):
+    """js/mock.js exists so the production decode path runs in both modes. A
+    route it does not answer is a decoder that ships untested."""
+    out = page.evaluate(
+        """async ([base, id]) => {
+             const mock = await import(base + '/js/mock.js');
+             const api = await import(base + '/js/api.js');
+             const r = mock.handle('GET', `/api/runs/${id}/mechanism`, null);
+             const m = api.decodeTMSM(r.buffer);
+             let mx = 0;
+             for (let i = 0; i < m.labels.length; i++) if (m.labels[i] > mx) mx = m.labels[i];
+             return { n: m.n_cells, nLabels: m.n_labels, max: mx,
+                      killed: m.aggregate.counts.KILLED };
+           }""",
+        [web_server, stub_run["run_id"]])
+    assert out["n"] == stub_run["mechanism"]["n_cells"]
+    assert out["nLabels"] == 8                      # tmesim.sim.mechanism.LABELS
+    assert out["max"] <= 7
+    assert out["killed"] == stub_run["mechanism"]["counts"]["KILLED"]
+
+
+def test_the_stub_verdict_sentence_is_marked_as_fabricated(
+        page, web_server, stub_run):
+    """The one sentence on this panel that survives a screenshot. Every other
+    marker of a stubbed session is chrome around the panel or paragraphs below
+    this line, so the disclaimer sits in the same block as the claim."""
+    text = _render(page, web_server, "finding.js", stub_run)
+    assert "SYNTHETIC — NOT A RESULT" in text
+    assert "js/mock.js fabricated the labels this sentence is counted from" in text
+    assert "not a finding about any tissue" in text
+    # And the panel still states the finding — the marker qualifies it, it does
+    # not replace it.
+    assert "of those survivors" in text or "survived this run" in text
+
+
+def test_the_stub_does_not_show_a_green_tick_for_an_identity(
+        page, web_server, stub_run):
+    """A reconciliation that passes by construction must not wear the colour and
+    the wording that mean "independently checked"."""
+    out = page.evaluate(
+        """async ([base, run]) => {
+             const m = await import(base + '/js/ui/mechanism.js');
+             const viewer = { labelVis: new Float32Array(8).fill(1),
+                              setLabelVisible() {} };
+             const leg = m.createMechanismLegend(viewer);
+             leg.set(run.mechanism);
+             document.body.appendChild(leg.node);
+             const t = leg.node.innerText;
+             const cls = leg.node.querySelector('.m-note-syn') ? 'syn'
+               : leg.node.querySelector('.m-ok') ? 'ok' : 'other';
+             leg.node.remove();
+             return { text: t, cls };
+           }""",
+        [web_server, stub_run])
+    assert out["cls"] == "syn", "the stub reconciliation is painted as checked"
+    assert "identity, not a check" in out["text"]
+    assert "reconciles bit-exact" not in out["text"]
+
+
+def test_the_empty_state_does_not_blame_a_backend_that_is_not_there(
+        page, web_server):
+    """The message every hosted visitor used to get. There is no backend in
+    stub mode, so "a backend omission" sends the reader to look for a
+    server-side failure that did not happen."""
+    run = dict(_run_fixture())
+    run.pop("mechanism", None)
+    text = _render(page, web_server, "finding.js", run)
+    assert "backend omission" not in text
+    assert "js/mock.js fabricated this run locally" in text
+    assert "Nothing here is a result" in text
+
+
+def test_the_stub_names_the_compounds_verdict_stability(stub_run):
+    """Absent, the panel says "not one of the twelve scored" — which on the
+    demo told every visitor that temozolomide, the compound the Studio opens
+    on and one the census scored as REVERSING, had not been looked at."""
+    vs = (stub_run.get("extra_metrics") or {}).get("verdict_stability")
+    assert vs, "the stub run carries no verdict_stability"
+    assert vs["compound"] == "temozolomide"
+    assert vs["verdict"] == "reverses"
+    assert vs["measured_on"] == "xenium_319"
+
+
+def test_the_mechanism_rail_hint_does_not_assert_an_audit():
+    """The one hint on this rail that stated a RESULT: on a run with no
+    attribution the header read "reconciles with kill_fraction" directly above
+    a body reading "this run carries no per-cell attribution"."""
+    src = open(os.path.join(WEB, "js", "ui", "inspect.js")).read()
+    assert "'reconciles with kill_fraction'" not in src
+    assert "'why each survivor survived'" in src
+
+
+# --------------------------------------------------------------------------- #
+# 11. the two controls the stub was hiding
+# --------------------------------------------------------------------------- #
+#
+# Clicking a survival row isolates that bucket in the viewer (2026-08-27), and
+# the legend's SHOW ALL undoes it in one click instead of six. Neither had a
+# test, and neither could be reached on any instance without a live backend,
+# because js/mock.js synthesised no attribution for them to act on.
+def test_clicking_a_survival_row_isolates_that_bucket(page, web_server, stub_run):
+    """The claim is a control: the sentence names a count, and the click shows
+    where those cells are. A row is only given the handler when its bucket has
+    a non-zero count -- isolating to an empty picture would be an invitation
+    the panel cannot honour."""
+    out = page.evaluate(
+        """async ([base, run]) => {
+             const m = await import(base + '/js/ui/finding.js');
+             const seen = [];
+             const p = m.createFindingPanel({ onIsolate: (c) => seen.push(c) });
+             p.render(run);
+             document.body.appendChild(p.el);
+             const rows = [...p.el.querySelectorAll('[role=button]')];
+             const labels = rows.map((r) => r.innerText.replace(/\\s+/g, ' ').trim());
+             rows[0].click();
+             const keyed = rows.length > 1;
+             if (keyed) {
+               rows[1].dispatchEvent(new KeyboardEvent('keydown',
+                 { key: 'Enter', bubbles: true }));
+             }
+             const tabbable = rows.every((r) => r.tabIndex >= 0);
+             p.el.remove();
+             return { n: rows.length, seen, labels, tabbable };
+           }""",
+        [web_server, stub_run])
+    assert out["n"] >= 2, "no survival row carries a handler"
+    assert out["seen"], "clicking a survival row isolated nothing"
+    # MECH codes: 1 UNREACHED, 2 UNDERDOSED, 3 RESISTANT, 4 STOCHASTIC.
+    assert all(c in (1, 2, 3, 4) for c in out["seen"]), out["seen"]
+    assert len(out["seen"]) == 2, "the keyboard path does not reach the click path"
+    assert out["tabbable"], "a row is a button the keyboard cannot reach"
+    # Rows are ordered largest share first, so the first one is the bucket the
+    # verdict sentence is about.
+    assert out["seen"][0] == 2, "the top row is not the dose-limited bucket"
+
+
+def test_show_all_appears_only_once_something_is_hidden(page, web_server, stub_run):
+    """A one-click action that takes six clicks to undo is a trap; a recovery
+    control that is always on screen is one more thing to think about before
+    anything has gone wrong. So it renders only when a category is hidden, and
+    it restores every one of them."""
+    out = page.evaluate(
+        """async ([base, run]) => {
+             const m = await import(base + '/js/ui/mechanism.js');
+             const vis = new Float32Array(8).fill(1);
+             const viewer = { labelVis: vis,
+                              setLabelVisible(c, on) { vis[c] = on ? 1 : 0; } };
+             const leg = m.createMechanismLegend(viewer);
+             leg.set(run.mechanism);
+             document.body.appendChild(leg.node);
+             const find = () => [...leg.node.querySelectorAll('button')]
+               .find((b) => /show all/i.test(b.textContent));
+             const before = !!find();
+             viewer.setLabelVisible(2, false);
+             leg.refresh();
+             const afterHiding = !!find();
+             find().click();
+             const restored = [...vis].every((v) => v === 1);
+             const afterRestore = !!find();
+             leg.node.remove();
+             return { before, afterHiding, restored, afterRestore };
+           }""",
+        [web_server, stub_run])
+    assert out["before"] is False, "SHOW ALL is on screen with nothing hidden"
+    assert out["afterHiding"] is True, "SHOW ALL never appears"
+    assert out["restored"] is True, "SHOW ALL left a category hidden"
+    assert out["afterRestore"] is False, "SHOW ALL outstays the state it undoes"

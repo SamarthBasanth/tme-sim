@@ -18,6 +18,8 @@ have to hold for that claim to survive, and each has a test here:
 from __future__ import annotations
 
 import os
+import pathlib
+import re
 import sys
 
 import numpy as np
@@ -47,6 +49,8 @@ from tmesim.sim.mechanism import (  # noqa: E402
     SURVIVED_UNDERDOSED,
     SURVIVED_UNREACHED,
     UNATTRIBUTED,
+    LABEL_DESCRIPTION,
+    LABEL_LIMITER,
     MechanismReconciliationError,
     MechanismThresholds,
     attribute,
@@ -579,3 +583,66 @@ def test_done_is_not_announced_before_the_payloads_are_on_disk(client):
     # The payloads a UI would ask for the instant it sees `done` are all there.
     for path in ("geometry", "mechanism", "timelapse"):
         assert client.get(f"/api/runs/{run_id}/{path}").status_code == 200
+
+
+_MOCK_JS = (pathlib.Path(__file__).resolve().parents[1]
+            / "app" / "web" / "js" / "mock.js")
+
+
+@pytest.fixture(scope="module")
+def src():
+    """js/mock.js with adjacent string literals joined, so an assertion is about
+    the sentence a reader sees and not about where the source wraps."""
+    return re.sub(r"[`'\"]\s*\+\s*[`'\"]", "", _MOCK_JS.read_text())
+
+
+# --------------------------------------------------------------------------- #
+# the stub's copy of this vocabulary
+# --------------------------------------------------------------------------- #
+class TestTheStubSpeaksTheSameVocabulary:
+    """``app/web/js/mock.js`` answers for the server when no backend does, and
+    since 2026-08-29 it synthesises a mechanism attribution so THE FINDING is
+    not an empty panel on every hosted instance whose backend is asleep.
+
+    That means a second copy of this module's label codes and descriptions, in
+    another language, which the legend shows as its row tooltips. A stub that
+    paraphrased them would teach a first-time reader a vocabulary the real
+    payload does not use, and the codes are WIRE VALUES -- a stub that ordered
+    them differently would paint every cell the wrong colour.
+    """
+
+    def test_the_stub_label_order_is_the_wire_order(self, src):
+        m = re.search(r"const MECH_LABELS = \[(.*?)\];", src, re.S)
+        assert m, "js/mock.js no longer defines MECH_LABELS"
+        names = [w.strip().strip("'\"") for w in m.group(1).split(",") if w.strip()]
+        assert names == list(LABELS)
+
+    def test_the_stub_limiter_rollup_matches(self, src):
+        m = re.search(r"const MECH_LIMITER = \{(.*?)\};", src, re.S)
+        assert m, "js/mock.js no longer defines MECH_LIMITER"
+        pairs = dict(re.findall(r"(\w+):\s*'([a-z]+)'", m.group(1)))
+        assert pairs == dict(LABEL_LIMITER)
+
+    @pytest.mark.parametrize("name", sorted(LABEL_DESCRIPTION))
+    def test_every_description_is_carried_verbatim(self, src, name):
+        # The em dash and the apostrophes are part of the sentence; only the
+        # source's own line wrapping is normalised away.
+        want = re.sub(r"\s+", " ", LABEL_DESCRIPTION[name]).strip()
+        got = re.sub(r"\s+", " ", src)
+        assert want in got, f"{name}'s description has drifted in js/mock.js"
+
+    def test_the_stub_bands_are_the_dataclass_defaults(self, src):
+        m = re.search(r"const MECH_THRESHOLDS = \{(.*?)\};", src, re.S)
+        assert m, "js/mock.js no longer defines MECH_THRESHOLDS"
+        got = {k: float(v) for k, v in re.findall(r"(\w+):\s*([0-9.]+)", m.group(1))}
+        base = MechanismThresholds()
+        assert got["unreached_ratio"] == base.unreached_ratio
+        assert got["adequate_ratio"] == base.adequate_ratio
+        # resistant_modulation is DERIVED in the real code; the stub carries the
+        # value that derivation produces from the shipped PDConfig.
+        assert got["resistant_modulation"] == max(
+            float(PDConfig().hypoxia_resistance),
+            float(PDConfig().quiescent_resistance))
+        # stochastic_min_p_kill is NOT here: it depends on the run's own kill
+        # rate, so the stub derives it per run exactly as resolve() does.
+        assert "stochastic_min_p_kill" not in got

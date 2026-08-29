@@ -20,6 +20,7 @@
 import { h, fill } from '../util/dom.js';
 import { num, int, pct, NULL_GLYPH } from '../util/fmt.js';
 import { MECH, MECH_META, LIMITER_LABEL, dominantReason } from '../mechanism.js';
+import { isSynthetic } from './provenance.js';
 
 /* ==================================================== breakdown ======== */
 
@@ -211,10 +212,20 @@ export function createMechanismLegend(viewer, { onToggle } = {}) {
       `bands: E/IC50 < ${num(th.unreached_ratio, 2)} unreached · `,
       `< ${num(th.adequate_ratio, 2)} underdosed · `,
       `modulation <= ${num(th.resistant_modulation, 2)} resistant`));
-    kids2.push(h('div', { class: rec.bit_exact ? 'm-ok' : 'm-bad' },
-      rec.bit_exact
-        ? `reconciles bit-exact with kill_fraction = ${num(rec.kill_fraction_from_engine, 6)}`
-        : `DOES NOT RECONCILE (delta ${rec.abs_difference})`));
+    // A GREEN TICK THAT AUDITS NOTHING IS WORSE THAN NO TICK. Against a live
+    // backend the two sides of this comparison are computed independently --
+    // the engine's kill_fraction and a tally of labels it did not produce --
+    // and `==` is a real check. In stub mode js/mock.js tallies one fabricated
+    // array and writes the same number into both, so the comparison passes by
+    // construction. It is still shown, because the payload still carries it,
+    // but not in the colour that means "checked".
+    kids2.push(h('div', { class: isSynthetic() ? 'm-note-syn' : (rec.bit_exact ? 'm-ok' : 'm-bad') },
+      isSynthetic()
+        ? `identity, not a check: kill_fraction = ${num(rec.kill_fraction_from_engine, 6)} `
+          + 'is the same tally on both sides (js/mock.js)'
+        : rec.bit_exact
+          ? `reconciles bit-exact with kill_fraction = ${num(rec.kill_fraction_from_engine, 6)}`
+          : `DOES NOT RECONCILE (delta ${rec.abs_difference})`));
     fill(note, ...kids2);
   }
 

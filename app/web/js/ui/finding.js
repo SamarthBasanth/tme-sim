@@ -51,6 +51,7 @@ import { int, pct, num, NULL_GLYPH } from '../util/fmt.js';
 import { doseInputBlock } from './doseinput.js';
 import { MECH } from '../mechanism.js';
 import { jointLimitedCaveat } from './verdict.js';
+import { isSynthetic } from './provenance.js';
 
 /** The limiter buckets, in the words a reader who has not read this repo can
  *  check. Keys are `mechanism.survival_breakdown` keys — see
@@ -205,17 +206,29 @@ export function createFindingPanel({ onIsolate } = {}) {
     const bd = (mech && mech.survival_breakdown) || null;
     const counts = (mech && mech.counts) || null;
     if (!mech || !bd || !counts) {
-      // The drug-free reconstruction path lands here, and so does any run whose
-      // backend omitted the attribution. They are different situations and a
-      // single "no data" would flatten them.
+      // THREE situations land here and a single "no data" would flatten them:
+      // a drug-free reconstruction, a run whose backend omitted the
+      // attribution, and -- the common one on a hosted instance -- a run no
+      // backend produced at all.
+      //
+      // "That is a backend omission" was what every visitor got whose backend
+      // was asleep. There is no backend in stub mode to have omitted anything:
+      // the shell already says STUB DATA in the header and js/mock.js is what
+      // made the run, so naming that cause sent the reader looking for a
+      // server-side failure that never happened.
       const noDrug = !(run.spec && run.spec.drug);
       empty(noDrug
         ? 'This run carried no compound, so there is no delivery-versus-'
           + 'potency finding to state: it reconstructed the tissue and stopped. '
           + 'Pick a drug in the RunSpec on the left and submit again.'
-        : `Run ${run.run_id} carried no per-cell mechanism attribution, so `
-          + 'this panel has nothing to read. That is a backend omission rather '
-          + 'than a result, and no number is substituted for it.');
+        : isSynthetic()
+          ? `Run ${run.run_id} carries no per-cell attribution, and it was not `
+            + 'produced by a backend: no server answered, so js/mock.js '
+            + 'fabricated this run locally. Nothing here is a result. When the '
+            + 'backend is reachable this panel states what the run found.'
+          : `Run ${run.run_id} carried no per-cell mechanism attribution, so `
+            + 'this panel has nothing to read. That is a backend omission '
+            + 'rather than a result, and no number is substituted for it.');
       return;
     }
     clear(el);
@@ -267,15 +280,35 @@ export function createFindingPanel({ onIsolate } = {}) {
     }
 
     /* ---- the verdict, in one line -------------------------------------- */
+    //
+    // THE ONE SENTENCE ON THIS PANEL THAT SURVIVES A SCREENSHOT. Every other
+    // marker of a stubbed session -- the striped frame, the magenta viewport
+    // tag, the per-value `synthetic` chips -- is chrome around the panel or
+    // several paragraphs below this line. This sentence reads as the product's
+    // claim wherever it is quoted from, so in stub mode the disclaimer is ON
+    // it, in the same block, and the rule is coloured to match.
     const [topKey] = entries[0] || [null];
     if (topKey) {
       const p = SURVIVAL_PHRASE[topKey];
+      const stub = isSynthetic();
       el.appendChild(h('div', {
         style: {
-          borderLeft: '3px solid var(--accent)', padding: '0 0 0 var(--sp-4)',
+          borderLeft: `3px solid var(${stub ? '--synthetic' : '--accent'})`,
+          padding: '0 0 0 var(--sp-4)',
           margin: '0 0 var(--sp-4)',
         },
-      }, para(h('b', `This is ${p.verdict}. `), p.gist)));
+      }, para(
+        stub
+          ? h('b', { style: { color: 'var(--synthetic)' } },
+            'SYNTHETIC — NOT A RESULT. ')
+          : null,
+        h('b', `This is ${p.verdict}. `), p.gist,
+        stub
+          ? h('span', { style: { color: 'var(--synthetic)' } },
+            ' No backend answered, so js/mock.js fabricated the labels this '
+            + 'sentence is counted from. It is a demonstration of the panel, '
+            + 'not a finding about any tissue.')
+          : null)));
     }
 
     /* ---- HOW MUCH OF THAT SENTENCE WAS AN INPUT? ------------------------
@@ -486,7 +519,11 @@ export function createFindingPanel({ onIsolate } = {}) {
       + 'absolute (1.77x) purely with which state route is chosen, everything '
       + 'else held identical. The shares above are ratios among survivors and '
       + 'do not inherit that movement. See Caveats, below, in full.',
-      rec && rec.bit_exact
+      isSynthetic()
+        ? ' These labels were fabricated by js/mock.js. Both sides of the '
+          + 'reconciliation below them are the same tally of that one '
+          + 'fabricated array, so it is an identity and audits nothing.'
+        : rec && rec.bit_exact
         ? ' The labels above reconcile bit-exactly with the engine\'s own '
           + 'kill_fraction, so they are a restatement of its arithmetic rather '
           + 'than a second opinion about it.'
