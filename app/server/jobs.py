@@ -193,34 +193,99 @@ CLAIM_SET_LOG = (
 )
 
 
-#: Which compounds' delivery/dose verdict SURVIVES the transvascular exchange
-#: term the transport law does not have.
-#:
-#: results/verdict_inversion_census.md measured the whole shipped library on the
-#: flagship section, exchange OFF vs ON at the shipped PS with nothing scaled.
-#: The dominant limiter INVERTS for 7 of the 12 scored compounds -- 58.3 % --
-#: including temozolomide, which is the compound the Studio opens on.
-#:
-#: The rule is mechanical rather than a list of names: a verdict holds exactly
-#: where the missing term would not have mattered much. Every compound that
-#: inverts loses most of its exposure under the split (mean AUC ON/OFF
-#: 0.062-0.633); every compound that holds keeps most of it (0.693-0.927).
-#: These four are the ones that held.
-#:
-#: Kept HERE and not in the browser because it is a measured result, not a
-#: display choice: a client-side list has no provenance, cannot be asserted
-#: against, and would not survive into result.json with the run it describes.
+# HOW A COMPOUND'S VERDICT BEHAVES UNDER THE TERM THE TRANSPORT LAW LACKS.
+#
+# results/verdict_inversion_census.md measured the whole shipped library on the
+# flagship section, exchange OFF vs ON at the shipped PS with nothing scaled.
+# It measured TWO reversals per compound, and they are not the same reversal:
+#
+#   delivery_dose_verdict_inverts  the panel's OWN headline -- delivery vs dose
+#                                  among the exposure-limited survivors.
+#                                  5 of 12 = 41.7 %.
+#   dominant_limiter_inverts       the four-way limiter the report prints
+#                                  (delivery / dose / resistance / ...).
+#                                  7 of 12 = 58.3 %.
+#
+# CONFLATING THEM IS WHAT WENT WRONG HERE. This module previously carried one
+# list -- the four compounds census section 4 recommends trusting -- and told
+# every other scored compound that its delivery/dose verdict REVERSES. For
+# irinotecan, palbociclib and ribociclib that is the opposite of what was
+# measured: their four-way limiter flips, their delivery/dose verdict does not.
+# The panel cited the census by name while saying a thing the census refutes,
+# which is the one failure this product exists to prevent.
+#
+# So the partition is by MEASUREMENT, in three tiers, and every tier is
+# asserted against results/verdict_inversion_census_data.json by
+# tests/test_verdict_stability.py -- these lists are hand-carried and the test
+# is the only thing that stops them drifting from the run that produced them.
+#
+# The tiers separate cleanly on exposure retention (mean AUC ON/OFF), which is
+# the mechanism and the reason the rule is not a list of names: entry
+# elasticity is exactly 1, so a wall resistance cuts exposure, and a compound
+# that loses an order of magnitude crosses its IC50 in far more cells.
+#
+#   reverses           0.054-0.140   exposure collapses; the headline flips
+#   holds, limiter no  0.200-0.633   headline survives, four-way limiter flips
+#   holds              0.693-0.927   most exposure survives; both hold
+#
+# There is no overlap between the three bands.
+#
+# Kept HERE and not in the browser because it is a measured result, not a
+# display choice: a client-side list has no provenance, cannot be asserted
+# against, and would not survive into result.json with the run it describes.
+# Kept as literals and not read from results/ because .dockerignore excludes
+# results/ from the image -- a runtime read would work in the repo and raise in
+# the container, which is the worst place to find out.
+
+#: The delivery/dose verdict itself inverts. The panel's headline sentence
+#: reverses for these.
+VERDICT_REVERSING_COMPOUNDS: frozenset = frozenset({
+    "carmustine", "cisplatin", "lomustine", "procarbazine", "temozolomide",
+})
+
+#: The delivery/dose verdict HOLDS, but the four-way dominant limiter inverts.
+#: Not a clean bill and not a reversal: the sentence on the panel survives, the
+#: label under it does not.
+VERDICT_LIMITER_ONLY_COMPOUNDS: frozenset = frozenset({
+    "irinotecan", "palbociclib", "ribociclib",
+})
+
+#: Both measures hold AND most exposure survives the split. These are the four
+#: census section 4 names as the only ones whose verdict is worth trusting on
+#: this section.
 VERDICT_STABLE_COMPOUNDS: frozenset = frozenset({
     "vincristine", "doxorubicin", "methotrexate", "etoposide",
 })
+
+#: The 12 compounds the census actually scored -- the UNION of the three tiers,
+#: never retyped, so a name cannot be in the scored set and in no tier (which
+#: would silently render as "not scored", i.e. as reassurance) or in two tiers
+#: at once. bevacizumab is the 13th and is excluded by value, not by name:
+#: bbb_penetrance = 0 makes its source identically zero and both arms
+#: bit-identical, so its verdict is an INPUT rather than a finding.
+_CENSUS_SCORED: frozenset = (VERDICT_REVERSING_COMPOUNDS
+                             | VERDICT_LIMITER_ONLY_COMPOUNDS
+                             | VERDICT_STABLE_COMPOUNDS)
 
 #: Measured on the flagship only. Naming the section stops the flag being read
 #: as a property of the compound anywhere.
 VERDICT_STABILITY_SECTION = "xenium_319"
 
+#: The two rates, carried with the flag so a renderer cannot pair the sentence
+#: with the wrong one -- which is exactly how this went wrong.
+VERDICT_DELIVERY_DOSE_INVERSION = {"n": 5, "of": 12, "percent": 41.7}
+VERDICT_LIMITER_INVERSION = {"n": 7, "of": 12, "percent": 58.3}
+
 
 def verdict_stability(drug_name) -> Dict:
     """Is THIS compound's delivery/dose verdict robust to the missing term?
+
+    Three states, because two would have to round one of them off:
+
+    ``"reverses"``            the delivery/dose verdict itself inverts.
+    ``"holds_with_caveat"``   the delivery/dose verdict holds; the four-way
+                              dominant limiter inverts.
+    ``"holds"``               both hold, and most exposure survives.
 
     Returns ``None`` for a compound the census did not score, rather than
     guessing: the census covered one library on one section, and absence from
@@ -231,31 +296,39 @@ def verdict_stability(drug_name) -> Dict:
     key = str(drug_name).strip().lower()
     if key not in _CENSUS_SCORED:
         return None
-    stable = key in VERDICT_STABLE_COMPOUNDS
+
+    reverses = key in VERDICT_REVERSING_COMPOUNDS
+    limiter_only = key in VERDICT_LIMITER_ONLY_COMPOUNDS
+    verdict = ("reverses" if reverses
+               else "holds_with_caveat" if limiter_only
+               else "holds")
+
+    if reverses:
+        note = (f"{key} REVERSES its delivery/dose verdict when the missing "
+                "transvascular exchange term is switched on, so the verdict "
+                "above is one of the unstable ones.")
+    elif limiter_only:
+        note = (f"{key} KEEPS its delivery/dose verdict when the missing "
+                "transvascular exchange term is switched on -- but its "
+                "four-way dominant limiter does NOT, so the label under the "
+                "sentence changes even though the sentence does not.")
+    else:
+        note = (f"{key} KEEPS its delivery/dose verdict when the missing "
+                "transvascular exchange term is switched on, and keeps most "
+                "of its exposure under the split.")
+
     return {
         "compound": key,
-        "stable": stable,
+        # True only where BOTH measures hold. A compound whose four-way
+        # limiter flips is not "stable" merely because the headline survived.
+        "stable": verdict == "holds",
+        "verdict": verdict,
+        "delivery_dose_verdict_inverts": reverses,
+        "dominant_limiter_inverts": reverses or limiter_only,
         "measured_on": VERDICT_STABILITY_SECTION,
         "source": "results/verdict_inversion_census.md",
-        "note": (
-            f"{key} KEEPS its delivery/dose verdict when the missing "
-            "transvascular exchange term is switched on."
-            if stable else
-            f"{key} REVERSES its delivery/dose verdict when the missing "
-            "transvascular exchange term is switched on, so the verdict above "
-            "is one of the unstable ones."
-        ),
+        "note": note,
     }
-
-
-#: The 12 compounds the census actually scored. bevacizumab is excluded by
-#: value, not by name: bbb_penetrance = 0 makes its source identically zero and
-#: both arms bit-identical, so its verdict is an INPUT rather than a finding.
-_CENSUS_SCORED: frozenset = frozenset({
-    "carmustine", "cisplatin", "doxorubicin", "etoposide", "irinotecan",
-    "lomustine", "methotrexate", "palbociclib", "procarbazine", "ribociclib",
-    "temozolomide", "vincristine",
-})
 
 
 def claim_set_stamp() -> Dict:

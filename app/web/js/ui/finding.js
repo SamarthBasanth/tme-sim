@@ -324,42 +324,68 @@ export function createFindingPanel({ onIsolate } = {}) {
     const jl = mech.joint_limited;
     const vstab = (run.extra_metrics || {}).verdict_stability || null;
     if (jl) {
+      /* THREE STATES, because two rounded one of them off.
+       *
+       * The census measured TWO reversals per compound and they are NOT the
+       * same reversal: this panel's own delivery/dose sentence (5 of 12) and
+       * the four-way dominant limiter printed under it (7 of 12). This block
+       * used to carry one boolean and the second rate, so IRINOTECAN,
+       * PALBOCICLIB and RIBOCICLIB -- limiter flips, verdict holds -- were
+       * each told "THIS VERDICT REVERSES FOR <name>", in a sentence that
+       * cited by name the file measuring it holding.
+       *
+       * The tier now arrives from the server as verdict_stability.verdict,
+       * where the compound lists are pinned to
+       * results/verdict_inversion_census_data.json by
+       * tests/test_verdict_stability.py. Absent means NOT SCORED and renders
+       * as the panel rate, never as reassurance. */
+      const vs = vstab && vstab.verdict ? vstab.verdict
+        /* A record written before the tiering carries `stable` but no
+         * `verdict`, and if `stable` is false its note may assert a reversal
+         * that was never measured. Where it is unambiguous (stable) it is
+         * honoured; where it is not, the run falls back to the panel rate and
+         * its note is withheld below. A stored claim is not rewritten, but a
+         * wrong one is not re-asserted either. */
+        : (vstab && vstab.stable === true ? 'holds' : null);
+      const who = vstab ? String(vstab.compound).toUpperCase() : '';
       el.appendChild(h('div.caveat.crit', h('span',
-        // Lead with THIS run's compound when the backend scored it. A reader
-        // looking at a temozolomide run was previously told the rate for the
-        // panel and left to work out which side they were on -- while the
-        // answer was known, measured, and now travels with the run
-        // (extra_metrics.verdict_stability). Absent means NOT SCORED, and is
-        // rendered as the general rate rather than as reassurance.
-        vstab && vstab.stable === false
-          ? h('b', `THIS VERDICT REVERSES FOR ${String(vstab.compound).toUpperCase()} `
-              + '— THE COMPOUND IN THIS RUN. ')
-          : (vstab && vstab.stable === true
-             ? h('b', `THIS VERDICT HOLDS FOR ${String(vstab.compound).toUpperCase()} `
-                 + '— but it reverses for 7 of the 12 shipped compounds. ')
-             : h('b', 'THIS VERDICT REVERSES FOR 7 OF THE 12 SHIPPED COMPOUNDS. ')),
+        h('b',
+          vs === 'reverses'
+            ? `THIS VERDICT REVERSES FOR ${who} — THE COMPOUND IN THIS RUN. `
+            : vs === 'holds_with_caveat'
+              ? `THIS VERDICT HOLDS FOR ${who} — BUT THE FOUR-WAY LIMITER `
+                + 'UNDER IT DOES NOT. '
+              : vs === 'holds'
+                ? `THIS VERDICT HOLDS FOR ${who} — one of the 4 of 12 for `
+                  + 'which both measures hold. '
+                : 'THIS VERDICT REVERSES FOR 5 OF THE 12 SHIPPED COMPOUNDS. '),
         'The transport law has no transvascular exchange resistance — drug '
         + 'crosses the vessel wall without one, a term the engine ships '
         + 'switched OFF. Switching it on at the shipped parameters, nothing '
-        + 'scaled, flips the dominant limiter for '
-        + '58% of the panel (7 of 12; bevacizumab excluded, its source is '
-        + 'identically zero). Up to 57% of tumour cells change their per-cell '
-        + 'label. ',
-        vstab
+        + 'scaled, reverses THIS delivery/dose verdict for 5 of the 12 scored '
+        + 'compounds (42%), and flips the four-way dominant limiter printed '
+        + 'below it for 7 of 12 (58%). Those are two counts of two different '
+        + 'claims, and only the first one is the sentence above. Bevacizumab '
+        + 'is excluded, its source is identically zero. Up to 57% of tumour '
+        + 'cells change their per-cell label. ',
+        vs && vstab && vstab.note
           ? vstab.note + ' Measured on ' + vstab.measured_on + '; see '
             + vstab.source + '.'
-          : 'This run\u2019s compound was not one of the twelve scored, so '
-            + 'nothing here says which side it falls on — absence from that '
+          : 'Nothing here says which side this run’s compound falls on: '
+            + 'it was not one of the twelve scored, and absence from that '
             + 'census is not evidence of stability.',
         h('br'), h('br'),
         h('b', 'WHICH ONES CAN BE TRUSTED, AND THE RULE IS MECHANICAL. '),
-        'A verdict is stable exactly where the missing term would not have '
-        + 'mattered much: every compound that inverts loses most of its '
-        + 'exposure under the split (0.06 to 0.63 of the original), and every '
-        + 'compound that holds keeps most of it (0.69 to 0.93). On this '
-        + 'section the stable ones are VINCRISTINE, DOXORUBICIN, METHOTREXATE '
-        + 'and ETOPOSIDE. Read a near-even split as undecided, not as a '
-        + 'finding.',
+        'Entry elasticity is exactly 1, so the missing wall resistance does '
+        + 'one thing — it cuts tissue exposure — and how much it cuts decides '
+        + 'what moves. The delivery/dose verdict reverses exactly where '
+        + 'exposure collapses to 0.05 to 0.14 of the original: CARMUSTINE, '
+        + 'CISPLATIN, LOMUSTINE, PROCARBAZINE, TEMOZOLOMIDE. It survives in '
+        + 'the middle band, 0.20 to 0.63, but the four-way limiter flips there: '
+        + 'IRINOTECAN, PALBOCICLIB, RIBOCICLIB. Both hold only where most of '
+        + 'the exposure survives, 0.69 to 0.93: DOXORUBICIN, ETOPOSIDE, '
+        + 'METHOTREXATE, VINCRISTINE. The three bands do not overlap. Read a '
+        + 'near-even split as undecided, not as a finding.',
         h('br'), h('br'),
         'Neither arm is the truth. The term is not switched on because doing '
         + 'so needs a per-compound wall permeability and a tissue '
@@ -367,9 +393,10 @@ export function createFindingPanel({ onIsolate } = {}) {
         + 'value spans 0.0206 to 0.102 um/s entirely on a vessel radius nobody '
         + 'has measured, which would replace an incomplete law with an '
         + 'unvalidated one. What the census establishes is not that the other '
-        + 'answer is right, but that for most of the panel this answer is NOT '
-        + 'DETERMINED BY THE DATA: two defensible treatments of the same '
-        + 'missing physics disagree. There is also a physical bound this law '
+        + 'answer is right, but that for 5 of the 12 scored compounds this '
+        + 'answer is NOT DETERMINED BY THE DATA, and for 3 more the limiter '
+        + 'under it is not: two defensible treatments of the same missing '
+        + 'physics disagree. There is also a physical bound this law '
         + 'does not respect: tissue exposure rises exactly in proportion to '
         + 'entry without limit, so nothing stops it exceeding the plasma level '
         + 'it came from. See results/verdict_inversion_census.md and '

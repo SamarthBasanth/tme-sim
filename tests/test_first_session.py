@@ -798,3 +798,111 @@ def test_the_bound_is_read_off_the_peak_where_the_two_readings_disagree(
     # The mean is still shown, still marked as not the bound.
     assert "1.29x the plasma MEAN" in text
     assert "Do not read that as the bound" in text
+
+
+# --------------------------------------------------------------------------- #
+# 9. the verdict's own sensitivity is stated for THIS compound, and correctly
+# --------------------------------------------------------------------------- #
+#
+# The census measured TWO reversals per compound: this panel's delivery/dose
+# sentence (5 of 12) and the four-way dominant limiter under it (7 of 12). The
+# panel carried one boolean and the second rate, so the three compounds whose
+# limiter flips while their verdict holds -- irinotecan, palbociclib,
+# ribociclib -- were each told "THIS VERDICT REVERSES FOR <NAME>", in a
+# sentence citing by name the file that measured it holding.
+#
+# The payloads below are the SHAPE app/server/jobs.py::verdict_stability
+# returns; that the shape is filled with the right names is asserted against
+# results/verdict_inversion_census_data.json in tests/test_verdict_stability.py.
+# This file only checks that each tier reaches the screen as itself.
+def _vstab(compound, verdict, note):
+    return {"compound": compound, "verdict": verdict,
+            "stable": verdict == "holds",
+            "delivery_dose_verdict_inverts": verdict == "reverses",
+            "dominant_limiter_inverts": verdict != "holds",
+            "measured_on": "xenium_319",
+            "source": "results/verdict_inversion_census.md",
+            "note": note}
+
+
+def _with_vstab(vstab):
+    run = _run_fixture()
+    run["extra_metrics"] = dict(run["extra_metrics"], verdict_stability=vstab)
+    return run
+
+
+def test_a_reversing_compound_is_told_so_by_name(page, web_server):
+    text = _render(page, web_server, "finding.js", _with_vstab(_vstab(
+        "temozolomide", "reverses", "temozolomide REVERSES its delivery/dose "
+        "verdict when the missing transvascular exchange term is switched on, "
+        "so the verdict above is one of the unstable ones.")))
+    assert "THIS VERDICT REVERSES FOR TEMOZOLOMIDE" in text
+    assert "THE COMPOUND IN THIS RUN" in text
+    assert "temozolomide REVERSES its delivery/dose verdict" in text
+
+
+def test_a_limiter_only_compound_is_not_told_its_verdict_reversed(
+        page, web_server):
+    """THE REGRESSION. irinotecan's delivery/dose verdict was measured HOLDING;
+    only its four-way limiter flips. The panel said the opposite, and cited the
+    census while saying it."""
+    text = _render(page, web_server, "finding.js", _with_vstab(_vstab(
+        "irinotecan", "holds_with_caveat", "irinotecan KEEPS its delivery/dose "
+        "verdict when the missing transvascular exchange term is switched on "
+        "-- but its four-way dominant limiter does NOT, so the label under the "
+        "sentence changes even though the sentence does not.")))
+    assert "THIS VERDICT REVERSES FOR IRINOTECAN" not in text, (
+        "the panel tells irinotecan its verdict reverses, beside a citation of "
+        "the census that measured it holding"
+    )
+    assert "THIS VERDICT HOLDS FOR IRINOTECAN" in text
+    # ...and it is not rendered as a clean bill either.
+    assert "FOUR-WAY LIMITER" in text
+    assert "does NOT" in text
+
+
+def test_a_stable_compound_reads_as_stable_without_overclaiming(
+        page, web_server):
+    text = _render(page, web_server, "finding.js", _with_vstab(_vstab(
+        "doxorubicin", "holds", "doxorubicin KEEPS its delivery/dose verdict "
+        "when the missing transvascular exchange term is switched on, and "
+        "keeps most of its exposure under the split.")))
+    assert "THIS VERDICT HOLDS FOR DOXORUBICIN" in text
+    assert "4 of 12" in text, "the panel-wide rate is dropped for a stable one"
+    assert "REVERSES FOR DOXORUBICIN" not in text
+
+
+def test_an_unscored_compound_gets_the_panel_rate_not_reassurance(
+        page, web_server):
+    """No verdict_stability at all: the census did not score this compound, and
+    absence from it is not evidence of stability."""
+    text = _render(page, web_server, "finding.js", _run_fixture())
+    assert "THIS VERDICT REVERSES FOR 5 OF THE 12 SHIPPED COMPOUNDS" in text
+    assert "absence from that census is not evidence of stability" in text
+
+
+def test_a_record_written_before_the_tiering_is_not_re_asserted(
+        page, web_server):
+    """A stored run from between 2026-08-27 and the tiering carries ``stable``
+    and no ``verdict``, and where ``stable`` is false its note may assert a
+    reversal that was never measured. It falls back to the panel rate with the
+    stale note withheld -- the record is not rewritten, but it is not repeated
+    either."""
+    text = _render(page, web_server, "finding.js", _with_vstab({
+        "compound": "irinotecan", "stable": False,
+        "measured_on": "xenium_319",
+        "source": "results/verdict_inversion_census.md",
+        "note": "irinotecan REVERSES its delivery/dose verdict when the "
+                "missing transvascular exchange term is switched on."}))
+    assert "irinotecan REVERSES" not in text
+    assert "THIS VERDICT REVERSES FOR IRINOTECAN" not in text
+    assert "THIS VERDICT REVERSES FOR 5 OF THE 12 SHIPPED COMPOUNDS" in text
+
+
+def test_the_two_rates_are_named_as_two_different_claims(page, web_server):
+    """5 of 12 is this sentence; 7 of 12 is the four-way limiter under it.
+    Printing only the second beside the first is what made the panel wrong."""
+    text = _render(page, web_server, "finding.js", _run_fixture())
+    assert "reverses THIS delivery/dose verdict for 5 of the 12 scored" in text
+    assert "four-way dominant limiter printed below it for 7 of 12" in text
+    assert "two counts of two different claims" in text

@@ -1,4 +1,16 @@
-# How often does the headline verdict reverse? — 7 of 12, and temozolomide is one
+# How often does the headline verdict reverse? — 5 of 12, and temozolomide is one
+
+> **CORRECTION (2026-08-29, no number changed).** This file measures TWO
+> reversals per compound and the summary lines below used to quote them
+> interchangeably: the **delivery/dose verdict** (the panel's own headline
+> sentence, **5 of 12**) and the **four-way dominant limiter** printed under
+> it (**7 of 12**). §1's table always carried both and no measured value here
+> has moved — but the conflation propagated: `app/server/jobs.py` shipped one
+> boolean built from §4's four names and told `irinotecan`, `palbociclib` and
+> `ribociclib` that their delivery/dose verdict reverses, while citing this
+> file, which measures it holding. The corrected sentences are marked below,
+> and the tiers are now asserted against `verdict_inversion_census_data.json`
+> by `tests/test_verdict_stability.py`.
 
 **Status: RUN AND MEASURED.** Driver: `experiments/verdict_inversion_census.py`.
 Data: `results/verdict_inversion_census_data.json`. Runtime **25,502 s** (7.1 h)
@@ -20,14 +32,17 @@ model is known to be missing and ships in the OFF position. That was 4 compounds
 on 1 section, and the panel was updated to say the verdict "can reverse". It
 could not say how often.
 
-**It reverses for 7 of the 12 scored compounds — 58.3 % of the shipped panel.**
+**The delivery/dose verdict reverses for 5 of the 12 scored compounds —
+41.7 %.** The coarser four-way dominant limiter moves for more: **7 of 12 —
+58.3 %.** They are different claims, the table in §1 scores them in separate
+columns, and the panel's headline sentence is the first one.
 
 | measure | value |
 |---|---:|
 | compounds in the library | 13 |
 | scored (excluding one degenerate zero-source) | 12 |
-| **dominant limiter inverts** | **7 / 12 = 58.3 %** |
-| delivery↔dose verdict specifically inverts | 5 / 12 = 41.7 % |
+| **delivery↔dose verdict inverts** (the panel's own sentence) | **5 / 12 = 41.7 %** |
+| four-way dominant limiter inverts (the label under it) | 7 / 12 = 58.3 % |
 | worst per-cell relabelling | **57.2 %** of tumour cells |
 | total cell labels changed across the panel | 143,899 |
 
@@ -74,11 +89,27 @@ cuts tissue exposure, by between **7 %** (`vincristine`, 0.927) and **95 %**
 crosses the IC50 threshold in many more cells, and cells move from
 SURVIVED_UNDERDOSED to SURVIVED_UNREACHED.
 
-The correlation is the readable part: **every compound whose verdict inverts
-loses most of its exposure** (ratios 0.062–0.633), and every compound that is
-stable keeps most of it (0.693–0.927). `doxorubicin` at 0.837 relabels 0.6 % of
-cells; `temozolomide` at 0.140 relabels 57.2 %. The verdict is stable exactly
-where the missing term would not have mattered much.
+> **CORRECTION (2026-08-29).** This paragraph previously read "every compound
+> whose verdict inverts loses most of its exposure (ratios 0.062–0.633), and
+> every compound that is stable keeps most of it (0.693–0.927)". Those two bands
+> partition the panel only if `cisplatin` is dropped from it: its dominant
+> limiter does NOT invert and it retains **0.054** — the lowest ratio in the
+> table. The measured structure is three bands, not two, and it is stated below.
+> No ratio changed.
+
+The correlation is the readable part, and it separates the panel into **three
+bands that do not overlap**:
+
+| band | mean AUC ON/OFF | compounds |
+|---|---:|---|
+| delivery/dose verdict **reverses** | 0.054–0.140 | `carmustine`, `cisplatin`, `lomustine`, `procarbazine`, `temozolomide` |
+| verdict holds, **four-way limiter inverts** | 0.200–0.633 | `irinotecan`, `palbociclib`, `ribociclib` |
+| **both hold** | 0.693–0.927 | `doxorubicin`, `etoposide`, `methotrexate`, `vincristine` |
+
+`doxorubicin` at 0.837 relabels 0.6 % of cells; `temozolomide` at 0.140 relabels
+57.2 %. The verdict is stable exactly where the missing term would not have
+mattered much — and the middle band is the one a two-state summary has nowhere
+to put, which is how three compounds ended up labelled as reversing.
 
 ## 3. Checks
 
@@ -105,3 +136,10 @@ verdict is only trustworthy where the compound retains most of its exposure
 under the split. On this section that is `vincristine`, `doxorubicin`,
 `methotrexate` and `etoposide`. It is not trustworthy for temozolomide, which is
 the compound the product demonstrates itself with.
+
+That is a recommendation about **exposure retention**, and it is not the same
+question as whether a given compound's verdict was measured reversing — the
+distinction §2's three bands make. `irinotecan`, `palbociclib` and `ribociclib`
+kept their delivery/dose verdict and lost their four-way limiter; reading this
+paragraph as the reversal column is precisely the error the `CORRECTION` at the
+top of this file records.
