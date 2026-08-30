@@ -1691,6 +1691,11 @@ class TestAccountAndLimits:
         import app.server.api as api_mod
 
         monkeypatch.setattr(api_mod, "_MAX_GRID_CELLS", 100_000)
+        # The source is RESOLVED at import alongside the value now, so patching
+        # the value alone would leave the payload reporting "default" for a
+        # ceiling that is nothing of the kind.
+        monkeypatch.setattr(api_mod, "_MAX_GRID_CELLS_SOURCE",
+                            "TMESIM_MAX_GRID_CELLS")
         c, mgr = self._make_client(monkeypatch, tmp_path)
         try:
             limits = c.get("/api/limits", headers=self._H).json()
@@ -2114,3 +2119,141 @@ class TestBannerElseBinding:
                     owners.append(ast.get_source_segment(src, node.test))
         assert owners == ["api_key"], (
             f"the no-authentication `else` hangs off {owners!r}, not `api_key`")
+
+
+class TestCeilingResolution:
+    """``_resolve_max_grid_cells`` — where the grid ceiling comes from.
+
+    Four branches, and the interesting one is what `auto` does NOT do. It
+    adopts 46,070 voxels: the largest grid MEASURED to survive a 512 MB box.
+    That is applying a measurement, not fitting one — the only two points that
+    exist are "46,070 survived" and "286,200 died", so the only honest
+    automatic ceiling is the one that survived, and it is knowingly
+    conservative about everything between them.
+
+    It is OPT-IN. The ceiling does not move on its own when a small cgroup
+    limit is detected, because a server that silently refuses a spec the
+    operator expects to run, on the strength of a number it read out of /sys,
+    is a debugging session nobody asked for. Detection always drives the
+    WARNING; it drives the CEILING only by name.
+    """
+
+    def _resolve(self, monkeypatch, value, mem=None):
+        import app.server.api as api_mod
+
+        if value is None:
+            monkeypatch.delenv("TMESIM_MAX_GRID_CELLS", raising=False)
+        else:
+            monkeypatch.setenv("TMESIM_MAX_GRID_CELLS", value)
+        if mem is None:
+            monkeypatch.delenv("TMESIM_HOST_MEMORY_MB", raising=False)
+        else:
+            monkeypatch.setenv("TMESIM_HOST_MEMORY_MB", mem)
+        return api_mod._resolve_max_grid_cells()
+
+    def test_unset_is_the_default(self, monkeypatch):
+        import app.server.api as api_mod
+        assert self._resolve(monkeypatch, None) == \
+            (api_mod._DEFAULT_MAX_GRID_CELLS, "default")
+
+    def test_an_explicit_number_is_reported_as_explicit(self, monkeypatch):
+        """Even when it happens to equal the default. The source used to be
+        INFERRED from the value, so `TMESIM_MAX_GRID_CELLS=40000000` reported
+        itself as "default" — an operator who set it deliberately was told the
+        server had ignored them."""
+        import app.server.api as api_mod
+        assert self._resolve(monkeypatch, "123456") == \
+            (123456, "TMESIM_MAX_GRID_CELLS")
+        assert self._resolve(
+            monkeypatch, str(api_mod._DEFAULT_MAX_GRID_CELLS)) == \
+            (api_mod._DEFAULT_MAX_GRID_CELLS, "TMESIM_MAX_GRID_CELLS")
+
+    def test_auto_on_a_small_host_adopts_the_measured_survivor(
+            self, monkeypatch):
+        from app.server.account import MEASURED_OK_VOXELS, MEASURED_OOM_VOXELS
+
+        cells, source = self._resolve(monkeypatch, "auto", mem="512")
+        assert cells == MEASURED_OK_VOXELS
+        assert source.startswith("auto (")
+        # The whole point: below the count that killed a box of this size.
+        assert cells < MEASURED_OOM_VOXELS
+
+    def test_auto_on_a_large_or_undeclared_host_says_which_branch_ran(
+            self, monkeypatch):
+        """`auto` must never hide the fact that it did nothing."""
+        import app.server.api as api_mod
+
+        cells, source = self._resolve(monkeypatch, "auto", mem="16000")
+        assert cells == api_mod._DEFAULT_MAX_GRID_CELLS
+        assert "no small-host limit detected" in source
+
+        cells, source = self._resolve(monkeypatch, "auto", mem=None)
+        assert cells == api_mod._DEFAULT_MAX_GRID_CELLS
+        assert "no small-host limit detected" in source
+
+    def test_a_typo_refuses_to_start(self, monkeypatch):
+        """The dangerous failure is a typo falling back to 40 M on a small
+        host, which permits the spec measured to kill it. Loud, not silent."""
+        with pytest.raises(SystemExit) as exc:
+            self._resolve(monkeypatch, "1O0000")   # letter O, not zero
+        assert "neither an integer nor 'auto'" in str(exc.value)
+        assert "40,000,000" in str(exc.value)
+
+    def test_detection_alone_never_moves_the_ceiling(self, monkeypatch):
+        """The opt-in guarantee, stated as a test: a tiny detected host with
+        nothing set must leave the ceiling exactly where it was."""
+        import app.server.api as api_mod
+        assert self._resolve(monkeypatch, None, mem="128") == \
+            (api_mod._DEFAULT_MAX_GRID_CELLS, "default")
+
+
+class TestEnvVarsAreDocumented:
+    """CI for one page of the claim surface.
+
+    ``docs/DEPLOYMENT.md`` §4 opened with "Six. There is no config file; these
+    are the whole surface" while the code read TEN. ``TMESIM_MAX_GRID_CELLS``
+    had been the difference between a refusal and a dead container for weeks
+    and was not on the page at all. Nobody wrote a wrong sentence: the sentence
+    was true when it was written and the code moved underneath it, which is
+    this project's most persistent defect and the one thing `results/` and
+    `docs/` have no CI for.
+
+    This is a small, exact piece of that CI. It does not check that the prose
+    is RIGHT — only that no variable the server reads is absent from the page
+    that claims to list them all.
+    """
+
+    _DOC = os.path.join(_REPO, "docs", "DEPLOYMENT.md")
+    _SRC_DIR = os.path.join(_REPO, "app", "server")
+
+    def _vars_in_code(self):
+        found = set()
+        for name in sorted(os.listdir(self._SRC_DIR)):
+            if not name.endswith(".py"):
+                continue
+            with open(os.path.join(self._SRC_DIR, name)) as fh:
+                found.update(re.findall(r"TMESIM_[A-Z_]+", fh.read()))
+        return found
+
+    def test_every_env_var_the_server_reads_is_on_the_page(self):
+        with open(self._DOC) as fh:
+            doc = fh.read()
+        missing = sorted(v for v in self._vars_in_code() if v not in doc)
+        assert not missing, (
+            "docs/DEPLOYMENT.md claims to list the whole environment surface "
+            f"and does not mention: {missing}")
+
+    def test_the_stated_count_matches_the_code(self):
+        """The number in the opening sentence is itself a claim."""
+        with open(self._DOC) as fh:
+            doc = fh.read()
+        m = re.search(r"## 4\. Environment variables\s+(\w+)\.", doc)
+        assert m, "the section no longer opens with a count"
+        words = {"four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+                 "nine": 9, "ten": 10, "eleven": 11, "twelve": 12}
+        stated = words.get(m.group(1).lower())
+        assert stated is not None, f"unparsable count {m.group(1)!r}"
+        actual = len(self._vars_in_code())
+        assert stated == actual, (
+            f"docs/DEPLOYMENT.md §4 says {m.group(1)} ({stated}); the server "
+            f"reads {actual}: {sorted(self._vars_in_code())}")

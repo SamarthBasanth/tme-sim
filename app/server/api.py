@@ -170,9 +170,51 @@ _LARGE_GRID_CELLS = 1_500_000
 #: So a constrained host sets TMESIM_MAX_GRID_CELLS to what it can actually
 #: afford and gets a 400 with a reason instead of a dead container. 100_000
 #: permits dx >= ~20 um on this section and refuses dx = 12.
+#: ``TMESIM_MAX_GRID_CELLS=auto`` adopts the largest grid MEASURED to survive
+#: on a host of this size -- 46,070 voxels, the dx = 30 um point above, which
+#: peaked at 220 MiB on the 512 MB instance. It applies a MEASUREMENT; it does
+#: not fit one. The only two points available are "46,070 survived" and
+#: "286,200 died", so the only honest automatic ceiling is the one that
+#: survived, and it is deliberately conservative: it refuses grids between
+#: those points that might well have been fine. An operator who wants that
+#: range back sets a number instead.
+#:
+#: OPT-IN, and that is the whole design. The ceiling could have moved on its
+#: own the moment a small cgroup limit was detected, and it does not: a server
+#: that silently refuses a spec the operator expects to run, because it read a
+#: number out of /sys, is a debugging session nobody asked for. Detection
+#: drives the WARNING unconditionally (see account.oom_warning); it drives the
+#: CEILING only when asked to, by name.
 _DEFAULT_MAX_GRID_CELLS = 40_000_000
-_MAX_GRID_CELLS = int(
-    os.environ.get("TMESIM_MAX_GRID_CELLS") or _DEFAULT_MAX_GRID_CELLS)
+
+
+def _resolve_max_grid_cells():
+    """(ceiling, source). See the note above for why ``auto`` is opt-in."""
+    raw = (os.environ.get("TMESIM_MAX_GRID_CELLS") or "").strip()
+    if not raw:
+        return _DEFAULT_MAX_GRID_CELLS, "default"
+    if raw.lower() == "auto":
+        from .account import (MEASURED_INSTANCE_MB, MEASURED_OK_VOXELS,
+                              memory_limit)
+        mem = memory_limit()
+        if mem["bytes"] and mem["bytes"] <= MEASURED_INSTANCE_MB * 1024 * 1024:
+            return MEASURED_OK_VOXELS, f"auto ({mem['source']})"
+        # `auto` on a host that is NOT small, or whose size is undeclared,
+        # falls back to the default rather than guessing a middle value --
+        # and reports that it did, so "auto" never hides which branch ran.
+        return _DEFAULT_MAX_GRID_CELLS, "auto (no small-host limit detected)"
+    try:
+        return int(raw), "TMESIM_MAX_GRID_CELLS"
+    except ValueError:
+        # A typo must not silently restore the 40 M default on a small box.
+        raise SystemExit(
+            f"TMESIM_MAX_GRID_CELLS={raw!r} is neither an integer nor 'auto'. "
+            "Refusing to start rather than fall back to the 40,000,000 "
+            "default, which on a small host permits the spec measured to "
+            "OOM-kill it.")
+
+
+_MAX_GRID_CELLS, _MAX_GRID_CELLS_SOURCE = _resolve_max_grid_cells()
 
 #: Hard floor on dx_um for the case where the section extent is unknown and
 #: the voxel ceiling above cannot be evaluated. 0.5 um is well below a cell
@@ -2272,9 +2314,10 @@ def create_app(manager: Optional[JobManager] = None,
     _limits = {
         "max_grid_cells": _MAX_GRID_CELLS,
         "max_grid_cells_default": _DEFAULT_MAX_GRID_CELLS,
-        "max_grid_cells_source": (
-            "TMESIM_MAX_GRID_CELLS" if _MAX_GRID_CELLS != _DEFAULT_MAX_GRID_CELLS
-            else "default"),
+        # The RESOLVED source, not one inferred from the value. The inferred
+        # version said "default" for an explicit TMESIM_MAX_GRID_CELLS=40000000
+        # and could not describe `auto` at all.
+        "max_grid_cells_source": _MAX_GRID_CELLS_SOURCE,
         # The point above which a spec is allowed but slow, distinct from the
         # ceiling above which it is refused. A client that shows only the
         # ceiling lets a user walk into a ten-minute reconstruction with no
@@ -2298,7 +2341,7 @@ def create_app(manager: Optional[JobManager] = None,
         # between a configured number and a recorded measurement -- not a
         # prediction, and not a derived ceiling. See account.oom_exposure.
         "oom_exposure": oom_exposure(
-            _MAX_GRID_CELLS, _MAX_GRID_CELLS == _DEFAULT_MAX_GRID_CELLS),
+            _MAX_GRID_CELLS, _MAX_GRID_CELLS_SOURCE == "default"),
     }
     app.include_router(build_account_router(
         jobs=jobs, store=store, reports=reports, limits=_limits,

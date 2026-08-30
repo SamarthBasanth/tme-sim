@@ -255,10 +255,9 @@ def main(argv=None) -> int:
     # this host's size. An operator who sees this line has a real problem, not
     # boilerplate.
     from .account import oom_warning
-    from .api import _DEFAULT_MAX_GRID_CELLS, _MAX_GRID_CELLS
+    from .api import _MAX_GRID_CELLS, _MAX_GRID_CELLS_SOURCE
 
-    _oom = oom_warning(_MAX_GRID_CELLS,
-                       _MAX_GRID_CELLS == _DEFAULT_MAX_GRID_CELLS)
+    _oom = oom_warning(_MAX_GRID_CELLS, _MAX_GRID_CELLS_SOURCE == "default")
     if _oom:
         print(_oom)
 

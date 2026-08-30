@@ -740,8 +740,15 @@ any directory it can read), and leave `TMESIM_STUDIO_EXPOSE_TRACEBACKS` unset.
 
 ## 4. Environment variables
 
-Six. There is no config file; these are the whole surface, and only the first
-five are security-relevant.
+Ten. There is no config file; these are the whole surface, and only five are
+security-relevant.
+
+This section said "Six" while the code read ten — `TMESIM_MAX_GRID_CELLS` had
+been load-bearing for a while and was never listed here, which is the failure
+this repository keeps having: the document that was true when it was written.
+`tests/test_app_server.py::TestEnvVarsAreDocumented` now enumerates every
+`TMESIM_*` read anywhere in `app/server/` and fails if one is missing from this
+file, so the count above cannot drift again without a red test.
 
 **Four of the six are read once, at process start, and need a restart to
 change.** `TMESIM_STUDIO_API_KEY`, `TMESIM_STUDIO_ALLOWED_HOSTS` and
@@ -774,6 +781,73 @@ behind you (verified; §1c). An explicit `--api-key` on the command line still
 overrides the exported key — that is the one deliberate exception, it is the
 ordering you'd expect, and it is available only on `python -m app.server`
 (§1b).
+
+### `TMESIM_MAX_GRID_CELLS`
+
+**The one that keeps a small host alive**, and the reason this section was
+audited at all.
+
+Measured on a 512 MB instance (Render's free tier), flagship Xenium GBM, real
+container: `dx = 30 um` is 46,070 voxels and peaks at 220 MiB — comfortable.
+`dx = 12 um` is 286,200 voxels and the container is **OOM-KILLED**. Not the run
+failing: the *process* dies, `/healthz` stops answering, and one ordinary
+request takes the service down for everyone. The default ceiling of 40,000,000
+does not catch that, because 286,200 voxels is a perfectly reasonable ask on a
+machine with room for it.
+
+* **Unset:** 40,000,000. That is the "no request should ever ask for this"
+  number, not the "this machine can afford it" one. Those are different numbers
+  and only the operator knows the second.
+* **An integer:** used verbatim. `100000` permits `dx >= ~20 um` on the
+  flagship section and refuses `dx = 12`.
+* **`auto`:** adopts 46,070 — the largest grid *measured* to survive a host this
+  size — but **only when a limit at or below 512 MB is actually detected**. On a
+  larger or undeclared host it falls back to the default and says which branch
+  ran, so `auto` never hides its own inaction. It applies a measurement rather
+  than fitting one: the only two points that exist are "46,070 survived" and
+  "286,200 died", so it is deliberately conservative about everything between
+  them. An operator who wants that range back sets a number.
+* **Anything else:** the process **refuses to start**. A typo must not fall back
+  to 40,000,000 on a small box.
+
+Detection alone never moves the ceiling — that is opt-in, by name. What
+detection always does is *warn*: when the configured ceiling still permits the
+286,200-voxel spec on a host at or below 512 MB, the startup banner says so and
+so does the Account panel's Limits tab. On a correctly configured host both are
+silent.
+
+On Render's free tier, set `TMESIM_MAX_GRID_CELLS=auto` or `100000`.
+
+### `TMESIM_HOST_MEMORY_MB`
+
+An override for the memory detection above, in megabytes. Read only to answer
+"how big is this host", never to set a ceiling by itself.
+
+Detection reads cgroup v2 `memory.max`, then cgroup v1
+`memory.limit_in_bytes`, and treats `max` and v1's huge sentinel as *no limit
+declared*. Set this when a platform enforces a limit it does not expose through
+cgroups. Undetected memory is reported as **not declared**, never as
+"unlimited" — a host can be capped by something this process cannot see.
+
+### `TMESIM_BILLING_PROVIDER`
+
+Names a payment provider for `GET /api/account`'s billing block. **Setting it
+does not enable billing and cannot**: with no implementation mounted the block
+reports `configured-but-not-implemented` and `enabled` stays `false`. It exists
+so that wiring a provider later is a config change plus a real implementation,
+and so a half-finished integration is a state an operator can *see* rather than
+a silent one. No charge is made, no payment method is stored, no usage is
+metered.
+
+### `TMESIM_STUDIO_API_KEY_SOURCE`
+
+**Written by the process, not for you to set.** `python -m app.server` records
+which of its three key sources won — `generated`, `flag` or `environment` — so
+`GET /api/account` can report it weeks later, when the startup banner that said
+the same thing is scrollback nobody has. An operator who has *lost* the key
+needs to know whether they chose it or the process invented one at boot and
+printed it exactly once. An unrecognised value is reported as `unknown` rather
+than mapped to a plausible guess.
 
 ### `TMESIM_STUDIO_API_KEY`
 
