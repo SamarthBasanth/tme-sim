@@ -241,6 +241,27 @@ def main(argv=None) -> int:
             print("              tissue outside that directory will be "
                   f"REFUSED; set {DATA_ROOTS_VAR} to include yours")
 
+    # OUTSIDE the key's if/else, for the reason the tissue-roots line above
+    # says: this is about the MACHINE, not about authentication, and nesting it
+    # under either branch would hide it in exactly one configuration. Placing
+    # it INSIDE cost an hour once already -- dropped between the `if` body and
+    # its `else`, it parses cleanly and silently rebinds the `else`, so a
+    # correctly secured server announces "no authentication on any /api/
+    # route". Two statements at the wrong indent, no syntax error, opposite
+    # meaning.
+    #
+    # Silent on a correctly configured host: it fires only when this server's
+    # grid ceiling still permits the spec measured to OOM-kill a container of
+    # this host's size. An operator who sees this line has a real problem, not
+    # boilerplate.
+    from .account import oom_warning
+    from .api import _DEFAULT_MAX_GRID_CELLS, _MAX_GRID_CELLS
+
+    _oom = oom_warning(_MAX_GRID_CELLS,
+                       _MAX_GRID_CELLS == _DEFAULT_MAX_GRID_CELLS)
+    if _oom:
+        print(_oom)
+
     if args.reload:
         uvicorn.run("app.server.api:app", host=args.host, port=args.port,
                     reload=True, log_level=args.log_level)

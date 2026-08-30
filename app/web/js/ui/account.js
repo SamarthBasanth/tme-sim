@@ -380,6 +380,49 @@ export function createAccountPanel() {
         ? NULL_GLYPH : `${L.min_dx_um} um`),
       row('solver timestep', L.pde_dt_s === undefined
         ? NULL_GLYPH : `${L.pde_dt_s} s`))));
+    // The exposure block, ABOVE the formula, because an operator whose server
+    // is one request from dying does not need to know how the count is
+    // computed first. Rendered only when the server actually sent it, so an
+    // older backend degrades to the rest of the tab rather than to a blank.
+    const ox = L.oom_exposure;
+    if (ox) {
+      const m = ox.measured || {};
+      const memMB = Number.isFinite(ox.host_memory_bytes)
+        ? `${int(Math.round(ox.host_memory_bytes / 1048576))} MB`
+        : 'not declared to this process';
+      wrap.appendChild(h('div.hr-lbl', 'Can one request kill this server?'));
+      wrap.appendChild(h('div.tblwrap', h('table.tbl',
+        row('host memory', memMB, ox.host_memory_source || ''),
+        row('ceiling permits the measured kill',
+          ox.ceiling_permits_measured_oom ? 'YES' : 'no'),
+        row('host at or below the measured instance',
+          ox.host_at_or_below_measured_instance === null
+            ? 'unknown' : (ox.host_at_or_below_measured_instance ? 'yes' : 'no'),
+          'Unknown means no limit is declared to this process — which is not '
+          + 'the same as having room. A platform can cap memory without '
+          + 'exposing it.'))));
+
+      if (ox.ceiling_permits_measured_oom
+          && ox.host_at_or_below_measured_instance) {
+        wrap.appendChild(h('div.caveat.crit', h('span',
+          h('b', 'ONE ORDINARY REQUEST CAN TAKE THIS SERVICE DOWN. '),
+          `This host declares ${memMB}, at or below the ${int(m.instance_mb)} `
+          + `MB instance where ${int(m.oom_voxels)} voxels OOM-KILLED the `
+          + 'container — and the grid ceiling still permits that spec. It is '
+          + 'not the run that fails: the PROCESS dies and /healthz stops '
+          + 'answering, for everyone. Set TMESIM_MAX_GRID_CELLS on the host.')));
+      } else if (ox.ceiling_permits_measured_oom && ox.ceiling_is_default) {
+        wrap.appendChild(h('div.caveat', h('span',
+          h('b', 'THE CEILING IS THE UNCONFIGURED DEFAULT. '),
+          `It permits the ${int(m.oom_voxels)}-voxel spec that OOM-killed a `
+          + `${int(m.instance_mb)} MB container, and no memory limit is `
+          + 'declared here. On a small host, set TMESIM_MAX_GRID_CELLS.')));
+      }
+
+      // Never let the two numbers above be read as a model.
+      wrap.appendChild(h('div.hint', m.note || ''));
+    }
+
     wrap.appendChild(h('div.hr-lbl', 'How the grid count is computed'));
     wrap.appendChild(codeBlock(L.grid_cells_formula || '(not published)',
       'the grid formula'));

@@ -2267,7 +2267,7 @@ def create_app(manager: Optional[JobManager] = None,
     # the number validate_spec refuses with are the same number. The failure
     # this prevents is the one this project keeps having: a second copy of a
     # value, correct on the day it was written.
-    from .account import build_account_router
+    from .account import build_account_router, oom_exposure
 
     _limits = {
         "max_grid_cells": _MAX_GRID_CELLS,
@@ -2293,6 +2293,12 @@ def create_app(manager: Optional[JobManager] = None,
             "(extent_um[0] / dx_um) * (extent_um[1] / dx_um)"),
         "field_bytes_per_grid_cell": 8,
         "grid_cells_requires": "section extent_um",
+        # Whether this server's ceiling still permits the spec that was
+        # MEASURED to OOM-kill a container of this host's size. A comparison
+        # between a configured number and a recorded measurement -- not a
+        # prediction, and not a derived ceiling. See account.oom_exposure.
+        "oom_exposure": oom_exposure(
+            _MAX_GRID_CELLS, _MAX_GRID_CELLS == _DEFAULT_MAX_GRID_CELLS),
     }
     app.include_router(build_account_router(
         jobs=jobs, store=store, reports=reports, limits=_limits,

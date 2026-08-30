@@ -253,3 +253,169 @@ def _billing() -> Dict:
             "payment method is stored, and no usage is metered."
         ),
     }
+
+
+# --------------------------------------------------------------------------- #
+# Host memory, and whether this server's ceiling actually protects it
+# --------------------------------------------------------------------------- #
+#
+# THE MEASUREMENT THIS IS BUILT ON, AND ITS LIMITS.
+#
+# app/server/api.py records two points, both taken on a 512 MB instance
+# (Render's free tier), flagship Xenium GBM, in a real container with no bind
+# mount:
+#
+#     46,070 voxels (dx = 30 um)  -> peaks at 220 MiB, comfortable
+#    286,200 voxels (dx = 12 um)  -> the container is OOM-KILLED
+#
+# TWO POINTS AT ONE INSTANCE SIZE IS NOT A LAW. It cannot be turned into a
+# bytes-per-voxel constant and it must not be: 220 MiB across 46,070 voxels is
+# ~5 KiB a voxel, which is nothing like the 8 bytes a float64 field costs, so
+# the peak is dominated by the cell population and the interpreter and NOT by
+# the grid. Fitting a line through two points of a quantity that is mostly not
+# the independent variable would produce a confident number with nothing under
+# it — the exact failure this repository keeps finding.
+#
+# So nothing here derives a ceiling. This code detects what the host actually
+# grants, and reports one comparison that is a plain fact rather than a model:
+# does this server's configured ceiling still permit the spec that was MEASURED
+# to kill an instance of this size? If it does, the operator is one ordinary
+# request away from a dead container, and that is worth saying out loud at
+# startup and on the Account panel instead of leaving it to be discovered.
+
+#: cgroup v2, then v1. Absent on macOS and on a bare host, which is not an
+#: error — it means "no container limit", and the answer is None.
+_CGROUP_V2 = "/sys/fs/cgroup/memory.max"
+_CGROUP_V1 = "/sys/fs/cgroup/memory/memory.limit_in_bytes"
+
+#: cgroup v1 writes a sentinel rather than "max" when there is no limit. The
+#: exact value varies with page size, so anything absurdly large is treated as
+#: "unlimited" rather than compared against a magic constant.
+_UNLIMITED_ABOVE = 1 << 50  # 1 PiB
+
+#: The two recorded points. Values, not a model. See the block above.
+MEASURED_INSTANCE_MB = 512
+MEASURED_OK_VOXELS = 46_070
+MEASURED_OK_PEAK_MIB = 220
+MEASURED_OOM_VOXELS = 286_200
+
+
+def _read_int(path: str) -> Optional[int]:
+    try:
+        with open(path) as fh:
+            raw = fh.read().strip()
+    except OSError:
+        return None
+    if raw == "max":
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def memory_limit() -> Dict:
+    """What this host actually grants the process, and how we know.
+
+    ``TMESIM_HOST_MEMORY_MB`` overrides everything. It exists because a
+    platform can enforce a limit it does not expose through cgroups, and
+    because a test needs to drive this without a container -- an operator who
+    knows the number can state it rather than have the code shrug.
+
+    ``bytes`` is ``None`` when nothing declares a limit. That is reported as
+    "not declared", never as "unlimited": a host can be capped by something
+    this process cannot see, and the difference matters to anyone reading the
+    warning below.
+    """
+    override = os.environ.get("TMESIM_HOST_MEMORY_MB", "").strip()
+    if override:
+        try:
+            mb = float(override)
+            if mb > 0:
+                return {"bytes": int(mb * 1024 * 1024),
+                        "source": "TMESIM_HOST_MEMORY_MB"}
+        except ValueError:
+            pass  # a malformed override falls through to detection
+    for path, source in ((_CGROUP_V2, "cgroup v2 memory.max"),
+                         (_CGROUP_V1, "cgroup v1 memory.limit_in_bytes")):
+        v = _read_int(path)
+        if v is not None and 0 < v < _UNLIMITED_ABOVE:
+            return {"bytes": v, "source": source}
+    return {"bytes": None, "source": "not declared"}
+
+
+def oom_exposure(max_grid_cells: int, ceiling_is_default: bool) -> Dict:
+    """Is this server's ceiling still above the spec measured to kill it?
+
+    Returns the recorded measurements verbatim plus two booleans, both of which
+    are comparisons rather than predictions:
+
+    ``ceiling_permits_measured_oom``
+        the configured ceiling is at or above the voxel count that was measured
+        to OOM-kill a 512 MB instance. True says the refusal path will NOT stop
+        that spec. It says nothing about whether THIS host would die of it.
+
+    ``host_at_or_below_measured_instance``
+        this host's declared memory is at or below the 512 MB the measurement
+        was taken on. Unknown memory reads as None, not False -- an undetected
+        limit is not the same as a generous one.
+
+    When both are true the operator is one ordinary request from a dead
+    container, and that is stated. When memory is undetected the warning is
+    softened to name the uncertainty rather than dropped: the ceiling is still
+    above a spec known to have killed something.
+    """
+    mem = memory_limit()
+    mb = (mem["bytes"] / 1024 / 1024) if mem["bytes"] else None
+    at_or_below = None if mb is None else mb <= MEASURED_INSTANCE_MB
+    permits = int(max_grid_cells) >= MEASURED_OOM_VOXELS
+    return {
+        "host_memory_bytes": mem["bytes"],
+        "host_memory_source": mem["source"],
+        "ceiling_is_default": bool(ceiling_is_default),
+        "ceiling_permits_measured_oom": permits,
+        "host_at_or_below_measured_instance": at_or_below,
+        "measured": {
+            "instance_mb": MEASURED_INSTANCE_MB,
+            "ok_voxels": MEASURED_OK_VOXELS,
+            "ok_peak_mib": MEASURED_OK_PEAK_MIB,
+            "oom_voxels": MEASURED_OOM_VOXELS,
+            "note": ("Two points at one instance size, recorded in "
+                     "app/server/api.py. NOT a bytes-per-voxel law: the "
+                     "measured peak is dominated by the cell population, not "
+                     "the grid, so no ceiling is derived from it."),
+        },
+    }
+
+
+def oom_warning(max_grid_cells: int, ceiling_is_default: bool) -> Optional[str]:
+    """The startup line, or ``None`` when there is nothing to warn about.
+
+    Returns a STRING rather than logging, so ``__main__.py`` prints it in the
+    banner where an operator is already looking and the tests can assert on it
+    without capturing a logger.
+    """
+    ex = oom_exposure(max_grid_cells, ceiling_is_default)
+    if not ex["ceiling_permits_measured_oom"]:
+        return None  # the ceiling already refuses the spec that killed a box
+    mb = ex["host_memory_bytes"]
+    if ex["host_at_or_below_measured_instance"]:
+        return (
+            f"  !!  this host declares {mb / 1024 / 1024:,.0f} MB "
+            f"({ex['host_memory_source']}), at or below the "
+            f"{MEASURED_INSTANCE_MB} MB instance where {MEASURED_OOM_VOXELS:,} "
+            f"voxels OOM-KILLED the container -- and the grid ceiling is "
+            f"{max_grid_cells:,}, which still permits it.\n"
+            "  !!  One ordinary request can take the whole service down. Set "
+            "TMESIM_MAX_GRID_CELLS to what this machine can afford (100000 "
+            "permits dx >= ~20 um on the flagship section and refuses dx = 12)."
+        )
+    if mb is None and ceiling_is_default:
+        return (
+            f"  !   no memory limit is declared to this process, and the grid "
+            f"ceiling is the {max_grid_cells:,} default -- which permits the "
+            f"{MEASURED_OOM_VOXELS:,}-voxel spec that OOM-killed a "
+            f"{MEASURED_INSTANCE_MB} MB container. If this host is small, set "
+            "TMESIM_MAX_GRID_CELLS."
+        )
+    return None

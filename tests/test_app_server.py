@@ -1936,3 +1936,181 @@ class TestPrunedPayloads:
                 "the prune record did not survive _restore's key whitelist"
         finally:
             mgr.shutdown()
+
+
+class TestHostMemoryAndOomExposure:
+    """``app/server/account.py``: what the host grants, and whether this
+    server's grid ceiling still permits the spec measured to kill it.
+
+    The measurement behind this is TWO POINTS AT ONE INSTANCE SIZE (46,070
+    voxels peaks at 220 MiB, 286,200 voxels OOM-kills, both on 512 MB). That
+    supports a COMPARISON and not a law -- 220 MiB over 46,070 voxels is ~5 KiB
+    a voxel against the 8 bytes a float64 field costs, so the peak is dominated
+    by the cell population and not the grid. The first test below is what stops
+    a later change from quietly fitting a line through those two points.
+    """
+
+    def test_no_ceiling_is_ever_derived_from_detected_memory(
+            self, monkeypatch):
+        """Detecting 128 MB must not lower the ceiling by itself.
+
+        A derived ceiling would be a bytes-per-voxel law fitted to two points
+        of a quantity that is mostly not the independent variable: a confident
+        number with nothing under it. The code reports the exposure and leaves
+        the ceiling to the operator, and this pins that.
+        """
+        import importlib
+
+        import app.server.api as api_mod
+
+        monkeypatch.delenv("TMESIM_MAX_GRID_CELLS", raising=False)
+        monkeypatch.setenv("TMESIM_HOST_MEMORY_MB", "128")
+        importlib.reload(api_mod)
+        try:
+            assert api_mod._MAX_GRID_CELLS == api_mod._DEFAULT_MAX_GRID_CELLS, (
+                "the ceiling moved with detected memory — that is a derived "
+                "law fitted to two measured points, which this repository "
+                "does not do")
+        finally:
+            monkeypatch.delenv("TMESIM_HOST_MEMORY_MB", raising=False)
+            importlib.reload(api_mod)
+
+    def test_the_warning_fires_only_when_the_ceiling_permits_the_kill(
+            self, monkeypatch):
+        from app.server.account import MEASURED_OOM_VOXELS, oom_warning
+
+        monkeypatch.setenv("TMESIM_HOST_MEMORY_MB", "512")
+        # default ceiling on a small box: the spec that killed a container is
+        # still allowed through, so this must be loud.
+        loud = oom_warning(40_000_000, True)
+        assert loud and "OOM-KILLED" in loud
+        assert f"{MEASURED_OOM_VOXELS:,}" in loud
+        assert "TMESIM_MAX_GRID_CELLS" in loud
+        # a ceiling BELOW the measured kill already refuses it: silent.
+        assert oom_warning(MEASURED_OOM_VOXELS - 1, False) is None
+        # exactly at it still permits it (the refusal is `>`), so still loud.
+        assert oom_warning(MEASURED_OOM_VOXELS, False) is not None
+
+    def test_undetected_memory_is_not_reported_as_unlimited(self, monkeypatch):
+        """A host can be capped by something this process cannot see. Unknown
+        must read as unknown, never as headroom."""
+        from app.server.account import memory_limit, oom_exposure
+
+        monkeypatch.delenv("TMESIM_HOST_MEMORY_MB", raising=False)
+        monkeypatch.setattr("app.server.account._CGROUP_V2", "/nonexistent/v2")
+        monkeypatch.setattr("app.server.account._CGROUP_V1", "/nonexistent/v1")
+        m = memory_limit()
+        assert m["bytes"] is None
+        assert m["source"] == "not declared"
+        ex = oom_exposure(40_000_000, True)
+        assert ex["host_at_or_below_measured_instance"] is None, \
+            "unknown memory must be None, not False"
+
+    def test_cgroup_v2_max_and_a_v1_sentinel_both_read_as_no_limit(
+            self, monkeypatch, tmp_path):
+        from app.server.account import memory_limit
+
+        monkeypatch.delenv("TMESIM_HOST_MEMORY_MB", raising=False)
+        v2 = tmp_path / "memory.max"
+        v1 = tmp_path / "limit_in_bytes"
+        monkeypatch.setattr("app.server.account._CGROUP_V2", str(v2))
+        monkeypatch.setattr("app.server.account._CGROUP_V1", str(v1))
+
+        v2.write_text("max\n")                      # cgroup v2 "no limit"
+        v1.write_text("9223372036854771712\n")      # cgroup v1 sentinel
+        assert memory_limit()["bytes"] is None
+
+        v2.write_text("536870912\n")
+        got = memory_limit()
+        assert got["bytes"] == 536870912
+        assert "cgroup v2" in got["source"]
+
+    def test_limits_publishes_the_exposure(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("TMESIM_STUDIO_API_KEY", "k")
+        manager = JobManager(root=str(tmp_path))
+        c = TestClient(create_app(manager))
+        try:
+            ex = c.get("/api/limits", headers={"X-API-Key": "k"}
+                       ).json()["oom_exposure"]
+            assert ex["measured"]["oom_voxels"] == 286_200
+            assert ex["measured"]["instance_mb"] == 512
+            assert "NOT a bytes-per-voxel law" in ex["measured"]["note"]
+            assert isinstance(ex["ceiling_permits_measured_oom"], bool)
+        finally:
+            manager.shutdown()
+
+
+class TestBannerElseBinding:
+    """A regression guard for a two-line edit that parses and inverts meaning.
+
+    Adding a block between ``if api_key:``'s body and its ``else:`` at the
+    OUTER indent rebinds the ``else`` to the new ``if``. Python accepts it. The
+    result is that a correctly secured server prints "api key NONE -- no
+    authentication on any /api/ route", which is the single most alarming line
+    the banner can emit and would be false.
+
+    This happened twice in one session while adding the OOM warning below the
+    key block, so it gets a test rather than a comment.
+    """
+
+    def test_a_secured_server_never_announces_no_authentication(
+            self, monkeypatch, tmp_path, capsys):
+        import sys as _sys
+        import types
+
+        import app.server.__main__ as server_main
+
+        fake_uvicorn = types.ModuleType("uvicorn")
+        fake_uvicorn.run = lambda *a, **k: None
+        monkeypatch.setitem(_sys.modules, "uvicorn", fake_uvicorn)
+        monkeypatch.setenv("TMESIM_STUDIO_DATA_ROOTS", str(tmp_path))
+        for var in MAIN_WRITES_ENV:
+            monkeypatch.setenv(var, os.environ.get(var, ""))
+            monkeypatch.delenv(var, raising=False)
+        monkeypatch.setenv("TMESIM_STUDIO_API_KEY", "a-real-secret")
+        # PIN THE OOM WARNING OFF. Without this the test passes for the wrong
+        # reason: with the bug planted the banner becomes
+        # `if _oom: print(_oom) else: print("api key NONE...")`, and on a host
+        # with an unconfigured ceiling `_oom` is truthy, so the else never runs
+        # and the assertion below never sees the damage. Caught by planting the
+        # real bug and watching this test stay green. A ceiling below the
+        # measured kill silences the warning, which is exactly the state that
+        # exercises the else.
+        monkeypatch.setenv("TMESIM_MAX_GRID_CELLS", "100000")
+        import importlib
+
+        import app.server.api as api_mod
+
+        # try/finally, not a trailing reload: _MAX_GRID_CELLS is read at
+        # IMPORT, so a failed assertion below would otherwise leave every later
+        # test in this session running against a 100,000 ceiling.
+        importlib.reload(api_mod)
+        try:
+            assert server_main.main(["--host", "0.0.0.0"]) == 0
+            out = capsys.readouterr().out
+            assert "a-real-secret" in out, "the banner should report the key"
+            assert "no authentication on any /api/ route" not in out, (
+                "a server WITH a key announced that it has none — the `else` "
+                "of `if api_key:` has been rebound to a later `if`")
+        finally:
+            monkeypatch.delenv("TMESIM_MAX_GRID_CELLS", raising=False)
+            importlib.reload(api_mod)
+
+    def test_the_else_belongs_to_the_key_check_not_a_later_if(self):
+        """Read structurally, from the AST, so it cannot be satisfied by a
+        coincidence of runtime state."""
+        import ast
+        import inspect
+
+        import app.server.__main__ as server_main
+
+        src = inspect.getsource(server_main)
+        tree = ast.parse(src)
+        owners = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.If) and node.orelse:
+                seg = ast.get_source_segment(src, node.orelse[0]) or ""
+                if "no authentication on any /api/ route" in seg:
+                    owners.append(ast.get_source_segment(src, node.test))
+        assert owners == ["api_key"], (
+            f"the no-authentication `else` hangs off {owners!r}, not `api_key`")
