@@ -423,7 +423,17 @@ class TestLimits:
         assert "WITHDRAWN" in body
         assert "113.1x" in body and "1.53x" in body
         assert "1307.5x" in body
-        assert "vinorelbine -> doxorubicin" in body
+        # The ORDERING ITSELF IS NOT PRINTED. This assertion used to be
+        # `assert "vinorelbine -> doxorubicin" in body`, a leftover the
+        # conversion named in this docstring missed: the whole point of the
+        # withdrawal is that this document does not put two compound names in
+        # an order, and a limits paragraph that does it "as evidence" still
+        # prints an ordering to a reader who is skimming. The FORCE of the
+        # caveat is kept -- the top-1 changes, and the file that names the pair
+        # is cited -- which is what the next two assertions check.
+        assert "vinorelbine" not in body.lower()
+        assert "top-1 CHANGES" in body
+        assert "capacity_ranking_robustness.md" in body
         # invariance 1 — EXACT, with its measurement
         assert "1.41e-14" in body
         assert "0.005 to 26" in body and "5,200x" in body

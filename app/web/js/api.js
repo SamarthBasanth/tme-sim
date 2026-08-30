@@ -14,6 +14,8 @@
 //   GET    /api/runs/{id}/geometry          (TMSG binary)
 //   GET    /api/runs/{id}/field/{name}      (TMSF binary)
 //   POST   /api/validate
+//   GET    /api/limits                       (what this server will refuse)
+//   GET    /api/account                      (key, deployment, usage, billing)
 //
 // Policy:
 //  * one automatic retry on a network error or 5xx, with a 400 ms backoff;
@@ -77,6 +79,25 @@ export const api = {
     catch { return ''; }
   })(),
 };
+
+/** Which store the current key is actually in: 'local' (stay signed in on
+ *  this browser), 'session' (this tab only), 'none' (no key), or 'unavailable'
+ *  (storage threw -- private mode, or a browser set to block site data; the
+ *  key still works for this page load).
+ *
+ *  The Account panel reports this rather than remembering what the user ticked
+ *  on the gate, because the two can disagree: a key entered with "stay signed
+ *  in" ON in a private window is in NEITHER store, and telling that user they
+ *  are signed in on this browser is the panel lying about the one thing it
+ *  exists to be authoritative on. */
+export function apiKeyStorage() {
+  if (!api.apiKey) return 'none';
+  try {
+    if (localStorage.getItem(API_KEY_STORAGE) === api.apiKey) return 'local';
+    if (sessionStorage.getItem(API_KEY_STORAGE) === api.apiKey) return 'session';
+    return 'unavailable';
+  } catch { return 'unavailable'; }
+}
 
 /** Persist a new key (or clear with '') and use it on every subsequent call. */
 export function setApiKey(key, persist = true) {
@@ -279,6 +300,20 @@ export async function probe() {
 }
 
 /* ------------------------------------------------------------ routes --- */
+
+/* --- the deployment's own surface ---------------------------------------- *
+ * Both are `noFallback`, and that is the whole point of them.
+ *
+ * Every other route degrades to js/mock.js when the backend stops answering,
+ * because a dead workstation helps nobody and the shell labels the whole
+ * session STUB DATA. These two must NOT: the Account panel answers "which key
+ * am I sending", "what will this server refuse" and "is anyone charging me",
+ * and a seeded-PRNG answer to any of those is worse than no answer. A
+ * fabricated ceiling would make the spec editor confidently green on a spec
+ * the real server rejects; a fabricated billing block is a claim about money.
+ * So a failure here propagates and the panel shows the failure. */
+export const getAccount = () => call('GET', '/api/account', { noFallback: true });
+export const getLimits = () => call('GET', '/api/limits', { noFallback: true });
 
 export const getSections = () => call('GET', '/api/sections');
 export const getDrugs = () => call('GET', '/api/drugs');

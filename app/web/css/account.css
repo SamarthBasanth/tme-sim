@@ -1,0 +1,125 @@
+/* account.css — the Account panel (js/ui/account.js).
+ *
+ * Its own file, linked after components.css, for the same reason projects.css
+ * is: the panel is a self-contained <dialog> that injects its own toolbar
+ * button and touches nothing in the three-rail workstation layout.
+ *
+ * Every colour is a token from tokens.css, so the panel follows the theme
+ * toggle in both directions with no rule of its own. */
+
+#acct-dlg {
+  width: min(880px, 94vw);
+  max-height: 88vh;
+}
+
+.acct-body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.acct-nav {
+  flex: 0 0 auto;
+  width: 168px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  overflow-y: auto;
+}
+
+.acct-div {
+  flex: 0 0 1px;
+  background: var(--line-1);
+}
+
+.acct-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--sp-3) var(--sp-4) var(--sp-5);
+}
+
+/* Tabs are real <button>s, so they are in the tab order and take the global
+ * focus ring. aria-pressed carries the state; the styling follows it rather
+ * than a parallel class, so the two cannot disagree. */
+.acct-tab {
+  appearance: none;
+  text-align: left;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+}
+.acct-tab:hover { color: var(--fg-1); background: var(--bg-2); }
+.acct-tab[aria-pressed="true"] {
+  color: var(--fg-0);
+  background: var(--bg-2);
+  border-color: var(--line-1);
+  font-weight: 600;
+}
+
+.acct-sec { display: flex; flex-direction: column; gap: var(--sp-3); }
+.acct-sec > .tblwrap { margin: 0; }
+
+/* A copyable example. `overflow-x: auto` on the <pre> and not on the page:
+ * a curl line is long and the panel must never scroll sideways as a whole. */
+.acct-code {
+  position: relative;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+}
+.acct-code pre {
+  margin: 0;
+  padding: var(--sp-3);
+  padding-right: calc(var(--sp-3) + 52px);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.55;
+  color: var(--fg-1);
+}
+.acct-code-act {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+}
+
+.acct-form { display: flex; flex-direction: column; gap: var(--sp-3); }
+.acct-check {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+}
+
+.acct-list {
+  margin: 0;
+  padding-left: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--fg-1);
+}
+
+/* Narrow: the nav becomes a scrolling strip above the pane rather than a
+ * column that squeezes the content it labels. */
+@media (max-width: 640px) {
+  .acct-body { flex-direction: column; }
+  .acct-nav {
+    width: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: var(--sp-2) var(--sp-3);
+  }
+  .acct-tab { white-space: nowrap; }
+  .acct-div { flex-basis: 1px; width: 100%; }
+}

@@ -17,7 +17,7 @@ import { toast, notifyError } from './toast.js';
 import { railGroup, railNav } from './rail.js';
 import { createCompoundPanel } from './compound.js';
 import { createTissuePanel, NOT_VALIDATED, NOT_RUNNABLE } from './tissue.js';
-import { dur, num } from '../util/fmt.js';
+import { dur, num, int } from '../util/fmt.js';
 
 const MODES = {
   sensitivity_mode: ['uniform', 'determinant'],
@@ -32,6 +32,174 @@ const MODES = {
 const STATE_MODE_DEFAULT = 'oxygen';
 
 const NO_DRUG = '— none (reconstruction only)';
+
+/* ========================================================== grid budget ===
+ *
+ * WHAT THIS EXISTS FOR. `dx_um` is the only field in this form whose cost is
+ * quadratic, it is the field a first-time operator reaches for first, and
+ * until now nothing in the editor said what a given value would ask the
+ * server to allocate. The server refuses above a ceiling; the operator found
+ * that out by pressing Submit.
+ *
+ * THE FORMULA IS THE SERVER'S, COPIED. app/server/api.py::validate_spec:
+ *
+ *     if (dx is not None and section_row
+ *             and section_row.get("extent_um") and dx > 0):
+ *         ex, ey = section_row["extent_um"]
+ *         n_cells_grid = (ex / dx) * (ey / dx)
+ *         if n_cells_grid > _MAX_GRID_CELLS:   -> an ERROR, the run is refused
+ *
+ * Deliberately NOT rounded to whole columns and rows. `js/mock.js` line 461
+ * rounds — `Math.round(EX/dx) * Math.round(EY/dx)` — and the two disagree by a
+ * fraction of a percent. This estimate has to predict a REFUSAL, so it mirrors
+ * the code that refuses, not the code that reconstructs.
+ *
+ * THE DRIFT, STATED. This is a hand-copy of a Python expression into
+ * JavaScript. Nothing enforces that the two stay equal: there is no JS test
+ * runner in this repo, no endpoint that returns the count, and no shared
+ * source for the expression. If api.py's expression changes — a different
+ * rounding, a third dimension, a per-source correction — this function keeps
+ * predicting the old number until a human reads both files. The blast radius
+ * is bounded: the estimate is advisory, POST /api/validate remains the only
+ * thing that decides, and its verdict is already rendered below the form.
+ */
+function gridCells(extentUm, dxUm) {
+  if (!Array.isArray(extentUm) || extentUm.length < 2) return null;
+  const ex = Number(extentUm[0]);
+  const ey = Number(extentUm[1]);
+  const dx = Number(dxUm);
+  if (!Number.isFinite(ex) || !Number.isFinite(ey)) return null;
+  if (!Number.isFinite(dx) || dx <= 0) return null;
+  return (ex / dx) * (ey / dx);
+}
+
+/** Python's `{x:g}` closely enough to PREVIEW a sentence the server will write.
+ *
+ * Six significant figures, trailing zeros dropped — so 12.0 prints `12`, the
+ * way the refusal does. It decides nothing: the refusal itself is the
+ * server's, and this only predicts how it will read. Python switches to
+ * exponent form outside roughly [1e-5, 1e6) and this does not; `dx_um` is a
+ * micrometre pitch and never lands there in practice, and if it ever does the
+ * preview reads oddly while the real refusal is unaffected.
+ */
+function pyG(x) {
+  if (!Number.isFinite(x)) return String(x);
+  return String(Number(x.toPrecision(6)));
+}
+
+/** The refusal the server would write, reproduced from api.py's own f-string.
+ *
+ * Reproduced rather than paraphrased so that the sentence the operator reads
+ * before submitting is the sentence they would read after. Source, verbatim:
+ *
+ *     field_b = n_cells_grid * 8
+ *     field = (f"{field_b / 1e9:,.1f} GB" if field_b >= 1e9
+ *              else f"{field_b / 1e6:,.1f} MB")
+ *     tuned = _MAX_GRID_CELLS != _DEFAULT_MAX_GRID_CELLS
+ *     errors.append(
+ *         f"dx_um = {dx:g} um on this section gives a grid of "
+ *         f"~{n_cells_grid:,.0f} voxels, above the "
+ *         f"{_MAX_GRID_CELLS:,} ceiling"
+ *         + (" this server is configured with "
+ *            "(TMESIM_MAX_GRID_CELLS)" if tuned else "")
+ *         + f" — one float64 field alone would be {field}, and a "
+ *         "solve allocates several plus the cell population. "
+ *         "Use a coarser dx_um.")
+ *
+ * `tuned` is a fact only the server holds (it compares its ceiling against its
+ * own default), so this client can only reproduce that clause when a server
+ * payload has told it so. When it has not, the clause is omitted and the
+ * preview is marked as a preview.
+ */
+function refusalText(dx, n, ceiling, tuned) {
+  const bytes = n * 8;
+  const field = bytes >= 1e9
+    ? `${num(bytes / 1e9, 1)} GB`
+    : `${num(bytes / 1e6, 1)} MB`;
+  return `dx_um = ${pyG(dx)} um on this section gives a grid of ~${int(n)} `
+    + `voxels, above the ${int(ceiling)} ceiling`
+    + (tuned ? ' this server is configured with (TMESIM_MAX_GRID_CELLS)' : '')
+    + ` — one float64 field alone would be ${field}, and a solve allocates `
+    + 'several plus the cell population. Use a coarser dx_um.';
+}
+
+/** The field name the server side is expected to grow. See `ceiling_` below. */
+const CEILING_KEY = 'max_grid_cells';
+
+/** Pull a grid-cell ceiling out of ANY server payload, or return null.
+ *
+ * Three shapes are accepted because the field does not exist yet and the
+ * session adding it has not committed to one: a top-level `max_grid_cells`,
+ * or the same key under a `limits` / `server_limits` object. Anything absent,
+ * non-numeric or non-positive reads as "this server did not say", which is a
+ * state the panel renders rather than papers over.
+ */
+function readCeiling(o) {
+  if (!o || typeof o !== 'object') return null;
+  const candidates = [
+    o[CEILING_KEY],
+    o.limits && o.limits[CEILING_KEY],
+    o.server_limits && o.server_limits[CEILING_KEY],
+  ];
+  for (const c of candidates) {
+    const v = Number(c);
+    if (Number.isFinite(v) && v > 0) return v;
+  }
+  return null;
+}
+
+/** Recover the ceiling from a refusal the server has already written.
+ *
+ * Last resort, and strictly an improvement on knowing nothing: once the server
+ * has refused, its own sentence carries the number. Coupled to the wording in
+ * api.py — if that is reworded the match simply fails and the panel goes back
+ * to saying the ceiling is unknown, which is what it was saying anyway. Never
+ * preferred over a payload field.
+ */
+const CEILING_FROM_REFUSAL = /above the ([\d,]+) ceiling/;
+const CEILING_TUNED_MARK = 'TMESIM_MAX_GRID_CELLS';
+
+/** The ONLY runtime this repository records for a Studio run, with its spec.
+ *
+ * docs/DEPLOYMENT.md, on the container acceptance run: "A real end-to-end run
+ * — reconstruction plus transport plus metrics, submitted over the published
+ * port and polled to `done` — completes in-container on 40,887 cells. On the
+ * stock `GET /api/defaults` spec (`xenium_319`, temozolomide, `dx 12 um`, 6 h
+ * window, `plasma_peak 50 uM`) that is **`runtime_s` 47.13 cold**, on a 4-CPU
+ * VM-backed daemon."
+ *
+ * The same paragraph attaches two conditions and both are honoured here: it
+ * is not a benchmark, and "a runtime was quoted with no RunSpec attached" is
+ * named as the defect — "the window, the mesh and the compound each move it.
+ * Quote the spec or don't quote the time." So the spec travels with the
+ * number, and the number is shown as NOT APPLYING the moment the form moves
+ * off that spec. NOTHING here scales it with dx: this repo records no measured
+ * dx-to-runtime relation for a Studio run, and inventing one is forbidden.
+ */
+const RECORDED_RUN = {
+  seconds: 47.13,
+  where: 'docs/DEPLOYMENT.md',
+  host: 'a 4-CPU VM-backed daemon, cold',
+  spec: {
+    section: 'xenium_319',
+    drug: 'temozolomide',
+    dx_um: 12,
+    total_time_s: 21600,
+    plasma_peak: 50,
+  },
+};
+
+/** Does the form currently hold the exact spec RECORDED_RUN was measured on? */
+function matchesRecordedRun(spec) {
+  if (!spec) return false;
+  const r = RECORDED_RUN.spec;
+  const pk = spec.pk || {};
+  return spec.section === r.section
+    && spec.drug === r.drug
+    && Number(spec.dx_um) === r.dx_um
+    && Number(spec.total_time_s) === r.total_time_s
+    && Number(pk.plasma_peak) === r.plasma_peak;
+}
 
 /** Normalise whatever the backend puts in errors[]/warnings[]. */
 function normDiag(d) {
@@ -104,6 +272,57 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     segs[key] = h('div.seg', { role: 'group', 'aria-label': key.replace(/_/g, ' ') }, buttons);
   }
 
+  /* ------------------------------------------------------ grid budget -- */
+
+  // The server-reported grid-cell ceiling, in grid cells. DELIBERATELY NOT A
+  // CONSTANT IN THIS FILE.
+  //
+  // app/server/api.py holds it as `_MAX_GRID_CELLS`, which is
+  // `_DEFAULT_MAX_GRID_CELLS = 40_000_000` unless the operator sets the
+  // environment variable `TMESIM_MAX_GRID_CELLS` — and a constrained host is
+  // supposed to set it, because the 40 M default is the "no request should
+  // ever ask for this" number and not the "this machine can afford it" one.
+  // A number typed here would therefore be wrong on exactly the deployments
+  // that need it most, and wrong silently.
+  //
+  // `GET /api/limits` exposes it, added 2026-08-30 alongside the Account
+  // panel. It is a route of its OWN rather than a field on /api/defaults, for
+  // the reason the previous version of this comment gave: the /api/defaults
+  // body is adopted verbatim as the RunSpec and posted straight back to
+  // /api/validate, which warns on unrecognised fields, so a ceiling published
+  // there would make every boot report an unrecognised-field warning.
+  //
+  // `api.getLimits()` is `noFallback`: it never answers from js/mock.js. A
+  // fabricated ceiling is worse than no ceiling, because it would make this
+  // panel confidently green on a spec the real server refuses. When the call
+  // fails, this stays null and the panel says the ceiling is unknown.
+  //
+  // adoptCeilingFromDiags() remains the second source: once the server has
+  // actually refused a spec, its own refusal text carries the real number, and
+  // that is the one source that cannot be out of date.
+  let ceiling_ = null;
+  let ceilingSrc_ = '';
+  let ceilingTuned_ = false;
+
+  const gbChip = h('span.chip.st-queued', {
+    title: 'How this spec stands against the server\'s grid-cell ceiling.',
+  }, 'no estimate');
+  const gbArith = h('div.gb-arith', '—');
+  const gbCount = h('div.gb-count', '—');
+  const gbCeil = h('div.gb-line');
+  const gbRefusal = h('div.gb-refusal.hidden');
+  const gbFacts = h('div.gb-line');
+  const gbMem = h('div.gb-line');
+  const gbRun = h('div.gb-line');
+
+  // Sits in the form, directly under GRID DX and above DRUG, because it is
+  // about this section crossed with this dx and those are the two controls
+  // immediately above it. It is not a section of its own: it has no state to
+  // configure and collapsing it would hide a limit (UI_ARCHITECTURE.md §2.4).
+  const gridBudget = h('div.span2.gridbudget',
+    h('div.gb-head', h('span.gb-t', 'Grid budget'), h('span.grow'), gbChip),
+    gbArith, gbCount, gbCeil, gbRefusal, gbFacts, gbMem, gbRun);
+
   const unit = (t) => h('span.unit', t);
   const lbl = (text, forId, title) => h('label.lbl', { for: forId, title: title || '' }, text);
 
@@ -138,6 +357,7 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     row('Section', 'f-section', h('div', sectionSel, sectionCaveats), null,
       'GET /api/sections'),
     row('Grid dx', 'f-dx', dxInp, 'um', 'reconstruction grid pitch'),
+    gridBudget,
     row('Drug', 'f-drug', drugSel, null, 'GET /api/drugs; null = reconstruction only'),
     [lbl('Sensitivity', null), segs.sensitivity_mode, h('div.field-err.hidden')],
     [lbl('Vascular', null), segs.vascular_mode, h('div.field-err.hidden')],
@@ -387,7 +607,12 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       }, `${s.label}${s.available ? '' : '  [unavailable]'}${own}${noRun}${mark}`));
     }
     sections_ = sections;
+    // A section row is the most natural place for the server to publish the
+    // ceiling — the refusal is per-section arithmetic — so the rows are swept
+    // for it before the budget is painted. No row carries it today.
+    for (const s of sections || []) if (adoptCeiling(s, 'GET /api/sections')) break;
     paintSectionCaveats();
+    paintGridBudget();
   }
 
   // The picker's own caveat line, repainted whenever the selection changes.
@@ -419,6 +644,220 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       sectionCaveats.appendChild(
         h('div.hint', { title: c.reason }, `• ${c.capability} — REFUSED`));
     }
+  }
+
+  /* ------------------------------------------------------ grid budget -- */
+
+  /** Adopt a ceiling from a server payload. Higher-quality sources win. */
+  function adoptCeiling(payload, where) {
+    const v = readCeiling(payload);
+    if (v === null) return false;
+    ceiling_ = v;
+    ceilingSrc_ = where;
+    // "Tuned" means the operator lowered it with TMESIM_MAX_GRID_CELLS, which
+    // is the clause the server adds to its own refusal. The server reports the
+    // PROVENANCE (`max_grid_cells_source`), not a boolean, so this reads that
+    // rather than a `..._tuned` flag that was guessed at before the endpoint
+    // existed and that nothing has ever sent. If the field is absent we do not
+    // infer it: the preview then simply omits the clause.
+    const src = payload && (payload.max_grid_cells_source
+      || (payload.limits && payload.limits.max_grid_cells_source));
+    ceilingTuned_ = src === 'TMESIM_MAX_GRID_CELLS';
+    return true;
+  }
+
+  /** Adopt a ceiling out of a refusal the server has already written. */
+  function adoptCeilingFromDiags(diags) {
+    for (const d of diags || []) {
+      const msg = (d && d.message) || '';
+      const m = CEILING_FROM_REFUSAL.exec(msg);
+      if (!m) continue;
+      const v = Number(m[1].replace(/,/g, ''));
+      if (!Number.isFinite(v) || v <= 0) continue;
+      ceiling_ = v;
+      ceilingSrc_ = 'the server\'s own refusal for this spec';
+      ceilingTuned_ = msg.includes(CEILING_TUNED_MARK);
+      return true;
+    }
+    return false;
+  }
+
+  function paintGridBudget() {
+    const sec = (sections_ || []).find((x) => x.id === sectionSel.value) || null;
+    const dx = parseFloat(dxInp.value);
+    const dxOk = Number.isFinite(dx) && dx > 0;
+    const extent = sec && Array.isArray(sec.extent_um) && sec.extent_um.length >= 2
+      && Number.isFinite(Number(sec.extent_um[0]))
+      && Number.isFinite(Number(sec.extent_um[1]))
+      ? [Number(sec.extent_um[0]), Number(sec.extent_um[1])]
+      : null;
+    const n = gridCells(extent, dx);
+
+    for (const el of [gbArith, gbCount, gbCeil, gbRefusal, gbFacts, gbMem, gbRun]) clear(el);
+    gbRefusal.classList.add('hidden');
+
+    const chip = (klass, text, title) => {
+      gbChip.className = 'chip ' + klass;
+      gbChip.textContent = text;
+      gbChip.title = title;
+    };
+
+    /* --- what dx MEANS, stated whatever else is or is not known. --------- */
+    gbFacts.appendChild(h('span',
+      dxOk
+        ? h('span.mono.strong', `dx = ${pyG(dx)} um`)
+        : h('span.mono.strong', 'dx'),
+      ' is the edge length of one square grid cell — the mesh the '
+      + 'reconstruction lays over the section and every transport solve steps '
+      + 'on. Halving it quadruples the grid.'));
+
+    /* --- which section, and its REAL cell count. ------------------------ */
+    if (!sec) {
+      gbFacts.appendChild(h('div',
+        'No section is selected in this form, or the section list has not '
+        + 'loaded yet (GET /api/sections).'));
+    } else {
+      const ident = h('div',
+        'Section ', h('span.mono.strong', sec.id), ' — ');
+      if (sec.n_cells === null || sec.n_cells === undefined) {
+        ident.appendChild(h('span', 'this section reports no cell count'
+          + (sec.n_cells_reason ? ': ' + sec.n_cells_reason : '.')));
+      } else {
+        ident.appendChild(h('span.mono.strong', int(sec.n_cells)));
+        ident.appendChild(h('span', ' measured cells'));
+        if (n !== null && n > 0) {
+          // Arithmetic on two numbers the server supplied, labelled as such.
+          // It is the honest answer to "is this mesh fine or coarse for this
+          // specimen" and it is not a claim about the physics.
+          ident.appendChild(h('span',
+            `, i.e. ${num(sec.n_cells / n, 2)} measured cells per grid cell.`));
+        } else {
+          ident.appendChild(h('span', '.'));
+        }
+      }
+      gbFacts.appendChild(ident);
+    }
+
+    /* --- the count, the ceiling, the refusal. --------------------------- */
+    if (!sec) {
+      gbArith.textContent = '—';
+      gbCount.textContent = '— grid cells';
+      chip('st-queued', 'no section', 'No section row to take an extent from.');
+      gbCeil.textContent = 'The grid size cannot be computed until a section is '
+        + 'selected: it is that section\'s measured extent divided by dx.';
+    } else if (!extent) {
+      gbArith.textContent = '—';
+      gbCount.textContent = '— grid cells';
+      chip('st-queued', 'extent unknown',
+        'GET /api/sections returned no extent_um for this section.');
+      gbCeil.appendChild(h('span',
+        'This section reports no ', h('span.mono', 'extent_um'),
+        ', so the grid size cannot be computed here'
+        + (sec.extent_um_reason ? ': ' + sec.extent_um_reason : '.')
+        + ' The server evaluates its ceiling from the same field, so it will '
+        + 'not refuse on grid size either — the run proceeds and whatever the '
+        + 'reconstruction allocates is unbounded by that check.'));
+    } else if (!dxOk) {
+      gbArith.textContent = '—';
+      gbCount.textContent = '— grid cells';
+      chip('st-queued', 'dx not set', 'dx_um must be a positive number.');
+      gbCeil.textContent = 'Enter a positive dx to size the grid.';
+    } else {
+      const [ex, ey] = extent;
+      gbArith.textContent = `(${num(ex, 0)} / ${pyG(dx)}) x (${num(ey, 0)} / ${pyG(dx)}) um`;
+      clear(gbCount);
+      append(gbCount, [h('span.mono.strong', int(n)), h('span.gb-u', ' grid cells')]);
+
+      if (ceiling_ === null) {
+        chip('st-queued', 'ceiling unknown',
+          'No server payload has reported ' + CEILING_KEY + '.');
+        gbCeil.appendChild(h('span',
+          'This server does not report its grid-cell ceiling, so how close '
+          + 'this spec is to a refusal is ', h('b', 'unknown here'),
+          '. The ceiling is real — ', h('span.mono', '_MAX_GRID_CELLS'),
+          ' in ', h('span.mono', 'app/server/api.py'),
+          ', which a constrained host is expected to lower through ',
+          h('span.mono', 'TMESIM_MAX_GRID_CELLS'),
+          ' — and no number is printed here because a hardcoded one would be '
+          + 'wrong on exactly those hosts. Press Validate: the server answers '
+          + 'with the ceiling in its refusal, and this line then shows it.'));
+      } else {
+        const frac = n / ceiling_;
+        // The dx at which this section reaches the ceiling, from the inverse
+        // of the server's own expression: n = ex*ey/dx^2 > C  <=>  dx <
+        // sqrt(ex*ey/C). It answers "how close am I" in the units of the
+        // control the operator is actually turning.
+        const dxAtCeiling = Math.sqrt((ex * ey) / ceiling_);
+        const provenance = ceilingTuned_
+          ? 'configured on this server through TMESIM_MAX_GRID_CELLS'
+          : `reported by ${ceilingSrc_}`;
+        gbCeil.appendChild(h('span',
+          'Ceiling ', h('span.mono.strong', int(ceiling_)),
+          ` grid cells (${provenance}), reached on this section at `,
+          h('span.mono.strong', `dx = ${num(dxAtCeiling, 2)} um`),
+          '. This spec is at ',
+          h('span.mono.strong', `${num(frac * 100, frac < 0.1 ? 3 : 1)} %`),
+          ' of it.'));
+
+        if (n > ceiling_) {
+          chip('st-failed', 'will be refused',
+            'The server refuses this spec on grid size.');
+          gbRefusal.classList.remove('hidden');
+          append(gbRefusal, [
+            h('div.gb-r-lbl', 'the server will refuse this spec'),
+            h('div.gb-r-msg', refusalText(dx, n, ceiling_, ceilingTuned_)),
+            h('div.gb-r-note',
+              'Reproduced from the refusal in app/server/api.py so that what '
+              + 'you read before submitting is what you would read after. The '
+              + 'server writes the real one; if the two ever differ, the '
+              + 'server\'s is the true one.'),
+          ]);
+        } else {
+          // NOT green. Under the ceiling is not the same as affordable — see
+          // the memory note directly below, where a spec at 0.7 % of the
+          // default ceiling kills a 512 MB container. A green "ok" chip here
+          // would be the loudest reassurance the palette has, attached to a
+          // fact that does not support it.
+          chip('st-queued', 'under ceiling',
+            'Below the reported ceiling. That is not the same as affordable '
+            + 'on this host — read the memory note.');
+        }
+      }
+    }
+
+    /* --- grid size is not the same as memory. Measured, and recorded. ---- */
+    gbMem.appendChild(h('span',
+      h('b', 'A grid under the ceiling can still kill the server. '),
+      'app/server/api.py records the measurement: on a 512 MB instance '
+      + '(Render\'s free tier), flagship Xenium GBM, in a real container, ',
+      h('span.mono.strong', 'dx = 30 um'), ' peaks at 220 MiB, and ',
+      h('span.mono.strong', 'dx = 12 um'),
+      ' OOM-KILLS the container — the process dies, and /healthz stops '
+      + 'answering, so one ordinary request takes the service down for '
+      + 'everyone. That spec is under 1 % of the 40,000,000 default ceiling. A '
+      + 'constrained host has to lower TMESIM_MAX_GRID_CELLS to what it can '
+      + 'actually afford.'));
+
+    /* --- runtime, only where the repo records one. ----------------------- */
+    const st = store.get();
+    const matches = matchesRecordedRun(st && st.spec);
+    const r = RECORDED_RUN;
+    gbRun.appendChild(h('span',
+      h('b', 'Runtime: '),
+      'this repository records exactly one end-to-end Studio run time — ',
+      h('span.mono.strong', `${num(r.seconds, 2)} s`),
+      ` on ${r.host} (${r.where}), for the stock defaults spec: `,
+      h('span.mono', `${r.spec.section} · ${r.spec.drug} · dx ${r.spec.dx_um} um`
+        + ` · ${r.spec.total_time_s / 3600} h · plasma peak ${r.spec.plasma_peak} uM`),
+      '. ',
+      matches
+        ? h('span', h('b', 'That is this spec.'),
+          ' It is one machine and one cold start, not a benchmark.')
+        : h('span', h('b', 'That is not this spec, and the number does not '
+          + 'transfer. '),
+        'The window, the mesh and the compound each move it, and this repo '
+        + 'records no measured relation between dx and run time for a Studio '
+        + 'run, so none is estimated here.')));
   }
 
   function setDrugs(drugs) {
@@ -485,6 +924,7 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     }
     syncing = false;
     paintSectionCaveats();
+    paintGridBudget();
   }
 
   function readForm() {
@@ -541,6 +981,10 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     store.set({ spec, specText: text, specTextValid: true });
     if (!editorFocused) setEditorText(text);
     paintGutter();
+    // Live, on every keystroke in `dx` and every change of section — the whole
+    // point is that the operator sees the cost while turning the dial, not
+    // 340 ms later when the debounced validator lands, and not after Submit.
+    paintGridBudget();
     scheduleValidate();
   }
 
@@ -734,8 +1178,15 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       const errors = (res.errors || []).map(normDiag);
       const warnings = (res.warnings || []).map(normDiag);
       const ok = res.ok !== undefined ? !!res.ok : errors.length === 0;
+      // The verdict body is the third place the ceiling could be published,
+      // and the refusal itself is the fourth — a payload field wins, and the
+      // refusal text is only read when nothing has published one.
+      if (!adoptCeiling(res, 'POST /api/validate') && ceiling_ === null) {
+        adoptCeilingFromDiags(errors);
+      }
       store.set({ validation: { ok, errors, warnings }, validating: false });
       renderDiags(errors, warnings);
+      paintGridBudget();
       okBadge.className = 'chip st-' + (ok ? 'done' : 'failed');
       // `valid · 5 warn` used to be one string inside one green chip, so the
       // ok hue — the loudest "nothing to see here" signal the palette has —
@@ -782,6 +1233,22 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
   }
 
   function loadSpec(spec) {
+    // `loadSpec` receives the GET /api/defaults body verbatim (main.js), and
+    // that body is still read for a ceiling in case a future server publishes
+    // one there. It is NOT where the ceiling comes from: /api/defaults is
+    // adopted verbatim as the RunSpec and posted straight back to
+    // /api/validate, which warns on unrecognised fields, so a ceiling on it
+    // would make every boot report an unrecognised-field warning. That is why
+    // the server put it on /api/limits, fetched just below.
+    adoptCeiling(spec, 'GET /api/defaults');
+    // Fire-and-forget: the ceiling is an ANNOTATION on the form, so waiting for
+    // it would delay the editor for a number that only qualifies what is in it.
+    // A failure is swallowed HERE and nowhere else -- the panel's "ceiling not
+    // known" state is the honest rendering of it, and a toast on every boot of
+    // an older server would be noise about a field that server never had.
+    api.getLimits().then((lim) => {
+      if (adoptCeiling(lim, 'GET /api/limits')) paintGridBudget();
+    }).catch(() => { /* stays unknown; the panel says so */ });
     store.set({ spec, specText: serialise(spec), specTextValid: true });
     setEditorText(serialise(spec));
     toForm(spec);

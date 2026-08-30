@@ -76,6 +76,11 @@ from app.server.payloads import (  # noqa: E402
 #: If you add a variable to main(), add it here.
 MAIN_WRITES_ENV = (
     "TMESIM_STUDIO_API_KEY",
+    # Added 2026-08-30 with /api/account, which reports WHICH of main()'s three
+    # key sources won. Omitting it from this tuple leaked a stale "flag" or
+    # "generated" into every later app in the session -- the same failure the
+    # note above describes, one variable later.
+    "TMESIM_STUDIO_API_KEY_SOURCE",
     "TMESIM_STUDIO_ALLOWED_HOSTS",
     "TMESIM_STUDIO_DATA_ROOTS",
 )
@@ -1617,3 +1622,317 @@ class TestIpv6LoopbackIsExcludedFromTheHostAllowlist:
         monkeypatch.setenv("TMESIM_STUDIO_ALLOWED_HOSTS", "localhost")
         assert server_main.main(["--host", "::1"]) == 0
         assert os.environ["TMESIM_STUDIO_ALLOWED_HOSTS"] == "localhost"
+
+
+class TestAccountAndLimits:
+    """``/api/limits`` and ``/api/account`` — the deployment's own surface.
+
+    These two routes exist because everything else in this API answers a
+    question about TISSUE, and a user also has questions about the INSTANCE:
+    which key am I sending, what will this server refuse, what has it done, and
+    is anyone charging me. See ``app/server/account.py``.
+
+    The tests below are mostly about the two ways this surface could lie:
+
+    * the ceiling the spec editor shows a user before a run could drift away
+      from the ceiling ``validate_spec`` actually refuses with, leaving the
+      editor confidently green on a spec the server rejects. The client cannot
+      call ``validate_spec`` on every keystroke, so it reimplements the
+      formula, so there ARE two copies and the only question is whether
+      anything checks them against each other. ``test_limits_formula_matches_
+      validate`` is that check.
+    * the billing block could read as though billing existed. It is
+      scaffolding for an integration that has not been built, and a scaffold
+      that does not say so is a claim.
+    """
+
+    _K = "account-test-key"
+    _H = {"X-API-Key": _K}
+
+    def _make_client(self, monkeypatch, root, key=_K):
+        monkeypatch.setenv("TMESIM_STUDIO_API_KEY", key)
+        # __main__.py records the provenance; a test that builds the app
+        # directly has to clear it or it inherits whatever ran last.
+        monkeypatch.delenv("TMESIM_STUDIO_API_KEY_SOURCE", raising=False)
+        monkeypatch.delenv("TMESIM_BILLING_PROVIDER", raising=False)
+        manager = JobManager(root=str(root))
+        return TestClient(create_app(manager)), manager
+
+    # -- the gate ---------------------------------------------------------- #
+    def test_both_routes_are_gated(self, monkeypatch, tmp_path):
+        """Neither is a liveness route. A fingerprint, a usage count and a
+        refusal threshold are operational detail about a machine."""
+        c, mgr = self._make_client(monkeypatch, tmp_path)
+        try:
+            assert c.get("/api/limits").status_code == 401
+            assert c.get("/api/account").status_code == 401
+            assert c.get("/api/limits", headers=self._H).status_code == 200
+            assert c.get("/api/account", headers=self._H).status_code == 200
+        finally:
+            mgr.shutdown()
+
+    # -- the formula, checked against the refusal it predicts --------------- #
+    def test_limits_formula_matches_validate(self, monkeypatch, tmp_path):
+        """The published formula must predict the actual refusal boundary.
+
+        Method: lower the ceiling to a value whose critical ``dx`` lands in a
+        range the other dx rules do not touch, compute the boundary from the
+        formula ``/api/limits`` publishes, then ask ``/api/validate`` on either
+        side of it. A spec 2% coarser than the boundary must NOT be refused for
+        grid size; a spec 2% finer must be.
+
+        Asserted on the GRID error specifically, not on ``ok``: both of these
+        specs also trip the coarse-mesh warnings, and a test that just watched
+        ``ok`` flip would pass for the wrong reason the moment an unrelated
+        rule started erroring.
+        """
+        import math
+
+        import app.server.api as api_mod
+
+        monkeypatch.setattr(api_mod, "_MAX_GRID_CELLS", 100_000)
+        c, mgr = self._make_client(monkeypatch, tmp_path)
+        try:
+            limits = c.get("/api/limits", headers=self._H).json()
+            assert limits["max_grid_cells"] == 100_000
+            assert limits["max_grid_cells_source"] == "TMESIM_MAX_GRID_CELLS"
+
+            # The client reimplements this string. Asserting the literal means
+            # editing the published formula forces editing this test, which
+            # forces a human to look at whether the client still agrees.
+            assert limits["grid_cells_formula"] == \
+                "(extent_um[0] / dx_um) * (extent_um[1] / dx_um)"
+
+            row = next(r for r in c.get("/api/sections", headers=self._H).json()
+                       if r["id"] == SECTION)
+            ex, ey = row["extent_um"]
+
+            def cells(dx):  # the published formula, implemented here
+                return (ex / dx) * (ey / dx)
+
+            ceiling = limits["max_grid_cells"]
+            dx_crit = math.sqrt(ex * ey / ceiling)
+            dx_ok, dx_bad = dx_crit * 1.02, dx_crit * 0.98
+            # The premise of the test, checked rather than assumed.
+            assert cells(dx_ok) < ceiling < cells(dx_bad)
+            assert dx_ok > limits["min_dx_um"] and dx_bad > limits["min_dx_um"]
+
+            def grid_errors(dx):
+                body = {**default_spec(), "section": SECTION, "dx_um": dx}
+                verdict = c.post("/api/validate", json=body,
+                                 headers=self._H).json()
+                return [e for e in verdict["errors"] if "ceiling" in e]
+
+            assert grid_errors(dx_ok) == [], (
+                "the server refused a spec the published formula says is "
+                "under the ceiling")
+            bad = grid_errors(dx_bad)
+            assert bad, ("the server accepted a spec the published formula "
+                         "says is over the ceiling")
+            assert f"{ceiling:,}" in bad[0]
+        finally:
+            mgr.shutdown()
+
+    # -- the key ----------------------------------------------------------- #
+    def test_account_never_echoes_the_key(self, monkeypatch, tmp_path):
+        """A fingerprint is an identifier. The secret itself must not appear
+        anywhere in the payload, at any nesting depth."""
+        c, mgr = self._make_client(monkeypatch, tmp_path)
+        try:
+            raw = c.get("/api/account", headers=self._H).text
+            assert self._K not in raw
+            body = c.get("/api/account", headers=self._H).json()
+            assert body["auth"]["key_fingerprint"]
+            assert body["auth"]["key_fingerprint"] == \
+                body["auth"]["caller_fingerprint"]
+            assert body["auth"]["matches"] is True
+        finally:
+            mgr.shutdown()
+
+    def test_fingerprint_distinguishes_two_keys(self):
+        """The panel's whole job is telling a user WHICH saved key this
+        browser is sending, so two keys must not share a fingerprint."""
+        from app.server.account import key_fingerprint
+
+        assert key_fingerprint("alpha") != key_fingerprint("beta")
+        assert key_fingerprint("alpha") == key_fingerprint("alpha")
+        assert key_fingerprint("") is None
+        assert key_fingerprint("   ") is None
+        # Not a truncated bare digest of the secret: a bare sha256 of a
+        # low-entropy operator-chosen key is a dictionary lookup.
+        import hashlib
+        assert key_fingerprint("alpha") != \
+            hashlib.sha256(b"alpha").hexdigest()[:12]
+
+    def test_key_source_is_reported_and_unknown_stays_unknown(
+            self, monkeypatch, tmp_path):
+        """An operator who has LOST the key needs to know whether they chose
+        it or the process invented one at boot and printed it once."""
+        c, mgr = self._make_client(monkeypatch, tmp_path)
+        try:
+            # Nothing recorded it -> it was already in the environment.
+            assert c.get("/api/account", headers=self._H
+                         ).json()["auth"]["source"] == "environment"
+            for recorded, reported in (("generated", "generated-at-startup"),
+                                       ("flag", "--api-key"),
+                                       ("environment", "environment"),
+                                       ("nonsense", "unknown")):
+                monkeypatch.setenv("TMESIM_STUDIO_API_KEY_SOURCE", recorded)
+                assert c.get("/api/account", headers=self._H
+                             ).json()["auth"]["source"] == reported
+        finally:
+            mgr.shutdown()
+
+    def test_main_records_which_key_source_won(self, monkeypatch, tmp_path):
+        """The banner works this out to print a label; the panel needs it
+        weeks later, when the banner is scrollback nobody has."""
+        import sys as _sys
+        import types
+
+        import app.server.__main__ as server_main
+
+        fake_uvicorn = types.ModuleType("uvicorn")
+        fake_uvicorn.run = lambda *a, **k: None
+        monkeypatch.setitem(_sys.modules, "uvicorn", fake_uvicorn)
+        monkeypatch.setenv("TMESIM_STUDIO_DATA_ROOTS", str(tmp_path))
+        # main() writes these into os.environ DIRECTLY, and a bare
+        # delenv(raising=False) records NOTHING when the variable is absent --
+        # so main()'s value survives teardown and leaks into every app built
+        # afterwards. setenv first, so the restore is always recorded. This is
+        # the same loop _run_main uses over the same shared tuple; a
+        # hand-rolled second copy here is what let the leak in the first time.
+        for var in MAIN_WRITES_ENV:
+            monkeypatch.setenv(var, os.environ.get(var, ""))
+            monkeypatch.delenv(var, raising=False)
+
+        monkeypatch.delenv("TMESIM_STUDIO_API_KEY", raising=False)
+        monkeypatch.delenv("TMESIM_STUDIO_API_KEY_SOURCE", raising=False)
+        assert server_main.main(["--host", "0.0.0.0"]) == 0
+        assert os.environ["TMESIM_STUDIO_API_KEY_SOURCE"] == "generated"
+
+        monkeypatch.delenv("TMESIM_STUDIO_API_KEY_SOURCE", raising=False)
+        assert server_main.main(["--api-key", "chosen-on-the-flag"]) == 0
+        assert os.environ["TMESIM_STUDIO_API_KEY_SOURCE"] == "flag"
+
+        monkeypatch.delenv("TMESIM_STUDIO_API_KEY_SOURCE", raising=False)
+        monkeypatch.setenv("TMESIM_STUDIO_API_KEY", "already-exported")
+        assert server_main.main([]) == 0
+        assert os.environ["TMESIM_STUDIO_API_KEY_SOURCE"] == "environment"
+
+    # -- usage and billing -------------------------------------------------- #
+    def test_usage_says_it_is_an_inventory_not_a_meter(
+            self, monkeypatch, tmp_path):
+        """Deleting a run decrements these counts. Anything that reads like a
+        meter here would be the first half of a billing claim."""
+        c, mgr = self._make_client(monkeypatch, tmp_path)
+        try:
+            usage = c.get("/api/account", headers=self._H).json()["usage"]
+            assert "not a meter" in usage["kind"]
+            assert usage["attribution"].startswith("none")
+            assert usage["runs_total"] == sum(usage["runs_by_status"].values())
+        finally:
+            mgr.shutdown()
+
+    def test_billing_is_never_enabled_and_says_why(
+            self, monkeypatch, tmp_path):
+        """Naming a provider must not be mistakable for having built one.
+
+        With TMESIM_BILLING_PROVIDER set and no implementation mounted, the
+        block reports configured-but-not-implemented and ``enabled`` stays
+        False -- a state an operator will notice, rather than a silent
+        half-integration.
+        """
+        c, mgr = self._make_client(monkeypatch, tmp_path)
+        try:
+            b = c.get("/api/account", headers=self._H).json()["billing"]
+            assert b["enabled"] is False
+            assert b["status"] == "not-configured"
+            assert b["provider"] is None
+            assert b["blocked_on"], "the preconditions must be stated"
+            assert any("shared key" in r for r in b["blocked_on"])
+
+            monkeypatch.setenv("TMESIM_BILLING_PROVIDER", "some-psp")
+            b = c.get("/api/account", headers=self._H).json()["billing"]
+            assert b["enabled"] is False, \
+                "naming a provider must never flip billing on"
+            assert b["status"] == "configured-but-not-implemented"
+            assert b["provider"] == "some-psp"
+        finally:
+            mgr.shutdown()
+
+
+class TestPrunedPayloads:
+    """A payload deleted to reclaim disk must not be reported as one that was
+    never produced.
+
+    ``scripts/prune_run_payloads.py`` removes ``timelapse.bin`` from old runs
+    (measured 2026-08-30: 1,164 MB across 73 runs, the largest thing this
+    repository generates). Without a record of the prune, ``_binary`` falls
+    through to "no drug time-lapse was captured for this run (timelapse_frames
+    was 0, or this run predates the feature)" -- a confident sentence in which
+    every clause is false for a run that captured one and had it pruned.
+
+    That is this project's signature defect, correct reasoning pointed at the
+    wrong object, and it is the ONLY reason the prune writes a record at all.
+    So the record has to survive a restart and the endpoint has to prefer it.
+    """
+
+    def _restored(self, tmp_path, doc):
+        (tmp_path / "r_00001").mkdir()
+        (tmp_path / "r_00001" / "result.json").write_text(json.dumps(doc))
+        manager = JobManager(root=str(tmp_path))
+        return TestClient(create_app(manager)), manager
+
+    def _doc(self, **extra):
+        doc = {"run_id": "r_00001", "status": "done",
+               "spec": {"section": SECTION, "dx_um": 30.0, "drug": "cisplatin"},
+               "timelapse": {"n_frames": 12}}
+        doc.update(extra)
+        return doc
+
+    def test_a_pruned_payload_is_410_and_says_it_existed(self, tmp_path):
+        c, mgr = self._restored(tmp_path, self._doc(pruned_payloads={
+            "timelapse": {"at": "2026-08-30", "bytes": 27476084,
+                          "reason": "Pruned to reclaim disk."}}))
+        try:
+            r = c.get("/api/runs/r_00001/timelapse")
+            assert r.status_code == 410, "a pruned payload is Gone, not Not Found"
+            reason = r.json()["detail"]["reason"]
+            assert "DID produce" in reason
+            assert "2026-08-30" in reason
+            assert "27,476,084" in reason
+            # The false explanation must NOT be the one that comes out.
+            assert "timelapse_frames was 0" not in reason
+            assert "predates the feature" not in reason
+        finally:
+            mgr.shutdown()
+
+    def test_without_a_prune_record_the_old_reason_still_applies(self, tmp_path):
+        """The prune branch must not swallow the genuine never-produced case:
+        a run that really captured nothing still gets its own reason."""
+        c, mgr = self._restored(tmp_path, self._doc(
+            timelapse={"reason": "timelapse_frames was 0"}))
+        try:
+            r = c.get("/api/runs/r_00001/timelapse")
+            assert r.status_code == 404
+            assert "timelapse_frames was 0" in r.json()["detail"]["reason"]
+        finally:
+            mgr.shutdown()
+
+    def test_the_prune_record_survives_a_restart(self, tmp_path):
+        """``JobManager._restore`` copies a whitelist of keys out of
+        result.json. A key missing from that whitelist is silently dropped, and
+        the endpoint then falls back to the false reason on the NEXT boot --
+        green today, lying tomorrow."""
+        (tmp_path / "r_00001").mkdir()
+        (tmp_path / "r_00001" / "result.json").write_text(json.dumps(
+            self._doc(pruned_payloads={"timelapse": {"at": "2026-08-30",
+                                                     "bytes": 1}})))
+        mgr = JobManager(root=str(tmp_path))
+        try:
+            job = mgr.get("r_00001")
+            assert job is not None
+            assert "pruned_payloads" in (job.body or {}), \
+                "the prune record did not survive _restore's key whitelist"
+        finally:
+            mgr.shutdown()

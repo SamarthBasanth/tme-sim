@@ -1652,6 +1652,14 @@ class JobManager:
                                  "extra_metrics", "reach", "provenance",
                                  "drug_params",
                                  "mechanism", "mechanism_reason", "timelapse",
+                                 # Written by scripts/prune_run_payloads.py
+                                 # when a binary payload is deleted to reclaim
+                                 # disk. It MUST survive a restart: without it
+                                 # the server tells a caller the payload was
+                                 # never produced, which is false, and a
+                                 # confident false reason is worse than the
+                                 # missing file it explains.
+                                 "pruned_payloads",
                                  # a TPL sweep's grid, rows and provenance —
                                  # without this a restored protocol run would
                                  # come back with an empty result grid

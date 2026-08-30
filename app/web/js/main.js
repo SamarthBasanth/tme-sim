@@ -9,6 +9,7 @@ import { createInspectPanel } from './ui/inspect.js';
 import { createHistoryPanel } from './ui/history.js';
 import { createReportsPanel } from './ui/reports.js';
 import { createProjectsPanel } from './ui/projects.js';
+import { createAccountPanel } from './ui/account.js';
 import { createOverlays } from './ui/overlays.js';
 import { createMechanismLegend, createTimelapseScrubber, fmtTime as fmtClock } from './ui/mechanism.js';
 import { createWindowLevel } from './ui/wl.js';
@@ -79,6 +80,7 @@ let inspect = null;
 let history = null;
 let reportsPanel = null;
 let projectsPanel = null;
+let accountPanel = null;
 let wl = null;
 let tools = null;
 
@@ -199,6 +201,11 @@ async function boot() {
   // live in their own modal with their own stylesheet, and inject their own
   // toolbar button — the three-rail layout is untouched.
   projectsPanel = createProjectsPanel({ store });
+  // Same pattern, same reason: it injects its own toolbar button and its own
+  // <dialog>, so the three-rail layout is untouched. Created unconditionally
+  // even in stub mode -- the panel's job there is to SAY the backend is not
+  // answering, which it cannot do if it was never built.
+  accountPanel = createAccountPanel();
 
   const body = $('#body');
   body.insertBefore(specPanel.el, body.firstChild);
@@ -1413,6 +1420,7 @@ window.__tmesim = {
   get viewer() { return viewer; },
   get store() { return store; },
   get projects() { return projectsPanel; },
+  get account() { return accountPanel; },
   get tools() { return tools; },
   get wl() { return wl; },
   api,

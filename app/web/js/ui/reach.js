@@ -55,7 +55,7 @@
 // exactly how `1x IC50` came to be defended as though it meant something.
 
 import { h, clear } from '../util/dom.js';
-import { pct, num, sci, NULL_GLYPH } from '../util/fmt.js';
+import { pct, num, sci, int, dur, NULL_GLYPH } from '../util/fmt.js';
 import { doseInputBlock, doseFraming } from './doseinput.js';
 import { jointLimitedCaveat } from './verdict.js';
 
@@ -311,6 +311,126 @@ export function splitAxes(s) {
 const fmtRatio = (v) => String(v);
 const fmtFrac = (v) => (Number.isFinite(v) ? pct(v, 1) + '%' : NULL_GLYPH);
 
+/* --------------------------------------------------------- REFUSALS ------
+ * A NUMBER THIS PAYLOAD DOES NOT CARRY, rendered as a refusal rather than as
+ * a dash.
+ *
+ * `fmt.js` renders a missing value as a bare em dash, which is right for a
+ * dense metrics column and wrong here: in a table of percentages a lone dash
+ * is indistinguishable from a zero seen badly, from a rendering bug, and from
+ * a value the panel decided not to show. Every other refusal on this panel is
+ * stated in full (see the `null_reason` branch, which is the same rule applied
+ * to the whole map), so a missing cell gets the glyph AND the word AND — on
+ * hover and in the accessibility tree — the field name that is absent.
+ *
+ * It is deliberately NOT smaller than the numbers around it. */
+function missing(why) {
+  return h('span.no-val', { title: why }, `${NULL_GLYPH} not reported`);
+}
+
+/* How many points of a series the chart above could not plot. A polyline
+ * simply spans a gap, so an absent value looks like an interpolated one —
+ * which is the single thing this panel may not do. Returns null when the
+ * series is complete, so nothing is printed in the ordinary case. */
+function missingPointsNote(ys, what) {
+  const n = ys.filter((v) => !Number.isFinite(v)).length;
+  if (!n) return null;
+  return h('div.caveat.crit', h('span',
+    h('b', `${n} OF ${ys.length} POINTS ARE MISSING FROM THIS CURVE. `),
+    `The payload carries no value for ${n} of the ${ys.length} ${what}. `
+    + 'The line is drawn through the points that exist, so it spans those gaps '
+    + 'without marking them — nothing has been interpolated, estimated or '
+    + 'filled in, and the table below prints the gaps explicitly. Read the '
+    + 'curve as having holes in it, not as continuous.'));
+}
+
+/* ------------------------------------------------------ WHICH MAP ---------
+ * Three states, and the third is not a variant of the second.
+ *
+ * A record written before `window_mode` existed has the key ABSENT. Two of the
+ * caveats on this panel used to branch `=== 'steady_state' ? A : B`, so such a
+ * record was handed the FINITE-WINDOW capacity figures — asserted, with three
+ * measured numbers in them — two hundred words after the panel had already
+ * refused to say which mode it was in. That is the panel contradicting itself
+ * on its own claim surface, and it is the reason the mode is resolved once,
+ * here, into a value that has an "unrecorded" case a caller must handle. */
+const MODE = { STEADY: 'steady_state', FINITE: 'finite_window', UNRECORDED: 'unrecorded' };
+
+function windowModeOf(reach) {
+  const wm = reach && reach.window_mode;
+  return (wm === MODE.STEADY || wm === MODE.FINITE) ? wm : MODE.UNRECORDED;
+}
+
+/** The window, in words, with BOTH readings of it — seconds as recorded and
+ *  hours as read — so no reader converts 21600 in their head. */
+function windowWords(ctx) {
+  if (ctx.mode === MODE.STEADY) return 'steady state · no exposure window';
+  if (ctx.mode === MODE.FINITE) {
+    return Number.isFinite(ctx.windowS)
+      ? `finite window · ${int(ctx.windowS)} s (${dur(ctx.windowS)})`
+      : 'finite window · length not recorded in this payload';
+  }
+  return 'which map produced this is not recorded';
+}
+
+/* The tag that travels with a figure. Every chart and table on this panel used
+ * to be mode-less: the mode was stated once, in prose, above the first of them,
+ * and a reader who scrolled to the ladder or the falloff met numbers that mean
+ * different things in the two modes with nothing on them saying which. Set at
+ * the disclosure floor, never below it. */
+function modeTag(ctx, what) {
+  return h('div.figmode', {
+    title: 'Which of the two maps produced the figure directly above this '
+      + 'line. The two answer different questions and are not '
+      + 'interchangeable; see the banner at the top of the delivery evidence.',
+  }, `${what} — ${windowWords(ctx)}`);
+}
+
+/* ------------------------------------------------------ COPY A NUMBER -----
+ * A real <button>, so it is in the tab order and takes the global focus ring
+ * with no extra rule.
+ *
+ * What it copies is never the bare number. Every failure this panel is written
+ * against is a number that travelled without the thing that qualifies it — the
+ * denominator, the units, the map it came from, the prohibition on comparing
+ * it across compounds — so the clipboard payload carries all four. A copied
+ * figure that lands in a slide deck should arrive already unable to be read as
+ * a ranking or as an absolute kill fraction. */
+function copyBtn(getText, what) {
+  const b = h('button.btn.ghost.tiny.copy-num', {
+    type: 'button',
+    title: `Copy ${what} to the clipboard WITH its denominator, its units, the `
+      + 'map it came from and the limits on it. The bare number is not offered.',
+  }, 'copy');
+  let restore = 0;
+  b.addEventListener('click', () => {
+    const say = (msg) => {
+      b.textContent = msg;
+      clearTimeout(restore);
+      restore = setTimeout(() => { b.textContent = 'copy'; }, 2000);
+    };
+    const txt = getText();
+    const cb = navigator.clipboard;
+    if (!cb || typeof cb.writeText !== 'function') { say('no clipboard'); return; }
+    cb.writeText(txt).then(() => say('copied'), () => say('copy blocked'));
+  });
+  return b;
+}
+
+/** The live read-out a hovered or focused row writes into. `aria-live` so a
+ *  keyboard user hears the row they arrowed onto; a default line so it is never
+ *  an empty box waiting to be discovered. */
+function makeReadout(defaultText) {
+  const el = h('div.rung-readout', {
+    'aria-live': 'polite', role: 'status', tabindex: '-1',
+  }, defaultText);
+  return {
+    el,
+    set(text) { el.textContent = text; },
+    reset() { el.textContent = defaultText; },
+  };
+}
+
 /**
  * THE VERDICT — is this a delivery problem or a dose problem — and the three
  * things that qualify it: the exposure shortfall, how much of the answer was
@@ -358,7 +478,32 @@ function renderVerdict(el, run) {
       unattributed: 'not explained by the model’s own bands. A non-zero share '
         + 'here is itself the finding.',
     };
+    /* THE COUNT AND ITS DENOMINATOR, beside the percentage.
+     *
+     * This panel printed "99.8% of SURVIVING tumour cells" and neither number
+     * the share is made of. js/ui/finding.js — the OTHER panel that states this
+     * same verdict — prints both, and the test that pins it says why: this
+     * project has already mis-attached a share off this rail to the wrong
+     * denominator (survivors, 21,140, against viable tumour cells, 2,008, which
+     * is the ladder's denominator further down THIS panel). A percentage whose
+     * denominator is not beside it is how that repeats.
+     *
+     * The label-to-limiter mapping is not invented here: the payload states it
+     * in `survival_breakdown_note` ("'delivery' = SURVIVED_UNREACHED, 'dose' =
+     * SURVIVED_UNDERDOSED, ...") and `mechanism.counts` is keyed by those label
+     * names. Where the payload carries no counts, the share is printed as
+     * before and the absence is stated — not filled in. */
+    const LIMITER_LABEL = {
+      delivery: 'SURVIVED_UNREACHED', dose: 'SURVIVED_UNDERDOSED',
+      resistance: 'SURVIVED_RESISTANT', chance: 'SURVIVED_STOCHASTIC',
+      unattributed: 'UNATTRIBUTED',
+    };
+    const counts = mech.counts || null;
+    const nSurv = mech.n_survived;
     if (topKey) {
+      const topCount = counts && Number.isFinite(counts[LIMITER_LABEL[topKey]])
+        ? counts[LIMITER_LABEL[topKey]] : null;
+      const haveCounts = topCount !== null && Number.isFinite(nSurv);
       el.appendChild(h('div', {
         style: { display: 'flex', alignItems: 'baseline', gap: 'var(--sp-4)',
                  margin: '0 0 var(--sp-3)' },
@@ -369,8 +514,34 @@ function renderVerdict(el, run) {
       h('span', { style: { fontSize: 'var(--fs-disclosure)', color: 'var(--fg-1)',
                            lineHeight: 'var(--lh-body)' } },
       h('b', LABEL[topKey] || topKey.toUpperCase()), ' — ',
-      `${fmtFrac(topVal)} of SURVIVING tumour cells. `,
+      haveCounts
+        ? `${int(topCount)} of ${int(nSurv)} SURVIVING tumour cells, which is `
+          + `${fmtFrac(topVal)} of them. `
+        : `${fmtFrac(topVal)} of SURVIVING tumour cells. `,
       MEANING[topKey] || '')));
+      if (haveCounts) {
+        el.appendChild(h('div.figmode', {
+          title: 'The two numbers this percentage is made of, so it cannot '
+            + 'travel without them. mechanism.counts.'
+            + LIMITER_LABEL[topKey] + ' over mechanism.n_survived.',
+        },
+        `${int(topCount)} / ${int(nSurv)} surviving tumour cells `
+        + `· mechanism.counts.${LIMITER_LABEL[topKey]} over `
+        + 'mechanism.n_survived · NOT the same denominator as the ladder below, '
+        + 'which counts VIABLE tumour cells',
+        copyBtn(() => `${LABEL[topKey] || topKey} = ${int(topCount)} of `
+          + `${int(nSurv)} surviving tumour cells (${fmtFrac(topVal)}), run `
+          + `${run.run_id}. Share of SURVIVORS, not of the tumour and not a `
+          + 'kill fraction. Vivum: single-compound, single-section; not '
+          + 'comparable across compounds.', 'this verdict share')));
+      } else {
+        el.appendChild(h('div.caveat', h('span',
+          h('b', 'THE COUNTS BEHIND THIS PERCENTAGE ARE NOT IN THIS PAYLOAD. '),
+          'This record carries mechanism.survival_breakdown but not '
+          + 'mechanism.counts and mechanism.n_survived, so how many cells the '
+          + 'share is of, and how many are in it, cannot be shown. Neither is '
+          + 'reconstructed from the share.')));
+      }
     }
     const fold = mech.exposure_shortfall_fold;
     if (Number.isFinite(fold)) {
@@ -417,7 +588,7 @@ function renderVerdict(el, run) {
  *
  * EXTRACTED FROM render() 2026-08-22, verbatim; depends on `run` alone.
  */
-function renderSpread(el, run) {
+function renderSpread(el, run, ctx) {
   /* ---- delivery heterogeneity, the headline of this half ------------- *
    * P90/P10 over tumour-cell exposure. It is a ratio of two percentiles of
    * ONE field, so it is scale-free for exactly the same reason the reach
@@ -473,6 +644,53 @@ function renderSpread(el, run) {
       + 'threshold to choose, and computed over the tumour cell set rather '
       + 'than the viable band, so it does not move with the grid the way a '
       + '"fraction of viable tumour" does.')));
+    /* BOTH TERMS OF THE RATIO, ON SCREEN, WITH THEIR UNITS AND THEIR
+     * DENOMINATOR — and the disclosure that the division happened here.
+     *
+     * The headline above is `num(p90 / p10, 2)`: a division performed in this
+     * browser, printed as a bare "2.00x", with neither percentile, neither
+     * unit and no count anywhere near it. Three separate house rules land on
+     * that. A ratio is shown with both of its terms so the reader can do the
+     * division (js/ui/doseinput.js, and the test that pins it). A number
+     * derived in the browser says so, because it is not in result.json and
+     * carries no provenance (the same file's `derived` branch). And a
+     * percentage — or a fold-change — travels with its denominator.
+     *
+     * The denominator is `reach.n_tumor`: `exposure_percentiles` is taken over
+     * `tumor_cell_exposure(...)`'s cell set and `compute_reach` reads
+     * `n_tumor` off that same call, so it is the same population by
+     * construction rather than by coincidence. */
+    const nT = (ctx && Number.isFinite(ctx.nTumor)) ? ctx.nTumor : null;
+    el.appendChild(h('div.tblwrap', h('table.tbl.zebra',
+      h('thead', h('tr', h('th', 'term'), h('th.right', 'value'))),
+      h('tbody',
+        h('tr', h('td.mono', 'P90 — best-perfused tenth'),
+          h('td.right.num.mono', `${sci(p90, 3)} uM`)),
+        h('tr', h('td.mono', 'P10 — worst-perfused tenth'),
+          h('td.right.num.mono', `${sci(p10, 3)} uM`)),
+        h('tr', h('td.mono.strong', 'P90 / P10'),
+          h('td.right.num.mono.strong', `${num(p90 / p10, 2)}x`)),
+        h('tr', h('td.mono', 'over'),
+          h('td.right.num.mono', nT !== null
+            ? `${int(nT)} tumour cells`
+            : missing('reach.n_tumor is absent from this payload')))))));
+    el.appendChild(h('div.figmode', {
+      title: 'Where these two numbers come from and what was done to them '
+        + 'here, so the fold-change can be checked rather than believed.',
+    },
+    'extra_metrics.E_p90_uM / extra_metrics.E_p10_uM · Derived in this browser: '
+    + 'the two percentiles are recorded, their ratio is not, so this division is '
+    + 'not in result.json and carries no provenance of its own · both are '
+    + 'percentiles of AUC / window over the tumour cell set, so this figure '
+    + 'reads the run\'s own exposure window whatever the map below is built '
+    + 'from · a ratio between two points of one field, never a rank',
+    copyBtn(() => `delivery spread P90/P10 = ${num(p90 / p10, 2)}x `
+      + `(P90 ${sci(p90, 6)} uM / P10 ${sci(p10, 6)} uM over `
+      + `${nT !== null ? int(nT) + ' tumour cells' : 'an unrecorded number of tumour cells'}), `
+      + `run ${run.run_id}. Divided in the browser from extra_metrics.E_p90_uM `
+      + 'and extra_metrics.E_p10_uM. Within-map heterogeneity only: not a '
+      + 'permeability result, not an absolute kill fraction, not comparable '
+      + 'across compounds.', 'the delivery spread')));
     // THIS MAP CANNOT SEE A PERMEABILITY BARRIER, and it is the first thing a
     // reader will assume it does. bbb_penetrance is a pure global multiplier
     // on the source term, so it divides out of every within-map ratio —
@@ -510,7 +728,7 @@ function renderSpread(el, run) {
  * whose output is mostly caveats — a refactor that drops a sentence is a
  * disclosure silently shortened, and this repo may not do that.
  */
-function renderFalloff(el, reach) {
+function renderFalloff(el, reach, ctx) {
   /* ---- falloff ------------------------------------------------------- */
   const fall = reach.falloff || {};
   const fd = fall.distance_um || [];
@@ -523,6 +741,60 @@ function renderFalloff(el, reach) {
       fmtX: (v) => num(v, 0) + 'um', fmtY: (v) => num(v, 2),
       markIndex: 0, yMax: Math.max(1, ...fv.filter(Number.isFinite)),
     }));
+    el.appendChild(modeTag(ctx, 'the curve above'));
+    // missingPointsNote() returns null when nothing is missing, and
+    // appendChild(null) is a TypeError that kills the rest of this render --
+    // so the panel would go blank precisely on the healthy case.
+    const fvGaps = missingPointsNote(fv, 'distance bins');
+    if (fvGaps) el.appendChild(fvGaps);
+    /* THE TABLE UNDER THE CHART, and the per-bin counts that were being
+     * dropped.
+     *
+     * `lineChart`'s own contract says the numbers are "printed as a table
+     * underneath — that table is the accessible view, and it is also why no
+     * value is ever invented to fill a gap". The ladder had that table. This
+     * chart never did: its values existed only as SVG `<title>` tooltips, so a
+     * screen-reader user got `role="img"` and one label, and a sighted reader
+     * could only read a value off a pixel.
+     *
+     * `falloff.count` — how many grid points each bin averages over — was in
+     * the payload from the first version of this panel and has never been on
+     * screen. It is the one number that says how much to trust a bin: the
+     * backend's own rule is that a bin needs at least `min_bin_count` grid
+     * points to be usable at all, and the far bins of a section always thin
+     * out. A curve whose last point is a mean over the minimum admissible
+     * number of points reads exactly like one whose last point is a mean over
+     * thousands, and only this column separates them. */
+    const fc = Array.isArray(fall.count) && fall.count.length === fd.length
+      ? fall.count : null;
+    const minBin = fall.min_bin_count;
+    el.appendChild(h('div.tblwrap', { style: { margin: 'var(--sp-3) 0 0' } },
+      h('table.tbl.zebra',
+        h('thead', h('tr',
+          h('th', 'distance'),
+          h('th.right', ctx.refIsConc ? 'conc / reference' : 'exposure / reference'),
+          fc ? h('th.right', 'grid points in bin') : null)),
+        h('tbody', fd.map((d, i) => h('tr',
+          { title: `bin centred ${num(d, 0)} um from the nearest endothelial `
+            + `cell${fc ? `, averaging ${int(fc[i])} grid points` : ''}` },
+          h('td.mono' + (i === 0 ? '.strong' : ''), `${num(d, 0)} um`),
+          h('td.right.num.mono' + (i === 0 ? '.strong' : ''),
+            Number.isFinite(fv[i]) ? num(fv[i], 4)
+              : missing('falloff.normalised_mean_auc carries no value for this bin')),
+          fc ? h('td.right.num.mono', int(fc[i])) : null))))));
+    el.appendChild(h('div.figmode', {
+      title: 'What one row of the table above is, and what the first row is by '
+        + 'construction rather than by measurement.',
+    },
+    `bin width ${(Number.isFinite(fall.bin_um) ? num(fall.bin_um, 0) : '?')} um`
+    + (Number.isFinite(minBin)
+      ? ` · a bin is usable only with at least ${int(minBin)} grid points in it`
+      : '')
+    + ' · the first row is 1.0000 by construction — it IS the reference every '
+    + 'other row is divided by, not a measurement that happened to land there'
+    + (fc ? '' : ' · this payload carries no falloff.count, so how many grid '
+      + 'points each bin averages over is not on the record and is not '
+      + 'estimated here')));
     el.appendChild(prose(
       'Each bin is the mean exposure over tissue at that distance from the '
       + 'nearest endothelial cell, divided by the perivascular reference, so '
@@ -569,8 +841,25 @@ function renderFalloff(el, reach) {
      * ratio carries an O(1/T) tail however converged the field is, and the
      * field is converged to 1.112e-05 at 6 h.
      * Sources: results/reach_invariances_measure.md, steady_state_reach.md. */
+    /* THREE ARMS, NOT TWO. The `? steady : finite` this used to be handed the
+     * finite-window figures — three measured numbers, asserted — to any record
+     * that predates `window_mode`, two hundred words after the panel had
+     * explicitly refused to say which mode such a record is in. */
     el.appendChild(h('div.caveat.crit', h('span',
-      reach.window_mode === 'steady_state'
+      ctx.mode === MODE.UNRECORDED
+        ? [h('b', 'WHETHER CAPACITY REACHES THIS FIGURE IS NOT RECORDED. '),
+           'Whether a tissue-capacity term R touches this curve depends '
+           + 'entirely on which of the two maps produced it, and this record '
+           + 'does not say (window_mode is absent). The two answers are far '
+           + 'apart and neither is being assumed: on a converged steady state '
+           + 'R multiplies a time derivative the map does not have, and across '
+           + 'R = 1 to 4184 this curve moves at most 4.5e-14; over a finite '
+           + 'window R rescales time, and at R = 39 the same curve moves '
+           + '0.3772 absolute on a curve whose whole range is 1.0 to 0.51, '
+           + 'with the fitted penetration length collapsing 279.7 to 76.7 um. '
+           + 'Treat this figure as carrying the WORSE of those two until the '
+           + 'run is re-made on a build that records its mode.']
+        : ctx.mode === MODE.STEADY
         ? [h('b', 'CAPACITY CANNOT REACH THIS FIGURE. '),
            'A tissue-capacity term R multiplies the TIME DERIVATIVE and '
            + 'nothing else, and a converged steady state has no time '
@@ -615,21 +904,77 @@ function renderFalloff(el, reach) {
  * EXTRACTED FROM render() 2026-08-22, verbatim — see renderFalloff above for
  * the losslessness check that licences the move. Depends on `run` alone.
  */
-function renderPotency(el, run) {
+function renderPotency(el, run, ctx) {
   /* ---- the demoted absolute reading ---------------------------------- */
   const ex = run.extra_metrics || {};
   const cov = [
-    ['0.5x IC50', ex.therapeutic_coverage_0_5x],
-    ['1x IC50', run.metrics ? run.metrics.therapeutic_coverage_1x : null],
-    ['2x IC50', ex.therapeutic_coverage_2x],
+    ['0.5x IC50', ex.therapeutic_coverage_0_5x, 'extra_metrics.therapeutic_coverage_0_5x'],
+    ['1x IC50', run.metrics ? run.metrics.therapeutic_coverage_1x : null,
+      'metrics.therapeutic_coverage_1x'],
+    ['2x IC50', ex.therapeutic_coverage_2x, 'extra_metrics.therapeutic_coverage_2x'],
   ].filter(([, v]) => v !== undefined);
   if (cov.length) {
     el.appendChild(microLabel('potency evidence'));
+    /* THE DENOMINATOR IN THE HEADER, AND THE COUNT IN THE ROW.
+     *
+     * "of tumour above it" named a population and no number. The population is
+     * the tumour CELL set — `therapeutic_coverage` scores `E_i = AUC_i / T`
+     * against the IC50 over `tumor_cell_exposure`'s cells, the same set
+     * `reach.n_tumor` counts — and it is a DIFFERENT denominator from the
+     * ladder above, which counts viable tumour cells only. Two ladders on one
+     * panel, quoted in percent, over two different populations, with neither
+     * population's size on screen, is the arithmetic this panel was making the
+     * reader do in their head.
+     *
+     * The count is reconstructed, and says so: coverage is a count over
+     * n_tumor, so `fraction * n_tumor` recovers the integer exactly — but it
+     * is still a multiplication done in this browser and not a recorded
+     * field. */
+    const nT = (ctx && Number.isFinite(ctx.nTumor)) ? ctx.nTumor : null;
     el.appendChild(h('div.tblwrap', h('table.tbl.zebra',
-      h('thead', h('tr', h('th', 'threshold'), h('th.right', 'of tumour above it'))),
-      h('tbody', cov.map(([k, v]) => h('tr',
+      h('thead', h('tr',
+        h('th', 'threshold'),
+        h('th.right', 'of tumour above it'),
+        nT !== null ? h('th.right', `cells (of ${int(nT)})`) : null)),
+      h('tbody', cov.map(([k, v, field]) => h('tr',
+        { title: `${field} — the fraction of tumour cells whose window-mean `
+          + `concentration E = AUC / window is at or above ${k}` },
         h('td.mono', k),
-        h('td.right.num.mono', fmtFrac(v))))))));
+        h('td.right.num.mono', Number.isFinite(v) ? fmtFrac(v)
+          : missing(`${field} is null or absent in this payload; no value is `
+            + 'substituted for it')),
+        nT !== null
+          ? h('td.right.num.mono', Number.isFinite(v)
+            ? int(Math.round(v * nT))
+            : missing(`${field} is null or absent in this payload`))
+          : null))))));
+    el.appendChild(h('div.figmode', {
+      title: 'What population these three percentages are shares of, which '
+        + 'field they were scored on, and which parts of the row were computed '
+        + 'here rather than recorded.',
+    },
+    (nT !== null
+      ? `denominator ${int(nT)} tumour cells (reach.n_tumor) — NOT the viable `
+        + 'band the ladder above counts'
+      : 'denominator: reach.n_tumor is absent from this payload, so the number '
+        + 'of tumour cells these shares are of is not on the record and no '
+        + 'count is reconstructed')
+    /* NOT `windowWords(ctx)` here, and the difference is the whole point of
+     * this line. `window_mode` describes the map the LADDER is built on. This
+     * table is scored on the marched AUC field and always carries the run's
+     * exposure window, including when the ladder above is the windowless
+     * steady map — so quoting "no exposure window" against it would be the
+     * panel labelling one figure with another figure's mode. */
+    + ' · scored as E = AUC / window against IC50, so these read the run\'s own '
+    + 'exposure window'
+    + (Number.isFinite(ctx && ctx.windowS)
+      ? `, which this record puts at ${int(ctx.windowS)} s (${dur(ctx.windowS)})`
+      : ', whose length this record does not carry — reach.window_s is only '
+        + 'reported in finite-window mode')
+    + (nT !== null
+      ? ' · Derived in this browser: the cells column is the recorded fraction '
+        + 'multiplied by that denominator, and is not itself a recorded field'
+      : '')));
     el.appendChild(h('div.caveat', h('span',
       h('b', 'ABSOLUTE, and shown as a ladder for that reason. '),
       'Coverage compares an exposure to an IC50, so unlike everything above '
@@ -738,6 +1083,32 @@ export function createReachPanel() {
     }
 
     const x = reach.headline_x;
+
+    /* ---- ONE RESOLVED DESCRIPTION OF THIS PAYLOAD, THREADED EVERYWHERE ---
+     * Which map, how long a window, what the reference is a reference OF, and
+     * the two cell counts every percentage on this panel is a share of. Each
+     * of these was previously read independently at the point of use — or, in
+     * the case of the two counts and the window length, present in the payload
+     * and read nowhere at all — so different blocks could and did disagree
+     * about what run they were describing.
+     *
+     * `refUnits` / `refIsConc` are HOISTED, not changed: the finite-window map
+     * normalises by an exposure (uM*s) and the steady map by a concentration
+     * (uM), the wire key is `E_ref_uM_s` in both, and every sentence that names
+     * the quantity has to pick its noun from the units. Hoisting them lets the
+     * blocks ABOVE the reference paragraph pick the same noun it does. */
+    const refUnits = reach.E_ref_units || (reach.units && reach.units.E_ref) || 'uM*s';
+    const refIsConc = /^\s*uM\s*$/i.test(String(refUnits));
+    const ctx = {
+      mode: windowModeOf(reach),
+      windowS: Number.isFinite(reach.window_s) ? reach.window_s : null,
+      refUnits,
+      refIsConc,
+      refWord: refIsConc ? 'reference concentration' : 'reference exposure',
+      nViable: Number.isFinite(reach.n_viable) ? reach.n_viable : null,
+      nTumor: Number.isFinite(reach.n_tumor) ? reach.n_tumor : null,
+      runId: run.run_id,
+    };
 
     renderVerdict(el, run);
 
@@ -850,7 +1221,7 @@ export function createReachPanel() {
         + 'the cells sit and are unaffected by this.')));
     }
 
-    renderSpread(el, run);
+    renderSpread(el, run, ctx);
 
     /* THE REFERENCE EXPOSURE, in that order: what it is, then where it came
      * from. This paragraph used to OPEN on the backend's `E_ref_source`
@@ -869,8 +1240,8 @@ export function createReachPanel() {
      * concentration an exposure on screen would be this panel repeating that
      * mistake in words, where a reader can act on it — so the word is read off
      * the units, never assumed. */
-    const refUnits = reach.E_ref_units || (reach.units && reach.units.E_ref) || 'uM*s';
-    const refIsConc = /^\s*uM\s*$/i.test(String(refUnits));
+    /* `refUnits` / `refIsConc` are resolved once at the top of render() — the
+     * blocks above this paragraph have to pick the same noun it does. */
     el.appendChild(prose(
       'Every ratio on this panel is ',
       refIsConc ? 'some concentration' : 'some exposure',
@@ -961,8 +1332,24 @@ export function createReachPanel() {
      * read as written -- "the whole ladder" -- all three understate, 0.0011 by
      * a factor of 365. Stated per-rung below, because a single max over rungs
      * reports the worst rung and the headline is the best one. */
+    /* THREE ARMS, NOT TWO — see the identical correction on the falloff
+     * caveat above. A record with no `window_mode` used to be told, flatly,
+     * that its headline rung is bit-identical over R = 1 to 39. Nothing in
+     * such a record supports that sentence. */
     el.appendChild(h('div.caveat', h('span',
-      reach.window_mode === 'steady_state'
+      ctx.mode === MODE.UNRECORDED
+        ? [h('b', 'WHAT TISSUE CAPACITY DOES TO THIS LADDER IS NOT RECORDED. '),
+           'The engine assigns every compound a capacity of 1.0 and measured '
+           + 'values span 3.2 to 4184 mL/g (n = 33). What that assignment costs '
+           + 'this ladder depends on which map produced it, and this record '
+           + 'does not say (window_mode is absent). On a converged steady state '
+           + 'every rung moves exactly 0.000e+00 across the full measured range; '
+           + 'over a finite window the whole 7-rung ladder moves 0.4021 over '
+           + 'R = 1 to 39 and 0.9427 over the full range — worse than the '
+           + 'cross-compound ordering this product withdrew. Neither is claimed '
+           + 'for this run. Do not quote a rung of this ladder as '
+           + 'capacity-insensitive without a record that says which map it is.']
+        : ctx.mode === MODE.STEADY
         ? [h('b', 'THIS LADDER DOES NOT DEPEND ON TISSUE CAPACITY. '),
            'The engine assigns every compound a capacity of 1.0, and measured '
            + 'values span 3.2 to 4184 mL/g (n = 33). On a converged steady '
@@ -982,7 +1369,7 @@ export function createReachPanel() {
            + 'ladder 0.9427, both worse than the cross-compound ordering this '
            + 'product withdrew. Read the rung you are using, not the ladder.'])));
 
-    renderFalloff(el, reach);
+    renderFalloff(el, reach, ctx);
 
     /* ---- the invariance statement, from the backend --------------------
      * RESTRUCTURED, NOT REDUCED, 2026-08-22.
@@ -1032,7 +1419,7 @@ export function createReachPanel() {
         + 'this refusal applies to.')));
     }
 
-    renderPotency(el, run);
+    renderPotency(el, run, ctx);
   }
 
   return { el, render };

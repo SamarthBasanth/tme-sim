@@ -79,6 +79,7 @@ import math
 import os
 import secrets
 import threading
+import time
 from contextlib import asynccontextmanager, contextmanager
 from typing import Dict, List, Optional
 
@@ -177,6 +178,16 @@ _MAX_GRID_CELLS = int(
 #: the voxel ceiling above cannot be evaluated. 0.5 um is well below a cell
 #: diameter, so no legitimate tissue-scale run is refused by it.
 MIN_DX_UM = 0.5
+
+#: Wall-clock at import, used for the uptime figure on /api/account.
+#:
+#: At IMPORT, not at create_app(): the tests build several apps in one process
+#: and a per-app boot time would report the age of the most recent test
+#: fixture. What an operator wants from "uptime" is how long THIS PROCESS has
+#: been answering, and that is what this measures. It is time.time(), so it is
+#: a wall clock and it moves if the host clock is adjusted -- fine for an
+#: order-of-magnitude "has this restarted?", not a duration to compute against.
+_PROCESS_STARTED_AT = time.time()
 
 
 # --------------------------------------------------------------------------- #
@@ -2247,6 +2258,46 @@ def create_app(manager: Optional[JobManager] = None,
 
     app.include_router(build_protocol_router(jobs))
 
+    # /api/limits and /api/account — the deployment's own surface. See
+    # app/server/account.py for why these are a separate module, and why the
+    # limits are PASSED IN rather than imported there.
+    #
+    # `_limits` is built here, from the module-level constants the refusal
+    # path itself reads, so the number the spec editor shows before a run and
+    # the number validate_spec refuses with are the same number. The failure
+    # this prevents is the one this project keeps having: a second copy of a
+    # value, correct on the day it was written.
+    from .account import build_account_router
+
+    _limits = {
+        "max_grid_cells": _MAX_GRID_CELLS,
+        "max_grid_cells_default": _DEFAULT_MAX_GRID_CELLS,
+        "max_grid_cells_source": (
+            "TMESIM_MAX_GRID_CELLS" if _MAX_GRID_CELLS != _DEFAULT_MAX_GRID_CELLS
+            else "default"),
+        # The point above which a spec is allowed but slow, distinct from the
+        # ceiling above which it is refused. A client that shows only the
+        # ceiling lets a user walk into a ten-minute reconstruction with no
+        # warning.
+        "large_grid_cells": _LARGE_GRID_CELLS,
+        "min_dx_um": MIN_DX_UM,
+        "dx_kill_ladder_coarse_um": DX_KILL_LADDER_COARSE_UM,
+        "dx_penetration_ladder_coarse_um": DX_PENETRATION_LADDER_COARSE_UM,
+        "pde_dt_s": PDE_DT_S,
+        # Stated so a client can reimplement it without reading this file, and
+        # so the reimplementation has something to be checked AGAINST. The
+        # extent comes from the section row's `extent_um`; a section without
+        # one cannot be checked client-side at all, and the client must say so
+        # rather than assume the spec is fine.
+        "grid_cells_formula": (
+            "(extent_um[0] / dx_um) * (extent_um[1] / dx_um)"),
+        "field_bytes_per_grid_cell": 8,
+        "grid_cells_requires": "section extent_um",
+    }
+    app.include_router(build_account_router(
+        jobs=jobs, store=store, reports=reports, limits=_limits,
+        cache=RECON_CACHE, started_at=_PROCESS_STARTED_AT))
+
     # The UI, mounted LAST so /api always wins.
     _mount_web(app)
     return app
@@ -2316,6 +2367,26 @@ def _binary(jobs: JobManager, run_id: str, payload: str, label: str):
             ),
         })
     body = job.body or {}
+    # A payload deleted to reclaim disk is NOT a payload that was never
+    # produced, and the branches below would say the latter -- naming a cause
+    # ("timelapse_frames was 0, or this run predates the feature") that is
+    # simply untrue for a run that captured one and had it pruned. That is the
+    # exact failure this repository keeps finding: a confident explanation
+    # pointed at the wrong object. So a recorded prune answers first, and says
+    # what was removed, when, and how to get it back.
+    pruned = (body.get("pruned_payloads") or {}).get(payload)
+    if isinstance(pruned, dict):
+        raise HTTPException(status_code=410, detail={
+            "message": f"{label} was pruned from this run",
+            "run_id": run_id,
+            "reason": (
+                f"this run DID produce {label}; the file was deleted on "
+                f"{pruned.get('at', 'an unrecorded date')} to reclaim disk "
+                f"({pruned.get('bytes', 0):,} bytes). "
+                + str(pruned.get("reason") or "")
+            ).strip(),
+            "recoverable": "re-run the RunSpec in this record",
+        })
     if payload == "field_drug_auc" and not job.spec.get("drug"):
         reason = ("the drug_auc field only exists for a run with a drug; this "
                   "RunSpec had drug=null (reconstruction-only).")

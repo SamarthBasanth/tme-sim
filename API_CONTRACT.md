@@ -165,9 +165,84 @@ a research tool, not a diagnostic product. Concretely:
 | `GET`  | `/api/protocol/sweeps/{id}` | → the same job in the editor's projection (alias) |
 | `DELETE` | `/api/protocol/sweeps/{id}` | cancel a queued/running sweep |
 | `POST` | `/api/protocol/upload` | `{filename, content \| content_base64}` or multipart `file` → `{path, preview}` |
+| `GET`  | `/api/limits` | → what this server refuses; see below |
+| `GET`  | `/api/account` | → this deployment: key, limits, usage inventory, billing |
 
 `status` ∈ `queued | running | done | failed | cancelled`. On `failed`, `RunResult.error`
 carries the message; the UI must surface it, never swallow it.
+
+### The deployment's own surface — `GET /api/limits`, `GET /api/account`
+
+Every other route in this contract answers a question about TISSUE. These two
+answer questions about the INSTANCE, and they are the backing for Studio's
+Account panel (`app/web/js/ui/account.js`, server side `app/server/account.py`).
+
+Both are gated like any `/api/` route. That is deliberate: a key fingerprint, a
+usage count and a deployment's refusal thresholds are operational detail about
+a machine. The "how do I get a key" copy that an UNAUTHENTICATED visitor needs
+therefore lives in the client, because by definition that visitor cannot call
+these.
+
+Both are `noFallback` on the front end: they never answer from `js/mock.js`.
+A fabricated ceiling would make the spec editor confidently green on a spec the
+real server refuses, and a fabricated billing block is a claim about money.
+
+`GET /api/limits` →
+
+```
+{max_grid_cells, max_grid_cells_default, max_grid_cells_source,
+ large_grid_cells, min_dx_um, dx_kill_ladder_coarse_um,
+ dx_penetration_ladder_coarse_um, pde_dt_s,
+ grid_cells_formula, field_bytes_per_grid_cell, grid_cells_requires}
+```
+
+`max_grid_cells_source` is `"default"` or `"TMESIM_MAX_GRID_CELLS"`.
+`large_grid_cells` is the ALLOWED-BUT-SLOW threshold and is a different number
+from the refusal ceiling; a client showing only the ceiling lets a user walk
+into a ten-minute reconstruction with no warning.
+
+`grid_cells_formula` is published as text because the client has to reimplement
+it — it cannot call `/api/validate` on every keystroke — so there are two
+copies of one formula by construction. `tests/test_app_server.py::
+TestAccountAndLimits::test_limits_formula_matches_validate` checks the
+published formula against the real refusal boundary on a real section, which is
+the only thing that keeps the two honest.
+
+It is a route of its own rather than a field on `/api/defaults` because the
+`/api/defaults` body is adopted verbatim as a `RunSpec` and posted straight back
+to `/api/validate`, which warns on unrecognised fields.
+
+`GET /api/account` → `{contract, auth, deployment, usage, billing}`
+
+* `auth` — `{required, header, scheme, source, key_fingerprint,
+  caller_fingerprint, matches, self_service_signup, rotatable_via_api,
+  how_to_rotate}`. The fingerprints are HMAC-SHA256 truncated to 12 hex, and
+  are IDENTIFIERS: nothing authenticates against them, and the key itself never
+  appears in the payload. `source` is `environment`, `--api-key`,
+  `generated-at-startup`, or `unknown` — the distinction an operator who has
+  LOST the key needs. Both `self_service_signup` and `rotatable_via_api` are
+  `false`: there is no user table and no key-issuing endpoint.
+* `deployment` — `{single_shared_key, data_roots_confined, limits,
+  started_at_unix, uptime_s}`.
+* `usage` — a **current inventory, not a meter**, and it says so in its own
+  `kind` field. Deleting a run decrements it. `attribution` states the
+  limitation outright: one shared key means no run can be attributed to a
+  person.
+* `billing` — scaffolding, labelled as scaffolding. `enabled` is always
+  `false`; naming a provider in `TMESIM_BILLING_PROVIDER` moves `status` to
+  `configured-but-not-implemented` and does NOT flip `enabled`. `blocked_on`
+  names the preconditions (per-caller identity; a durable usage record) rather
+  than leaving them for the UI to remember.
+
+### Pruned payloads — `410 Gone`
+
+A binary payload can be deleted to reclaim disk by
+`scripts/prune_run_payloads.py`, which records the deletion in the run's own
+`result.json` under `pruned_payloads`. `_binary` reads that record FIRST and
+answers **410** with the truth — this run did produce it, it was removed on this
+date, re-run the spec — instead of falling through to a reason that says the
+payload was never produced. That fall-through sentence is false for a pruned
+run, and a confident false reason is worse than the missing file it explains.
 
 ### TPL — `POST /api/protocol/*`
 

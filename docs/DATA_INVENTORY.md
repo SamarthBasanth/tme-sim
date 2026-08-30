@@ -467,3 +467,50 @@ collections; Vivli/CSDR clinical-trial IPD; METASPACE raw imzML behind free
 registration) are tabulated in
 [`../results/DATA_HUNT.md`](../results/DATA_HUNT.md) §4, together with the
 confirmed dead ends so nobody re-spends the time.
+
+# Deleted on purpose — 2026-08-30 disk sweep
+
+The repository reached 8.4 GB on a working laptop and was swept. Two rules
+governed it: nothing a TEST depends on was removed, and nothing was removed
+without a recorded way back.
+
+**`data_cache/greenwald_gbm_codex/ZH1007_INF.ome.tif` — 1,548,785,153 bytes,
+DELETED.** The second of the two CODEX pairs. Verified unreferenced by any
+code, test, experiment or CI workflow before removal — the only mentions in the
+repository are in `results/gbm_3d_registration.md`, which is a dated record of a
+pass that, in its own words, added no test because no new code existed to pin.
+Its derived output, `results/gbm_3d_registration_zh1007inf_overlay.png`, is
+still present. **To get it back:** Zenodo `10.5281/zenodo.12624860`, served
+under exactly that filename, exactly that byte count.
+
+**`data_cache/greenwald_gbm_codex/ZH1007_NEC_B.ome.tif` — 920,859,118 bytes,
+KEPT.** `tests/test_codex_adapter.py` skips its whole module without it, so
+deleting it would have converted eleven live tests into eleven silent skips —
+a green suite testing nothing, which is the defect class this project is most
+prone to. Confirmed still running after the sweep: 11 passed.
+
+**Tarballs in `data_cache/*` — KEPT**, though their extracted directories sit
+beside them. They look redundant and are not: `tmesim/data/ingest.py` looks for
+`*cell_feature_matrix.tar.gz` by name, and `tmesim/data/real/singlecell_spatial.py`
+records each one's exact expected byte count. Deleting them triggers a
+re-download, not a saving.
+
+**`data_cache/hunt/` — KEPT.** It reads like scratch from a finished search and
+is not: `tmesim/validation/gbm_tmz_exvivo.py`, `scorecard.py`,
+`moncayo_explant.py` and `kill_calibration.py` all read directories under it by
+path.
+
+**`app/runs/*/timelapse.bin` — 54 runs pruned, 782,579,352 bytes**, by
+`scripts/prune_run_payloads.py`. Runs cited in `results/`, `archive/`, `docs/`
+or `README.md` are protected, as are the ten most recent. A pruned run records
+the fact in its own `result.json`, and the API answers **410** naming the date
+and the byte count rather than the pre-existing 404 reason, which would have
+claimed the run never captured one. Re-running the spec in the record
+reproduces the payload.
+
+**`.export-drive/` (72 MB), `landing-3d/.next`, `__pycache__`,
+`.pytest_cache`, `tmesim.egg-info`, two zero-byte `curl_codex*.log` — DELETED.**
+All regenerated on demand; `.export-drive/` is rebuilt by
+`scripts/studio_export/drive.mjs`.
+
+Result: 8.4 GB → 6.2 GB.

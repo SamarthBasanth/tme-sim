@@ -798,3 +798,85 @@ def test_the_bound_is_read_off_the_peak_where_the_two_readings_disagree(
     # The mean is still shown, still marked as not the bound.
     assert "1.29x the plasma MEAN" in text
     assert "Do not read that as the bound" in text
+
+
+# --------------------------------------------------------------------------- #
+# The Account panel (js/ui/account.js)
+# --------------------------------------------------------------------------- #
+class TestAccountPanel:
+    """The panel that answers questions about the DEPLOYMENT, not the tissue.
+
+    Two invariants are worth a browser for. The first is a security one: the
+    API tab exists to be COPIED, and "copy" is the button people press without
+    reading, so a snippet with the live key baked into it is how a secret ends
+    up pasted into a chat window. ``apiExamples`` is exported as a pure
+    function of (base, header) precisely so that invariant is testable rather
+    than reviewable -- the key is not an input to it.
+
+    The second is the stub-mode refusal. Every other panel in Studio degrades
+    to synthetic data when the backend stops answering. This one must not:
+    which key you are sending, what the server refuses and whether anyone is
+    charged are facts about a real server, and a plausible-looking answer to
+    any of them is worse than no answer.
+    """
+
+    def test_the_copyable_examples_cannot_contain_the_key(self, page):
+        """The key is set in the browser, then every example is generated and
+        searched for it. Not a source grep: the strings are BUILT and read."""
+        out = page.evaluate(
+            """async () => {
+              const api = await import('./js/api.js');
+              api.setApiKey('SUPER-SECRET-KEY-abc123', false);
+              const m = await import('./js/ui/account.js');
+              const ex = m.apiExamples('https://example.test/', 'X-API-Key');
+              const all = Object.values(ex).join('\\n');
+              return {
+                key_present: all.includes('SUPER-SECRET-KEY-abc123'),
+                placeholder_present: all.includes('$VIVUM_API_KEY'),
+                n: Object.keys(ex).length,
+                trailing_slash: all.includes('example.test//'),
+              };
+            }""")
+        assert out["key_present"] is False, \
+            "a copyable example contained the live API key"
+        assert out["placeholder_present"] is True, \
+            "the examples must carry the $VIVUM_API_KEY placeholder"
+        assert out["n"] >= 5
+        assert out["trailing_slash"] is False, \
+            "a base URL with a trailing slash produced a doubled slash"
+
+    def test_the_panel_refuses_to_describe_a_backend_that_is_not_answering(
+            self, page):
+        """In stub mode it renders the refusal, not plausible values."""
+        text = page.evaluate(
+            """async () => {
+              const api = await import('./js/api.js');
+              api.api.stub = true;
+              const m = await import('./js/ui/account.js');
+              const p = m.createAccountPanel();
+              await p.reload();
+              const t = p.element.textContent;
+              api.api.stub = false;
+              return t;
+            }""")
+        assert "THE BACKEND IS NOT ANSWERING" in text
+        # It must not print a billing or limits value it does not have.
+        assert "not-configured" not in text
+        assert "BILLING IS NOT ENABLED" not in text
+
+    def test_it_injects_its_own_button_and_leaves_the_rails_alone(self, page):
+        counts = page.evaluate(
+            """async () => {
+              const before = document.querySelectorAll('.rail-group').length;
+              const m = await import('./js/ui/account.js');
+              m.createAccountPanel();
+              return {
+                btn: !!document.querySelector('#btn-account'),
+                dlg: !!document.querySelector('#acct-dlg'),
+                rails_unchanged:
+                  document.querySelectorAll('.rail-group').length === before,
+              };
+            }""")
+        assert counts["btn"] is True
+        assert counts["dlg"] is True
+        assert counts["rails_unchanged"] is True

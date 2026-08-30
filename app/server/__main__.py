@@ -131,6 +131,22 @@ def main(argv=None) -> int:
             api_key = secrets.token_urlsafe(24)
             generated = True
     os.environ["TMESIM_STUDIO_API_KEY"] = api_key
+    # Record WHICH of the three sources won, for /api/account to report.
+    #
+    # The banner below already works this out to print a label, but the banner
+    # is scrollback: an operator reading Studio's Account panel three weeks
+    # later cannot see it. Without this, account.py would have to infer the
+    # source from the key's presence alone and could not distinguish "the
+    # operator chose this secret" from "the process invented one at boot and
+    # printed it exactly once" -- which is precisely the distinction someone
+    # who has LOST the key needs. Unset means the variable was already in the
+    # environment when the app was built (Docker ENV, systemd, a shell export)
+    # and this module never ran.
+    if api_key:
+        os.environ["TMESIM_STUDIO_API_KEY_SOURCE"] = (
+            "generated" if generated
+            else "flag" if args.api_key is not None
+            else "environment")
 
     # SECURITY: on the default loopback bind the only legitimate Host values
     # are the loopback names, so pin them -- that blocks DNS rebinding, where
