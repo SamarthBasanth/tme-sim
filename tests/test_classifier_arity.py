@@ -188,16 +188,44 @@ def test_fixed_classifier_composition_on_section_one(xenium):
     assert missing == []
 
 
-def test_endothelial_fraction_moved_toward_the_independent_estimates(xenium):
-    """Both external references sit near 8-10%; the fix must not overshoot.
+def test_endothelial_fraction_is_in_band_and_is_the_corrected_rule(xenium):
+    """The band alone is unfalsifiable, so this also pins the rule behind it.
 
-    NOT a tuning target -- the gate was frozen at 1.0 for every candidate. This
-    only pins that the corrected value stays in the single-digit-to-low-teens
-    band the reconstruction is documented to produce.
+    CORRECTION. This test used to be called
+    ``test_endothelial_fraction_moved_toward_the_independent_estimates`` and
+    asserted only ``5.0 < fixed < 15.0``. Both halves were wrong:
+
+    * DIRECTION. On THIS section the fix moves the endothelial fraction
+      9.74 -> 10.50 %, i.e. 0.76 pp *away* from the 8.0 % volume-EM anchor it
+      claimed to move toward. What actually improved is the CROSS-SECTION
+      spread, 2.91x -> 1.49x, and ``results/classifier_fix.md`` §0 says in
+      terms that "the target was consistency, not the 8.0 % volume-EM anchor,
+      which was never optimised against".
+    * DISCRIMINATION. ``5 < x < 15`` is cleared by ALL FIVE aggregation rules
+      ever considered -- matched_null_z 10.50, mean_z 9.74, mean_z_norm 8.65,
+      max_z 6.70, marker_vote 10.37. It passed unchanged with the arity bug
+      restored as the default. A bound that admits the defect it was written to
+      detect is a check that has stopped checking.
+
+    The spread claim needs s2 (517 MB) and s3 (320 MB) and is not measurable
+    from this section, so what this test CAN hold down is the pair: the band
+    still holds, AND the default is really the corrected rule rather than the
+    legacy one silently restored.
     """
     expression, genes = xenium
     fixed = _pct(phenotype_cells(expression, genes)[0])["ENDOTHELIAL"]
+    legacy = _pct(phenotype_cells(expression, genes,
+                                  aggregation="mean_z")[0])["ENDOTHELIAL"]
+
     assert 5.0 < fixed < 15.0, fixed
+
+    # The discriminating half: the default must not BE the legacy rule.
+    assert abs(fixed - legacy) > TOL_PP, (
+        f"the default rule returns the legacy arity-biased endothelial "
+        f"fraction ({fixed:.2f}% vs mean_z's {legacy:.2f}%) -- the fix has been "
+        "reverted or silently bypassed, and the band above cannot see it")
+    assert fixed == pytest.approx(FIXED_PCT["ENDOTHELIAL"], abs=TOL_PP), fixed
+    assert legacy == pytest.approx(LEGACY_PCT["ENDOTHELIAL"], abs=TOL_PP), legacy
 
 
 # --------------------------------------------------------------------------- #

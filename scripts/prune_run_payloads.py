@@ -51,13 +51,31 @@ RUN_ID_RE = re.compile(rb"r_\d{5}")  # bytes: results/ holds PNGs and
 CITATION_ROOTS = ("results", "archive", "docs", "README.md", "API_CONTRACT.md")
 
 
+#: A citation written as a RANGE. Found the hard way: `docs/RUNBOOK_DEPLOY.md`
+#: line 368 reads ``\`r_00027\`-\`r_00029\``` and the plain id scan matched only
+#: the two endpoints, so `r_00028` — cited, in a published record, by a
+#: document this script exists to protect — was pruned. The gap was invisible
+#: because the scan found *something* at that line and looked like it worked.
+RANGE_RE = re.compile(
+    b"r_([0-9]{5})\\s*`?\\s*(?:--|\xe2\x80\x93|\xe2\x80\x94|-|to)\\s*`?\\s*r_([0-9]{5})")
+
+#: A range wider than this is treated as prose that happens to contain two ids
+#: rather than as a citation, so an unrelated pair on one line cannot protect
+#: hundreds of runs. Ranges in this repo's records are a handful of runs wide.
+MAX_RANGE = 50
+
+
 def cited_run_ids(repo: str = _REPO) -> set:
-    """Every ``r_NNNNN`` mentioned in a published record.
+    """Every ``r_NNNNN`` mentioned in a published record, ENDPOINTS INCLUDED.
 
     Deliberately a TEXT scan over whole trees rather than a curated list: a
     curated list is a second copy of the truth and would go stale the first
     time someone cited a run in a new file. A false positive here costs some
     disk; a false negative breaks a citation in a dated record.
+
+    Ranges are expanded. ``r_00027`-`r_00029`` cites THREE runs and the middle
+    one is named nowhere on the line, which is exactly how `r_00028` was pruned
+    out from under a citation on 2026-08-30.
     """
     found = set()
     for root in CITATION_ROOTS:
@@ -76,6 +94,12 @@ def cited_run_ids(repo: str = _REPO) -> set:
             except OSError:
                 continue
             found.update(m.decode() for m in RUN_ID_RE.findall(blob))
+            for lo, hi in RANGE_RE.findall(blob):
+                a, b = int(lo), int(hi)
+                if a > b:
+                    a, b = b, a
+                if b - a <= MAX_RANGE:
+                    found.update(f"r_{n:05d}" for n in range(a, b + 1))
     return found
 
 

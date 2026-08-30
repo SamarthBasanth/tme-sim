@@ -740,7 +740,7 @@ any directory it can read), and leave `TMESIM_STUDIO_EXPOSE_TRACEBACKS` unset.
 
 ## 4. Environment variables
 
-Ten. There is no config file; these are the whole surface, and only five are
+Eleven. There is no config file; these are the whole surface, and only five are
 security-relevant.
 
 This section said "Six" while the code read ten — `TMESIM_MAX_GRID_CELLS` had
@@ -798,8 +798,13 @@ machine with room for it.
 * **Unset:** 40,000,000. That is the "no request should ever ask for this"
   number, not the "this machine can afford it" one. Those are different numbers
   and only the operator knows the second.
-* **An integer:** used verbatim. `100000` permits `dx >= ~20 um` on the
-  flagship section and refuses `dx = 12`.
+* **An integer:** used verbatim. `100000` permits `dx >= 20.25 um` on the
+  flagship section and refuses `dx = 12`. It also refuses `dx = 20`: measured
+  with the server's own extent formula, `dx = 20` on `xenium_319` is **102,419
+  voxels**, 2.4 % over the ceiling, and break-even is `dx = 20.2405 um`. An
+  earlier version of this line (and of the comment in `app/server/api.py` it
+  was copied from) said `~20`, which would have led an operator to set a
+  ceiling that refuses the resolution they chose it for.
 * **`auto`:** adopts 46,070 — the largest grid *measured* to survive a host this
   size — but **only when a limit at or below 512 MB is actually detected**. On a
   larger or undeclared host it falls back to the default and says which branch
@@ -817,6 +822,23 @@ so does the Account panel's Limits tab. On a correctly configured host both are
 silent.
 
 On Render's free tier, set `TMESIM_MAX_GRID_CELLS=auto` or `100000`.
+
+### `TMESIM_PROTOCOL_MAX_WINDOW_S`
+
+How long a transport solve may cover, in seconds. Default 86,400 (24 h), which
+covers a full daily dosing interval so an `every 24 h` schedule resolves for one
+complete cycle of its own period.
+
+A Stupp course is ~168 days; a PDE solve at `dt = 10 s` over that is 1.45e6
+steps and is not something this backend will start. A longer protocol is
+**truncated to this window and the truncation is reported** — with how many
+doses fell outside it — rather than silently shortened, and the value in force
+is carried in every result.
+
+Read at import in `tmesim/protocol/dosing.py`, reachable from a running server
+through the `/api/protocol/*` routes. It sat outside this page's original scan
+(`app/server/` only) and was found by a claim-surface audit that counted the
+whole repository; the scan now covers `tmesim/protocol/` too.
 
 ### `TMESIM_HOST_MEMORY_MB`
 

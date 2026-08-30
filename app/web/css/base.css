@@ -52,6 +52,82 @@ button, input, select, textarea {
   white-space: nowrap;
 }
 
+/* --- measured vs derived -------------------------------------------------
+   The product's whole claim is that you can tell which numbers came off the
+   instrument and which ones the model made up out of them. Until now that
+   distinction was carried ONLY by the colour of a provenance chip and by the
+   sentence in its `title`, i.e. by a hue and a hover — neither of which is
+   available to a keyboard reader, a colour-blind reader, or anyone glancing.
+
+   A band is the structural version: the two kinds of quantity are in two
+   separately-titled boxes, and each box states its kind in three independent
+   channels — the WORD in its heading, a distinct GLYPH, and a distinct rule
+   colour. Delete any two and it still reads. Section 4.5 of
+   docs/UI_ARCHITECTURE.md is the rule this satisfies. */
+.prov-band {
+  border-left: 3px solid var(--line-2);
+  padding: var(--sp-3) 0 var(--sp-4) var(--sp-5);
+  margin: 0 0 var(--sp-5);
+}
+.prov-band:last-child { margin-bottom: 0; }
+.prov-band > .pb-head {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--fg-2);
+  margin-bottom: var(--sp-3);
+}
+.prov-band > .pb-head::before {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+/* The band note is prose about the numbers above it, so it holds the
+   disclosure floor and is never set below the values it qualifies — the
+   values in these bands are --fs-sm, and so is this. */
+.prov-band > .pb-note {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  margin-bottom: var(--sp-4);
+}
+.prov-band.refused > .pb-note { color: var(--fg-0); }
+.prov-band.measured  { border-left-color: var(--ok); }
+.prov-band.measured  > .pb-head { color: var(--ok); }
+.prov-band.measured  > .pb-head::before { content: "\25CF"; }   /* filled disc */
+.prov-band.derived   { border-left-color: var(--info); }
+.prov-band.derived   > .pb-head { color: var(--info); }
+.prov-band.derived   > .pb-head::before { content: "\25B3"; }   /* open triangle */
+.prov-band.assumed   { border-left-color: var(--warn); }
+.prov-band.assumed   > .pb-head { color: var(--warn); }
+.prov-band.assumed   > .pb-head::before { content: "\25A0"; }   /* filled square */
+.prov-band.refused   { border-left-color: var(--crit); background: var(--crit-bg); }
+.prov-band.refused   > .pb-head { color: var(--crit); }
+.prov-band.refused   > .pb-head::before { content: "\2298"; }   /* circled slash */
+
+/* --- an absence, stated ---------------------------------------------------
+   `—` on its own is the shape of a number that is missing and the shape of a
+   number that is zero and the shape of a number the backend refused, and the
+   reader cannot tell which. The glyph stays (fmt.js's NULL_GLYPH is the house
+   placeholder); what changes is that it is never alone. `.kv-why` spans both
+   columns of a `.kv` list so the sentence has the full width, and is set at
+   the same size as the values it stands in for — never smaller. */
+.nullv { color: var(--fg-3); font-family: var(--font-mono); }
+.kv > .kv-why, .kv-why {
+  grid-column: 1 / -1;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  padding: var(--sp-1) 0 var(--sp-3);
+  border-bottom: 1px solid var(--line-0);
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.kv > .kv-why:last-child { border-bottom: 0; }
+
 .muted  { color: var(--fg-2); }
 .dim    { color: var(--fg-3); }
 .strong { color: var(--fg-0); }
@@ -91,6 +167,21 @@ hr.rule {
 [role="row"]:focus-visible {
   outline-offset: calc(-1 * var(--focus-w));
 }
+/* A ring drawn OUTSIDE an element is clipped by the nearest scroll container,
+   and both rails are scroll containers whose sections run edge to edge. These
+   are the controls that sit flush against that edge: draw their ring inside so
+   the focused thing is visibly focused rather than focused-and-half-cropped.
+   `.sect > summary` additionally sets `overflow: hidden` on itself. */
+.sect > summary:focus-visible,
+.chan input:focus-visible,
+.rail-nav button:focus-visible {
+  outline-offset: calc(-1 * var(--focus-w));
+}
+/* The channel rows are a grid of <label>s: the checkbox carries the focus, but
+   the row is what the eye is on, so the row says so too. Not a colour-only
+   signal — the ring on the checkbox is still the focus indicator; this is the
+   row telling you which row that checkbox belongs to. */
+.chan:focus-within { background: var(--bg-2); box-shadow: inset 2px 0 0 var(--focus); }
 
 /* --- scrollbars: thin, chromeless, always-visible track ------------------ */
 .scroll { overflow: auto; overscroll-behavior: contain; }

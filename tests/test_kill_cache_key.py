@@ -209,14 +209,59 @@ def test_the_definition_site_builds_the_key_exactly_once():
     assert "{digest}" in built[0]
 
 
+_SHARED_HELPERS = ("unit_transport_cache_key", "require_cached_unit_field")
+
+
+def _imported_names(tree: ast.AST) -> set:
+    """Names actually bound by an ``import`` statement in ``tree``."""
+    bound = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for a in node.names:
+                bound.add(a.asname or a.name.split(".")[0])
+    return bound
+
+
+def _called_names(tree: ast.AST) -> set:
+    """Names appearing in call position, bare or as ``mod.attr(...)``."""
+    called = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        if isinstance(fn, ast.Name):
+            called.add(fn.id)
+        elif isinstance(fn, ast.Attribute):
+            called.add(fn.attr)
+    return called
+
+
 @pytest.mark.parametrize("relpath", _CACHE_KEY_CALL_SITES[1:])
 def test_every_cache_site_imports_the_shared_key_function(relpath):
-    """The counterpart: each site must actually import the shared helper."""
+    """The counterpart: each site must actually import the shared helper.
+
+    Checked against the parse tree, not the source text. A substring search
+    over the raw file is satisfied by a COMMENT that merely names the helper,
+    so a site could delete its import, hand-roll the lookup, and keep this
+    green on the strength of the sentence explaining why it must not -- which
+    is the same "a check that has stopped checking" defect this file exists to
+    stop. Binding the name is also not enough on its own: an import nothing
+    calls is the same vacuity one level up, so the helper must appear in call
+    position too.
+    """
     src = (_repo_root() / relpath).read_text()
-    assert ("unit_transport_cache_key" in src
-            or "require_cached_unit_field" in src), (
+    tree = ast.parse(src)
+    imported = _imported_names(tree) & set(_SHARED_HELPERS)
+    called = _called_names(tree) & set(_SHARED_HELPERS)
+    assert imported, (
         f"{relpath} touches the unit-transport cache but imports neither "
-        "unit_transport_cache_key nor require_cached_unit_field")
+        "unit_transport_cache_key nor require_cached_unit_field. "
+        f"(Names bound by import here: {sorted(_imported_names(tree))[:12]}...) "
+        "Mentioning the helper in a comment or docstring does not count.")
+    assert called, (
+        f"{relpath} imports {sorted(imported)} but never calls it -- the "
+        "lookup is being hand-rolled somewhere in this file, which is how the "
+        "five sites diverged in the first place.")
 
 
 # --------------------------------------------------------------------------- #

@@ -1120,10 +1120,21 @@ async function loadTimelapse(id, run) {
     const tl = await api.getTimelapse(id);
     scrubber.set(tl, info || {});
     store.set({ timelapse: tl });
-  } catch {
-    // A run without a time-lapse is ordinary; the reason already rides in
-    // RunResult.timelapse.reason and is shown in the run's provenance panel.
+  } catch (err) {
+    // A run without a time-lapse is ordinary. A run whose time-lapse was
+    // PRUNED is not the same thing, and this catch used to erase the
+    // difference: the comment here said "the reason already rides in
+    // RunResult.timelapse.reason", which is null for a pruned run, so the
+    // server's 410 — carrying the date, the byte count and how to regenerate,
+    // the entire point of writing that record — was received and thrown away.
+    // 410 is Gone, not Not Found, and it is the one failure here worth saying
+    // out loud once.
     scrubber.clear();
+    if (err && err.status === 410) {
+      const said = (err.payload && err.payload.detail
+                    && err.payload.detail.reason) || err.message;
+      toast('warn', 'This run\u2019s time-lapse was pruned', said);
+    }
   }
 }
 

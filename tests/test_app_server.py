@@ -1924,6 +1924,45 @@ class TestPrunedPayloads:
         finally:
             mgr.shutdown()
 
+    def test_a_pruned_run_does_not_also_report_the_payload_as_available(
+            self, tmp_path):
+        """The run document and the payload endpoint must not disagree.
+
+        MEASURED on the live store 2026-08-30: 51 of 54 pruned runs reported
+        `timelapse.available: true, n_frames: 24, reason: null` NEXT TO their
+        own `pruned_payloads` record, because `result_view` copies `self.body`
+        wholesale. So `GET /api/runs/{id}` asserted, in one payload, both that
+        the file was there and that it had been deleted -- and a client that
+        trusts the document never asks for the payload and never sees the
+        correct 410. Found by a claim-surface audit, not by the prune's own
+        tests.
+        """
+        c, mgr = self._restored(tmp_path, self._doc(
+            timelapse={"available": True, "n_frames": 24, "reason": None},
+            pruned_payloads={"timelapse": {"at": "2026-08-30",
+                                           "bytes": 27476084}}))
+        try:
+            tl = c.get("/api/runs/r_00001").json()["timelapse"]
+            assert tl["available"] is False, \
+                "the document still claims a deleted payload is available"
+            assert tl["pruned"] is True
+            assert tl["reason"] and "deleted on 2026-08-30" in tl["reason"]
+            assert "27,476,084" in tl["reason"]
+            # The run DID capture 24 frames. That fact is history and stays.
+            assert tl["n_frames"] == 24
+        finally:
+            mgr.shutdown()
+
+    def test_an_unpruned_run_is_left_alone(self, tmp_path):
+        c, mgr = self._restored(tmp_path, self._doc(
+            timelapse={"available": True, "n_frames": 24, "reason": None}))
+        try:
+            tl = c.get("/api/runs/r_00001").json()["timelapse"]
+            assert tl["available"] is True
+            assert "pruned" not in tl
+        finally:
+            mgr.shutdown()
+
     def test_the_prune_record_survives_a_restart(self, tmp_path):
         """``JobManager._restore`` copies a whitelist of keys out of
         result.json. A key missing from that whitelist is silently dropped, and
@@ -2224,16 +2263,35 @@ class TestEnvVarsAreDocumented:
     """
 
     _DOC = os.path.join(_REPO, "docs", "DEPLOYMENT.md")
-    _SRC_DIR = os.path.join(_REPO, "app", "server")
+
+    #: Scanned trees. `app/server` alone was NOT enough: a claim-surface audit
+    #: on 2026-08-30 counted 12 TMESIM_* in the repository against the 10 this
+    #: found, and the difference included TMESIM_PROTOCOL_MAX_WINDOW_S, which
+    #: lives in tmesim/protocol/dosing.py and is reachable from a running
+    #: server through the /api/protocol/* routes. A knob an operator can turn
+    #: on a deployment belongs on the deployment page wherever its code sits.
+    _SRC_TREES = (("app", "server"), ("tmesim", "protocol"))
+
+    #: Variables that are NOT deployment knobs, each with the reason. An
+    #: exclusion needs a justification here rather than a silent narrowing of
+    #: the scan, so adding a variable anywhere forces a decision instead of
+    #: quietly widening the gap between the page and the code.
+    _NOT_DEPLOYMENT = {
+        "TMESIM_BAKED": "build-time only (scripts/build_studio_export.py); "
+                        "never read by a running server",
+    }
 
     def _vars_in_code(self):
         found = set()
-        for name in sorted(os.listdir(self._SRC_DIR)):
-            if not name.endswith(".py"):
-                continue
-            with open(os.path.join(self._SRC_DIR, name)) as fh:
-                found.update(re.findall(r"TMESIM_[A-Z_]+", fh.read()))
-        return found
+        for parts in self._SRC_TREES:
+            d = os.path.join(_REPO, *parts)
+            for root, _dirs, files in os.walk(d):
+                for name in sorted(files):
+                    if not name.endswith(".py"):
+                        continue
+                    with open(os.path.join(root, name)) as fh:
+                        found.update(re.findall(r"TMESIM_[A-Z_]+", fh.read()))
+        return found - set(self._NOT_DEPLOYMENT)
 
     def test_every_env_var_the_server_reads_is_on_the_page(self):
         with open(self._DOC) as fh:
@@ -2257,3 +2315,88 @@ class TestEnvVarsAreDocumented:
         assert stated == actual, (
             f"docs/DEPLOYMENT.md §4 says {m.group(1)} ({stated}); the server "
             f"reads {actual}: {sorted(self._vars_in_code())}")
+
+
+class TestPruneCitationProtection:
+    """``scripts/prune_run_payloads.py`` must not delete what a record cites.
+
+    Its whole justification is "a reader following a citation must find what
+    the citation points at". On 2026-08-30 it deleted `r_00028`, which
+    `docs/RUNBOOK_DEPLOY.md:368` cites as part of the range
+    ``r_00027`-`r_00029``. The plain id scan matched the two ENDPOINTS, found
+    "something" on that line, and looked like it had worked. The middle of a
+    range is named nowhere.
+    """
+
+    def _fn(self):
+        import importlib.util
+
+        path = os.path.join(_REPO, "scripts", "prune_run_payloads.py")
+        spec = importlib.util.spec_from_file_location("_prune", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_a_range_in_an_isolated_tree_protects_its_middle(self, tmp_path):
+        """Against a TEMP repo, not the real one.
+
+        The first version of this test asserted `r_00028 in cited_run_ids()`
+        over the live tree, and it passed with the range logic DELETED --
+        because `results/claim_surface_audit_2026-08-30.md`, the audit that
+        found the bug, names `r_00028` in prose, and `results/` is a citation
+        root. The test was green for a reason with nothing to do with ranges.
+        Caught by planting the original bug; it would otherwise have shipped as
+        a guard that guards nothing.
+        """
+        mod = self._fn()
+        docs = tmp_path / "docs"
+        docs.mkdir()
+        (docs / "note.md").write_text(
+            "three runs, cited as a range: `r_00027`-`r_00029`, all "
+            "temozolomide.\n")
+        cited = mod.cited_run_ids(repo=str(tmp_path))
+        assert cited == {"r_00027", "r_00028", "r_00029"}, (
+            "a range cites its middle, and the middle is named nowhere on the "
+            f"line; got {sorted(cited)}")
+
+    def test_the_real_citation_that_was_missed_is_protected_now(self):
+        """The live tree, kept as a second check -- weaker than the one above
+        (see its docstring) but it is the actual record that broke."""
+        mod = self._fn()
+        cited = mod.cited_run_ids()
+        assert {"r_00027", "r_00028", "r_00029"} <= cited
+
+    def test_the_middle_of_a_range_is_not_findable_by_the_plain_id_scan(self):
+        """The premise, checked rather than assumed: if RUN_ID_RE could already
+        see `r_00028` in that line, the range logic would be redundant and this
+        whole class would be theatre."""
+        mod = self._fn()
+        line = b"three runs: `r_00027`-`r_00029`, all temozolomide."
+        plain = {m.decode() for m in mod.RUN_ID_RE.findall(line)}
+        assert plain == {"r_00027", "r_00029"}
+        assert "r_00028" not in plain
+
+    @pytest.mark.parametrize("text,expect", [
+        (b"`r_00027`-`r_00029`", {"r_00027", "r_00028", "r_00029"}),
+        ("r_00040–r_00042".encode(), {"r_00040", "r_00041", "r_00042"}),
+        ("r_00050—r_00051".encode(), {"r_00050", "r_00051"}),
+        (b"r_00060 to r_00061", {"r_00060", "r_00061"}),
+        (b"r_00070--r_00071", {"r_00070", "r_00071"}),
+    ])
+    def test_every_dash_a_human_types_is_read_as_a_range(self, text, expect):
+        mod = self._fn()
+        got = set()
+        for lo, hi in mod.RANGE_RE.findall(text):
+            got.update(f"r_{n:05d}" for n in range(int(lo), int(hi) + 1))
+        assert got == expect
+
+    def test_a_descending_range_still_expands(self):
+        mod = self._fn()
+        pairs = mod.RANGE_RE.findall(b"r_00009-r_00007")
+        assert pairs, "a descending range must still be recognised"
+
+    def test_an_absurd_range_is_not_treated_as_a_citation(self):
+        """Two unrelated ids on one line must not protect the whole store.
+        MAX_RANGE is what stops a false positive costing every run's disk."""
+        mod = self._fn()
+        assert mod.MAX_RANGE < 100

@@ -408,7 +408,8 @@ def oom_warning(max_grid_cells: int, ceiling_is_default: bool) -> Optional[str]:
             f"{max_grid_cells:,}, which still permits it.\n"
             "  !!  One ordinary request can take the whole service down. Set "
             "TMESIM_MAX_GRID_CELLS to what this machine can afford (100000 "
-            "permits dx >= ~20 um on the flagship section and refuses dx = 12)."
+            "permits dx >= 20.25 um on the flagship section and refuses both "
+            "dx = 12 and dx = 20)."
         )
     if mb is None and ceiling_is_default:
         return (

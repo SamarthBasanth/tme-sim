@@ -16,6 +16,7 @@
 
 import { h, clear, fill } from '../util/dom.js';
 import { CELL_TYPES } from '../gl/viewer.js';
+import { MECH_META } from '../mechanism.js';
 import { FIELD_NAMES, fieldMeta } from '../fields.js';
 import { RAMP_NAMES, RAMP_META } from '../gl/ramps.js';
 import { METRICS, metricProvenance, reportProvenance, fieldProvenance, chip, STANDING_LIMITS, claimSetNotice, claimSetEraLabel } from './provenance.js';
@@ -40,6 +41,84 @@ function metricUnit(key) {
   const m = METRICS[key];
   if (!m) return '';
   return m.fmt === 'pct' ? '%' : m.unit;
+}
+
+/**
+ * WHAT EACH METRIC IS A FRACTION *OF*, in cells, on the same line as the
+ * percentage.
+ *
+ * Three of the four metrics are per-TUMOUR-CELL statistics and the panel used
+ * to print them as bare percentages, with the only tumour-cell count on the
+ * rail eight rows down in `Reconstruction report`. A reader who wants "11.2% of
+ * what?" had to hold one number, scroll, and multiply — and this project has
+ * already mis-stated one of its own findings by attaching a percentage to the
+ * wrong denominator (see the header of tests/test_first_session.py, item 3).
+ *
+ * Nothing here is computed: the denominator is `report.n_tumor`, read off the
+ * same RunResult, printed beside the percentage rather than derived from it.
+ * The mapping is not a guess — each line names where the tumour-cell
+ * denominator is asserted upstream:
+ *
+ *   kill_fraction            reconciles bit-exactly with the per-cell labels,
+ *                            whose own killed_fraction_of_tumor divides by
+ *                            n_tumor (tmesim/sim/mechanism.py)
+ *   therapeutic_coverage_1x  "the fraction of tumor cells whose time-averaged
+ *                            exposure exceeds mult * IC50"
+ *                            (tmesim/validation/delivery_metrics.py)
+ *   mean_tumor_auc           "the same statistics evaluated on the real tumor
+ *                            CELLS" (same file)
+ *
+ * `penetration_length_um` is deliberately absent: it is a fitted decay distance
+ * of a field, not a per-cell statistic, and inventing a denominator for it
+ * would be worse than leaving the question open.
+ */
+const METRIC_DENOMINATOR = {
+  kill_fraction: (n) => `of the ${n} tumour cells in this reconstruction`,
+  therapeutic_coverage_1x: (n) => `of the ${n} tumour cells in this reconstruction`,
+  mean_tumor_auc: (n) => `mean over the ${n} tumour cells in this reconstruction`,
+};
+
+/**
+ * An absence, stated. The em dash on its own is the shape of a missing number,
+ * a zero and a refusal all at once, and the reader cannot tell which — so the
+ * glyph never appears in this rail without the sentence that says which one it
+ * is.
+ *
+ * @param {string} reason  why there is no value. Never composed from a number.
+ */
+function why(reason) {
+  return h('div.kv-why', reason);
+}
+
+/** The null placeholder, marked as one rather than left as loose punctuation. */
+function nullValue() {
+  return h('span.nullv', NULL_GLYPH);
+}
+
+/**
+ * A titled band of quantities that share a provenance kind.
+ *
+ * The distinction between "an instrument measured this on this specimen" and
+ * "the model produced this from something an instrument measured" is the
+ * product's entire claim, and until this pass it was carried in the READ rail
+ * by a chip's HUE and a chip's `title` — a colour and a hover. This is the
+ * structural version: two boxes, each stating its kind in a word, a glyph and
+ * a rule (css/base.css `.prov-band`).
+ *
+ * @param {'measured'|'derived'|'assumed'|'refused'} kind
+ * @param {string} head  the band's own claim about itself, in words
+ * @param {string} note  one sentence naming where that claim comes from
+ */
+function provBand(kind, head, note, ...body) {
+  return h('div.prov-band.' + kind,
+    h('h4.pb-head', head),
+    // ABOVE the values, not under them. On a spot section this note is the
+    // refusal that says the two coordinates below it were synthesised, and the
+    // rule this rail already applies to a superseded claim set holds here too:
+    // a reader who is going to be shown a number that is not what it looks like
+    // has to be told before they read it, not after.
+    note ? h('div.pb-note', note) : null,
+    ...body);
 }
 
 /* ---------------------------------------------------------- caveats ------
@@ -150,37 +229,92 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   windowLevelEl, profileEl, regionEl, distanceEl, mechanismEl, onIsolateMechanism }) {
   /* ------------------------------------------------------- channels ---- */
   const chanList = h('div');
+  const chanDen = h('div.kv-why');
   const chanRows = [];
 
   function buildChannels(counts, total) {
     clear(chanList);
     chanRows.length = 0;
+    const n = Number.isFinite(total) ? total : null;
+
+    /* THE DENOMINATOR, ONCE, ABOVE THE COLUMN OF PERCENTAGES.
+     * Each row used to read "12,345  58.2%" with no statement anywhere in the
+     * panel of what the 58.2 was a percentage OF — the only cell count on this
+     * screen is in the top bar, which is a different panel and can be showing a
+     * different run. It is one sentence and it removes the arithmetic. */
+    clear(chanDen);
+    if (!counts) {
+      chanDen.appendChild(h('span',
+        'No geometry is loaded, so there are no cells to count. These five '
+        + 'channels still toggle what the viewer would draw; the counts appear '
+        + 'when a run\'s cells load over GET /api/runs/{id}/geometry.'));
+    } else if (!n) {
+      chanDen.appendChild(h('span',
+        'The loaded geometry reports zero cells, so every share below would '
+        + 'divide by zero and none is shown. The counts are the payload\'s own.'));
+    } else {
+      chanDen.appendChild(h('span',
+        'Counts are cells in the loaded geometry. Every share below is of the '
+        + 'same denominator: ', h('b', int(n)), ' cells.'));
+    }
+
     CELL_TYPES.forEach((name, i) => {
       const cb = h('input', {
         type: 'checkbox', checked: true,
         'aria-label': `channel ${name}`,
+        // Solo, from the keyboard. The gesture existed as alt-click only, which
+        // is a mouse-only path to a control that has no other route: there is
+        // no "show only this type" button anywhere in the app. Alt+Enter on the
+        // focused channel does exactly what alt-click does, and both are named
+        // on the row and in the panel hint rather than left to be discovered.
+        onkeydown: (e) => {
+          if (!e.altKey || (e.key !== 'Enter' && e.key !== ' ')) return;
+          e.preventDefault();
+          solo(i);
+        },
         onchange: (e) => { viewer.setVisible(i, e.target.checked); syncRow(i); onChange && onChange(); },
       });
       const c = counts ? counts[i] : null;
-      const row = h('label.chan', { title: `${name} — click to toggle, alt-click to solo` },
+      const share = (c !== null && c !== undefined && n) ? `${pct(c / n, 1)}%` : null;
+      const row = h('label.chan', {
+        title: c === null || c === undefined
+          ? `${name} — click, or Space, to toggle this channel. `
+            + 'Alt-click, or Alt+Enter, shows only this one. No cell counts '
+            + 'are available until a geometry is loaded.'
+          : `${name} — ${int(c)} of ${n ? int(n) : 'an unknown number of'} cells`
+            + `${share ? ' (' + share + ')' : ''}. Click, or Space, to toggle `
+            + 'this channel. Alt-click, or Alt+Enter, shows only this one.',
+      },
         cb,
         h('span.sw', { style: { background: `var(${CHAN_VARS[i]})` } }),
         h('span.nm', name),
-        h('span.ct', c === null ? NULL_GLYPH : `${int(c)}  ${total ? pct(c / total, 1) : NULL_GLYPH}%`),
+        // The unit is on the count and the share is only printed when there is
+        // a denominator to divide by — "—%" was a null glyph wearing a unit,
+        // which reads as a measured zero.
+        c === null || c === undefined
+          ? h('span.ct', nullValue())
+          : h('span.ct', int(c), h('span.unit', 'cells'),
+            share ? h('span', { style: { marginLeft: 'var(--sp-4)' } }, share) : null),
       );
       row.addEventListener('click', (e) => {
         if (!e.altKey) return;
         e.preventDefault();
-        CELL_TYPES.forEach((_, j) => {
-          viewer.setVisible(j, j === i);
-          chanRows[j].querySelector('input').checked = j === i;
-          syncRow(j);
-        });
-        onChange && onChange();
+        solo(i);
       });
       chanRows.push(row);
       chanList.appendChild(row);
     });
+  }
+
+  /** Show only channel `i`. The one gesture with no button anywhere else. */
+  function solo(i) {
+    CELL_TYPES.forEach((_, j) => {
+      viewer.setVisible(j, j === i);
+      const cb = chanRows[j].querySelector('input');
+      if (cb) cb.checked = j === i;
+      syncRow(j);
+    });
+    onChange && onChange();
   }
   function syncRow(i) {
     chanRows[i].classList.toggle('off', !viewer.visible[i]);
@@ -194,11 +328,23 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     onChange && onChange();
   }
 
-  const chanHead = h('div.frow', { style: { marginBottom: '3px' } },
-    h('button.btn.ghost.sm', { onclick: () => setAll(true) }, 'all'),
-    h('button.btn.ghost.sm', { onclick: () => setAll(false) }, 'none'),
+  const chanHead = h('div.frow', { style: { marginBottom: 'var(--sp-2)' } },
+    h('button.btn.ghost.sm', {
+      title: 'Draw every cell type.', onclick: () => setAll(true),
+    }, 'all'),
+    h('button.btn.ghost.sm', {
+      title: 'Draw no cell type. The pinned cell stays marked either way.',
+      onclick: () => setAll(false),
+    }, 'none'),
     h('span.grow'),
-    h('span.dim', { style: { fontSize: 'var(--fs-micro)' } }, 'alt-click = solo'),
+    // Both routes to the same gesture, named. It was "alt-click = solo", which
+    // is a mouse-only instruction for a control with no other route.
+    h('span.dim', {
+      style: { fontSize: 'var(--fs-disclosure)' },
+      title: 'Solo shows exactly one channel and hides the other four. On a '
+        + 'focused channel checkbox, Alt+Enter (or Alt+Space) does the same '
+        + 'thing as alt-clicking the row.',
+    }, 'solo: alt-click · alt+enter'),
   );
 
   /* ---------------------------------------------------- field overlay -- */
@@ -254,24 +400,60 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   const fieldNote = h('div.field-note');
 
   let onFieldChange = () => {};
+  // The overlay currently loaded, kept so the SELECTED CELL panel can say which
+  // field the value under the cell belongs to, and in what unit. `viewer.field`
+  // is the raw grid and carries neither.
+  let currentField = null;
 
   function setFieldInfo(name, f) {
     const meta = fieldMeta(name || '');
     if (!name || !f) {
-      fill(fieldStats,
-        h('dt', 'state'), h('dd.dim', 'no overlay'));
-      fieldNote.textContent = '';
+      // Not "state: —". Nothing is wrong and nothing is missing: no overlay is
+      // selected, which is a choice the operator has made and can unmake with
+      // the control four rows above this line.
+      fill(fieldStats, why(
+        'No field overlay is selected, so there is no grid to describe. Pick '
+        + 'one in Field, above, to load it over GET /api/runs/{id}/field/{name} '
+        + 'and read its range, its pitch and its provenance here.'));
+      clear(fieldNote);
+      currentField = null;
+      renderCell();
       return;
     }
     const fp = fieldProvenance(name);
+    // payloads.py is explicit that a grid with NO finite entry reports nan for
+    // both ends of its range, and that "the front end must treat a non-finite
+    // range as 'no data', not as 0..1". `auto(NaN)` returns the null glyph, so
+    // before this the panel printed "— vol frac" — a dash wearing a unit, which
+    // is exactly the shape of a measured zero.
+    const finiteRange = Number.isFinite(f.min) && Number.isFinite(f.max);
     fill(fieldStats,
-      h('dt', 'min'), h('dd', auto(f.min), h('span.unit', meta.unit)),
-      h('dt', 'max'), h('dd', auto(f.max), h('span.unit', meta.unit)),
-      h('dt', 'grid'), h('dd', `${f.rows} × ${f.cols}`),
-      h('dt', 'dx'), h('dd', num(f.dx, 2), h('span.unit', 'um')),
+      h('dt', 'min'), h('dd', finiteRange ? auto(f.min) : nullValue(),
+        finiteRange ? h('span.unit', meta.unit) : null),
+      h('dt', 'max'), h('dd', finiteRange ? auto(f.max) : nullValue(),
+        finiteRange ? h('span.unit', meta.unit) : null),
+      finiteRange ? null : why(
+        'This grid carries no finite value, so it has no range. The payload '
+        + 'reports nan for both ends rather than substituting 0..1 '
+        + '(app/server/payloads.py), and nothing is drawn from it.'),
+      h('dt', 'grid'), h('dd', `${int(f.rows)} × ${int(f.cols)}`,
+        h('span.unit', 'nodes')),
+      h('dt', 'pitch'), h('dd', num(f.dx, 2), h('span.unit', 'um/node')),
       h('dt', 'provenance'), h('dd', chip(fp.kind, fp.why)),
-    );
-    fieldNote.textContent = `${meta.source}. ${meta.note}`;
+      // Where min and max come from, which is not the same question as where
+      // the field comes from: they are the payload header's own finite range
+      // over the whole grid, not a statistic of the tissue under it.
+      why('min and max are the payload header\'s range over the FINITE entries '
+        + 'of the whole grid — every node, tissue or not — so they are the '
+        + 'colour-ramp bounds, not a statistic of this section.'));
+    // --fs-disclosure, not the stylesheet's --fs-micro. `meta.note` is prose,
+    // and for the oxygen field it is the sentence that says the whole overlay
+    // is a SURROGATE. A limit set in the size reserved for unit suffixes is a
+    // limit that reads as a footnote; tokens.css names the floor.
+    fill(fieldNote, h('span', { style: { fontSize: 'var(--fs-disclosure)' } },
+      `${meta.source}. ${meta.note}`));
+    currentField = { name, f, meta };
+    renderCell();
   }
 
   /* ---------------------------------------------------------- render -- */
@@ -315,17 +497,257 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   const tallyEl = h('span.cv-tally');
   const reportEl = h('dl.kv');
   const errorEl = h('div.hidden');
+
+  /* --------------------------------------------------- selected cell ----
+   * WHY A CELL IS IN THE STATE IT IS IN.
+   *
+   * Clicking a cell already did something: the stage's top-left card names its
+   * phenotype, its coordinates, the field value under the pointer and the local
+   * composition. What it never said is the thing the click is actually asked in
+   * order to find out — WHY this cell is where the run put it — and it could
+   * not say it, because that answer is three payloads wide: the mechanism label
+   * (TMSM), the band thresholds that produced the label (the same payload's
+   * JSON block), and the exposure field the bands were evaluated on (TMSF).
+   *
+   * It also could not make the distinction this product exists to make. On the
+   * stage card a cell's POSITION and its FIELD VALUE are two rows of the same
+   * `dl` in the same type at the same weight, and one of them came off a
+   * segmentation while the other is a bilinear interpolation of a solved grid.
+   * Here they are in two separately-titled bands — see provBand() — so the
+   * measured/derived split is structural rather than a chip's hue.
+   *
+   * ON A SPOT SECTION THE FIRST BAND IS NOT A MEASUREMENT AT ALL. A Visium
+   * reconstruction has no measured cells: it PLACES them from the per-spot
+   * deconvolved fractions at spot centroids with a seeded jitter
+   * (app/server/cache.py::_visium_metadata, tmesim/reconstruct/real_pipeline.py
+   * ::reconstruct_real_visium), which is why app/server/api.py refuses per-cell
+   * spatial statistics on every `visium` section outright. `report.source` is
+   * the run's own record of which reconstructor produced it, so this panel
+   * reads that rather than guessing from a section id.
+   *
+   * Nothing here is computed in the browser. Every number is read off the
+   * viewer's own payload buffers and every sentence about the mechanism is the
+   * backend's `label_descriptions` / `threshold_derivation` string. */
+  const cellEl = h('div');
+  let currentRun = null;
+
+  /** The run's own attribution block, or null. */
+  function mechAggregate() {
+    return (currentRun && currentRun.mechanism) || null;
+  }
+
+  /**
+   * Is this run's per-cell geometry MEASURED, or synthesised from spots?
+   * @returns {{spot: boolean, source: string|null}}
+   */
+  function geometryOrigin() {
+    const src = currentRun && currentRun.report && currentRun.report.source
+      ? String(currentRun.report.source).toLowerCase() : null;
+    return { spot: src === 'visium', source: src };
+  }
+
+  function cellEmpty(msg) {
+    fill(cellEl, h('div', {
+      style: {
+        fontSize: 'var(--fs-disclosure)', lineHeight: 'var(--lh-body)',
+        color: 'var(--fg-2)',
+      },
+    }, msg));
+  }
+
+  function renderCell() {
+    // The stub viewer (no WebGL2) has no picking at all, and neither does a
+    // viewer with no geometry loaded. Both are ordinary states, and each says
+    // which one it is rather than sharing one blank panel.
+    if (typeof viewer.cellInfo !== 'function') {
+      cellEmpty('The cell viewer is unavailable on this workstation (no '
+        + 'WebGL2), so no cell can be picked. Every other panel in this rail '
+        + 'still reads the run.');
+      return;
+    }
+    if (!viewer.geom) {
+      cellEmpty('No cell geometry is loaded, so there is nothing to pick. Open '
+        + 'a finished run to load its cells.');
+      return;
+    }
+    const sel = Number.isInteger(viewer.selected) ? viewer.selected : -1;
+    if (sel < 0) {
+      cellEmpty('No cell is pinned. Click a cell on the specimen and this panel '
+        + 'says what was measured on it, what the model derived from that, and '
+        + 'which mechanism band the run put it in. Clicking empty tissue, or '
+        + 'the unpin button on the specimen toolbar, clears it again.');
+      return;
+    }
+    let info = null;
+    try {
+      info = viewer.cellInfo(sel);
+    } catch {
+      info = null;   // a payload swapped out from under the selection
+    }
+    if (!info) {
+      cellEmpty('The pinned cell is no longer in the loaded geometry — the '
+        + 'stage has been given a different run\'s cells since it was pinned. '
+        + 'Nothing is shown for it, because the index would name a different '
+        + 'cell.');
+      return;
+    }
+
+    clear(cellEl);
+    const origin = geometryOrigin();
+
+    /* ---- band 1: what an instrument put here, or what did not ---------- */
+    const posRows = h('dl.kv',
+      h('dt', 'phenotype'), h('dd', info.typeName,
+        chip(origin.spot ? 'computed' : 'measured', origin.spot
+          ? 'On a spot section a cell TYPE is a deconvolution product, not a segmentation call.'
+          : 'Cell phenotype calls come from the segmented spatial assay.')),
+      h('dt', 'x'), h('dd', num(info.x, 1), h('span.unit', 'um')),
+      h('dt', 'y'), h('dd', num(info.y, 1), h('span.unit', 'um')),
+      why('Coordinates are micrometres in the reconstruction\'s own domain '
+        + 'frame, with the origin at the corner of the grid — not slide '
+        + 'coordinates and not a distance from anything.'));
+
+    if (origin.spot) {
+      cellEl.appendChild(provBand('refused',
+        'not measured — synthesised from a spot',
+        'This section is spot-level, so this cell was PLACED by deconvolution '
+        + 'at a spot centroid with a seeded jitter; nothing segmented it and '
+        + 'nothing measured where it sits. Per-cell spatial statistics are '
+        + 'refused outright on such a section — the full refusal is on the '
+        + 'section itself, in the picker on the Setup rail '
+        + '(app/server/api.py::SPOT_SPATIAL_REFUSAL). Read the coordinates '
+        + 'below as the synthesis, not as this tissue.',
+        posRows));
+    } else {
+      cellEl.appendChild(provBand('measured',
+        'measured on this specimen',
+        origin.source
+          ? `Reconstructed by the ${origin.source} route: positions and `
+            + 'phenotype calls come from the segmented spatial assay, and '
+            + 'nothing in the model chain moved them.'
+          : 'This run does not record which reconstructor produced it, so '
+            + 'whether these two rows are segmented or synthesised is not '
+            + 'established from this screen.',
+        posRows));
+    }
+
+    /* ---- band 2: what the model made of it ----------------------------- */
+    const derived = [];
+    const agg = mechAggregate();
+    const code = (info.label === null || info.label === undefined)
+      ? null : Number(info.label);
+    const meta = (code !== null && MECH_META[code]) ? MECH_META[code] : null;
+
+    if (meta) {
+      const desc = (agg && agg.label_descriptions
+        && agg.label_descriptions[meta.name]) || null;
+      derived.push(h('div', {
+        style: {
+          display: 'flex', alignItems: 'baseline', gap: 'var(--sp-4)',
+          marginBottom: 'var(--sp-2)',
+        },
+      },
+      h('span', {
+        style: {
+          width: '9px', height: '9px', flex: '0 0 auto',
+          background: `var(${meta.var})`,
+          border: '1px solid color-mix(in srgb, var(--fg-0) 30%, transparent)',
+        },
+      }),
+      h('span.mono.strong', meta.name),
+      h('span.grow'),
+      chip('computed', 'The per-cell mechanism attribution, decoded from the '
+        + 'TMSM payload for this run. It is the engine\'s own label, and the '
+        + 'whole label array reconciles bit-exactly with kill_fraction.')));
+      derived.push(h('div', {
+        style: {
+          fontSize: 'var(--fs-sm)', lineHeight: 'var(--lh-body)',
+          color: 'var(--fg-1)', marginBottom: 'var(--sp-4)',
+        },
+      }, desc || 'This run\'s attribution payload carries no description for '
+        + 'this label, so only the label\'s name is shown. Nothing is '
+        + 'substituted for the sentence.'));
+
+      // WHICH BAND, AND WHERE ITS EDGES ARE. The label is a bucket, and a
+      // bucket without its boundaries is a verdict without its test. Both the
+      // thresholds and the sentence explaining how each was arrived at are the
+      // backend's (tmesim/sim/mechanism.py::MechanismThresholds.resolve).
+      const th = (agg && agg.thresholds) || null;
+      if (th) {
+        derived.push(h('dl.kv',
+          h('dt', 'unreached below'), h('dd', num(th.unreached_ratio, 2),
+            h('span.unit', 'E/IC50')),
+          h('dt', 'underdosed below'), h('dd', num(th.adequate_ratio, 2),
+            h('span.unit', 'E/IC50')),
+          h('dt', 'resistant at or below'), h('dd', num(th.resistant_modulation, 2),
+            h('span.unit', '× kill prob.')),
+          why('The bands this run sorted every surviving tumour cell into. '
+            + 'E is the cell\'s own time-averaged exposure and IC50 is the '
+            + 'compound\'s, so E/IC50 is a ratio and carries no unit of its '
+            + 'own. These are this run\'s resolved values, not defaults.')));
+      }
+    } else if (code !== null) {
+      derived.push(why(`This cell carries mechanism code ${code}, which this `
+        + 'client has no name for. The attribution payload and this build '
+        + 'disagree about the label set; nothing is guessed.'));
+    } else {
+      derived.push(why(currentRun && currentRun.mechanism_reason
+        ? 'No mechanism label for this cell: ' + currentRun.mechanism_reason
+        : 'No per-cell mechanism attribution is loaded for this run, so there '
+          + 'is no answer to "why is this cell in this state". A '
+          + 'reconstruction-only run has none by construction; otherwise the '
+          + 'status bar carries the backend\'s reason.'));
+    }
+
+    /* the local field value — the other half of "why" */
+    if (currentField && currentField.f) {
+      const fp = fieldProvenance(currentField.name, currentRun);
+      const v = info.fieldValue;
+      const hasV = v !== null && v !== undefined && Number.isFinite(v);
+      derived.push(h('dl.kv',
+        h('dt', currentField.meta.short), h('dd',
+          hasV ? auto(v) : nullValue(),
+          hasV ? h('span.unit', currentField.meta.unit) : null,
+          chip(fp.kind, fp.why)),
+        hasV
+          ? why(`${currentField.meta.label} at this cell, bilinearly `
+            + `interpolated between the four nearest nodes of the ${int(currentField.f.rows)}`
+            + ` × ${int(currentField.f.cols)} solved grid at `
+            + `${num(currentField.f.dx, 2)} um per node. It is a value OF THE `
+            + 'FIELD read at the cell\'s position, never a per-cell '
+            + 'measurement of the cell.')
+          : why('This cell lies outside the loaded field grid, so there is no '
+            + 'value to sample. Nothing is extrapolated to the edge.')));
+    } else {
+      derived.push(why('No field overlay is loaded, so the local field value '
+        + 'this cell\'s band was decided on is not on screen. Load one in '
+        + 'Field overlay, under VIEW, to read it here.'));
+    }
+
+    cellEl.appendChild(provBand('derived',
+      'derived by the model',
+      'Everything in this band is a model output computed from the band above '
+      + 'plus the RunSpec. None of it was measured on this cell, and none of '
+      + 'it has been scored against a measured response.',
+      ...derived));
+  }
+
   const headRunEl = h('span.mono.strong', {
     style: { marginLeft: 'var(--sp-3)', flex: '0 0 auto' },
-  }, NULL_GLYPH);
+  }, 'no run');
 
   function renderRun(run) {
+    currentRun = run || null;
     findingPanel.render(run || null);
     reachPanel.render(run && run.status === 'done' ? run : null);
-    headRunEl.textContent = (run && run.run_id) || NULL_GLYPH;
+    // Two words, not a dash. This slot answers "whose numbers am I reading",
+    // and `—` is not an answer to it — it is the same glyph the rail uses for
+    // a missing measurement, in the one place where nothing is missing.
+    headRunEl.textContent = (run && run.run_id) || 'no run';
     headRunEl.title = run
       ? `Every number in this rail was produced by ${run.run_id}.`
-      : 'No run is loaded.';
+      : 'No run is loaded, so every panel in this rail is showing its empty '
+        + 'state rather than a stale result.';
 
     /* metrics */
     clear(metricsEl);
@@ -383,19 +805,50 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
        * Promoting any of them would move the violation rather than fix it.
        * Four equal numbers is the honest layout for four quantities of which
        * none is the answer. */
+      const nTumor = (run.report && Number.isFinite(run.report.n_tumor))
+        ? run.report.n_tumor : null;
+      const reasons = run.metric_reasons || {};
       for (const key of Object.keys(METRICS)) {
         const v = run.metrics[key];
         const m = METRICS[key];
         const p = metricProvenance(key, run);
         const isNull = v === null || v === undefined;
+        // THE DENOMINATOR, BESIDE THE PERCENTAGE. See METRIC_DENOMINATOR above
+        // for which count each metric divides by and where that is asserted.
+        // Printed only when the run actually carries the count — this composes
+        // no number and substitutes none.
+        const den = (!isNull && nTumor !== null && METRIC_DENOMINATOR[key])
+          ? METRIC_DENOMINATOR[key](int(nTumor)) : null;
+        // A null metric is a REFUSAL with a recorded reason, not an unknown.
+        // jobs.py writes `metric_reasons[name]` every time it declines to
+        // report one ("requires a drug; this RunSpec has drug=null", "no TUMOR
+        // cells in this reconstruction", "the exp+floor fit did not converge").
+        // The rail dropped all of it and printed a dash.
+        const reason = isNull ? (reasons[key] || null) : null;
+        const metaNote = (text) => h('span', {
+          // Not --fs-micro: these are the sentences that stop the percentage
+          // above them being attached to the wrong population, or a dash being
+          // read as a zero.
+          style: {
+            gridColumn: '1 / -1', fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--fs-disclosure)', color: 'var(--fg-1)',
+            paddingTop: 'var(--sp-2)',
+          },
+        }, text);
         metricsEl.appendChild(h('div.metric',
           h('div.m-name', m.label),
           h('div.m-val' + (isNull ? '.null' : ''),
-            fmtMetric(key, v),
+            isNull ? nullValue() : fmtMetric(key, v),
             isNull ? null : h('span.unit', metricUnit(key))),
           h('div.m-meta',
             chip(p.kind, p.why),
-            h('span.m-src', m.src)),
+            h('span.m-src', m.src),
+            den ? metaNote(den) : null,
+            isNull ? metaNote(reason
+              ? 'No value: ' + reason + '. Nothing is substituted for it.'
+              : 'No value, and this run recorded no reason for it in '
+                + 'metric_reasons. That is a backend omission; do not read the '
+                + 'dash as a zero.') : null),
         ));
         /* THE HARD STOP, ON THE NUMBER, NOT A THOUSAND WORDS BELOW IT.
          *
@@ -414,10 +867,21 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       const extra = Object.keys(run.metrics).filter((k) => !(k in METRICS));
       for (const key of extra) {
         const v = run.metrics[key];
+        // `=== null` missed `undefined`, which rendered as the null glyph in a
+        // cell not marked null. Both are "the backend did not give a value".
+        const isNull = v === null || v === undefined;
         metricsEl.appendChild(h('div.metric',
           h('div.m-name', key),
-          h('div.m-val' + (v === null ? '.null' : ''), auto(v)),
-          h('div.m-meta', chip('computed', 'Metric not described by the front-end table; shown verbatim from the backend.')),
+          h('div.m-val' + (isNull ? '.null' : ''), isNull ? nullValue() : auto(v)),
+          h('div.m-meta',
+            chip('computed', 'Metric not described by the front-end table; shown verbatim from the backend.'),
+            // No unit, because this client has no table entry for this key and
+            // guessing one would be worse than saying so.
+            h('span.m-src', isNull
+              ? (reasons[key] || 'No value, and no reason recorded for it.')
+              : 'Not described by this client\'s metric table, so it is shown '
+                + 'verbatim from the backend WITHOUT a unit — the unit is not '
+                + 'carried on the wire and is not guessed here.')),
         ));
       }
       // The delivery law, on the same screen as the numbers it produced. Every
@@ -448,12 +912,26 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     /* provenance block */
     const pv = (run && run.provenance) || null;
     if (!pv) {
-      fill(provEl, h('dt', 'state'), h('dd.dim', NULL_GLYPH));
+      // "state —". Three different situations wore that one dash: no run open,
+      // a run that has not finished, and a finished run whose record carries no
+      // provenance block at all — and only the third is a defect.
+      fill(provEl, why(!run
+        ? 'No run is loaded, so there is nothing to state the provenance of. '
+          + 'Submit the RunSpec on the left, or open a run from the history '
+          + 'dock below.'
+        : run.status !== 'done'
+          ? `Run ${run.run_id} is ${run.status}. The provenance block is written `
+            + 'when the job finishes, so there is none yet.'
+          : `Run ${run.run_id} finished without a provenance block. Every number `
+            + 'in this rail is therefore unattributed, which is a backend '
+            + 'omission rather than a result — do not read the absence as '
+            + '"nothing to declare".'));
     } else {
       // IC50 is LITERATURE, not MEASURED. It is a real measurement — on GDSC
       // cell lines, not on this section. Wearing the same green chip as the
       // cell count implies both came off this specimen; only one did.
       const ic50Measured = pv.ic50_source && /measured/i.test(pv.ic50_source);
+      const hasIc50 = pv.ic50_uM !== null && pv.ic50_uM !== undefined;
       // The delivery law leads the block. It is not a detail of the run — it is
       // the source term of the transport solve every number below is integrated
       // out of, and the only input measured to reorder the drug panel. The
@@ -467,19 +945,35 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
           h('dd', h('span.mono', dlaw.law),
             chip('assumed', dlaw.caveat)),
         ] : []),
-        h('dt', 'alpha'), h('dd', auto(pv.alpha),
+        // Dimensionless, and it never said so: a bare "0.4312" beside four
+        // quantities that all carry units reads as a fifth measured value.
+        h('dt', 'alpha'), h('dd', auto(pv.alpha), h('span.unit', 'dimensionless'),
           chip('assumed', pv.alpha_source
             ? `${pv.alpha_source}\n\nFitted once against a published penetration distance, then held fixed; it is not re-measured per section.`
             : 'Tortuosity calibration constant. Fitted once, then held fixed; it is not re-measured per section.')),
-        h('dt', 'IC50'), h('dd', pv.ic50_uM === null || pv.ic50_uM === undefined ? NULL_GLYPH : auto(pv.ic50_uM), h('span.unit', 'uM'),
+        h('dt', 'IC50'), h('dd',
+          hasIc50 ? auto(pv.ic50_uM) : nullValue(),
+          hasIc50 ? h('span.unit', 'uM') : null,
           chip(ic50Measured ? 'literature' : 'assumed',
             `${pv.ic50_source || 'no source given'}${pv.ic50_note ? '\n\n' + pv.ic50_note : ''}`
             + '\n\nMeasured in cell culture, NOT on this section. This tissue has no measured drug response.')),
+        // The backend records WHY there is no potency (jobs.py writes
+        // `ic50_reason` on a reconstruction-only run). The dash used to be the
+        // whole message, and a missing IC50 is the difference between "this run
+        // had no drug" and "we could not find one for this drug".
+        hasIc50 ? null : why(pv.ic50_reason
+          ? 'No IC50: ' + pv.ic50_reason
+          : 'No IC50 was resolved for this run and no reason was recorded. '
+            + 'Every potency-dependent number above is therefore undefined '
+            + 'rather than zero.'),
         h('dt', 'runtime'), h('dd', dur(run.runtime_s), chip('measured', 'Wall-clock time the backend spent on this job.')),
       );
       if (pv.ic50_source) {
-        provEl.appendChild(h('dt', 'IC50 src'));
-        provEl.appendChild(h('dd', { title: pv.ic50_source, style: { fontSize: 'var(--fs-micro)' } }, pv.ic50_source));
+        // Full width and wrapping, at the disclosure floor. It was a --fs-micro
+        // `dd`, and a `.kv > dd` is nowrap with an ellipsis — so the one line
+        // saying WHERE the potency came from was both the smallest text in the
+        // panel and truncated, with the rest of the sentence on a hover.
+        provEl.appendChild(why('IC50 source: ' + pv.ic50_source));
       }
       if (pv.state_mode) {
         provEl.appendChild(h('dt', 'state route'));
@@ -591,26 +1085,88 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     const rep = (run && run.report) || null;
     clear(reportEl);
     if (!rep) {
-      fill(reportEl, h('dt', 'state'), h('dd.dim', NULL_GLYPH));
+      fill(reportEl, why(!run
+        ? 'No run is loaded, so no specimen has been reconstructed. This block '
+          + 'describes the grid and the tissue a run was built on.'
+        : run.status !== 'done'
+          ? `Run ${run.run_id} is ${run.status}. The reconstruction report is `
+            + 'written when the job finishes.'
+          : `Run ${run.run_id} finished without a reconstruction report, so the `
+            + 'grid, the cell counts and the tissue means it was solved on are '
+            + 'unstated. That is a backend omission, not an empty specimen.'));
     } else {
-      const kv = (k, label, value, unitTxt) => {
+      /**
+       * @param {string} k        the report key, for reportProvenance()
+       * @param {string} label    the row label
+       * @param {*} value         the rendered value, or null when absent
+       * @param {string} unitTxt  the unit — every number in this block has one
+       * @param {string} absent   what to say INSTEAD of a dash when value is null
+       */
+      const kv = (k, label, value, unitTxt, absent) => {
         const p = reportProvenance(k, run);
         reportEl.appendChild(h('dt', label));
-        reportEl.appendChild(h('dd', value, unitTxt ? h('span.unit', unitTxt) : null, chip(p.kind, p.why)));
+        reportEl.appendChild(h('dd',
+          value === null || value === undefined ? nullValue() : value,
+          (unitTxt && value !== null && value !== undefined) ? h('span.unit', unitTxt) : null,
+          chip(p.kind, p.why)));
+        if (value === null || value === undefined) {
+          reportEl.appendChild(why(absent
+            || `${label} is not carried in this run's reconstruction report. `
+              + 'Read the dash as absent, not as zero.'));
+        }
       };
-      kv('n_cells', 'cells', int(rep.n_cells));
-      kv('n_tumor', 'tumour', int(rep.n_tumor));
-      kv('grid', 'grid', Array.isArray(rep.grid) ? `${rep.grid[0]} × ${rep.grid[1]}` : NULL_GLYPH);
-      kv('dx_um', 'dx', num(rep.dx_um, 1), 'um');
-      kv('extent_um', 'extent', Array.isArray(rep.extent_um) ? `${num(rep.extent_um[0], 0)} × ${num(rep.extent_um[1], 0)}` : NULL_GLYPH, 'um');
-      kv('mean_vascular_density', 'vasc', auto(rep.mean_vascular_density), 'frac');
-      kv('mean_ecm_density', 'ECM', auto(rep.mean_ecm_density), 'frac');
-      kv('mean_oxygen', 'O2', auto(rep.mean_oxygen), 'norm');
-      kv('tissue_coverage_fraction', 'coverage', pct(rep.tissue_coverage_fraction, 1), '%');
+      const fin = (v) => (Number.isFinite(v) ? v : null);
+      const pair = (a) => (Array.isArray(a) && a.length >= 2 ? a : null);
+
+      // Units and denominators, on every row. Before this pass the block read
+      // "vasc 0.021 frac / ECM 0.310 frac / O2 0.640 norm / coverage 74.2 %" —
+      // four different quantities sharing three unexplained abbreviations, none
+      // of which said what the fraction was OF or over what the mean was taken.
+      // real_pipeline.reconstruction_report()._mean averages over the TISSUE
+      // MASK, not the whole grid; tissue_coverage_fraction is that mask's own
+      // share of the grid nodes. Both are said here, once, under the rows.
+      kv('n_cells', 'reconstructed', fin(rep.n_cells) === null ? null : int(rep.n_cells), 'cells');
+      // The two-number problem, removed: "tumour 21,140" next to "cells 89,436"
+      // made the share an exercise for the reader. `celltype_fractions` is the
+      // backend's own division and is printed when the run carries it; nothing
+      // is divided here.
+      const tumorFrac = rep.celltype_fractions
+        && Number.isFinite(rep.celltype_fractions.TUMOR)
+        ? rep.celltype_fractions.TUMOR : null;
+      kv('n_tumor', 'of which tumour', fin(rep.n_tumor) === null ? null
+        : h('span', int(rep.n_tumor), h('span.unit', 'cells'),
+          tumorFrac === null ? null
+            : h('span', { style: { marginLeft: 'var(--sp-4)' } },
+              pct(tumorFrac, 1), h('span.unit', '%'))),
+      null,
+      'This reconstruction does not state a tumour-cell count, so every '
+      + 'per-tumour-cell metric above has no denominator on this screen.');
+      kv('grid', 'grid', pair(rep.grid) ? `${int(rep.grid[0])} × ${int(rep.grid[1])}` : null, 'nodes');
+      kv('dx_um', 'dx', fin(rep.dx_um) === null ? null : num(rep.dx_um, 1), 'um/node');
+      kv('extent_um', 'extent', pair(rep.extent_um)
+        ? `${num(rep.extent_um[0], 0)} × ${num(rep.extent_um[1], 0)}` : null, 'um');
+      kv('mean_vascular_density', 'vasc', fin(rep.mean_vascular_density) === null
+        ? null : auto(rep.mean_vascular_density), 'vol frac');
+      kv('mean_ecm_density', 'ECM', fin(rep.mean_ecm_density) === null
+        ? null : auto(rep.mean_ecm_density), 'vol frac');
+      kv('mean_oxygen', 'O2', fin(rep.mean_oxygen) === null
+        ? null : auto(rep.mean_oxygen), 'norm. pO2');
+      kv('tissue_coverage_fraction', 'coverage', fin(rep.tissue_coverage_fraction) === null
+        ? null : pct(rep.tissue_coverage_fraction, 1), '% of grid nodes');
+      reportEl.appendChild(why(
+        'vasc, ECM and O2 are means over the TISSUE MASK — the nodes coverage '
+        + 'counts — not over the whole grid. Volume fractions and normalised '
+        + 'pO2 both run 0 to 1; pO2 is normalised to the arterial supply, not '
+        + 'to a measured tension on this tissue.'));
       if (rep.oxygen) {
         reportEl.appendChild(h('dt', 'O2 mode'));
-        reportEl.appendChild(h('dd', rep.oxygen.mode || NULL_GLYPH,
+        reportEl.appendChild(h('dd', rep.oxygen.mode || nullValue(),
           chip(rep.oxygen.is_surrogate ? 'assumed' : 'computed', rep.oxygen.caveat || rep.oxygen.source || '')));
+        if (!rep.oxygen.mode) {
+          reportEl.appendChild(why('This run does not name the route that '
+            + 'produced its oxygen field, so the chip beside it is the only '
+            + 'thing standing between that field and being read as measured.'));
+        }
       }
       if (rep.cell_state) {
         const cs = rep.cell_state;
@@ -620,35 +1176,79 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
         // state to NO cell and a reader must not read that as a measured zero.
         const kind = unmeasured.length ? 'assumed' : (cs.is_measured ? 'measured' : 'assumed');
         reportEl.appendChild(h('dt', 'state mode'));
-        reportEl.appendChild(h('dd', cs.mode || NULL_GLYPH,
+        reportEl.appendChild(h('dd', cs.mode || nullValue(),
           chip(kind, cs.caveat || cs.source || '')));
+        if (!cs.mode) {
+          reportEl.appendChild(why('This run does not name the route that '
+            + 'labelled cells.state, and that label is what the resistance '
+            + 'multipliers act on. Read the dash as unstated.'));
+        }
         if (unmeasured.length) {
           reportEl.appendChild(h('dt', 'UNMEASURED'));
-          reportEl.appendChild(h('dd', {
-            title: 'These states are assigned to NO cell because this panel cannot measure them. That is NOT the same as computed and found to be zero.',
-            style: { fontSize: 'var(--fs-micro)' },
-          }, unmeasured.join(', '), chip('assumed', 'Declared UNMEASURED by the panel-coverage check.')));
+          reportEl.appendChild(h('dd', unmeasured.join(', '),
+            chip('assumed', 'Declared UNMEASURED by the panel-coverage check.')));
+          // Was a --fs-micro `dd` with the whole explanation on a hover, in a
+          // cell that is nowrap-with-ellipsis. This is the single most
+          // misreadable row in the block: a state that is assigned to NO cell
+          // looks identical to a state that was computed and came out zero.
+          reportEl.appendChild(why(
+            'These states are assigned to NO cell because this panel cannot '
+            + 'measure them. That is NOT the same as computed and found to be '
+            + 'zero, and their resistance multipliers therefore act on nothing.'));
         }
         const fr = cs.fractions_tumor;
         if (fr) {
-          reportEl.appendChild(h('dt', 'tumour V/Q/H'));
+          // "tumour V/Q/H  12.0 / 74.1 / 13.9 %" asked the reader to expand
+          // three initials and then to remember, from a row eleven above, what
+          // the percentages were of. The words are written out and the
+          // denominator is named on the same screen as the numbers.
+          reportEl.appendChild(h('dt', 'tumour bands'));
           reportEl.appendChild(h('dd',
             `${pct(fr.viable, 1)} / ${pct(fr.quiescent, 1)} / ${pct(fr.hypoxic, 1)}`,
             h('span.unit', '%'),
             chip(kind, 'Tumour-cell band occupancy under this state route. These occupancies are what the PDConfig resistance multipliers act on.')));
+          reportEl.appendChild(why(
+            'viable / quiescent / hypoxic, in that order, as percentages of '
+            + (fin(rep.n_tumor) === null
+              ? 'the tumour cells in this reconstruction (whose count this run '
+                + 'does not state)'
+              : `the ${int(rep.n_tumor)} tumour cells above`)
+            + ' — not of all cells.'));
         }
       }
       if (rep.sensitivity) {
         const s = rep.sensitivity;
         reportEl.appendChild(h('dt', 'sens mode'));
-        reportEl.appendChild(h('dd', s.mode || NULL_GLYPH,
+        reportEl.appendChild(h('dd', s.mode || nullValue(),
           chip(s.is_uniform ? 'assumed' : 'computed', s.caveat || '')));
+        if (!s.mode) {
+          reportEl.appendChild(why('This run does not name the per-cell '
+            + 'sensitivity model it applied. Every kill number above is '
+            + 'conditional on it.'));
+        }
         if (s.mgmt_applied) {
           reportEl.appendChild(h('dt', 'MGMT scalar'));
-          reportEl.appendChild(h('dd', auto(s.mgmt_scalar), chip('computed', 'Derived from the supplied per-patient MGMT log2 CPM through the calibrated logistic.')));
+          // Dimensionless, and specifically a MULTIPLIER on the per-cell
+          // sensitivity array — a bare "0.62" beside a column of unit-carrying
+          // values read as a fifth measured quantity.
+          reportEl.appendChild(h('dd',
+            Number.isFinite(s.mgmt_scalar) ? auto(s.mgmt_scalar) : nullValue(),
+            Number.isFinite(s.mgmt_scalar) ? h('span.unit', '× sensitivity') : null,
+            chip('computed', 'Derived from the supplied per-patient MGMT log2 CPM through the calibrated logistic.')));
+          if (!Number.isFinite(s.mgmt_scalar)) {
+            reportEl.appendChild(why('This run reports that an MGMT scalar was '
+              + 'applied but does not carry its value, so what it multiplied '
+              + 'the sensitivity by is unknown from this screen.'));
+          }
         }
       }
     }
+
+    // The selected cell's explanation is made of THIS run's label descriptions,
+    // THIS run's band thresholds and THIS run's reconstructor, so it is repainted
+    // whenever the run under it changes — otherwise a pinned cell keeps the
+    // previous run's reasons under the new run's picture.
+    renderCell();
   }
 
   /* ------------------------------------------------------------ root -- */
@@ -673,6 +1273,17 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       h('details.sect', { open: true, id: 'sect-finding' },
         h('summary', sectTitle('The finding'), h('span.hint', 'what this run says, in cells')),
         h('div.sect-body', findingPanel.el)),
+
+      // SECOND, because it is the one panel in this rail that answers a question
+      // about ONE cell rather than about the run, and the gesture that fills it
+      // — clicking the specimen — is the first thing anybody does. It sat
+      // nowhere at all: the stage's hover card names a cell's phenotype and
+      // coordinates and stops there, so "why is this cell alive" had no answer
+      // anywhere in the product. See the block comment on renderCell().
+      h('details.sect', { open: true, id: 'sect-cell' },
+        h('summary', sectTitle('Selected cell'),
+          h('span.hint', 'click a cell · measured vs derived')),
+        h('div.sect-body', cellEl)),
 
       h('details.sect', { open: true },
         h('summary', sectTitle('Metrics'), h('span.hint', 'provenance on every value')),
@@ -712,7 +1323,7 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     railGroup('view', 'View', 'display only — never the run',
       h('details.sect', { open: true },
         h('summary', sectTitle('Channels'), h('span.hint', 'cell type')),
-        h('div.sect-body', chanHead, chanList)),
+        h('div.sect-body', chanHead, chanList, chanDen)),
 
       h('details.sect', { open: true },
         h('summary', sectTitle('Field overlay'), h('span.hint', '/field/{name}')),
@@ -800,6 +1411,45 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   buildChannels(null, 0);
   renderRun(null);
   setFieldInfo(null, null);
+
+  /* --------------------------------------------- selection watcher ------
+   * The pin lives on the viewer (`viewer.selected`, set by the stage's own
+   * pointer handler in js/main.js) and there is no seam through which that
+   * module tells a panel about it — the read-out it does drive is an overlay
+   * it owns. Rather than add a second pin owner that could disagree with the
+   * first, this reads the one the stage already writes.
+   *
+   * The cost is two integer comparisons and three identity comparisons per
+   * animation frame, and `renderCell()` runs only when one of them changes.
+   * The labels and the field are watched alongside the index because both
+   * arrive AFTER the geometry — the mechanism payload is a separate request,
+   * and a time-lapse frame swaps the field without any panel being told — so a
+   * cell pinned before either lands would otherwise keep saying they are
+   * missing. None of the four is reassigned per frame (js/gl/viewer.js writes
+   * them only in setGeometry / setField / setLabels), so a still stage costs
+   * four comparisons and no work. Started only when the viewer can actually
+   * pick, so the stub viewer (no WebGL2) never enters the loop at all. */
+  if (typeof viewer.cellInfo === 'function'
+      && typeof requestAnimationFrame === 'function') {
+    let lastSel = -1;
+    let lastLabels = viewer.labels || null;
+    let lastGeom = viewer.geom || null;
+    let lastFieldRef = viewer.field || null;
+    const watch = () => {
+      const sel = Number.isInteger(viewer.selected) ? viewer.selected : -1;
+      const labels = viewer.labels || null;
+      const geom = viewer.geom || null;
+      const fieldRef = viewer.field || null;
+      if (sel !== lastSel || labels !== lastLabels || geom !== lastGeom
+          || fieldRef !== lastFieldRef) {
+        lastSel = sel; lastLabels = labels; lastGeom = geom;
+        lastFieldRef = fieldRef;
+        renderCell();
+      }
+      requestAnimationFrame(watch);
+    };
+    requestAnimationFrame(watch);
+  }
 
   return {
     el: root,

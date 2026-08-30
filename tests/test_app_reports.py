@@ -805,11 +805,35 @@ class TestRenderedDocument:
         assert "UNTESTED, not covered" in hero
         # The two hero disclosures whose SUBJECT was the ranking are re-pointed,
         # not dropped: the law's leverage is still quoted with the swap that
-        # measured it, and the missing potency readout is re-aimed at the terms
+        # MEASURED it, and the missing potency readout is re-aimed at the terms
         # that actually read an IC50.
-        assert "vincristine" in hero
+        #
+        # The MAGNITUDE is the evidence and is asserted. The two compound NAMES
+        # are not: this used to assert `"vincristine" in hero`, which pinned the
+        # exported document to printing `cisplatin -> vincristine` as a named
+        # top-1 ordering ~2,400 lines from its own limit 2, where the same
+        # document refuses to name which compounds traded places on the grounds
+        # that naming them prints the very ordering the page withdrew. The old
+        # hedge ("quoted as evidence, not as a comparison") does not survive the
+        # guardrail this project wrote for itself: "in any form, hedged or not,
+        # positive or negative -- including as a limit".
+        assert "swapped 4 of 45" in hero, "the measured leverage must survive"
+        # The ORDERING is gone, not every compound name. This report IS about
+        # one compound and says so throughout ("reached by cisplatin"); a
+        # blanket `"cisplatin" not in hero` was wrong and would have forced the
+        # run's own subject out of its own headline. What is prohibited is two
+        # compounds placed in an order, so that is what is asserted -- and
+        # TestNoOrderingSurvivesInTheExportedDocument enforces the general rule
+        # by proximity, across the whole document.
+        # `&rarr;` alone is not the prohibition either: the hero uses arrows for
+        # a call chain (calibrate_alpha -> calibrated_drugparams -> ...). Two
+        # over-broad assertions in a row here is the lesson -- the rule is
+        # "compound NEXT TO compound in an order", which needs proximity, and
+        # proximity is what TestNoOrderingSurvivesInTheExportedDocument does.
+        # These two pin the specific strings that were live.
+        assert "vincristine" not in hero
+        assert "rank 1)" not in hero
         assert "47x" in hero
-        assert "EVIDENCE OF THE LAW'S LEVERAGE" in hero
         assert "SET, not a winner" in hero
         assert "0.587" in hero
         assert "ex-vivo potency readout" in hero
@@ -1091,3 +1115,100 @@ class TestReportEndToEnd:
         assert "transvascular_delivery_law" in ids
         assert "ranking_is_the_output" not in ids
         assert report["not_for_clinical_use"] is True
+
+
+class TestNoOrderingSurvivesInTheExportedDocument:
+    """The report is the artefact a user EXPORTS AND FORWARDS.
+
+    A claim-surface audit on 2026-08-30 found the generated document printing
+    ``cisplatin -> vincristine`` as a named top-1 ordering, ~2,400 lines away
+    from its own limit 2, which refuses to name which compounds traded places
+    *on the grounds that naming them prints the very ordering the page has
+    withdrawn*. One document, two incompatible policies. It also printed
+    ``P(cisplatin = rank 1) = 0.931``, narrated as history and still rendering
+    a named compound at rank 1.
+
+    Both were hedged ("quoted here as EVIDENCE OF THE LAW'S LEVERAGE and not as
+    a comparison"), and the guardrail this project wrote for itself admits no
+    hedge: "in any form, hedged or not, positive or negative -- including as a
+    limit" (landing-3d/lib/copy.ts). So this test does not read intent. It
+    checks that no compound name is rendered adjacent to ranking vocabulary,
+    which is the thing a reader actually takes away.
+
+    Scoped to STRINGS THAT REACH THE PAGE, not to the module docstring: the
+    docstring names the pair as the evidence for the withdrawal, which is
+    internal engineering context a maintainer needs and no reader ever sees.
+    """
+
+    #: The engine's compound lists. Not exhaustive by design -- a name this
+    #: misses is a gap, and the fix is to add it, not to loosen the rule.
+    _COMPOUNDS = ("cisplatin", "vincristine", "vinorelbine", "doxorubicin",
+                  "temozolomide", "etoposide", "methotrexate", "carmustine",
+                  "lomustine", "irinotecan", "palbociclib", "ribociclib",
+                  "procarbazine", "bevacizumab")
+    _RANKING = ("rank 1", "rank1", "top-1", "top 1", "&rarr;", "ranked first",
+                "wins", "beats")
+
+    def _rendered_strings(self):
+        """Every string literal in report.py OUTSIDE the module docstring."""
+        import ast
+
+        path = os.path.join(_ROOT, "app", "server", "report.py")
+        with open(path) as fh:
+            src = fh.read()
+        tree = ast.parse(src)
+        doc = ast.get_docstring(tree, clean=False) or ""
+        out = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if node.value == doc:
+                    continue
+                out.append((node.lineno, node.value))
+        return out
+
+    #: How close counts as "beside", in characters.
+    #:
+    #: NOT per-string. The limits bodies are single string literals thousands
+    #: of characters long, and a whole-string test flagged `irinotecan` --
+    #: named for its OWN Cmax span at two doses, 1,660 vs 3,392 ng/mL, which is
+    #: a within-compound fact and exactly the kind of evidence the page should
+    #: carry -- because the words "top-1" appeared hundreds of characters away
+    #: in the same paragraph. That is a false positive, and a guard that cries
+    #: wolf gets loosened by the next person rather than fixed.
+    #:
+    #: 160 characters is roughly two rendered lines: close enough that a reader
+    #: takes the two away together, which is the thing being prohibited.
+    _WINDOW = 160
+
+    def test_no_compound_is_rendered_beside_ranking_vocabulary(self):
+        bad = []
+        for lineno, text in self._rendered_strings():
+            low = text.lower()
+            for c in self._COMPOUNDS:
+                start = low.find(c)
+                while start != -1:
+                    lo = max(0, start - self._WINDOW)
+                    hi = min(len(low), start + len(c) + self._WINDOW)
+                    window = low[lo:hi]
+                    for r in self._RANKING:
+                        if r in window:
+                            bad.append(
+                                f"report.py:{lineno}: {c!r} within "
+                                f"{self._WINDOW} chars of {r!r}")
+                    start = low.find(c, start + 1)
+        assert not bad, (
+            "the exported report renders a compound name next to ranking "
+            "vocabulary; cross-compound ordering was withdrawn 2026-08-21 and "
+            "the prohibition admits no hedge:\n  " + "\n  ".join(sorted(set(bad))))
+
+    def test_the_check_has_a_subject(self):
+        """A guard that scans nothing passes for free. Prove it sees the real
+        strings: report.py must contain compound names and ranking vocabulary
+        SEPARATELY, or the test above is vacuous by construction."""
+        strings = self._rendered_strings()
+        assert len(strings) > 200, f"only {len(strings)} strings scanned"
+        joined = " ".join(t.lower() for _, t in strings)
+        assert any(c in joined for c in self._COMPOUNDS), \
+            "no compound name found at all — the scan is looking in the wrong place"
+        assert any(r in joined for r in self._RANKING), \
+            "no ranking vocabulary found at all — the scan cannot fire"

@@ -514,3 +514,27 @@ All regenerated on demand; `.export-drive/` is rebuilt by
 `scripts/studio_export/drive.mjs`.
 
 Result: 8.4 GB → 6.2 GB.
+
+## One casualty of the 2026-08-30 prune, recorded rather than quietly fixed
+
+`app/runs/r_00028/timelapse.bin` **was deleted despite being cited.**
+`docs/RUNBOOK_DEPLOY.md:368` cites three runs as a range —
+``r_00027`-`r_00029`` — and the prune script's citation scan matched run ids
+one at a time. It found the two endpoints, protected them, and never saw the
+middle: `r_00028` is named nowhere on that line. The scan found *something*
+there, so it looked like it had worked.
+
+Found by the claim-surface audit of the same day, not by the script. The script
+now expands ranges (ASCII hyphen, `--`, en dash, em dash and the word "to"),
+`r_00028` is protected going forward, and
+`tests/test_app_server.py::TestPruneCitationProtection` pins it against a
+temporary tree — the first version of that test passed with the bug still in
+place, because the audit report itself names `r_00028` in prose and `results/`
+is a citation root.
+
+The file is not recoverable as itself: re-running the RunSpec produces a new
+run id, not `r_00028`. The run record is intact and the API answers `410` with
+the date, the byte count and how to regenerate, so a reader following that
+citation gets a straight answer rather than a missing file. That is the whole
+reason the prune records itself; it is not a substitute for not having deleted
+it.

@@ -1,0 +1,2912 @@
+{
+  "generated": "2026-08-30T06:32:43Z",
+  "alpha_start": 22.223477711172563,
+  "repeat_check": {
+    "pass": true,
+    "dx_um": 30.0,
+    "compound": "temozolomide",
+    "first": {
+      "kill_fraction": 0.11212833865278016,
+      "F": 0.0,
+      "E_ref": 7.802417277073126,
+      "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388"
+    },
+    "repeat": {
+      "kill_fraction": 0.11212833865278016,
+      "F": 0.0,
+      "E_ref": 7.802417277073126,
+      "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388"
+    }
+  },
+  "source_root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap",
+  "source_note": "frozen git archive of HEAD a679c0f3ebf52729761262c8ae080cb9d5030ccd, extracted read-only into a scratch dir; data_cache symlinked to the repo checkout",
+  "section": "xenium_319",
+  "shipped_dx_um": 12.0,
+  "hosted_dx_um": 30.0,
+  "hosted_max_grid_cells": 100000,
+  "dx_ladder": [
+    30.0,
+    24.0,
+    20.0,
+    16.0,
+    12.0,
+    10.0,
+    8.0,
+    7.0
+  ],
+  "compounds": [
+    "temozolomide",
+    "doxorubicin"
+  ],
+  "reach_ladder": [
+    0.01,
+    0.02,
+    0.05,
+    0.1,
+    0.2,
+    0.5,
+    1.0
+  ],
+  "headline_x": 0.1,
+  "prereg": {
+    "quantity": "reach.compute_reach(...)['headline_under_reached_fraction'], i.e. F(0.1): the fraction of VIABLE tumour cells whose steady-state concentration is below 0.1 x the perivascular reference E_ref",
+    "step_threshold": 0.01,
+    "span_threshold": 0.05,
+    "statement": "PRE-REGISTERED, BEFORE MEASUREMENT. The shipped steady-state reach verdict is declared RESOLUTION-DEPENDENT -- and the shipped default dx = 12 um declared NOT on the converged side -- if EITHER: (1) |F(0.1; dx_k+1) - F(0.1; dx_k)| > 0.01 for any single refinement step at dx <= 12 um (12->10, 10->8, 8->7), for either compound; or (2) the categorical verdict -- the dominant limiter from sim.mechanism.survival_breakdown, or the delivery-vs-dose call among exposure-limited survivors -- differs between any two rungs of the ladder, for either compound. SECONDARY, reported either way and NOT a substitute for the above: the full-ladder span max|F(0.1)| - min|F(0.1)| over 30..7 um, called LARGE above 0.05. If (1) or (2) fires the headline of results/dx_sensitivity_steady.md says FAILED and no other metric is substituted for F(0.1)."
+  },
+  "shipped_reference": {
+    "kill_fraction": 0.11221232991768859,
+    "n_grid_cells": 286200,
+    "source": "docs/DEPLOYMENT.md, stock GET /api/defaults spec run end-to-end in the container"
+  },
+  "rows": [
+    {
+      "dx_um": 30.0,
+      "compound": "temozolomide",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 2.231679916381836,
+      "grid": [
+        170,
+        271
+      ],
+      "n_grid_cells": 46070,
+      "n_tissue_voxels": 30976,
+      "n_cells": 40887,
+      "extent_um": [
+        8130.0,
+        5100.0
+      ],
+      "over_hosted_ceiling": false,
+      "max_darcy_speed_um_s": 0.276183540804258,
+      "cfl_at_production_dt": 0.09206118026808599,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 12.791697978973389,
+      "kill_fraction": 0.11212833865278016,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.001466275659824047,
+          "dose": 0.998533724340176,
+          "resistance": 0.0,
+          "chance": 0.0,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 2670,
+          "SURVIVED_UNREACHED": 31,
+          "SURVIVED_UNDERDOSED": 21111,
+          "SURVIVED_RESISTANT": 0,
+          "SURVIVED_STOCHASTIC": 0,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 21142,
+        "dominant_limiter": "dose",
+        "dominant_share": 0.998533724340176,
+        "n_delivery": 31,
+        "n_dose": 21111,
+        "n_exposure_limited": 21142,
+        "delivery_share_of_exposure_limited": 0.001466275659824047,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 10541
+      },
+      "distance_s": 0.030778884887695312,
+      "reach_s": 0.2838761806488037,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.42050520059435365
+          ]
+        },
+        "E_ref": 7.802417277073126,
+        "E_ref_units": "uM",
+        "n_viable": 2019,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.9505183406058413,
+          0.906401805652968,
+          0.893330257560452,
+          0.8693800190510609,
+          0.8424687313282773,
+          0.8130190692620733,
+          0.7817041248533327,
+          0.741660338271184,
+          0.712489724078762,
+          0.7100668803676681,
+          0.6467290096377427,
+          0.624411793152889,
+          0.6092078997858137,
+          0.5224743502113723
+        ],
+        "falloff_count": [
+          1376,
+          3368,
+          4239,
+          4552,
+          4552,
+          3809,
+          2963,
+          2216,
+          1449,
+          985,
+          608,
+          339,
+          211,
+          106,
+          60
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 529612800,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 529612800,
+        "peak_rss_mib": 505.078125,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 15.338032960891724,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 22.423537969589233
+    },
+    {
+      "dx_um": 24.0,
+      "compound": "temozolomide",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 1.6981489658355713,
+      "grid": [
+        213,
+        338
+      ],
+      "n_grid_cells": 71994,
+      "n_tissue_voxels": 48445,
+      "n_cells": 40887,
+      "extent_um": [
+        8112.0,
+        5112.0
+      ],
+      "over_hosted_ceiling": false,
+      "max_darcy_speed_um_s": 0.4991789440611093,
+      "cfl_at_production_dt": 0.20799122669212888,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 29.494177103042603,
+      "kill_fraction": 0.1120023517554174,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.001655237644833294,
+          "dose": 0.9983447623551667,
+          "resistance": 0.0,
+          "chance": 0.0,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 2667,
+          "SURVIVED_UNREACHED": 35,
+          "SURVIVED_UNDERDOSED": 21110,
+          "SURVIVED_RESISTANT": 0,
+          "SURVIVED_STOCHASTIC": 0,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 21145,
+        "dominant_limiter": "dose",
+        "dominant_share": 0.9983447623551667,
+        "n_delivery": 35,
+        "n_dose": 21110,
+        "n_exposure_limited": 21145,
+        "delivery_share_of_exposure_limited": 0.001655237644833294,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 10538
+      },
+      "distance_s": 0.08018684387207031,
+      "reach_s": 0.9328351020812988,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0004945598417408506,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0004945598417408506,
+            0.0004945598417408506,
+            0.0004945598417408506,
+            0.0004945598417408506,
+            0.0004945598417408506,
+            0.0004945598417408506,
+            0.37932739861523246
+          ]
+        },
+        "E_ref": 7.689166312922458,
+        "E_ref_units": "uM",
+        "n_viable": 2022,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.9595595565332008,
+          0.9249117484099433,
+          0.9062161137292496,
+          0.8826966831576747,
+          0.8529452060867728,
+          0.8279985128339085,
+          0.7896736300571595,
+          0.7598007277672791,
+          0.7288675340869214,
+          0.6956810328689977,
+          0.6573969592094049,
+          0.6283358180258863,
+          0.6120487646592226,
+          0.5205876693721276
+        ],
+        "falloff_count": [
+          2248,
+          5017,
+          6878,
+          7106,
+          6937,
+          6038,
+          4638,
+          3457,
+          2281,
+          1523,
+          959,
+          540,
+          316,
+          187,
+          93
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 504856576,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 504856576,
+        "peak_rss_mib": 481.46875,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 32.20534801483154,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 38.66061210632324
+    },
+    {
+      "dx_um": 20.0,
+      "compound": "temozolomide",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 2.858855724334717,
+      "grid": [
+        255,
+        406
+      ],
+      "n_grid_cells": 103530,
+      "n_tissue_voxels": 69769,
+      "n_cells": 40887,
+      "extent_um": [
+        8120.0,
+        5100.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.4590644328897103,
+      "cfl_at_production_dt": 0.22953221644485516,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 24.507833003997803,
+      "kill_fraction": 0.11204434738787161,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.0015607264472190692,
+          "dose": 0.998439273552781,
+          "resistance": 0.0,
+          "chance": 0.0,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 2668,
+          "SURVIVED_UNREACHED": 33,
+          "SURVIVED_UNDERDOSED": 21111,
+          "SURVIVED_RESISTANT": 0,
+          "SURVIVED_STOCHASTIC": 0,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 21144,
+        "dominant_limiter": "dose",
+        "dominant_share": 0.998439273552781,
+        "n_delivery": 33,
+        "n_dose": 21111,
+        "n_exposure_limited": 21144,
+        "delivery_share_of_exposure_limited": 0.0015607264472190692,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 10540
+      },
+      "distance_s": 0.03277897834777832,
+      "reach_s": 0.34418392181396484,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0004975124378109452,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0004975124378109452,
+            0.0004975124378109452,
+            0.0004975124378109452,
+            0.0004975124378109452,
+            0.0004975124378109452,
+            0.0004975124378109452,
+            0.39054726368159204
+          ]
+        },
+        "E_ref": 7.706676559594562,
+        "E_ref_units": "uM",
+        "n_viable": 2010,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.9535203107963215,
+          0.9256096199730568,
+          0.9023361278842006,
+          0.8814602199789695,
+          0.8526141274649394,
+          0.8235505330098465,
+          0.7895805017418762,
+          0.7571628441156096,
+          0.7211740695802836,
+          0.6949578565118495,
+          0.660302550655814,
+          0.6358174413705471,
+          0.5962886890006135,
+          0.5630703151280865
+        ],
+        "falloff_count": [
+          3184,
+          7363,
+          9749,
+          10316,
+          10037,
+          8636,
+          6734,
+          4900,
+          3306,
+          2203,
+          1369,
+          792,
+          453,
+          253,
+          132
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 536068096,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 536068096,
+        "peak_rss_mib": 511.234375,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 27.743651628494263,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 33.626469135284424
+    },
+    {
+      "dx_um": 16.0,
+      "compound": "temozolomide",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 1.6558611392974854,
+      "grid": [
+        318,
+        507
+      ],
+      "n_grid_cells": 161226,
+      "n_tissue_voxels": 108973,
+      "n_cells": 40887,
+      "extent_um": [
+        8112.0,
+        5088.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.49336108427190445,
+      "cfl_at_production_dt": 0.3083506776699403,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 40.69128608703613,
+      "kill_fraction": 0.11204434738787161,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.002033673855467272,
+          "dose": 0.9979663261445327,
+          "resistance": 0.0,
+          "chance": 0.0,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 2668,
+          "SURVIVED_UNREACHED": 43,
+          "SURVIVED_UNDERDOSED": 21101,
+          "SURVIVED_RESISTANT": 0,
+          "SURVIVED_STOCHASTIC": 0,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 21144,
+        "dominant_limiter": "dose",
+        "dominant_share": 0.9979663261445327,
+        "n_delivery": 43,
+        "n_dose": 21101,
+        "n_exposure_limited": 21144,
+        "delivery_share_of_exposure_limited": 0.002033673855467272,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 10530
+      },
+      "distance_s": 0.05204486846923828,
+      "reach_s": 0.6129121780395508,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0004987531172069825,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0004987531172069825,
+            0.0004987531172069825,
+            0.0004987531172069825,
+            0.0004987531172069825,
+            0.0004987531172069825,
+            0.0004987531172069825,
+            0.3820448877805486
+          ]
+        },
+        "E_ref": 7.6977517496967955,
+        "E_ref_units": "uM",
+        "n_viable": 2005,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.9540085000310439,
+          0.9265007681416185,
+          0.9075826949063418,
+          0.8807101125451927,
+          0.8547687503226555,
+          0.8222827466327284,
+          0.7906380959635512,
+          0.7596781621537864,
+          0.7241428377782664,
+          0.6936010525976456,
+          0.6654012303460891,
+          0.6317088166340351,
+          0.6013098676809006,
+          0.530143731551428
+        ],
+        "falloff_count": [
+          5044,
+          11363,
+          15316,
+          16006,
+          15796,
+          13525,
+          10450,
+          7654,
+          5172,
+          3451,
+          2131,
+          1224,
+          724,
+          388,
+          213
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 724369408,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 724369408,
+        "peak_rss_mib": 690.8125,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 43.01210427284241,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 46.0828857421875
+    },
+    {
+      "dx_um": 12.0,
+      "compound": "temozolomide",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 2.835041046142578,
+      "grid": [
+        424,
+        675
+      ],
+      "n_grid_cells": 286200,
+      "n_tissue_voxels": 193752,
+      "n_cells": 40887,
+      "extent_um": [
+        8100.0,
+        5088.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.6252283303668744,
+      "cfl_at_production_dt": 0.5210236086390619,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 64.6268789768219,
+      "kill_fraction": 0.11221232991768859,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.0021759697256386,
+          "dose": 0.9978240302743614,
+          "resistance": 0.0,
+          "chance": 0.0,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 2672,
+          "SURVIVED_UNREACHED": 46,
+          "SURVIVED_UNDERDOSED": 21094,
+          "SURVIVED_RESISTANT": 0,
+          "SURVIVED_STOCHASTIC": 0,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 21140,
+        "dominant_limiter": "dose",
+        "dominant_share": 0.9978240302743614,
+        "n_delivery": 46,
+        "n_dose": 21094,
+        "n_exposure_limited": 21140,
+        "delivery_share_of_exposure_limited": 0.0021759697256386,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 10525
+      },
+      "distance_s": 0.07982707023620605,
+      "reach_s": 1.228280782699585,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.00049800796812749,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.00049800796812749,
+            0.00049800796812749,
+            0.00049800796812749,
+            0.00049800796812749,
+            0.00049800796812749,
+            0.00049800796812749,
+            0.37300796812749004
+          ]
+        },
+        "E_ref": 7.658492201761668,
+        "E_ref_units": "uM",
+        "n_viable": 2008,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.9594545864534524,
+          0.9341405484580892,
+          0.9112343777453985,
+          0.8858380287115726,
+          0.8596533506713819,
+          0.8277638479411552,
+          0.7951114504866255,
+          0.7597839699972821,
+          0.727880596179947,
+          0.6953862587493328,
+          0.661760519921275,
+          0.6240877136069571,
+          0.5922293324425574,
+          0.5173963862603007
+        ],
+        "falloff_count": [
+          8875,
+          20404,
+          26994,
+          28777,
+          27875,
+          24013,
+          18657,
+          13600,
+          9144,
+          6148,
+          3799,
+          2186,
+          1287,
+          704,
+          365
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 1086603264,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 1086603264,
+        "peak_rss_mib": 1036.265625,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 68.77002787590027,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 72.5290322303772
+    },
+    {
+      "dx_um": 10.0,
+      "compound": "temozolomide",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 3.2193098068237305,
+      "grid": [
+        508,
+        810
+      ],
+      "n_grid_cells": 411480,
+      "n_tissue_voxels": 278968,
+      "n_cells": 40887,
+      "extent_um": [
+        8100.0,
+        5080.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.6276490384651235,
+      "cfl_at_production_dt": 0.6276490384651235,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 88.32247018814087,
+      "kill_fraction": 0.11221232991768859,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.0022232734153263957,
+          "dose": 0.9977767265846736,
+          "resistance": 0.0,
+          "chance": 0.0,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 2672,
+          "SURVIVED_UNREACHED": 47,
+          "SURVIVED_UNDERDOSED": 21093,
+          "SURVIVED_RESISTANT": 0,
+          "SURVIVED_STOCHASTIC": 0,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 21140,
+        "dominant_limiter": "dose",
+        "dominant_share": 0.9977767265846736,
+        "n_delivery": 47,
+        "n_dose": 21093,
+        "n_exposure_limited": 21140,
+        "delivery_share_of_exposure_limited": 0.0022232734153263957,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 10524
+      },
+      "distance_s": 0.25113606452941895,
+      "reach_s": 5.039588928222656,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0005002501250625312,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0005002501250625312,
+            0.0005002501250625312,
+            0.0005002501250625312,
+            0.0005002501250625312,
+            0.0005002501250625312,
+            0.0005002501250625312,
+            0.3626813406703352
+          ]
+        },
+        "E_ref": 7.653400593912158,
+        "E_ref_units": "uM",
+        "n_viable": 1999,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.9625563693741033,
+          0.9346665833411294,
+          0.9118727211114451,
+          0.8863193356012791,
+          0.8595195016959516,
+          0.8278873204363133,
+          0.7948633899615438,
+          0.7610196635360302,
+          0.7276162158577355,
+          0.6964184009688043,
+          0.6642269903981174,
+          0.6278462279748095,
+          0.5924315768269938,
+          0.5158511861073056
+        ],
+        "falloff_count": [
+          12720,
+          29403,
+          39039,
+          41336,
+          40206,
+          34406,
+          26911,
+          19515,
+          13288,
+          8836,
+          5480,
+          3103,
+          1839,
+          1039,
+          521
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 1388756992,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 1388756992,
+        "peak_rss_mib": 1324.421875,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 96.83250498771667,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 100.92933797836304
+    },
+    {
+      "dx_um": 8.0,
+      "compound": "temozolomide",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 8.028012990951538,
+      "grid": [
+        635,
+        1012
+      ],
+      "n_grid_cells": 642620,
+      "n_tissue_voxels": 435924,
+      "n_cells": 40887,
+      "extent_um": [
+        8096.0,
+        5080.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.7334008815823102,
+      "cfl_at_production_dt": 0.9167511019778878,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 205.55092215538025,
+      "kill_fraction": 0.11217033428523437,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.002270469703419895,
+          "dose": 0.9977295302965801,
+          "resistance": 0.0,
+          "chance": 0.0,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 2671,
+          "SURVIVED_UNREACHED": 48,
+          "SURVIVED_UNDERDOSED": 21093,
+          "SURVIVED_RESISTANT": 0,
+          "SURVIVED_STOCHASTIC": 0,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 21141,
+        "dominant_limiter": "dose",
+        "dominant_share": 0.9977295302965801,
+        "n_delivery": 48,
+        "n_dose": 21093,
+        "n_exposure_limited": 21141,
+        "delivery_share_of_exposure_limited": 0.002270469703419895,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 10523
+      },
+      "distance_s": 0.3172919750213623,
+      "reach_s": 6.535025119781494,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0005005005005005005,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0005005005005005005,
+            0.0005005005005005005,
+            0.0005005005005005005,
+            0.0005005005005005005,
+            0.0005005005005005005,
+            0.0005005005005005005,
+            0.35185185185185186
+          ]
+        },
+        "E_ref": 7.624288596390409,
+        "E_ref_units": "uM",
+        "n_viable": 1998,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.966124668454237,
+          0.9394797513458591,
+          0.9151011052213129,
+          0.8902575565030799,
+          0.8623592243538943,
+          0.8314535193728897,
+          0.7987363409716527,
+          0.7640320145783086,
+          0.7300013232465773,
+          0.697834028324052,
+          0.6624824869895884,
+          0.6261440085028305,
+          0.5892072250841401,
+          0.5179912854904555
+        ],
+        "falloff_count": [
+          19919,
+          45955,
+          60919,
+          64514,
+          62832,
+          53809,
+          42099,
+          30592,
+          20660,
+          13758,
+          8600,
+          4906,
+          2858,
+          1607,
+          835
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 1728266240,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 1728266240,
+        "peak_rss_mib": 1648.203125,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 220.43125224113464,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 227.24916315078735
+    },
+    {
+      "dx_um": 7.0,
+      "compound": "temozolomide",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 12.714875936508179,
+      "grid": [
+        725,
+        1157
+      ],
+      "n_grid_cells": 838825,
+      "n_tissue_voxels": 569385,
+      "n_cells": 40887,
+      "extent_um": [
+        8099.0,
+        5075.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.6668247640495739,
+      "cfl_at_production_dt": 0.9526068057851056,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 222.55405521392822,
+      "kill_fraction": 0.11221232991768859,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.002317880794701987,
+          "dose": 0.997682119205298,
+          "resistance": 0.0,
+          "chance": 0.0,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 2672,
+          "SURVIVED_UNREACHED": 49,
+          "SURVIVED_UNDERDOSED": 21091,
+          "SURVIVED_RESISTANT": 0,
+          "SURVIVED_STOCHASTIC": 0,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 21140,
+        "dominant_limiter": "dose",
+        "dominant_share": 0.997682119205298,
+        "n_delivery": 49,
+        "n_dose": 21091,
+        "n_exposure_limited": 21140,
+        "delivery_share_of_exposure_limited": 0.002317880794701987,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 10522
+      },
+      "distance_s": 0.37351512908935547,
+      "reach_s": 9.283343315124512,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.000500751126690035,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.000500751126690035,
+            0.000500751126690035,
+            0.000500751126690035,
+            0.000500751126690035,
+            0.000500751126690035,
+            0.000500751126690035,
+            0.3660490736104156
+          ]
+        },
+        "E_ref": 7.645765601430736,
+        "E_ref_units": "uM",
+        "n_viable": 1997,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.964258182947856,
+          0.937157905328637,
+          0.9125586691210132,
+          0.8872744149834577,
+          0.8598042036144211,
+          0.8283269664726568,
+          0.7961258149075652,
+          0.7603138986985196,
+          0.7269924079163892,
+          0.694550247157242,
+          0.6612371445902008,
+          0.6233216693215501,
+          0.5865193394627455,
+          0.5160276022690826
+        ],
+        "falloff_count": [
+          26057,
+          59994,
+          79489,
+          84437,
+          81981,
+          70307,
+          55043,
+          39802,
+          27118,
+          17947,
+          11233,
+          6377,
+          3737,
+          2114,
+          1069
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 1922449408,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 1922449408,
+        "peak_rss_mib": 1833.390625,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 244.92578959465027,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 253.52744507789612
+    },
+    {
+      "dx_um": 30.0,
+      "compound": "doxorubicin",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 1.1330039501190186,
+      "grid": [
+        170,
+        271
+      ],
+      "n_grid_cells": 46070,
+      "n_tissue_voxels": 30976,
+      "n_cells": 40887,
+      "extent_um": [
+        8130.0,
+        5100.0
+      ],
+      "over_hosted_ceiling": false,
+      "max_darcy_speed_um_s": 0.276183540804258,
+      "cfl_at_production_dt": 0.09206118026808599,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 8.121941804885864,
+      "kill_fraction": 0.4777843104317151,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.0024125452352231603,
+          "dose": 0.0033775633293124246,
+          "resistance": 0.9802171290711701,
+          "chance": 0.01399276236429433,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 11377,
+          "SURVIVED_UNREACHED": 30,
+          "SURVIVED_UNDERDOSED": 42,
+          "SURVIVED_RESISTANT": 12189,
+          "SURVIVED_STOCHASTIC": 174,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 12435,
+        "dominant_limiter": "resistance",
+        "dominant_share": 0.9802171290711701,
+        "n_delivery": 30,
+        "n_dose": 42,
+        "n_exposure_limited": 72,
+        "delivery_share_of_exposure_limited": 0.4166666666666667,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 7
+      },
+      "distance_s": 0.030304908752441406,
+      "reach_s": 0.24776101112365723,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.00396235760277365,
+            0.28083209509658247,
+            0.8935116394254582
+          ]
+        },
+        "E_ref": 0.21334636061348947,
+        "E_ref_units": "uM",
+        "n_viable": 2019,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.791585516064748,
+          0.6190000888886682,
+          0.5566398976227983,
+          0.49426135372557867,
+          0.42613075200135553,
+          0.376639903256949,
+          0.32596543654521437,
+          0.2756002352297784,
+          0.24288943491442097,
+          0.2207114240554015,
+          0.1721253344364291,
+          0.15440210595596557,
+          0.13806011210354185,
+          0.10613693857390857
+        ],
+        "falloff_count": [
+          1376,
+          3368,
+          4239,
+          4552,
+          4552,
+          3809,
+          2963,
+          2216,
+          1449,
+          985,
+          608,
+          339,
+          211,
+          106,
+          60
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 569131008,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 569131008,
+        "peak_rss_mib": 542.765625,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 9.533011674880981,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 13.96272587776184
+    },
+    {
+      "dx_um": 24.0,
+      "compound": "doxorubicin",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 2.6017050743103027,
+      "grid": [
+        213,
+        338
+      ],
+      "n_grid_cells": 71994,
+      "n_tissue_voxels": 48445,
+      "n_cells": 40887,
+      "extent_um": [
+        8112.0,
+        5112.0
+      ],
+      "over_hosted_ceiling": false,
+      "max_darcy_speed_um_s": 0.4991789440611093,
+      "cfl_at_production_dt": 0.20799122669212888,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 26.740234851837158,
+      "kill_fraction": 0.4773223584747186,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.0024907600835609835,
+          "dose": 0.003856660774546039,
+          "resistance": 0.9794311425357545,
+          "chance": 0.014221436606138518,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 11366,
+          "SURVIVED_UNREACHED": 31,
+          "SURVIVED_UNDERDOSED": 48,
+          "SURVIVED_RESISTANT": 12190,
+          "SURVIVED_STOCHASTIC": 177,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 12446,
+        "dominant_limiter": "resistance",
+        "dominant_share": 0.9794311425357545,
+        "n_delivery": 31,
+        "n_dose": 48,
+        "n_exposure_limited": 79,
+        "delivery_share_of_exposure_limited": 0.3924050632911392,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 9
+      },
+      "distance_s": 0.03439974784851074,
+      "reach_s": 0.3454439640045166,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0004945598417408506,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0004945598417408506,
+            0.0004945598417408506,
+            0.0004945598417408506,
+            0.0004945598417408506,
+            0.002967359050445104,
+            0.27497527200791294,
+            0.880811078140455
+          ]
+        },
+        "E_ref": 0.20993145549808245,
+        "E_ref_units": "uM",
+        "n_viable": 2022,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.7866297911323197,
+          0.6456516004888594,
+          0.5680758720022717,
+          0.4969351358793343,
+          0.43697679339475193,
+          0.3834422801309089,
+          0.32847717619650907,
+          0.28497338394208516,
+          0.24666132188570547,
+          0.21276877816676043,
+          0.17811775726877058,
+          0.1545086918965874,
+          0.14198647390102734,
+          0.10187839601336697
+        ],
+        "falloff_count": [
+          2248,
+          5017,
+          6878,
+          7106,
+          6937,
+          6038,
+          4638,
+          3457,
+          2281,
+          1523,
+          959,
+          540,
+          316,
+          187,
+          93
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 620396544,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 620396544,
+        "peak_rss_mib": 591.65625,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 29.72178363800049,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 35.7546169757843
+    },
+    {
+      "dx_um": 20.0,
+      "compound": "doxorubicin",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 1.4290211200714111,
+      "grid": [
+        255,
+        406
+      ],
+      "n_grid_cells": 103530,
+      "n_tissue_voxels": 69769,
+      "n_cells": 40887,
+      "extent_um": [
+        8120.0,
+        5100.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.4590644328897103,
+      "cfl_at_production_dt": 0.22953221644485516,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 22.439377784729004,
+      "kill_fraction": 0.4773643541071728,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.0024106066693451184,
+          "dose": 0.003696263559662515,
+          "resistance": 0.9799116110887907,
+          "chance": 0.013981518682201688,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 11367,
+          "SURVIVED_UNREACHED": 30,
+          "SURVIVED_UNDERDOSED": 46,
+          "SURVIVED_RESISTANT": 12195,
+          "SURVIVED_STOCHASTIC": 174,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 12445,
+        "dominant_limiter": "resistance",
+        "dominant_share": 0.9799116110887907,
+        "n_delivery": 30,
+        "n_dose": 46,
+        "n_exposure_limited": 76,
+        "delivery_share_of_exposure_limited": 0.39473684210526316,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 9
+      },
+      "distance_s": 0.06668210029602051,
+      "reach_s": 0.7066659927368164,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0004975124378109452,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0004975124378109452,
+            0.0004975124378109452,
+            0.0004975124378109452,
+            0.0004975124378109452,
+            0.003482587064676617,
+            0.2766169154228856,
+            0.8840796019900498
+          ]
+        },
+        "E_ref": 0.21038439785452925,
+        "E_ref_units": "uM",
+        "n_viable": 2010,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.7766494074193406,
+          0.6500436445752742,
+          0.563636258104917,
+          0.4990253113661282,
+          0.4354850147356105,
+          0.38299550045638425,
+          0.3285699646237353,
+          0.2845508001601944,
+          0.24215461045583717,
+          0.21231542508619733,
+          0.1790869324766655,
+          0.15742629964553106,
+          0.1355778599054181,
+          0.1134978248838674
+        ],
+        "falloff_count": [
+          3184,
+          7363,
+          9749,
+          10316,
+          10037,
+          8636,
+          6734,
+          4900,
+          3306,
+          2203,
+          1369,
+          792,
+          453,
+          253,
+          132
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 622739456,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 622739456,
+        "peak_rss_mib": 593.890625,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 24.641746997833252,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 29.11070203781128
+    },
+    {
+      "dx_um": 16.0,
+      "compound": "doxorubicin",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 3.5502758026123047,
+      "grid": [
+        318,
+        507
+      ],
+      "n_grid_cells": 161226,
+      "n_tissue_voxels": 108973,
+      "n_cells": 40887,
+      "extent_um": [
+        8112.0,
+        5088.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.49336108427190445,
+      "cfl_at_production_dt": 0.3083506776699403,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 50.47094178199768,
+      "kill_fraction": 0.47715437594490173,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.002329317269076305,
+          "dose": 0.004337349397590362,
+          "resistance": 0.9793574297188755,
+          "chance": 0.013975903614457831,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 11362,
+          "SURVIVED_UNREACHED": 29,
+          "SURVIVED_UNDERDOSED": 54,
+          "SURVIVED_RESISTANT": 12193,
+          "SURVIVED_STOCHASTIC": 174,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 12450,
+        "dominant_limiter": "resistance",
+        "dominant_share": 0.9793574297188755,
+        "n_delivery": 29,
+        "n_dose": 54,
+        "n_exposure_limited": 83,
+        "delivery_share_of_exposure_limited": 0.3493975903614458,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 13
+      },
+      "distance_s": 0.1192011833190918,
+      "reach_s": 1.727755069732666,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0004987531172069825,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0004987531172069825,
+            0.0004987531172069825,
+            0.0004987531172069825,
+            0.0004987531172069825,
+            0.004488778054862843,
+            0.26433915211970077,
+            0.883790523690773
+          ]
+        },
+        "E_ref": 0.20954998362689453,
+        "E_ref_units": "uM",
+        "n_viable": 2005,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.7787404207616463,
+          0.6529857699830649,
+          0.5701623350835558,
+          0.4991537111866753,
+          0.439163790844525,
+          0.38025550832907395,
+          0.331496327854281,
+          0.2856738460553068,
+          0.24415776050822807,
+          0.21164732994893853,
+          0.18191150783620852,
+          0.15521524754460828,
+          0.1375655060911824,
+          0.10558719426466591
+        ],
+        "falloff_count": [
+          5044,
+          11363,
+          15316,
+          16006,
+          15796,
+          13525,
+          10450,
+          7654,
+          5172,
+          3451,
+          2131,
+          1224,
+          724,
+          388,
+          213
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 603144192,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 603144192,
+        "peak_rss_mib": 575.203125,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 55.86817383766174,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 63.016398906707764
+    },
+    {
+      "dx_um": 12.0,
+      "compound": "doxorubicin",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 6.01300573348999,
+      "grid": [
+        424,
+        675
+      ],
+      "n_grid_cells": 286200,
+      "n_tissue_voxels": 193752,
+      "n_cells": 40887,
+      "extent_um": [
+        8100.0,
+        5088.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.6252283303668744,
+      "cfl_at_production_dt": 0.5210236086390619,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 107.8479700088501,
+      "kill_fraction": 0.47690240215017643,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.002569043031470777,
+          "dose": 0.004174694926140013,
+          "resistance": 0.9793673731535003,
+          "chance": 0.013888888888888888,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 11356,
+          "SURVIVED_UNREACHED": 32,
+          "SURVIVED_UNDERDOSED": 52,
+          "SURVIVED_RESISTANT": 12199,
+          "SURVIVED_STOCHASTIC": 173,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 12456,
+        "dominant_limiter": "resistance",
+        "dominant_share": 0.9793673731535003,
+        "n_delivery": 32,
+        "n_dose": 52,
+        "n_exposure_limited": 84,
+        "delivery_share_of_exposure_limited": 0.38095238095238093,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 11
+      },
+      "distance_s": 0.21820592880249023,
+      "reach_s": 3.6149370670318604,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.00049800796812749,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.00049800796812749,
+            0.00049800796812749,
+            0.00049800796812749,
+            0.00049800796812749,
+            0.00249003984063745,
+            0.26294820717131473,
+            0.875996015936255
+          ]
+        },
+        "E_ref": 0.20696745908680705,
+        "E_ref_units": "uM",
+        "n_viable": 2008,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.7897681311483142,
+          0.6645703795348602,
+          0.576596397609754,
+          0.5057778841765318,
+          0.4444652296092316,
+          0.3870599361533101,
+          0.33485476705817324,
+          0.28750673404798094,
+          0.2480521321727768,
+          0.2127514014464294,
+          0.18230757650726423,
+          0.15671335317472498,
+          0.13626606262059227,
+          0.10532566844495167
+        ],
+        "falloff_count": [
+          8875,
+          20404,
+          26994,
+          28777,
+          27875,
+          24013,
+          18657,
+          13600,
+          9144,
+          6148,
+          3799,
+          2186,
+          1287,
+          704,
+          365
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 874954752,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 874954752,
+        "peak_rss_mib": 834.421875,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 117.69411873817444,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 126.1069610118866
+    },
+    {
+      "dx_um": 10.0,
+      "compound": "doxorubicin",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 9.51235580444336,
+      "grid": [
+        508,
+        810
+      ],
+      "n_grid_cells": 411480,
+      "n_tissue_voxels": 278968,
+      "n_cells": 40887,
+      "extent_um": [
+        8100.0,
+        5080.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.6276490384651235,
+      "cfl_at_production_dt": 0.6276490384651235,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 142.2177541255951,
+      "kill_fraction": 0.47694439778263065,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.002569249297470895,
+          "dose": 0.004496186270574067,
+          "resistance": 0.9788036932958651,
+          "chance": 0.014130871136089924,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 11357,
+          "SURVIVED_UNREACHED": 32,
+          "SURVIVED_UNDERDOSED": 56,
+          "SURVIVED_RESISTANT": 12191,
+          "SURVIVED_STOCHASTIC": 176,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 12455,
+        "dominant_limiter": "resistance",
+        "dominant_share": 0.9788036932958651,
+        "n_delivery": 32,
+        "n_dose": 56,
+        "n_exposure_limited": 88,
+        "delivery_share_of_exposure_limited": 0.36363636363636365,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 13
+      },
+      "distance_s": 0.25870227813720703,
+      "reach_s": 5.045619964599609,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0005002501250625312,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0005002501250625312,
+            0.0005002501250625312,
+            0.0005002501250625312,
+            0.0005002501250625312,
+            0.0030015007503751876,
+            0.25962981490745374,
+            0.8749374687343672
+          ]
+        },
+        "E_ref": 0.20648437291006674,
+        "E_ref_units": "uM",
+        "n_viable": 1999,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.7955447023412259,
+          0.6663960445738586,
+          0.5773772247581618,
+          0.5067722934758445,
+          0.44502444428027776,
+          0.38770773417712434,
+          0.335091174939178,
+          0.2879470601612766,
+          0.24778285316826767,
+          0.21307270125530162,
+          0.18298235255785433,
+          0.15617641375875543,
+          0.13484893918005036,
+          0.10317625781971251
+        ],
+        "falloff_count": [
+          12720,
+          29403,
+          39039,
+          41336,
+          40206,
+          34406,
+          26911,
+          19515,
+          13288,
+          8836,
+          5480,
+          3103,
+          1839,
+          1039,
+          521
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 1231355904,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 1231355904,
+        "peak_rss_mib": 1174.3125,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 157.03443217277527,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 166.6321759223938
+    },
+    {
+      "dx_um": 8.0,
+      "compound": "doxorubicin",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 14.0090172290802,
+      "grid": [
+        635,
+        1012
+      ],
+      "n_grid_cells": 642620,
+      "n_tissue_voxels": 435924,
+      "n_cells": 40887,
+      "extent_um": [
+        8096.0,
+        5080.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.7334008815823102,
+      "cfl_at_production_dt": 0.9167511019778878,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 215.62744665145874,
+      "kill_fraction": 0.47652444145808837,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.002647412755716005,
+          "dose": 0.004412354592860008,
+          "resistance": 0.978820697954272,
+          "chance": 0.014119534697152025,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 11347,
+          "SURVIVED_UNREACHED": 33,
+          "SURVIVED_UNDERDOSED": 55,
+          "SURVIVED_RESISTANT": 12201,
+          "SURVIVED_STOCHASTIC": 176,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 12465,
+        "dominant_limiter": "resistance",
+        "dominant_share": 0.978820697954272,
+        "n_delivery": 33,
+        "n_dose": 55,
+        "n_exposure_limited": 88,
+        "delivery_share_of_exposure_limited": 0.375,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 12
+      },
+      "distance_s": 0.459561824798584,
+      "reach_s": 12.518583059310913,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.0005005005005005005,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.0005005005005005005,
+            0.0005005005005005005,
+            0.0005005005005005005,
+            0.0005005005005005005,
+            0.003003003003003003,
+            0.25375375375375375,
+            0.8708708708708709
+          ]
+        },
+        "E_ref": 0.20529670446634907,
+        "E_ref_units": "uM",
+        "n_viable": 1998,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.7995569941701524,
+          0.671443204697688,
+          0.5811440667357761,
+          0.5101021781265923,
+          0.44723311160153933,
+          0.3901338603576375,
+          0.3374314811156142,
+          0.2898133389019235,
+          0.24933010122842336,
+          0.21442573581132915,
+          0.1834017844423024,
+          0.15648433607614537,
+          0.1363752720959255,
+          0.10489470313261534
+        ],
+        "falloff_count": [
+          19919,
+          45955,
+          60919,
+          64514,
+          62832,
+          53809,
+          42099,
+          30592,
+          20660,
+          13758,
+          8600,
+          4906,
+          2858,
+          1607,
+          835
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 1725169664,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 1725169664,
+        "peak_rss_mib": 1645.25,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 242.61460876464844,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 253.86165404319763
+    },
+    {
+      "dx_um": 7.0,
+      "compound": "doxorubicin",
+      "section": "xenium_319",
+      "alpha": 22.223477711172563,
+      "build_s": 18.929384231567383,
+      "grid": [
+        725,
+        1157
+      ],
+      "n_grid_cells": 838825,
+      "n_tissue_voxels": 569385,
+      "n_cells": 40887,
+      "extent_um": [
+        8099.0,
+        5075.0
+      ],
+      "over_hosted_ceiling": true,
+      "max_darcy_speed_um_s": 0.6668247640495739,
+      "cfl_at_production_dt": 0.9526068057851056,
+      "pde": {
+        "dt": 10.0,
+        "total_time": 21600.0,
+        "convection": true,
+        "save_every": 500,
+        "transvascular_exchange": false,
+        "seed": 0
+      },
+      "sim_s": 259.6591651439667,
+      "kill_fraction": 0.4766084327229968,
+      "mechanism": {
+        "survival_breakdown": {
+          "delivery": 0.0027280751023028163,
+          "dose": 0.004493300168498756,
+          "resistance": 0.9787370617026399,
+          "chance": 0.014041563026558613,
+          "unattributed": 0.0
+        },
+        "counts": {
+          "KILLED": 11349,
+          "SURVIVED_UNREACHED": 34,
+          "SURVIVED_UNDERDOSED": 56,
+          "SURVIVED_RESISTANT": 12198,
+          "SURVIVED_STOCHASTIC": 175,
+          "UNATTRIBUTED": 0,
+          "ALREADY_DEAD": 0,
+          "NOT_TUMOR": 17075
+        },
+        "n_tumor": 23812,
+        "n_survived": 12463,
+        "dominant_limiter": "resistance",
+        "dominant_share": 0.9787370617026399,
+        "n_delivery": 34,
+        "n_dose": 56,
+        "n_exposure_limited": 90,
+        "delivery_share_of_exposure_limited": 0.37777777777777777,
+        "delivery_dose_verdict": "dose",
+        "cells_to_flip": 12
+      },
+      "distance_s": 0.4555060863494873,
+      "reach_s": 10.831471920013428,
+      "reach": {
+        "null_reason": null,
+        "window_mode": "steady_state",
+        "window_s": null,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.000500751126690035,
+        "curve": {
+          "x": [
+            0.01,
+            0.02,
+            0.05,
+            0.1,
+            0.2,
+            0.5,
+            1.0
+          ],
+          "under_reached_fraction": [
+            0.000500751126690035,
+            0.000500751126690035,
+            0.000500751126690035,
+            0.000500751126690035,
+            0.0030045067601402104,
+            0.2543815723585378,
+            0.8763144717075614
+          ]
+        },
+        "E_ref": 0.20572847197154678,
+        "E_ref_units": "uM",
+        "n_viable": 1997,
+        "n_tumor": 23812,
+        "penetration_reused": false,
+        "penetration_fit_error": null,
+        "falloff_distance_um": [
+          5.0,
+          15.0,
+          25.0,
+          35.0,
+          45.0,
+          55.0,
+          65.0,
+          75.0,
+          85.0,
+          95.0,
+          105.0,
+          115.0,
+          125.0,
+          135.0,
+          145.0
+        ],
+        "falloff_normalised": [
+          1.0,
+          0.7986920693551345,
+          0.6704870980359097,
+          0.5796815488531505,
+          0.5084207043900705,
+          0.44616766693407034,
+          0.38856510432426056,
+          0.3366275742594251,
+          0.2882756338578755,
+          0.24820757666946078,
+          0.21332301757640298,
+          0.1830351385824581,
+          0.15557637923857728,
+          0.1355526867492484,
+          0.10444347838446676
+        ],
+        "falloff_count": [
+          26057,
+          59994,
+          79489,
+          84437,
+          81981,
+          70307,
+          55043,
+          39802,
+          27118,
+          17947,
+          11233,
+          6377,
+          3737,
+          2114,
+          1069
+        ],
+        "falloff_bin_um": 10.0
+      },
+      "memory": {
+        "ru_maxrss_raw": 2147237888,
+        "ru_maxrss_unit": "bytes",
+        "peak_rss_bytes": 2147237888,
+        "peak_rss_mib": 2047.765625,
+        "platform": "macOS-15.7.3-arm64-arm-64bit"
+      },
+      "source": {
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388",
+        "n_files": 151,
+        "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap"
+      },
+      "wall_s": 289.875527381897,
+      "alpha_end": 22.223477711172563,
+      "subprocess_wall_s": 302.5966839790344
+    }
+  ],
+  "dropped": [],
+  "checks": {
+    "A_mode_is_steady": {
+      "pass": true,
+      "window_modes_seen": [
+        "steady_state"
+      ],
+      "null_rungs": [],
+      "catches": "a dropped drug= argument, which would silently make every rung a finite-window map of a different field"
+    },
+    "B_rungs_distinct": {
+      "pass": true,
+      "duplicate_pairs": [],
+      "n_fingerprints": 16,
+      "n_rows": 16,
+      "catches": "a sweep that reused one reconstruction, which would report perfect convergence with every rung green"
+    },
+    "C_shipped_reproduced": {
+      "pass": true,
+      "kill_fraction": 0.11221232991768859,
+      "kill_fraction_published": 0.11221232991768859,
+      "n_grid_cells": 286200,
+      "n_grid_cells_published": 286200,
+      "catches": "a harness that is not the shipped pipeline, whose convergence statement would be about something else"
+    },
+    "E_one_source_tree": {
+      "pass": true,
+      "sha256_seen": [
+        "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388"
+      ],
+      "root": "/private/tmp/claude-501/-Users-samarthbasanth/05d22d67-3289-4ed1-ba30-fe372c1e0d5e/scratchpad/snap",
+      "n_files": 151,
+      "catches": "a concurrent edit to the physics or compile chain landing mid-sweep -- the defect that destroyed the first attempt at this sweep and produced a 2.8x kill_fraction jump that would have read as a mesh effect"
+    },
+    "F_repeat_bit_identical": {
+      "pass": true,
+      "dx_um": 30.0,
+      "compound": "temozolomide",
+      "first": {
+        "kill_fraction": 0.11212833865278016,
+        "F": 0.0,
+        "E_ref": 7.802417277073126,
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388"
+      },
+      "repeat": {
+        "kill_fraction": 0.11212833865278016,
+        "F": 0.0,
+        "E_ref": 7.802417277073126,
+        "sha256": "b13ef1960e4c259863a575027b0ebb34fa375bc019cb72c4e6c273d02af7f388"
+      },
+      "catches": "any drift -- source, cache or otherwise -- between the first rung and the last. A rung re-run AFTER the whole ladder must return bit-identical numbers to the one run BEFORE it."
+    },
+    "all_pass": true
+  },
+  "analysis": {
+    "per_compound": {
+      "temozolomide": {
+        "dx_um": [
+          30.0,
+          24.0,
+          20.0,
+          16.0,
+          12.0,
+          10.0,
+          8.0,
+          7.0
+        ],
+        "F_headline": [
+          0.0,
+          0.0004945598417408506,
+          0.0004975124378109452,
+          0.0004987531172069825,
+          0.00049800796812749,
+          0.0005002501250625312,
+          0.0005005005005005005,
+          0.000500751126690035
+        ],
+        "steps": [
+          {
+            "from_dx": 30.0,
+            "to_dx": 24.0,
+            "dF": 0.0004945598417408506,
+            "abs_dF": 0.0004945598417408506,
+            "below_shipped": false,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 24.0,
+            "to_dx": 20.0,
+            "dF": 2.9525960700946177e-06,
+            "abs_dF": 2.9525960700946177e-06,
+            "below_shipped": false,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 20.0,
+            "to_dx": 16.0,
+            "dF": 1.240679396037267e-06,
+            "abs_dF": 1.240679396037267e-06,
+            "below_shipped": false,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 16.0,
+            "to_dx": 12.0,
+            "dF": -7.451490794924782e-07,
+            "abs_dF": 7.451490794924782e-07,
+            "below_shipped": false,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 12.0,
+            "to_dx": 10.0,
+            "dF": 2.2421569350411985e-06,
+            "abs_dF": 2.2421569350411985e-06,
+            "below_shipped": true,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 10.0,
+            "to_dx": 8.0,
+            "dF": 2.503754379692665e-07,
+            "abs_dF": 2.503754379692665e-07,
+            "below_shipped": true,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 8.0,
+            "to_dx": 7.0,
+            "dF": 2.50626189534503e-07,
+            "abs_dF": 2.50626189534503e-07,
+            "below_shipped": true,
+            "exceeds_threshold": false
+          }
+        ],
+        "fine_steps_exceeding": [],
+        "max_abs_step_below_shipped": 2.2421569350411985e-06,
+        "max_abs_step_all": 0.0004945598417408506,
+        "span": 0.000500751126690035,
+        "span_exceeds_secondary": false,
+        "dominant_limiters": [
+          "dose"
+        ],
+        "limiter_changes": false,
+        "delivery_dose_verdicts": [
+          "dose"
+        ],
+        "delivery_dose_changes": false,
+        "F_at_shipped": 0.00049800796812749,
+        "F_at_hosted": 0.0,
+        "F_at_finest": 0.000500751126690035
+      },
+      "doxorubicin": {
+        "dx_um": [
+          30.0,
+          24.0,
+          20.0,
+          16.0,
+          12.0,
+          10.0,
+          8.0,
+          7.0
+        ],
+        "F_headline": [
+          0.0,
+          0.0004945598417408506,
+          0.0004975124378109452,
+          0.0004987531172069825,
+          0.00049800796812749,
+          0.0005002501250625312,
+          0.0005005005005005005,
+          0.000500751126690035
+        ],
+        "steps": [
+          {
+            "from_dx": 30.0,
+            "to_dx": 24.0,
+            "dF": 0.0004945598417408506,
+            "abs_dF": 0.0004945598417408506,
+            "below_shipped": false,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 24.0,
+            "to_dx": 20.0,
+            "dF": 2.9525960700946177e-06,
+            "abs_dF": 2.9525960700946177e-06,
+            "below_shipped": false,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 20.0,
+            "to_dx": 16.0,
+            "dF": 1.240679396037267e-06,
+            "abs_dF": 1.240679396037267e-06,
+            "below_shipped": false,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 16.0,
+            "to_dx": 12.0,
+            "dF": -7.451490794924782e-07,
+            "abs_dF": 7.451490794924782e-07,
+            "below_shipped": false,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 12.0,
+            "to_dx": 10.0,
+            "dF": 2.2421569350411985e-06,
+            "abs_dF": 2.2421569350411985e-06,
+            "below_shipped": true,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 10.0,
+            "to_dx": 8.0,
+            "dF": 2.503754379692665e-07,
+            "abs_dF": 2.503754379692665e-07,
+            "below_shipped": true,
+            "exceeds_threshold": false
+          },
+          {
+            "from_dx": 8.0,
+            "to_dx": 7.0,
+            "dF": 2.50626189534503e-07,
+            "abs_dF": 2.50626189534503e-07,
+            "below_shipped": true,
+            "exceeds_threshold": false
+          }
+        ],
+        "fine_steps_exceeding": [],
+        "max_abs_step_below_shipped": 2.2421569350411985e-06,
+        "max_abs_step_all": 0.0004945598417408506,
+        "span": 0.000500751126690035,
+        "span_exceeds_secondary": false,
+        "dominant_limiters": [
+          "resistance"
+        ],
+        "limiter_changes": false,
+        "delivery_dose_verdicts": [
+          "dose"
+        ],
+        "delivery_dose_changes": false,
+        "F_at_shipped": 0.00049800796812749,
+        "F_at_hosted": 0.0,
+        "F_at_finest": 0.000500751126690035
+      }
+    },
+    "criterion_1_fine_step_exceeds": false,
+    "criterion_2_categorical_verdict_changes": false,
+    "resolution_dependent": false,
+    "prereg_result": "PASSED",
+    "secondary_span_large": false
+  },
+  "alpha_end": 22.223477711172563
+}

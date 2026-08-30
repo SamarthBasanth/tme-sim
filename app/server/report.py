@@ -2639,10 +2639,14 @@ def render_html(doc: Dict) -> str:
          term <span class="mono">{_esc(law.get('alternative_law'))}</span>
          re-weights delivery by permeability, which spans <b>47x</b> across this
          engine's GBM compound list — enough that on the panel this document used
-         to rank it moved the top-1 pick outright, <b>cisplatin &rarr;
-         vincristine</b>, swapping 4 of 45 pairs. That swap is quoted here as
-         EVIDENCE OF THE LAW'S LEVERAGE and not as a comparison: it is how large
-         a re-shaping of delivery the choice of source term is worth. A wrong
+         to rank it <b>moved the top-1 pick outright and swapped 4 of 45
+         pairs</b>. WHICH compounds traded places is not printed here: this
+         document's own limit 2 refuses to name them, on the grounds that naming
+         them prints the very ordering the page has withdrawn &mdash; and a hedge
+         (&ldquo;quoted as evidence, not as a comparison&rdquo;) does not change
+         what a reader takes from two compound names and an arrow. The magnitude
+         is the evidence, and the magnitude is kept: it is how large a re-shaping
+         of delivery the choice of source term is worth. A wrong
          effective diffusivity does the same thing to the SHAPE of the gradient
          rather than to its level, which is exactly what the two invariances
          above cannot divide out (<a href="{law_ref}">see the delivery-law limit
@@ -2661,8 +2665,10 @@ def render_html(doc: Dict) -> str:
          sentence used to appear here as a caveat on a RANKING, in
          results/ranking_robustness.md §8's words: <b>"the reportable output of
          this pipeline for the top of the panel is a SET, not a winner"</b>,
-         with P(cisplatin = rank 1) at 0.931 under that report's declared priors
-         falling to <b>0.587</b> in its stress scenario — and the measurement it
+         with the top compound's probability of holding rank 1 falling from
+         <b>0.931</b> under that report's declared priors to <b>0.587</b> in its
+         stress scenario &mdash; that compound is not named, because narrating a
+         withdrawn ranking as history still renders a named compound at rank 1 — and the measurement it
          named as the fix was a patient-specific potency readout. The ranking is
          gone; the missing measurement is not, and it lands on exactly the terms
          named above. A per-compound IC50 is still a monolayer cell-line number

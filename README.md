@@ -506,14 +506,26 @@ classifier ([`heldout_patient.md`](results/heldout_patient.md) §2).
 
 ## The honest summary
 
-Vivum is a research instrument whose defensible output is the **relative
-comparison of compounds on one tissue section**, with essentially **no external
-validation of the transport physics itself**. The narrow claim has been attacked
-from several directions and held — with one measured exception that a user must
-know before running anything: **the diffusivity law reproduces about a quarter
-of the measured compound-to-compound spread, so a ranking over similar-mass
-analogues is weak evidence rather than a measurement** (see the box at the top of
-this page). The broad claim — that the transport physics is validated, or that
+Vivum is a research instrument whose defensible output is a **ratio inside one
+map, between regions of one tissue section, for one compound**, with essentially
+**no external validation of the transport physics itself**.
+
+This paragraph used to open "the relative comparison of **compounds** on one
+tissue section" — the exact sentence the box at the top of this page records as
+**withdrawn on 2026-08-21**. It sat 480 lines below its own retraction, under a
+heading reading "The honest summary", for nine days. Nobody wrote a wrong
+sentence twice; the retraction was added at the top and this copy was missed,
+which is this project's named defect and it survived in the one section a
+sceptical reader goes to first.
+
+The narrow claim has been attacked from several directions and held — with one
+measured exception a user must know before running anything: **the diffusivity
+law reproduces about a quarter of the measured compound-to-compound spread**
+(see the box at the top of this page). That is a limit on the law, and it is
+recorded as a limit. It is deliberately **not** written as "so a ranking over
+similar-mass analogues is weak evidence", which is how it used to read: grading
+an ordering as weak evidence still offers it as evidence, and the prohibition
+admits no grade. The broad claim — that the transport physics is validated, or that
 any absolute number it produces is trustworthy — has been tested and is false.
 
 The sharpest available statement of that gap is

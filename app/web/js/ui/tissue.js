@@ -107,6 +107,19 @@ function remedyFor(message) {
 }
 
 /**
+ * Is this record spot transcriptomics?
+ *
+ * The one platform test in this file, because it changes what a count IS
+ * (spots, not cells) and it is what app/server/api.py keys its per-cell
+ * refusal on — `_SPOT_SOURCES = ("visium",)`, matched against `platform` for an
+ * ingested record and `source` for a built-in one. Same key, same word, so the
+ * panel and the refusal cannot disagree about which sections are affected.
+ */
+function isSpot(rec) {
+  return String((rec && (rec.platform || rec.source)) || '').toLowerCase() === 'visium';
+}
+
+/**
  * The one sentence that distinguishes a section ingested here from a built-in
  * one. Exported because js/ui/spec.js says it again at the point of SELECTION —
  * one string, one claim, three places it cannot be missed.
@@ -310,7 +323,20 @@ export function createTissuePanel({ onRegistered }) {
         + 'in its .tar.gz. gene_panel.json is optional and only carries provenance.'),
       h('li', 'Visium: a Space Ranger output — spatial/ with tissue_positions '
         + 'and scalefactors_json.json, beside filtered_feature_bc_matrix/. The '
-        + 'two must be siblings.'),
+        + 'two must be siblings. ',
+      // Said BEFORE the path is typed, not discovered after the ingest. A
+      // Visium directory registers and runs; what it cannot do is carry a
+      // per-cell number, and this is the whole class of refusal a first-time
+      // operator is most likely to walk into. app/server/api.py keys it on the
+      // platform alone (_SPOT_SOURCES), so it lands on every Visium section
+      // regardless of panel content, and its full text appears against the
+      // section in the list below once it is registered.
+      h('b', 'A Visium ingest is SPOT-level: '),
+      'a row is a ~55 um spot pooling several cells, so it has no measured '
+        + 'cells at all — a run PLACES them by deconvolution — and per-cell '
+        + 'spatial statistics, the perivascular reference and the delivery '
+        + 'spread are all REFUSED on it. It still ingests, and the counts it '
+        + 'reports are spots.'),
       h('li', 'MEX: matrix.mtx + features.tsv + barcodes.tsv (gzipped or not) '
         + 'beside any CSV/TSV with a barcode column and an x/y pair. Ingestable '
         + 'and inspectable, but NOT runnable: the reconstruction pipeline has no '
@@ -440,20 +466,172 @@ export function createTissuePanel({ onRegistered }) {
 
   function detectionRow(det) {
     const conf = det.confidence ?? det.detect_confidence;
+    const hasConf = Number.isFinite(conf);
     const cells = [];
     if (det.platform) cells.push(['format detected', det.platform]);
     if (det.layout) cells.push(['layout', det.layout]);
-    return h('div.frow', {
+    return h('div', {
+      style: { borderBottom: '1px solid var(--line-1)' },
+    },
+    h('div.frow', {
       style: {
-        gap: 'var(--sp-4)', padding: 'var(--sp-3) var(--sp-5)',
-        borderBottom: '1px solid var(--line-1)', fontSize: 'var(--fs-xs)',
-        flexWrap: 'wrap',
+        gap: 'var(--sp-4)', padding: 'var(--sp-3) var(--sp-5) var(--sp-1)',
+        fontSize: 'var(--fs-xs)', flexWrap: 'wrap',
       },
     },
     cells.flatMap(([k, v]) => [h('span.lbl', k), h('span.mono.strong', String(v))]),
-    conf === undefined || conf === null ? null : h('span.frow', {
+    !hasConf ? null : h('span.frow', {
       style: { gap: 'var(--sp-4)' }, title: FORMAT_CONF_TITLE,
-    }, h('span.lbl', 'file-format match'), h('span.mono.strong', num(conf, 2))));
+    }, h('span.lbl', 'file-format match'),
+    // OUT OF WHAT. It was a bare "0.85" whose ceiling existed only in a hover:
+    // a lone number between 0 and 1 beside a tissue section reads as a
+    // confidence in the sample, and this one is a count of which files of a
+    // known layout were found. The denominator is now printed next to it.
+    h('span.mono.strong', num(conf, 2), h('span.unit', '/ 1.00')))),
+    // The same sentence that was hover-only. It is prose, so it takes the
+    // disclosure floor, and it is on screen because "confidence" beside a
+    // patient sample is the one word on this panel most likely to be
+    // misread — this project does not ship another "Model confidence: High".
+    !hasConf ? null : h('div', {
+      style: {
+        padding: '0 var(--sp-5) var(--sp-3)',
+        fontSize: 'var(--fs-disclosure)', lineHeight: 'var(--lh-body)',
+        color: 'var(--fg-2)',
+      },
+    }, 'That is how completely the FILE LAYOUT was recognised — 1.00 means '
+      + 'every file this layout expects was present and named as expected. It '
+      + 'says nothing about the tissue, the data quality, or any number '
+      + 'produced from it.'));
+  }
+
+  /* ------------------------------------------- per-section caveats -------
+   * WHAT A SECTION CANNOT SUPPORT, BEFORE A RUN IS LAUNCHED.
+   *
+   * GET /api/sections returns `caveats` on every record — a list of
+   * `{capability, status, reason}` built by app/server/api.py::_with_caveats —
+   * plus `spatial_spread_valid` and `n_caveats_blocking`. Until this pass this
+   * panel read that response for one thing (which ids are ingested) and threw
+   * the rest away, so the list of registered sections was an id, a chip and a
+   * path, and the refusals attached to them were reachable only from a `title`
+   * on an <option> in the picker on the other rail.
+   *
+   * WHICH SECTIONS CARRY WHICH, verified rather than assumed:
+   *
+   *  * The SPOT refusal is not in ingest_registry.py at all. It is added at
+   *    the HTTP boundary, keyed on the platform — `_SPOT_SOURCES = ("visium",)`
+   *    matched against `platform` (ingested) or `source` (built-in) — so it
+   *    lands on every Visium section, the four built-in ones and any Visium
+   *    directory ingested here alike. Its text is api.py::SPOT_SPATIAL_REFUSAL
+   *    and it says per-cell spatial statistics AND the delivery map are invalid
+   *    on such a section, because the endothelial positions its source term is
+   *    built from are synthesised like every other cell's.
+   *  * ingest_registry.py adds exactly one caveat of its own: on a `mex`
+   *    bundle it appends an "INSPECTABLE, not runnable" detect_issue and sets
+   *    `runnable: False`.
+   *  * everything else comes from the stored CAPABILITY report, which only an
+   *    ingested section carries, and from `detect_issues`.
+   *
+   * The reasons are rendered IN FULL and never behind a toggle, with the same
+   * component the run's own caveats use, because this panel's second rule is
+   * that the refusal is the product. */
+  function sectionCaveats(rec) {
+    const list = Array.isArray(rec.caveats) ? rec.caveats : null;
+    const box = h('div');
+    if (!list) {
+      // Not silence. An older server, or one that could not describe this
+      // section, returns the record without the field, and "no caveats shown"
+      // must never be read as "no caveats".
+      box.appendChild(h('div.caveats', caveatNode(
+        'CAVEATS NOT STATED FOR THIS SECTION. This server did not return a '
+        + 'caveats list on GET /api/sections, so what this specimen cannot '
+        + 'support is unknown from this screen — that is not the same as '
+        + 'nothing being refused. Scan the directory again, or read the '
+        + 'capability report above.', 1)));
+      return box;
+    }
+    const blocking = list.filter((c) => c.status === 'NO');
+    const qualified = list.filter((c) => c.status !== 'NO');
+    box.appendChild(h('div.cv-index', {
+      title: 'Every caveat below is shown in full — none is collapsed, clamped '
+        + 'or dismissible. "Refused" counts the readouts this section cannot '
+        + 'support at all; "qualified" counts the ones that come with a '
+        + 'condition on how they are read.',
+    },
+    h('span' + (blocking.length ? '.hard' : ''),
+      h('b', String(blocking.length)), ' refused'),
+    h('span.sep', '·'),
+    h('span', h('b', String(qualified.length)), ' qualified'),
+    h('span.grow'),
+    h('span.dim', 'none hidden')));
+    if (!list.length) {
+      box.appendChild(h('div.caveat.info', h('span',
+        'This server refused nothing and qualified nothing on this section. '
+        + 'Its capability report, above, is still the only check it has '
+        + 'passed.')));
+      return box;
+    }
+    const cav = h('div.caveats');
+    // Refusals first: a reader who stops after one line should have stopped
+    // after the one that says a number cannot be produced at all.
+    [...blocking, ...qualified].forEach((c, i) => {
+      const text = `${c.capability || 'capability'} — ${c.status || 'CAVEAT'}: `
+        + `${c.reason || 'no reason given by the server'}`;
+      cav.appendChild(caveatNode(text, i + 1, c.status === 'NO' ? 'crit' : ''));
+    });
+    box.appendChild(cav);
+    return box;
+  }
+
+  /**
+   * A registered section's measured scale, with the right noun on the count.
+   *
+   * `n_cells` on a VISIUM record is a count of SPOTS, not of cells: cache.py's
+   * `_ingested_metadata` copies `n_cells_ingested` into `n_spots` for exactly
+   * that platform, and tmesim/data/ingest.py states that a Visium row "is a
+   * ~55 um spot pooling several cells, NOT a cell". This panel printed all of
+   * them as "cells".
+   */
+  function scaleRow(rec) {
+    const spot = isSpot(rec);
+    const n = Number.isFinite(rec.n_spots) ? rec.n_spots
+      : (Number.isFinite(rec.n_cells) ? rec.n_cells : null);
+    const ext = Array.isArray(rec.extent_um) && rec.extent_um.length >= 2
+      ? rec.extent_um : null;
+    const bits = [];
+    if (rec.platform || rec.source) {
+      bits.push(h('span.mono', String(rec.platform || rec.source)));
+      bits.push(h('span.dim', '·'));
+    }
+    bits.push(n === null
+      ? h('span.dim', 'count not stated')
+      : h('span', h('span.mono', int(n)),
+        h('span.unit', spot ? 'spots' : 'cells')));
+    bits.push(h('span.dim', '·'));
+    // The extent used to be `(array || []).map(...).join(' × ') + ' mm'`, which
+    // on a record without one printed the string " mm" — a unit with no number
+    // in front of it, which is worse than a dash.
+    bits.push(ext === null
+      ? h('span.dim', 'extent not stated')
+      : h('span', h('span.mono', `${num(ext[0] / 1000, 2)} × ${num(ext[1] / 1000, 2)}`),
+        h('span.unit', 'mm')));
+    if (Number.isFinite(rec.n_genes)) {
+      bits.push(h('span.dim', '·'));
+      bits.push(h('span', h('span.mono', int(rec.n_genes)),
+        h('span.unit', 'genes')));
+    }
+    return h('div.frow', {
+      style: {
+        gap: 'var(--sp-3)', flexWrap: 'wrap', padding: 'var(--sp-1) 0',
+        fontSize: 'var(--fs-xs)', color: 'var(--fg-2)',
+      },
+      title: spot
+        ? 'A Visium row is a ~55 um spot pooling several cells, so this is a '
+          + 'count of spots. The cells a run works on are PLACED from the '
+          + 'per-spot deconvolved fractions and do not exist until the section '
+          + 'is reconstructed.'
+        : 'Measured at ingest time by tmesim.data.ingest and stored with the '
+          + 'section; not re-derived on this screen.',
+    }, bits);
   }
 
   function render(res, registered) {
@@ -498,11 +676,42 @@ export function createTissuePanel({ onRegistered }) {
             flexWrap: 'wrap',
           },
         },
-        h('span.lbl', 'cells'), h('span.mono.strong', int(sec.n_cells_ingested)),
-        h('span.lbl', 'genes'), h('span.mono.strong', int(sec.n_genes_ingested)),
+        // "cells" was the label on every platform, including Visium — where
+        // `n_cells_ingested` is a count of ~55 um SPOTS, each pooling several
+        // cells (tmesim/data/ingest.py; cache.py copies it into `n_spots` for
+        // exactly this platform). One word, and it was the wrong one on a
+        // quarter of the built-in catalogue.
+        h('span.lbl', isSpot(sec) ? 'spots' : 'cells'),
+        Number.isFinite(sec.n_cells_ingested)
+          ? h('span.mono.strong', int(sec.n_cells_ingested),
+            h('span.unit', isSpot(sec) ? 'spots' : 'cells'))
+          : h('span.dim', 'not stated'),
+        h('span.lbl', 'genes'),
+        Number.isFinite(sec.n_genes_ingested)
+          ? h('span.mono.strong', int(sec.n_genes_ingested), h('span.unit', 'genes'))
+          : h('span.dim', 'not stated'),
         h('span.lbl', 'extent'),
-        h('span.mono.strong', (sec.extent_um_ingested || [])
-          .map((v) => num(v / 1000, 2)).join(' × ') + ' mm')));
+        // `(x || []).map(...).join(' × ') + ' mm'` printed the bare string
+        // " mm" when the record carried no extent: a unit with nothing in
+        // front of it, which reads as a measurement of zero.
+        Array.isArray(sec.extent_um_ingested) && sec.extent_um_ingested.length >= 2
+          ? h('span.mono.strong',
+            sec.extent_um_ingested.map((v) => num(v / 1000, 2)).join(' × '),
+            h('span.unit', 'mm'))
+          : h('span.dim', 'not stated')));
+        if (isSpot(sec)) {
+          outEl.appendChild(h('div', {
+            style: {
+              padding: 'var(--sp-1) var(--sp-5) var(--sp-3)',
+              fontSize: 'var(--fs-disclosure)', lineHeight: 'var(--lh-body)',
+              color: 'var(--fg-2)', borderBottom: '1px solid var(--line-1)',
+            },
+          }, 'A Visium row is a ~55 um spot pooling several cells, so the count '
+            + 'above is spots. This section has no measured cells at all: a run '
+            + 'PLACES them from the per-spot deconvolved fractions, which is why '
+            + 'per-cell statistics are refused on it — see the refusals under '
+            + 'its entry in the list at the bottom of this panel.'));
+        }
       }
       const issues = det.issues || det.detect_issues || [];
       if (issues.length) {
@@ -659,24 +868,77 @@ export function createTissuePanel({ onRegistered }) {
 
   /* --------------------------------------------------- ingested so far -- */
 
+  /** One sentence, at the disclosure floor, in the panel's own voice. */
+  function storedNote(text) {
+    return h('div', {
+      style: {
+        fontSize: 'var(--fs-disclosure)', lineHeight: 'var(--lh-body)',
+        color: 'var(--fg-2)', padding: 'var(--sp-2) 0',
+      },
+    }, text);
+  }
+
   async function refreshStored() {
     let list = [];
     try {
       list = await api.getSections();
-    } catch {
+    } catch (err) {
+      // Was `clear(storedEl); return;` — a silent blank. The list of sections
+      // this operator has registered vanishing without a word is exactly the
+      // shape of "there are none", and the two must not look the same.
       clear(storedEl);
+      storedEl.appendChild(h('div.hr-lbl', { style: { margin: '0 0 var(--sp-2)' } },
+        'Ingested sections · unknown'));
+      storedEl.appendChild(storedNote(
+        'GET /api/sections did not answer, so this list could not be read. '
+        + 'Nothing has been removed — what is registered on the server is '
+        + 'unchanged and simply unknown from here. '
+        + String((err && err.message) || '')));
       return;
     }
-    const mine = (list || []).filter((s) => s.ingested);
+    // Array.isArray, not `list || []`: a server that answers 200 with an object
+    // instead of a list threw a TypeError out of this function and left the
+    // whole list — including every refusal on it — blank, with the failure
+    // visible only in the console.
+    if (!Array.isArray(list)) {
+      clear(storedEl);
+      storedEl.appendChild(h('div.hr-lbl', { style: { margin: '0 0 var(--sp-2)' } },
+        'Ingested sections · unknown'));
+      storedEl.appendChild(storedNote(
+        'GET /api/sections answered with something that is not a list of '
+        + 'sections, so this list could not be read. Nothing has been removed; '
+        + 'what is registered on the server is unchanged and unknown from here.'));
+      return;
+    }
+    const mine = list.filter((s) => s && s.ingested);
     clear(storedEl);
-    if (!mine.length) return;
+    if (!mine.length) {
+      // An empty list is a state with two causes, and the operator's next
+      // action differs between them.
+      storedEl.appendChild(h('div.hr-lbl', { style: { margin: '0 0 var(--sp-2)' } },
+        'Ingested sections · 0'));
+      storedEl.appendChild(storedNote(api.api && api.api.stub
+        ? 'The Studio is running on stub data because the backend is not '
+          + 'answering, so this list is not a statement about what is '
+          + 'registered on any server. Start the backend to read the real one.'
+        : 'No section has been ingested on this server. The built-in specimens '
+          + 'are still in the picker; nothing here removes or replaces them. '
+          + 'Sections registered by a SEPARATE process are not picked up until '
+          + 'this server restarts (app/server/ingest_registry.py::load_store).'));
+      return;
+    }
+    const refusedTotal = mine.reduce(
+      (a, s) => a + (Array.isArray(s.caveats)
+        ? s.caveats.filter((c) => c.status === 'NO').length : 0), 0);
     storedEl.appendChild(h('div.hr-lbl', { style: { margin: '0 0 var(--sp-2)' } },
-      `Ingested sections · ${mine.length} · none validated`));
+      `Ingested sections · ${mine.length} · none validated`
+      + (refusedTotal ? ` · ${refusedTotal} refused readout`
+        + `${refusedTotal === 1 ? '' : 's'}` : '')));
     for (const rec of mine) {
       storedEl.appendChild(h('div.frow', {
         style: {
           gap: 'var(--sp-3)', alignItems: 'baseline',
-          padding: 'var(--sp-2) 0', borderBottom: '1px solid var(--line-1)',
+          padding: 'var(--sp-2) 0',
           fontSize: 'var(--fs-xs)',
         },
       },
@@ -714,6 +976,22 @@ export function createTissuePanel({ onRegistered }) {
         },
       }),
       ));
+      // What this specimen IS — scale, in the right noun.
+      storedEl.appendChild(scaleRow(rec));
+      // Whether it can be reached at all. `available: false` means the bytes
+      // the record points at are gone or no longer ingestable; the row used to
+      // look identical to a healthy one.
+      if (rec.available === false) {
+        storedEl.appendChild(h('div.caveats', caveatNode(
+          'SECTION UNAVAILABLE: ' + String(rec.reason
+            || 'the server did not say why. The record is still registered; '
+              + 'the data it points at could not be read.'), 1, 'crit')));
+      }
+      // What it CANNOT support — in full, before anything is run against it.
+      storedEl.appendChild(sectionCaveats(rec));
+      storedEl.appendChild(h('div', {
+        style: { borderBottom: '1px solid var(--line-2)', margin: '0 0 var(--sp-5)' },
+      }));
     }
   }
 

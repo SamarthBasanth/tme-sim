@@ -128,6 +128,7 @@ import ast
 import enum
 import hashlib
 import inspect
+import re
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field, is_dataclass
@@ -163,6 +164,13 @@ __all__ = [
     "EXCHANGE",
     "TWO_ROUTE",
     "flag_named",
+    "WatchedTargetMissing",
+    "unresolvable_watched",
+    "unwatched_alternates",
+    "cited_lines",
+    "recognised_lines",
+    "stale_citations",
+    "undeclared_sites",
 ]
 
 
@@ -428,6 +436,80 @@ def _resolve(mod_name: str, attr: str) -> Any:
     return getattr(importlib.import_module(mod_name), attr)
 
 
+class WatchedTargetMissing(RuntimeError):
+    """A :data:`WATCHED` target stopped resolving, and it is not an absent extra.
+
+    :data:`WATCHED` holds STRINGS, so a watched function that is renamed, moved
+    or deleted does not break an import -- it just stops being patched. That
+    failure is silent and its consequence is the exact inversion this module
+    exists to prevent: nothing observes the alternate solver, so
+    :attr:`Probe.alt_solver_calls` is zero, so ``UNREACHABLE`` is no longer
+    withheld, and the guard publishes "no transport solve happens here" about a
+    path that solves transport.
+
+    Exactly one degradation is tolerated, and it is narrow: the target's own
+    PACKAGE is not importable at all, which is the ``app/`` optional-extra case
+    argued at :data:`WATCHED`. A module that imports fine and no longer has the
+    attribute is a RENAME, not an absent extra, and raises this.
+    """
+
+
+def _optional_package_absent(mod_name: str, exc: BaseException) -> bool:
+    """Is ``exc`` the module itself not being installed, rather than a rename?
+
+    ``ModuleNotFoundError.name`` is the module that could not be found. It
+    counts as "this optional extra is not installed" only when it IS the
+    watched module or a package containing it. A ModuleNotFoundError raised by
+    a broken dependency INSIDE an installed module is a real failure and must
+    stay loud.
+    """
+    if not isinstance(exc, ModuleNotFoundError):
+        return False
+    missing = getattr(exc, "name", None)
+    if not missing:
+        return False
+    return mod_name == missing or mod_name.startswith(missing + ".")
+
+
+def unresolvable_watched(
+    flag: Optional["Flag"] = None,
+) -> Dict[Tuple[str, str], str]:
+    """Watched targets that no longer resolve for a reason that is NOT an
+    absent optional package. Empty is the only healthy answer.
+
+    This is :func:`instrument`'s tolerance turned into an assertion. The
+    ``except Exception: continue`` in the patch loop is correct for a checkout
+    without ``.[app]`` and catastrophic for a rename, and nothing distinguished
+    the two until this existed.
+    """
+    flag = flag or EXCHANGE
+    out: Dict[Tuple[str, str], str] = {}
+    for mod_name, attr in flag.watched:
+        try:
+            _resolve(mod_name, attr)
+        except Exception as exc:  # noqa: BLE001 - the point is to classify it
+            if _optional_package_absent(mod_name, exc):
+                continue
+            out[(mod_name, attr)] = f"{type(exc).__name__}: {exc}"
+    return out
+
+
+def unwatched_alternates(flag: Optional["Flag"] = None) -> Tuple[str, ...]:
+    """Names registered as alternates/precursors that nothing INSTRUMENTS.
+
+    :attr:`Flag.alt_destinations` and :attr:`Flag.precursors` only do their job
+    -- withholding ``UNREACHABLE`` -- if :func:`instrument` actually wraps
+    them, and it wraps :attr:`Flag.watched`. A name in one table and not the
+    other reads as covered and counts nothing: :meth:`Probe.of` returns an
+    empty list for a function that was never patched, so the verdict falls
+    through to ``UNREACHABLE`` exactly as if the alternate did not exist.
+    """
+    flag = flag or EXCHANGE
+    watched_attrs = {attr for _, attr in flag.watched}
+    registered = set(flag.alt_destinations) | set(flag.precursors)
+    return tuple(sorted(registered - watched_attrs))
+
+
 def _make_wrapper(original: Callable[..., Any], name: str, probe: Probe) -> Callable[..., Any]:
     import functools
 
@@ -502,8 +584,24 @@ def instrument(
         for mod_name, attr in watched:
             try:
                 original = _resolve(mod_name, attr)
-            except Exception:  # pragma: no cover - a watched target vanished
-                continue
+            except Exception as exc:  # noqa: BLE001 - classified, not swallowed
+                # An absent optional package is the ONE tolerated degradation
+                # (see WATCHED). Anything else -- above all a module that
+                # imports fine and no longer has the attribute -- is a rename,
+                # and a renamed watch degrades silently into a false
+                # UNREACHABLE. Fail loudly instead.
+                if _optional_package_absent(mod_name, exc):
+                    continue
+                raise WatchedTargetMissing(
+                    f"watched target {mod_name}.{attr} did not resolve "
+                    f"({type(exc).__name__}: {exc}). WATCHED holds strings, so "
+                    "a rename here does not break an import -- it silently "
+                    "stops the target being instrumented, and an alternate "
+                    "solver that is not instrumented cannot withhold the "
+                    "UNREACHABLE verdict. Update WATCHED (and ALT_SOLVERS if "
+                    "the name changed); do NOT let this degrade to 'not "
+                    "watched'."
+                ) from exc
             wrapper = _make_wrapper(original, attr, probe)
             for module in list(sys.modules.values()):
                 if module is None:
@@ -801,6 +899,11 @@ class CallSites:
     #: carrier-bearing flag, where being a direct caller is already the
     #: statement that this file is on the path.
     precursor_calls: Tuple[int, ...] = ()
+    #: Line numbers of calls to a :attr:`Flag.alt_destinations` -- a
+    #: RE-IMPLEMENTED destination that answers the same question and that the
+    #: flag cannot reach. See :attr:`unreached_alt_calls` for why these are
+    #: scanned at all.
+    alt_calls: Tuple[int, ...] = ()
     #: Which flag this was scanned for, for the failure message.
     flag: str = "transvascular_exchange"
 
@@ -844,9 +947,35 @@ class CallSites:
         return self.precursor_calls
 
     @property
+    def unreached_alt_calls(self) -> Tuple[int, ...]:
+        """Alternate-destination calls in a file that reaches nothing else.
+
+        The third polarity, and the one the sweep was blind to. ``ALT_SOLVERS``
+        was only ever consulted DYNAMICALLY -- :attr:`Probe.alt_solver_calls`
+        withholds ``UNREACHABLE`` when a re-implemented solver ran. But
+        :func:`sweep_repo` looked for the destination, the entry points and the
+        precursors and nothing else, so a file whose ONLY route to the physics
+        is an alternate solver appeared in no sweep at all. It solved transport,
+        the flag could not reach it, and the guard never asked the question --
+        which is the same silence as an undeclared ``NO_PDE``, arrived at from
+        the other side.
+
+        Suppressed once the file also reaches the destination or an entry
+        point, exactly as :attr:`stranded_calls` is: such a file is already on
+        the path and already gets a verdict.
+        """
+        if self.direct_calls or self.engine_calls:
+            return ()
+        return self.alt_calls
+
+    @property
     def undeclarable(self) -> Tuple[int, ...]:
         """Every line at which this file needs a declaration to stay honest."""
-        return tuple(sorted(set(self.bare_direct_calls) | set(self.stranded_calls)))
+        return tuple(sorted(
+            set(self.bare_direct_calls)
+            | set(self.stranded_calls)
+            | set(self.unreached_alt_calls)
+        ))
 
     @property
     def predicted(self) -> Category:
@@ -915,6 +1044,7 @@ def scan_call_sites(
     with_k: List[int] = []
     engine: List[int] = []
     precursor: List[int] = []
+    alt: List[int] = []
     for node in ast.walk(root):
         if not isinstance(node, ast.Call):
             continue
@@ -929,8 +1059,15 @@ def scan_call_sites(
                 with_k.append(node.lineno)
         elif name in flag.entry_points:
             engine.append(node.lineno)
-        elif name in flag.precursors:
-            precursor.append(node.lineno)
+        else:
+            # Not elif-chained with the precursor arm: for TWO_ROUTE the two
+            # tables OVERLAP on purpose (cell_exclusion is both), and a name
+            # that fell into only one of them would make the other table's
+            # sweep silently narrower than it reads.
+            if name in flag.precursors:
+                precursor.append(node.lineno)
+            if name in flag.alt_destinations:
+                alt.append(node.lineno)
 
     target = str(path) if symbol is None else f"{path}::{symbol}"
     return CallSites(
@@ -939,6 +1076,7 @@ def scan_call_sites(
         direct_calls_with_exchange_k=tuple(sorted(with_k)),
         engine_calls=tuple(sorted(engine)),
         precursor_calls=tuple(sorted(precursor)),
+        alt_calls=tuple(sorted(alt)),
         flag=flag.name,
     )
 
@@ -1021,19 +1159,23 @@ DECLARATIONS: Tuple[Declaration, ...] = (
         path="tmesim/validation/kill_calibration.py",
         category=Category.INERT,
         reason=(
-            "Calls simulate_drug_transport directly (kill_calibration.py:681) "
-            "with no exchange_k. The calibration constant it fits is therefore "
-            "an exchange-OFF constant whatever the config says."
+            "unit_transport calls simulate_drug_transport directly "
+            "(kill_calibration.py:844) with no exchange_k. The calibration "
+            "constant it fits is therefore an exchange-OFF constant whatever "
+            "the config says. (This citation had drifted 163 lines and was "
+            "corrected on 2026-08-30 by stale_citations; the claim was still "
+            "true, but nothing had re-checked it since it was written.)"
         ),
     ),
     Declaration(
         path="tmesim/validation/immune_sink_impact.py",
         category=Category.INERT,
         reason=(
-            "Calls simulate_drug_transport directly at three sites (252, 272, "
-            "286) with no exchange_k. Its own per-voxel immune sink is passed by "
+            "Calls simulate_drug_transport directly at three sites (258, 278, "
+            "292) with no exchange_k. Its own per-voxel immune sink is passed by "
             "hand, which is exactly the pattern exchange_k would need and does "
-            "not get."
+            "not get. (These citations had drifted by 6 and were corrected on "
+            "2026-08-30 by stale_citations.)"
         ),
     ),
     Declaration(
@@ -1042,9 +1184,13 @@ DECLARATIONS: Tuple[Declaration, ...] = (
         category=Category.INERT,
         reason=(
             "Builds its own PDEConfig and calls simulate_drug_transport directly "
-            "(vessel_profile.py:646) with no exchange_k, unlike analyze_drug in "
+            "(vessel_profile.py:729) with no exchange_k, unlike analyze_drug in "
             "the same file. A whole-file verdict would average these two into "
-            "something false."
+            "something false. (This citation had drifted 83 lines and was "
+            "corrected on 2026-08-30 by stale_citations. The stale value had "
+            "landed inside the OTHER half of the split -- the half declared "
+            "PROPAGATED -- so the evidence for 'this function is INERT' was "
+            "pointing at the function that is not.)"
         ),
     ),
     Declaration(
@@ -1144,6 +1290,33 @@ EXEMPTIONS: Tuple[Exemption, ...] = (
             "self-test. The solver is the destination a flag has to reach, so "
             "'does the flag reach it from here' is not a meaningful question; "
             "these calls construct exchange_k by hand where they mean to."
+        ),
+    ),
+    Exemption(
+        path="tmesim/validation/moncayo_explant.py",
+        reason=(
+            "The module that DEFINES the bath_diffusion alternate solver "
+            "(line 528) and then exercises it. Its own calls are the solver "
+            "being run by its home, which is the same situation "
+            "physics/diffusion.py is in one level up; the question this sweep "
+            "asks -- 'did a caller reach the physics without the flag' -- is "
+            "not meaningful at the definition site. Callers ELSEWHERE are not "
+            "exempt and are still swept."
+        ),
+    ),
+    Exemption(
+        path="app/server/reach.py",
+        reason=(
+            "The module that DEFINES the steady_state_concentration alternate "
+            "solver (line 559) and then drives it from its own request handler "
+            "(line 952). Same standing as diffusion.py and moncayo_explant.py: "
+            "the definition site is where a flag ARRIVES, not a place that can "
+            "fail to carry it, and this solver takes exchange_k explicitly. It "
+            "is exempted rather than declared for the reason written against "
+            "DECLARATIONS: a Declaration here would have to name a category, "
+            "and NO_PDE -- 'no transport solve happens here' -- is exactly the "
+            "false statement to publish about the module that solves the "
+            "transport steady state."
         ),
     ),
 )
@@ -1379,7 +1552,8 @@ def sweep_repo(root: str | Path = ".", flag: Optional[Flag] = None) -> Dict[str,
                 cs = scan_call_sites(py, flag=flag)
             except (SyntaxError, UnicodeDecodeError):  # pragma: no cover
                 continue
-            if cs.direct_calls or cs.engine_calls or cs.precursor_calls:
+            if (cs.direct_calls or cs.engine_calls or cs.precursor_calls
+                    or cs.alt_calls):
                 found[str(py.relative_to(root))] = cs
     return found
 
@@ -1427,27 +1601,171 @@ def reimplementation_candidates(root: str | Path = ".") -> Dict[str, Tuple[str, 
     return out
 
 
+def undeclared_sites(
+    root: str | Path = ".", flag: Optional[Flag] = None
+) -> Dict[str, Tuple[int, ...]]:
+    """Undeclared silent-no-op LINES, per file. See :func:`undeclared_paths`.
+
+    Line-aware on purpose. The path-keyed version of this check treated ANY
+    declaration for a file as covering the whole file, which meant a
+    per-function declaration -- the mechanism that exists precisely because
+    ``vessel_profile.py`` has one safe half and one unsafe half -- also silently
+    licensed every OTHER function in that file, including ones written later.
+    A new bare call added beside a declared one produced no failure at all.
+
+    A ``symbol`` declaration now covers only the lines inside that symbol; the
+    residue is reported.
+    """
+    flag = flag or EXCHANGE
+    root = Path(root)
+    exempt = {e.path for e in flag.exemptions}
+    whole_file = {d.path for d in flag.declarations if d.symbol is None}
+    by_symbol: Dict[str, List[str]] = {}
+    for d in flag.declarations:
+        if d.symbol is not None:
+            by_symbol.setdefault(d.path, []).append(d.symbol)
+
+    out: Dict[str, Tuple[int, ...]] = {}
+    for path, cs in sweep_repo(root, flag=flag).items():
+        if path in exempt or path in whole_file:
+            continue
+        residue = set(cs.undeclarable)
+        if not residue:
+            continue
+        for symbol in by_symbol.get(path, ()):
+            # A declared symbol that has since been renamed away is caught by
+            # test_declared_path_lands_in_its_declared_category, which scans it
+            # directly and raises. Here it simply covers nothing, which is the
+            # safe direction.
+            try:
+                sub = scan_call_sites(root / path, symbol, flag=flag)
+            except LookupError:
+                continue
+            residue -= set(sub.undeclarable)
+        if residue:
+            out[path] = tuple(sorted(residue))
+    return out
+
+
 def undeclared_paths(root: str | Path = ".", flag: Optional[Flag] = None) -> List[str]:
     """Files on which the flag is a silent no-op and nobody has written it down.
 
-    Two shapes, one per polarity (see :class:`CallSites`):
+    Three shapes, one per polarity (see :class:`CallSites`):
 
     * BARE -- the destination is called without the carrier.
     * STRANDED -- the governed quantity is computed out of the precursors and
       the destination is never reached.
+    * UNREACHED ALTERNATE -- the only route to the physics is a RE-IMPLEMENTED
+      destination the flag cannot reach.
 
     Either way the run completes, the numbers are plausible, and they are the
     flag-OFF numbers whatever the caller set. The correct response is to add a
     declaration (or fix the call), never to widen the exemption list.
     """
+    return sorted(undeclared_sites(root, flag=flag))
+
+
+# --------------------------------------------------------------------------- #
+# Line citations inside a written reason
+# --------------------------------------------------------------------------- #
+#: The three ways a reason in this module cites a line. Deliberately narrow --
+#: a looser pattern would harvest digits out of ``1.554447793e+09`` and
+#: ``R^2 = 0.022`` and the check would fail on prose instead of on drift.
+_CITE_PATH_LINE = re.compile(r"\b([\w./-]+\.py):(\d+)\b")
+_CITE_LINE_WORD = re.compile(r"\blines?\s+(\d+(?:\s*,\s*\d+)*)")
+_CITE_TUPLE = re.compile(r"\((\d+(?:\s*,\s*\d+)+)\)")
+
+
+def cited_lines(reason: str) -> Tuple[Tuple[Optional[str], int], ...]:
+    """Every ``(file-or-None, line)`` a written reason points at.
+
+    Recognises ``pk_reality.py:218``, ``(line 307)`` and ``(252, 272, 286)``,
+    which are the three spellings the tables in this module actually use.
+    """
+    out: List[Tuple[Optional[str], int]] = []
+    for m in _CITE_PATH_LINE.finditer(reason):
+        out.append((m.group(1), int(m.group(2))))
+    for rx in (_CITE_LINE_WORD, _CITE_TUPLE):
+        for m in rx.finditer(reason):
+            for chunk in m.group(1).split(","):
+                out.append((None, int(chunk.strip())))
+    return tuple(sorted(set(out), key=lambda t: (t[0] or "", t[1])))
+
+
+def recognised_lines(path: str | Path, flag: Optional[Flag] = None) -> frozenset:
+    """Lines in ``path`` this flag's scanner can honestly point at.
+
+    Call sites for the flag (destination, entry points, precursors, alternate
+    destinations) plus the ``def`` lines of those same names, so that a table
+    entry may cite either "the call that strands the flag" or "the function
+    that defines the alternate solver".
+    """
     flag = flag or EXCHANGE
-    declared = {d.path for d in flag.declarations}
-    exempt = {e.path for e in flag.exemptions}
-    return [
-        path
-        for path, cs in sweep_repo(root, flag=flag).items()
-        if cs.undeclarable and path not in declared and path not in exempt
+    path = Path(path)
+    cs = scan_call_sites(path, flag=flag)
+    lines = (set(cs.direct_calls) | set(cs.engine_calls)
+             | set(cs.precursor_calls) | set(cs.alt_calls))
+    names = {flag.destination, *flag.entry_points, *flag.precursors,
+             *flag.alt_destinations}
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in ast.walk(tree):
+        if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name in names):
+            lines.add(node.lineno)
+    return frozenset(lines)
+
+
+def stale_citations(
+    root: str | Path = ".", flag: Optional[Flag] = None
+) -> Dict[str, Tuple[str, ...]]:
+    """Table entries whose written reason cites a line that has MOVED.
+
+    The reason is the whole product of this module: ``NO_PDE`` and ``INERT``
+    are claims someone signed, and the signature is the sentence saying WHERE
+    the flag stops existing. A reason that names a line number is making a
+    checkable statement, and until this function existed nothing checked it --
+    so the line drifted with every edit above it and the entry went on reading
+    as though it had been verified. Three of them had already drifted when this
+    was written, and one had drifted onto the OTHER half of a split file: the
+    reason for "this function is INERT" pointed into the function declared
+    PROPAGATED.
+
+    Returns ``{table entry name: (problem, ...)}``. Empty is the healthy answer.
+    """
+    flag = flag or EXCHANGE
+    root = Path(root)
+    entries: List[Tuple[str, str, str]] = [
+        (d.name, d.path, d.reason) for d in flag.declarations
     ]
+    entries += [(f"exemption:{e.path}", e.path, e.reason) for e in flag.exemptions]
+    entries += [(f"wiring:{w.path}", w.path, w.reason) for w in flag.wiring_points]
+
+    cache: Dict[str, frozenset] = {}
+    out: Dict[str, Tuple[str, ...]] = {}
+    for name, path, reason in entries:
+        problems: List[str] = []
+        for named_file, line in cited_lines(reason):
+            if named_file is not None and Path(named_file).name != Path(path).name:
+                problems.append(
+                    f"cites {named_file}:{line}, which is not the file this "
+                    f"entry is about ({path}). Cite lines in the declared file."
+                )
+                continue
+            if path not in cache:
+                f = root / path
+                cache[path] = (
+                    recognised_lines(f, flag=flag) if f.is_file() else frozenset()
+                )
+            if line not in cache[path]:
+                known = sorted(cache[path])
+                problems.append(
+                    f"cites line {line}, which is not a {flag.name} call site "
+                    f"or definition in {path}. The lines the scanner "
+                    f"recognises there are {known or 'none at all'}."
+                )
+        if problems:
+            out[name] = out.get(name, ()) + tuple(problems)
+    return out
 
 
 def undeclared_direct_callers(root: str | Path = ".") -> List[str]:
@@ -1491,8 +1809,15 @@ TWO_ROUTE_WATCHED: Tuple[Tuple[str, str], ...] = (
     ("tmesim.molecular.two_route", "two_route_diffusivity"),
     ("tmesim.molecular.brownian", "simulate_effective_diffusivity"),
     ("tmesim.molecular.ecm_mesh", "ogston_renkin_hindrance"),
-    # Alternate destination -- see TWO_ROUTE_ALT.
+    # Alternate destinations -- see TWO_ROUTE_ALT. BOTH of them: tissue_hindrance
+    # was listed in TWO_ROUTE_ALT and TWO_ROUTE_PRECURSORS but was never watched,
+    # so Probe.of("tissue_hindrance") returned [] however many times it ran, and
+    # neither alt_solver_calls nor precursor_calls could count it. It only failed
+    # to produce a false UNREACHABLE because it happens to call cell_exclusion
+    # internally; inlining that would have flipped the verdict. Found by
+    # unwatched_alternates() on 2026-08-30.
     ("tmesim.molecular.ecm_mesh", "cell_exclusion"),
+    ("tmesim.molecular.ecm_mesh", "tissue_hindrance"),
 )
 
 #: The IMPERMEABLE-cell law: it answers the same question the two-route law

@@ -30,7 +30,41 @@
   --bg-panel: rgba(16, 18, 21, 0.72);
   --ink: #f3f5f6;
   --ink-dim: rgba(243, 245, 246, 0.62);
-  --ink-faint: rgba(243, 245, 246, 0.34);
+  /*
+   * 0.50, NOT THE 0.34 THIS WAS, AND THE REASON IS A MEASUREMENT RATHER THAN A
+   * PREFERENCE.
+   *
+   * Composited over the scrim plateau the copy sits on (rgb 4,5,7) and over the
+   * panel ground (16,18,21), 0.34 renders at contrast ratios of 2.80 and 2.93
+   * against the 4.5 that normal-size text needs. Twelve declarations take this
+   * token and eleven of them are TEXT — and it is not incidental text:
+   *
+   *   .specimen__pct            58.2% / 19.5% / 11.8% / 10.5% — measured
+   *                             cell-type shares, i.e. data
+   *   .specimen__note           "10x Genomics, CC BY 4.0" — the licence
+   *                             attribution the data is used under
+   *   .specimen__facts dt       Cells / Section / Depth
+   *   .metric-overlay__refs dt  "Well-mixed model", "Clustering-matched null"
+   *                             — the two nulls that BOUND the 2.0x, which
+   *                             MetricOverlay.tsx puts in the readout rather
+   *                             than a footnote precisely so they are not
+   *                             skipped
+   *   .*__footnote              the caveat on each readout
+   *   .attribution__sub         delivery-limited / dose-limited / cell state
+   *
+   * So the page was setting its licence attribution, its caveats and its null
+   * references at the lowest legibility on the page — the same inversion the
+   * note above `.ledger__state` records for the verdict column, arrived at from
+   * a different direction. Measured after, on those same two grounds: 4.94 and
+   * 4.96, both AA at these sizes.
+   *
+   * IT COSTS NO PIXELS, which is what makes it available at every viewport
+   * including the ones the block near the end of this file is fighting for
+   * room in. --ink-dim (0.62) is still a clear step above it, so the three-tier
+   * hierarchy is intact; the twelfth declaration is `.progress-rail__tick`'s
+   * border, which is decorative and aria-hidden and reads correctly either way.
+   */
+  --ink-faint: rgba(243, 245, 246, 0.5);
   --hairline: rgba(243, 245, 246, 0.14);
   --accent: #7fd1e0;
   --accent-dim: rgba(127, 209, 224, 0.5);
@@ -308,6 +342,40 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/*
+ * THE FOCUS RING IS A PROPERTY OF THE PAGE, NOT OF THE TWO COMPONENTS THAT
+ * HAPPEN TO HAVE ONE TODAY.
+ *
+ * `.cta-button` and `.cta-link` each carry their own `:focus-visible` rule
+ * further down, written when it was discovered that this file had none at all.
+ * That fixed the two elements that existed; it did not fix the page. Anything
+ * focusable added later — a link inside a ledger detail, a disclosure toggle,
+ * a skip link — would fall straight back to the user agent ring, which on a
+ * near-black ground is a coin flip by browser, and it is the one state a mouse
+ * user never sees and so nobody checks.
+ *
+ * Stating it once here makes the ring the default and leaves the two specific
+ * rules as what they now are: per-component refinements (a border colour, a
+ * radius) layered on a guarantee that already holds.
+ */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/*
+ * Selection was unstyled, which on `color-scheme: dark` means the UA's own
+ * blue — a hue that appears nowhere else here and that lands worst on the one
+ * thing a reader is most likely to select: a number in the ledger or a value
+ * in the specimen caption. Taken from the accent already in the palette, at an
+ * alpha low enough that the selected text keeps its own colour rather than
+ * being repainted.
+ */
+::selection {
+  background: rgba(127, 209, 224, 0.28);
+  color: var(--ink);
 }
 
 main {
@@ -803,6 +871,7 @@ body::after {
  * does not collide with Atkinson's descenders, which are long by design.
  */
 .cta-link {
+  position: relative;
   font-family: var(--font-sans);
   font-size: 0.82rem;
   font-weight: 400;
@@ -811,6 +880,26 @@ body::after {
   border-bottom: 1px solid var(--hairline);
   padding-bottom: 1px;
   transition: color 0.25s ease, border-color 0.25s ease;
+}
+
+/*
+ * THE TARGET IS BIGGER THAN THE TEXT, AND IT COSTS NO LAYOUT.
+ *
+ * Measured, this link's box is 21.7px tall — under the 24x24 CSS px minimum
+ * (WCAG 2.5.8) and well under what a thumb wants. Padding would fix it and
+ * would also add height to the closing beat, which is one of the two beats
+ * this file spends its last 200 lines fitting into a phone. An absolutely
+ * positioned hit area is out of flow, so it buys the target without spending a
+ * pixel of the budget.
+ *
+ * Inset by 0.45rem vertically rather than more: the pill above it sits one
+ * `.cta-row` gap away (0.6rem at the narrow tiers), so a taller area would
+ * start swallowing clicks aimed at the primary action.
+ */
+.cta-link::after {
+  content: "";
+  position: absolute;
+  inset: -0.45rem -0.5rem;
 }
 
 .cta-link:hover {
@@ -2308,10 +2397,33 @@ body::after {
  * beats are tall is a fact about the authored sequence, not about the
  * component.
  */
+/*
+ * THE TOP PADDING IS A CLAMP AGAINST svh, NOT A CONSTANT, AND THAT IS THE FIX
+ * FOR A MEASURED DESKTOP CLIP.
+ *
+ * These beats are top-aligned, so their top edge is this padding and their
+ * bottom edge is this padding plus however tall the content came out. A
+ * constant 6.5rem therefore spends 104px of a short window's height before the
+ * content gets any, and the overflow lands at the bottom where `.scroll-pin`
+ * eats it.
+ *
+ * Measured at 1440x900 with the constant: beat 02's content ran 789.8px from a
+ * top edge of 104, so its bottom edge was 893.8 — inside the 900px pin at rest,
+ * and 19.8px OUTSIDE it while the arrival transform was carrying the beat down
+ * (see the 26px note in the narrow block below). A laptop window is exactly
+ * where nobody looked, because the two viewports this page had been tuned at
+ * were 1512x950 and 390x844.
+ *
+ * The clamp floors at the same 4.75rem the narrow layout already uses (which
+ * clears the header band — the mark's box ends at y≈44 and the header scrim at
+ * y≈71) and reaches the full 6.5rem at about 1160px of viewport height, so
+ * nothing changes on the tall desktop this was composed at. Measured after, at
+ * 1440x900: top 76, bottom 865.8, budget 874.
+ */
 .narrative-layer > .narrative-section:nth-child(2),
 .narrative-layer > .narrative-section:nth-child(5) {
   justify-content: flex-start;
-  padding-top: 6.5rem;
+  padding-top: clamp(4.75rem, 8svh, 6.5rem);
   padding-bottom: 2rem;
 }
 
@@ -2425,6 +2537,403 @@ body::after {
     font-size: 0.585rem;
     letter-spacing: 0.055em;
     color: var(--ink);
+  }
+}
+
+/* =======================================================================
+ * SHORT VIEWPORTS — EVERY FIT RULE ABOVE THIS POINT IS KEYED ON WIDTH, AND
+ * THE THING THAT CLIPS IS HEIGHT.
+ *
+ * That sentence is the whole defect. `.scroll-pin` is `height: 100svh;
+ * overflow: hidden`, so the quantity a beat has to fit inside is the viewport's
+ * HEIGHT, and every rule that had been written to make it fit — the ledger
+ * tightening, the readout reservation, the two beats' top alignment — was
+ * placed behind `@media (max-width: 820px)`. A 360x740 phone therefore received
+ * the identical layout to the 390x844 one the page was tuned at, with 104px
+ * (12.3%) less height to put it in, and nothing anywhere reported the
+ * difference.
+ *
+ * MEASURED AT 360x740 BEFORE THIS BLOCK EXISTED, content edges against a 740px
+ * pin, and the arrival transform (below) applied:
+ *
+ *     beat 02   top  76.0   bottom 846.6   clipped 132.6px off the bottom
+ *     beat 03   top  13.4   bottom 526.6   clipped  12.6px off the top,
+ *                                          and overlapping its own readout
+ *                                          panel by 43px
+ *     beat 05   top  76.0   bottom 822.5   clipped 108.5px off the bottom
+ *     beat 06   top  27.0   bottom 785.0   clipped  71.0px off the bottom
+ *
+ * Four of six beats, and what is cut off the bottom of 02 and 05 is the last
+ * rows of the ledgers — i.e. the registered limits, which are the one thing on
+ * this page that must never be the part that goes missing.
+ *
+ * THE 26px IS NOT A MARGIN OF COMFORT, IT IS THE TRANSFORM. `sectionVisual`
+ * (lib/timeline.ts) translates a beat by `(1 - opacity) * 26px`, downward while
+ * it arrives and upward while it leaves, so a block that merely fits at peak
+ * opacity is cut by up to 26px on the way in and out. The budget a beat must
+ * land inside is therefore [26, pinHeight - 26], not [0, pinHeight].
+ *
+ * WHY THE CEILING IS 880px AND NOT 760. 100svh on a real phone is the SMALL
+ * viewport — the window with the browser's chrome showing — so a device that
+ * reports 390x844 to the CSS `@media` engine renders this pin at roughly
+ * 390x730. A headless 390x844 viewport has no chrome and so measures 844, which
+ * is exactly why a page verified only in a headless 390x844 window can be
+ * clipped on the phone it was verified for. Taking every ≤820px-wide viewport
+ * up to 880px tall through these rules makes the two agree, and it brings beat
+ * 06 at 390x844 from a bottom edge of 811px — against the ~805px the block
+ * above records as the survivable limit — down to well inside it.
+ *
+ * WHAT IS TRADED, STATED PLAINLY: leading, gaps and padding, plus display size
+ * on headings that are one or two lines. NO COPY IS CUT, no ledger row is
+ * dropped, and no body text loses more than a step of size — for a fixed column
+ * width a text block's height is set by the line-height RATIO and the character
+ * count, not by the em, so shrinking prose here would buy almost nothing and
+ * cost legibility. The leading is what is actually spent.
+ * ======================================================================= */
+
+@media (max-width: 820px) and (max-height: 880px) {
+  /*
+   * A wider column is the cheapest height there is: it takes characters off
+   * the wrap and therefore whole LINES off every paragraph, which is the one
+   * lever that reduces a text block without touching its type size. 1.15rem
+   * still reads as a margin rather than as an edge-to-edge failure.
+   */
+  .narrative-section {
+    padding-left: clamp(1.15rem, 5vw, 1.5rem);
+    padding-right: clamp(1.15rem, 5vw, 1.5rem);
+    /* Clears the wordmark (its box ends at y≈44) rather than the whole header
+       scrim. The scrim is a gradient to transparent and darkens text it passes
+       over on this ground, so sitting inside its tail costs nothing; sitting
+       under the MARK is the collision that matters. */
+    padding-top: 3.6rem;
+  }
+
+  /* Leading, not size. 1.66 is composed for a 34rem desktop measure; on a
+     ~320px column it is loose enough to cost a beat its last ledger row. */
+  .narrative-section p {
+    line-height: 1.45;
+  }
+
+  .narrative-section h1 {
+    line-height: 1.02;
+  }
+
+  .narrative-section h2 {
+    line-height: 1.12;
+  }
+
+  .narrative-section__body,
+  .narrative-section--hero .narrative-section__body {
+    gap: 0.72rem;
+  }
+
+  /* ---- the two ledger beats (02, 05) ---------------------------------- */
+
+  /*
+   * Beat 05 is six registered limits, a one-line headline and a one-line lead:
+   * it is ~90% ledger, so its top edge is the only thing left to spend once the
+   * rows are as tight as they get. 3.35rem still starts the kicker below the
+   * wordmark (y≈44).
+   */
+  .narrative-layer > .narrative-section:nth-child(2),
+  .narrative-layer > .narrative-section:nth-child(5) {
+    padding-top: 3.35rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .narrative-layer > .narrative-section:nth-child(2) h2,
+  .narrative-layer > .narrative-section:nth-child(5) h2 {
+    font-size: 1.34rem;
+  }
+
+  .narrative-layer > .narrative-section:nth-child(2) .narrative-section__body,
+  .narrative-layer > .narrative-section:nth-child(5) .narrative-section__body {
+    gap: 0.5rem;
+  }
+
+  .narrative-layer > .narrative-section:nth-child(2) > .narrative-section__body > p,
+  .narrative-layer > .narrative-section:nth-child(5) > .narrative-section__body > p {
+    line-height: 1.4;
+  }
+
+  /*
+   * EVERY RULE FROM HERE TO THE END OF THIS BLOCK IS SCOPED TO THE PINNED
+   * EXPERIENCE, AND THE SCOPE IS THE POINT.
+   *
+   * `.ledger`, `.metric-overlay` and `.attribution` are rendered by BOTH
+   * experiences — the reduced-motion fallback lays the same components out in
+   * normal document flow (see `.reduced-motion-section__metric` above). That
+   * layout has no `.scroll-pin` and therefore no fitting problem: it scrolls,
+   * so nothing it contains can be truncated no matter how tall it gets.
+   *
+   * Compression bought to survive a clip is a cost, not an improvement, and
+   * charging it to the fallback would charge it to the reader who asked for
+   * less motion — plausibly for other accessibility reasons too — in exchange
+   * for nothing. `.narrative-layer` and `.scroll-pin >` are what keep it in the
+   * experience that needs it.
+   */
+  .narrative-layer .ledger {
+    margin-top: 0;
+  }
+
+  .narrative-layer .ledger__caption {
+    line-height: 1.3;
+    margin-bottom: 0;
+  }
+
+  /*
+   * Six rows means every pixel here is spent six times, which is why this is
+   * where the block is tightest. The hairline on each row's top edge is what
+   * keeps them separable at this density — it is doing the work the padding
+   * used to, and it is why none of it is removed.
+   */
+  .narrative-layer .ledger__row {
+    padding: 0.11rem 0 0.15rem;
+  }
+
+  /* Still a step and a half above the evidence line under it, which is the
+     hierarchy this row is built on: name, verdict, then the measurement. */
+  .narrative-layer .ledger__label {
+    font-size: 0.82rem;
+  }
+
+  .narrative-layer .ledger__detail {
+    font-size: 0.63rem;
+    line-height: 1.26;
+    margin-top: 0.06rem;
+  }
+
+  .narrative-layer .ledger__state {
+    margin-top: 0.06rem;
+  }
+
+  /* ---- the two readout panels (beats 03, 04) --------------------------- */
+  /*
+   * The panel and the beat beside it are competing for ONE column of height:
+   * the reservation below is the panel's height handed back to the beat as
+   * padding, so every pixel the panel keeps is a pixel the copy has to lose.
+   * At 360x740 the pair needed 749px of a 632px allowance, which is why beat
+   * 03 was simultaneously clipped at the top AND covered at the bottom.
+   *
+   * `.scroll-pin >` because in the fallback these are static children of
+   * `.reduced-motion-section__metric`, never direct children of the pin — so
+   * this cannot reach them, which is the intent described above.
+   */
+  .scroll-pin > .metric-overlay,
+  .scroll-pin > .attribution {
+    bottom: 0.9rem;
+    padding: 0.8rem 0.9rem 0.75rem;
+    gap: 0.6rem;
+  }
+
+  .scroll-pin .attribution__header,
+  .scroll-pin .metric-overlay__header {
+    padding-bottom: 0.45rem;
+  }
+
+  .scroll-pin .attribution__rows {
+    gap: 0.3rem;
+  }
+
+  .scroll-pin .metric-overlay__grid {
+    gap: 0.35rem;
+  }
+
+  .scroll-pin .metric-overlay__row--total {
+    padding-top: 0.4rem;
+  }
+
+  .scroll-pin .metric-overlay__refs {
+    gap: 0.2rem;
+  }
+
+  .scroll-pin .attribution__footnote,
+  .scroll-pin .metric-overlay__footnote {
+    font-size: 0.6rem;
+    line-height: 1.35;
+  }
+
+  /* The band the copy must not centre itself into. Tracks the compressed
+     panel above: panel height + its 0.9rem offset + a gap. */
+  .narrative-layer > .narrative-section:nth-child(3),
+  .narrative-layer > .narrative-section:nth-child(4) {
+    padding-bottom: 13.5rem;
+  }
+
+  /* ---- the closing beat (06) ------------------------------------------ */
+  /*
+   * It is vertically CENTRED inside its own padding box, so an asymmetric box
+   * moves the content by half the difference: with 3.6rem on top and nothing
+   * underneath, centring pushed the block 29px DOWN and put its bottom edge
+   * past the pin. Matching the bottom padding to the top makes the centring
+   * centre on the viewport again, which is what it was written to do.
+   */
+  .narrative-layer > .narrative-section:nth-child(6) {
+    padding-bottom: 3.6rem;
+  }
+
+  .narrative-layer > .narrative-section:nth-child(6) .cta-row {
+    margin-top: 0;
+    gap: 0.6rem;
+  }
+}
+
+/*
+ * A SECOND NARROW TIER, FOR THE PHONES THAT ARE ANOTHER 70px SHORTER.
+ *
+ * 375x667 is an iPhone SE / 6 / 7 / 8 with no chrome subtracted, and it is also
+ * roughly what a 390x844 device reports for `100svh` once Safari's toolbars are
+ * on screen. Measured at 375x667 with only the tier above: beat 02 ran to a
+ * bottom edge of 679 against a 641 budget, beat 05 to 653.3, and beat 03's copy
+ * had come back down onto its own readout panel by 3.2px.
+ *
+ * THE INSTRUMENT CHANGES HERE, AND THE ARITHMETIC IS THE REASON. Above, only
+ * leading and spacing were spent, on the grounds that for a fixed column a text
+ * block's height follows the line-height ratio. That is half the story: lines
+ * grow with the em too, so a block's height goes as (font-size)² / (column
+ * width) — an 8% smaller em is a ~15% shorter block. Below 700px the leading is
+ * therefore given BACK (1.4 -> 1.45, which is more readable, not less) and the
+ * em pays instead. That is a better trade at this size than cramming lines
+ * together at a size the reader cannot use anyway.
+ */
+@media (max-width: 820px) and (max-height: 700px) {
+  .narrative-layer > .narrative-section:nth-child(2) > .narrative-section__body > p,
+  .narrative-layer > .narrative-section:nth-child(5) > .narrative-section__body > p {
+    font-size: 0.8rem;
+    line-height: 1.45;
+  }
+
+  .narrative-layer > .narrative-section:nth-child(2),
+  .narrative-layer > .narrative-section:nth-child(5) {
+    padding-top: 3.15rem;
+  }
+
+  /* Scoped for the reason given in the tier above: the fallback scrolls and
+     has nothing to gain from any of this. */
+  .narrative-layer .ledger__caption {
+    line-height: 1.2;
+  }
+
+  .narrative-layer .ledger__row {
+    padding: 0.07rem 0 0.1rem;
+  }
+
+  .narrative-layer .ledger__detail {
+    line-height: 1.2;
+  }
+
+  /*
+   * Beats 03 and 04 are squeezed from both sides — the header above, the
+   * readout band below — so both sides give. The copy takes the same em step
+   * as the ledger beats (measured: beat 03's paragraph goes 16 lines at 14.72px
+   * to 15 at 13.6px, and the block from 341.3px to 295.8px), and the band comes
+   * in with the panels, which lose padding and gap at this height too.
+   *
+   * Without the em step beat 03's kicker floated up to y = 45.2 and grazed the
+   * wordmark, whose box ends at 46.8.
+   */
+  .narrative-layer > .narrative-section:nth-child(3) > .narrative-section__body > p,
+  .narrative-layer > .narrative-section:nth-child(4) > .narrative-section__body > p {
+    font-size: 0.85rem;
+  }
+
+  .narrative-layer > .narrative-section:nth-child(3),
+  .narrative-layer > .narrative-section:nth-child(4) {
+    padding-bottom: 12.5rem;
+  }
+
+  .scroll-pin > .metric-overlay,
+  .scroll-pin > .attribution {
+    bottom: 0.7rem;
+    padding: 0.65rem 0.8rem 0.6rem;
+    gap: 0.5rem;
+  }
+}
+
+/* =======================================================================
+ * SHORT AND WIDE — THE SAME DEFECT ON A LAPTOP.
+ *
+ * The block above is `(max-width: 820px)`, so a 1280x720 or 1366x768 laptop
+ * window — a 16:9 panel, which is most of them — matched none of it and got the
+ * layout composed for 1512x950. Measured at 1280x720 before this block:
+ *
+ *     beat 02   top 76.0   bottom 861.8   clipped 167.8px off a 720px pin
+ *     beat 05   top 76.0   bottom 795.4   clipped 101.4px
+ *     beat 06   top 17.9   bottom 702.1   clipped   8.1px, both ends
+ *
+ * Beat 02's content was 785.8px tall in a window 720px high: taller than the
+ * viewport before the transform was even applied.
+ *
+ * WHAT IS SPENT, AND WHY IT IS THE HEADLINE FIRST. At this width the display
+ * size is at the top of its clamp (52px) and the copy column is capped at 34rem,
+ * so a two-line headline alone is 114px — 16% of the window — sitting above a
+ * paragraph and six registered limits. On a screen this shape the headline is
+ * the element with the most size and the least information, so it yields first,
+ * then the leading, then the ledger's row padding. The column measure is NOT
+ * widened: the directional scrim (`.narrative-section--left::before`) falls to
+ * zero at 56% of the frame, and copy set past that point is unprotected against
+ * the point cloud — a legibility failure traded for a fitting one.
+ * ======================================================================= */
+
+@media (min-width: 821px) and (max-height: 860px) {
+  .narrative-section h1 {
+    font-size: clamp(2.3rem, 5vw, 3.6rem);
+    line-height: 1.04;
+  }
+
+  .narrative-section h2 {
+    font-size: clamp(1.7rem, 2.9vw, 2.1rem);
+    line-height: 1.1;
+  }
+
+  .narrative-section p {
+    line-height: 1.5;
+  }
+
+  .narrative-section__body {
+    gap: 0.85rem;
+  }
+
+  .narrative-section--hero .narrative-section__body {
+    gap: 1rem;
+  }
+
+  /* Clears the wordmark (box ends at y = 46.8) rather than the whole header
+     scrim, for the same reason the narrow block does. */
+  .narrative-layer > .narrative-section:nth-child(2),
+  .narrative-layer > .narrative-section:nth-child(5) {
+    padding-top: 3.6rem;
+    padding-bottom: 1rem;
+  }
+
+  /* Scoped to the pinned experience for the reason given in the narrow block:
+     the fallback scrolls, so none of this buys it anything. */
+  .narrative-layer .ledger {
+    margin-top: 0;
+  }
+
+  .narrative-layer .ledger__caption {
+    line-height: 1.32;
+  }
+
+  .narrative-layer .ledger__row {
+    padding: 0.26rem 0 0.3rem;
+  }
+
+  .narrative-layer .ledger__detail {
+    line-height: 1.42;
+    margin-top: 0.2rem;
+  }
+
+  /* Centred inside its own padding box, so the box has to stay symmetric or
+     the centring displaces it — same failure as beat 06 in the narrow block. */
+  .narrative-layer > .narrative-section:nth-child(6) {
+    padding-top: 3.6rem;
+    padding-bottom: 3.6rem;
+  }
+
+  .narrative-layer > .narrative-section:nth-child(6) .cta-row {
+    margin-top: 0;
   }
 }
 

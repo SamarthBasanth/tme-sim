@@ -169,7 +169,12 @@ _LARGE_GRID_CELLS = 1_500_000
 #:
 #: So a constrained host sets TMESIM_MAX_GRID_CELLS to what it can actually
 #: afford and gets a 400 with a reason instead of a dead container. 100_000
-#: permits dx >= ~20 um on this section and refuses dx = 12.
+#: permits dx >= 20.25 um on this section and refuses dx = 12 -- and
+#: refuses dx = 20 TOO, which this line used to say it allowed. Measured
+#: 2026-08-30 with this file's own extent formula on xenium_319:
+#: dx = 20 is 102,419 voxels, 2.4 % OVER the ceiling. Break-even is
+#: dx = 20.2405 um. An operator sizing a host off '~20' would have set a
+#: ceiling that refuses the resolution they picked it for.
 #: ``TMESIM_MAX_GRID_CELLS=auto`` adopts the largest grid MEASURED to survive
 #: on a host of this size -- 46,070 voxels, the dx = 30 um point above, which
 #: peaked at 220 MiB on the 512 MB instance. It applies a MEASUREMENT; it does

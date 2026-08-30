@@ -277,12 +277,43 @@ class TestTheVerdictIsKeyedToTheVersion:
             for sentence in entry.get("retired_text") or ():
                 assert sentence not in blob
 
-    def test_the_newest_entry_leads_the_change_list(self):
-        st = claim_set_status({"version": 0})
-        got = [c["version"] for c in st["changes"]]
-        assert got == sorted(got, reverse=True), (
-            "the most recent withdrawal is the one a stale reader most needs "
-            "first")
+    def test_the_newest_entry_leads_the_change_list(self, monkeypatch):
+        """The most recent withdrawal is the one a stale reader most needs first.
+
+        CORRECTION, 2026-08-30. This used to read the REAL log, which has ONE
+        entry, so ``changes`` had one element and
+        ``got == sorted(got, reverse=True)`` was true under every possible
+        ordering. Deleting the ``reversed()`` in ``claim_set_status`` left it
+        green. An ordering is only observable across several entries, so the
+        test now supplies them.
+        """
+        from app.server import jobs as _jobs
+
+        log = tuple(
+            {
+                "version": v,
+                "adopted": f"2026-08-2{v}",
+                "withdrew": (
+                    f"Synthetic withdrawal {v}, long enough to satisfy the "
+                    "record's own well-formedness rule and present only so "
+                    "that the change list has more than one element to order."
+                ),
+                "sources": CLAIM_SET_LOG[0]["sources"],
+                "retired_text": (),
+            }
+            for v in (1, 2, 3)
+        )
+        monkeypatch.setattr(_jobs, "CLAIM_SET_LOG", log)
+        monkeypatch.setattr(_jobs, "CLAIM_SET_VERSION", 3)
+
+        got = [c["version"] for c in _jobs.claim_set_status({"version": 0})["changes"]]
+        assert got == [3, 2, 1], (
+            f"the change list must be newest-first; got {got}")
+
+        # And a partially-stale record is told only what it missed, still
+        # newest-first -- the same rule, on the other branch.
+        mid = [c["version"] for c in _jobs.claim_set_status({"version": 1})["changes"]]
+        assert mid == [3, 2], mid
 
     def test_a_stamp_from_the_future_is_not_bannered(self):
         """A record newer than this build is not stale; it is unfamiliar.
@@ -355,16 +386,59 @@ class TestARecordCanContradictItsOwnStamp:
         assert st["contradicts"] and st["contradicts"][0]["version"] == 1
         assert "CONTRADICTS THE CLAIM SET IT IS STAMPED WITH" in st["headline"]
 
-    def test_the_contradiction_leads_when_both_findings_hold(self):
+    def test_the_contradiction_leads_when_both_findings_hold(self, monkeypatch):
         """"This record disagrees with the claim set it names" is a stranger
         fact than "this record is old", and a reader told only the second will
-        read the stamp as a reason to trust the text."""
-        st = claim_set_status({"version": 1}, [RETIRED])
-        # Force both: bump the notional current set by checking a stamp that is
-        # simultaneously behind and non-compliant is impossible at n=1, so this
-        # asserts the ordering rule directly on the branch that decides it.
-        assert st["contradicted"] is True
-        assert st["headline"].startswith("THIS RECORD CONTRADICTS")
+        read the stamp as a reason to trust the text.
+
+        CORRECTION, 2026-08-30. This test used to call
+        ``claim_set_status({"version": 1}, [RETIRED])`` and assert
+        ``contradicted is True`` and the CONTRADICTS headline, with a comment
+        conceding that making both findings hold "is impossible at n=1, so
+        this asserts the ordering rule directly on the branch that decides
+        it". It does not. At ``CLAIM_SET_VERSION == 1`` the two findings are
+        MUTUALLY EXCLUSIVE -- a stamp of 1 is not superseded, and a stamp of 0
+        honours no entry so it cannot contradict -- so the ``if contradicts /
+        elif superseded`` precedence is never exercised. Inverting that
+        precedence in ``jobs.py`` (making it ``if superseded / elif
+        contradicts``) left this test, and all 48 in this file, GREEN.
+
+        The ordering rule is only observable where both findings hold, so the
+        test has to build that state: a two-version log under which a record
+        stamped 1 is BOTH behind the current set (2) AND carrying a sentence
+        that claim set 1 -- one it claims to satisfy -- already retired.
+        """
+        from app.server import jobs as _jobs
+
+        later = {
+            "version": 2,
+            "adopted": "2026-08-29",
+            "withdrew": (
+                "A SECOND, SYNTHETIC withdrawal, present only so that a record "
+                "can be simultaneously behind the current claim set and "
+                "non-compliant with the one it names. It exists to exercise "
+                "the precedence between the two findings, which is otherwise "
+                "unreachable while the real log has a single entry."
+            ),
+            "sources": CLAIM_SET_LOG[0]["sources"],
+            "retired_text": ("a sentence retired only by claim set 2",),
+        }
+        monkeypatch.setattr(_jobs, "CLAIM_SET_LOG", (CLAIM_SET_LOG[0], later))
+        monkeypatch.setattr(_jobs, "CLAIM_SET_VERSION", 2)
+
+        st = _jobs.claim_set_status({"version": 1}, [RETIRED])
+
+        # Both findings genuinely hold -- this is the state the old test could
+        # not reach, and without it the assertion below cannot fail.
+        assert st["superseded"] is True, "behind claim set 2"
+        assert st["contradicted"] is True, "and non-compliant with claim set 1"
+
+        # THE RULE: the compliance finding leads.
+        assert st["headline"].startswith("THIS RECORD CONTRADICTS"), st["headline"]
+        assert "SUPERSEDED CLAIM SET" not in st["headline"]
+        assert "CONTRADICTS" in st["warning"]
+        # ...and being contradicted does not cost it the list of what it missed.
+        assert [c["version"] for c in st["changes"]] == [2]
 
     def test_an_unstamped_record_is_old_rather_than_non_compliant(self):
         """It never claimed to satisfy anything, so it cannot have failed to.
@@ -1023,14 +1097,35 @@ class TestOneVocabulary:
         js = _read("app", "web", "js", "ui", "provenance.js")
         assert "WITHDRAWN" in js and "SUPERSEDED" in js
 
-    def test_both_fronts_cite_the_same_measurement_for_the_same_withdrawal(self):
+    def test_both_fronts_cite_the_same_measurement_for_the_same_withdrawal(
+            self, tmp_path):
         """``report.py`` names two files when it declines to re-render a panel
         ranking. Claim set 1 withdrew that same ranking. Different citations
-        for one withdrawal would mean one of them is stale."""
-        report_src = _read("app", "server", "report.py")
+        for one withdrawal would mean one of them is stale.
+
+        CORRECTION, 2026-08-30. This used to assert ``src in report_src`` over
+        the WHOLE of ``report.py``. Both filenames also appear in that module's
+        own docstring and in several unrelated caveat strings, so the citations
+        inside the panel withdrawal — the only ones this test is about — could
+        be replaced with two other filenames and it stayed green. The check now
+        reads the warning the product actually EMITS, so it is scoped to the
+        withdrawal it claims to be about.
+        """
+        doc = TestAReportDocumentIsMarkedToo._doc(
+            "rep_09005", drug=None, drugs=["temozolomide", "carmustine"])
+        rep = TestAReportDocumentIsMarkedToo._restore(tmp_path, doc)
+
+        panel = [w for w in rep.warnings if "compound RANKING" in w]
+        assert len(panel) == 1, (
+            f"expected exactly one panel-withdrawal warning; got {rep.warnings}")
+
         ranking = [e for e in CLAIM_SET_LOG if "RANKING" in e["withdrew"]]
         assert ranking, "claim set 1 is the ranking withdrawal"
         for src in ranking[0]["sources"]:
-            assert src in report_src, (
-                f"claim set {ranking[0]['version']} cites {src}; report.py's "
-                "withdrawal of the same claim does not")
+            assert src in panel[0], (
+                f"claim set {ranking[0]['version']} cites {src}; the panel "
+                "withdrawal report.py emits for the SAME claim does not:\n"
+                f"  {panel[0]}\n"
+                "One of the two citations is stale. (Naming the file somewhere "
+                "else in report.py does not count -- that is what let this "
+                "test go green while the withdrawal cited something else.)")

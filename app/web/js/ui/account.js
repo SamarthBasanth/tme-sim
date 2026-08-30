@@ -443,8 +443,15 @@ export function createAccountPanel() {
 
     // The server's own framing, first and in full. A page headed "Usage" is
     // read as a meter unless it says otherwise before the numbers.
+    // The server's own sentence, READ, not re-authored. This block used to
+    // restate `usage.kind` in the client's own words while the module header
+    // above claimed it "repeats the server's own word for what those numbers
+    // are". It did not, and a caveat written in two places is corrected in
+    // one. `kind` leads; the elaboration stays here because the server sends a
+    // label, not a paragraph.
     wrap.appendChild(h('div.caveat.info', h('span',
-      h('b', 'THIS IS AN INVENTORY, NOT A METER. '),
+      h('b', `THIS IS ${String(u.kind || 'AN INVENTORY, NOT A METER')
+        .toUpperCase()}. `),
       'These are the things that exist on this server right now. Deleting a '
       + 'run makes the number go down. Nothing here accumulates, nothing is '
       + 'billed from it, and it is not a record of what has been done.')));
@@ -456,7 +463,19 @@ export function createAccountPanel() {
       row('reports', u.reports === null || u.reports === undefined
         ? NULL_GLYPH : int(u.reports)),
       row('process uptime', Number.isFinite(d.uptime_s)
-        ? dur(d.uptime_s) : NULL_GLYPH))));
+        ? dur(d.uptime_s) : NULL_GLYPH),
+      // Served by account.py and, until now, silently dropped here. A field
+      // the server computes and the client discards is a field nobody will
+      // notice going wrong.
+      row('reconstruction cache',
+        (u.reconstruction_cache && Number.isFinite(u.reconstruction_cache.size))
+          ? `${int(u.reconstruction_cache.size)} / `
+            + `${int(u.reconstruction_cache.maxsize)} entries · `
+            + `${int(u.reconstruction_cache.hits)} hits, `
+            + `${int(u.reconstruction_cache.misses)} misses`
+          : NULL_GLYPH,
+        'Reconstructions held in memory. Warm entries are why a second run on '
+        + 'the same section and dx is fast; it is not a usage record.'))));
 
     if (u.attribution) {
       wrap.appendChild(h('div.caveat.crit', h('span',

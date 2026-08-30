@@ -1542,6 +1542,38 @@ class Job:
             for k, v in self.body.items():
                 if not k.startswith("_"):
                     out[k] = v
+        # --- a pruned payload is not an available one --------------------- #
+        # `self.body` is copied wholesale above, so a run whose timelapse.bin
+        # was deleted by scripts/prune_run_payloads.py kept reporting
+        # `timelapse.available: true` next to its own `pruned_payloads` record.
+        # MEASURED 2026-08-30 on this store: 51 of 54 pruned runs asserted
+        # BOTH, in one payload — the API simultaneously claiming the file is
+        # there and that it was deleted. The 410 path in api.py::_binary was
+        # right; the run document beside it was not, which is worse than either
+        # being wrong alone, because a client that trusts the document never
+        # asks for the payload and never sees the correct answer.
+        #
+        # Reconciled at READ time, like the delivery law below and for the same
+        # reason: the record on disk stays what the run wrote. The prune is a
+        # fact about the filesystem NOW, so it belongs in the view, not in the
+        # history.
+        if annotate:
+            pruned = out.get("pruned_payloads") or {}
+            for name, rec in (pruned.items() if isinstance(pruned, dict) else ()):
+                block = out.get(name)
+                if not isinstance(block, dict):
+                    continue
+                block = dict(block)
+                block["available"] = False
+                block["pruned"] = True
+                block["reason"] = (
+                    f"this run produced {name}, and the file was deleted on "
+                    f"{rec.get('at', 'an unrecorded date')} to reclaim disk "
+                    f"({rec.get('bytes', 0):,} bytes). Re-run the RunSpec in "
+                    "this record to reproduce it."
+                )
+                out[name] = block
+
         # --- delivery law, backfilled for runs that predate the record ------ #
         # Runs completed before this field existed are still served from
         # app/runs/ and still put a ranked delivery number on screen, so they

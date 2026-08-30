@@ -40,6 +40,8 @@ it. The whole file is well under a second.
 from __future__ import annotations
 
 import sys
+import textwrap
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -49,23 +51,32 @@ from tmesim.core import DrugParams
 from tmesim.core.config import PDEConfig, SimConfig
 from tmesim.sim.engine import simulate_response
 from tmesim.validation.propagation import (
+    ALT_SOLVERS,
     DECLARATIONS,
     EXCHANGE,
     EXEMPTIONS,
     FLAGS,
     TWO_ROUTE,
+    WATCHED,
     Category,
     Declaration,
     Flag,
+    WatchedTargetMissing,
     check_flag_propagation,
+    cited_lines,
     declaration_for,
     digest,
     instrument,
+    recognised_lines,
     scan_call_sites,
+    stale_citations,
     sweep_repo,
     undeclared_direct_callers,
     undeclared_paths,
+    undeclared_sites,
     undeclared_wiring,
+    unresolvable_watched,
+    unwatched_alternates,
     wiring_points,
 )
 
@@ -478,14 +489,17 @@ def test_vessel_profile_is_split_not_averaged():
 def test_no_undeclared_paths(flag: Flag):
     """The part that does not depend on anyone remembering.
 
-    A file that reaches the destination without the carrier -- or that computes
+    A file that reaches the destination without the carrier -- that computes
     the governed quantity out of the precursors and never reaches the
-    destination at all -- is a code path on which the flag is silently inert
-    and nobody has written it down.
+    destination at all -- or whose only route to the physics is a
+    RE-IMPLEMENTED destination the flag cannot reach -- is a code path on which
+    the flag is silently inert and nobody has written it down.
     """
-    undeclared = undeclared_paths(REPO, flag=flag)
+    sites = undeclared_sites(REPO, flag=flag)
+    undeclared = [f"{p}:{','.join(str(n) for n in lines)}"
+                  for p, lines in sorted(sites.items())]
     assert not undeclared, (
-        f"the {flag.name} flag is a silent no-op in these files and they have "
+        f"the {flag.name} flag is a silent no-op at these lines and they have "
         "no declaration:\n  " + "\n  ".join(undeclared) + "\n\n"
         f"Add a Declaration (with a reason) to the {flag.name} table in "
         "tmesim.validation.propagation, or route the computation through "
@@ -770,3 +784,358 @@ def test_sweep_covers_every_known_affected_module():
             with pytest.raises(LookupError):
                 declaration_for(path)
             assert declaration_for(path, symbol).category is Category.INERT
+
+
+# =========================================================================== #
+# 5. What the guard was silently NOT checking
+#
+# Everything above proves the checker classifies correctly. This section is
+# about the tables and the instrumentation themselves -- the parts that had no
+# guard of their own and so could rot while every test above stayed green.
+# =========================================================================== #
+def _fake_root(tmp_path: Path, files: dict) -> Path:
+    """A minimal repo-shaped tree, so a sweep can be run over a PLANTED defect
+    without touching the real tables."""
+    for rel, src in files.items():
+        p = tmp_path / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(textwrap.dedent(src), encoding="utf-8")
+    return tmp_path
+
+
+def _bare_flag(**kw) -> Flag:
+    """EXCHANGE with the real tables emptied, for planting into."""
+    base = dict(declarations=(), exemptions=(), wiring_points=())
+    base.update(kw)
+    return replace(EXCHANGE, **base)
+
+
+# --- (a) a file added since the last sweep, reaching transport by a route the
+#         static scan never looked for -------------------------------------- #
+def test_an_alternate_solver_only_file_is_not_invisible(tmp_path):
+    """The hole. ``ALT_SOLVERS`` was consulted DYNAMICALLY only.
+
+    ``Probe.alt_solver_calls`` withholds UNREACHABLE when a re-implemented
+    solver ran, but ``sweep_repo`` looked for the destination, the entry points
+    and the precursors and nothing else. A file whose ONLY route to the physics
+    is an alternate solver therefore appeared in NO sweep: it solved transport,
+    the flag could not reach it, and no guard asked the question. That silence
+    is the same silence as an undeclared NO_PDE, arrived at from the far side.
+    """
+    root = _fake_root(tmp_path, {
+        "experiments/steady_probe.py": """
+            from app.server.reach import steady_state_concentration
+
+            def probe(micro, drug, source):
+                return steady_state_concentration(micro, drug, source)
+        """,
+        # The control: a file on the sanctioned route must NOT be flagged, or
+        # the check is just "everything is undeclared" and proves nothing.
+        "experiments/honest_probe.py": """
+            from tmesim.sim.engine import simulate_response
+
+            def probe(micro, cfg):
+                return simulate_response(micro, cfg)
+        """,
+    })
+
+    swept = sweep_repo(root, flag=EXCHANGE)
+    cs = swept["experiments/steady_probe.py"]
+    assert cs.alt_calls, "the alternate-solver call site was not even scanned"
+    assert cs.direct_calls == () and cs.engine_calls == ()
+    assert cs.unreached_alt_calls == cs.alt_calls
+    assert cs.undeclarable == cs.alt_calls
+
+    sites = undeclared_sites(root, flag=EXCHANGE)
+    assert "experiments/steady_probe.py" in sites, (
+        "a file that solves transport through an ALT_SOLVER and nothing else "
+        "is still invisible to the sweep")
+    assert "experiments/honest_probe.py" not in sites
+
+
+def test_the_alternate_route_is_suppressed_once_the_real_one_is_reached(tmp_path):
+    """The polarity, pinned. An alternate call in a file that ALSO reaches the
+    destination is not a separate defect -- that file already has a verdict, and
+    reporting it twice would push people to widen the exemption list."""
+    root = _fake_root(tmp_path, {
+        "experiments/both.py": """
+            def probe(micro, drug, source, pde):
+                a = simulate_drug_transport(micro, drug, source, pde)
+                b = bath_diffusion(micro, 10.0, drug)
+                return a, b
+        """,
+    })
+    cs = sweep_repo(root, flag=EXCHANGE)["experiments/both.py"]
+    assert cs.alt_calls and cs.direct_calls
+    assert cs.unreached_alt_calls == ()
+    assert cs.undeclarable == cs.bare_direct_calls
+
+
+def test_the_alt_solver_homes_are_still_visible_to_the_real_sweep():
+    """A floor under the check above: if the alternate scan silently stopped
+    matching, every assertion in this section would pass vacuously."""
+    swept = sweep_repo(REPO, flag=EXCHANGE)
+    for path in ("tmesim/validation/moncayo_explant.py", "app/server/reach.py"):
+        assert path in swept, f"{path} vanished from the sweep"
+        assert swept[path].alt_calls, f"{path} no longer shows alternate-solver calls"
+
+
+# --- a per-function declaration must not license the rest of the file ------- #
+def test_a_symbol_declaration_does_not_license_the_whole_file(tmp_path):
+    """The sweep keyed declarations by PATH, so declaring one function
+    whitelisted every other function in the same file -- including ones written
+    afterwards. ``vessel_profile.py`` is declared per-function precisely because
+    a file can hold both polarities, which is exactly the file shape where this
+    hole bites."""
+    root = _fake_root(tmp_path, {
+        "tmesim/mixed.py": """
+            def declared_half(micro, drug, source, pde, k):
+                return simulate_drug_transport(micro, drug, source, pde, exchange_k=k)
+
+            def written_later(micro, drug, source, pde):
+                return simulate_drug_transport(micro, drug, source, pde)
+        """,
+    })
+    flag = _bare_flag(declarations=(
+        Declaration(
+            path="tmesim/mixed.py",
+            symbol="declared_half",
+            category=Category.PROPAGATED,
+            reason="Passes exchange_k explicitly; this half is on the honest path.",
+        ),
+    ))
+
+    # The path-keyed predicate the old sweep used would have passed this file.
+    assert "tmesim/mixed.py" in {d.path for d in flag.declarations}
+
+    sites = undeclared_sites(root, flag=flag)
+    assert "tmesim/mixed.py" in sites, (
+        "an undeclared bare call beside a declared function is not reported")
+    assert sites["tmesim/mixed.py"] == (6,), sites
+    # And the declared half is genuinely covered, not merely drowned out.
+    assert 3 not in sites["tmesim/mixed.py"]
+
+
+# --- (b) a stale table entry ------------------------------------------------ #
+@pytest.mark.parametrize("flag", FLAGS, ids=[f.name for f in FLAGS])
+def test_a_stale_entry_cannot_suppress_anything(flag: Flag):
+    """Every path named by any table still exists.
+
+    ``test_no_declaration_or_exemption_is_stale`` already asserts this for
+    declarations and exemptions; this adds wiring points and states the
+    consequence directly, because the danger of a stale entry is not that it is
+    untidy -- it is that ``undeclared_sites`` skips a path a table names, so a
+    file later written at that path inherits a permission nobody re-read.
+    """
+    for d in flag.declarations:
+        assert (REPO / d.path).is_file(), f"{flag.name}: stale declaration {d.name}"
+    for e in flag.exemptions:
+        assert (REPO / e.path).is_file(), f"{flag.name}: stale exemption {e.path}"
+    for w in flag.wiring_points:
+        assert (REPO / w.path).is_file(), f"{flag.name}: stale wiring point {w.path}"
+
+
+# --- (c) a written reason that cites a line which has since MOVED ----------- #
+@pytest.mark.parametrize("flag", FLAGS, ids=[f.name for f in FLAGS])
+def test_no_written_reason_cites_a_line_that_has_moved(flag: Flag):
+    """The reason IS the product of this module.
+
+    ``INERT`` and ``NO_PDE`` are claims a person signed, and the signature is
+    the sentence naming WHERE the flag stops existing. Nothing checked those
+    line numbers, so they drifted with every edit above them while the entry
+    went on reading as if it had been verified. Three had already drifted when
+    this test was written; one of them had drifted onto the other half of a
+    split file, so the evidence for "this function is INERT" pointed into the
+    function declared PROPAGATED.
+    """
+    stale = stale_citations(REPO, flag=flag)
+    assert not stale, (
+        f"{flag.name}: written reasons citing lines that have moved:\n  "
+        + "\n  ".join(f"{name}: {'; '.join(msgs)}" for name, msgs in stale.items())
+        + "\n\nRe-read the code and correct the citation. Deleting the line "
+        "number instead is allowed, but only if you have actually re-checked "
+        "the claim it was supporting."
+    )
+
+
+def test_the_citation_check_has_a_subject():
+    """A citation checker over reasons that cite nothing passes vacuously.
+
+    This is the defect class this repo keeps producing, so the floor is pinned:
+    the real tables must actually contain line citations for the check to be
+    checking anything.
+    """
+    cited = {
+        f"{f.name}:{d.name}": cited_lines(d.reason)
+        for f in FLAGS for d in f.declarations if cited_lines(d.reason)
+    }
+    assert len(cited) >= 9, cited
+    # And every one of them resolves -- which is what the test above asserts,
+    # restated here so the floor and the check cannot drift apart.
+    for f in FLAGS:
+        for d in f.declarations:
+            for named, line in cited_lines(d.reason):
+                assert line in recognised_lines(REPO / d.path, flag=f), (d.name, line)
+
+
+def test_the_citation_reader_reads_the_spellings_the_tables_use():
+    """...and refuses the digits that are NOT line numbers. A reader that
+    harvested every integer would fail on ``1.554447793e+09`` and ``R^2 =
+    0.022`` and the check would be abandoned as noisy."""
+    assert cited_lines("directly (pk_reality.py:218) with no exchange_k") == (
+        ("pk_reality.py", 218),)
+    assert cited_lines("unit_transport (line 307) calls the solver") == ((None, 307),)
+    assert cited_lines("at three sites (415, 826, 853) with no exchange_k") == (
+        (None, 415), (None, 826), (None, 853))
+    # Not line numbers.
+    assert cited_lines("auc_sum was 1.554447793e+09 against 6.86608671e+08") == ()
+    assert cited_lines("scored at R^2 = 0.022 against 71 compounds") == ()
+    assert cited_lines("alpha moved 148.60815765445545 -> 22.223477711172563") == ()
+    assert cited_lines("a Declaration needs a written reason (>=25 chars)") == ()
+
+
+def test_the_citation_check_goes_red_on_a_line_that_moved(tmp_path):
+    """The plant, permanently. A citation checker that cannot fail is the
+    problem it was written to solve."""
+    root = _fake_root(tmp_path, {
+        "tmesim/drifted.py": "\n" * 40 + textwrap.dedent("""\
+            def f(micro, drug, source, pde):
+                return simulate_drug_transport(micro, drug, source, pde)
+        """),
+    })
+    assert recognised_lines(root / "tmesim/drifted.py", flag=EXCHANGE) == frozenset({42})
+
+    honest = _bare_flag(declarations=(Declaration(
+        path="tmesim/drifted.py", category=Category.INERT,
+        reason="Calls the solver bare at drifted.py:42 with no exchange_k at all.",
+    ),))
+    assert stale_citations(root, flag=honest) == {}
+
+    drifted = _bare_flag(declarations=(Declaration(
+        path="tmesim/drifted.py", category=Category.INERT,
+        reason="Calls the solver bare at drifted.py:12 with no exchange_k at all.",
+    ),))
+    problems = stale_citations(root, flag=drifted)
+    assert "tmesim/drifted.py" in problems, "a moved citation was not caught"
+    assert "cites line 12" in problems["tmesim/drifted.py"][0]
+
+    # A citation naming a DIFFERENT file is refused too, rather than skipped --
+    # skipping is how a citation check quietly stops covering half its table.
+    cross = _bare_flag(declarations=(Declaration(
+        path="tmesim/drifted.py", category=Category.INERT,
+        reason="Calls the solver bare at somewhere_else.py:42, no exchange_k at all.",
+    ),))
+    assert "is not the file this entry is about" in (
+        stale_citations(root, flag=cross)["tmesim/drifted.py"][0])
+
+
+# --- the WATCHED soft reference into the optional app/ package -------------- #
+@pytest.mark.parametrize("flag", FLAGS, ids=[f.name for f in FLAGS])
+def test_every_watched_target_still_resolves(flag: Flag):
+    """``WATCHED`` holds STRINGS, so a renamed target does not break an import.
+    It just stops being patched, silently, and an alternate solver that is not
+    patched cannot withhold the UNREACHABLE verdict."""
+    bad = unresolvable_watched(flag)
+    assert not bad, (
+        f"{flag.name}: watched targets that no longer resolve: {bad}\n"
+        "This does not raise on import and it does not fail any other test -- "
+        "it silently stops instrumenting the target."
+    )
+
+
+@pytest.mark.parametrize("flag", FLAGS, ids=[f.name for f in FLAGS])
+def test_every_registered_alternate_is_actually_instrumented(flag: Flag):
+    """Being in ``ALT_SOLVERS``/``precursors`` does nothing on its own.
+
+    ``Probe.of(name)`` returns ``[]`` for a function that was never patched, so
+    a name registered in one table and absent from ``WATCHED`` counts zero
+    calls however often it runs -- and the verdict falls straight through to
+    UNREACHABLE, exactly as if the alternate had never been registered.
+    ``tissue_hindrance`` was in this state and only escaped producing a false
+    UNREACHABLE because it happens to call a watched primitive internally.
+    """
+    missing = unwatched_alternates(flag)
+    assert not missing, (
+        f"{flag.name}: registered as alternate/precursor but never "
+        f"instrumented: {missing}. Add (module, attr) to the flag's watched "
+        "tuple; registering a name that nothing patches is a guard that "
+        "reports green while counting nothing."
+    )
+
+
+def test_the_app_soft_reference_resolves_today():
+    """The one deliberately soft entry in ``WATCHED``, checked against the real
+    code rather than trusted.
+
+    ``app/`` is an optional extra, so ``instrument`` is allowed to skip this
+    target when the PACKAGE is not installed. It is not allowed to skip it
+    because the function was renamed -- and nothing distinguished the two.
+    """
+    assert ("app.server.reach", "steady_state_concentration") in WATCHED
+    assert "steady_state_concentration" in ALT_SOLVERS
+
+    try:
+        from app.server import reach
+    except ModuleNotFoundError as exc:  # pragma: no cover - app extra installed here
+        assert (exc.name or "").split(".")[0] == "app", (
+            f"app/ failed to import for a reason that is NOT an absent extra: {exc}")
+        pytest.skip("app extra not installed; the soft reference is untestable here")
+
+    fn = getattr(reach, "steady_state_concentration", None)
+    assert fn is not None, (
+        "app.server.reach imports fine but steady_state_concentration is gone. "
+        "That is a RENAME, not an absent optional extra: the watch silently "
+        "stops and app/server/reach.py starts reading as NO_PDE -- 'no "
+        "transport solve happens here' -- about the module that solves the "
+        "transport steady state.")
+
+    # ALT_SOLVERS claims this one takes exchange_k explicitly and defaults it to
+    # None. Hold the comment to its word: if it lost the parameter, the reason
+    # written beside it in the table would be false.
+    import inspect
+
+    params = inspect.signature(fn).parameters
+    assert "exchange_k" in params, params
+    assert params["exchange_k"].default is None, params["exchange_k"].default
+
+
+def test_a_renamed_watched_target_is_loud_not_silently_unwatched(monkeypatch):
+    """The plant for the soft reference. ``instrument`` used to swallow EVERY
+    resolution failure with ``except Exception: continue``."""
+    reach = pytest.importorskip("app.server.reach")
+    assert hasattr(reach, "steady_state_concentration")
+
+    from tmesim.physics import diffusion
+    before = diffusion.simulate_drug_transport
+
+    monkeypatch.delattr(reach, "steady_state_concentration")
+
+    assert ("app.server.reach", "steady_state_concentration") in unresolvable_watched(EXCHANGE)
+    with pytest.raises(WatchedTargetMissing) as excinfo:
+        with instrument():
+            pass
+    assert "steady_state_concentration" in str(excinfo.value)
+    # Everything patched before the failure is still restored.
+    assert diffusion.simulate_drug_transport is before
+
+
+def test_an_absent_optional_package_is_the_only_tolerated_degradation():
+    """The other half of the distinction, or the test above would just be
+    "never tolerate anything" and would break a checkout without ``.[app]``."""
+    absent = _bare_flag(watched=(
+        ("tmesim.physics.diffusion", "simulate_drug_transport"),
+        ("no_such_optional_extra.server.reach", "steady_state_concentration"),
+    ))
+    assert unresolvable_watched(absent) == {}
+    with instrument(flag=absent) as probe:  # must NOT raise
+        pass
+    assert probe.calls == []
+
+    # ... whereas an importable module missing the attribute is a rename.
+    renamed = _bare_flag(watched=(
+        ("tmesim.physics.diffusion", "renamed_away_solver"),
+    ))
+    assert ("tmesim.physics.diffusion", "renamed_away_solver") in unresolvable_watched(renamed)
+    with pytest.raises(WatchedTargetMissing):
+        with instrument(flag=renamed):
+            pass

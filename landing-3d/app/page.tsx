@@ -1,6 +1,16 @@
 import ScrollExperience from "@/components/scroll/ScrollExperience";
+import { assertStudioUrl } from "@/lib/envGuard";
 
 export default function Home() {
+  /*
+   * The build-time refusal for NEXT_PUBLIC_STUDIO_URL. This is a SERVER
+   * component, so the check runs while the page is prerendered — during
+   * `next build` — and neither it nor the `localhost` regex it needs is
+   * compiled into the browser bundle. lib/envGuard.ts carries the argument for
+   * why that matters and why this is a call rather than a side-effect import.
+   */
+  assertStudioUrl();
+
   return (
     <>
       {/*
