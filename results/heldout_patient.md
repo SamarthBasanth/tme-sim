@@ -1,5 +1,39 @@
 # The held-out patient — running the whole validated pipeline on a second real GBM section
 
+> # ⚠️ WITHDRAWN SUBJECT — BANNER ADDED 2026-09-03. THE CROSS-COMPOUND ORDERING THIS DOCUMENT RESTS ON NO LONGER EXISTS AS A CLAIM.
+>
+> **This banner is the only edit made to this file.** Nothing below it has been
+> changed, reworded, re-scored or removed. It is preserved byte-identical as the
+> record of what was believed and measured at the time, because a record that was
+> wrong is part of the record.
+>
+> **What is below.** Re-runs the whole pipeline on a second real GBM section the pipeline was never developed on. Its §3 asks whether the compound ordering holds on that second patient, §6 lists ordering results among what generalises and what does not, and §6.5 reports the ordering and the delivery × potency structure behind it as surviving. **Those rows are about the withdrawn output.** The reconstruction and vascular-morphometry rows — endothelial fraction, vascular area fraction, MVD — and the hypoxia check are unaffected, and they remain the load-bearing negative results of the report.
+>
+> **What was withdrawn, and when.** On **2026-08-21** Vivum withdrew the ordering
+> of one compound against another. The withdrawal is absolute rather than
+> conditional: there is no grid spacing, no section and no compound set for which
+> this product orders compounds against each other. It is not a confidence
+> downgrade and it is not satisfied by a hedge, a stated limit or a stated
+> uncertainty — the output was removed, and `compare-drugs` was removed with it.
+> `README.md` carries the withdrawal in full.
+>
+> **The two measurements that withdrew it.**
+>
+> * [`results/pk_ranking_robustness.md`](pk_ranking_robustness.md) — per-compound
+>   plasma exposure across the retained compounds spans **113.1x**, while the
+>   published order first breaks at a spread of **1.53x**. The variation that real
+>   per-compound dosing supplies is far wider than the margin the order tolerates.
+> * [`results/capacity_ranking_robustness.md`](capacity_ranking_robustness.md) —
+>   the engine carries **no per-compound tissue-capacity term at all**. Under a
+>   *uniform* capacity — every compound given the same value, which is exactly the
+>   case the "a constant error cancels out of a ranking" defence covers — the
+>   published order still breaks, at **R = 36.3** on the GBM 10-drug panel and
+>   **R = 5.28** on the breast 10-drug panel, both below the best available
+>   constant of **39**.
+>
+> **Neither reason is repairable inside this document**, and nothing below is
+> re-run or re-scored by this banner.
+
 Every validated result in this project was developed on **one** tissue: the 319-gene 10x Xenium GBM section (40,887 cells). This report re-runs the entire pipeline — reconstruction, vessel segmentation, the five-drug simulation and the hypoxia check — on a **second real patient the pipeline was never developed on**: the 480-gene Immuno-Oncology Xenium GBM section (816,769 cells). Both sections are driven through the identical frozen production path at the identical settings, so **section 1's numbers here are re-derived, not quoted**.
 
 **3 of 7 claims that could be scored as generalisation replicate.** A further 2 fail on **both** sections — those are not generalisation failures, they are claims that do not hold in this configuration at all, and they are called out separately because conflating the two would be the easiest way to make this report say something it should not. The headline, one line each:

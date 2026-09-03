@@ -394,9 +394,11 @@ above would have to be re-measured.
 [`results/grid_convergence_gbm.md`](results/grid_convergence_gbm.md) §2.1
 
 **The top-1 pick is not decision-grade.** Correcting the delivery law changes the
-top-1 GBM pick (cisplatin → vincristine), changes the top-3 set, and swaps 4 of 45
-pairs — two of them across gaps of 40.5 % and 35.6 % of the leader's kill.
-P(cisplatin rank 1) falls **0.9277 → 0.3965**.
+top-1 GBM pick outright, changes the top-3 set, and swaps 4 of 45 pairs — two of
+them across gaps of 40.5 % and 35.6 % of the leader's kill. The leader's
+probability of holding rank 1 falls **0.9277 → 0.3965**. Which compounds traded
+places is not named: the magnitude is what makes the ordering undecidable, and
+printing the pair would print the ordering this page withdrew.
 → [`results/transvascular_exchange_revalidation.md`](results/transvascular_exchange_revalidation.md) §4.1.
 `results/ranking_robustness.md` §8: *"the reportable output of this pipeline for
 the top of the panel is a SET, not a winner."*
@@ -654,7 +656,7 @@ wins. The molecular layer's own contract: [`MOLECULAR_CONTRACT.md`](MOLECULAR_CO
 | What is the model, mathematically? | [`docs/MATHEMATICAL_MODEL.md`](docs/MATHEMATICAL_MODEL.md) |
 | Where did every byte of data come from? | [`docs/DATA_INVENTORY.md`](docs/DATA_INVENTORY.md) |
 | What open data exists to validate this, and what does not? | [`results/DATA_HUNT.md`](results/DATA_HUNT.md) |
-| How should I compare drugs? | [`results/delivery_metrics.md`](results/delivery_metrics.md) |
+| Which delivery metric is defensible, and why was the old one retired? | [`results/delivery_metrics.md`](results/delivery_metrics.md) |
 | Is the solver trustworthy? | [`results/numerical_rigor.md`](results/numerical_rigor.md) + its correction block |
 | Is the grid fine enough? | [`results/grid_convergence_gbm.md`](results/grid_convergence_gbm.md), [`results/grid_convergence_breast.md`](results/grid_convergence_breast.md) |
 | Scripting drug/dose/sweep experiments | [`PROTOCOL_LANGUAGE.md`](PROTOCOL_LANGUAGE.md) + Studio's protocol tab |

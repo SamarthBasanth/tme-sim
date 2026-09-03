@@ -880,3 +880,76 @@ class TestAccountPanel:
         assert counts["btn"] is True
         assert counts["dlg"] is True
         assert counts["rails_unchanged"] is True
+
+
+@pytest.mark.parametrize("mode", ["steady_state", "finite_window"])
+def test_every_figure_on_the_reach_panel_carries_a_capacity_note(
+        page, web_server, mode):
+    """No figure block may be silent about capacity while its siblings speak.
+
+    The panel renders three figures off one field: the DELIVERY SPREAD (a ratio
+    of two percentiles), the FALLOFF curve, and the reach LADDER. The falloff
+    and the ladder each carried a three-state capacity note keyed on
+    `window_mode`; the delivery spread carried none, so the figure with a
+    MEASURED capacity sensitivity was the one figure with nothing on it saying
+    so. Found by a claim-surface audit on 2026-08-30, not by this file.
+
+    The engine assigns every compound a tissue capacity of exactly 1.0 while
+    measured values span 3.2 to 4184 mL/g, so "does capacity reach this number"
+    is a question every figure here has to answer — and in a steady map the
+    answer is a clean "no, by inspection", which is worth saying rather than
+    leaving to inference.
+
+    This test is structural on purpose. It does not check the wording; it
+    checks that no figure heading is followed by evidence with no capacity
+    statement between it and the next figure.
+    """
+    from app.server import reach as R  # noqa: PLC0415
+
+    run = _run_fixture()
+    run["reach"] = {
+        "null_reason": None,
+        "headline_x": 0.1,
+        "headline_under_reached_fraction": 0.00049800796812749,
+        "curve": {"x": [0.01, 0.1, 1.0],
+                  "under_reached_fraction": [0.0005, 0.0005, 0.3934]},
+        "falloff": {"distance_um": [5.0, 55.0],
+                    "normalised_mean_auc": [1.0, 0.6], "bin_um": 10.0},
+        "E_ref_uM_s": 4708982.107545392,
+        "E_ref_units": "uM" if mode == "steady_state" else "uM*s",
+        "E_ref_source": "penetration_length_fit(...)['drug']['perivascular_mean']",
+        "window_mode": mode,
+        "window_note": "note",
+        "units": {"E_ref": "uM" if mode == "steady_state" else "uM*s"},
+        "convention": R.CONVENTION_NOTE,
+        "scale_invariance": _backend_notes()[mode],
+    }
+    text = page.evaluate(_RENDER_JS, [web_server, "reach.js", run])
+
+    assert "DELIVERY SPREAD" in text, "the delivery spread figure is missing"
+    spread_at = text.index("DELIVERY SPREAD")
+
+    # Every capacity statement on the panel, in render order.
+    caps = [m.start() for m in re.finditer(r"CAPACIT", text)]
+    assert caps, "the panel renders no capacity statement at all"
+
+    after_spread = [c for c in caps if c > spread_at]
+    assert after_spread, (
+        "the DELIVERY SPREAD figure is rendered with no capacity statement "
+        "anywhere below it, while the falloff and ladder below both carry one")
+
+    # And it must be attached to the spread, not borrowed from the next figure:
+    # the gap between the heading and its capacity note must be smaller than
+    # the gap to the following figure's heading.
+    nxt = [text.index(h) for h in ("FALLOFF", "falloff", "LADDER", "ladder")
+           if h in text and text.index(h) > spread_at]
+    if nxt:
+        assert after_spread[0] < min(nxt), (
+            "the first capacity statement after DELIVERY SPREAD belongs to the "
+            "NEXT figure — the spread itself is still silent")
+
+    # The two modes say opposite things, and neither may be absent.
+    if mode == "steady_state":
+        assert "CANNOT REACH" in text
+    else:
+        assert "CAPACITY-SENSITIVE" in text

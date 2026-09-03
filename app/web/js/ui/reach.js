@@ -691,6 +691,64 @@ function renderSpread(el, run, ctx) {
       + 'and extra_metrics.E_p10_uM. Within-map heterogeneity only: not a '
       + 'permeability result, not an absolute kill fraction, not comparable '
       + 'across compounds.', 'the delivery spread')));
+    /* THE CAPACITY CAVEAT, WHICH THIS BLOCK DID NOT CARRY AND ITS TWO
+     * SIBLINGS BOTH DO.
+     *
+     * The falloff curve and the reach ladder each render a three-state
+     * capacity note keyed on `window_mode`. The delivery spread — the same
+     * field, read as a ratio of two percentiles — rendered none, so the one
+     * figure on this panel with a measured capacity sensitivity was also the
+     * one with nothing on it saying so. Found by a claim-surface audit, not by
+     * this panel's own tests.
+     *
+     * Numbers below read from results/p90_capacity_sweep.json (2026-08-24),
+     * arm A, `truncated window (dt/R, T/R), convection ON`. Its ladder runs
+     * R = 1 to 4184; at R = 39, the best-available constant, the ratio's
+     * fold-change from R = 1 spans 1.258x to 1.562x across the compounds it
+     * swept. Stated as a RANGE across the panel, deliberately: naming which
+     * compound moved more would put two compounds' numbers where a reader
+     * compares them, which is the ordering this product withdrew.
+     *
+     * NOTE FOR WHOEVER RECONCILES THE RECORD: that JSON's own verdict field
+     * reads "THE HEADLINE IS CAPACITY-SENSITIVE AND SO IS THE CLAIM BUILT ON
+     * IT", while results/p90_capacity_sweep.md beside it still reads "Status:
+     * PRE-DECLARED, NOT YET RUN", and the JSON carries only arm A of the two
+     * that were pre-declared. That discrepancy is NOT resolved here — a dated
+     * record and a headline claim are not a UI fix. What is fixed here is the
+     * narrower and unarguable thing: this block was silent where its siblings
+     * speak. */
+    el.appendChild(h('div.caveat.crit', h('span',
+      ctx.mode === MODE.UNRECORDED
+        ? [h('b', 'WHETHER CAPACITY REACHES THIS RATIO IS NOT RECORDED. '),
+           'A tissue-capacity term R rescales TIME, so whether it touches '
+           + 'this ratio depends entirely on which of the two maps produced '
+           + 'it — and this record does not say (window_mode is absent). On a '
+           + 'converged steady state R multiplies a time derivative the map '
+           + 'does not have. Over a finite window it does reach this figure: '
+           + 'measured at R = 39, the ratio is 1.258x to 1.562x its R = 1 '
+           + 'value depending on the compound. Treat this figure as carrying '
+           + 'the worse of those two until the run is re-made on a build that '
+           + 'records its mode.']
+        : ctx.mode === MODE.STEADY
+        ? [h('b', 'CAPACITY CANNOT REACH THIS RATIO. '),
+           'A tissue-capacity term R multiplies the TIME DERIVATIVE and '
+           + 'nothing else, and a converged steady state has no time '
+           + 'derivative — so R is absent from this map by inspection, not '
+           + 'small. This is the one limit a FINITE-WINDOW reading of the '
+           + 'same field does carry: there, at R = 39, this ratio measures '
+           + '1.258x to 1.562x its R = 1 value depending on the compound.']
+        : [h('b', 'THIS RATIO IS CAPACITY-SENSITIVE. '),
+           'The engine assigns every compound a tissue capacity of exactly '
+           + '1.0. Measured values span 3.2 to 4184 mL/g (n = 33 rat brain '
+           + 'slices; best-available constant 39). Capacity rescales time, so '
+           + 'over a finite window it changes how far the field has got. '
+           + 'Swept over R = 1 to 4184, this ratio at R = 39 is 1.258x to '
+           + '1.562x its R = 1 value depending on the compound, and it keeps '
+           + 'climbing above that. The number above is therefore conditional '
+           + 'on a term this engine does not measure and assumes to be 1.0. '
+           + 'Source: results/p90_capacity_sweep.json.'],
+    )));
+
     // THIS MAP CANNOT SEE A PERMEABILITY BARRIER, and it is the first thing a
     // reader will assume it does. bbb_penetrance is a pure global multiplier
     // on the source term, so it divides out of every within-map ratio —

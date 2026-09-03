@@ -1,5 +1,39 @@
 # Bring your own compound — what a self-compiled molecule is, and what it is not
 
+> # ⚠️ WITHDRAWN SUBJECT — BANNER ADDED 2026-09-03. THE CROSS-COMPOUND ORDERING THIS DOCUMENT RESTS ON NO LONGER EXISTS AS A CLAIM.
+>
+> **This banner is the only edit made to this file.** Nothing below it has been
+> changed, reworded, re-scored or removed. It is preserved byte-identical as the
+> record of what was believed and measured at the time, because a record that was
+> wrong is part of the record.
+>
+> **What is below.** What a self-compiled, user-supplied molecule is and is not. **This is a second, separate banner** — the one immediately below it, dated 2026-08-14, concerns the diffusivity law and is unrelated to this one. What is superseded here is §6.1, "The permitted claim, in full", whose **CAN** clause grants the reader permission to compare a supplied compound against others on the same section and read the resulting ordering. **That permission is revoked.** The prohibition admits no hedge: an ordering offered as an ordering of the model's inputs, or as an unvalidated one, is still an ordering. The §3 finding already sitting in the **CANNOT** clause — that the transport ordering is refuted for analogues of similar molecular weight — was correct and is now subsumed by the broader withdrawal.
+>
+> **What was withdrawn, and when.** On **2026-08-21** Vivum withdrew the ordering
+> of one compound against another. The withdrawal is absolute rather than
+> conditional: there is no grid spacing, no section and no compound set for which
+> this product orders compounds against each other. It is not a confidence
+> downgrade and it is not satisfied by a hedge, a stated limit or a stated
+> uncertainty — the output was removed, and `compare-drugs` was removed with it.
+> `README.md` carries the withdrawal in full.
+>
+> **The two measurements that withdrew it.**
+>
+> * [`results/pk_ranking_robustness.md`](pk_ranking_robustness.md) — per-compound
+>   plasma exposure across the retained compounds spans **113.1x**, while the
+>   published order first breaks at a spread of **1.53x**. The variation that real
+>   per-compound dosing supplies is far wider than the margin the order tolerates.
+> * [`results/capacity_ranking_robustness.md`](capacity_ranking_robustness.md) —
+>   the engine carries **no per-compound tissue-capacity term at all**. Under a
+>   *uniform* capacity — every compound given the same value, which is exactly the
+>   case the "a constant error cancels out of a ranking" defence covers — the
+>   published order still breaks, at **R = 36.3** on the GBM 10-drug panel and
+>   **R = 5.28** on the breast 10-drug panel, both below the best available
+>   constant of **39**.
+>
+> **Neither reason is repairable inside this document**, and nothing below is
+> re-run or re-scored by this banner.
+
 > # ⚠️ CORRECTED 2026-08-14 — "DIFFUSIVITY IS A FUNCTION OF MW ALONE" NO LONGER DESCRIBES THE SHIPPING COMPILER
 >
 > **This banner is the only edit made to this file.** No number or table below it

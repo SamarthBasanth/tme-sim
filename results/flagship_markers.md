@@ -1,5 +1,39 @@
 # Re-anchoring the flagship drug panel to a section that can measure cell state
 
+> # ⚠️ WITHDRAWN SUBJECT — BANNER ADDED 2026-09-03. THE CROSS-COMPOUND ORDERING THIS DOCUMENT RESTS ON NO LONGER EXISTS AS A CLAIM.
+>
+> **This banner is the only edit made to this file.** Nothing below it has been
+> changed, reworded, re-scored or removed. It is preserved byte-identical as the
+> record of what was believed and measured at the time, because a record that was
+> wrong is part of the record.
+>
+> **What is below.** Re-runs the flagship five-compound panel on a section that can measure cell state, against the 319-gene section that cannot. Its headline table reports the resulting cross-compound ordering, asks whether it matches the previously published run (it does not), and concludes that what transfers between the two sections is the ordering and the machinery rather than the levels. **The transferable quantity it names is the withdrawn one.** Its cell-state, MGMT and section-selection findings are unaffected and stand as written.
+>
+> **What was withdrawn, and when.** On **2026-08-21** Vivum withdrew the ordering
+> of one compound against another. The withdrawal is absolute rather than
+> conditional: there is no grid spacing, no section and no compound set for which
+> this product orders compounds against each other. It is not a confidence
+> downgrade and it is not satisfied by a hedge, a stated limit or a stated
+> uncertainty — the output was removed, and `compare-drugs` was removed with it.
+> `README.md` carries the withdrawal in full.
+>
+> **The two measurements that withdrew it.**
+>
+> * [`results/pk_ranking_robustness.md`](pk_ranking_robustness.md) — per-compound
+>   plasma exposure across the retained compounds spans **113.1x**, while the
+>   published order first breaks at a spread of **1.53x**. The variation that real
+>   per-compound dosing supplies is far wider than the margin the order tolerates.
+> * [`results/capacity_ranking_robustness.md`](capacity_ranking_robustness.md) —
+>   the engine carries **no per-compound tissue-capacity term at all**. Under a
+>   *uniform* capacity — every compound given the same value, which is exactly the
+>   case the "a constant error cancels out of a ranking" defence covers — the
+>   published order still breaks, at **R = 36.3** on the GBM 10-drug panel and
+>   **R = 5.28** on the breast 10-drug panel, both below the best available
+>   constant of **39**.
+>
+> **Neither reason is repairable inside this document**, and nothing below is
+> re-run or re-scored by this banner.
+
 **Experiment:** `experiments/flagship_markers.py` (run: `./.venv/bin/python experiments/flagship_markers.py`)
 
 `results/cell_state_impact.md` established that the section almost every headline number in this project comes from — `data_cache/xenium_gbm`, the 40,887-cell 319-gene Xenium brain panel — **cannot support a cell state at all**: it carries no hypoxia-response gene of the marker set (HYPOXIC is UNMEASURED there and no cell is assigned it), and MKI67+TOP2A fire in 1.42% of its tumour cells, 13x below the published 19-40% GBM Ki-67 range, so a per-cell proliferation call is refused. Its own conclusion was that absolute kill and kill ceilings must not be quoted from that section.

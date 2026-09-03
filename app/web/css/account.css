@@ -123,3 +123,23 @@
   .acct-tab { white-space: nowrap; }
   .acct-div { flex-basis: 1px; width: 100%; }
 }
+
+/* The "Send it now" result. A <pre> because the body is JSON and the status
+ * line is fixed-width; `overflow-x: auto` on it alone so a long error can
+ * never make the panel scroll sideways. */
+.acct-test { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.acct-testout {
+  margin: 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  color: var(--fg-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.55;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

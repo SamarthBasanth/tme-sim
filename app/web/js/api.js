@@ -14,6 +14,7 @@
 //   GET    /api/runs/{id}/geometry          (TMSG binary)
 //   GET    /api/runs/{id}/field/{name}      (TMSF binary)
 //   POST   /api/validate
+//   GET    /api/health                       (liveness; detail only with a key)
 //   GET    /api/limits                       (what this server will refuse)
 //   GET    /api/account                      (key, deployment, usage, billing)
 //
@@ -312,6 +313,12 @@ export async function probe() {
  * fabricated ceiling would make the spec editor confidently green on a spec
  * the real server rejects; a fabricated billing block is a claim about money.
  * So a failure here propagates and the panel shows the failure. */
+/** GET /api/health. `noFallback` like its two neighbours, and for a sharper
+ *  reason: the Account panel's "Send it now" button exists to tell a user
+ *  whether their key reaches a REAL server. Answering it from js/mock.js would
+ *  report success for a server that is not there, which is the precise
+ *  question the button was added to settle. */
+export const getHealth = () => call('GET', '/api/health', { noFallback: true });
 export const getAccount = () => call('GET', '/api/account', { noFallback: true });
 export const getLimits = () => call('GET', '/api/limits', { noFallback: true });
 

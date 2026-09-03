@@ -1,5 +1,39 @@
 # CLAIM INVENTORY — what Vivum claims, and what backs each claim
 
+> # ⚠️ WITHDRAWN SUBJECT — BANNER ADDED 2026-09-03. THE CROSS-COMPOUND ORDERING THIS DOCUMENT RESTS ON NO LONGER EXISTS AS A CLAIM.
+>
+> **This banner is the only edit made to this file.** Nothing below it has been
+> changed, reworded, re-scored or removed. It is preserved byte-identical as the
+> record of what was believed and measured at the time, because a record that was
+> wrong is part of the record.
+>
+> **What is below.** The inventory of what Vivum claims and what backs each claim, compiled **2026-08-12**. **This is a second, separate banner** — the one immediately below it, dated 2026-08-14, concerns the two-route transport promotion and is unrelated to this one. Rows **C2** and **C3** of the tables below were annotated in place on 2026-08-21 to record the ranking failure. **§2, "What a competent reviewer would accept today", was missed.** Its item 2 still lists the relative comparison of compounds on one section, presented as a ranking with stated limits, among what a reviewer would accept. The subject of that item no longer exists and it should be read as struck; the invariance limits it refers to were measured and are true, and a true invariance is still not a licence to order compounds.
+>
+> **What was withdrawn, and when.** On **2026-08-21** Vivum withdrew the ordering
+> of one compound against another. The withdrawal is absolute rather than
+> conditional: there is no grid spacing, no section and no compound set for which
+> this product orders compounds against each other. It is not a confidence
+> downgrade and it is not satisfied by a hedge, a stated limit or a stated
+> uncertainty — the output was removed, and `compare-drugs` was removed with it.
+> `README.md` carries the withdrawal in full.
+>
+> **The two measurements that withdrew it.**
+>
+> * [`results/pk_ranking_robustness.md`](pk_ranking_robustness.md) — per-compound
+>   plasma exposure across the retained compounds spans **113.1x**, while the
+>   published order first breaks at a spread of **1.53x**. The variation that real
+>   per-compound dosing supplies is far wider than the margin the order tolerates.
+> * [`results/capacity_ranking_robustness.md`](capacity_ranking_robustness.md) —
+>   the engine carries **no per-compound tissue-capacity term at all**. Under a
+>   *uniform* capacity — every compound given the same value, which is exactly the
+>   case the "a constant error cancels out of a ranking" defence covers — the
+>   published order still breaks, at **R = 36.3** on the GBM 10-drug panel and
+>   **R = 5.28** on the breast 10-drug panel, both below the best available
+>   constant of **39**.
+>
+> **Neither reason is repairable inside this document**, and nothing below is
+> re-run or re-scored by this banner.
+
 > # ⚠️ CORRECTED 2026-08-14 — TWO TRANSPORT ROWS ARE STALE. THIS INVENTORY PREDATES THE TWO-ROUTE PROMOTION.
 >
 > **This banner is the only edit made to this file.** No row below it has been

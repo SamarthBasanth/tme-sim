@@ -334,6 +334,11 @@ export function createAccountPanel() {
 
     wrap.appendChild(h('div.hr-lbl', 'Check it works'));
     wrap.appendChild(codeBlock(ex.health, 'the health check'));
+    // Run the SAME call from the page, so a user setting up automation can
+    // tell "my key is wrong" from "my shell quoting is wrong" without leaving
+    // this tab. It sends the key this browser holds, which is the one thing
+    // the copied snippet cannot do for them.
+    wrap.appendChild(testCall(base, hdr));
 
     wrap.appendChild(h('div.hr-lbl', 'List what this server can run on'));
     wrap.appendChild(codeBlock(ex.catalogue, 'the catalogue calls'));
@@ -354,6 +359,87 @@ export function createAccountPanel() {
       + 'you are looking at. Two clients submitting at once queue behind each '
       + 'other. The full route list is in API_CONTRACT.md in the repository.')));
     return wrap;
+  }
+
+  /** "Send it now" for the health check.
+   *
+   * Deliberately the SMALLEST request on the page: GET /api/health, which
+   * returns a bare {"ok": true} to an anonymous caller and the operational
+   * detail only to one holding the key. So the two outcomes a user needs to
+   * tell apart are visible in the response body itself -- a bare ok means the
+   * server answered but did not accept the key, and that is a different
+   * problem from a 401 and a very different one from a network failure.
+   *
+   * It renders the REAL status line and the REAL body, not a verdict. A green
+   * tick that says "working" hides which of those three happened.
+   */
+  function testCall(base, hdr) {
+    const out = h('pre.acct-testout', { hidden: true });
+    const btn = h('button.btn.ghost.sm', {
+      type: 'button',
+      title: `GET ${base}/api/health with the key this browser is holding`,
+    }, 'Send it now');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const was = btn.textContent;
+      btn.textContent = 'sending…';
+      out.hidden = false;
+      out.textContent = '…';
+      const t0 = performance.now();
+      try {
+        const body = await api.getHealth();
+        const ms = Math.round(performance.now() - t0);
+        // THE TELL IS A NAMED FIELD, NOT A KEY COUNT.
+        //
+        // This started as `Object.keys(body).length <= 1`, which is a magic
+        // number that breaks silently the day an anonymous caller is given a
+        // second harmless field. `runs_dir` is one of the values api.py's
+        // handler withholds from an unauthenticated caller by name, so its
+        // presence IS the authenticated answer.
+        //
+        // VERIFIED against a live server, both ways: with the right key the
+        // body carries runs_dir / runs / projects / reconstruction_cache /
+        // pde_dt_s; with a rotated-out key it is exactly {"ok": true}.
+        const gated = !(body && "runs_dir" in body);
+        out.textContent =
+          `200 OK · ${ms} ms\n`
+          + JSON.stringify(body, null, 1) + '\n\n'
+          + (gated
+             ? 'The server answered, but returned only {"ok": true} — the '
+               + 'reply an ANONYMOUS caller gets. Either this deployment has '
+               + 'no key set, or the key this browser is sending was not '
+               + 'accepted for the operational detail.'
+             : 'The server answered AND accepted the key: this body carries '
+               + 'the operational detail that is withheld from an '
+               + 'unauthenticated caller.');
+      } catch (e) {
+        // NOTE ON THE 401 BRANCH BELOW: it cannot fire for THIS route.
+        // /api/health is exempt from the key gate on purpose — a platform
+        // health checker cannot send a header, and pointing one at a 401 got a
+        // healthy container killed here, twice. So a wrong key gets 200 and a
+        // withheld body, which the `gated` test above is what detects. The
+        // branch is kept because it is correct for any caller that reaches it
+        // and would be wrong to invent later under pressure; it is documented
+        // as unreachable-today rather than left looking live.
+        const ms = Math.round(performance.now() - t0);
+        const st = (e && e.status) || 0;
+        out.textContent =
+          `${st || 'no response'} · ${ms} ms\n`
+          + String((e && e.message) || e) + '\n\n'
+          + (st === 401
+             ? 'The server is reachable and rejected the key. Replace it on '
+               + 'the Access tab.'
+             : st === 0
+             ? 'No reply at all — the request did not reach a server. This is '
+               + 'a network or URL problem, not a key problem.'
+             : 'The server replied with an error. The status above is its '
+               + 'own; nothing here has been reinterpreted.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = was;
+      }
+    });
+    return h('div.acct-test', btn, out);
   }
 
   /* -- limits ------------------------------------------------------------ */

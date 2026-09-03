@@ -25,6 +25,46 @@
 > PDE solves from a drug-parameter state that no longer exists in the history.
 > Fixed; see `tests/test_kill_cache_key.py`. The body below is left as measured.
 
+> ## ⚠️ THE "PRIMARY OUTPUT" SENTENCE IN THE BOTTOM LINE IS WITHDRAWN — BANNER ADDED 2026-09-03
+>
+> **This banner and the one above it are the only edits made to this file.**
+> Nothing below has been changed, reworded, re-scored or removed; it is
+> preserved as the record of what was measured and believed at the time.
+>
+> **What this banner is about.** The banner above supersedes §3's *ratios*. It
+> says nothing about the closing claim of "The bottom line", which asserts that
+> the ordering of one compound against another is invariant across every route
+> and the whole potency band and "remains the honest primary output of this
+> simulator". **That output no longer exists.** It was withdrawn on
+> **2026-08-21** — the same day as the ratios above — and this file was not
+> re-read for it, so the sentence has stood since as a positive assertion of
+> the product's headline with nothing on the page qualifying it. It is not a
+> confidence downgrade and is not satisfied by a hedge or a stated limit: the
+> output was removed, and `compare-drugs` was removed with it.
+>
+> **The two measurements that withdrew it**, neither of them repairable inside
+> this document:
+>
+> * [`results/pk_ranking_robustness.md`](pk_ranking_robustness.md) —
+>   per-compound plasma exposure across the retained compounds spans **113.1x**
+>   while the published order first breaks at a spread of only **1.53x**.
+> * [`results/capacity_ranking_robustness.md`](capacity_ranking_robustness.md)
+>   — the engine carries **no per-compound tissue-capacity term at all**, and
+>   under a *uniform* capacity the order still breaks below the best available
+>   constant.
+>
+> **The invariance argument in that sentence does not rescue it.** Its premise
+> is correct — an effect that multiplies every compound identically cannot
+> reorder them — but the two measurements above are not common-mode. They are
+> per-compound, which is exactly the class an invariance-to-common-mode
+> argument cannot cover.
+>
+> **One further thing on the same line.** The bottom line also prints three
+> compounds' absolute-kill intervals in sequence. Absolute kill is not a
+> defensible output of this product in any form, and placing several
+> compounds' numbers where a reader compares them is the ordering above by
+> another route. Both are preserved below as written; neither is a live claim.
+
 **The measured anchor we hold is a 2-D monolayer assay. The model is a 3-D microenvironment. That gap is not error — it is the phenomenon the model exists to reproduce, and this file tests whether it reproduces it.**
 
 > ### Headline
