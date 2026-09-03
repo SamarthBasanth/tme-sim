@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
 from . import ast as A
-from .dosing import DoseConversion, convert_dose
+from .dosing import DoseConversion, convert_dose, window_plan
 from .errors import BudgetError, ResolutionError, TplError, collect
 from .parser import parse
 from .resolve import ResolvedDrug, check_capability, resolve_drug
@@ -168,6 +168,12 @@ class RunPlan:
     sensitivity_mode: str = "uniform"
     report: List[str] = field(default_factory=list)
     dose_conversion: Optional[DoseConversion] = None
+    #: Drug-independent window bookkeeping
+    #: (:class:`tmesim.protocol.dosing.WindowPlan` as a dict). Present whether
+    #: or not the drug was compiled, which is exactly why the truncation can be
+    #: stated at ``/validate`` and ``/run`` time, where ``dose_conversion`` is
+    #: still ``None``.
+    window: Dict = field(default_factory=dict)
     recon_key: Tuple = ()
     line: int = 0
     col: int = 0
@@ -209,6 +215,7 @@ class RunPlan:
             "spec": self.spec(),
             "dose_conversion": (self.dose_conversion.to_dict()
                                 if self.dose_conversion else None),
+            "window": dict(self.window),
             "reconstruction_key": list(self.recon_key),
             "line": self.line,
             "col": self.col,
@@ -239,6 +246,31 @@ class Plan:
     def n_runs(self) -> int:
         return len(self.runs)
 
+    @property
+    def truncation(self) -> Dict:
+        """What the observation window cut from this plan, across every run.
+
+        A truncated run answers a SHORTER question than the program asked, so
+        this has to be visible where the operator commits the compute, not only
+        in a ``/plan`` panel they may never open. It is built from
+        :attr:`RunPlan.window`, which is filled whether or not a drug was
+        compiled, so ``/validate`` and ``/run`` carry it too.
+        """
+        cut = [r for r in self.runs if r.window.get("truncated")]
+        worst = max(
+            cut, default=None,
+            key=lambda r: r.window["n_administrations_outside_window"])
+        return {
+            "truncated": bool(cut),
+            "n_runs": len(self.runs),
+            "n_runs_truncated": len(cut),
+            "window_s": (self.runs[0].window.get("window_s")
+                         if self.runs else None),
+            "worst_run_index": (worst.index if worst is not None else None),
+            "message": (worst.window["note"] if worst is not None else ""),
+            "runs": [dict(r.window, index=r.index) for r in cut],
+        }
+
     def to_dict(self) -> Dict:
         return {
             "ok": self.ok,
@@ -252,6 +284,7 @@ class Plan:
             "sweep_axes": list(self.sweep_axes),
             "expects": list(self.expects),
             "estimated_cost": dict(self.estimated_cost),
+            "truncation": self.truncation,
         }
 
 
@@ -382,10 +415,15 @@ def plan(source: str, compile_drugs: bool = True, check_budget: bool = True,
             "line": sw.line, "col": sw.col,
         })
 
+    # ---- one program, one compound ---------------------------------------- #
+    # See WITHDRAWN_CROSS_COMPOUND_PROGRAM: the per-statement `compare` guard
+    # below is not enough, because the grid is a property of the PLAN.
+    one_compound = _check_one_compound(program, drug_defs, diags)
+
     # ---- expand the cross-product ----------------------------------------- #
     combos = _cross_product(axes)
     index = 0
-    for stmt in program.runs:
+    for stmt in (program.runs if one_compound else []):
         drugs = list(getattr(stmt, "drugs", []) or [])
         proto_name = stmt.protocol
         section = stmt.section
@@ -444,6 +482,11 @@ def plan(source: str, compile_drugs: bool = True, check_budget: bool = True,
                 diags.error("dx must be > 0.", node=stmt, code="out-of-range")
                 break
 
+            # Drug-INDEPENDENT: the observation window cuts the SCHEDULE,
+            # so the truncation is knowable at /validate and /run time, where
+            # `conv` below is None because no drug has been compiled.
+            wp = window_plan(*_schedule_args(proto, combo), max_window_s)
+
             for alias in drugs:
                 resolved = out.drugs.get(alias)
                 try:
@@ -471,6 +514,7 @@ def plan(source: str, compile_drugs: bool = True, check_budget: bool = True,
                     state_mode=state_mode, sensitivity_mode=sens_mode,
                     report=list(opts.report) or list(A.METRICS),
                     dose_conversion=conv,
+                    window=wp.to_dict(),
                     axes={k: str(v) for k, v in combo.items()},
                     recon_key=(section, round(float(dx_um), 6), VASCULAR_MODE,
                                OXYGEN_MODE, state_mode),
@@ -512,6 +556,66 @@ WITHDRAWN_CROSS_COMPOUND = (
     "`sweep`. Run each compound in its own program if you need both maps; the "
     "map for one compound is the product, the ordering between them is not."
 )
+
+
+#: Why a PROGRAM may name only one compound. :func:`_check_compare` refuses
+#: ``compare A, B``, but that guard is scoped to ONE STATEMENT, and on
+#: 2026-09-03 four trivial rewrites were measured walking straight around it,
+#: every one of them planning cleanly with ``ok = True``:
+#:
+#:   * two ``run`` statements, one per compound          -> 2 runs, 2 compounds
+#:   * a ``compare`` on one compound and a ``run`` on another -> 6 runs
+#:   * two ``compare`` statements, one per compound      -> 6 runs
+#:   * any of those crossed with a ``sweep``             -> an 8-cell,
+#:     two-compound dose ladder
+#:
+#: A plan is ONE job with ONE ``grid``, ONE ``rows`` list and ONE sweep
+#: snapshot, and the editor renders that snapshot as a single colour-scaled
+#: strip or matrix over ``min(metric) .. max(metric)`` across every cell
+#: (``app/web/js/ui/protocol.js`` lines 793-801). Two compounds in one plan
+#: therefore put two compounds' numbers on one scale, in one picture, where a
+#: reader compares them — which IS the withdrawn ordering, whatever the program
+#: intended by it. The rule belongs on the PLAN, not on the statement.
+WITHDRAWN_CROSS_COMPOUND_PROGRAM = (
+    "a TPL program may name only ONE compound. " + WITHDRAWN_CROSS_COMPOUND +
+    " This program's runs land in one sweep grid, on one colour scale, which "
+    "is the ordering itself however the runs were written — as two `run` "
+    "blocks, as two `compare` blocks, or as one of each. Split it into one "
+    "program per compound."
+)
+
+
+def _check_one_compound(program: A.Program, drug_defs: Dict[str, A.DrugDef],
+                        diags: collect) -> bool:
+    """Every run in this program names the same compound. ``True`` to expand.
+
+    Refused at VALIDATION time, before the cross-product is materialised, so a
+    two-compound program plans zero runs — the same outcome ``compare A, B``
+    has had since 2026-08-21.
+    """
+    seen: List[str] = []          # compounds named by EARLIER statements
+    for stmt in program.runs:
+        cols = list(getattr(stmt, "drug_cols", []) or
+                    [getattr(stmt, "drug_col", 0)])
+        here = [(i, a) for i, a in enumerate(getattr(stmt, "drugs", []) or [])
+                if a in drug_defs]   # `unknown-drug` is reported on its own
+        for i, alias in here:
+            # Only a CROSS-statement clash is reported here. Two compounds
+            # inside one `compare` is _check_compare's case and it has a
+            # sharper sentence for it; stealing that would make the refusal
+            # less useful, not more.
+            if seen and alias not in seen:
+                diags.error(
+                    f"this program runs {seen[0]} and {alias}: "
+                    + WITHDRAWN_CROSS_COMPOUND_PROGRAM,
+                    node=stmt, code="withdrawn-ranking",
+                    col=((cols[i] if i < len(cols) else 0)
+                         or getattr(stmt, "drug_col", 0) or stmt.col))
+                return False
+        for _, alias in here:
+            if alias not in seen:
+                seen.append(alias)
+    return True
 
 
 def _check_compare(stmt: A.CompareStmt, drugs: List[str], n_combos: int,
@@ -596,12 +700,14 @@ def _cross_product(axes) -> List[Dict[str, Quantity]]:
     return combos
 
 
-def _dose_to_pk(proto: A.ProtocolDef, combo: Dict[str, Quantity],
-                resolved: Optional[ResolvedDrug], compiled: bool,
-                max_window_s: float) -> Optional[DoseConversion]:
-    """Apply the sweep coordinates to a protocol and convert it to PKConfig."""
-    dose_q = combo.get("dose") or proto.dose.amount
-    over_q = combo.get("over") or proto.dose.over
+def _schedule_args(proto: A.ProtocolDef, combo: Dict[str, Quantity]
+                   ) -> Tuple[float, int, float, int]:
+    """``(every_s, repeat, rest_s, cycles)`` for one point of the sweep.
+
+    Shared by :func:`_dose_to_pk` and the window bookkeeping in :func:`plan`, so
+    the schedule the operator is TOLD about and the schedule the solver runs
+    come from one expression rather than two that may drift.
+    """
     every_q = combo.get("every") or (proto.every.interval if proto.every else None)
     repeat = int(combo["repeat"].value) if "repeat" in combo else (
         proto.repeat.count if proto.repeat else 1)
@@ -609,6 +715,16 @@ def _dose_to_pk(proto: A.ProtocolDef, combo: Dict[str, Quantity],
         proto.cycles.count if proto.cycles else 1)
     rest_s = proto.rest.duration.canonical()[0] if proto.rest else 0.0
     every_s = every_q.canonical()[0] if every_q is not None else 86400.0
+    return every_s, repeat, rest_s, cycles
+
+
+def _dose_to_pk(proto: A.ProtocolDef, combo: Dict[str, Quantity],
+                resolved: Optional[ResolvedDrug], compiled: bool,
+                max_window_s: float) -> Optional[DoseConversion]:
+    """Apply the sweep coordinates to a protocol and convert it to PKConfig."""
+    dose_q = combo.get("dose") or proto.dose.amount
+    over_q = combo.get("over") or proto.dose.over
+    every_s, repeat, rest_s, cycles = _schedule_args(proto, combo)
 
     route = proto.route.value if proto.route else "iv"
 

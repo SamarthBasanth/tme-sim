@@ -36,6 +36,7 @@ from tmesim.protocol import (
     validate_source,
 )
 from tmesim.protocol.dosing import BODY_WEIGHT_KG, BSA_M2, PK_LITERATURE
+from tmesim.protocol.executor import DEFAULT_MAX_RUNS as _DEFAULT_MAX_RUNS  # noqa: F401
 from tmesim.protocol.errors import TplError
 from tmesim.protocol.executor import DEFAULT_MAX_RUNS
 
@@ -337,6 +338,39 @@ class TestDoseToPk:
         assert any(a.quantity == "body_surface_area" and a.value == BSA_M2
                    and a.provenance == "assumed" for a in c.assumptions)
 
+    def test_the_stated_patient_constants_are_the_ones_in_force(self):
+        """The operator-facing sentence used to HARDCODE "1.73 m2" while the
+        arithmetic used ``BSA_M2``. Planting ``BSA_M2 = 1.99`` left all 132
+        tests green -- the only test that pinned "1.73 m2" was matching the
+        prose, not the value -- so the run could have been charged at one body
+        size and described at another.
+        """
+        import tmesim.protocol.dosing as D
+
+        # The LITERAL, not `== BSA_M2`. 1.73 m2 / 70 kg are documented values,
+        # not free parameters: API_CONTRACT.md:287 publishes
+        # "150 mg/m2 x 1.73 m2 = 259.5 mg" as the conversion string this
+        # backend returns. Every assertion phrased against the imported
+        # constant moves with it and cannot fail -- that is exactly how
+        # BSA_M2 = 1.99 stayed green across all 132 tests.
+        assert BSA_M2 == 1.73
+        assert BODY_WEIGHT_KG == 70.0
+        # The module docstring is a THIRD copy, and no f-string can interpolate
+        # a docstring, so it is pinned rather than generated.
+        assert f"BSA = {BSA_M2:g} m2" in D.__doc__
+        assert f"weight = {BODY_WEIGHT_KG:g} kg" in D.__doc__
+
+        c = self._tmz()
+        bsa = next(a for a in c.assumptions
+                   if a.quantity == "body_surface_area")
+        assert bsa.value == BSA_M2
+        assert f"{BSA_M2:g} m2" in bsa.source
+        assert f"{BSA_M2}" in " ".join(c.conversions)
+        w = self._tmz(dose=Quantity(2.0, "mg/kg"))
+        bw = next(a for a in w.assumptions if a.quantity == "body_weight")
+        assert bw.value == BODY_WEIGHT_KG
+        assert f"{BODY_WEIGHT_KG:g} kg" in bw.source
+
     def test_mg_per_kg_uses_the_stated_body_weight(self):
         c = self._tmz(dose=Quantity(2.0, "mg/kg"))
         assert c.amount_mg == pytest.approx(2.0 * BODY_WEIGHT_KG)
@@ -502,6 +536,71 @@ class TestSweepExpansion:
         codes = [d["code"] for d in p.diagnostics.to_dicts()]
         assert "withdrawn-ranking" in codes
 
+    def test_two_compounds_in_one_program_plan_nothing(self):
+        """The `compare A, B` guard is scoped to ONE STATEMENT. On 2026-09-03
+        four rewrites were measured walking around it, every one planning
+        cleanly with ok = True and putting two compounds' metrics in ONE grid:
+
+          two `run` blocks (2 runs) | `compare` + `run` (6) |
+          two `compare` blocks (6)  | `sweep` x two `run` blocks (8)
+
+        A plan is one job with one `grid`, one `rows` list and one sweep
+        snapshot, and the editor paints that snapshot on a single colour scale
+        spanning every cell (app/web/js/ui/protocol.js:793-801) — so two
+        compounds in one plan IS the withdrawn ordering, however it was
+        written. The rule is therefore on the plan.
+        """
+        head = (f'drug TMZ from smiles "{TMZ_SMILES}"\nend\n'
+                'drug CIS from library "cisplatin"\nend\n'
+                'protocol p\n  route iv\n  dose 75 mg/m2\nend\n')
+        tails = {
+            "two run blocks":
+                'run TMZ with p on xenium_319\n  dx 30 um\nend\n'
+                'run CIS with p on xenium_319\n  dx 30 um\nend\n',
+            "compare + run":
+                'sweep dose from 50 to 100 mg/m2 step 25\n'
+                'compare TMZ with p on xenium_319\n  dx 30 um\nend\n'
+                'run CIS with p on xenium_319\n  dx 30 um\nend\n',
+            "two compare blocks":
+                'sweep dose from 50 to 100 mg/m2 step 25\n'
+                'compare TMZ with p on xenium_319\n  dx 30 um\nend\n'
+                'compare CIS with p on xenium_319\n  dx 30 um\nend\n',
+            "sweep x two run blocks":
+                'sweep dose from 50 to 200 mg/m2 step 50\n'
+                'run TMZ with p on xenium_319\n  dx 30 um\nend\n'
+                'run CIS with p on xenium_319\n  dx 30 um\nend\n',
+        }
+        for label, tail in tails.items():
+            p = plan(head + tail, compile_drugs=False)
+            assert not p.ok, label
+            assert p.n_runs == 0, label
+            assert {r.drug_alias for r in p.runs} == set(), label
+            d = next((x for x in p.diagnostics.to_dicts()
+                      if x["code"] == "withdrawn-ranking"), None)
+            assert d is not None, (label, p.diagnostics.to_dicts())
+            assert "TMZ" in d["message"] and "CIS" in d["message"], label
+            assert "results/pk_ranking_robustness.md" in d["message"], label
+            assert "results/capacity_ranking_robustness.md" in d["message"], label
+            assert d["line"] > 0 and d["col"] > 0, label
+
+    def test_one_compound_across_several_run_blocks_is_still_allowed(self):
+        # The rule is one COMPOUND, not one run statement. Two runs of the same
+        # compound at different dx are a parameter comparison, which is the
+        # product; this is what must NOT be caught by the guard above.
+        src = (f'drug TMZ from smiles "{TMZ_SMILES}"\nend\n'
+               'drug CIS from library "cisplatin"\nend\n'
+               'protocol p\n  route iv\n  dose 75 mg/m2\nend\n'
+               'run TMZ with p on xenium_319\n  dx 30 um\nend\n'
+               'run TMZ with p on xenium_319\n  dx 60 um\nend\n')
+        p = plan(src, compile_drugs=False)
+        assert p.ok, p.diagnostics.to_dicts()
+        assert p.n_runs == 2
+        assert {r.drug_alias for r in p.runs} == {"TMZ"}
+        # CIS is defined but never run: defining a second compound is not the
+        # violation, putting it in the grid is.
+        assert not [d for d in p.diagnostics.errors
+                    if d.code == "withdrawn-ranking"]
+
     def test_the_cross_product_shares_one_reconstruction(self):
         p = plan(STUPP.replace(
             "run TMZ", "sweep dose from 50 to 400 mg/m2 step 50\nrun TMZ"),
@@ -560,6 +659,59 @@ class TestSweepExpansion:
         assert d["code"] == "empty-sweep"
 
 
+class TestWindowTruncation:
+    """``tmesim/protocol/dosing.py`` says the window truncation "is reported
+    (with how many doses fell outside it) rather than hidden". These trace that
+    claim from the arithmetic to every route that can be asked about the run.
+
+    It used to stop short of two of them: the sentence lived only on a
+    ``DoseConversion``, and ``POST /api/protocol/run`` plans with
+    ``compile_drugs=False`` and so never builds one. An operator who went
+    validate -> run was told nothing about 29 of 30 doses being dropped.
+    """
+
+    def test_the_planner_states_it_without_compiling_a_drug(self):
+        p = plan(STUPP, compile_drugs=False)
+        assert p.ok, p.diagnostics.to_dicts()
+        assert p.drugs["TMZ"].drug_params is None     # nothing was compiled
+        # The record rides on the RUN, not on the DoseConversion: the window
+        # cuts the schedule, and the schedule does not depend on the compound.
+        assert p.runs[0].window["truncated"] is True
+        assert p.runs[0].window["n_administrations_outside_window"] == 29
+        t = p.truncation
+        assert t["truncated"] is True
+        assert t["n_runs"] == 1 and t["n_runs_truncated"] == 1
+        assert t["runs"][0]["n_administrations_total"] == 30
+        assert t["runs"][0]["n_administrations_outside_window"] == 29
+        assert "29 of 30 administrations fall OUTSIDE" in t["message"]
+
+    def test_it_is_the_same_sentence_the_conversion_puts_on_the_result(self):
+        # One arithmetic, one sentence. Two copies could drift, and then the
+        # operator is shown one window and the solver runs another.
+        planner = plan(STUPP, compile_drugs=False).truncation["message"]
+        compiled = plan(STUPP, compile_drugs=True).runs[0].dose_conversion
+        assert planner in compiled.notes
+        assert compiled.n_administrations_outside_window == 29
+
+    def test_a_schedule_that_fits_the_window_is_not_flagged(self):
+        p = plan(STUPP, compile_drugs=False, max_window_s=200 * 86400.0)
+        assert p.truncation["truncated"] is False
+        assert p.truncation["n_runs_truncated"] == 0
+        assert p.truncation["message"] == ""
+
+    def test_a_sweep_that_changes_the_schedule_counts_the_truncated_points(self):
+        # `sweep cycles` varies the protocol duration, so some points are cut
+        # and some are not: the aggregate has to count, not just flag.
+        src = STUPP.replace("run TMZ",
+                            "sweep cycles from 1 to 2 in 2 steps\nrun TMZ")
+        p = plan(src, compile_drugs=False, max_window_s=40 * 86400.0)
+        assert p.n_runs == 2
+        flags = [r.window["truncated"] for r in p.runs]
+        assert flags == [False, True], flags
+        assert p.truncation["n_runs_truncated"] == 1
+        assert p.truncation["worst_run_index"] == 1
+
+
 # --------------------------------------------------------------------------- #
 class TestCapability:
     def test_marker_state_mode_on_the_319_panel_is_an_error(self):
@@ -570,6 +722,35 @@ class TestCapability:
                                  if "state_mode markers" in ln)
         assert "hypoxia" in d["message"]
         assert "cell_state_impact" in d["message"]
+
+    def test_a_program_naming_no_metric_does_not_open_on_absolute_kill(self):
+        """`report` is optional, and what you get for saying nothing becomes
+        the sweep grid's opening column: the editor takes ``metrics[0]``
+        (app/web/js/ui/protocol.js:758), the editor's metric list is built from
+        ``plan.runs[0].report``, and that defaults to ``list(METRICS)``.
+
+        With `kill` first, a program that named no metric opened on a
+        colour-scaled map of ABSOLUTE KILL — the one number the SAME plan's
+        capability caveat says must never be quoted from this panel. The metric
+        is not removed; it is no longer what you get for saying nothing.
+        """
+        from app.server.protocol_wire import _metric_rows
+
+        src = STUPP.replace(
+            "  report coverage, kill, mean_auc, penetration_length\n", "")
+        p = plan(src, compile_drugs=False)
+        assert p.ok, p.diagnostics.to_dicts()
+        assert p.runs[0].report == list(METRICS)     # this IS the default
+        assert p.runs[0].report[0] != "kill"
+        assert "kill" in p.runs[0].report            # still available
+        assert _metric_rows(p)[0]["key"] != "kill"
+        # An explicit request still wins: the user named it.
+        explicit = plan(src.replace("  dx 30 um", "  dx 30 um\n  report kill"),
+                        compile_drugs=False)
+        assert _metric_rows(explicit)[0]["key"] == "kill"
+        # The caveat that makes the default matter is on the same plan.
+        assert any("ABSOLUTE KILL MUST NOT BE QUOTED" in d.message
+                   for d in p.diagnostics.warnings)
 
     def test_the_default_oxygen_route_is_allowed_with_a_caveat(self):
         v = validate_source(STUPP)
@@ -589,9 +770,18 @@ class TestCapability:
         src = STUPP.replace("xenium_319", "visium_gbm1").replace(
             "sensitivity uniform", "sensitivity determinant")
         codes = [d["code"] for d in errors(src)]
-        # Either the section is not cached in this checkout (refused with a
-        # reason) or the mode is refused; both are the required behaviour.
-        assert codes and set(codes) <= {"capability", "section-unavailable"}
+        assert codes
+        # The old assertion was `set(codes) <= {"capability",
+        # "section-unavailable"}`, which passes when the section is simply not
+        # cached -- i.e. it went green without ever reaching the determinant
+        # guard it is named for. A checkout that cannot reach the subject must
+        # SKIP, not pass.
+        if set(codes) == {"section-unavailable"}:
+            pytest.skip("visium_gbm1 is not cached in this checkout, so the "
+                        "determinant refusal cannot be reached here")
+        assert "capability" in codes
+        d = next(x for x in errors(src) if x["code"] == "capability")
+        assert "per-cell expression" in d["message"]
 
     def test_the_mode_tuples_match_the_server_registry(self):
         from app.server.cache import SENSITIVITY_MODES, STATE_MODES
@@ -841,6 +1031,37 @@ class TestRoutes:
         assert got["status"] in ("queued", "running", "done")
         assert got["source"] == STUPP
 
+    def test_a_two_compound_program_is_refused_at_every_route(self, client):
+        """No route may hand back a payload with two compounds' numbers in it.
+
+        `compare TMZ, CIS` was already refused; this is the same program
+        written as two `run` blocks crossed with a `sweep`, which planned
+        cleanly as an 8-cell two-compound dose ladder until 2026-09-03.
+        """
+        src = (f'drug TMZ from smiles "{TMZ_SMILES}"\nend\n'
+               'drug CIS from library "cisplatin"\nend\n'
+               'protocol p\n  route iv\n  dose 75 mg/m2\nend\n'
+               'sweep dose from 50 to 200 mg/m2 step 50\n'
+               'run TMZ with p on xenium_319\n  dx 30 um\nend\n'
+               'run CIS with p on xenium_319\n  dx 30 um\nend\n')
+        n_before = len(client.get("/api/runs").json())
+
+        v = client.post("/api/protocol/validate", json={"source": src}).json()
+        assert v["ok"] is False
+        assert any(e["code"] == "withdrawn-ranking" for e in v["errors"])
+
+        pl = client.post("/api/protocol/plan", json={"source": src}).json()
+        assert pl["ok"] is False
+        assert pl["runs"] == [] and pl["run_count"] == 0 and pl["n_runs"] == 0
+        assert pl["refusal"]["code"] == "withdrawn-ranking"
+
+        r = client.post("/api/protocol/run", json={"source": src})
+        assert r.status_code == 400
+        detail = r.json()["detail"]
+        assert "withdrawn-ranking" in [d["code"] for d in detail["diagnostics"]]
+        # nothing was enqueued, so no grid exists to compare them in
+        assert len(client.get("/api/runs").json()) == n_before
+
     def test_a_missing_protocol_run_is_a_404(self, client):
         assert client.get("/api/protocol/runs/r_99999").status_code == 404
 
@@ -969,7 +1190,7 @@ class TestEditorWire:
         assumptions = body["assumptions"]
         assert assumptions and all(isinstance(a, str) for a in assumptions)
         joined = " ".join(assumptions)
-        assert "1.73 m2" in joined                     # the BSA conversion
+        assert f"{BSA_M2:g} m2" in joined              # the BSA IN FORCE
         assert "PMID" in joined                        # a citation travels
         assert "time_resolved" in joined
         assert body["caveats"] and all(isinstance(c, str) for c in body["caveats"])
@@ -985,6 +1206,42 @@ class TestEditorWire:
         assert ref["remedy_text"] == "allow runs 100"
         assert ref["remedy_line"] == ref["line"] > 0
 
+    def test_the_truncation_reaches_plan_run_and_the_snapshot(self, client):
+        """``tmesim/protocol/dosing.py`` says the truncation "is reported (with
+        how many doses fell outside it) rather than hidden".
+
+        It used to reach ``/plan``'s ``assumptions`` list and nothing else:
+        ``/validate`` and ``/run`` plan with ``compile_drugs=False`` and so never
+        built the ``DoseConversion`` that carried the sentence, and on the
+        results panel the editor renders ``assumptions`` inside a COLLAPSED
+        <details> (app/web/js/ui/protocol.js:809) while ``caveats`` sit beside
+        the numbers (:790).
+        """
+        pl = client.post("/api/protocol/plan", json={"source": STUPP}).json()
+        t = pl["truncation"]
+        assert t["truncated"] is True
+        assert t["n_runs"] == 1 and t["n_runs_truncated"] == 1
+        assert "29 of 30 administrations fall OUTSIDE" in t["message"]
+        assert any("fall OUTSIDE" in c for c in pl["caveats"])
+        assert any("fall OUTSIDE" in a for a in pl["assumptions"])
+
+        # /run is where the operator commits the compute.
+        r = client.post("/api/protocol/run",
+                        json={"source": STUPP, "max_window_s": 300})
+        assert r.status_code == 202
+        body = r.json()
+        assert body["truncation"]["truncated"] is True
+        assert body["truncation"]["n_runs_truncated"] == 1
+        rid = body["run_id"]
+
+        # ...and a poll of the STILL-QUEUED sweep says it too, before any
+        # result document exists to carry it.
+        got = client.get(f"/api/protocol/runs/{rid}").json()
+        assert got["status"] in ("queued", "running", "done")
+        assert got["truncation"]["truncated"] is True
+        sweep = client.get(f"/api/protocol/sweeps/{rid}").json()
+        assert sweep["truncation"]["truncated"] is True
+
     def test_a_rejected_plan_still_has_the_shape_of_a_plan(self, client):
         body = client.post("/api/protocol/plan",
                            json={"source": "drug\n"}).json()
@@ -993,6 +1250,26 @@ class TestEditorWire:
                     "errors", "warnings", "diagnostics"):
             assert isinstance(body[key], list), key
         assert body["run_count"] == 0
+
+    def test_the_rejected_plan_shape_holds_on_the_EXCEPTION_path_too(self):
+        """`_diag_only(plan_shape=True)` is the fallback body for a plan that
+        RAISED. The sibling test above never reaches it: `plan()` does not raise
+        for malformed input, it returns a not-ok Plan, so every garbage body the
+        suite posts ("", "{{{", "\\x00", an unterminated string) comes back
+        through the NORMAL projection. Breaking `_diag_only`'s shape left the
+        whole file green. Call it directly, since no route can.
+        """
+        from app.server.protocol_api import _diag_only
+
+        diag = [{"severity": "error", "line": 1, "col": 1, "end_col": 2,
+                 "code": "internal", "message": "boom", "hint": None}]
+        out = _diag_only(diag, plan_shape=True)
+        assert out["ok"] is False and out["run_count"] == 0
+        for key in ("runs", "axes", "metrics", "assumptions", "caveats",
+                    "errors", "warnings", "diagnostics", "expects"):
+            assert isinstance(out[key], list), key
+        assert isinstance(out["truncation"], dict)
+        assert out["errors"] and out["errors"][0]["code"] == "internal"
 
     def test_confirm_run_count_mismatch_is_a_409(self, client):
         r = client.post("/api/protocol/run",
@@ -1095,6 +1372,36 @@ class TestUploadBodyLimits:
         assert r.status_code == 413
         assert "limit" in json.dumps(r.json())
 
+    def test_the_cap_is_the_documented_size_and_not_merely_self_consistent(self):
+        """Both oversized-body tests build their payload from
+        ``_MAX_BODY_BYTES + 1``, so the cap's VALUE is untested: raising the
+        constant to 8 MB leaves them green (measured), and so would 4 GB. This
+        is the only body limit in the product (there is no reverse proxy in
+        deployment mode 1a, protocol_api.py:68-74), so the number is pinned."""
+        from app.server.protocol_api import _MAX_BODY_BYTES, _MAX_UPLOAD_BYTES
+
+        assert _MAX_BODY_BYTES == 4 * 1024 * 1024
+        assert _MAX_UPLOAD_BYTES == 2 * 1024 * 1024
+        # the multipart envelope has to fit around a full-size payload
+        assert _MAX_BODY_BYTES > _MAX_UPLOAD_BYTES
+
+    def test_the_cap_binds_with_no_content_length_to_trust(self, client):
+        """The Content-Length branch is the cheap path and it is CLIENT-SUPPLIED.
+        A chunked body carries no length to refuse on, so only the counter
+        inside the stream loop can stop it -- and that counter is the whole
+        basis for the claim that the cap binds BEFORE the allocation. The
+        sibling test above is satisfied by the header branch alone."""
+        from app.server.protocol_api import _MAX_BODY_BYTES
+
+        def chunks():
+            for _ in range((_MAX_BODY_BYTES // 65536) + 2):
+                yield b"x" * 65536
+
+        r = client.post("/api/protocol/upload", content=chunks(),
+                        headers={"content-type": "text/plain"})
+        assert r.status_code == 413
+        assert "limit" in json.dumps(r.json())
+
     def test_an_oversized_multipart_upload_is_refused(self, client):
         from app.server.protocol_api import _MAX_BODY_BYTES
 
@@ -1119,10 +1426,19 @@ class TestUploadBodyLimits:
 
     @pytest.mark.parametrize("boundary", ["a" * 71, "bad\\boundary", "b<ad>"])
     def test_a_malformed_boundary_is_refused(self, client, boundary):
-        r = client.post("/api/protocol/upload", content=b"--x--\r\n",
+        """The body must be WELL-FORMED under the bad boundary, or the 400 comes
+        from "no file part" and _BOUNDARY_RE is never reached. It used to be
+        b"--x--\r\n", which has no part at all: deleting the regex left this
+        test green, which is the whole defect this file keeps growing."""
+        sep = f"--{boundary}".encode()
+        body = (sep + b'\r\nContent-Disposition: form-data; name="file"; '
+                b'filename="tpl_bnd.smi"\r\n\r\n'
+                + TMZ_SMILES.encode() + b"\r\n" + sep + b"--\r\n")
+        r = client.post("/api/protocol/upload", content=body,
                         headers={"content-type":
                                  f"multipart/form-data; boundary={boundary}"})
-        assert r.status_code == 400
+        assert r.status_code == 400, r.text
+        assert "boundary" in json.dumps(r.json())
 
     def test_a_legitimate_upload_is_unaffected(self, client):
         body = (b'--BND\r\nContent-Disposition: form-data; name="file"; '

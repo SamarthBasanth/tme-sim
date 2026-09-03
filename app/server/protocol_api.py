@@ -275,7 +275,12 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
                             f"{p.n_runs}. Re-plan before running."),
                 "confirmed": int(confirm), "run_count": p.n_runs})
 
-        spec = {"kind": PROTOCOL_JOB_KIND, "source": source}
+        spec = {"kind": PROTOCOL_JOB_KIND, "source": source,
+                # Stashed on the SPEC, not only in the result, so a poll of a
+                # queued or running sweep can state the truncation too: the
+                # plan projection that also carries it is not written until the
+                # job finishes.
+                "truncation": jsonable(p.truncation)}
         for key in ("max_runs", "max_window_s"):
             if body.get(key):
                 spec[key] = body[key]
@@ -288,6 +293,13 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
             "run_count": p.n_runs,
             "max_runs": p.max_runs,
             "allow_runs": p.allow_runs,
+            # /run is where the operator COMMITS the compute, so it is where a
+            # truncated schedule has to be said. This response used to carry
+            # nothing about it: the sentence existed only on a `dose_conversion`
+            # that /run never builds (it plans with compile_drugs=False), so an
+            # operator who went validate -> run was never told that 29 of a
+            # Stupp course's 30 administrations would be dropped.
+            "truncation": p.truncation,
             "warnings": [d.to_dict() for d in p.diagnostics.warnings],
             "estimated_cost": p.estimated_cost,
             "runs": [{"index": r.index, "run_id": None, "status": "queued",
@@ -327,6 +339,8 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
             # carries its own metrics; nothing orders the rows for the caller.
             "sweep_axes": body.get("sweep_axes", []),
             "expects": body.get("expects", []),
+            "truncation": ((body.get("plan") or {}).get("truncation")
+                           or job.spec.get("truncation") or {}),
             "diagnostics": body.get("diagnostics", []),
             "reconstructions": body.get("reconstructions"),
             "plan": body.get("plan"),
@@ -622,7 +636,7 @@ def _diag_only(diags: List[Dict], plan_shape: bool = False) -> Dict:
     if plan_shape:
         out.update({"runs": [], "axes": [], "metrics": [], "assumptions": [],
                     "caveats": [], "estimated_cost_s": 0, "cost_note": None,
-                    "refusal": None, "expects": []})
+                    "refusal": None, "expects": [], "truncation": {}})
     return out
 
 

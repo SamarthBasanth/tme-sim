@@ -64,6 +64,7 @@ from .units import Quantity, _fmt
 __all__ = [
     "BSA_M2", "BODY_WEIGHT_KG", "PK_LITERATURE", "DEFAULT_MAX_WINDOW_S",
     "Assumption", "DoseConversion", "schedule_times", "convert_dose",
+    "WindowPlan", "window_plan",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -260,6 +261,83 @@ def schedule_times(every_s: float, repeat: int, rest_s: float,
     return times, cycles * cycle_len
 
 
+@dataclass
+class WindowPlan:
+    """What the observation window does to a schedule.
+
+    Computed from the SCHEDULE ALONE — no compound, no molecular weight, no
+    compilation. That is the point of splitting it out of
+    :func:`convert_dose`: ``convert_dose`` is reached only once a drug has been
+    compiled, so ``POST /api/protocol/validate`` and ``POST /api/protocol/run``
+    — both of which plan with ``compile_drugs=False`` — never reached it and
+    said NOTHING about a truncated schedule. The operator committed the compute
+    at ``/run`` without being told that 29 of a Stupp course's 30
+    administrations would be dropped. Truncation does not depend on the
+    compound, so it does not have to wait for one.
+
+    One arithmetic, in one place. A second copy in the planner would be free to
+    drift from this one, and then the number the operator is shown stops
+    matching the number the solver used.
+    """
+
+    window_s: float = 0.0
+    protocol_duration_s: float = 0.0
+    administrations: List[float] = field(default_factory=list)
+    in_window: List[float] = field(default_factory=list)
+    truncated: bool = False
+
+    @property
+    def n_administrations_total(self) -> int:
+        return len(self.administrations)
+
+    @property
+    def n_administrations_outside_window(self) -> int:
+        return len(self.administrations) - len(self.in_window)
+
+    @property
+    def note(self) -> str:
+        """The sentence stating the truncation; ``""`` when nothing was cut."""
+        if not self.truncated:
+            return ""
+        return (
+            f"This protocol spans {_fmt(self.protocol_duration_s / 86400.0)} d "
+            f"but the transport solve covers the first "
+            f"{_fmt(self.window_s / 3600.0)} h. "
+            f"{self.n_administrations_outside_window} of "
+            f"{self.n_administrations_total} administrations fall OUTSIDE the "
+            "observed window and deliver no drug in this result. The window is "
+            "a compute limit (a full course at dt = 10 s is ~1.5e6 timesteps), "
+            "not a claim that the later doses do not matter.")
+
+    def to_dict(self) -> Dict:
+        return {
+            "window_s": self.window_s,
+            "protocol_duration_s": self.protocol_duration_s,
+            "n_administrations_total": self.n_administrations_total,
+            "n_administrations_outside_window":
+                self.n_administrations_outside_window,
+            "truncated": self.truncated,
+            "note": self.note,
+        }
+
+
+def window_plan(every_s: float, repeat: int, rest_s: float, cycles: int,
+                max_window_s: float) -> WindowPlan:
+    """Apply the observation window to a schedule and record what it cut."""
+    admin, duration = schedule_times(every_s, repeat, rest_s, cycles)
+    window = min(duration, float(max_window_s))
+    # Always cover at least the first administration and one interval, so a
+    # single-dose protocol still has something to observe.
+    window = max(window, min(float(max_window_s), max(every_s, 3600.0)))
+    return WindowPlan(
+        window_s=window,
+        protocol_duration_s=duration,
+        administrations=list(admin),
+        in_window=[t for t in admin if t < window - 1e-9],
+        truncated=duration > window + 1e-9,
+    )
+
+
 def _uniform_spacing(times: List[float], rel_tol: float = 1e-9
                      ) -> Optional[float]:
     """The common spacing of ``times`` if it is uniform, else ``None``."""
@@ -337,8 +415,8 @@ def convert_dose(
             f"{_fmt(out.amount_mg)} mg")
         out.assumptions.append(Assumption(
             "body_surface_area", BSA_M2, "m2", "assumed",
-            "standard adult body-surface-area normalisation (1.73 m2), the "
-            "value named in PROTOCOL_LANGUAGE.md. This script states no "
+            f"standard adult body-surface-area normalisation ({BSA_M2:g} m2), "
+            "the value named in PROTOCOL_LANGUAGE.md. This script states no "
             "patient, so no patient-specific BSA exists to use."))
     elif dose.unit == "mg/kg":
         out.amount_mg = float(dose.value) * BODY_WEIGHT_KG
@@ -347,7 +425,8 @@ def convert_dose(
             f"{_fmt(out.amount_mg)} mg")
         out.assumptions.append(Assumption(
             "body_weight", BODY_WEIGHT_KG, "kg", "assumed",
-            "generic 70 kg adult. This script states no patient."))
+            f"generic {BODY_WEIGHT_KG:g} kg adult. This script states no "
+            "patient."))
     else:  # mg
         out.amount_mg = float(dose.value)
         out.conversions.append(f"{_fmt(out.amount_mg)} mg (flat amount)")
@@ -430,26 +509,21 @@ def convert_dose(
         f"{_fmt(bolus_peak)} uM per dose")
 
     # --- 6. schedule expansion + window ------------------------------------ #
-    admin, duration = schedule_times(every_s, repeat, rest_s, cycles)
+    # The arithmetic and the sentence both live in `window_plan` so the PLANNER
+    # can state the same truncation before any drug is compiled — see
+    # :class:`WindowPlan`.
+    wp = window_plan(every_s, repeat, rest_s, cycles, max_window_s)
+    admin = list(wp.administrations)
+    duration = wp.protocol_duration_s
+    window = wp.window_s
     out.protocol_duration_s = duration
-    out.n_administrations_total = len(admin)
-    window = min(duration, float(max_window_s))
-    # Always cover at least the first administration and one interval, so a
-    # single-dose protocol still has something to observe.
-    window = max(window, min(float(max_window_s), max(every_s, 3600.0)))
+    out.n_administrations_total = wp.n_administrations_total
     out.window_s = window
-    out.truncated = duration > window + 1e-9
-    in_window = [t for t in admin if t < window - 1e-9]
-    out.n_administrations_outside_window = len(admin) - len(in_window)
+    out.truncated = wp.truncated
+    in_window = list(wp.in_window)
+    out.n_administrations_outside_window = wp.n_administrations_outside_window
     if out.truncated:
-        out.notes.append(
-            f"This protocol spans {_fmt(duration / 86400.0)} d but the "
-            f"transport solve covers the first {_fmt(window / 3600.0)} h. "
-            f"{out.n_administrations_outside_window} of "
-            f"{out.n_administrations_total} administrations fall OUTSIDE the "
-            "observed window and deliver no drug in this result. The window is "
-            "a compute limit (a full course at dt = 10 s is ~1.5e6 timesteps), "
-            "not a claim that the later doses do not matter.")
+        out.notes.append(wp.note)
     if not in_window:
         in_window = [0.0]
         out.notes.append(

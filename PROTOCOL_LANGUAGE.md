@@ -130,6 +130,7 @@ expect kill > 0.05                # recorded as pass/fail; never alters the resu
 | `compare TMZ, CIS with ...` (two distinct compounds) | **error** — `withdrawn-ranking` |
 | `compare TMZ, TMZ with ...` | **error** — names one compound twice, so every run is the same run |
 | `compare TMZ with ...` and no `sweep` | **error** — plans one run, and one run is not a comparison |
+| ANY program naming two compounds across SEPARATE statements — two `run` blocks, `compare` plus `run`, two `compare` blocks, or a `sweep` over either | **error** — `withdrawn-ranking`. Added 2026-09-03: the three rows above are scoped to ONE STATEMENT, and a plan is one job with one `grid`, one `rows` list and one colour scale spanning every cell, so the compounds land on a shared axis however they got there. Measured: all four rewrites planned cleanly, one of them an eight-point two-compound dose ladder. |
 
 `rank by <metric>` is **gone from the language**. A program containing it is a
 validation error naming the withdrawal, not a silent no-op.
@@ -195,8 +196,16 @@ routes (`results/cell_state_impact.md`), tissue capacity uniform and per-compoun
 swept, and silence is not coverage.
 
 **Migration.** Replace `compare A, B with P on S` with one `run` statement per compound,
-read each map on its own, and delete the `rank by` line. There is no flag that restores the
-old behaviour.
+**each in its own program**, read each map on its own, and delete the `rank by` line. There
+is no flag that restores the old behaviour.
+
+> **"Each in its own program" was added on 2026-09-03, and it is the whole
+> instruction.** Without it this sentence was the documented route around the
+> prohibition it exists to serve: two `run` statements in ONE program parsed,
+> planned and executed, and put both compounds in one grid on one colour scale.
+> The executor now refuses that, so a program following the old wording gets
+> `withdrawn-ranking` rather than a ranking. Reading each map on its own means
+> running each on its own.
 
 ---
 

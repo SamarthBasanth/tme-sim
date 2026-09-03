@@ -143,8 +143,22 @@ def _normalise(lines):
     return [_LINE_NOISE_RE.sub("", ln) for ln in lines]
 
 
+#: The four frozen contracts at the repository root. NOT `README.md` alone,
+#: which is all this scanned at first — and not what the 2026-08-30 audit
+#: enumerated either. `README.md:621` says the contracts OUTRANK the docs the
+#: audit did read, so they are the highest-authority text in the tree and were
+#: the only part of it nothing checked.
+#:
+#: Found on 2026-09-03: `PROTOCOL_LANGUAGE.md`'s own migration advice, followed
+#: literally, produced a two-compound grid — the frozen spec documenting the
+#: route around a prohibition the executor was enforcing.
+_ROOT_CONTRACTS = ("README.md", "API_CONTRACT.md", "PROTOCOL_LANGUAGE.md",
+                   "ARCHITECTURE_CONTRACT.md", "MOLECULAR_CONTRACT.md")
+
+
 def _surface_files():
-    out = [os.path.join(_ROOT, "README.md")]
+    out = [os.path.join(_ROOT, n) for n in _ROOT_CONTRACTS
+           if os.path.exists(os.path.join(_ROOT, n))]
     docs = os.path.join(_ROOT, "docs")
     for root, _dirs, files in os.walk(docs):
         for name in sorted(files):

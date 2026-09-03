@@ -198,6 +198,16 @@ def _assumption_lines(plan) -> List[str]:
 def _caveat_lines(plan) -> List[str]:
     out = [d["message"] for d in plan.diagnostics.to_dicts()
            if d["severity"] == "warning"]
+    # The window truncation belongs HERE, not only in `assumptions`. The editor
+    # renders `caveats` beside the numbers and unconditionally
+    # (app/web/js/ui/protocol.js:651, and :790 — "standing caveats sit WITH the
+    # numbers"), while `assumptions` on the RESULTS panel is a collapsed
+    # <details> (:809) holding a dozen PK arithmetic lines. A truncated run is
+    # answering a shorter question than the program asked; that does not belong
+    # behind a disclosure triangle.
+    note = (getattr(plan, "truncation", None) or {}).get("message") or ""
+    if note and note not in out:
+        out.append(note)
     return out
 
 
@@ -236,6 +246,9 @@ def editor_plan(body: Dict, plan) -> Dict:
     body["metrics"] = _metric_rows(plan)
     body["assumptions"] = _assumption_lines(plan)
     body["caveats"] = _caveat_lines(plan)
+    # Structured, so a client detects a truncated schedule without matching on
+    # English. `message` is the same sentence `caveats` carries.
+    body["truncation"] = getattr(plan, "truncation", None) or {}
     body["refusal"] = _refusal(plan)
     # `runs` keeps every contract field and gains the editor's.
     for entry, run in zip(body.get("runs") or [], plan.runs):
@@ -310,6 +323,12 @@ def sweep_snapshot(job, body: Dict) -> Dict:
         "caveats": plan_doc.get("caveats") or [],
         "assumptions": plan_doc.get("assumptions") or [],
         "expects": body.get("expects") or [],
+        # `plan_doc` does not exist until the job has FINISHED, so a poll of a
+        # queued or running sweep would say nothing about the truncation. The
+        # submitting route stashes it on the job spec for exactly that window.
+        "truncation": (plan_doc.get("truncation")
+                       or (getattr(job, "spec", None) or {}).get("truncation")
+                       or {}),
         "estimated_cost_s": plan_doc.get("estimated_cost_s"),
         "elapsed_s": round(job.elapsed_s, 3),
         "runs": runs,

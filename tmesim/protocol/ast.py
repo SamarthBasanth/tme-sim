@@ -74,9 +74,18 @@ SWEEPABLE: Dict[str, Dict] = {
 #: single-run constructs: a metric is reported for a run, or asserted about a
 #: run. Ordering COMPOUNDS by one of these was withdrawn on 2026-08-21 (see
 #: ``PROTOCOL_LANGUAGE.md`` §5), so no construct here orders anything.
+#: ORDER MATTERS and `coverage` leads deliberately. When a run block names no
+#: `report`, the executor defaults to ``list(METRICS)``, the editor's metric
+#: list is built in that order, and the sweep grid renders ``metrics[0]`` as its
+#: opening column (``app/web/js/ui/protocol.js:758``). With `kill` first, a
+#: program that named no metric opened on a colour-scaled map of ABSOLUTE KILL
+#: — the one number this plan's own capability caveat says "MUST NOT BE QUOTED
+#: FROM 'xenium_319' UNDER ANY STATE ROUTE" (``resolve.check_capability``). The
+#: metric is not removed; a program that writes `report kill` still gets it
+#: first. It is no longer what you get for saying nothing.
 METRICS: Dict[str, str] = {
-    "kill": "kill_fraction",
     "coverage": "therapeutic_coverage_1x",
+    "kill": "kill_fraction",
     "mean_auc": "mean_tumor_auc",
     "penetration_length": "penetration_length_um",
 }

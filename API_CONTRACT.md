@@ -160,7 +160,7 @@ a research tool, not a diagnostic product. Concretely:
 | `DELETE` | `/api/reports/{id}` | cancel a queued/running report (cancels every arm) |
 | `POST` | `/api/protocol/validate` | `{source}` → `{ok, diagnostics[], n_runs, max_runs}` — parse only, no compute |
 | `POST` | `/api/protocol/plan` | `{source}` → the expanded run list, run count and estimated cost; **executes nothing** |
-| `POST` | `/api/protocol/run` | `{source}` → `{run_id, n_runs, warnings[], estimated_cost}` — **202**, enqueues the whole sweep as ONE job |
+| `POST` | `/api/protocol/run` | `{source}` → `{run_id, n_runs, warnings[], estimated_cost, truncation}` — **202**, enqueues the whole sweep as ONE job |
 | `GET`  | `/api/protocol/runs/{id}` | → results + the sweep grid; safe to poll while running |
 | `GET`  | `/api/protocol/sweeps/{id}` | → the same job in the editor's projection (alias) |
 | `DELETE` | `/api/protocol/sweeps/{id}` | cancel a queued/running sweep |
@@ -317,8 +317,39 @@ runs are serialised on one worker and a dose sweep on one specimen **reconstruct
 
 `GET /api/protocol/runs/{id}` → `{run_id, status, stage, progress, elapsed_s, error,
 source, n_runs, grid[], rows[], sweep_axes[], expects[], diagnostics[],
-reconstructions, plan, log_tail[]}`. **409** if `{id}` is a `RunSpec` run rather than a
-protocol run.
+reconstructions, plan, truncation, log_tail[]}`. **409** if `{id}` is a `RunSpec` run
+rather than a protocol run.
+
+### `truncation` — the window the solve actually covered
+
+`{truncated, n_runs, n_runs_truncated, window_s, worst_run_index, message, runs[]}`,
+carried on `/plan`, `/run`, and on `/runs/{id}` and `/sweeps/{id}` **while the job is
+still queued**. Verified against a live plan rather than transcribed:
+
+```
+run TMZ with stupp on xenium_319   (75 mg/m2 every 24 h, repeat 30, dx 30 um)
+  -> truncated: True   n_runs_truncated: 1/1   window_s: 86400.0
+     "This protocol spans 30 d but the transport solve covers the first 24 h.
+      29 of 30 administrations fall OUTSIDE the observed window and deliver no
+      drug in this result. The window is a compute limit ... not a claim that
+      the later doses do not matter."
+```
+
+A transport solve covers at most `TMESIM_PROTOCOL_MAX_WINDOW_S` (default 86,400 s). A
+longer protocol is truncated to it — a Stupp course is ~168 days, and at `dt = 10 s` that
+is 1.45e6 steps, which this backend will not start.
+
+`tmesim/protocol/dosing.py` has always said the truncation "is reported (with how many
+doses fell outside it) rather than hidden". Traced end to end on 2026-09-03 it reached
+`/plan`'s `assumptions[]` and **nothing else**: `/run` — the commit point, where a user
+spends the compute — said nothing, because the sentence lived on a `DoseConversion` and
+`/run` plans with `compile_drugs=False`. An operator going validate → run was never told
+that **29 of a Stupp course's 30 administrations fall outside the observed window**. The
+key above is that fix; the arithmetic now lives in one place (`window_plan()`) so the
+number and the sentence cannot drift apart.
+
+It is REPORTED, not refused. The contract's posture here is report-not-hide, and a
+mandatory acknowledgement would break existing clients.
 
 > **2026-08-21 — `ranking` removed from this payload.** It carried the `rank by` order of a
 > multi-compound `compare`. Both are withdrawn from TPL (`PROTOCOL_LANGUAGE.md` §5): a
