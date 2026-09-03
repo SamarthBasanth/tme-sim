@@ -14,14 +14,19 @@ Four things are tested, in rising order of what they would cost if they broke:
 
 2. **The honesty claims are true, not just written down.** The provenance table
    says logP is a Crippen prediction, that Crippen cannot see stereochemistry,
-   and that diffusivity is a function of MW alone. Each of those is asserted
-   numerically here, so the sentence on the operator's screen cannot become
-   false without a test failing.
+   and that tissue diffusivity comes from a two-route law that reproduces only
+   about a quarter of the measured compound-to-compound spread. Each of those is
+   asserted numerically here, so the sentence on the operator's screen cannot
+   become false without a test failing. ``TestOrderingIsNotOfferedAsEvidence``
+   is the mechanical half of the same job: it fails if any string this surface
+   can put on screen offers a cross-compound ordering at ANY grade.
 
 3. **A user compound is compiled EXACTLY as a library drug is.** Same alpha, same
    binding-site barrier, same bridge -- checked by compiling a library drug's own
    SMILES under a user name and demanding bit-identical transport parameters. If
-   this drifts, the ranking (the only defensible output either has) is invalid.
+   this drifts, a user compound is not on the same footing as a library one and
+   the within-map reading that IS defensible stops meaning the same thing for
+   the two of them.
 
 4. **The Studio wiring.** The endpoints, the store, the drug catalogue, the
    RunSpec validator, and one real end-to-end run driven with a user compound.
@@ -30,6 +35,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import sys
 import time
 
@@ -372,9 +378,18 @@ class TestProvenanceIsTrue:
 
         joined = " ".join(c.caveats)
         # The transport caveat is no longer a hard stop, because the claim it
-        # guards is no longer a refutation -- but it must still be unambiguous
-        # about the strength of the evidence.
-        assert "WEAK EVIDENCE, NOT A MEASUREMENT" in joined
+        # guards is no longer a refutation -- but the shortfall must still be
+        # stated, and stated as a property of the LAW.
+        #
+        # RE-PINNED 2026-09-03. This asserted
+        # ``"WEAK EVIDENCE, NOT A MEASUREMENT" in joined`` -- i.e. it REQUIRED
+        # the surface to grade a cross-compound ordering as a weak kind of
+        # evidence. The prohibition admits no grade, so that assertion was
+        # holding the defect in place. What is pinned now is the same
+        # measurement said about the law instead of about an ordering.
+        assert "ABOUT A QUARTER OF THE MEASURED SPREAD BETWEEN COMPOUNDS" in joined
+        assert "8.3x" in joined and "29.7x" in joined
+        assert "LIMIT ON THE LAW, NOT A LICENCE" in joined
         assert "0.718" in joined and "0 of 31" in joined
         # ... and the panel must still carry at least one genuine hard stop, so
         # that softening this one did not soften the renderer's stop behaviour.
@@ -385,12 +400,11 @@ class TestProvenanceIsTrue:
 
         STRENGTHENED 2026-08-22, and the reason is the point. This test used to
         assert ``"not a validated prediction" in can`` -- a QUALIFIER, because
-        the list still *offered* the ranking and hung a warning on it:
-
-            "Compare this compound against others on the SAME tissue section
-             ... and read the ORDERING rather than the levels ... Note what
-             this ordering is: a statement about THIS MODEL's inputs, not a
-             validated prediction."
+        the list still *offered* the ordering as an instruction and hung a
+        warning on it. (The retired instruction is NOT reproduced here, and the
+        verbatim quotation of it that stood in this docstring until 2026-09-03
+        has been removed: quoting a withdrawn claim reprints it, and a test
+        docstring is not exempt from that rule.)
 
         The cross-compound ranking was measured and WITHDRAWN on 2026-08-21,
         and the prohibition is absolute rather than conditional. So a qualified
@@ -883,10 +897,22 @@ class TestEndToEndRun:
         # how they may be READ, not about withholding them.
         assert run["metrics"]["mean_tumor_auc"] > 0.0
 
-    def test_a_user_compound_can_be_ranked_against_a_library_drug(self, client, store):
-        """The defensible claim, exercised: two compounds, one tissue, one
-        RunSpec, both compiled with the same alpha -- so the ORDERING is
-        meaningful even though neither absolute level is."""
+    def test_a_user_compound_goes_through_the_same_transport_law(self, client, store):
+        """PARITY, not an ordering. Two compounds, one tissue, one RunSpec, both
+        compiled with the same alpha: what is pinned is that a user compound is
+        carried by the SAME transport law a library drug is, which is why the
+        within-map reading means the same thing for both.
+
+        RENAMED AND REFRAMED 2026-09-03. This test was called
+        ``test_a_user_compound_can_be_ranked_against_a_library_drug`` and its
+        docstring called the ordering "the defensible claim". Cross-compound
+        ordering was withdrawn on 2026-08-21 and the prohibition is
+        unconditional, so a test that named it as the product was pinning a
+        claim the product does not make. The ASSERTION below is unchanged and is
+        not an ordering claim: it is a monotonicity property of the diffusivity
+        law -- a much heavier molecule must compile to a smaller D_eff -- which
+        would be a real engine bug if it broke.
+        """
         client.post("/api/compounds",
                     json={"name": "ACME-BIG", "smiles": DOXORUBICIN,
                           "ic50_uM": 1.0})
@@ -913,10 +939,260 @@ class TestEndToEndRun:
             results[drug] = client.get(f"/api/runs/{rid}").json()
 
         # Doxorubicin's structure is far heavier than temozolomide's, so the
-        # user compound must be the slower-diffusing of the two. That is a
-        # RANKING statement, which is the only kind either run supports.
+        # user compound must compile to the smaller D_eff. This is a property of
+        # the LAW being applied identically to both -- an engine invariant, not
+        # a product output, and nothing here is reported to a user as an order.
         assert (results["ACME-BIG"]["drug_params"]["diffusivity_um2_s"]
                 < results["temozolomide"]["drug_params"]["diffusivity_um2_s"])
         # And both carry the standing limits on their absolute numbers.
         for r in results.values():
             assert r["provenance"]["caveats"]
+
+
+# --------------------------------------------------------------------------- #
+# 5. The prohibition, enforced mechanically over the whole BYO surface
+# --------------------------------------------------------------------------- #
+#
+# WHY THIS EXISTS. On 2026-08-30 a claim-surface audit found the bring-your-own
+# compound surface running TWO policies at once. `app/web/js/ui/provenance.js`
+# said ordering compounds "is withdrawn"; `tmesim/molecular/byo.py` -- rendered
+# verbatim into the same Studio panel -- told the same reader to read the order
+# over a mass-matched series as a weak kind of evidence, and a field method told
+# them to read the provenance "before you rank on it". One product, two
+# policies, and the softer one was the one the compile screen showed.
+#
+# The prohibition admits no grade. "Weak evidence" is still evidence; "a
+# hypothesis to test" is still an offer; "an absolute or a fine-grained one" is
+# still a licence for the coarse one. So a prose guard that only looked for the
+# word "ranking" would have passed every one of those. This guard looks for the
+# SHAPE: an ordering handed to the reader at some strength, or an imperative
+# telling the reader to produce one.
+#
+# WHAT IT DELIBERATELY DOES NOT FLAG. "24 of 31 exact-mass pairs ordered
+# correctly" is how the transport LAW scored against a published dataset. That
+# is a measurement of the law, it is what `provenance.js` has always carried,
+# and removing it would delete a number rather than a claim. The line this
+# guard draws is between a statement ABOUT THE LAW and an ordering offered to
+# the reader.
+#
+# HONEST LIMIT OF TIER 2. The offer-verb rule is exempted by a prohibition
+# marker in the same clause, because the honest sentences ("DO NOT read an
+# ORDERING across compounds") are built out of exactly the words being hunted.
+# That exemption is a laundering route in principle -- which is why every
+# construction that has no honest form at all is in TIER 1, where nothing is
+# exempt. The two historical violations this file was written against are
+# caught by TIER 1, not by TIER 2.
+
+_ORDER_RE = re.compile(
+    r"\b(?:rank|ranks|ranked|ranking|rankings"
+    r"|order|orders|ordered|ordering|orderings)\b", re.IGNORECASE)
+
+#: TIER 1 -- constructions with NO honest form on this surface. No exemption.
+_UNCONDITIONAL = (
+    (r"\bmay be ranked\b", "permits a cross-compound ordering outright"),
+    (r"\bcan be ranked\b", "permits a cross-compound ordering outright"),
+    (r"\bmay be ordered\b", "permits a cross-compound ordering outright"),
+    (r"\buse (?:it|this|them|these) to (?:rank|order)\b",
+     "instructs the reader to produce an ordering"),
+    (r"\bbefore you (?:rank|order)\b",
+     "assumes the reader will produce an ordering"),
+    (r"\brank on (?:it|this|them)\b",
+     "assumes the reader will produce an ordering"),
+    (r"\btreat the order(?:ing)?\b", "hands the reader an ordering to act on"),
+    (r"\bread the order(?:ing)? (?:over|across|of|rather)\b",
+     "hands the reader an ordering to act on"),
+    (r"\bonly an ordering\b", "offers an ordering as the surviving content"),
+    (r"\bonly a ranking\b", "offers an ordering as the surviving content"),
+    (r"\b(?:ranking|ordering) is the claim\b",
+     "names an ordering as the product's claim"),
+    (r"\bdelivery ranking\b", "offers an ordering under a narrower label"),
+    (r"\bpotency ranking\b", "offers an ordering under a narrower label"),
+    (r"\b(?:ranking|ordering) only\b", "offers an ordering under a hedge"),
+    (r"\b(?:ranking|ordering) rather than the levels\b",
+     "instructs the reader to read an ordering"),
+)
+
+#: TIER 1b -- words that put a STRENGTH on a claim. Near an ordering word they
+#: turn a prohibition into a graded offer, and the prohibition admits no grade.
+_GRADE_RE = re.compile(
+    r"\b(?:weak(?:er|est)? evidence|as evidence|some evidence|is evidence"
+    r"|a hypothesis|hypothesis to test|suggestive|indicative"
+    r"|fine[- ]grained|coarse[- ]grained|better than nothing"
+    r"|rough guide|a guide|directional)\b", re.IGNORECASE)
+#: Characters, not words: a grade this far from an ordering word is about
+#: something else. 200 spans the longest legitimate sentence on this surface.
+_GRADE_WINDOW = 200
+
+#: TIER 2 -- an imperative whose object is an ordering. Noun-ambiguous verbs
+#: ("report", "take") are deliberately absent: they produced false positives on
+#: prose that narrates the withdrawal.
+_OFFER_RE = re.compile(
+    r"\b(?:read|treat|use|quote|interpret|rank|ranks|order|orders|compare)\b"
+    r"[^\n]{0,80}?"
+    r"\b(?:rank|ranks|ranked|ranking|rankings|order|orders|ordered|ordering)\b",
+    re.IGNORECASE)
+
+#: TIER 2 -- a clause carrying one of these is narrating or performing the
+#: PROHIBITION, not the offer.
+_PROHIBITION = (
+    "withdraw", "withdrawn", "do not", "don't", "does not", "did not",
+    "is not", "are not", "was not", "were not", "must not", "cannot",
+    "can not", "never", "no ordering", "no ranking", "not offered",
+    "not a licence", "not an ordering", "not a ranking", "prohibit",
+    "retired", "abolished", "in any form",
+)
+
+_CLAUSE_SPLIT_RE = re.compile(r"[.;:]|--|—|\n")
+
+
+def _js_text(path):
+    """Read a Studio module as prose: string concatenation joined, comment
+    markers stripped, so a sentence split across source lines is one clause."""
+    with open(path, encoding="utf-8") as fh:
+        src = fh.read()
+    src = re.sub(r"'\s*\n\s*\+\s*'", "", src)          # '...' \n + '...'
+    src = re.sub(r'"\s*\n\s*\+\s*"', "", src)
+    src = re.sub(r"(?m)^\s*(?://+|\*+)\s?", "", src)   # // and JSDoc markers
+    return src
+
+
+def _strings(obj, where, out):
+    """Collect every string a nested API payload can put on a screen."""
+    if isinstance(obj, str):
+        out.append((where, obj))
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            _strings(v, f"{where}[{k!r}]", out)
+    elif isinstance(obj, (list, tuple)):
+        for i, v in enumerate(obj):
+            _strings(v, f"{where}[{i}]", out)
+
+
+def _byo_surface(alpha):
+    """Every string the bring-your-own-compound surface can emit, labelled."""
+    out = []
+    out.append(("tmesim/molecular/byo.py::__doc__", byo.__doc__ or ""))
+    _strings(list(byo.CAN_CONCLUDE), "byo.CAN_CONCLUDE", out)
+    _strings(list(byo.CANNOT_CONCLUDE), "byo.CANNOT_CONCLUDE", out)
+    # Compiled payloads, across the branches that change the wording: an IC50
+    # supplied vs absent (two different caveats and two different `ic50`
+    # methods), and an in-library vs extrapolated MW (the warnings branch).
+    variants = (
+        ("aspirin+ic50", "ACME-101", ASPIRIN, 1.0),
+        ("aspirin-no-ic50", "ACME-102", ASPIRIN, None),
+        ("doxorubicin", "ACME-BIG", DOXORUBICIN, 2.5),
+        ("extrapolated-mw", "SMALL-1", "CC(=O)NC", None),
+    )
+    for tag, name, smiles, ic50 in variants:
+        d = compile_user_compound(name, smiles, ic50_uM=ic50, alpha=alpha).as_dict()
+        _strings(d, f"compile_user_compound[{tag}]", out)
+    for rel in ("app/web/js/ui/compound.js", "app/web/js/ui/provenance.js"):
+        out.append((rel, _js_text(os.path.join(_REPO, rel))))
+    return out
+
+
+def _ordering_offers(text):
+    """Every ordering-as-evidence construction in ``text``, with its reason."""
+    found = []
+    for pat, why in _UNCONDITIONAL:
+        for m in re.finditer(pat, text, re.IGNORECASE):
+            found.append((m.group(0), why))
+    order_spans = [m.span() for m in _ORDER_RE.finditer(text)]
+    for g in _GRADE_RE.finditer(text):
+        gs, ge = g.span()
+        for os_, oe in order_spans:
+            if min(abs(os_ - ge), abs(gs - oe)) <= _GRADE_WINDOW:
+                found.append((
+                    f"{text[os_:oe]} ... {g.group(0)}",
+                    "grades an ordering by strength; the prohibition admits "
+                    "no grade"))
+                break
+    for clause in _CLAUSE_SPLIT_RE.split(text):
+        low = clause.lower()
+        if any(p in low for p in _PROHIBITION):
+            continue
+        m = _OFFER_RE.search(clause)
+        if m:
+            found.append((m.group(0).strip(),
+                          "an imperative whose object is an ordering, with no "
+                          "prohibition in the same clause"))
+    return found
+
+
+class TestOrderingIsNotOfferedAsEvidence:
+    """Cross-compound ordering was withdrawn on 2026-08-21 and the prohibition
+    is unconditional. This is the mechanical check that the BYO surface -- the
+    module strings, every compiled payload, and the two Studio modules that
+    render them -- offers it at no grade at all."""
+
+    def test_the_patterns_fire_on_the_phrasings_this_guard_was_written_for(self):
+        """A guard nobody has watched fail is a guard nobody has.
+
+        These four literals are the constructions the 2026-08-30 audit found
+        live on this surface, transcribed here so the patterns cannot be
+        loosened into uselessness without this test going red. They are
+        assertions ABOUT THE REGEXES, not text that ships anywhere.
+        """
+        historical = (
+            "Read the ORDER over a mass-matched series as weak evidence, not "
+            "as a measurement",
+            "MEASURED AGAINST DATA, PARTLY SUPPORTED -- read this before you "
+            "rank on it",
+            "Treat the order as a hypothesis to test",
+            "a compiled compound may be RANKED against other compounds",
+        )
+        for phrasing in historical:
+            assert _ordering_offers(phrasing), (
+                "the guard no longer detects a phrasing that was live on this "
+                f"surface: {phrasing!r}")
+        # ...and it does NOT fire on how the LAW was scored, which is a
+        # measurement and must survive.
+        benign = (
+            "Scored BLIND and UNFITTED against 71 compounds: R^2 = 0.718, and "
+            "24 of 31 exact-mass pairs ordered correctly. The MW-only model "
+            "this replaced scored R^2 = 0.022 and ordered 0 of 31.",
+            "DO NOT read an ORDERING across compounds. The cross-compound "
+            "ranking was measured and WITHDRAWN on 2026-08-21.",
+            "It reproduces 8.3x of a measured 29.7x spread, so it "
+            "under-separates a congeneric series systematically.",
+        )
+        for phrasing in benign:
+            assert not _ordering_offers(phrasing), (
+                f"the guard is over-broad and would delete a measurement: "
+                f"{phrasing!r} -> {_ordering_offers(phrasing)}")
+
+    def test_no_byo_string_offers_an_ordering_at_any_grade(self, alpha):
+        surface = _byo_surface(alpha)
+        violations = []
+        for where, text in surface:
+            for hit, why in _ordering_offers(text):
+                violations.append(f"  {where}\n    {hit!r}\n    -> {why}")
+        assert not violations, (
+            "the bring-your-own-compound surface offers a cross-compound "
+            "ordering. That was measured and WITHDRAWN on 2026-08-21 and the "
+            "prohibition admits no grade -- not as weak evidence, not as a "
+            "hypothesis, not as a limit. The honest form of a shortfall is a "
+            "statement about the LAW.\n" + "\n".join(violations))
+
+    def test_the_surface_this_guard_scanned_is_the_real_one(self, alpha):
+        """Anti-vacuity. A guard that passes because it read nothing is the
+        defect this repo keeps finding, so the scanned surface is pinned by
+        size, by origin, and by content that must be present."""
+        surface = _byo_surface(alpha)
+        origins = {w.split("[")[0] for w, _ in surface}
+        for required in ("tmesim/molecular/byo.py::__doc__", "byo.CAN_CONCLUDE",
+                         "byo.CANNOT_CONCLUDE", "compile_user_compound",
+                         "app/web/js/ui/compound.js",
+                         "app/web/js/ui/provenance.js"):
+            assert required in origins, f"{required} was not scanned"
+        assert sum(len(t) for _, t in surface) > 30_000
+        # The prohibition must be STATED, not merely un-violated: a surface
+        # that said nothing at all would also pass the check above.
+        joined = {w: t for w, t in surface}
+        assert "WITHDRAWN" in " ".join(byo.CAN_CONCLUDE)
+        assert "WITHDRAWN" in " ".join(byo.CANNOT_CONCLUDE)
+        for rel in ("app/web/js/ui/compound.js", "app/web/js/ui/provenance.js"):
+            assert "withdrawn" in joined[rel].lower(), rel
+        cav = " ".join(compile_user_compound(
+            "ACME-101", ASPIRIN, ic50_uM=1.0, alpha=alpha).caveats)
+        assert "withdrawn" in cav.lower() and "2026-08-21" in cav

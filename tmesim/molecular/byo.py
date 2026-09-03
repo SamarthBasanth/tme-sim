@@ -55,10 +55,13 @@ being safe to hand to a user directly:
                           exact-mass pairs correctly against the old model's
                           0 of 31 (``results/two_route_promotion.md``).
                           WHAT IS STILL NOT TRUE: it reproduces 8.3x of a
-                          measured 29.7x spread -- about 24 % -- so a similar-
-                          mass series is separated WEAKLY rather than not at
-                          all, the whole test is ONE cell line, and no absolute
-                          number here is defensible.
+                          measured 29.7x spread -- about 24 % -- so the LAW
+                          under-separates a similar-mass series rather than
+                          failing on it outright, the whole test is ONE cell
+                          line, and no absolute number here is defensible.
+                          That shortfall is a limit on the law; it is not a
+                          licence to place compounds in an order, which is
+                          withdrawn.
    binding / clearance    ASSUMED. Structure heuristics, then OVERWRITTEN by the
                           single global constant ``alpha`` fitted on
                           doxorubicin's penetration anchor. The fit is one drug.
@@ -74,9 +77,14 @@ What a user may conclude
 ------------------------
 See :data:`CAN_CONCLUDE` / :data:`CANNOT_CONCLUDE`. The short version, which is
 the same claim the rest of this project makes for its own library: a compiled
-compound may be RANKED against other compounds on the same tissue section under
-the same settings. Its absolute AUC, kill fraction and penetration depth may not
-be read as predictions.
+compound may be read against ITSELF on one tissue section -- the RELATIVE
+exposure between regions of its own map, which survives a per-compound rescale
+because that rescale cancels from a ratio between two points of the same map.
+Its absolute AUC, kill fraction and penetration depth may not be read as
+predictions, and placing compounds in an order against each other was measured
+and WITHDRAWN on 2026-08-21 (``results/pk_ranking_robustness.md``,
+``results/capacity_ranking_robustness.md``). That prohibition is unconditional:
+this module offers no ordering in any form.
 
 This module does not modify ``core``, the tissue engine, ``descriptors``,
 ``compile_drug`` or ``validation.calibration``. It composes them.
@@ -187,8 +195,9 @@ CAN_CONCLUDE: Tuple[str, ...] = (
     "driven by an IC50 you measured is on far firmer ground than one driven by "
     "transport.",
     "Detect that two of your compounds are INDISTINGUISHABLE to this model. If "
-    "their compiled fields match, the model cannot rank them, and it says so "
-    "rather than inventing a difference. This is the most reliable thing the "
+    "their compiled fields match, the model cannot tell them apart at all, and "
+    "it says so rather than inventing a difference. This is the most reliable "
+    "thing the "
     "compiler does, and for a congeneric series it is often the honest answer.",
 )
 
@@ -209,18 +218,21 @@ CANNOT_CONCLUDE: Tuple[str, ...] = (
     "a measured 74-130 um^2/s, i.e. 1.5x too LOW, having previously been 2.2x "
     "too high. The two anchors disagree about where the engine sits and that is "
     "unresolved (results/two_route_promotion.md).",
-    "A TRANSPORT RANKING OF ANALOGUES OF SIMILAR MOLECULAR WEIGHT, AS AN "
-    "ABSOLUTE OR A FINE-GRAINED ONE. The MW-only model this engine used to ship "
-    "could not resolve such a series AT ALL -- flat by construction at matched "
-    "mass, R^2 = 0.022 against 71 compounds in HT29 multicellular layers "
-    "(Pruijn et al. 2008; results/diffusivity_falsification.md). The shipping "
-    "two-route model does resolve it, at R^2 = 0.718 blind on those same 71 "
-    "compounds with 24 of 31 exact-mass pairs ordered correctly "
-    "(results/two_route_promotion.md). But it reproduces 8.3x of a measured "
-    "29.7x spread -- roughly a QUARTER -- so it under-separates a congeneric "
-    "series systematically, and it has been tested against exactly ONE cell "
-    "line. Read the ORDER over a mass-matched series as weak evidence, not as a "
-    "measurement, and read no absolute diffusivity from it at all.",
+    "A TRANSPORT ORDERING OVER ANALOGUES OF SIMILAR MOLECULAR WEIGHT, IN ANY "
+    "FORM. Placing compounds in an order was measured and WITHDRAWN on "
+    "2026-08-21 and the prohibition is unconditional, so what follows is a "
+    "statement about the LAW and not a grade on an ordering. The MW-only model "
+    "this engine used to ship could not resolve such a series AT ALL -- flat by "
+    "construction at matched mass, R^2 = 0.022 against 71 compounds in HT29 "
+    "multicellular layers (Pruijn et al. 2008; "
+    "results/diffusivity_falsification.md). The shipping two-route model does "
+    "respond to such a series, scoring R^2 = 0.718 blind on those same 71 "
+    "compounds (results/two_route_promotion.md). But it reproduces 8.3x of a "
+    "measured 29.7x spread -- roughly a QUARTER -- so it under-separates a "
+    "congeneric series systematically, and it has been tested against exactly "
+    "ONE cell line. That shortfall bounds how much of the compound-to-compound "
+    "spread the law captures. No ordering is offered here in any form. "
+    "Read no absolute diffusivity from it at all.",
     "Anything about a stereoisomer, a salt form, a prodrug or a formulation. "
     "Crippen logP is stereochemistry-blind and there is no metabolism step, so an "
     "enantiomer pair compiles to bit-identical parameters and a prodrug compiles "
@@ -644,8 +656,9 @@ def _fields(mol: Molecule, prof: MolecularProfile, dp: DrugParams,
             "key": "diffusivity", "label": "Tissue diffusivity (engine input)",
             "unit": "um^2/s", "value": _f(dp.diffusivity),
             "kind": "assumed", "is_prediction": True,
-            "method": "MEASURED AGAINST DATA, PARTLY SUPPORTED -- read this "
-                      "before you rank on it. Free diffusivity x 2D "
+            "method": "MEASURED AGAINST DATA, PARTLY SUPPORTED -- read the "
+                      "shortfall below before you use this field. Free "
+                      "diffusivity x 2D "
                       "Brownian-dynamics micro-tortuosity x an Ogston-Renkin "
                       "ECM fibre-mesh size gate x a two-route cell term "
                       "(paracellular between cells + transcellular through "
@@ -669,7 +682,11 @@ def _fields(mol: Molecule, prof: MolecularProfile, dp: DrugParams,
                       "band (74-130 um^2/s for tirapazamine) by 1.5x on the low "
                       "side. The dimensionless hindrance factor, by contrast, "
                       "now lands INSIDE its measured band (10.3-fold against a "
-                      "measured 12-fold, results/cellular_exclusion.md).",
+                      "measured 12-fold, results/cellular_exclusion.md). The "
+                      "71-compound scores above are how the LAW was graded "
+                      "against a published dataset; placing your own compounds "
+                      "in an order by this field is withdrawn and is not "
+                      "offered here in any form.",
         },
         {
             "key": "bbb_penetrance", "label": "BBB penetrance", "unit": "frac",
@@ -686,8 +703,8 @@ def _fields(mol: Molecule, prof: MolecularProfile, dp: DrugParams,
             "key": "binding", "label": "Tissue loss: binding", "unit": "1/s",
             "value": _f(dp.binding), "kind": "assumed", "is_prediction": True,
             "method": (
-                "ASSUMED. The structure heuristic (logP + H-bond donors) supplies "
-                "only an ORDERING; its absolute scale is then overwritten by "
+                "ASSUMED. The structure heuristic (logP + H-bond donors) fixes "
+                "no scale of its own; the scale is supplied entirely by "
                 "alpha * uptake_proxy, where alpha"
                 + (f" = {alpha:.4g}" if alpha is not None else "")
                 + " is the project's SINGLE free constant, fitted on ONE drug "
@@ -716,8 +733,8 @@ def _fields(mol: Molecule, prof: MolecularProfile, dp: DrugParams,
                 "potency without docking or an assay, so a flagged 25 uM "
                 "PLACEHOLDER is in use. It is not a property of your compound. "
                 "Any kill fraction or IC50-coverage number computed from it is "
-                "meaningless in absolute terms, and a ranking against other "
-                "compounds is only a DELIVERY ranking, not a potency one."
+                "meaningless in absolute terms: what moves it is DELIVERY, not "
+                "potency, and it must not be read as potency at all."
             ),
         },
         {
@@ -845,8 +862,8 @@ def compile_user_compound(
     # that, so the caveat is written to trip that rule rather than to read
     # gently.
     caveats.append(
-        "TRANSPORT RANKING OVER SIMILAR-MASS ANALOGUES IS WEAK EVIDENCE, NOT A "
-        "MEASUREMENT. Diffusivity here consumes molecular weight, logP and "
+        "TRANSPORT REPRODUCES ABOUT A QUARTER OF THE MEASURED SPREAD BETWEEN "
+        "COMPOUNDS. Diffusivity here consumes molecular weight, logP and "
         "hydrogen-bond donor count through a two-route cell term. Scored blind "
         "against 71 compounds measured in HT29 multicellular layers (Pruijn et "
         "al. 2008, results/two_route_promotion.md) it reaches R^2 = 0.718 and "
@@ -854,9 +871,11 @@ def compile_user_compound(
         "0 of 31 for the molecular-weight-only model this replaced "
         "(results/diffusivity_falsification.md). It nonetheless reproduces only "
         "8.3x of the measured 29.7x spread, so it under-separates such a series "
-        "systematically, and it has been tested in ONE cell line. Treat the "
-        "order as a hypothesis to test, and do not quote the absolute "
-        "diffusivity at all."
+        "systematically, and it has been tested in ONE cell line. THAT IS A "
+        "LIMIT ON THE LAW, NOT A LICENCE: those scores are how the law was "
+        "graded against a published dataset, and placing compounds in an order "
+        "against each other is withdrawn and is not offered here in any form. "
+        "Do not quote the absolute diffusivity at all."
     )
     caveats.append(
         "logP here is an RDKit Crippen PREDICTION, not a measurement -- as it is "
@@ -869,17 +888,22 @@ def compile_user_compound(
         "SELF-COMPILED COMPOUND: every parameter except molecular weight and "
         "TPSA is a PREDICTION from the structure you supplied, not a "
         "measurement. Its absolute kill fraction, AUC and penetration depth are "
-        "NOT DEFENSIBLE and MUST NOT be quoted as results. Use it to RANK "
-        "compounds against each other on one tissue section; that ranking is the "
-        "claim this project defends."
+        "NOT DEFENSIBLE and MUST NOT be quoted as results. Use it to read where "
+        "this ONE compound reaches on ONE tissue section -- the RELATIVE "
+        "exposure between regions of its own map, which is the claim this "
+        "project defends. Placing compounds in an order against each other was "
+        "measured and withdrawn on 2026-08-21 "
+        "(results/pk_ranking_robustness.md, "
+        "results/capacity_ranking_robustness.md) and MUST NOT be read off this "
+        "compound in any form."
     )
     if ic50 is None:
         caveats.append(
             "NO IC50 WAS SUPPLIED for this compound, so a flagged 25 uM "
             "placeholder stands in. It is not a property of your molecule: any "
             "kill fraction or IC50-coverage number derived from it MUST NOT be "
-            "read as potency, and a ranking that includes this compound is a "
-            "DELIVERY ranking only.")
+            "read as potency at all -- what moves such a number is DELIVERY, "
+            "and the placeholder carries no potency information to read.")
     else:
         caveats.append(
             f"The IC50 of {ic50:g} uM is YOURS, taken as given. It was measured "

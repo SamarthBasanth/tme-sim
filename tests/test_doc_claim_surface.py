@@ -123,8 +123,40 @@ def _surface_files():
     return out
 
 
+def _studio_files():
+    """The OTHER outward-facing surface: what the Studio itself puts on screen.
+
+    A claim reaches a reader through the shipped UI exactly as it reaches them
+    through a document, and the audit found violations in both. `docs/` had no
+    check; `app/web/js/` had none either.
+
+    `tests/test_byo_compound.py::TestOrderingIsNotOfferedAsEvidence` is the DEEP
+    guard for the bring-your-own-compound slice — it walks compiled payloads,
+    grades imperatives, and knows about hedging tiers. This one is broad and
+    shallow: the same two unambiguous shapes as the documents above, across
+    every module. They overlap on two files on purpose. A surface this easy to
+    regress is worth checking twice, from two directions.
+    """
+    out = []
+    js = os.path.join(_ROOT, "app", "web", "js")
+    for root, _dirs, files in os.walk(js):
+        for name in sorted(files):
+            if name.endswith(".js"):
+                out.append(os.path.join(root, name))
+    return out
+
+
 def _rel(path):
     return os.path.relpath(path, _ROOT)
+
+
+@pytest.fixture(scope="module")
+def studio():
+    docs = {}
+    for path in _studio_files():
+        with open(path, encoding="utf-8") as fh:
+            docs[_rel(path)] = fh.read().splitlines()
+    return docs
 
 
 @pytest.fixture(scope="module")
@@ -210,3 +242,54 @@ def test_a_withdrawal_sentence_is_not_treated_as_an_exemption(surface):
         "premise: this line is exempt from the product-ranks check"
     assert ORDERING_RE.search(line), \
         "and the ordering check must still catch it — the two are independent"
+
+
+# --------------------------------------------------------------------------- #
+# The same two shapes, on the surface the Studio renders
+# --------------------------------------------------------------------------- #
+def test_the_studio_scan_has_a_subject(studio):
+    """Anti-vacuity for the second corpus, same as for the first."""
+    assert len(studio) >= 25, f"only {len(studio)} JS modules scanned"
+    blob = " ".join(" ".join(v) for v in studio.values()).lower()
+    assert any(c in blob for c in COMPOUNDS), \
+        "no compound name anywhere in app/web/js — wrong corpus?"
+    # The withdrawal must be POSITIVELY STATED somewhere on this surface, or
+    # the corpus could pass by containing no claims at all.
+    assert "withdrawn" in blob, \
+        "the Studio states the withdrawal nowhere; an empty surface is not a "\
+        "clean one"
+
+
+def test_the_studio_renders_no_explicit_cross_compound_ordering(studio):
+    """A comment counts.
+
+    Deliberately NOT limited to string literals. A source comment is read by
+    the next person to touch the file, and this project's own history is of a
+    retired claim surviving in prose next to the code that replaced it — the
+    bring-your-own-compound panel asserted a refuted law in the present tense
+    while the law that replaced it rendered 200px below. If an ordering is
+    worth deleting from the screen it is worth deleting from the file.
+    """
+    bad = []
+    for rel, lines in studio.items():
+        text = "\n".join(_normalise(lines))
+        for m in ORDERING_RE.finditer(text):
+            line_no = text.count("\n", 0, m.start()) + 1
+            bad.append(f"{rel}:{line_no}: {m.group(0)[:80]!r}")
+    assert not bad, (
+        "the Studio surface carries an explicit cross-compound ordering, "
+        "withdrawn 2026-08-21:\n  " + "\n  ".join(bad))
+
+
+def test_the_studio_does_not_describe_itself_as_ranking_compounds(studio):
+    bad = []
+    for rel, lines in studio.items():
+        for i, line in enumerate(lines, 1):
+            if not PRODUCT_RANKS_RE.search(line):
+                continue
+            if any(w in line.lower() for w in WITHDRAWAL_CONTEXT):
+                continue
+            bad.append(f"{rel}:{i}: {line.strip()[:110]}")
+    assert not bad, (
+        "the Studio describes itself as ranking or comparing compounds, with "
+        "no withdrawal context on the line:\n  " + "\n  ".join(bad))
