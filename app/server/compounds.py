@@ -198,6 +198,31 @@ class CompoundStore:
 
     # -- paths -------------------------------------------------------------- #
     def _dir(self, cid: str) -> str:
+        # SECURITY: THE ID IS A PATH SEGMENT, SO IT IS VALIDATED HERE AND NOT
+        # AT THE CALL SITES.
+        #
+        # Starlette percent-decodes before route matching, so `%2e%2e` arrives
+        # as the literal `..` inside a single segment and the router's `[^/]+`
+        # never sees a slash. Joined straight onto the store root it resolved
+        # one level up. MEASURED 2026-09-03 with a planted canary:
+        #   GET    /api/compounds/%2e%2e  -> 200, served the file above the root
+        #   DELETE /api/compounds/%2e%2e  -> 200, DELETED it
+        # A NUL byte in the same position reached open() and raised
+        # ValueError("embedded null byte") -- a 500 out of a lookup.
+        #
+        # Bounded to one level and to the fixed filename, and on a real
+        # deployment the reachable object does not exist -- so today's blast
+        # radius is nil. It was still a read-and-delete primitive one root
+        # reconfiguration away from mattering, and DELETE does not care that
+        # the file it removed was uninteresting.
+        #
+        # `COMPOUND_ID_RE` already existed and was applied only when LISTING the store
+        # directory. The guard was written and then not wired to the boundary
+        # that needed it.
+        if not COMPOUND_ID_RE.match(cid or ""):
+            raise CompoundError(f"no user compound {cid!r}",
+                                status=404,
+                                code="compound_not_found")
         return os.path.join(self.root, cid)
 
     def _path(self, cid: str) -> str:
@@ -210,6 +235,13 @@ class CompoundStore:
                 doc = json.load(fh)
         except FileNotFoundError:
             return None
+        except CompoundError:
+            # Already a well-formed refusal carrying its own status -- the id
+            # validation in _dir raises one. Re-raised UNTOUCHED so a 404 stays
+            # a 404 rather than being relabelled a 500 with a message claiming
+            # the file is on disk. See projects.py::_read for the same line and
+            # the traversal it was added with.
+            raise
         except Exception as exc:  # noqa: BLE001 - a corrupt file is reported
             raise CompoundError(
                 redact_exception(

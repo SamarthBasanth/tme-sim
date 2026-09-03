@@ -221,6 +221,47 @@ def _resolve_max_grid_cells():
 
 _MAX_GRID_CELLS, _MAX_GRID_CELLS_SOURCE = _resolve_max_grid_cells()
 
+#: App-wide request-body ceiling, in bytes.
+#:
+#: `app/server/protocol_api.py` has had a 4 MB cap with a Content-Length
+#: pre-check since a ~500 MB POST cost ~2.8 GB resident and a handful of them
+#: OOM'd the process. Its docstring makes the argument in one line: "a limit
+#: that fires after the allocation is not a limit."
+#:
+#: It applied to ONE router. Every other POST route -- /api/runs,
+#: /api/validate, /api/reports, /api/projects, /api/compounds,
+#: /api/sections/scan -- did a bare `await request.json()` and buffered the
+#: lot. MEASURED 2026-09-03: a 64 MB body was buffered and parsed by all six,
+#: in 0.07-0.45 s each, while the protocol router refused the same body in
+#: 0.009 s.
+#:
+#: Same number as the protocol router's, deliberately: the largest legitimate
+#: body here is a RunSpec or a compound definition, both kilobytes.
+MAX_REQUEST_BODY_BYTES = 4 * 1024 * 1024
+
+#: Ceiling on pk.n_doses. An ERROR, not a warning, for the reason the grid
+#: ceiling above is one: ``ok = not errors``, so a warning does not block the
+#: allocation it warns about.
+#:
+#: ``treatment/drugs.py::plasma_profile`` builds ``np.arange(n_doses)`` plus
+#: broadcast arrays of shape ``(n_doses, len(times))``. MEASURED on this
+#: machine with only THREE time points: n_doses = 2,000,000 peaks at 160 MB in
+#: 56 ms, and it is linear -- so 1e9 doses is ~80 GB for three points, and far
+#: more over a real time grid. ``POST /api/runs`` accepted n_doses = 10**15
+#: with a 202.
+#:
+#: This is the same class as the OOM the grid ceiling was added for: one
+#: ordinary POST that takes the process down for everyone. The grid was capped
+#: and the dose count was not. 10,000 is far above any real schedule -- a full
+#: Stupp course is 30-42 administrations.
+MAX_N_DOSES = 10_000
+
+#: Ceiling on total_time_s, in the same spirit. 100 years.
+#: POST /api/runs accepted total_time_s = 1e308 with a 202 before this. The window already
+#: warns above 72 h; this only refuses the values that are a memory request
+#: rather than a protocol.
+MAX_TOTAL_TIME_S = 100.0 * 365.25 * 24 * 3600
+
 #: Hard floor on dx_um for the case where the section extent is unknown and
 #: the voxel ceiling above cannot be evaluated. 0.5 um is well below a cell
 #: diameter, so no legitimate tissue-scale run is refused by it.
@@ -443,7 +484,13 @@ def _num(v):
         return None
     try:
         f = float(v)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
+        # OverflowError was missing and is the one that mattered: a JSON
+        # integer literal above sys.float_info.max is a perfectly good int, so
+        # TypeError and ValueError never fire and float() raises instead --
+        # straight out through validate_spec as a 500. Found while fixing the
+        # same bug in _as_number; this call site is reached one line later, so
+        # patching only that one moved the crash rather than removing it.
         return None
     return f if math.isfinite(f) else None
 
@@ -548,12 +595,45 @@ _SPEC_KEYS = {
 _PK_KEYS = {"plasma_peak", "half_life_s", "n_doses", "dose_interval_s"}
 
 
+def _is_whole(value) -> bool:
+    """Is this number an exact integer, without ever calling ``float()`` on a
+    value that cannot survive it?
+
+    ``float(x) != int(x)`` is the natural spelling and it raises OverflowError
+    on a JSON integer literal above ``sys.float_info.max`` -- a 500 out of a
+    validator. An ``int`` is whole by definition and needs no conversion at
+    all; only a genuine float has a fractional part to check.
+    """
+    if isinstance(value, int):
+        return True
+    return float(value).is_integer()
+
+
 def _as_number(value, name: str, errors: List[str]) -> Optional[float]:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         errors.append(f"{name}: expected a number, got {type(value).__name__} "
                       f"({value!r})")
         return None
-    v = float(value)
+    try:
+        v = float(value)
+    except OverflowError:
+        # A JSON integer literal above sys.float_info.max. Python parses it
+        # exactly, as an int, so the isinstance check above passes and float()
+        # is where it fails. MEASURED: 309 nines is a 500 out of
+        # POST /api/validate; 308 is a clean 200. Reproduced on dx_um,
+        # total_time_s, mgmt and three pk fields, and through /api/runs and
+        # /api/reports' spec_overrides.
+        #
+        # This is the failure the docstring below already argues against -- a
+        # 500 out of the endpoint whose whole job is turning bad input into a
+        # readable message.
+        #
+        # bit_length(), NOT the value: str() of an int over ~4,300 digits
+        # raises ValueError on Python 3.11+, so repr-ing it into the message
+        # would re-create the 500 inside the handler for it.
+        errors.append(f"{name}: integer is too large to be a floating-point "
+                      f"number ({value.bit_length()} bits)")
+        return None
     if not math.isfinite(v):
         errors.append(f"{name}: must be finite, got {value!r}")
         return None
@@ -795,6 +875,14 @@ def validate_spec(spec: Dict) -> Dict:
                     "transport solve would take zero steps and every exposure "
                     f"metric would be 0. Use total_time_s >= {PDE_DT_S:g}."
                 )
+            elif total_time > MAX_TOTAL_TIME_S:
+                errors.append(
+                    f"total_time_s = {total_time:g} s is above the "
+                    f"{MAX_TOTAL_TIME_S:g} s ceiling ({MAX_TOTAL_TIME_S / (365.25 * 86400):.0f} "
+                    f"years). At dt = {PDE_DT_S:g} s that is "
+                    f"{total_time / PDE_DT_S:.3g} timesteps; the window is a "
+                    "compute request at this size, not an exposure window. "
+                    "Use a window you would actually observe.")
             elif total_time > 3600.0 * 72:
                 warnings.append(
                     f"total_time_s = {total_time:g} s is "
@@ -960,10 +1048,17 @@ def validate_spec(spec: Dict) -> Dict:
             if isinstance(nd, bool) or not isinstance(nd, (int, float)):
                 errors.append(f"pk.n_doses: expected an integer, got "
                               f"{type(nd).__name__}")
-            elif float(nd) != int(nd):
+            elif not _is_whole(nd):
                 errors.append(f"pk.n_doses: must be a whole number, got {nd}")
             elif int(nd) < 1:
                 errors.append(f"pk.n_doses: must be >= 1, got {int(nd)}")
+            elif int(nd) > MAX_N_DOSES:
+                errors.append(
+                    f"pk.n_doses = {int(nd)}: above the {MAX_N_DOSES:,} "
+                    "ceiling. plasma_profile allocates an "
+                    "(n_doses x n_times) float64 array, so this is a memory "
+                    "request rather than a schedule -- a full Stupp course is "
+                    "30-42 administrations.")
             elif int(nd) > 100:
                 warnings.append(
                     f"pk.n_doses = {int(nd)}: doses superpose linearly, so a "
@@ -1037,7 +1132,7 @@ def _validate_readouts(spec: Dict, section_row, dx, total_time,
         errors.append(f"timelapse_frames: expected an integer, got "
                       f"{type(spec['timelapse_frames']).__name__}")
         return
-    elif float(frames) != int(frames):
+    elif not _is_whole(frames):
         errors.append(f"timelapse_frames: must be a whole number, got {frames}")
         return
     else:
@@ -1631,6 +1726,35 @@ def create_app(manager: Optional[JobManager] = None,
     if _allowed_hosts and "*" not in _allowed_hosts:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=_allowed_hosts)
 
+    @app.middleware("http")
+    async def _cap_request_body(request: Request, call_next):
+        """Refuse an oversized body BEFORE a handler buffers it.
+
+        Content-Length first, because it lets us refuse without reading a byte.
+        It is client-supplied and may be absent or a lie, so this is a cheap
+        pre-check and not the whole defence -- the protocol router additionally
+        counts its stream as it arrives, and a route needing that guarantee
+        should use `_capped_body`. What this stops is the ordinary case: a
+        large declared body reaching `await request.json()`.
+
+        GET/HEAD/OPTIONS are skipped rather than trusted. They can technically
+        carry a body, and refusing one on a liveness probe would be a new way
+        to fail a health check -- something this file has already done twice.
+        """
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            declared = request.headers.get("content-length")
+            if (declared is not None and declared.isdigit()
+                    and int(declared) > MAX_REQUEST_BODY_BYTES):
+                return JSONResponse(
+                    {"detail": {
+                        "message": (f"request body is {int(declared)} B, above "
+                                    f"the {MAX_REQUEST_BODY_BYTES} B limit"),
+                        "reason": ("a RunSpec, a report request and a compound "
+                                   "definition are all kilobytes"),
+                    }},
+                    status_code=413)
+        return await call_next(request)
+
     # Optional shared-secret gate on every /api/* route, OFF by default (empty
     # env var) so the local single-user workflow this app was built for is
     # completely unaffected. __main__.py sets TMESIM_STUDIO_API_KEY when a
@@ -1711,7 +1835,20 @@ def create_app(manager: Optional[JobManager] = None,
     app.state.reports = reports
 
     # ----------------------------------------------------------------- #
-    @app.get("/healthz")
+    # HEAD AS WELL AS GET, and this is not tidiness.
+    #
+    # FastAPI registers only the method you name, so HEAD /healthz returned 404
+    # — while the API-key middleware had already been written to exempt
+    # `request.method in ("GET", "HEAD")` on this path, i.e. the gate expected
+    # HEAD probes that the router then refused. A platform health check
+    # configured for HEAD would have marked this service down while it was
+    # serving perfectly.
+    #
+    # That is the failure this route exists because of: a health check pointed
+    # at a route it could not satisfy killed a healthy container here twice.
+    # Found by an input sweep, not by a probe, because nothing in this repo
+    # probes with HEAD.
+    @app.api_route("/healthz", methods=["GET", "HEAD"])
     def healthz() -> Dict:
         """Liveness, for a platform health checker. NOT ``/api/health``.
 
@@ -1774,7 +1911,15 @@ def create_app(manager: Optional[JobManager] = None,
             raise HTTPException(
                 status_code=400,
                 detail=f"request body is not valid JSON: {exc}") from exc
-        if not isinstance(body, dict) or not body.get("path"):
+        # isinstance(str), not truthiness. The test was `not body.get("path")`
+        # and the next line was `str(body["path"])`, so `{"path": {"a": 1}}`
+        # became the literal path `{'a': 1}`, was resolved against the server's
+        # working directory, and came back in the 200 body -- turning a type
+        # error into a disclosure of the server's CWD. No new read capability,
+        # but no reason to answer a dict with a filesystem path either.
+        if (not isinstance(body, dict)
+                or not isinstance(body.get("path"), str)
+                or not body["path"].strip()):
             raise HTTPException(
                 status_code=400,
                 detail="body must be an object with a 'path' string naming the "
@@ -1782,7 +1927,7 @@ def create_app(manager: Optional[JobManager] = None,
 
         from . import ingest_registry
 
-        path = str(body["path"])
+        path = body["path"]
         try:
             confined = confine_scan_path(path)
         except PathNotAllowed as exc:
@@ -1902,9 +2047,20 @@ def create_app(manager: Optional[JobManager] = None,
 
     @app.delete("/api/compounds/{compound_id}")
     def delete_compound(compound_id: str) -> Dict:
-        from .compounds import COMPOUND_STORE
+        from .compounds import COMPOUND_STORE, CompoundError
 
-        if not COMPOUND_STORE.delete(compound_id):
+        # CompoundError is CAUGHT here, unlike every sibling route above which
+        # already did. The store now validates the id at its own boundary (see
+        # compounds.py::_dir and the traversal it closed), so a malformed id
+        # raises here instead of being joined onto a path -- and an uncaught
+        # store error out of a DELETE is a 500 where the store meant a 404.
+        try:
+            deleted = COMPOUND_STORE.delete(compound_id)
+        except CompoundError as exc:
+            raise HTTPException(status_code=exc.status,
+                                detail={"code": exc.code,
+                                        "message": exc.message}) from exc
+        if not deleted:
             raise HTTPException(
                 status_code=404,
                 detail={"code": "compound_not_found",
@@ -2262,7 +2418,7 @@ def create_app(manager: Optional[JobManager] = None,
                 "reason": ("every queued arm was cancelled; an arm already "
                            "inside simulate_response finishes that solve first")}
 
-    @app.get("/api/health")
+    @app.api_route("/api/health", methods=["GET", "HEAD"])
     def health(request: Request) -> Dict:
         """Liveness to anyone; diagnostics only to a caller holding the key.
 
@@ -2329,6 +2485,10 @@ def create_app(manager: Optional[JobManager] = None,
         # warning.
         "large_grid_cells": _LARGE_GRID_CELLS,
         "min_dx_um": MIN_DX_UM,
+        # Published for the same reason the grid ceiling is: a client that
+        # cannot see a limit finds it by tripping it.
+        "max_n_doses": MAX_N_DOSES,
+        "max_total_time_s": MAX_TOTAL_TIME_S,
         "dx_kill_ladder_coarse_um": DX_KILL_LADDER_COARSE_UM,
         "dx_penetration_ladder_coarse_um": DX_PENETRATION_LADDER_COARSE_UM,
         "pde_dt_s": PDE_DT_S,

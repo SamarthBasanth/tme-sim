@@ -790,6 +790,36 @@ overrides the exported key — that is the one deliberate exception, it is the
 ordering you'd expect, and it is available only on `python -m app.server`
 (§1b).
 
+### What the key does NOT cover, stated so it is a decision
+
+With `TMESIM_STUDIO_API_KEY` set, four routes still answer an anonymous caller:
+`/openapi.json`, `/docs`, `/redoc` and `/ingest`. They sit outside `/api/` and
+serve GET, so the gate's fail-closed rule lets them through **by design** — the
+front end has to be able to load without a key in order to prompt for one.
+
+Audited 2026-09-03 with the gate on: none of them carries the key, an absolute
+host path, the runs directory, run counts or cache statistics.
+`tests/test_api_hostile_input.py::test_the_ungated_documentation_routes_disclose_no_operational_detail`
+pins that. So `/openapi.json` hands a stranger the **map** of the API and not
+its state.
+
+Whether a private deployment wants to publish that map is a judgement, not a
+defect, which is why it is written down here rather than silently changed. If
+you do not want it, put this deployment behind a reverse proxy that refuses
+those four paths — there is no flag, because a flag would be a fifth thing to
+get wrong.
+
+Two related properties worth knowing:
+
+* `/healthz` and `/api/health` answer **HEAD as well as GET**. Until 2026-09-03
+  they were GET-only and a HEAD probe got a 404, while the key middleware had
+  already been written to exempt HEAD on those paths — a platform health check
+  configured for HEAD would have marked a healthy service down.
+* Every POST route refuses a body above `MAX_REQUEST_BODY_BYTES` (4 MB) on the
+  declared Content-Length, before a handler buffers it. That cap used to apply
+  to `/api/protocol/*` only; a 64 MB body was buffered and parsed by the other
+  six POST routes.
+
 ### `TMESIM_MAX_GRID_CELLS`
 
 **The one that keeps a small host alive**, and the reason this section was

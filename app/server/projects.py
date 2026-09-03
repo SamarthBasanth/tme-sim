@@ -433,6 +433,30 @@ class ProjectStore:
 
     # -- paths -------------------------------------------------------------- #
     def _dir(self, project_id: str) -> str:
+        # SECURITY: THE ID IS A PATH SEGMENT, SO IT IS VALIDATED HERE AND NOT
+        # AT THE CALL SITES.
+        #
+        # Starlette percent-decodes before route matching, so `%2e%2e` arrives
+        # as the literal `..` inside a single segment and the router's `[^/]+`
+        # never sees a slash. Joined straight onto the store root it resolved
+        # one level up. MEASURED 2026-09-03 with a planted canary:
+        #   GET    /api/projects/%2e%2e  -> 200, served the file above the root
+        #   DELETE /api/projects/%2e%2e  -> 200, DELETED it
+        # A NUL byte in the same position reached open() and raised
+        # ValueError("embedded null byte") -- a 500 out of a lookup.
+        #
+        # Bounded to one level and to the fixed filename, and on a real
+        # deployment the reachable object does not exist -- so today's blast
+        # radius is nil. It was still a read-and-delete primitive one root
+        # reconfiguration away from mattering, and DELETE does not care that
+        # the file it removed was uninteresting.
+        #
+        # `PROJECT_ID_RE` already existed and was applied only when LISTING the store
+        # directory. The guard was written and then not wired to the boundary
+        # that needed it.
+        if not PROJECT_ID_RE.match(project_id or ""):
+            raise ProjectError(f"no such project {project_id!r}",
+                               status=404)
         return os.path.join(self.root, project_id)
 
     def _path(self, project_id: str) -> str:
@@ -445,6 +469,14 @@ class ProjectStore:
                 doc = json.load(fh)
         except FileNotFoundError:
             return None
+        except ProjectError:
+            # Already a well-formed refusal with its own status -- the id
+            # validation in _dir raises one. Re-raised UNTOUCHED so a 404 stays
+            # a 404: the broad catch below would otherwise relabel it a 500 and
+            # log "is on disk but could not be read" about a path that was
+            # never opened and a project that does not exist. Closing the
+            # traversal without this line turned the hole into a crash.
+            raise
         except Exception as exc:  # noqa: BLE001 - a corrupt file is reported
             raise ProjectError(
                 redact_exception(

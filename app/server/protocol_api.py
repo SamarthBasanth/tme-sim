@@ -31,7 +31,7 @@ import json
 import os
 import re
 import time
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -191,6 +191,36 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
     """Build the ``/api/protocol`` router bound to an existing job manager."""
     router = APIRouter(prefix="/api/protocol", tags=["protocol"])
 
+    def _limit_kwargs(body: Dict) -> Tuple[Dict, List[Dict]]:
+        """``max_runs`` / ``max_window_s`` off the body, or a diagnostic.
+
+        These were `int(body["max_runs"])` and `float(body["max_window_s"])`,
+        bare, and ABOVE the `try:` that wraps make_plan -- so this module's own
+        "never a bare traceback" contract did not cover them. Measured
+        2026-09-03: a string, a list, a dict or a >308-digit integer in either
+        field is a 500 out of /plan and /run.
+
+        A bad argument is a bad request, so it comes back as a diagnostic in
+        the shape the editor already renders, not as a crash.
+        """
+        kwargs: Dict = {}
+        diags: List[Dict] = []
+        for key, cast, word in (("max_runs", int, "an integer"),
+                                ("max_window_s", float, "a number")):
+            raw = body.get(key)
+            if not raw:
+                continue
+            try:
+                kwargs[key] = cast(raw)
+            except (TypeError, ValueError, OverflowError):
+                diags.append({
+                    "severity": "error", "code": "bad-argument", "line": 0,
+                    "col": 0,
+                    "message": (f"{key}: expected {word}, got "
+                                f"{type(raw).__name__}"),
+                })
+        return kwargs, diags
+
     @router.post("/validate")
     async def post_validate(request: Request) -> Dict:
         """Parse + static checks only. No compilation, no compute."""
@@ -216,11 +246,9 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
 
         body = await _body(request)
         source = _source_from(body)
-        kwargs: Dict = {}
-        if body.get("max_runs"):
-            kwargs["max_runs"] = int(body["max_runs"])
-        if body.get("max_window_s"):
-            kwargs["max_window_s"] = float(body["max_window_s"])
+        kwargs, bad = _limit_kwargs(body)
+        if bad:
+            return _diag_only(bad, plan_shape=True)
         t0 = time.time()
         try:
             p = make_plan(source, compile_drugs=True, **kwargs)
@@ -240,11 +268,10 @@ def build_protocol_router(jobs: JobManager) -> APIRouter:
 
         body = await _body(request)
         source = _source_from(body)
-        kwargs: Dict = {}
-        if body.get("max_runs"):
-            kwargs["max_runs"] = int(body["max_runs"])
-        if body.get("max_window_s"):
-            kwargs["max_window_s"] = float(body["max_window_s"])
+        kwargs, bad = _limit_kwargs(body)
+        if bad:
+            raise HTTPException(status_code=400,
+                                detail={"diagnostics": bad})
         try:
             # Cheap pass first so a bad script is a 400 with positions rather
             # than a job that fails 200 ms after being accepted.
