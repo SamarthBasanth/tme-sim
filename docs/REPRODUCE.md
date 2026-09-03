@@ -151,7 +151,8 @@ python -m tmesim.cli sections                                   # 0 of 7 runnabl
 python -m tmesim.validation.delivery_metrics --selftest         # ~3 s, no data needed
 ```
 
-`molecules` lists the 10 library GBM drugs. `--selftest` runs known-answer checks
+`molecules` lists the library GBM drugs — **12** as of 2026-09-03 (`len(GBM_DRUGS)`;
+this said 10, and the library grows). `--selftest` runs known-answer checks
 on the metric definitions and prints the arithmetic proof that `penetration_index`
 is scale-invariant over a 10⁶× dose change while `therapeutic_coverage` moves from
 0.0004 to 1.0000.
@@ -166,7 +167,8 @@ PY=$(which python) ./scripts/reproduce_real.sh
 
 ## 2. Data acquisition
 
-`data_cache/` is gitignored and holds **6.1 GB**. A fresh clone always starts from
+`data_cache/` is gitignored (with nine deliberately tracked provenance files) and holds
+**3.9 GB**, re-measured 2026-09-03 — this line said 6.1 GB. A fresh clone always starts from
 acquisition. Three classes of input:
 
 | class | how | size | needed for |
@@ -174,7 +176,7 @@ acquisition. Three classes of input:
 | **AUTO** | `python -m tmesim.cli acquire` | ~90 MB | GDSC2 potency, Ivy GAP niches, TCGA background |
 | **AUTO (sections)** | `acquire --sections xenium_319` (default) / `--sections all` | 16.6 MB / 304 MB | the tissue itself — reconstruct, simulate, Studio |
 | **MANUAL** | `curl` recipes below | ~830 MB | Everything else in the core pipeline |
-| **HUNT** | `data_cache/hunt/` | 5.3 GB | The external-validation stage only |
+| **HUNT** | `data_cache/hunt/` | 360 MB (re-measured 2026-09-03; this said 5.3 GB) | The external-validation stage only |
 
 **The distinction that decides whether anything runs at all:** the four tabular
 AUTO sources parameterise *drugs*. A tissue *section* is what a drug is
@@ -326,10 +328,11 @@ curl -L -o data_cache/drugresponse/hgcc_bootstrap.json    http://hgcc.se/portal/
 
 ### 2c. `data_cache/hunt/` — the external-validation corpus
 
-**5.3 GB, 38 directories, ~1,950 files**, produced by the 39-agent data hunt
-(`experiments/data_hunt_workflow.js` → `results/DATA_HUNT.md`, 164 datasets
-surveyed, 143 open). It is **not** reproducible with a single command and there is
-no manifest for 30 of the 38 directories.
+**360 MB, 24 top-level directories, 1,217 files** (re-measured 2026-09-03 with `du -sh`
+and `find`; this read 5.3 GB / 38 directories / ~1,950 files, which was wrong on all
+three), produced by the 39-agent data hunt (`experiments/data_hunt_workflow.js` →
+`results/DATA_HUNT.md`, 164 datasets surveyed, 143 open). It is **not** reproducible with
+a single command and most of its directories have no manifest.
 
 Only **four** directories are read by code today:
 
@@ -410,7 +413,7 @@ back** — their docstrings advertise `python -m …` commands that are currentl
 | module | state |
 |---|---|
 | `validation.cellstate_validation` | `run()`/`make_figure()` exist; no `write_report`, no `__main__` |
-| `validation.ranking_robustness` | **RUNNABLE — this row previously said "no `__main__`" and instructed readers to report cisplatin vs doxorubicin as a TIE. Both are superseded.** It landed, it has a `__main__`, and the measurement *contradicted* that prior: P(cisplatin = rank 1) = 0.9277 under the report's declared priors. **That in turn has been overturned** — those priors are all **common-mode**, and a **drug-specific** transport parameter breaks it: correcting the delivery law drops P(cisplatin rank 1) to **0.3965** and changes the top-1 GBM pick to vincristine (`results/transvascular_exchange_revalidation.md` §4.1). Read `results/ranking_robustness.md` — and its §8, which concludes the reportable output for the top of the panel is a **SET, not a winner** |
+| `validation.ranking_robustness` | **RUNNABLE — this row previously said "no `__main__`" and prescribed a named two-compound tie as the thing to report. Both are superseded.** It landed, it has a `__main__`, and the measurement *contradicted* that prior: under the report's declared priors the leader held its position with probability 0.9277. **That in turn has been overturned** — those priors are all **common-mode**, and a **drug-specific** transport parameter breaks it: correcting the delivery law drops that to **0.3965** and moves the top of the GBM panel (`results/transvascular_exchange_revalidation.md` §4.1). Its §8 then prescribed a reportable *set* in place of a single winner; that is superseded too — cross-compound ordering was withdrawn on 2026-08-21 and no top-of-panel output is offered at all, set or winner. No compound is named in this row, for the same reason. |
 | `validation.vessel_network_impact` | **RUNNABLE** — has `__main__`; `results/vessel_network_impact.{md,png}` exist. (Previously listed here as having no `__main__`; that was wrong.) |
 | *(hypoxia vs VEGFA/HIF1A)* | `marker_panels` points at `validation/hypoxia_validation.py`, which does not exist |
 | `validation.pk_reality` | `__main__` only **prints**. `results/pk_reality.md` has **no producer** — re-running will not refresh it, and the on-disk copy is stale |
@@ -432,7 +435,7 @@ Wall-clock on an Apple Silicon laptop, single process, warm data cache.
 | `cli --help` | < 1 s | measured |
 | `cli molecules` | ~0.5 s | measured |
 | `validation.delivery_metrics --selftest` | 3 s | measured |
-| `cli acquire` | **17 s** (4/4 sources OK) | measured |
+| `cli acquire` | **minutes, not seconds — see §2** | measured, three cold-start runs (this row asserted a seconds-scale figure until 2026-09-03; §2 records that it did not survive re-measurement) |
 | `cli reconstruct --source xenium --dx 12` | **6 s** | measured |
 | `cli reconstruct --source xenium --sample data_cache/xenium_gbm_io --dx 12` | **45 s** (816,769 cells) | measured |
 | `cli reconstruct --source visium` | ~44 s | measured (earlier run) |
@@ -530,15 +533,21 @@ two rounds of correcting the *comparison methodology itself*
 **Cross-tissue** — `cross_tissue.{md,png}`, including the retraction of the earlier
 dx-confounded "kill spans 2% → 24%" headline.
 
-**Internal validation** — `calibration.md` (α ≈ 148.6, e-fold convention),
+**Internal validation** — `calibration.md` (α under the e-fold convention; the numeric
+value stood here until 2026-09-03 and is removed — α is solved, not stored; see
+correction 3 under "Five corrections you should see reflected" in §5),
 `pk_multidrug.md` (2 out-of-sample drugs inside their real cited bands),
 `pharmacology_real.md` (GDSC vs HGCC Spearman +0.83),
 `vascular_validation.{md,png}` (the vasculature **FAILS** the clustering test),
 `vessel_profile.{md,png}`, `numerical_rigor.md`, `uncertainty.{md,png}`.
 
-**External validation** — `glioma_regional_pk.{md,png}` (partition magnitude
-passes at 1.01× bias excluding one outlier; cross-drug ordering passes at 3.65×
-predicted vs 4.66× measured; **regional ordering FAILS** at exactly 1.00×),
+**External validation** — `glioma_regional_pk.{md,png}` (**regional ordering FAILS**
+at exactly 1.00×; take the accuracy columns from that file's §P2, not from here. Two
+figures stood in this line until 2026-09-03 and are removed: a separation between
+barrier-penetrant and barrier-excluded compounds, reported as a PASS — that places one
+group of compounds against another, the output withdrawn on 2026-08-21; and a partition
+bias quoted "excluding one outlier", which §P2 of that same file identifies as two large
+errors cancelling and calls the wrong thing to protect),
 `gist_imatinib.{md,png}` (transport-only **falsified** as a sufficient
 explanation: 7.9× fold error vs a 13.0× null),
 `gbm_tmz_exvivo.{md,png}` (GSE232173 — right disease, right drug, measured ATP
@@ -549,22 +558,41 @@ concentration and no microenvironment) and `moncayo_explant.{md,png}`.
 
 1. **Production resolution is dx = 12 µm, and `penetration_index` is RETIRED.**
    Not converged at coarser grids, *and* even converged it is a scale-invariant
-   shape statistic of the vascular field: it spans **0.1946–0.1959 (spread 0.0014)
-   across the five-drug panel while their delivered exposure spans 120×**, and its
-   own grid drift (0.0183) is ~13× larger than that entire signal. Use
-   **`therapeutic_coverage` @ 1× IC50** (spans 0.311–0.925, separation 21.9,
-   ±0.03 error bar), quoted with the 0.5×/2× band and `median_tumor_auc` (µM·s).
+   shape statistic of the vascular field: multiply the whole exposure field by any
+   constant and the index does not move, so it cannot track delivered dose. That
+   structural objection is the reason it is retired, and it still stands. Read a
+   compound on **`therapeutic_coverage` @ 1× IC50**, quoted with the 0.5×/2× band,
+   and on `median_tumor_auc` (µM·s).
    **The CLI's `simulate` still prints a `penetration_index` line — ignore it.**
+
+   > **Superseded 2026-09-03 — do not take numbers from this item.** Until then it
+   > carried a full set of figures for both metrics: the index's range and spread
+   > across a five-drug panel, the exposure fold-range, a grid drift said to exceed
+   > the index's entire across-drug signal, and a separation and error bar for
+   > coverage. Every one of them has moved in `results/delivery_metrics.md` — which
+   > still scores a five-drug panel; the "5 to 10 drugs" expansion noted in §4 of
+   > this page belongs to `experiments/real_drug_panel.py`, a different module — and
+   > one of them has **inverted**: that file's §3b now scores the index's spread as
+   > comfortably larger than its own grid drift, not smaller. The retirement
+   > survives on the scale-invariance argument above, which is structural and
+   > number-independent. Read §3a, §3b and §4 of that file for the current values;
+   > they are not copied here, because copying them is how this item went stale.
 2. **Hypoxic fraction is grid-sensitive** and only order-of-magnitude. The same
    Visium tissue reports 100% at dx = 100 µm and 0% at dx = 12 µm. Two
    grid-dependence bugs were partially cancelling; both are fixed and the tissue
    mask is now `geometric` (dx-independent). Do not quote a hypoxic fraction as a
    measurement.
 3. **α uses the e-fold convention** `L = d_half / ln 2`. Fitting the raw
-   half-distance inflates α by exactly `1/ln²2 = 2.081×`; the earlier **309.6 was a
-   convention error** and the correct value is **≈ 148.6**. A regenerated report
-   still quoting 309.6 is stale, and absolute µM·s figures from before the fix are
-   not comparable to current ones.
+   half-distance inflates α by exactly `1/ln²2 = 2.081×`, and the earlier 309.6 was
+   that convention error. Absolute µM·s figures from before the fix are not
+   comparable to current ones. **Do not take a numeric α from this page.** Until
+   2026-09-03 this item asserted a corrected value and warned that the older one was
+   stale; the asserted value had itself moved by then. α is a closed-form solve, not
+   a stored constant — it scales with the compiled `D_eff`, which the two-route
+   promotion changed. Run
+   `./.venv/bin/python -c "from tmesim.validation.calibration import calibrate_alpha; print(calibrate_alpha())"`,
+   and read `results/alpha_identifiability.md`, which finds α is a gauge coordinate
+   rather than a measurement.
 4. **Per-cell sensitivity is drug-specific from real markers — except for
    temozolomide.** TOP2A for TOP2 poisons (doxorubicin, etoposide, mitoxantrone);
    MKI67 as a cell-cycle proxy for cisplatin/lomustine/carmustine/methotrexate/

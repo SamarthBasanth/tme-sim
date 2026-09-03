@@ -332,9 +332,23 @@ DRUG_LIBRARY: Dict[str, DrugParams] = {
         ic50=8.0, hill=1.3, bbb_penetrance=0.15, clearance=2e-4),
 
     # --- Real molecular-compile + GDSC/literature-calibrated entries -------
-    # Frozen snapshots of calibrated_drugparams(name, alpha=148.60815765445545)
-    # (alpha fit once on doxorubicin's e-fold penetration length; see
-    # validation.calibration). Potency provenance (GDSC2 glioma-measured vs.
+    # Frozen snapshots taken from calibrated_drugparams(name,
+    # alpha=148.60815765445545) AS THAT FUNCTION BEHAVED BEFORE THE TWO-ROUTE
+    # PROMOTION. They no longer reproduce from it, and that is not a drift in
+    # alpha: calibrated_drugparams itself changed, applying a two-route cell
+    # term that depends on each compound's logP and HBD count, so the gap is
+    # PER-COMPOUND rather than a common factor.
+    #
+    # MEASURED 2026-09-03, recomputing all nine at the alpha named above:
+    # every one differs, by ratios from 0.15x to 0.92x. Alpha itself moved
+    # 148.60815765445545 -> 22.223477711172563 for the same reason (see
+    # validation/propagation.py's declaration for two_route).
+    #
+    # NOTHING THE STUDIO RUNS USES THESE. app/server/jobs.py builds a
+    # DrugParams live via calibrated_drugparams(name, alpha) with the run's own
+    # alpha and passes the OBJECT. These are reached only through
+    # sim/engine.py::_resolve_drug when a caller passes a drug NAME instead --
+    # see the warning there. Potency provenance (GDSC2 glioma-measured vs.
     # curated literature, with citations) is in molecular.potency; run
     # ``python -m tmesim.molecular.potency`` or see molecular/potency.py's
     # LITERATURE_IC50 table for the exact sources.

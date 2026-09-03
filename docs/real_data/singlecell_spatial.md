@@ -301,7 +301,17 @@ targets" — a silent provenance falsification. `source` is now resolved from th
 
 `source` additionally now carries `cache_dir` and `n_panel_genes`.
 
-### Known downstream gap (NOT fixed here)
+### Known downstream gap — CLOSED since this was written (2026-09-03)
+
+> **This subsection is superseded and is kept as the record of the gap, not of the
+> state.** Every clause below has been overtaken: `reconstruct/marker_panels.py:137`
+> now defines `IO_PANEL_MARKER_MAP` using **exactly the substitutes named here as
+> available-but-out-of-scope** (endothelial VWF/FLT1/PLVAP; astro-lineage
+> SLC1A3/S100B/PTN; IL13RA2 for tumour), it is registered as `io_480` at `:233`,
+> `select_marker_map()` picks it for this section, and `results/classifier_fix.md`
+> scores the IO section with **four** classes — TUMOR, STROMAL, IMMUNE,
+> ENDOTHELIAL — not two. Making the marker map panel-aware was not "left open"; it
+> was done.
 
 `real_xenium.MARKER_MAP` was written against the brain panel. On the IO panel
 its ENDOTHELIAL marker (PECAM1) and all three STROMAL markers (MOG, AQP4, GJA1)
@@ -376,11 +386,16 @@ Newly possible, on measured bytes:
 
 ### What it does NOT unlock (be blunt)
 
-- **TMZ sensitivity is STILL UNMODELLED.** **MGMT is absent from this panel**,
-  exactly as it is from the 319-gene panel. No Xenium panel in this project
-  measures MGMT, so temozolomide sensitivity remains **unmeasured**, and any
-  per-cell TMZ sensitivity would be invented. This dataset does **not** close
-  that gap.
+- **TMZ sensitivity is STILL UNMODELLED *on this section*.** **MGMT is absent from
+  this panel**, exactly as it is from the 319-gene panel, so temozolomide
+  sensitivity remains **unmeasured here** and any per-cell TMZ sensitivity on *this*
+  dataset would be invented. **Corrected 2026-09-03:** this bullet generalised that
+  to "no Xenium panel in this project measures MGMT", which is no longer true —
+  `data_cache/gse324268_xenium/` is a 366-gene Xenium GBM panel that **does** carry
+  MGMT (`ENSG00000170430`, present in `GSE324268_gene_panel.json.gz`), it is a
+  registered section (`gse324268` in `SECTION_RECIPES`), and
+  `docs/outreach/04_holzel_gse324268.md` is built entirely on it. The gap is
+  panel-specific, not project-wide.
 - **Efflux is STILL UNMODELLED.** **ABCB1 (P-gp) and ABCG2 (BCRP) are both
   absent.** No real per-cell efflux term is available.
 - **GFAP is absent** (as on the brain panel). Astrocytic identity must still be

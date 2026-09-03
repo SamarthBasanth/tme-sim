@@ -162,9 +162,13 @@ above.
   temozolomide, lomustine (CCNU), carmustine (BCNU), procarbazine, methotrexate,
   doxorubicin, cisplatin, etoposide, vincristine, irinotecan (a topoisomerase-I
   inhibitor prodrug; note its compiled DrugParams describe the parent molecule,
-  not its active metabolite SN-38 — see `molecular/potency.py`), plus one
+  not its active metabolite SN-38 — see `molecular/potency.py`), `ribociclib`, plus one
   macromolecule marker (`bevacizumab`, `is_antibody=True`, MW ≈ 149 000) to
-  anchor the *size extreme*.
+  anchor the *size extreme*. **12 entries** as of 2026-09-03 (`len(GBM_DRUGS)`); this
+  list omitted `ribociclib`. The library grows — count it, do not read the count off
+  this page. Note also that `mitoxantrone`, which appears in this document's
+  penetration examples, is **not** in the library: `get_molecule('mitoxantrone')`
+  raises `KeyError`.
 - **`get_molecule(name) -> Molecule`** (KeyError-safe listing of valid names),
   **`all_molecules() -> list[Molecule]`** — both go through
   `descriptors.from_smiles`.
@@ -192,8 +196,14 @@ across three orders of magnitude in size.
 
   with `kB = 1.380649×10⁻²³ J/K`. Computed in SI (radius nm → m) then reported in
   **µm²/s** (× 10¹², since 1 m² = 10¹² µm²). Dimensional check is carried in the
-  docstring. The self-test verifies `D ∝ 1/r` and `D ∝ 1/η` exactly, and the
-  small-molecule (~400–500 µm²/s) vs antibody (~1–10 µm²/s) separation.
+  docstring. The self-test verifies `D ∝ 1/r` and `D ∝ 1/η` exactly, and asserts the
+  antibody's **free** diffusivity into `10 ≤ D ≤ 60` µm²/s
+  (`stokes_einstein.py:177`), which for a ~150 kDa IgG computes to ~34 µm²/s.
+  **Corrected 2026-09-03:** this line said the self-test verified a ~1–10 µm²/s
+  antibody figure. It does not, and `stokes_einstein.py:169-176` carries an explicit
+  HONESTY NOTE **refusing** that number — ~1–10 µm²/s is the *hindered tissue*
+  diffusivity produced downstream by `brownian.py`, not the free Stokes–Einstein value,
+  and the module declines to shrink the radius to fake a smaller free `D`.
 
 **Physics:** genuine first-principles hydrodynamics (a sphere in a viscous
 continuum). **In:** MW → radius → **Out:** dilute-fluid diffusivity, µm²/s. This
@@ -248,10 +258,13 @@ in 1/s.
 ### `compile_drug.py` — the bridge
 
 - **`build_profile(molecule, ecm_reference=0.4, ic50=None, temperature_K=310.0,
-  brownian_kw=None) -> MolecularProfile`** — runs the full pipeline: Stokes–Einstein
-  `free_diffusivity` → Brownian `hindrance` at `ecm_reference` (plus a small
-  `hindrance_curve`) → `permeability` + `bbb_penetrance` →
-  `binding`/`free_fraction`/`clearance`. Uses a provided `ic50`, else a
+  brownian_kw=None, two_route=True, two_route_kw=None) -> MolecularProfile`** — runs the
+  full pipeline: Stokes–Einstein `free_diffusivity` → Brownian `hindrance` at
+  `ecm_reference` (plus a small `hindrance_curve`) → the **two-route** cell term →
+  `permeability` + `bbb_penetrance` → `binding`/`free_fraction`/`clearance`.
+  **The signature here omitted `two_route` and `two_route_kw` until 2026-09-03**, which
+  hid the fact that the two-route law is **on by default** (`compile_drug.py:90`,
+  `_TWO_ROUTE_DEFAULT = True`) — the single most consequential default in this module. Uses a provided `ic50`, else a
   **flagged rough estimate** recorded as low-confidence in `provenance`.
 - **`molecule_to_drugparams(molecule_or_profile, ecm_reference=0.4, ic50=None,
   **kw) -> core.DrugParams`** — narrows the profile to the frozen engine's
@@ -371,6 +384,12 @@ density. The result flows into `DrugParams.diffusivity`.
 > compounds within 3× of measurement, a geometric bias of **1.03×**, and **24 of
 > 31** exact-mass pairs ordered correctly.
 >
+> **Before quoting that R²:** [`../results/hbd_convention_audit.md`](../results/hbd_convention_audit.md)
+> (2026-08-21) finds it was produced by feeding the scorer a donor-*atom* column where the
+> law's coefficient is defined per donor *group*, so it describes neither the shipping
+> engine nor the correct physics, and it bounds the correct-convention score to an interval
+> that CONTAINS 0.718 without confirming it. Take the interval from that file, not from here.
+>
 > **"Mechanistically derived" is now true of the form *and* of the content — but
 > the content is only about a quarter right.** The model reproduces **8.3×** of
 > the measured **29.7×** spread, so a similar-mass series is *under-separated*
@@ -394,8 +413,8 @@ separate is the whole honesty argument, so they are labeled explicitly in
 | Quantity | Module / function | Grade | Basis |
 |---|---|---|---|
 | Free diffusivity `free_diffusivity` | `stokes_einstein.free_diffusivity` | **First-principles physics** | Stokes–Einstein `D = kB T / (6πηr)` — exact hydrodynamics for a sphere in a continuum. |
-| Effective diffusivity / hindrance `effective_diffusivity`, `hindrance` | `brownian.simulate_effective_diffusivity` × `ecm_mesh.ogston_renkin_hindrance` × `two_route.two_route_diffusivity` | **PARTIALLY SUPPORTED against measurement** | Overdamped Langevin dynamics with excluded-volume obstacles, an Ogston–Renkin fibre-mesh gate, and a two-route permeable-cell effective-medium term (Hasselman & Johnson 1987). Scored blind on 71 measured compounds: **R² = 0.718**, 99 % within 3×, 24 of 31 exact-mass pairs ordered. The MW-only predecessor scored R² = 0.022 and ordered 0 of 31. Still recovers only 8.3× of a measured 29.7× spread, from one cell line, and the ABSOLUTE value still misses its measured band by 1.5×. |
-| Hydrodynamic radius `radius_hydrodynamic_nm` | `stokes_einstein.hydrodynamic_radius_nm` | **Empirical scaling** | Documented MW→radius power laws (small-molecule cube-root; globular-protein fit). Well-validated but empirical. |
+| Effective diffusivity / hindrance `effective_diffusivity`, `hindrance` | `brownian.simulate_effective_diffusivity` × `ecm_mesh.ogston_renkin_hindrance` × `two_route.two_route_diffusivity` | **PARTIALLY SUPPORTED against measurement** | Overdamped Langevin dynamics with excluded-volume obstacles, an Ogston–Renkin fibre-mesh gate, and a two-route permeable-cell effective-medium term (Hasselman & Johnson 1987). Scored blind on 71 measured compounds: **R² = 0.718**, 99 % within 3×, 24 of 31 exact-mass pairs ordered — but see `results/hbd_convention_audit.md` (2026-08-21) before quoting that R²: it was scored on a donor convention the shipping law does not use, and the correct-convention score is bounded only to an interval containing it. The MW-only predecessor scored R² = 0.022 and ordered 0 of 31. Still recovers only 8.3× of a measured 29.7× spread, from one cell line, and the ABSOLUTE value still misses its measured band by 1.5×. |
+| Hydrodynamic radius `radius_hydrodynamic_nm` | `stokes_einstein.hydrodynamic_radius_nm` | **Empirical scaling** | Documented MW→radius power laws (small-molecule cube-root; globular-protein fit). Long-established in the literature, but empirical and not scored here. |
 | Membrane permeability `membrane_permeability` | `permeability.membrane_permeability` | **Cheminformatic model** | Solubility–diffusion model (`P ≈ Kp·Dm/d`) — real physical *form*, descriptor-estimated inputs. |
 | BBB penetrance `bbb_penetrance` | `permeability.bbb_penetrance` | **Cheminformatic estimate** | Physicochemical BBB rules on MW/logP/TPSA/HBD. Structure-only; ordering-calibrated, not magnitude-calibrated. |
 | Free fraction / binding / clearance `free_fraction`, `tissue_binding_rate`, `clearance` | `binding.*` | **Cheminformatic estimate** | QSAR-style descriptor heuristics. Directionally reasonable, not fit to data. |
@@ -435,8 +454,8 @@ treating any molecular-layer number as calibrated.
   transporter model", and that was **wrong**. `tmesim/molecular/efflux.py`
   implements P-gp / BCRP from literature efflux ratios, and
   `tmesim/molecular/ion_trapping.py` implements ion trapping; both are scored
-  (`results/efflux_impact.md`, `results/ion_trapping_impact.md`). Default-off is
-  the *validated* recommendation, not an admission of absence: turning efflux on
+  (`results/efflux_impact.md`, `results/ion_trapping_impact.md`). Default-off is what
+  the measurement supports, not an admission of absence: turning efflux on
   does not improve the measured anchor, and ABCB1/ABCG2 are on the explicit
   ABSENT list for both Xenium panels, so nothing spatial constrains it here.
   **As shipped (default-off) the consequence below still holds**: a passive-only
@@ -465,19 +484,26 @@ effective diffusivity from a real Brownian simulation, the rest from documented
 cheminformatic models with explicit provenance. That is a real upgrade from
 "assumed" to "computed".
 
-**But not, for diffusivity, to "computed from the molecule."** That phrase stood
-here and it is measurably wrong: `effective_diffusivity` is computed from the
-molecule's **mass** alone, and at matched mass it is flat by construction while
-the measurement moves 3.7× (see the box in §3). The upgrade is real for the
-descriptor-consuming quantities; for transport it bought a better-founded
-*form* around the same single input.
+**Superseded 2026-09-03 — this paragraph described the falsified predecessor as the
+shipping model.** It argued that `effective_diffusivity` was computed from mass alone
+and was therefore flat at matched mass. That was true of the MW-only law, which was
+falsified; it has not been true since 2026-08-13. The shipping law is the **two-route**
+one, on by default (`compile_drug.py:90`), and `logP` and hydrogen-bond donor count
+reach `effective_diffusivity` through a membrane permeability — as the box in §3 of this
+same document already said, three sections above. What survives, and is the honest
+version of the point: the two-route law recovers only about a quarter of the measured
+compound-to-compound spread, so it **under-separates** a similar-mass series rather than
+being flat across one. The upgrade is real for the descriptor-consuming quantities; for
+transport it bought a better-founded *form* and a genuine but partial gain in content.
 
 It is **not**, however, a substitute for validation. Mechanistic ≠ correct — and
 this is no longer a hypothetical. This paragraph used to call the comparison
 against measured tissue PK "the necessary next step". **That step has been
 taken, and the layer lost — then partially recovered.** `effective_diffusivity`
 was scored against 71 measured compounds and falsified (§3); the two-route model
-that replaced it scores R² = 0.718 on the same data and brought the
+that replaced it scores R² = 0.718 on the same data (read
+`results/hbd_convention_audit.md`, 2026-08-21, before quoting that figure — it was scored
+on a donor convention the shipping law does not use) and brought the
 multicellular-layer **hindrance** anchor inside its measured band for the first
 time (FAIL → PASS, 1.77-fold → 10.33-fold against a measured 12-fold). The
 multicellular-layer **absolute `D_eff`** anchor still FAILS in `vivum validate`,

@@ -10,6 +10,13 @@
 >
 > * `bbb=0.558` for temozolomide is the **retracted arithmetic-mean** value; the
 >   shipped geometric-mean veto (`molecular/permeability.py`) returns **0.1254**.
+> * `eff_D=278 um^2/s` for temozolomide is stale by ~6.5×. Compiled live 2026-09-03,
+>   `compile_drug.molecule_to_drugparams(get_molecule('temozolomide')).diffusivity`
+>   returns **42.42 µm²/s** — the two-route law landed after this run. **This item was
+>   missing from the banner until 2026-09-03**, which is the sharper failure: a
+>   correction notice that enumerates four wrong numbers and omits a fifth reads as a
+>   completed audit of the page. Of the three values on that line only `ic50~606 uM`
+>   still reproduces.
 > * `penetration index 0.298` quotes a **RETIRED** metric — `penetration_index` is
 >   a scale-invariant shape statistic that reports the section's vascular geometry,
 >   not the drug's delivery (`results/delivery_metrics.md` §4). Use
@@ -81,7 +88,9 @@ tarball route (scipy.io.mmread) was chosen over the `.h5`.
 - `simulate_response` ran on the real-derived geometry:
   **predicted kill fraction 0.354**, penetration index 0.298, mean oxygen 0.59.
 
-Re-running `python -m tmesim.data.spatial_ingest` reproduces this end to end.
+Re-running `python -m tmesim.data.spatial_ingest` does **not** reproduce this end to
+end — two of the three compiled values on the line above have moved since (see the
+banner at the top of this file). This sentence claimed it did until 2026-09-03.
 
 ---
 

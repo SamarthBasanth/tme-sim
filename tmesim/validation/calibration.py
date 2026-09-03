@@ -54,7 +54,7 @@ UNIT CONVENTION (corrected): the published anchor is a HALF-distance (40-50 um t
 50% of perivascular intensity), while ``L`` is an E-FOLDING length. They differ by
 ``ln2``: ``L = d_half / ln2``, so ``L* = 45/ln2 ~= 64.9 um``, NOT 45 um. Fitting
 to the raw half-distance inflates alpha by ``1/ln^2(2) = 2.081x`` (it gave 309.6
-instead of the correct 148.6). ``calibrate_alpha`` now takes an e-folding target
+instead of the e-fold-converted one). ``calibrate_alpha`` now takes an e-folding target
 and every anchor band is converted before comparison. See the constant block below.
 
 The honest test (out-of-sample)
@@ -267,8 +267,14 @@ def calibrate_alpha(
 
     Passing the raw 45 um half-distance instead treats a half-distance as an
     e-folding length and inflates alpha by exactly ``1/ln^2(2) = 2.081x``; that is
-    the historical inconsistency (alpha 309.6 vs the correct 148.6) this signature
-    change removes. This is the ONLY fit in the module.
+    the historical inconsistency this signature change removes. The 2.081x is
+    exact and is the load-bearing part.
+
+    The two alpha values that inconsistency used to sit between are no longer
+    quoted here. They were, as "alpha 309.6 vs the correct 148.6" -- and
+    calling one of them "the correct" one made it a live claim about this
+    function's output, which returns 22.223477711172563 today. The ratio is the
+    fact; the pair was a snapshot. This is the ONLY fit in the module.
 
     Closed form (``k_eff`` is linear in alpha, ``L`` monotone in ``k_eff``)::
 

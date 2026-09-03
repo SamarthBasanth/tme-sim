@@ -109,8 +109,12 @@ open CC BY 4.0. Confirm on the file's portal record rather than assuming either.
 
 *Target ≤2,000 characters. Current draft is close to the limit; trim the last paragraph first.*
 
-> We are validating an open-source mechanistic model that predicts the spatial distribution of
-> therapeutic dose within glioblastoma tissue and the resulting local response. The model is
+> We are scoring an open-source mechanistic model that computes the spatial distribution of
+> delivered dose within glioblastoma tissue. It does not predict local response — that is the
+> gap this request is about, and it is stated in the next paragraph rather than claimed here.
+> (Until 2026-09-03 this opening sentence named the resulting local response as something the
+> model predicts, six lines above the concession that its response predictions have never been
+> tested. A data-access committee reads the first sentence.) The model is
 > reconstructed from spatial transcriptomics and solves reaction–diffusion transport through
 > patient-specific tissue architecture. Its delivery predictions have been scored against 125
 > human glioma tissue samples across 42 patients and 27 published regional pharmacokinetic
@@ -131,7 +135,7 @@ open CC BY 4.0. Confirm on the file's portal record rather than assuming either.
 >
 > We will state explicitly and prominently that radiation dose is not drug concentration: the
 > mechanism of cell kill, the time course, and the delivery physics all differ. This request
-> validates the **shape** of the model's spatial dose→response coupling, not its pharmacology.
+> tests the **shape** of the model's spatial dose→response coupling, not its pharmacology.
 > Analysis is retrospective and computational. No attempt will be made to re-identify any
 > individual; face-containing volumes will be used only for registration and never rendered,
 > published, or redistributed. Findings will be published openly, including if the model fails,

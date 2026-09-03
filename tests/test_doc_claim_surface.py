@@ -67,9 +67,39 @@ _C = "|".join(COMPOUNDS)
 #:
 #: `->` and `&rarr;` are included because a rendered arrow is what a reader
 #: sees, whatever the source spells it.
+#: Both directions and both entities. `<` and `&lt;` were absent from the first
+#: version and `pk_anchors.md:148` used exactly that; `↔` was absent and
+#: `VERIFICATION_METHODOLOGY.md:522` used exactly that. An ordering does not
+#: care which way the arrow points.
+_OPS = r">|<|&gt;|&lt;|→|←|↔|->|<-|<->|&rarr;|&larr;|&harr;|&#8594;"
+
 ORDERING_RE = re.compile(
-    rf"\b({_C})\b\**\s*(?:>|&gt;|→|-&gt;|->|&rarr;)\s*\**\s*\b({_C})\b",
+    rf"\b({_C})\b\**\s*(?:{_OPS})\s*\**\s*\b({_C})\b",
     re.IGNORECASE)
+
+#: "compound vs compound". A comparison of two named compounds is the
+#: prohibited act whether or not an arrow is drawn.
+#: `MATHEMATICAL_MODEL.md:440` used this form.
+VERSUS_RE = re.compile(
+    rf"\b({_C})\b\**\s*,?\s*(?:vs\.?|versus)\s*\**\s*\b({_C})\b",
+    re.IGNORECASE)
+
+#: The PROSE form: "the top-1 moved from X to Y". No operator at all, which is
+#: why it survived every symbol pattern. `QUICKSTART.md:104` used it.
+#:
+#: Gated on a ranking word nearby, deliberately. "from cisplatin to
+#: carboplatin" is an ordering when it describes which one came FIRST and is
+#: an ordinary sentence when it describes a substitution, and the difference
+#: is not in the two names. Requiring the ranking vocabulary keeps this from
+#: firing on prose that merely mentions two compounds in sequence.
+PROSE_ORDER_RE = re.compile(
+    rf"\b({_C})\b\**\s+to\s+\**\b({_C})\b", re.IGNORECASE)
+
+#: How near the ranking word has to be, in characters, for the prose form.
+PROSE_RANK_WINDOW = 140
+
+RANK_WORDS = ("top-1", "top 1", "rank", "ranked", "ranking", "pick",
+              "first place", "leader", "winner", "wins", "ordering", "order")
 
 #: The product described as doing the withdrawn thing. Deliberately narrow: it
 #: matches a CLAIM ABOUT THE PRODUCT, not the word "rank" in prose about why
@@ -150,6 +180,26 @@ def _rel(path):
     return os.path.relpath(path, _ROOT)
 
 
+def _ordering_hits(corpus):
+    """Every ordering of two named compounds, in any of the three forms."""
+    bad = []
+    for rel, lines in corpus.items():
+        text = "\n".join(_normalise(lines))
+        for label, rx in (("operator", ORDERING_RE), ("versus", VERSUS_RE)):
+            for m in rx.finditer(text):
+                line_no = text.count("\n", 0, m.start()) + 1
+                bad.append(f"{rel}:{line_no} [{label}]: {m.group(0)[:80]!r}")
+        for m in PROSE_ORDER_RE.finditer(text):
+            lo = max(0, m.start() - PROSE_RANK_WINDOW)
+            hi = min(len(text), m.end() + PROSE_RANK_WINDOW)
+            window = text[lo:hi].lower()
+            if not any(w in window for w in RANK_WORDS):
+                continue
+            line_no = text.count("\n", 0, m.start()) + 1
+            bad.append(f"{rel}:{line_no} [prose]: {m.group(0)[:80]!r}")
+    return bad
+
+
 @pytest.fixture(scope="module")
 def studio():
     docs = {}
@@ -200,13 +250,7 @@ def test_the_scan_has_a_subject(surface):
 
 
 def test_no_explicit_cross_compound_ordering(surface):
-    bad = []
-    for rel, lines in surface.items():
-        text = "\n".join(_normalise(lines))
-        for m in ORDERING_RE.finditer(text):
-            line_no = text.count("\n", 0, m.start()) + 1
-            bad.append(f"{rel}:{line_no}: {m.group(1)} ordered against "
-                       f"{m.group(2)} — {m.group(0)[:80]!r}")
+    bad = _ordering_hits(surface)
     assert not bad, (
         "cross-compound ordering was withdrawn 2026-08-21 and the prohibition "
         "admits no hedge, including as a limit or as evidence:\n  "
@@ -270,12 +314,7 @@ def test_the_studio_renders_no_explicit_cross_compound_ordering(studio):
     while the law that replaced it rendered 200px below. If an ordering is
     worth deleting from the screen it is worth deleting from the file.
     """
-    bad = []
-    for rel, lines in studio.items():
-        text = "\n".join(_normalise(lines))
-        for m in ORDERING_RE.finditer(text):
-            line_no = text.count("\n", 0, m.start()) + 1
-            bad.append(f"{rel}:{line_no}: {m.group(0)[:80]!r}")
+    bad = _ordering_hits(studio)
     assert not bad, (
         "the Studio surface carries an explicit cross-compound ordering, "
         "withdrawn 2026-08-21:\n  " + "\n  ".join(bad))
@@ -293,3 +332,53 @@ def test_the_studio_does_not_describe_itself_as_ranking_compounds(studio):
     assert not bad, (
         "the Studio describes itself as ranking or comparing compounds, with "
         "no withdrawal context on the line:\n  " + "\n  ".join(bad))
+
+
+# --------------------------------------------------------------------------- #
+# The coverage table — what an ordering can look like
+# --------------------------------------------------------------------------- #
+#
+# The first version of this guard matched `>` and the right-arrows only. It ran
+# GREEN over a corpus containing FOUR real violations, found by a person
+# reading the files: `<` in pk_anchors.md, `↔` in VERIFICATION_METHODOLOGY.md,
+# a prose "from X to Y" in QUICKSTART.md, and "vs." in MATHEMATICAL_MODEL.md.
+#
+# A guard whose coverage is a regex is only as good as the list of shapes
+# someone thought of, and there is no way to test for the shape nobody thought
+# of. What CAN be done is stop the list from quietly shrinking, and record the
+# negative cases so a later widening does not turn this into a guard that
+# fires on any two compound names in a paragraph. Both directions are pinned.
+@pytest.mark.parametrize("text,should_catch,why", [
+    ("cisplatin > doxorubicin", True, "greater-than"),
+    ("cisplatin &gt; doxorubicin", True, "greater-than, HTML entity"),
+    ("methotrexate < etoposide", True, "less-than: an ordering does not care "
+                                       "which way the arrow points"),
+    ("methotrexate &lt; etoposide", True, "less-than, HTML entity"),
+    ("cisplatin &rarr; vincristine", True, "right arrow, entity"),
+    ("temozolomide ↔ cisplatin", True, "double-headed arrow"),
+    ("doxorubicin vs. etoposide", True, "a comparison needs no arrow"),
+    ("doxorubicin versus etoposide", True, "spelled out"),
+    ("**cisplatin** &rarr; vincristine", True, "bold markers between the "
+                                               "name and the operator"),
+    ("> the order was **cisplatin** &rarr;\n> vincristine", True,
+     "blockquoted and wrapped: the continuation line starts '> ' and '>' is "
+     "also the operator"),
+    ("the top-1 pick moved from cisplatin to vincristine", True,
+     "prose, no operator at all"),
+    # --- and the ones that must NOT fire ---------------------------------- #
+    ("we switched the panel from cisplatin to carboplatin", False,
+     "a substitution with no ranking word is an ordinary sentence"),
+    ("cisplatin was measured at 50 uM", False, "one compound and a number"),
+    ("cisplatin, doxorubicin and etoposide are on the panel", False,
+     "a list is not an order"),
+    ("| dose | 5 |\n| cisplatin | 10 |", False,
+     "one compound per table row is not an ordering"),
+    ("cross-compound ordering is withdrawn", False,
+     "stating the prohibition names no compounds"),
+])
+def test_the_ordering_coverage_table(text, should_catch, why):
+    hits = _ordering_hits({"probe.md": text.splitlines()})
+    if should_catch:
+        assert hits, f"an ordering in this form is not detected — {why}"
+    else:
+        assert not hits, f"false positive: {why}"

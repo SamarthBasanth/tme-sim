@@ -44,8 +44,14 @@ So compare the sim's L / `1/e` numbers to the **L-equivalent** column below, not
 to the raw half-distances. (`pk_reality.py` currently compares to the raw
 40-50 µm, which is slightly conservative — it treats the half-distance as the
 1/e distance, understating the L-equivalent anchor a bit; the correct
-L-equivalent ~58-72 µm does not change its order-of-magnitude FAIL verdict, since
-the sim predicts L ≈ 796 µm, still ~11-14× too large.)
+L-equivalent ~58-72 µm does not change the verdict it recorded at the time.)
+
+**Superseded, 2026-09-03.** The parenthesis above carried a large predicted `L` for
+doxorubicin and an order-of-magnitude FAIL. That is no longer what the engine produces:
+`results/pk_multidrug.md` is the later dated record and reports doxorubicin inside its
+cited band, with the two out-of-sample drugs 2/2 inside theirs. Read that file for the
+current numbers; they are deliberately not copied here, because a second copy is how this
+one went stale.
 
 ---
 
@@ -128,25 +134,37 @@ Notes:
    quantitative penetration-length target.
 2. **mitoxantrone**, **topotecan** — L-equivalent **36–108 µm** (Patel). Extend
    the penetration-length check to two more drugs (order-of-magnitude
-   confidence). Also enable a **relative-ordering** check: all three are large,
-   strongly-bound anthracycline-class/topoisomerase agents and should all show
-   short (tens-of-µm) penetration — the sim should not predict one of them
-   reaching millimeters while another stays at tens of µm.
+   confidence). Also enable a **same-decade** check: all three are large,
+   strongly-bound anthracycline-class/topoisomerase agents and should each show
+   short (tens-of-µm) penetration — none should come out at millimetres. (This was
+   labelled a relative-ordering check until 2026-09-03. Its content was never an
+   ordering — it is a magnitude band applied to each compound separately — and the
+   label is corrected rather than the check.)
 
 These four rows give a real, multi-drug penetration-length band (~36–108 µm,
 tens of µm) that the engine's `penetration_length_um` / single-vessel `1/e`
-distance must reproduce. The current engine over-predicts (L ≈ 0.8 mm for
-doxorubicin), so this compendium sharpens the *same* documented failure across
-more drugs rather than resting on one.
+distance must reproduce. This paragraph recorded a large over-prediction as the
+then-current state; `results/pk_multidrug.md` supersedes it, and the compendium's
+value now is breadth — the same check on more compounds — rather than sharpening a
+failure that has since moved.
 
 **Usable for the sim's `bbb_penetrance` / partition check (not penetration length):**
 
 3. **temozolomide** 0.178, **methotrexate** 0.013, **cisplatin** ~0.025–0.029 —
-   real brain/CSF:plasma ratios spanning ~1.3%→18%, i.e. a >10× spread with a
-   clear ordering **methotrexate < cisplatin < temozolomide**. Compare to the
-   compiled `DrugParams.bbb_penetrance` for each drug: the sim should reproduce
-   at least this *ordering*, and ideally the ~0.01–0.2 magnitude band. These do
+   real brain/CSF:plasma ratios spanning ~1.3%→18%, i.e. a >10× spread. Compare
+   each drug's measured ratio to its own compiled `DrugParams.bbb_penetrance`,
+   one compound at a time, against the ~0.01–0.2 magnitude band. These do
    **not** validate penetration length.
+
+   **This item used to print the three compounds as an explicit sequence and
+   pre-register that sequence as the acceptance criterion.** Both halves are gone
+   as of 2026-09-03. The sequence is the output withdrawn on 2026-08-21 and a
+   pre-registration of it is a scheduled re-assertion; the prohibition covers a
+   criterion as squarely as a result. The criterion had also **failed on its own
+   terms** — `results/pk_multidrug.md:42` scores that concordance at Spearman
+   ρ = 0.50 (Kendall τ = 0.33, 2 of 3 pairs concordant), a partial agreement this
+   file never recorded. Per-compound magnitude against a published band is the
+   check that survives, and it is the one stated above.
 
 ## Caveats (honest)
 

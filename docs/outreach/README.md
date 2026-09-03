@@ -34,6 +34,17 @@
    > a correction banner. **The word to police in these drafts is "validated."** This project's
    > documented failure mode is that the engine stays sound while the claim surfaces drift, and
    > an outreach letter is the surface where drift reaches a named external person.
+   >
+   > **And a second sweep, 2026-09-03.** Every draft in this directory carried a
+   > *penetrant-vs-excluded separation between two groups of compounds*, quoted as a
+   > reproduced result. That is a cross-compound comparison, which this project withdrew on
+   > 2026-08-21, and the figure was additionally stale — `results/glioma_regional_pk.md:241`
+   > records that the shipping model's value for it moved by roughly a factor of five. It has
+   > been removed from `01` and `02` rather than updated. `02` additionally asserted a decided
+   > panel ordering, a pairwise contrast between two named compounds and a percentage
+   > difference in predicted kill; `03` opened its Research Use Statement by naming local
+   > response as something the model predicts, six lines above conceding it has never been
+   > tested. **Check every draft for all four shapes before sending.**
 4. **Decide the commercial question before you send.** Erasmus MC's biobank regulation routes
    any commercial involvement through their TTO rather than the standard non-commercial MTA
    (§8.3.3). If this project has or may have a commercial dimension, say so in the first email.
@@ -44,7 +55,9 @@
 
 ## Standing rules these drafts follow
 
-- Lead with what has been **built and validated**, not with what we want.
+- Lead with what has been **built and measured**, not with what we want. (This line said
+  "built and validated" until 2026-09-03 — thirteen lines after step 3 names "validated" as
+  the word to police. A standing rule that breaks its own rule is worse than no rule.)
 - State the stage plainly: **research prototype, not clinically validated.** No patient has
   been or will be treated on its output.
 - State what we offer in return: the validation harness, the reconstruction pipeline, a

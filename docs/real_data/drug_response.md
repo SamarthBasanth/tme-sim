@@ -22,10 +22,11 @@ data, and to be brutally honest about what is open vs access-gated.
   biology than GDSC (low-passage patient-derived vs immortalised lines), but it
   is still cells in a dish.
 - **The gold standard tmesim actually needs — a patient's spatial tissue paired
-  with that patient's measured drug response — remains access-GATED**
-  (HTAN/dbGaP for spatial tissue; PDMR MTA / organoid biobanks for the measured
-  kill). No open dataset closes that loop. This matches
-  `docs/real_data_status.md` section C.
+  with that patient's measured drug response — does not exist in any source this
+  project has found, open or gated.** No open dataset closes that loop. This
+  matches `docs/real_data_status.md` section C. Until 2026-09-03 this bullet named
+  HTAN/dbGaP and a PDMR MTA as the gated route holding it; both were checked and
+  neither does — see `docs/DATA_ACCESS_PLAN.md` §6–§7.
 - GBM **organoid** papers (Jacob 2020, Golebiewska 2020) have OPEN molecular
   data but their drug readouts are **small and largely qualitative/figure-level
   (no clean per-model IC50/AUC matrix)** — useful as sanity checks, not as a
@@ -121,7 +122,16 @@ microenvironment* changes drug response. Therefore:
   measured "response of this spatially-resolved tissue to this drug" in any open
   source.
 
-**To close the gold-standard loop you must obtain GATED data:**
+> **CORRECTED 2026-09-03 — the two gated routes below do not hold the data this
+> section assumes they do, and neither is worth an application.** Both were checked
+> in [`../DATA_ACCESS_PLAN.md`](../DATA_ACCESS_PLAN.md) §6–§7 and
+> [`../outreach/03_controlled_access_skeleton.md`](../outreach/03_controlled_access_skeleton.md)
+> §2: **HTAN has no GBM atlas at all**, and **NCI PDMR has no glioblastoma models and
+> no public drug-response data**. Those files carry the counts and the dates; they are
+> not restated here. Steps 1–3 below are kept as the record of what this document
+> assumed, not as instructions to follow — do not open either application on them.
+
+**What this section assumed would close the gold-standard loop:**
 1. **HTAN GBM** spatial multi-omics (tissue microenvironment) — access step:
    register at https://data.humantumoratlas.org, obtain **dbGaP** approval +
    sign the **HTAN Data Use Agreement** for the imaging/sequence levels.
@@ -132,8 +142,10 @@ microenvironment* changes drug response. Therefore:
 3. Validation = reconstruct the HTAN tissue, predict response with tmesim, and
    score against the paired PDMR/organoid measured kill from the matched model.
 
-Until those DUAs/MTAs are executed, the defensible claim is: **tmesim can be
-benchmarked against real, open, patient-derived pharmacology (HGCC + GDSC), and
-the spatial-microenvironment contribution to response remains validated only
-qualitatively pending controlled-access paired tissue+response data.**
-No synthetic stand-ins were used or proposed.
+The defensible claim is: **tmesim can be benchmarked against real, open,
+patient-derived pharmacology (HGCC + GDSC), and the spatial-microenvironment
+contribution to response is UNTESTED — no open dataset pairs a measured spatial drug
+distribution with a measured response in the same tumour.** Until 2026-09-03 that
+last clause said the contribution was qualitatively validated pending gated data,
+which claimed a grade of validation for a link nothing has scored, and pointed at two
+routes that do not hold the data. No synthetic stand-ins were used or proposed.

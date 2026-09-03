@@ -22,6 +22,36 @@ re-downloaded 2026-07-26.
 
 ## Files in `data_cache/ivygap/`
 
+> ### ⚠ STATUS ON THIS MACHINE, MEASURED 2026-09-03: none of these files is on disk
+>
+> `data_cache/ivygap/` **does not exist**. What exists is
+> `data_cache/ivy_gap/gene_expression_matrix.zip` (~37 MB), **unextracted**. The
+> loader falls back from `ivygap/` to `ivy_gap/` for the *directory*
+> (`tmesim/data/real/ivygap.py:61,64`) but does **not** extract the archive, so
+> `load_structures()` raises today:
+>
+> ```
+> FileNotFoundError: Missing cached Ivy GAP file:
+>   …/data_cache/ivygap/fpkm_table.csv. Extract gene_expression_matrix.zip
+>   into data_cache/ivygap/ first (see docs/real_data/ivygap.md).
+> ```
+>
+> **Four of the eight files below are recoverable by extracting that zip; four are
+> not in it at all.** The archive holds exactly `fpkm_table.csv`,
+> `rows-genes.csv`, `columns-samples.csv` and `README.txt`. The four
+> `/api/v2/gbm/<name>.csv` summary tables — `rna_seq_samples_details.csv`,
+> `sub_block_details.csv`, `gene_expression_details.csv` and `tumor_details.csv` —
+> are neither on disk nor in the zip, and must be re-fetched from the portal.
+>
+> **What that means for the tables further down this page.** The marker-signature
+> table is derived from the FPKM matrix and *is* reproducible once the zip is
+> extracted. The **fractional-area** table and the **subtype / MGMT** counts are
+> derived from `sub_block_details.csv` and `tumor_details.csv` respectively, and are
+> **not obtainable from anything this repository currently holds** — they are
+> reported here on the authority of the 2026-07-26 run, not on anything a reader can
+> re-derive today. Until 2026-09-03 this page presented all of it as cached and
+> present.
+
 Extracted from the open `gene_expression_matrix.zip`
 (`/api/v2/well_known_file_download/305873915`, ~37 MB zipped) plus four open
 summary CSVs (`/api/v2/gbm/<name>.csv`).
@@ -108,8 +138,9 @@ amplification, KPS, age.
 ## How per-structure signatures label the microenvironment
 
 `structure_signatures()` averages FPKM over the samples of each structure/region
-to give a **real measured transcriptional signature per zone**. Validated marker
-behaviour (mean FPKM) confirms the region mapping is real, not assumed:
+to give a **real measured transcriptional signature per zone**. Marker behaviour
+(mean FPKM) is consistent with the region mapping being real rather than assumed —
+each marker is most abundant in the zone its biology predicts:
 
 | Marker (biology) | margin | core | perivascular | necrotic |
 |---|---|---|---|---|

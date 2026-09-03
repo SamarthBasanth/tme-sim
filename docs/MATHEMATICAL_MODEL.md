@@ -146,7 +146,8 @@ r_s\,[\mathrm{nm}] =
 $$
 
 with MW in g/mol. Checks: MW = 300 → $r_s \approx 0.44$ nm; MW = 150 kDa →
-$r_s \approx 5.3$ nm (the known IgG value). **Status: empirical fit**, medium
+$r_s \approx 5.51$ nm (`hydrodynamic_radius_nm(150000)` = 5.506, measured 2026-09-03;
+this said 5.3, close to but not the value the function returns). **Status: empirical fit**, medium
 confidence — the prefactors are literature-calibrated, not derived.
 
 ### 2.2 Stokes–Einstein free diffusivity
@@ -353,6 +354,12 @@ independent.
 > model's **0 of 31**. It nonetheless reproduces **8.3×** of the measured **29.7×**
 > spread — about a **quarter** — so it *under-separates* a similar-mass series
 > systematically, and the whole test is **one cell line**.
+>
+> **Before quoting that R²:** [`../results/hbd_convention_audit.md`](../results/hbd_convention_audit.md)
+> (2026-08-21) finds it was produced by feeding the scorer a donor-*atom* column where the
+> law's coefficient is defined per donor *group*, so it describes neither the shipping
+> engine nor the correct physics, and it bounds the correct-convention score to an interval
+> that CONTAINS 0.718 without confirming it. Take the interval from that file, not from here.
 > → [`../results/two_route_promotion.md`](../results/two_route_promotion.md),
 > [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md)
 
@@ -362,20 +369,34 @@ independent.
 partitions into the bilayer, diffuses across the hydrophobic core, and partitions out.
 
 $$
-P = \frac{K_p\, D_m}{d},
+\frac{1}{P} = \frac{1}{P_{\mathrm{membrane}}} + \frac{1}{P_{\mathrm{aqueous}}},
 \qquad
-K_p = 10^{\,\mathrm{clamp}(\log P,\,-3,\,5)},
+P_{\mathrm{membrane}} = \frac{K_p\, D_m}{d},
+\qquad
+P_{\mathrm{aqueous}} = \frac{D_{\mathrm{water}}}{h_{\mathrm{UWL}}}
+$$
+$$
+K_p = 10^{\,\mathrm{clamp}(\log P,\,-3,\,3)},
 \qquad
 D_m = \frac{k_B T}{6\pi \eta_m r_s}
 $$
 
+> **Corrected 2026-09-03 — three errors, all in the reader's favour.** This section
+> described a **single** membrane leg, a $K_p$ clamp with an upper bound three decades
+> too high, and a bilayer viscosity an order of magnitude too low. The shipping model
+> (`molecular/permeability.py:108-113`, `:207-217`) is a **series** resistance of the
+> membrane leg and an unstirred aqueous boundary layer, and that second leg — which
+> caps `P` for the most lipophilic solutes, the ones the clamp was supposed to
+> bound — was documented nowhere.
+
 | symbol | meaning | unit | value |
 |---|---|---|---|
-| $P$ | passive permeability | µm/s | returned ($\times 10^6$ from m/s) |
-| $K_p$ | membrane/water partition coefficient | — | $10^{\log P}$, clamped to $[10^{-3}, 10^{5}]$ |
+| $P$ | passive permeability | µm/s | returned ($\times 10^6$ from m/s), series of the two legs |
+| $K_p$ | membrane/water partition coefficient | — | $10^{\log P}$, clamped to $[10^{-3}, 10^{3}]$ (`_LOGP_KP_MAX = 3.0`; this table said $10^{5}$) |
 | $D_m$ | solute diffusivity inside the bilayer core | m²/s | Stokes–Einstein with membrane viscosity |
-| $\eta_m$ | bilayer-core microviscosity | Pa·s | $0.10$ (≫ water's $10^{-3}$) |
+| $\eta_m$ | bilayer-core microviscosity | Pa·s | $1.0$ (`_ETA_MEMBRANE_PA_S`; this table said $0.10$) |
 | $d$ | hydrophobic bilayer thickness | m | $4.0$ nm |
+| $h_{\mathrm{UWL}}$ | unstirred water-layer thickness | µm | $30.0$ (`_UWL_THICKNESS_UM`; previously undocumented) |
 | $r_s$ | solute radius | m | `radius_hydrodynamic_nm`, else from MW at $\rho = 1$ g/cm³ |
 
 Units: $[D_m/d] = \mathrm{m/s}$, $K_p$ dimensionless. Antibodies (`is_antibody`)
@@ -413,10 +434,15 @@ Hard gates: $\beta_{\mathrm{BBB}} = 0$ for antibodies and for $\mathrm{MW}\ge100
 **Status: heuristic, low confidence, with a documented failure.** Temozolomide
 (MW ≈ 194, $\log P \approx -1.5$, TPSA ≈ 106) is clinically BBB-penetrant but is
 *under-predicted* by any purely physicochemical rule set. The module does **not**
-special-case it. `results/pk_multidrug.md` reports the measured consequence: BBB
-ordering vs. real CNS-partition ordering gives Spearman $\rho = 0.50$, Kendall
-$\tau = 0.33$ (2/3 pairs concordant) — partially concordant, inverting
-temozolomide vs. cisplatin.
+special-case it. `results/pk_multidrug.md` reports the measured consequence: scored
+against the real CNS-partition sequence, the structure-only score reaches only
+Spearman $\rho = 0.50$, Kendall $\tau = 0.33$ — 2 of 3 pairs concordant, so **one pair
+inverts**. Which pair is not named here: cross-compound ordering was withdrawn on
+2026-08-21, and naming the two compounds that exchange places prints the ordering as
+surely as asserting it would. This is recorded as a *limit on the score*, which is
+what it is. What survives is the per-compound magnitude check — each compound's
+`bbb_penetrance` against its own published brain:plasma ratio, described in
+`docs/real_data/pk_anchors.md`.
 
 ### 2.8 Plasma binding, tissue retention and clearance (heuristic priors)
 
@@ -825,9 +851,12 @@ $$
 $$
 
 i.e. tumor cells per fixed reference tile — dimensionless, of order 1, and free of
-the $\Delta x^{2}$ factor. $A_{\mathrm{ref}}$ is the converged production grid
-spacing squared (so the correction is a pure re-parameterisation at
-$\Delta x = 12\ \mu m$ and changes nothing there) and is also close to a single
+the $\Delta x^{2}$ factor. $A_{\mathrm{ref}}$ is the **production** grid spacing
+squared (so the correction is a pure re-parameterisation at $\Delta x = 12\ \mu m$ and
+changes nothing there) — **not a *converged* one**, which is how this read until
+2026-09-03: §10.5 and the appendix of this same document record that there is no
+$\Delta x$ at which this pipeline has been shown to be grid-converged, and that the
+word "grid-converged" is withdrawn and is also close to a single
 glioma-cell footprint ($\sim 100\ \mu\mathrm{m}^2$). On the synthetic tissue the
 mean oxygen is now invariant to $10^{-4}$ across a 4× range of $\Delta x$
 (asserted in `_test_...` / `tests/test_physics.py::test_oxygen_sink_is_grid_independent`).
@@ -931,8 +960,13 @@ $$
 | $\varphi$ | smoothed tumor occupancy, $[0,1]$ | — | `_tumor_field` |
 
 $\varphi$ is built by binning tumor-cell counts, Gaussian-smoothing with
-$\sigma = 5$ grid cells, and normalising by its maximum (so, unlike
-$\rho_{\mathrm{tum}}$ in §4, it *is* resolution-robust).
+$\sigma = 60\ \mu\mathrm{m}$ — a **physical length**, converted to pixels as
+$\sigma_{\mathrm{px}} = 60/\Delta x$ at use (`physics/pressure.py:99`, `:117-120`) —
+and normalising by its maximum, which is *why* it is resolution-robust where
+$\rho_{\mathrm{tum}}$ in §4 is not. **Corrected 2026-09-03:** this said
+$\sigma = 5$ grid cells. A grid-cell-native $\sigma$ is precisely the bug that makes a
+field mesh-dependent, and the code carries a comment saying so; documenting the
+constant in cells asserted the defect the code had already fixed.
 
 The two tumor pathologies enter through $\varphi$: **leaky vessels** raise $a$ by up
 to $1{+}G = 13\times$, and **absent lymphatics** drive $d \to 0$.
@@ -1069,7 +1103,7 @@ nonetheless scaled every absolute kill fraction. Current behaviour
 
 | drug | determinant on the 319-gene panel | status |
 |---|---|---|
-| doxorubicin, etoposide, mitoxantrone | **TOP2A** | the drug's actual **molecular target** (TOP2 poisons; PMID 19377506, 18574145) |
+| doxorubicin, etoposide (and mitoxantrone, which is **not in `GBM_DRUGS`** — `get_molecule('mitoxantrone')` raises `KeyError`, so `vivum simulate --drug mitoxantrone` fails; it reaches the engine only through the validation modules that construct it directly) | **TOP2A** | the drug's actual **molecular target** (TOP2 poisons; PMID 19377506, 18574145) |
 | cisplatin, lomustine, carmustine, methotrexate, vincristine | **MKI67** | **mechanistic proxy** — proliferation-gated cytotoxicity, *not* a measured sensitivity |
 | temozolomide, procarbazine | *none* (determinant is **MGMT**, absent from the panel) | **unmodelled**: $\sigma_c \equiv 1$ |
 | bevacizumab | *none* (no direct tumour-cell cytotoxicity) | $\sigma_c \equiv 1$ |
@@ -1118,8 +1152,10 @@ $$
 
 (`sim/engine.py`). Because the draw is a Bernoulli sample rather than the expected
 value, the kill fraction carries sampling noise $\sim\sqrt{\bar p(1-\bar p)/n}$; the
-numerical audits therefore average it over seeds $\{0,1,2,3\}$ while the deterministic
-penetration index is used as the primary signal.
+numerical audits therefore average it over seeds $\{0,1,2,3\}$ while a deterministic
+statistic carries the primary signal. **Corrected 2026-09-03:** that role was assigned
+here to the penetration index, which is **retired** — scale-invariant by construction,
+so it cannot track delivered dose (`results/delivery_metrics.md` §4).
 
 The engine's diagnostic viable-fraction *trajectory*
 (`sim/engine.py::_viable_history`) reuses the identical Hill mapping at scaled
@@ -1321,29 +1357,45 @@ Diffusivity, MW, IC₅₀, Hill and BBB are untouched.
 
 ### 8.3 Fitted values and the out-of-sample test
 
-| anchor convention | target $L_*$ | fitted $\alpha$ | status |
-|---|---:|---:|---|
-| raw half-distance treated as $L$ | 45 µm | 309.6 | **retired** (dimensionally wrong) |
-| e-fold-converted, $L = d_{1/2}/\ln 2$ | 64.9 µm | **148.6** | **the one convention in the tree** |
+| anchor convention | target $L_*$ | status |
+|---|---:|---|
+| raw half-distance treated as $L$ | 45 µm | **retired** (dimensionally wrong) |
+| e-fold-converted, $L = d_{1/2}/\ln 2$ | 64.9 µm | **the one convention in the tree** |
 
-**RESOLVED.** Both values used to be live for the same constant — `calibrate_alpha`
-defaulted to the raw 45 µm half-distance (giving 309.6) while `pk_multidrug.py`
-passed the converted target (giving 148.6); they differ by exactly $1/\ln^2 2 = 2.081$.
-`calibrate_alpha` now takes its target as an **e-folding length**
+**RESOLVED — the convention, not the value.** Both conventions used to be live for the
+same constant — `calibrate_alpha` defaulted to the raw 45 µm half-distance while
+`pk_multidrug.py` passed the converted target; they differ by exactly
+$1/\ln^2 2 = 2.081$. `calibrate_alpha` now takes its target as an **e-folding length**
 (`target_efold_um`, default `pk_anchors.half_distance_to_efold_length(45) = 64.92 µm`),
-so every caller in the tree gets **α = 148.6**, and `revalidate` compares
+so every caller in the tree gets the same convention, and `revalidate` compares
 out-of-sample predictions to the *converted* anchor band (36–108 µm) rather than the
 raw half-distances. Guarded by
-`tests/test_reality_layer.py::test_calibrate_alpha_target_is_an_efold_length`. Any
-figure or results file still quoting α = 309.6 predates this correction.
+`tests/test_reality_layer.py::test_calibrate_alpha_target_is_an_efold_length`.
 
-With $\alpha$ **frozen**, every other drug's $L$ is a pure prediction:
+**This table used to carry a numeric $\alpha$ for each row, and the numbers are removed
+rather than updated.** $\alpha$ is a closed-form solve, not a stored constant —
+`calibration.py:275-276` gives $k_{\text{eff}}^* = D_{\text{eff}}/L_*^2$ and
+$\alpha = (k_{\text{eff}}^* - k_{\text{passive}})/\text{uptake\_proxy}$ — so it moves
+whenever the compiled $D_{\text{eff}}$ moves, and the two-route promotion moved it. The
+value printed here until 2026-09-03 was stale, on a page that also warned readers about a
+stale value. Get it from the function:
 
-* **Out-of-sample (α = 148.6, current):** mitoxantrone $L = 48$ µm and topotecan
+```bash
+./.venv/bin/python -c "from tmesim.validation.calibration import calibrate_alpha; print(calibrate_alpha())"
+```
+
+[`../results/alpha_identifiability.md`](../results/alpha_identifiability.md) goes further:
+$\alpha$ is a **gauge coordinate, not a measurement** — rescaling every drug's binding
+prior and refitting moves it over four orders of magnitude while every downstream
+quantity is unchanged. Quoting it to many figures publishes a coordinate.
+
+With the *anchor* frozen, every other drug's $L$ is a pure prediction:
+
+* **Out-of-sample, current convention:** mitoxantrone $L = 48$ µm and topotecan
   $L = 84$ µm vs. the L-equivalent band 36–108 µm → 2/2 pass. Temozolomide
   penetrates far further than doxorubicin — correct direction for the opposite
   (weakly-bound) regime.
-* *(Historical, α = 309.6: mitoxantrone $L = 33.4$ µm compared against the raw
+* *(Historical, under the retired raw-half-distance convention: mitoxantrone $L = 33.4$ µm compared against the raw
   25–75 µm half-distance band. Both sides of that comparison used the wrong
   convention, which is why it also "passed".)*
 
@@ -1401,7 +1453,7 @@ to that per-section normalisation.
 
 | field | estimator | status |
 |---|---|---|
-| $\rho_{\mathrm{vasc}}$ | KDE of measured `ENDOTHELIAL` (PECAM1⁺/FLT1⁺) cell positions | **REAL** — vessel locations are measured cells, no geometry invented |
+| $\rho_{\mathrm{vasc}}$ | **discrete segmented vessel field** built from measured `ENDOTHELIAL` (PECAM1⁺/FLT1⁺) cell positions — nonzero only within a vessel radius, exactly zero elsewhere (`reconstruct/real_fields.py:179`, `_DEFAULT_VASCULAR_MODE = "discrete"`). The KDE this row described until 2026-09-03 is retained as the explicit `mode='kde'` option, not the default | **REAL** — vessel locations are measured cells, no geometry invented |
 | $\rho_{\mathrm{ecm}}$ | KDE of measured `STROMAL` (CAF-like) cell positions | **PROXY** — ECM is acellular and cannot be binned; matrix-depositing cell density stands in for matrix. `ecm_density_from_positions(weights=…)` exists precisely so a caller can pass ECM-transcript abundance (COL1A2, COL12A1, POSTN, VCAN, DCN, FBLN1, LAMA2 are on the panel) for a higher-fidelity field |
 | $O$ | `physics.oxygen.solve_oxygen` on the above | **SOLVED** — real-perfusion-driven, not painted |
 

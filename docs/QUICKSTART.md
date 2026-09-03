@@ -97,12 +97,14 @@ it as a module instead of the installed script.)
 > drove the shipping panels at realistic per-compound plasma dosing: exposure
 > across the retained compounds spans **113.1×**, the published GBM order first
 > breaks at a spread of **1.53×**, and one swap
-> (`irinotecan > temozolomide`, needing **1.961×**) sits inside a single
+> (needing only **1.961×**; which two compounds it exchanges is not named here,
+> for the same reason the order itself is not) sits inside a single
 > compound's own licensed dose range as published in one FDA label table
 > (**2.04×**). [`results/capacity_ranking_robustness.md`](../results/capacity_ranking_robustness.md)
-> then changed the **top-1 pick** of the shipping breast 10-drug panel from
-> `vinorelbine` to `doxorubicin` using this repository's *own* structural
-> binding-capacity rule. What survives is the **single-compound map**: one real
+> then **moved the top of the shipping breast 10-drug panel outright**, using this
+> repository's *own* structural binding-capacity rule. Which compound displaced which
+> is not named, for the same reason the order itself is not — that pair was printed
+> here until 2026-09-03. What survives is the **single-compound map**: one real
 > tissue, one compound, where the drug reaches and how much of the tumour it
 > never reaches. Within one map every per-compound scale factor is common to
 > every voxel and cancels exactly, so *relative* exposure between regions of
@@ -235,8 +237,11 @@ map) — and `--out <dir>` puts them somewhere else.
 
 **This is the product: one real tissue, one compound.** The map answers where
 that compound reaches in *this* section and how much of the tumour it never
-reaches; `penetration_index` and the viable-tumour fraction are the two
-summary numbers on it. Everything about the tissue (vascular geometry, ECM,
+reaches. **Corrected 2026-09-03:** this sentence named `penetration_index` as one of the
+map's two summary numbers. That metric is **RETIRED** — it is scale-invariant by
+construction and cannot track delivered dose (`results/delivery_metrics.md` §4), the CLI
+still prints it only for continuity, and `docs/REPRODUCE.md` §5 says to ignore the line.
+Read `therapeutic_coverage` at 1× IC50 and `median_tumor_auc` instead. Everything about the tissue (vascular geometry, ECM,
 oxygen, cell positions) is measured from the section, and everything about the
 compound comes from the same `calibrated_drugparams` → binding-site-barrier
 path `experiments/real_drug_panel.py` uses — nothing is reimplemented in the
@@ -290,6 +295,16 @@ a single map does and does not license.
 > 1.34, which scores 0.718 — the *lower* of the two, adopted anyway because it
 > comes from Abraham LSER coefficients rather than from fitting. See
 > `results/two_route_promotion.md` §1 and §4.)
+>
+> **And a third, which supersedes the framing of both.** The two paragraphs above treat
+> 0.718 as a real score of the physics that the shipping descriptor layer merely fails to
+> reproduce. [`../results/hbd_convention_audit.md`](../results/hbd_convention_audit.md)
+> (2026-08-21) is later than either and goes further: the scoring run itself fed a
+> donor-*atom* column into a coefficient defined per donor *group*, so 0.718 describes
+> neither the shipping engine nor the correct physics, and the correct-convention score is
+> bounded only to an interval — one that CONTAINS 0.718 without confirming it, and is far
+> too wide to serve as a validation. Take the interval from that file. This blockquote
+> carried only the descriptor axis until 2026-09-03.
 
 `--drug` takes any name in `tmesim.molecular.library.GBM_DRUGS`, and that
 library is actively growing (new agents are added on an ongoing basis). Ask it
@@ -392,8 +407,10 @@ FAIL         analytic adavosertib   [PMID 39820282]
                       bar       : fold error within 3x (module BAND_TIGHT); 10x reported alongside
 ```
 
-At the time of writing `--quick` covers 8 of the 16 registered anchor groups and
-ends on **PASS 7 / FAIL 6 / NOT TESTABLE 4 / DEFERRED 8** of 25 rows, exiting 1.
+Measured 2026-09-03: `build_registry()` holds **17** anchor groups, **9** of them
+tier `quick`, and a quick run emits **26 rows** ending on
+**PASS 8 / FAIL 6 / NOT TESTABLE 4 / DEFERRED 8**, exiting 1. (This read "8 of the 16"
+and "PASS 7 … of 25 rows".)
 The full run adds the PDE and geometry anchors and ends deeper in the red — see
 the failure list below. These counts move as anchors land; regenerate them from
 live output rather than trusting this page.
@@ -476,8 +493,9 @@ vivum validate --quick || echo "an external anchor regressed"
 ```
 
 Note that `--quick` is a *weaker* gate than the full run, not a faster
-equivalent: **13 of the 13 rows it scores never invoke the transport PDE**, so a
-green `--quick` is not evidence about the solver.
+equivalent: **all 14 rows it scores are `scope=analytic` and never invoke the transport
+PDE** (measured 2026-09-03; this line said 13 of 13), so a green `--quick` is not
+evidence about the solver.
 
 #### Every row names the physics it ran under
 
@@ -531,8 +549,12 @@ Three more things worth knowing before you quote a row:
   *tissue* (vessel density, spacing, area fraction, cellularity) with no drug
   and no solver anywhere in it — a real claim, but about what the transport
   runs **on**, not about the transport. The summary line prints how many of the
-  scored rows never touch the solver. Only the full (non-`--quick`) run
-  produces `PDE` rows at all.
+  scored rows never touch the solver. **`--quick` does emit `PDE`-scope rows** —
+  measured 2026-09-03, five of them — but none of them is *scored*: they come back
+  `NOT TESTABLE` or `DEFERRED`. That is the real asymmetry, and it is why a green
+  `--quick` says nothing about the solver. Until 2026-09-03 this line claimed only the
+  full run produced `PDE` rows at all, which is a different and false statement: the
+  rows are there, they just never reach a verdict.
 * **Rows list the conditionals they inherit**, and every cited conditional is
   printed in full at the bottom. The two with the longest reach are `alpha-fit`
   (everything downstream of the one fitted constant) and `ps-scale` (every
@@ -574,7 +596,7 @@ vivum studio
 ```
 Vivum Studio backend
   repo        /path/to/tme-sim
-  run history /path/to/tme-sim/app/server/.runs
+  run history /path/to/tme-sim/app/runs
   recon cache maxsize=4
   serving     http://127.0.0.1:8000
   your tissue http://127.0.0.1:8000/ingest
@@ -702,7 +724,13 @@ cfg = SimConfig(drug=drug_params, seed=0)
 cfg.pde.total_time = 1800.0   # fast demo window (seconds); library default is 12 h
 result = simulate_response(micro, cfg)
 print("kill_fraction:", round(result.kill_fraction, 4))
-# kill_fraction: 0.0198
+# kill_fraction: 0.0608
+#   Re-run verbatim 2026-09-03: this comment read 0.0198, a 3.07x miss. The two
+#   prints above it still reproduce to every digit; this one had drifted with the
+#   engine. It is here so the recipe REPRODUCES, and for no other purpose: an
+#   absolute kill fraction is not a defensible output of this model, carries no
+#   interval, and must not be read as a predicted effect. See the caveat at the
+#   end of this page.
 ```
 
 `result` (a `tmesim.sim.engine.SimulationResult`) also carries
@@ -738,9 +766,12 @@ micro = reconstruct_real(
   `data_cache/` is gitignored, so a fresh clone has zero runnable sections.
   `vivum acquire` (§1b) fetches the tabular sources *and* the `xenium_319`
   section, which is the one every example here uses; `--sections all` adds the
-  other auto-fetchable section. The Visium sections, `gse324268`, the breast
-  section and HGCC are **not** auto-fetchable and `vivum sections` prints the
-  exact commands for each. Until then, `reconstruct` / `simulate` /
+  other auto-fetchable section. The Visium sections and `gse324268` are **not**
+  auto-fetchable and `vivum sections` prints the exact commands for each. (Until
+  2026-09-03 this sentence also named a breast section and HGCC as entries that
+  command prints recipes for. It does not: `SECTION_RECIPES` holds **7** entries as of
+  2026-09-03 — three Xenium GBM and four Visium GBM — and neither a breast section nor
+  HGCC is among them, so `vivum sections` prints nothing for either.) Until then, `reconstruct` / `simulate` /
   `molecular-run` raise a clear file-not-found error naming the missing path
   rather than silently substituting synthetic data — there is no synthetic
   fallback anywhere in this codebase.

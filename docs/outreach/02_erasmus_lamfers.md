@@ -106,8 +106,7 @@ fitted to a measured tension. What survives is the
 delivery axis, and I want to be exact about its scope: scored against 125 human glioma tissue
 samples across 42 patients plus 27 PMID-anchored regional PK measurements, the model predicts
 tumour:plasma partition to about a **2× geometric-mean fold error**, with 6/6 drugs inside 10×,
-and reproduces the measured BBB-penetrant vs BBB-excluded separation (3.65× predicted, 4.66×
-measured) from molecular structure alone. That is a **structure-only permeability coefficient**
+each compound scored against its own measured value. That is a **structure-only permeability coefficient**
 being scored — those rows do not invoke the transport solver, and I should not be read as saying
 the solved concentration field is validated. Of the checks that do compare a solved field to an
 external measurement there are three, and all three fail. The regional axis fails too: the model
@@ -125,7 +124,11 @@ know the 0.997 was agreement between a *biased* estimator and another estimator 
 real cross-platform result. Cross-platform composition concordance is an open question in this
 project, not evidence for anything. More broadly: every reconstruction-level external check I
 have made has since been retracted or failed to replicate on a held-out section, while the
-transport-level checks have held. That asymmetry is the honest summary of where this stands.
+transport-level checks have fared better. That asymmetry is the honest summary of where this
+stands — with the caveat that "better" is not "held": `results/pk_ranking_robustness.md` and
+`results/capacity_ranking_robustness.md` are later stress tests on the transport side, and
+`results/brain_slice_anchor.md` records a transport-level anchor that FAILS. Re-read those before
+sending; this sentence claimed the transport-level checks had held outright until 2026-09-03.
 
 **What I cannot do, and why I am writing.** The response half has never been tested. I ran a
 systematic sweep of 164 datasets, and there is no open dataset anywhere — in any tumour type —
@@ -151,21 +154,30 @@ it.
    and I mention it only because it means the question is about pairing two things you already
    do rather than acquiring something new.
 
-Those two drugs are not arbitrary. Our panel ranking is decided by delivery × potency, and
-cisplatin and doxorubicin sit at opposite ends of both axes — cisplatin has roughly 157× the
-delivered exposure and 49× the IC50. They currently differ by about 4% in predicted kill, which
-is well inside our own parameter uncertainty, so the honest output today is a tie rather than a
-recommendation. A Monte Carlo over that uncertainty shows the dominant remaining term is
-"the median glioma cell line" standing in for "this tumour." A per-patient IC50 pair for those
-two collapses it. Doxorubicin's uncertainty is particularly inflated because it is simply
+Those two drugs are not arbitrary. They sit at opposite ends of both axes the model has to
+combine — how much reaches the tissue, and how much is needed once it is there — which makes
+them the pair on which our own uncertainty is widest. A Monte Carlo over that uncertainty shows
+the dominant remaining term is "the median glioma cell line" standing in for "this tumour." A
+per-patient IC50 pair for those two collapses that term from a population spread to a
+measurement error. Doxorubicin's uncertainty is particularly inflated because it is simply
 absent from the GDSC glioma screen.
+
+To be plain about what I am *not* asking for: this project withdrew any output that places one
+compound against another on 2026-08-21, and I am not asking you to help settle which of the two
+does better. Until 2026-09-03 this paragraph did exactly that — it presented a decided panel
+ordering, a pairwise exposure-and-potency contrast between the two named compounds, and a
+percentage difference in predicted kill. All three are withdrawn claim shapes and are not
+restated here; an absolute kill fraction in particular is not a defensible output of this
+model at all. The ask is to shrink an uncertainty, not to break a tie.
 
 A retrospective version would also be valuable and cheaper: the two extra curves on cultures
 derived from specimens for which a spatial section already exists in your archive.
 
 **What I would provide.** Before seeing any of your data I would commit, in a timestamped and
-version-controlled file, to the predicted drug ordering, the predicted per-region exposure, and
-the predicted MGMT effect size — so the comparison is a prediction rather than a fit. I would
+version-controlled file, to the predicted per-region exposure and the predicted MGMT effect
+size — so the comparison is a prediction rather than a fit. (Until 2026-09-03 this list also
+committed to a predicted ordering across compounds. That output was withdrawn on 2026-08-21;
+pre-registering it would have been a commitment to re-assert a withdrawn claim.) I would
 run the reconstruction and transport model on your section at no cost, and hand over the code
 and the validation harness (a set of scoring modules with permutation tests, leave-one-out
 cross-validation and an explicit uncertainty Monte Carlo) whether or not the result is

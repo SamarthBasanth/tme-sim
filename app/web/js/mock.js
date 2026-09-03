@@ -543,7 +543,13 @@ function provenanceFor(spec, rng) {
     caveats.push('MGMT enters as a single per-patient scalar. The spatial MGMT signal was measured and found to be noise; do not read spatial MGMT structure into this run.');
   }
   return {
-    alpha: 148.6 + rng() * 9,
+    // Synthetic, like everything in this file, but anchored on the right
+    // ORDER OF MAGNITUDE. This read `148.6 + rng() * 9`, the pre-two-route
+    // constant; calibrate_alpha() returns 22.2235 today. A stub is allowed to
+    // be fake and is not allowed to teach a number that is 6.7x wrong — the
+    // provenance panel renders this, and STUB DATA labels the value as
+    // invented, not as differently-scaled.
+    alpha: 22.2235 + rng() * 1.4,
     ic50_uM: d ? d.ic50_uM : null,
     ic50_source: d ? d.ic50_source : null,
     sensitivity_note: spec.sensitivity_mode === 'uniform'
@@ -661,9 +667,11 @@ function publicRun(r) {
 /** Two finished runs so history + comparison have content on first paint.
  *
  * BOTH ARMS ARE THE SAME COMPOUND, and that is deliberate. The seed used to be
- * temozolomide vs lomustine, which made the shipped demo of the comparison
- * panel a two-DRUG comparison — the one reading this product no longer
- * supports. The legitimate use of A/B is a single compound under two
+ * TWO DIFFERENT COMPOUNDS, which made the shipped demo of the comparison panel
+ * a cross-compound comparison — the one reading this product no longer
+ * supports. Which two is not written here: naming the pair in a comment
+ * explaining why the pair was removed reprints exactly what was removed, and
+ * the names carry none of the point. The legitimate use of A/B is a single compound under two
  * conditions, so the demo now varies the dose and the mesh and holds the drug
  * fixed. A shipped example teaches people what the tool is for.
  */

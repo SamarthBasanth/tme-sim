@@ -199,3 +199,90 @@ def test_summary_on_real_microenvironment(real_micro):
     assert 0.0 <= s["mean_ecm"] <= 1.0
     assert 0.0 <= s["mean_vascular"] <= 1.0
     assert s["grid"] == real_micro.domain.shape
+
+
+class TestFrozenLibraryIsNotTheLivePhysics:
+    """``DRUG_LIBRARY``'s calibrated snapshots predate the two-route promotion.
+
+    They are reachable at runtime: ``sim/engine.py::_resolve_drug`` falls back
+    to them whenever a caller passes a drug NAME instead of a ``DrugParams``.
+    No Studio run does — ``app/server/jobs.py`` compiles live via
+    ``calibrated_drugparams(name, alpha)`` and passes the object — but any
+    script, notebook or experiment that passes a string gets the old physics
+    with no error and no warning.
+
+    This test does NOT assert the two agree. They do not, and forcing them to
+    would mean either refreezing the table (a change to shipped constants) or
+    reverting the law. It pins the DIVERGENCE, so that:
+
+    * silently refreshing the table turns this red, and whoever does it has to
+      read the note in ``core/config.py`` and decide deliberately; and
+    * the claim in that note — that the gap is per-compound rather than a
+      common factor — stays checked, because a common factor would mean alpha
+      alone moved and the note would be wrong.
+    """
+
+    FROZEN_ALPHA = 148.60815765445545
+
+    #: Only the entries below config.py's "Real molecular-compile" marker. The
+    #: three "-like" placeholders above it (temozolomide, doxorubicin,
+    #: cisplatin) were never outputs of calibrated_drugparams and are not in
+    #: scope -- a first version of this check included them and produced a
+    #: "12 of 12 differ" result that was measuring the wrong set.
+    CALIBRATED = ("lomustine", "carmustine", "procarbazine", "vincristine",
+                  "methotrexate", "etoposide", "irinotecan", "palbociclib",
+                  "ribociclib")
+
+    def _ratios(self):
+        from tmesim.core.config import DRUG_LIBRARY
+        from tmesim.validation.calibration import calibrated_drugparams
+
+        out = {}
+        for name in self.CALIBRATED:
+            frozen = DRUG_LIBRARY[name + "-like"].diffusivity
+            live = calibrated_drugparams(name, self.FROZEN_ALPHA).diffusivity
+            out[name] = live / frozen
+        return out
+
+    def test_the_frozen_table_no_longer_reproduces_from_that_alpha(self):
+        ratios = self._ratios()
+        same = [n for n, r in ratios.items() if abs(r - 1.0) < 1e-6]
+        assert not same, (
+            "these frozen entries now reproduce from calibrated_drugparams at "
+            f"the alpha config.py names: {same}. Either the table was "
+            "refreshed or the law was reverted — both are deliberate acts, and "
+            "the note in core/config.py has to be updated to match.")
+
+    def test_the_gap_is_per_compound_not_a_common_factor(self):
+        """The note's load-bearing claim.
+
+        If every compound moved by the same factor the cause would be alpha
+        alone and the two-route explanation would be wrong.
+        """
+        ratios = self._ratios()
+        spread = max(ratios.values()) / min(ratios.values())
+        assert spread > 2.0, (
+            f"the frozen/live ratios span only {spread:.3g}x — that looks like "
+            "a single global factor, not a per-compound law. core/config.py "
+            "attributes the gap to a two-route term keyed on logP and HBD; "
+            "if that is no longer true the note is wrong.")
+
+    def test_a_name_and_an_object_are_not_interchangeable(self):
+        """The trap itself, exercised through the real resolver."""
+        from tmesim.core.config import DRUG_LIBRARY, SimConfig
+        from tmesim.sim.engine import _resolve_drug
+        from tmesim.validation.calibration import calibrated_drugparams
+
+        name = "methotrexate"
+        by_name = _resolve_drug(SimConfig(drug=name + "-like"))
+        assert by_name.diffusivity == DRUG_LIBRARY[name + "-like"].diffusivity, \
+            "the string branch no longer reads the frozen table"
+
+        live = calibrated_drugparams(name, self.FROZEN_ALPHA)
+        by_object = _resolve_drug(SimConfig(drug=live))
+        assert by_object.diffusivity == live.diffusivity, \
+            "the object branch must pass the caller's compile through untouched"
+        assert by_name.diffusivity != by_object.diffusivity, (
+            "passing a name and passing a live compile now agree — if that is "
+            "intended, core/config.py and engine.py::_resolve_drug both say "
+            "otherwise and must be corrected")

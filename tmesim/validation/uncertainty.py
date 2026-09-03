@@ -148,8 +148,14 @@ _ALPHA_SIGMA = math.log(_ALPHA_SPAN) / stats.norm.ppf(0.95)  # ~0.4214
 
 def build_priors(alpha0: Optional[float] = None) -> Dict[str, Prior]:
     """Build the prior spec. ``alpha0`` defaults to the freshly fitted calibration
-    constant (the e-fold-converted fit, ~148.6) so the alpha prior is always centred
-    on the actual fit."""
+    constant, so the alpha prior is always centred on the actual fit.
+
+    THE VALUE IS NOT NAMED HERE. This docstring said "~148.6"; the fit returns
+    22.223477711172563 today, and it said so two lines above a comment claiming
+    this text "can never drift from the module it documents". The code was
+    always right -- it calls ``calibrate_alpha()`` -- and only the number
+    written beside it went stale, which is the whole argument for not writing
+    it down twice."""
     if alpha0 is None:
         alpha0 = calibrate_alpha()
     alpha0 = float(alpha0)

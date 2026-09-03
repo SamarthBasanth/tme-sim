@@ -196,9 +196,16 @@ in off the stage (`Mechanism`, §2.3), organised into
 
 | Group | Sections | Question |
 |---|---|---|
-| **RESULT** | Metrics · Mechanism · Caveats · Provenance · Reconstruction report | what did the run find, and how much of it is measured |
+| **RESULT** | Mechanism · The finding · Selected cell · Metrics · Delivery or dose · Caveats · Provenance · Reconstruction report | what did the run find, and how much of it is measured |
 | **VIEW** | Channels · Field overlay · Window / level · Render | how is the picture being drawn |
 | **MEASURE** | Line profile · Regions · Distance | what did I measure on it |
+
+> **Re-derived from the source 2026-09-03.** The rail builds **15** sections
+> (`grep -oE "sectTitle\('[^']+'\)" app/web/js/ui/inspect.js`). The RESULT row above
+> listed five and omitted three: **The finding**, **Selected cell** and **Delivery or
+> dose** — the first of which is the screen the user lands on. An inventory that is
+> silent about the first screen is not an inventory. Re-run that one-liner rather than
+> trusting this table; nothing mechanically couples them.
 
 RESULT is first because it is the payoff of the primary verb. VIEW is second
 because it is used continuously. MEASURE is last because it is episodic. The

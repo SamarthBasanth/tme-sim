@@ -12,9 +12,15 @@ has one shared secret and no accounts, no audit log, no encryption at rest, and
 no per-record access control — §2 is the full list of what it does not do for
 you. Software with those gaps has no business holding data that identifies a
 person, and declining that scope is more honest than claiming a bar this
-application does not clear. Vivum reconstructs a tissue section and ranks
-compounds against it; it performs no diagnosis and produces nothing that is
-intended to select therapy for a patient.
+application does not clear. Vivum reconstructs a tissue section and
+reports, for ONE compound at a time, a ratio between regions inside that one
+map; it performs no diagnosis and produces nothing that is intended to select
+therapy for a patient. Until 2026-09-03 this sentence instead described the
+product as ordering one compound against another — the claim withdrawn on
+2026-08-21, left standing in the scope paragraph a data-access committee reads
+to decide whether this may be deployed at all. The withdrawn wording is not
+reproduced here: quoting it verbatim prints the claim, which is the same rule
+that applies to a limit or a piece of evidence.
 
 Every dataset this project ships with is open, public research data (10x
 Genomics/GEO Xenium and Visium sections) with no patient-identifiable
@@ -750,8 +756,10 @@ this repository keeps having: the document that was true when it was written.
 `TMESIM_*` read anywhere in `app/server/` and fails if one is missing from this
 file, so the count above cannot drift again without a red test.
 
-**Four of the six are read once, at process start, and need a restart to
-change.** `TMESIM_STUDIO_API_KEY`, `TMESIM_STUDIO_ALLOWED_HOSTS` and
+**Four are read once, at process start, and need a restart to
+change.** (This said "four of the six" — a leftover from when the count above was
+six; the four named below are unchanged, and two more are covered in the next
+paragraph.) `TMESIM_STUDIO_API_KEY`, `TMESIM_STUDIO_ALLOWED_HOSTS` and
 `TMESIM_STUDIO_ALLOWED_ORIGINS` are read while the app is being built — each
 decides whether a middleware is installed at all, so there is nothing left to
 re-read afterwards — and `TMESIM_RECON_CACHE_SIZE` is read at import, when the

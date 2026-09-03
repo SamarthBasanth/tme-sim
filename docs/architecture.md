@@ -296,7 +296,7 @@ All are runnable as `python -m tmesim.validation.<name>`.
 | `gbm_tmz_exvivo` | GSE232173 — glioma + temozolomide + measured ex-vivo ATP viability (Ntafoulis 2023, PMID 37620410) | runnable → `results/gbm_tmz_exvivo.{md,png}` |
 | `moncayo_explant` | HGSOC explants: 376,736-pixel MALDI-MSI drug map + 114 GeoMx ROIs | runnable |
 | `cellstate_validation` | oxygen-banded cell states vs measured per-cell MKI67/TOP2A | **INCOMPLETE** — `run()`/`make_figure()` exist, no `write_report`, no `__main__` |
-| `ranking_robustness` | is the top-1 drug call decision-grade under parameter uncertainty? | **RUNNABLE** — has `__main__`; `results/ranking_robustness.md` + `.png` + `ranking_robustness_mc.npz` all exist. **Its answer is now NO.** It clears its pre-declared bar under the *common-mode* priors it sweeps (P(cisplatin rank 1) = 0.931), but a **drug-specific** transport parameter destroys it: correcting the delivery law drops that to **0.3965** and changes the top-1 pick (`results/transvascular_exchange_revalidation.md` §4.1). Report a **SET, not a winner** (`results/ranking_robustness.md` §8). |
+| `ranking_robustness` | was the top-of-panel call decision-grade under parameter uncertainty? | **RUNNABLE** — has `__main__`; `results/ranking_robustness.md` + `.png` + `ranking_robustness_mc.npz` all exist. **Its answer was NO, and the question is now moot.** Under the *common-mode* priors it sweeps, the leader held its position with probability 0.931; a **drug-specific** transport parameter destroys that, dropping it to **0.3965** and moving the top of the panel (`results/transvascular_exchange_revalidation.md` §4.1). Until 2026-09-03 this row closed by prescribing a reportable set in place of a single winner — superseded: cross-compound ordering was withdrawn on 2026-08-21 and there is no reportable top of panel at all, set or winner. |
 | `vessel_network_impact` | what changes if the KDE source is swapped for the discrete vessel network (§7.5a) | **RUNNABLE** — has `__main__`; `results/vessel_network_impact.{md,png}` exist. (Previously listed here as INCOMPLETE; that was wrong.) |
 | *(hypoxia vs VEGFA/HIF1A)* | simulated oxygen vs the IO panel's measured VEGFA/HIF1A | **NOT WRITTEN** — `marker_panels` already carries `HYPOXIA_RESPONSE_GENES` and points at a `validation/hypoxia_validation.py` that does not exist |
 
@@ -464,8 +464,10 @@ Panel reality check: PRESENT — MKI67, TOP2A, EGFR, TP53, AQP4, PCNA, CDK1.
 ABSENT — MGMT, ABCB1, ABCG2, CDKN2A, ATM, MSH2, MLH1, PARP1.
 
 The **default reconstruction is drug-agnostic** (uniform 1.0 for every drug), so
-drug *rankings* are unaffected by the sensitivity model and absolute kills are an
-equal no-resistance upper bound. Applying the drug-specific model makes absolute
+the sensitivity model contributes nothing that varies between compounds and
+absolute kills are an equal no-resistance upper bound. Until 2026-09-03 that
+invariance was stated here as a property of an across-compound ordering, which
+is an output this project withdrew on 2026-08-21. Applying the drug-specific model makes absolute
 kill fractions **conditional** on it — never a measured response. Visium
 reconstructions have no per-cell transcripts, so sensitivity stays uniform 1.0 and
 that is reported.
@@ -486,15 +488,28 @@ converged regime entirely.
 
 **(b) Even converged, it is a scale-invariant shape statistic.**
 `penetration_index = mean(AUC) / p99(AUC)` is a ratio: multiply the entire exposure
-field by any constant and it does not move. At dx = 12 µm it therefore reports the
-**vascular geometry**, identical for every drug on one section — it collapses to
-**0.194–0.196 across the whole five-drug panel** while their delivered exposure
-spans **~122×**. Correlating it against vascular density is close to circular.
+field by any constant and it does not move, so it cannot track delivered dose at all.
+That is the structural objection, it is number-independent, and it is why the metric is
+retired. Correlating it against vascular density is close to circular.
 
-**Consequence.** Compare drugs by **`mean_tissue_auc` / `mean_tumor_auc`** (µM·s,
-absolute) or **`therapeutic_coverage` at 1× IC50** (the fraction of tumor cells
-whose time-averaged exposure `E = AUC/T` clears the drug's own IC50 — dimensionally
-sound and genuinely drug-discriminating). **The word "grid-converged" used to appear
+> **Superseded 2026-09-03.** This paragraph also carried the index's range across the
+> panel and the fold-range of the panel's delivered exposure, and used the narrowness of
+> the first against the width of the second as the argument. Both figures have moved in
+> `results/delivery_metrics.md` §3a–§3b, and the related drift-versus-spread inequality
+> has **inverted** there — the index's across-panel spread is now the larger of the two.
+> The scale-invariance argument above is unaffected and is the one to rely on. Current
+> values live in that file and are deliberately not duplicated here.
+
+**Consequence.** Read a compound on **`mean_tissue_auc` / `mean_tumor_auc`**
+(µM·s, absolute) or on **`therapeutic_coverage` at 1× IC50** (the fraction of
+tumor cells whose time-averaged exposure `E = AUC/T` clears that drug's own
+IC50 — dimensionally sound, and sensitive to the compound rather than to the
+section's vascular geometry). Until 2026-09-03 this line instructed the reader
+to place two compounds side by side on these metrics: they are the metrics on
+which a SINGLE compound is legible, and being sensitive to the compound is not
+a licence to put two of them on one axis. Cross-compound ordering was withdrawn
+2026-08-21. The old instruction is not quoted here — reprinting it is the same
+act as making it. **The word "grid-converged" used to appear
 in that parenthesis and is withdrawn**: `results/CLAIM_INVENTORY.md` §3 lists
 *"`therapeutic_coverage` … grid-converged (±0.03)"* as not established at dx = 12 for
 either panel. What is defensible is that `therapeutic_coverage` separates drugs far
@@ -528,15 +543,29 @@ delivered exposure versus these drugs' IC50s.
 Neither is a bug in the code. Both are consequences of what the reconstruction
 *is*, and both bound what the model may claim.
 
-### (a) The vascular source is a smooth KDE, not a vessel network
+### (a) The vascular source WAS a smooth KDE; it is now the discrete network
 
-`vascular_density` is a Gaussian KDE (bandwidth ~40 µm) of measured endothelial
-cell positions, masked to tissue and divided by its own maximum. It is the source
-term for every drug. Three independent analyses converged on the same root cause:
+**Superseded as a description of the shipped default, retained as the record of
+why the default moved.** `real_fields.py:179` sets
+`_DEFAULT_VASCULAR_MODE = "discrete"` — the segmented-vessel field of
+`reconstruct.vessel_network`, exactly zero away from a vessel (§7.1 records the
+same, and cites the same line). The 40 µm-bandwidth endothelial-KDE source
+described below is retained unchanged as an explicit non-default option, and
+every measurement in this subsection was taken on it.
 
-- **`vessel_profile` / `delivery_metrics`:** the fitted penetration length is
-  **26–28 µm for all five panel drugs** against a **source-null of 23.7 µm** — the
-  decay is measuring the KDE bandwidth, not drug transport.
+Under that KDE source, `vascular_density` was a Gaussian KDE (bandwidth ~40 µm) of
+measured endothelial cell positions, masked to tissue and divided by its own
+maximum, and it was the source term for every drug. Three independent analyses
+converged on the same root cause:
+
+- **`vessel_profile` / `delivery_metrics`:** under the KDE source the fitted
+  penetration length sat within a hair of the source-null — the decay was measuring the
+  KDE bandwidth, not drug transport. **The two figures that stood here until 2026-09-03
+  are removed rather than updated:** `results/delivery_metrics.md` §3a now fits the
+  decay against a *direct* nearest-endothelial-cell distance instead of the legacy
+  percentile-mask threshold, the fitted lengths span several-fold rather than clustering,
+  and the source-null fit no longer returns a finite value at all. Read §3a of that file;
+  a restated pair of numbers here is what went stale.
 - **`dose_schedule`:** the exposure profile has a **flat floor at ~12% of peak**,
   so no tissue is genuinely drug-starved and delivery is never the binding
   constraint.
@@ -555,7 +584,13 @@ under-represents the poorly-delivered tail of the tumour.**
 **Consequence: treat every vessel-relative spatial claim as confounded.**
 `therapeutic_coverage` is the exception that survives, because it is computed over
 the *fixed set of real measured cells* rather than over vessel-relative geometry.
-The fix is `reconstruct.vessel_network` (built, dormant); literature basis
+The fix was `reconstruct.vessel_network`, and it has **shipped** — this line read
+"built, dormant" until 2026-09-03, which had been false since commit `ceb96c0`
+(§7.1). Whether the promotion actually discharges the confound is a separate
+question this section does not answer: see
+[`../results/vessel_promotion.md`](../results/vessel_promotion.md) and
+[`../results/vessel_network_impact.md`](../results/vessel_network_impact.md)
+rather than treating the confound as closed. Literature basis
 ~20 endothelial cells per mm of vessel, 1–2 EC per capillary cross-section
 (Shapson-Coe 2024 *Science* volume EM; Sargent 2023) — i.e. one EC ≈ 50 µm of vessel.
 
@@ -635,10 +670,25 @@ d_half = L · ln 2        =>        L = d_half / ln 2 ≈ 1.443 · d_half
 ```
 
 Fitting α directly to the raw half-distance skips that conversion and inflates α by
-exactly `1/ln²2 = 2.081×`. **That is the origin of the old α = 309.6; the correct
-value is α ≈ 148.6** (`calibrate_alpha()` → 148.608 against a target e-folding
-length of 64.92 µm). `calibrate_alpha` now takes an e-folding target so the mistake
-cannot recur silently. Any report still quoting 309.6 is stale.
+exactly `1/ln²2 = 2.081×`. That convention error is the origin of the retired α = 309.6.
+`calibrate_alpha` now takes an e-folding target so the mistake cannot recur silently.
+
+**Do not quote a numeric α from this page — call the function.**
+
+```bash
+./.venv/bin/python -c "from tmesim.validation.calibration import calibrate_alpha; print(calibrate_alpha())"
+```
+
+α is a closed-form solve, not a stored constant: `calibration.py:275-276` gives
+`k_eff* = D_eff / L_target²` and `α = (k_eff* − k_passive) / uptake_proxy`, so α moves
+whenever the compiled `D_eff` moves — and the two-route promotion moved it. Until
+2026-09-03 this paragraph asserted a fixed corrected value and warned that an older one
+was stale; the asserted value had itself gone stale by then, which is the worse failure,
+because a staleness warning signals the number has been checked. See also
+[`../results/alpha_identifiability.md`](../results/alpha_identifiability.md), which finds
+α is a gauge coordinate rather than a measurement: rescaling every drug's binding prior
+and refitting moves α over four orders of magnitude while leaving every downstream
+quantity — every `k`, every `L`, the out-of-sample prediction — unchanged.
 
 With α frozen, the model **predicts** out-of-sample: mitoxantrone 48.2 µm and
 topotecan 83.6 µm (a chemically distinct class), both inside their real cited
@@ -661,12 +711,16 @@ bands.
   **0.945 → 0.016**), the endothelial fraction (replicates, but only after two
   rounds of correcting the comparison methodology itself), and the vascular area
   fraction (`results/reconstruction_validation_roadmap.md` §5). *Transport
-  physics*: in `vivum validate --quick`, **13 of 13 scored rows never invoke the
-  solver**; in the full run **21 of 33** do not; and of the rows where a solved
+  physics*: in `vivum validate --quick`, **all 14 scored rows are `scope=analytic` and
+  never invoke the solver** (measured 2026-09-03; this said 13 of 13); in the full run
+  **21 of 33** do not, a figure not re-measured here; and of the rows where a solved
   field is compared to an external measurement there are **three, and all three
   FAIL** (`results/CLAIM_INVENTORY.md` §0, §1e). What *has* held is
-  transport/physics at the coefficient level: the doxorubicin→mitoxantrone/topotecan
-  out-of-sample penetration prediction (2/2) and the closed-form α calibration.
+  transport/physics at the coefficient level: the out-of-sample penetration-length
+  prediction for two drugs the anchor was not fitted to, 2/2 inside their cited bands.
+  The closed-form α calibration stood beside it here until 2026-09-03 and is struck —
+  `results/alpha_identifiability.md` finds α is a gauge coordinate rather than a
+  measurement, so it is not something that can have held.
   Say that; do not say "the transport physics is validated."
 - **2D.** A section is naturally 2D, but out-of-plane vascular connectivity is
   invisible: a vessel just above the plane makes a point look "far" when it is not.
@@ -693,16 +747,27 @@ bands.
   law (paracellular + transcellular), so `logP` and hydrogen-bond donor count
   reach transport through a membrane permeability. Scored blind and unfitted
   against 71 compounds measured in one cell line: **R² = 0.718**, 99 % within 3×,
-  24 of 31 exact-mass pairs ordered correctly. The MW-only model it replaced was
+  24 of 31 exact-mass pairs ordered correctly. **Before quoting that R²:**
+  [`../results/hbd_convention_audit.md`](../results/hbd_convention_audit.md)
+  (2026-08-21) finds it was produced by feeding the scorer a donor-*atom* column where
+  the law's coefficient is defined per donor *group*, so it describes neither the
+  shipping engine nor the correct physics, and it bounds the correct-convention score to
+  an interval that CONTAINS 0.718 without confirming it. Take the interval from that
+  file, not from here. The MW-only model it replaced was
   FALSIFIED on the same data (R² = 0.022, flat by construction at matched mass,
   0 of 31 ordered). **Still not true:** 8.3× of a measured 29.7× spread, ONE cell
   line, and absolute `D_eff` still misses its measured multicellular-layer band
-  by 1.5×. **Read a ranking over similar-mass analogues as weak evidence.**
+  by 1.5×. That is a limit on the law, and it is recorded here as a limit and
+  nothing else. Until 2026-09-03 this bullet closed by instructing the reader to
+  treat an ordering over similar-mass analogues as a weak grade of evidence.
+  Grading an ordering still offers the ordering as evidence, and the 2026-08-21
+  prohibition admits no grade; the old instruction is not reproduced, because
+  reprinting it performs it.
   → [`../results/two_route_promotion.md`](../results/two_route_promotion.md),
   [`../results/diffusivity_falsification.md`](../results/diffusivity_falsification.md)
 - **Systemic PK: averaged by default, time-resolved on request.** By default a
   single time-averaged sustained plasma level drives the transport solve; it
-  preserves total delivered drug and relative ranking, but it makes any two
+  preserves total delivered drug, but it makes any two
   schedules with the same cumulative exposure *bit-identical inputs*, so
   fractionation and infusion duration are unresolvable in that mode.
   `PDEConfig.time_resolved=True` drives the source with the real `plasma(t)` at

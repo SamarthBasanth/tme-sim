@@ -17,14 +17,16 @@ diagnosis that motivated the single most expensive experiment in the project.
 
 ## 0. The ledger
 
-The pass ran against a model with a passing test suite (**55 tests green at the time**; the suite now
-collects 114). Test count was not the constraint. Every defect below was found by a check that a unit
-test cannot express.
+The pass ran against a model with a passing test suite (**55 tests green at the time**; the suite
+collects **1448** as of 2026-09-03, measured with `pytest --collect-only -q` — this line said 114
+until then and understated it by more than 12×). Test count was not the constraint, and the growth
+since only sharpens the point: every defect below was found by a check that a unit test cannot
+express, and the suite has been green throughout.
 
 | # | Defect | Class | How it was found |
 |---|---|---|---|
 | 1 | Endothelial fraction 2× too high (single-marker argmax bias): 20.6% → 9.7% | wrong value | external comparison to volume-EM tissue counting |
-| 2 | `penetration_index` not grid-converged **and definitionally unable to discriminate** | metric below its own noise floor | signal-vs-drift ratio (pattern 5) |
+| 2 | `penetration_index` not grid-converged **and scale-invariant by construction, so it cannot track delivered dose** | metric below its own noise floor *as measured then* | signal-vs-drift ratio (pattern 5) |
 | 3 | Hypoxic fraction a grid artifact: 94% at dx=30 → 13% at dx=12 → 7% at dx=8 | invariance violation | grid-refinement invariance check |
 | 4 | α off by exactly 1/ln²2 — half-distance vs e-fold convention | unit/convention error | writing the derivation down |
 | 5 | Per-cell sensitivity a placeholder suppressing all kills ~5× | placeholder shipped as model | provenance audit |
@@ -397,24 +399,41 @@ A representation that makes the null undefined is strictly better than one that 
 any constant and it does not move — a property asserted arithmetically in the module's self-test:
 scaling the field by 10⁻³ and 10³ leaves it identical to 1e-12.
 
-Across a five-drug panel whose mean delivered exposure differs by **120×**:
+> **SUPERSEDED 2026-09-03 — the table below is the measurement as it stood when this argument
+> was written, and every cell in it has since moved.** It is kept because the *method* is the
+> subject of this page and the method is sound: score a candidate metric's across-drug spread
+> against its own grid drift, on a matched scale, and refuse a metric that carries less signal
+> than numerical noise. But the current numbers are in `results/delivery_metrics.md` §3b and
+> §4, and **the inequality this section drew from them has inverted there** — the index's
+> across-panel spread is now comfortably larger than its own grid drift, not an order of
+> magnitude smaller. Do not cite the figures below as current, and do not restate the
+> conclusion that follows from them as a live finding.
 
-| | `penetration_index` (retired) | `therapeutic_coverage` @1× IC50 (replacement) |
+Across a five-drug panel whose mean delivered exposure differed by **120×** *(as measured then)*:
+
+| *(historical)* | `penetration_index` (retired) | `therapeutic_coverage` @1× IC50 (replacement) |
 |---|---|---|
 | range across the panel | 0.1946 – 0.1959 | 0.3108 – 0.9248 |
 | **across-drug spread** | **0.0014** | **0.614** |
 | grid drift 15→12 µm, worst drug, absolute | 0.0183 | 0.0281 |
 | **separation = spread / drift** | **0.082** | **21.9** |
 
-**The grid drift is 13× the entire across-drug spread.** Refining the mesh moves the metric an order
-of magnitude more than changing the drug does. It was not measuring delivery; it was measuring the
-vascular geometry of the section, which is identical for all five drugs.
+On those numbers the grid drift exceeded the entire across-drug spread: refining the mesh moved
+the metric far more than changing the drug did. That is what retired the metric at the time. **It
+is not why the retirement stands today** — the separation argument no longer runs in that
+direction, and what survives is the structural one, that `mean(AUC)/p99(AUC)` is scale-invariant
+by construction and therefore cannot track delivered dose whatever its spread. `delivery_metrics.md`
+§4 makes the same distinction.
 
-The consequence was not cosmetic. Ranked by `penetration_index` the panel comes out
-`cisplatin > lomustine > temozolomide > methotrexate > doxorubicin`. Ranked by the replacement metric
-it comes out `cisplatin > doxorubicin > lomustine > methotrexate > temozolomide` — which is the
-*identical* order the simulated kill fraction produces from an independent computation. The retired
-metric's ranking was noise.
+The consequence was not cosmetic: **the two metrics order the panel differently, and only two of
+the five compounds hold their position between them.** The retired metric's ordering was noise.
+
+The two orderings themselves are NOT printed here. They were, until 2026-09-03, side by side and
+with the replacement's called out as "the *identical* order the simulated kill fraction produces
+from an independent computation" — which reads as a cross-validated ranking, on a page whose job is
+to explain why ranking was retired. Cross-compound ordering was withdrawn on 2026-08-21 and the
+prohibition admits no exemption for evidence. What the argument actually needs is the *disagreement*,
+and the disagreement is the sentence above.
 
 ### The rule, pre-declared
 
@@ -495,16 +514,19 @@ bar and not a rationalisation.
 > point of this section is the pre-declaration, not the answer. **It is no longer the
 > project's position.** Correcting the transvascular delivery law — a **drug-specific**
 > transport parameter rather than the common-mode ones the ranking had previously been
-> stress-tested against — changes the **top-1 GBM pick (cisplatin → vincristine)**, changes
+> stress-tested against — **changes the top-1 GBM pick outright**, changes
 > the top-3 set, swaps 4 of 45 pairs (two across gaps of 40.5 % and 35.6 % of the leader's
-> kill, against a Bernoulli sd of ~0.003), and drops **P(cisplatin rank 1) from 0.9277 to
-> 0.3965** — destroying the same pre-declared bar it had met
+> kill, against a Bernoulli sd of ~0.003), and drops **the leader's probability of holding
+> rank 1 from 0.9277 to 0.3965** — destroying the same pre-declared bar it had met
 > (`results/transvascular_exchange_revalidation.md` §4.1). Independently, a source-geometry
-> change swaps cisplatin↔temozolomide at rank 1 in both raw and dose-matched arms
-> (`results/delivery_source_geometry.md` §5.2). `results/CLAIM_INVENTORY.md` §1g now lists
-> **"the top-1 drug call is not decision-grade"** as a *defensible* claim, and
-> `results/ranking_robustness.md` §8's conclusion stands: *"the reportable output of this
-> pipeline for the top of the panel is a SET, not a winner."*
+> change exchanges the top two of the panel in both raw and dose-matched arms
+> (`results/delivery_source_geometry.md` §5.2) — the pair was named here until 2026-09-03
+> and is not restated, since naming it prints the ordering. `results/CLAIM_INVENTORY.md` §1g
+> lists **"the top-1 drug call is not decision-grade"** as a defensible claim. That is now
+> the weaker of the two available statements: `results/ranking_robustness.md` §8's
+> conclusion — a reportable *set* in place of a winner — was **superseded on 2026-08-21**,
+> when cross-compound ordering was withdrawn outright. There is no reportable top of panel
+> at all, set or winner.
 >
 > **The methodological moral, restated:** a pre-declared bar tells you whether a result
 > cleared it *under the perturbations you swept*. This one swept common-mode perturbations
@@ -561,6 +583,14 @@ Three instances from this project, each a different form of the discipline.
 point estimate went the right way: MKI67-positive in **2.22%** of VIABLE cells against 0.444%
 section-wide — a **5.0× rate ratio**, permutation **p = 0.0078**, surviving depth stratification
 (p = 0.0069).
+
+> **Superseded 2026-09-03 — the case study is intact, the numbers are not.**
+> `results/state_validation.md` has since been regenerated and its §2.3 now rests on **zero
+> positive cells out of zero**: under the shipping `geometric` mask the HYPOXIC band is empty at
+> every Δx, so the contrast has no cells and every statistic above returns `nan`. The
+> methodological point this section makes — that a significant-looking result can be declined on
+> power grounds, from the same table that produced it — is *strengthened*, not weakened, by the
+> regeneration. Take the figures from that file; the ones above are the historical instance.
 
 It was reported as **not to be believed**, for reasons computed in the same table:
 
@@ -795,7 +825,7 @@ The report puts this first, above every scientific finding:
 > effect would have overstated it 35× on the headline metric — this is the single most important
 > methodological point in the report.
 
-### The matched control also validated a *positive* result
+### The matched control also confirmed a *positive* result
 
 The same design confirms which effects are real. Fitted decay length L is scale-invariant, and arms B
 and C — which differ *only* by the 3.36× dose factor — agree on L to within **2.7%**. So the
@@ -847,7 +877,14 @@ conventions and three grid spacings:
 | `occupancy` | 12 | 13.43% | 85.98% | **0.60%** |
 
 **The VIABLE fraction runs 0.60% to 98.19% — a 165× swing — and neither the mask nor the mesh is a
-measurement.** Both are bookkeeping. The report states the consequence: under the current shipping
+measurement.** Both are bookkeeping.
+
+> **Superseded 2026-09-03.** The table above and the 165× are the measurement as it stood.
+> `results/state_validation.md` §2.2 has since been regenerated: the VIABLE fraction now spans
+> from *exactly zero* to about a tenth, so the swing is unbounded rather than 165×, and HYPOXIC is
+> **0.00% in every row** — not 13.43% in one. The section's argument (a bookkeeping choice moves a
+> state fraction more than any physics does) survives the regeneration and is if anything sharper.
+> Quote the current numbers from that file, not from here. The report states the consequence: under the current shipping
 default the HYPOXIC state is *empty at every Δx*, so the hypoxia-resistance multiplier has no cells
 to act on; the 86% quiescent / 13.4% hypoxic split quoted in an earlier results file comes from the
 legacy convention that the reconstruction layer has since abandoned.
@@ -859,8 +896,15 @@ multiplier and it largely cancels; the **levels** are not defensible as measurem
 
 ### 10b. An error of exactly 1/ln²2
 
-The calibration constant α had two live values in the tree: **309.6** and **148.6**. They differ by
-exactly **1/ln²2 = 2.081**.
+The calibration constant α once had two live values in the tree: **309.6** and **148.6**. They
+differ by exactly **1/ln²2 = 2.081**.
+
+**Both are historical, and neither is α today.** This subsection is a case study in a *convention*
+error, and the two numbers are kept only because the exact factor between them is the point. α is a
+closed-form solve that scales with the compiled `D_eff`, and the two-route promotion changed
+`D_eff`, so the corrected-convention value has since moved too. Until 2026-09-03 the second half of
+this subsection presented 148.6 as the current value. Get α from
+`tmesim.validation.calibration.calibrate_alpha()`, never from this page.
 
 The cause: published perivascular immunofluorescence studies report `d_½`, the distance at which
 intensity falls to half. The model's `L` is the 1/e distance. For `C(x) = C₀e^{−x/L}`,
@@ -873,11 +917,11 @@ Two properties make this instructive:
 - **The error is exact and derivable.** An unexplained factor of 2.081 between two computations of
   the same constant is a convention error, not noise. Discrepancies with clean closed forms should be
   chased to their algebra, not averaged.
-- **The old value passed its own out-of-sample test.** With α = 309.6, mitoxantrone's predicted
-  L = 33.4 µm was compared against a 25–75 µm band — a band of *raw half-distances*. Both sides of
-  the comparison used the wrong convention, which is why it passed. With α = 148.6, mitoxantrone
-  (48 µm) and chemically distinct topotecan (84 µm) both land inside the correctly converted 36–108 µm
-  band, 2/2. **A consistently-applied wrong convention validates itself.** The fix is now pinned by
+- **The old value passed its own out-of-sample test.** Under the raw-half-distance convention,
+  mitoxantrone's predicted L = 33.4 µm was compared against a 25–75 µm band — a band of *raw
+  half-distances*. Both sides of the comparison used the wrong convention, which is why it passed.
+  Under the corrected e-fold convention, mitoxantrone (48 µm) and chemically distinct topotecan
+  (84 µm) both land inside the correctly converted 36–108 µm band, 2/2. **A consistently-applied wrong convention validates itself.** The fix is now pinned by
   `test_calibrate_alpha_target_is_an_efold_length`.
 
 ### 10c. Results files going stale against a changing codebase
@@ -1108,8 +1152,12 @@ the three**:
    zero over 97.5% of the tissue, far-field exposure moves only **1.12×** (25.99% → 23.18% of
    perivascular). The reason is arithmetic: reaction–diffusion length is 73–296 µm and the diffusion
    length over the 6 h window is ~4,000 µm, against a median intervessel gap of 40 µm — one to two
-   orders of magnitude larger. No tumour cell in any arm receives zero drug; the essentially-zero
-   fraction is 0.11–0.17% in every arm. The floor is a property of the tissue, not of the smoothing.
+   orders of magnitude larger. The essentially-zero fraction is 0.11–0.17% in every arm.
+   **Corrected 2026-09-03:** this sentence also asserted that *no* tumour cell in any arm receives
+   zero drug. `results/vessel_network_impact.md` has a separate **"exactly zero"** column beside the
+   essentially-zero one, and it is not empty — 0.07–0.15% of cells in every arm. The quantitative
+   point (the floor is tissue physics, not smoothing) is unaffected; the absolute "no cell" was not
+   the column being read. The floor is a property of the tissue, not of the smoothing.
 2. **"Penetration length cannot discriminate drugs" was stale**, and the cause was defect #7 (the
    tissue mask), not the vasculature. Demonstrated without running a solve, by refitting the source
    null under the retired mask: 23.68 µm, matching the published 23.7 µm to three significant figures.
@@ -1155,9 +1203,13 @@ that one weighting scheme finds a trend."
 - It cannot manufacture **data**. The pass established that no open dataset anywhere pairs measured
   spatial drug distribution with measured treatment response in the same tumour. The response axis of
   this model is not validatable with open data, and no amount of methodology changes that.
-- Verifying a component does not validate it. Mass conserved to 4e-14, unconditionally stable,
-  dt-converged and grid-converged — all true of the oxygen solve, and all compatible with predicting
-  the measured marker only weakly (ρ ≈ 0.15, within-section). It out-predicts a kd-tree query, but
+- Verifying a component does not validate it. The solver is unconditionally stable, dt-converged and
+  grid-converged, and the oxygen solve still predicts the measured marker only weakly (ρ ≈ 0.15,
+  within-section). **Corrected 2026-09-03:** the "mass conserved to 4e-14" figure was attributed here
+  to the oxygen solve. `results/numerical_rigor.md:67` attributes it to the **drug-transport**
+  operator — total drug mass on the real irregular mask, at the round-off floor. The argument is
+  unchanged and arguably stronger with the right subject: the transport operator is exactly
+  conservative by construction, and that buys nothing about whether its inputs are right. It out-predicts a kd-tree query, but
   winning a contest between weak predictors is not validation either.
 - **It cannot catch a claim the arithmetic never made.** Defect #11 was a hand-written sentence that
   inverted a comparison the code beside it computed correctly. No invariance check, convergence

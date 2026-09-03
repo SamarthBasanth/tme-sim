@@ -144,7 +144,27 @@ def _working_copy(micro: Microenvironment) -> Microenvironment:
 
 def _resolve_drug(cfg: SimConfig) -> DrugParams:
     """Resolve the drug to simulate from ``cfg.drug`` (a :class:`DrugParams` or a
-    library name string)."""
+    library name string).
+
+    THE TWO BRANCHES ARE NOT EQUIVALENT, AND THE STRING ONE IS THE OLD PHYSICS.
+
+    Passing a :class:`DrugParams` uses whatever the caller compiled — which for
+    every Studio run is ``calibrated_drugparams(name, alpha)`` at that run's own
+    alpha, with the two-route cell term applied. Passing a NAME reaches
+    ``core.config.DRUG_LIBRARY``, whose entries are snapshots frozen BEFORE the
+    two-route promotion. Measured 2026-09-03: the frozen diffusivities differ
+    from a live compile by ratios from 0.15x to 0.92x, per compound, because
+    the two-route term keys on logP and HBD count.
+
+    So a caller who passes ``"methotrexate-like"`` gets a diffusivity roughly
+    6.5x the value the same compound would be given today, silently and with no
+    error. That is a real trap and it is why this is documented here rather
+    than only at the table.
+
+    ``tests/test_core.py::TestFrozenLibraryIsNotTheLivePhysics`` pins the
+    divergence so it cannot be quietly reconciled, or quietly widened, without
+    someone reading this note.
+    """
     drug = cfg.drug
     if isinstance(drug, str):
         return get_drug(drug)

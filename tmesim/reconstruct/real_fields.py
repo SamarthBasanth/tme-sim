@@ -127,10 +127,19 @@ def _kde_on_grid(
 #:
 #: * **alpha does not need re-fitting.** ``validation.calibration.calibrate_alpha``
 #:   is a closed-form solve on the compiled drug plus the published anchor; no
-#:   vascular field enters it. It returns 148.608... under either mode, and
+#:   vascular field enters it. It returns THE SAME VALUE under either mode --
+#:   that mode-invariance is the finding, and it still holds -- and
 #:   ``validation.pk_multidrug.run()`` is byte-identical. Forcing an *empirical*
 #:   section-scale re-fit instead BREAKS the out-of-sample check under BOTH
-#:   fields, so 148.6 stands.
+#:   fields, so the closed-form solve stands.
+#:
+#:   THE NUMBER IS NOT REPEATED HERE. This comment said "returns 148.608...
+#:   under either mode" and "so 148.6 stands"; ``calibrate_alpha()`` returns
+#:   22.223477711172563 today, so a reader checking the claim found the text
+#:   wrong and had no way to tell whether the FINDING had also moved. It had
+#:   not. A second copy of a value is a promise to update two places, and this
+#:   file broke it -- call ``calibrate_alpha()``, which is the one place that
+#:   is right by construction.
 #: * **grid convergence holds.** Coverage @1x IC50, mean tumour AUC and kill are
 #:   converged for the discrete source by dx = 12 um (dx 8 -> 6 changes 0.0010
 #:   abs / 0.18% / 0.0002 abs), and the source's own area fraction is ~4x MORE

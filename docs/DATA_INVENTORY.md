@@ -1,18 +1,39 @@
 # DATA_INVENTORY — the backup record for `data_cache/`
 
-`data_cache/` is **gitignored**. It holds **6.1 GB** of real open data that nothing
-in this repository can regenerate from source code. **This file is the backup
-record**: if `data_cache/` is deleted, everything below must be re-downloadable
-from what is written here.
+`data_cache/` is **gitignored with nine deliberate exceptions**, and holds **3.9 GB**
+of real open data that nothing in this repository can regenerate from source code.
+**This file is the backup record**: if `data_cache/` is deleted, everything below must
+be re-downloadable from what is written here.
 
-Scope: every dataset on disk, with its path, source/accession, licence, size, what
+> **Re-measured 2026-09-03.** This line said 6.1 GB and said the directory was
+> gitignored without qualification. Both were wrong. `du -sh data_cache` → **3.9G**.
+> `git ls-files data_cache` → **9 tracked files**: the `brain_slice/` and
+> `pruijn2008/` provenance notes and CSVs, which are small, hand-curated and
+> deliberately versioned. Every size in this file is a measurement with a date, not a
+> constant — re-measure before quoting one.
+
+Scope: the datasets recorded below, with path, source/accession, licence, size, what
 it enables, and **whether it is reproducible via `python -m tmesim.cli acquire` or
 needs a manual/scripted fetch**.
 
+> **This is NOT "every dataset on disk", which is what this line claimed until
+> 2026-09-03.** Checked by listing `data_cache/` and grepping each entry against this
+> file: **9 top-level entries are not named here at all** — `gbmspace_visium`,
+> `greenwald_gbm_visium`, `gse324268_xenium`, `xenium_breast_janesick`,
+> `gdsc_breast_dose_response.csv` and four `*_runs.json` caches. The most serious is
+> **`xenium_breast_janesick`**, which `tmesim/validation/scorecard.py:2686` declares a
+> hard `needs=`, so an anchor cannot run without it — and this backup record carries no
+> URL, no size and no recipe for it. **If `data_cache/` were deleted today, this file
+> would not be enough to rebuild it.** Re-run that listing before trusting the coverage.
+
 | Tier | Path | Size | Needed for |
 |---|---|---:|---|
-| **A — core pipeline** | `data_cache/*` (excluding `hunt/`) | **~0.9 GB** | Everything. Without it no reconstruction, no simulation, no internal validation runs. |
-| **B — external validation corpus** | `data_cache/hunt/` | **5.3 GB**, 38 dirs, ~1,950 files | The audit-era external validations (`glioma_regional_pk`, `gist_imatinib`, `moncayo_explant`, `gbm_tmz_exvivo`) and the landscape survey in `results/DATA_HUNT.md`. |
+| **A — core pipeline** | `data_cache/*` (excluding `hunt/`) | **3.6 GiB** (3.87 GB decimal), i.e. nearly all of it | Everything. Without it no reconstruction, no simulation, no internal validation runs. |
+| **B — external validation corpus** | `data_cache/hunt/` | **360 MB**, 24 top-level dirs, 1,217 files | The audit-era external validations (`glioma_regional_pk`, `gist_imatinib`, `moncayo_explant`, `gbm_tmz_exvivo`) and the landscape survey in `results/DATA_HUNT.md`. |
+
+> **Both rows re-measured 2026-09-03** (`du -sh`, `find … -type d/-type f`). Tier A was
+> given as ~0.9 GB and Tier B as 5.3 GB / 38 dirs / ~1,950 files. The two were close to
+> **inverted**: the bulk is in Tier A, not in the hunt corpus.
 
 Three acquisition classes are used throughout:
 
@@ -30,7 +51,10 @@ Everything here is **open**: no login, no DUA, no MTA. Per-dataset narrative
 provenance (what was deliberately *not* downloaded, byte counts, sha256 prefixes)
 is in [`real_data/`](real_data/).
 
-## A1. `data_cache/xenium_gbm/` — 30 MB — **MANUAL** — *the primary tissue*
+## A1. `data_cache/xenium_gbm/` — 30 MB — **AUTO** — *the primary tissue*
+
+> Re-checked 2026-09-03: `SECTION_RECIPES['xenium_319']['mode']` is `auto`, so
+> `vivum acquire` fetches this section. This heading said **MANUAL**.
 
 | | |
 |---|---|
@@ -53,7 +77,10 @@ curl -L -o data_cache/xenium_gbm/Xenium_GBM_gene_panel.json            "${BASE}_
 The loader extracts `cell_feature_matrix.tar.gz` on first use into
 `cell_feature_matrix/{matrix.mtx.gz,features.tsv.gz,barcodes.tsv.gz}`.
 
-## A2. `data_cache/xenium_gbm_io/` — 536 MB — **MANUAL** — *the deep panel*
+## A2. `data_cache/xenium_gbm_io/` — 536 MB — **AUTO** — *the deep panel*
+
+> Re-checked 2026-09-03: `SECTION_RECIPES['xenium_io']['mode']` is `auto`
+> (reachable via `vivum acquire --sections all`). This heading said **MANUAL**.
 
 | | |
 |---|---|
@@ -125,7 +152,14 @@ curl -L -o data_cache/scref_gbm/GSE84465_series_matrix.txt.gz \
   https://ftp.ncbi.nlm.nih.gov/geo/series/GSE84nnn/GSE84465/matrix/GSE84465_series_matrix.txt.gz #    145,533 B
 ```
 
-## A5. `data_cache/ivy_gap/` + `data_cache/ivygap/` — 36 MB + 89 MB — **AUTO (+ unzip) / MANUAL**
+## A5. `data_cache/ivy_gap/` — 36 MB on disk; `data_cache/ivygap/` **ABSENT** — **AUTO (+ unzip) / MANUAL**
+
+> Re-measured 2026-09-03. `data_cache/ivy_gap/` is 36 MB and holds the **unextracted**
+> `gene_expression_matrix.zip`. `data_cache/ivygap/` — the ~89 MB extracted tree the
+> loader actually reads — **does not exist**, so `load_structures()` raises
+> `FileNotFoundError` today. The unzip step in this section has not been run on this
+> machine. See [`real_data/ivygap.md`](real_data/ivygap.md), which now carries the same
+> status and the list of which files the zip does and does not contain.
 
 | | |
 |---|---|
@@ -195,7 +229,7 @@ supplements; see `real_data/drug_response.md` for the article DOIs.
 |---|---|
 | **Dataset** | **TCGA-GBM** via the GDC REST API |
 | **Licence** | Open tier, no dbGaP needed for these endpoints |
-| **Contents** | 80 clinical cases; 8 open STAR gene-count files + `manifest.json` |
+| **Contents** | 80 clinical cases; **7** open STAR gene-count files + `manifest.json` (counted 2026-09-03; this said 8, which was the directory entry count including the manifest) |
 | **Enables** | Cohort context only. **No current validation module depends on it** — it is background, not load-bearing. |
 | **Source** | `https://api.gdc.cancer.gov/{cases,files,data}` |
 
@@ -213,7 +247,11 @@ sets the single calibration constant α is **Primeau 2005, PMID 16361566**
 
 # TIER B — `data_cache/hunt/` — the external-validation corpus
 
-**5.3 GB, 38 directories, ~1,950 files.** Produced by
+**360 MB, 24 top-level directories, 1,217 files** — re-measured 2026-09-03; this read
+5.3 GB / 38 directories / ~1,950 files, and the corpus on disk is roughly **15× smaller**
+than that. Treat the per-dataset entries below as a record of what the hunt *retrieved*,
+not as a manifest of what is on disk today: files listed here may have been pruned since,
+and at least one named below has. Produced by
 `experiments/data_hunt_workflow.js`: **28 hunter angles** (one directory each) +
 **10 independent verification agents** (`verified_0` … `verified_9`) + a synthesis
 pass → [`../results/DATA_HUNT.md`](../results/DATA_HUNT.md), which surveyed
@@ -396,7 +434,10 @@ re-obtained if a future validation needs it.
 | `clinical_trial_open/` | 2.9 MB | **Catalogues, not data**: Vivli glioblastoma DataCite DOIs, CSDR sponsor study index, NCI Project Data Sphere CNS metadata (all `"downloadable": false`), PDS access PDF | **[ON DISK]** e.g. DOI `10.25934/pr00011517.0`; requests via `https://vivli.org` | gated |
 | `radiopharm_pet/` | 1.7 MB | **ACRIN-6684** ¹⁸F-FMISO hypoxia PET in GBM: 31 SDTM clinical CSVs + `acrin6684_fmiso_pet_vs_outcome.csv` (38 patients, `SUVmean_tumor … days_to_death`) | **[ON DISK]** dbGaP **`phs004225`**; GDC/CRDC GUIDs `dg.4DFC/<uuid>` → `https://nci-crdc.datacommons.io/ga4gh/drs/v1/objects/dg.4DFC/<uuid>`. **[HUNT]** `https://www.cancerimagingarchive.net/collection/acrin-fmiso-brain/` | SCRIPTED |
 
-## B6. `verified_0` … `verified_9` — 371 MB total
+## B6. `verified_0` … `verified_9` — 69 MB total
+
+> Re-measured 2026-09-03 (`du -sch data_cache/hunt/verified_*`). This heading said
+> 371 MB.
 
 Independent re-download caches from the 10 verification agents. Two of them
 **falsified** hunter claims, and those falsifications are load-bearing.
@@ -438,7 +479,11 @@ Read this before relying on Tier B.
    not data), `organ_on_chip/dryad_README.md` (auth-error blob),
    `organ_on_chip/dryad_data.zip` and `dryad_organoid_array.zip` (56 bytes each),
    `cgga_clinical/__MACOSX/` (junk).
-4. **~716 MB of the 5.3 GB is duplicated.** `GSE148842_RAW.tar` (358 MB) exists
+4. **Duplication was the largest single waste when this was written, and it is gone.**
+   Re-checked 2026-09-03: `GSE148842_RAW.tar` is **no longer anywhere under
+   `data_cache/`**, so the ~716 MB figure below and the total it was a fraction of are
+   both historical. The list is kept as the record of what to avoid re-downloading.
+   `GSE148842_RAW.tar` (358 MB) existed
    twice (`sc_drug_perturb/`, `slice_organotypic/`); `GSE148842/*.cts.txt.gz` three
    times; `NIR_wt943_2.xlsb` three times; the Zenodo 5776125 and 5795371 sets twice;
    LUMIERE/UPENN clinical CSVs twice; `zenodo_figshare/gbm_pd1_geomx_z16839828/`

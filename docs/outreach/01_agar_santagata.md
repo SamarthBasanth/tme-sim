@@ -93,8 +93,7 @@ length is still 2–5× the published value because its consumption term has nev
 What survives is the delivery axis, and it is scored: against 125 human glioma
 tissue samples across 42 patients plus 27 PMID-anchored regional PK measurements, predicted
 tumour:plasma partition lands within about a **2× geometric-mean fold error**, 6/6 drugs inside
-10×, with the BBB-penetrant vs BBB-excluded separation reproduced from molecular structure alone
-(3.65× predicted, 4.66× measured). To be exact about what that scores: it is a **structure-only
+10×, each compound scored against its own measured value. To be exact about what that scores: it is a **structure-only
 permeability coefficient**, and those rows never invoke the transport solver. Of the checks that
 do compare a solved field to an external measurement there are three, and all three fail. I would
 not want "the delivery axis is scored" read as "the concentration field is validated." One

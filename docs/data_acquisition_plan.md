@@ -1,5 +1,28 @@
 # Data Acquisition Plan — real glioblastoma data for `tmesim`
 
+> # ⚠ SUPERSEDED — DO NOT FOLLOW THIS DOCUMENT
+>
+> **Checked 2026-09-03. This page describes a pipeline that no longer exists, and it
+> was the only stale file in `docs/` carrying no banner saying so.**
+>
+> * **`tmesim/data/loaders.py` does not exist**, and neither does the
+>   `load_real_cohort()` it documents in §B. `grep -rn "load_real_cohort"` over the
+>   tree returns no definition — only this file and `ARCHITECTURE_CONTRACT.md`
+>   referring to one.
+> * Their **absence is now a pass condition**, not a gap.
+>   `scripts/reproduce_real.sh:176-180` fails the harness outright if
+>   `tmesim/data/loaders.py` or `tmesim/data/synthetic.py` reappears on the import
+>   path, and prints `synthetic modules absent … OK` when they do not.
+> * The **synthetic 2-D layout** in §B is part of what that check exists to keep out.
+> * The controlled-access section (§C) is superseded by
+>   [`DATA_ACCESS_PLAN.md`](DATA_ACCESS_PLAN.md) §6–§7, which re-checked these routes
+>   and found several of them do not hold the data assumed here.
+>
+> **Read [`REAL_BUILD_PLAN.md`](REAL_BUILD_PLAN.md) and
+> [`DATA_ACCESS_PLAN.md`](DATA_ACCESS_PLAN.md) instead.** This file is kept as the
+> record of what was planned in July 2026 and what replaced it — the §A source table
+> is still a useful account of which GDC/GDSC endpoints were reachable on that date.
+
 *Last verified live: 2026-07-25 (GDC Data Release 45.0; GDSC release 8.5).*
 
 This document records (A) what the open-tier live acquisition in
