@@ -49,7 +49,8 @@ cold Render instance is four chances to look broken.
   "sections_available": int,          // how many sections this server can run
   "drugs_available": int,
   "totals": {"projects": int, "runs": int, "specimens": int},
-  "server": {"contract": "v1", "stub": false}
+  "server": {"contract": "v1", "stub": false,
+             "storage": {"persistent": false, "detail": "..."}}
 }
 ```
 
@@ -217,3 +218,41 @@ for this whole contract.
   page must not imply otherwise — no avatars, no "your" projects, no owner
   column.
 * Deleting or rewriting anything in `results/` or `archive/`.
+
+---
+
+## AMENDMENT — 2026-09-20: `server.storage`
+
+Additive, optional, and the only change to this contract since it was frozen.
+Recorded here rather than left to drift: a frozen document that no longer
+describes the payload is the defect this project keeps finding, and freezing
+was meant to stop parallel agents colliding, not to stop the document being
+true.
+
+`GET /api/workspace`'s `server` object carries a third key:
+
+```json
+"storage": { "persistent": false, "detail": "<one sentence>" }
+```
+
+**Why it is in the boot payload and not on a route of its own.** When
+`persistent` is `false`, the home page must say so in the SAME render that
+invites the user to create a project. A second round trip would show the
+invitation first, and being told afterwards is not being told.
+
+**What it means.** `persistent: true` says only that the operator pointed the
+stores at a configured state directory (`TMESIM_STATE_DIR`). It is a statement
+about WHERE work is written, never a promise that the storage behind it is
+backed up or replicated — an overstated assurance about someone's data is worse
+than none.
+
+**Why it exists.** Measured on the live deployment 2026-09-20: the variable was
+unset, `/api/health` reported `runs_dir: /app/app/runs`, and that host
+auto-deploys on every push. A visitor could create a project, register a
+specimen, run a simulation, and lose all of it having been told nothing. It was
+not hypothetical — a completed run on the live service was destroyed by the
+very next deploy, and the run counter restarted at `r_00001`.
+
+**Compatibility.** A client that does not read the key behaves exactly as
+before, which is §8's bar. Consumers must treat it as optional: absent means an
+older server, and absence must never be rendered as `persistent: true`.

@@ -239,6 +239,36 @@ function banner(kind, title, chip, bodyNodes, footNodes) {
     footNodes && footNodes.length ? h('div.hb-foot', footNodes) : null);
 }
 
+/** This server writes into a container filesystem, so the work a visitor is
+ *  about to do will not survive its next deploy.
+ *
+ *  MEASURED ON THE LIVE DEPLOYMENT 2026-09-20: `TMESIM_STATE_DIR` was unset,
+ *  so `/api/health` reported `runs_dir: /app/app/runs`. That host auto-deploys
+ *  on every push. A visitor could create a project, register a specimen, run a
+ *  simulation and lose all of it, having been told nothing.
+ *
+ *  The repo already refuses to persist silently into a directory that will be
+ *  thrown away (app/server/cache.py::state_dir_problem) and already argues that
+ *  "a workspace that forgets is worse than no workspace". Both of those speak
+ *  to the OPERATOR, who reads logs. This speaks to the USER, who does not.
+ *
+ *  `warn`, not `crit`: nothing is broken and everything on the page is real.
+ *  Rendering it as an error would train people to ignore the red ones. */
+function ephemeralStorageBanner(detail) {
+  return banner('warn', 'Work on this server is not kept', null,
+    [
+      h('p', 'Projects and runs you create here are written inside the '
+        + 'container this server runs in, and are ', h('b', 'destroyed on its '
+        + 'next restart or deploy'), '. Everything on this page is real — it '
+        + 'is simply not being saved anywhere durable.'),
+      h('p', 'Nothing here is wrong, and the simulator is fully working. Treat '
+        + 'this deployment as a place to try the product rather than to keep '
+        + 'work you care about.'),
+      detail ? h('p.mono.small', detail) : null,
+    ],
+    [studioBtn('Open the Studio anyway')]);
+}
+
 function retryBtn() {
   return h('button.btn.primary', { type: 'button', onclick: () => location.reload() },
     'Try again');
@@ -663,6 +693,15 @@ function render(res) {
   if (clientStub) banners.push(stubBanner());
   else if (serverStub) banners.push(serverStubBanner());
   if (server.contract && server.contract !== 'v1') banners.push(contractBanner(server.contract));
+  // AFTER the stub/contract banners and BEFORE the grid renders, so the
+  // warning is on screen in the same paint as the invitation to create a
+  // project. A user must not be asked to invest in a workspace and told
+  // afterwards that it forgets.
+  const storage = (server.storage && typeof server.storage === 'object')
+    ? server.storage : null;
+  if (storage && storage.persistent === false) {
+    banners.push(ephemeralStorageBanner(storage.detail));
+  }
 
   if (banners.length) fill(statusHost, banners);
   else clear(statusHost);

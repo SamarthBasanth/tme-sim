@@ -307,6 +307,53 @@ def state_dir_problem() -> Optional[str]:
     return None
 
 
+def storage_disclosure() -> dict:
+    """Whether work written to this server survives a redeploy, and why.
+
+    THE PRODUCT SHOULD NOT LET A USER BELIEVE SOMETHING FALSE ABOUT ITS OWN
+    STORAGE. Measured on the live deployment 2026-09-20: ``TMESIM_STATE_DIR``
+    was unset, so ``runs_dir()`` and ``projects_dir()`` resolved under
+    ``/app/app`` -- a container filesystem discarded on every deploy, and the
+    service auto-deploys on every push. A visitor could create a project, add
+    specimens, run simulations, and lose all of it without ever being told that
+    was possible.
+
+    The repo already argues the principle in two places -- ``runs_dir``'s own
+    docstring ("a workspace that forgets is worse than no workspace, because it
+    invites the investment and then loses it") and the refusal in
+    :func:`state_dir_problem`, which declines to start rather than persist
+    silently into a directory that will be thrown away. Both protect the
+    OPERATOR, who reads logs. This one is for the USER, who does not.
+
+    It is deliberately a statement about CONFIGURATION, not durability. A
+    configured state directory says the operator pointed the stores somewhere
+    they chose; it cannot promise that place is backed up, replicated, or
+    itself surviving. The wording says exactly that much and no more, because
+    an overstated assurance about someone's data is worse than none.
+    """
+    root = state_dir()
+    if root:
+        return {
+            "persistent": True,
+            "detail": (
+                "This server keeps projects and runs in a configured state "
+                "directory, so they survive a restart or a redeploy. That is "
+                "a statement about where they are written, not a promise that "
+                "the storage behind it is backed up."
+            ),
+        }
+    return {
+        "persistent": False,
+        "detail": (
+            "This server has no configured state directory, so projects and "
+            "runs are written inside the container and are DESTROYED on the "
+            "next restart or deploy. Treat it as a place to try the product, "
+            "not to keep work. The operator can fix this by setting "
+            "TMESIM_STATE_DIR to a mounted disk."
+        ),
+    }
+
+
 def runs_dir() -> str:
     """Absolute path to the run store (created on demand).
 

@@ -428,6 +428,60 @@ class TestTheHomePageActuallyBoots:
         pg.wait_for_timeout(1200)
         return p, browser, pg, errors
 
+    def _storage_body(self, persistent):
+        return {
+            "projects": [], "recent_runs": [], "sections_available": 3,
+            "drugs_available": 12,
+            "totals": {"projects": 0, "runs": 0, "specimens": 0},
+            "server": {"contract": "v1", "stub": False,
+                       "storage": {"persistent": persistent,
+                                   "detail": "probe detail sentence"}},
+        }
+
+    def test_an_ephemeral_server_warns_before_inviting_the_work(
+            self, home_server):
+        """MEASURED ON THE LIVE DEPLOYMENT 2026-09-20: TMESIM_STATE_DIR was
+        unset, /api/health reported runs_dir=/app/app/runs, and that host
+        auto-deploys on every push. A visitor could create a project, register
+        a specimen, run a simulation, and lose all of it having been told
+        nothing.
+
+        The warning has to be in the SAME paint as the invitation to create a
+        project. Being told afterwards is not being told.
+        """
+        p, browser, pg, errors = self._open(
+            home_server, route=self._storage_body(False))
+        try:
+            body = pg.inner_text("body")
+            assert "not kept" in body, (
+                "an ephemeral server rendered no storage warning; the page "
+                "invites a user to create a project and never says the work "
+                "is destroyed on the next deploy.\n" + body[:400])
+            assert "destroyed on its next restart or deploy" in body, body[:400]
+            # Same paint as the invitation, not after it.
+            assert "New project" in body, (
+                "the invitation is missing, so this test cannot show the "
+                "warning arrives with it")
+            assert not errors, errors[:2]
+        finally:
+            browser.close()
+            p.stop()
+
+    def test_a_persistent_server_says_nothing(self, home_server):
+        """The warning must be a statement about THIS server, not decoration.
+        A banner that renders either way tells a user nothing."""
+        p, browser, pg, errors = self._open(
+            home_server, route=self._storage_body(True))
+        try:
+            body = pg.inner_text("body")
+            assert "not kept" not in body, (
+                "a server that DOES keep work still warned that it does not:\n"
+                + body[:400])
+            assert not errors, errors[:2]
+        finally:
+            browser.close()
+            p.stop()
+
     def test_boot_raises_nothing(self, home_server):
         """The outage was an uncaught throw. Nothing else needs to be true for
         this to be worth asserting."""

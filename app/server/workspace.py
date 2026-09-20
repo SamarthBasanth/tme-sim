@@ -105,6 +105,7 @@ from fastapi import APIRouter, Request
 from .cache import (
     all_sections,
     log_internal,
+    storage_disclosure,
     # The availability half of ``describe_section``'s dispatch. Imported
     # rather than reimplemented so the RULE has one home; see the module
     # docstring for the drift guard that keeps this honest.
@@ -495,7 +496,12 @@ def workspace_payload(jobs, store) -> Dict:
         # that came FROM the server is by construction not stub data, so this
         # is false here and true only in the mock. The field exists so the home
         # page reads one key regardless of which of the two answered it.
-        "server": {"contract": WORKSPACE_CONTRACT_VERSION, "stub": False},
+        # `storage` travels in the boot payload rather than on a route of its
+        # own because the home page must be able to say "this will not be
+        # kept" in the same render that invites the user to create a project.
+        # A second round trip would show the invitation first.
+        "server": {"contract": WORKSPACE_CONTRACT_VERSION, "stub": False,
+                   "storage": storage_disclosure()},
     }
 
 

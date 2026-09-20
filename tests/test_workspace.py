@@ -163,7 +163,17 @@ def test_empty_workspace_renders_rather_than_500(runs_root, store):
     assert out["projects"] == []
     assert out["recent_runs"] == []
     assert out["totals"] == {"projects": 0, "runs": 0, "specimens": 0}
-    assert out["server"] == {"contract": "v1", "stub": False}
+    # The contract's two keys, pinned exactly as sec. 5 declares them.
+    assert out["server"]["contract"] == "v1"
+    assert out["server"]["stub"] is False
+    # Plus the additive disclosure (contract amendment 2026-09-20). Asserted
+    # rather than tolerated: a field the page uses to tell a user their work
+    # will be destroyed must not be able to go missing silently.
+    storage = out["server"]["storage"]
+    assert set(storage) == {"persistent", "detail"}
+    assert isinstance(storage["persistent"], bool)
+    assert storage["detail"] and isinstance(storage["detail"], str)
+    assert set(out["server"]) == {"contract", "stub", "storage"}
     # Counts are ints even when they are zero -- `null` here would make the
     # home page render "sections available: null".
     assert isinstance(out["sections_available"], int)
