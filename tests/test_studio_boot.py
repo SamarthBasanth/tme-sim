@@ -155,3 +155,61 @@ class TestTheRouteBackIsNotConditionalOnTheUrl:
         finally:
             browser.close()
             p.stop()
+
+
+class TestRestoreDoesNotDuplicateARun:
+    """`_restore` reads each run's id from INSIDE its result.json, not from the
+    directory name, so two directories can declare the same run_id — a copied
+    run directory, a restored backup, a hand-edited document.
+
+    `_jobs` is a dict and de-duplicated silently. `_order` was a list and did
+    not, and `list()` maps `_order` back through `_jobs`, so it returned THE
+    SAME Job OBJECT TWICE.
+
+    Found 2026-09-20 while checking whether cross_section.py's `n_runs` could
+    over-count the way workspace.py's did. It could not — but a list-based
+    accumulator downstream reported 2 runs for a compound holding 1, so every
+    consumer was quietly compensating for this.
+    """
+
+    def test_two_directories_with_one_id_yield_one_job(self, tmp_path):
+        from app.server.jobs import JobManager
+
+        root = tmp_path / "runs"
+        root.mkdir()
+        for d in ("r_00001", "r_00002"):
+            rd = root / d
+            rd.mkdir()
+            (rd / "result.json").write_text(json.dumps({
+                # BOTH declare r_00001 — the collision this guards.
+                "run_id": "r_00001",
+                "status": "done",
+                "spec": {"section": "xenium_319", "drug": "temozolomide"},
+            }))
+
+        mgr = JobManager(str(root))
+        listed = mgr.list()
+        ids = [j.run_id for j in listed]
+        assert ids.count("r_00001") == 1, (
+            "JobManager.list() returned the same run more than once: "
+            f"{ids}. Every downstream count that trusts this list is then "
+            "wrong, and only consumers that happen to de-duplicate are safe.")
+        assert len({id(j) for j in listed}) == len(listed), (
+            "the same Job object appears twice in list()")
+
+    def test_an_ordinary_pair_of_runs_is_untouched(self, tmp_path):
+        """The de-duplication must not lose a genuinely distinct run."""
+        from app.server.jobs import JobManager
+
+        root = tmp_path / "runs"
+        root.mkdir()
+        for d in ("r_00001", "r_00002"):
+            rd = root / d
+            rd.mkdir()
+            (rd / "result.json").write_text(json.dumps({
+                "run_id": d, "status": "done",
+                "spec": {"section": "xenium_319", "drug": "temozolomide"},
+            }))
+
+        ids = sorted(j.run_id for j in JobManager(str(root)).list())
+        assert ids == ["r_00001", "r_00002"], ids

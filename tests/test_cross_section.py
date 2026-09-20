@@ -726,12 +726,44 @@ class TestNRunsIsNotTheWorkspaceOvercount:
     def test_a_run_seen_twice_is_counted_once(self):
         """The ``set`` is load-bearing and must survive a "simplification".
 
-        ``JobManager.list()`` is ``[self._jobs[i] for i in
-        reversed(self._order)]`` and ``_restore`` appends to ``_order`` using
-        the ``run_id`` written INSIDE each ``result.json``. Two run directories
-        declaring the same id therefore hand the SAME ``Job`` back twice. Built
-        here on a REAL ``JobManager`` rather than a fake, because the claim is
-        about that class's restore path and a fake would only restate it.
+        HOW THIS TEST GOT ITS DUPLICATE, AND WHY IT NO LONGER DOES.
+        It originally built one on a REAL ``JobManager``: ``_restore`` reads
+        each run's id from INSIDE its ``result.json`` rather than from the
+        directory name, so two directories declaring the same id appended that
+        id to ``_order`` twice and ``list()`` handed the same ``Job`` back
+        twice. It asserted that premise explicitly -- "if list() did not
+        actually yield the run twice, this test proves nothing" -- and that
+        assertion is what caught the change: ``_restore`` now de-duplicates
+        (``app/server/jobs.py``), so the upstream defect is closed and the
+        premise is gone.
+
+        The duplicate is therefore constructed HERE, where
+        ``available_compounds`` actually sees it, instead of being borrowed
+        from a bug in another module. That is the better shape anyway: this
+        function's contract is that it counts distinct run ids WHATEVER it is
+        handed, and a test that could only produce a duplicate via one
+        particular upstream fault was testing that fault as much as this set.
+        """
+        run = make_run("r_00001", "sec_a", drug="temozolomide")
+        # The same run object, twice — exactly what a caller with any
+        # duplicate-yielding source hands in.
+        jobs = FakeJobs([run, run])
+        assert [j.result_view()["run_id"]
+                for j in jobs.list()] == ["r_00001", "r_00001"], (
+            "the duplicate was not constructed; this test would prove nothing")
+
+        (row,) = xs.available_compounds(jobs)["compounds"]
+        assert row["n_runs"] == 1, (
+            "n_runs counted one run twice -- the accumulator stopped being a "
+            "set of ids")
+        assert row["n_sections"] == 1
+
+    def test_the_upstream_duplicate_source_is_closed(self):
+        """The defect this test used to borrow its duplicate from.
+
+        Kept as a regression: ``_restore`` must not re-admit a run id it has
+        already loaded, or every consumer that trusts ``JobManager.list()``
+        silently over-counts again.
         """
         import json
         import tempfile
@@ -750,17 +782,10 @@ class TestNRunsIsNotTheWorkspaceOvercount:
                                "metrics": {"kill_fraction": 0.1}}, fh)
             manager = JobManager(root=runs, start_worker=False)
             try:
-                listed = manager.list()
-                # The premise, checked rather than assumed: if list() did not
-                # actually yield the run twice, this test proves nothing.
-                assert [j.run_id for j in listed] == ["r_00001", "r_00001"], \
-                    f"the duplicate was not constructed: {[j.run_id for j in listed]}"
-
-                (row,) = xs.available_compounds(manager)["compounds"]
-                assert row["n_runs"] == 1, (
-                    "n_runs counted one run twice -- the accumulator stopped "
-                    "being a set of ids")
-                assert row["n_sections"] == 1
+                ids = [j.run_id for j in manager.list()]
+                assert ids == ["r_00001"], (
+                    "JobManager.list() returned the same run more than once: "
+                    f"{ids}")
             finally:
                 manager.shutdown()
         finally:

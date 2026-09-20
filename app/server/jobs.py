@@ -1755,8 +1755,28 @@ class JobManager:
                 job._log.append(line)
             job.log("restored from disk (this server was restarted)")
             with self._lock:
+                # THE ID COMES FROM INSIDE THE FILE, NOT FROM THE DIRECTORY
+                # NAME (`stored.get("run_id", name)`), so two directories can
+                # declare the same run_id -- a copied run directory, a restored
+                # backup, a hand-edited result.json. `_jobs` is a dict and
+                # de-duplicates silently; `_order` is a list and did not, so
+                # `list()` (which maps `_order` back through `_jobs`) returned
+                # THE SAME Job OBJECT TWICE.
+                #
+                # Demonstrated 2026-09-20 on a real JobManager while checking
+                # whether cross_section.py's n_runs could over-count: a
+                # list-based accumulator downstream reported 2 runs for a
+                # compound holding 1. Nothing shipped a wrong number, because
+                # every consumer found that day de-duplicates -- but they were
+                # each compensating for this, and a future consumer that
+                # reasonably trusts `list()` would not.
+                #
+                # Last writer wins for the payload, which matches `_jobs`
+                # already, and the id keeps its FIRST position in the order so
+                # a restart does not reshuffle history.
+                if job.run_id not in self._jobs:
+                    self._order.append(job.run_id)
                 self._jobs[job.run_id] = job
-                self._order.append(job.run_id)
                 try:
                     self._counter = max(
                         self._counter, int(job.run_id.split("_")[-1]))
