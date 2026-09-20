@@ -564,8 +564,43 @@ jobs:
             sleep 2
           done
           [ "$code" = "200" ] || { echo "::error::the key printed to docker logs was rejected (HTTP $code)"; docker logs "$AUTOKEY_CONTAINER"; exit 1; }
-          nokey=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8001/api/health)
-          [ "$nokey" = "401" ] || { echo "::error::expected 401 without the generated key, got $nokey"; exit 1; }
+          # /api/health IS REACHABLE WITHOUT A KEY, ON PURPOSE, AND THE
+          # PROTECTION IS IN THE BODY RATHER THAN THE STATUS.
+          #
+          # This assertion used to demand 401 and went stale when the route was
+          # exempted from the gate: a platform health check is configured in a
+          # DASHBOARD, and one already pointed at /api/health kept 401ing and
+          # killing a container that was serving correctly. Telling an operator
+          # to go and change a setting is not a fix when the code can stop
+          # being wrong.
+          #
+          # So the check that matters is no longer the status code. It is that
+          # an anonymous caller gets a BARE liveness answer while the operator
+          # detail -- the runs directory, the project directory, run counts and
+          # cache statistics -- appears ONLY for a caller holding the key.
+          # Asserting 200 alone would be weaker than the old test; asserting
+          # what the body does NOT contain is stronger than either.
+          nokey_code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8001/api/health)
+          [ "$nokey_code" = "200" ] || { echo "::error::/api/health is the liveness route and must answer an anonymous GET; got $nokey_code"; exit 1; }
+
+          nokey_body=$(curl -s -m 5 http://127.0.0.1:8001/api/health)
+          for leaked in runs_dir projects_dir reconstruction_cache pde_dt_s; do
+            case "$nokey_body" in
+              *"$leaked"*)
+                echo "::error::/api/health disclosed '$leaked' to an UNAUTHENTICATED caller. The route is ungated so a dashboard health check cannot kill the container; the DATA is still supposed to need the key."
+                echo "body was: $nokey_body"
+                exit 1 ;;
+            esac
+          done
+
+          # And the redaction must not be achieved by the route being broken.
+          keyed_body=$(curl -s -m 5 -H "X-API-Key: $key" http://127.0.0.1:8001/api/health)
+          case "$keyed_body" in
+            *runs_dir*) : ;;
+            *) echo "::error::/api/health returned no runs_dir even WITH the key ($keyed_body) -- the anonymous redaction above proves nothing if the keyed answer is empty too"; exit 1 ;;
+          esac
+          echo "/api/health: anonymous gets liveness only, keyed gets the operator detail"
+
           echo "the generated key authenticates, and requests without it are 401"
 
       - name: Container logs (on failure)
