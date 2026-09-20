@@ -91,6 +91,40 @@ So 24.x is a safe bump if Vercel ever retires 22.x; change the one line in
 > is set in an `.npmrc`, and there is no `.npmrc` here. Builds still work; the
 > pin exists for Vercel, not for you.
 
+## 3a. Verified against the real Studio, 2026-09-20
+
+Everything above was written against placeholder hosts. This section records a
+run against the deployment this page actually points at, because a runbook
+verified only with `studio.example.org` has never proved the one thing that
+matters — that the built page contains the production URL and not a leftover
+loopback default.
+
+```
+NEXT_PUBLIC_STUDIO_URL=https://vivum.onrender.com npm run build   -> exit 0
+NEXT_PUBLIC_STUDIO_URL=https://vivum.onrender.com npm run lint    -> exit 0
+NEXT_PUBLIC_STUDIO_URL=... npm run audit:viewports  -> exit 0 (11 x 2)
+NEXT_PUBLIC_STUDIO_URL=... npm run audit:network    -> exit 0
+```
+
+Checked in the build output itself, not inferred from the exit code:
+
+| Check | Result |
+|---|---|
+| `https://vivum.onrender.com` in `.next/` | **5 occurrences** |
+| `localhost:8000` in `.next/static/` | **0** |
+
+The second row is the load-bearing one. `lib/env.ts` falls back to
+`http://localhost:8000` when the variable is unset, and Next **inlines**
+`process.env.NEXT_PUBLIC_STUDIO_URL` as a string at build time — so a build run
+without the variable does not fail at runtime in an obvious way, it ships a
+page whose primary call to action points at the visitor's own machine. Zero is
+the only acceptable number here, and it is worth re-checking on any deploy
+where the build log does not show the variable being read.
+
+The live target itself was verified the same day: `/` serves the workspace,
+`/studio` serves the Studio, `/index.html` is preserved, and `/api/*` answers
+401 without a key.
+
 ## 4. Environment variables
 
 **There is exactly one, and the default is wrong in production.**
