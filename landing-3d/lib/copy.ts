@@ -449,6 +449,16 @@
  *    reproduces it, so it carries no information. The statistic is invalid
  *    on spot data, where immune positions are synthesised rather than
  *    measured. See results/immune_sink_impact.md.
+ *    ADDED 2026-09-20, AND IT IS THE HALF THAT WAS MISSING FOR FIVE WEEKS:
+ *    THE TERM IS NOT IN THE SHIPPING PRODUCT. `tmesim/molecular/immune_sink.py`
+ *    is imported by its own validation module and by nothing else, so the
+ *    mechanism these numbers measure is off BY CONSTRUCTION and no run this
+ *    product performs contains it. It did not improve the measured human-glioma
+ *    anchor, which is why. Any copy about this beat must say so in the same
+ *    breath as the number: the finding is a DEMONSTRATION that geometry carries
+ *    what a compartment cannot express, and it is not a feature. Nothing on
+ *    this page may present it as something the product computes for you, and
+ *    the instrument panel beside it may not be labelled as an ordinary run.
  */
 
 /**
@@ -675,24 +685,81 @@ export const SECTION_COPY: readonly SectionCopy[] = [
      * the finding and drop the refutability clause — without it the sentence is
      * just a smaller claim, and the point is that it is a CHECKABLE one.
      *
+     * THE COMPARATOR WENT ON 2026-09-20 AND THE CLAUSE STAYED. It read "A bench
+     * assay on that section could refute it; a ranking never could." That was
+     * the only occurrence of the word "ranking" in rendered copy on this page,
+     * and results/claim_surface_audit_2026-08-30.md section 2.4 recorded it as
+     * a judgment call rather than settling it. It is not a judgment call
+     * against the rule as written: the prohibition at the head of this file
+     * covers a cross-compound ordering "in any form, hedged or not, POSITIVE OR
+     * NEGATIVE — including as a limit", and a sentence whose rhetorical work is
+     * done by contrast with an ordering is an ordering used as a limit. It also
+     * does the specific damage the prohibition exists to prevent: a reader who
+     * meets "a ranking never could" on a product page has been told the product
+     * has one, and that the page is merely being modest about it.
+     *
+     * The requirement above survives the edit intact — the refutability clause
+     * is still here and still attached to the finding. What it no longer does
+     * is buy its force from the withdrawn feature. Four characters shorter,
+     * measured, so the beat's registered height ceiling is not touched.
+     *
      * WHAT THE VERDICT SENTENCE OWES, AND WHERE THE DEBT IS PAID. "The drug
      * arrives almost everywhere" is the model's own reading and is the exact
      * direction in which the engine is measured to be WRONG — its one
-     * out-of-sample perivascular gradient is ~14x too shallow, which flatters
-     * reach. "Under-dosed" also reads as "raise the dose", which the product
+     * out-of-sample perivascular gradient is 2.2-3.0x too shallow on the map,
+     * which flatters reach. (That figure was ~14x here until 2026-09-20; see
+     * the row itself on beat 06 for why the larger number was wrong and why
+     * correcting it DOWNWARD was still the honest edit.) "Under-dosed" also reads as "raise the dose", which the product
      * explicitly warns against because most of those cells are resistance-
      * flagged as well. Neither caveat fits in this beat (see the ceiling
      * above), so both are ledger rows on beat 06 and both name this sentence.
      * If this beat is ever given room, those two are what it should buy first.
      */
-    body: "A compound compiles from its own structure: two routes through the cell layer, fed by lipophilicity and hydrogen-bond donors as well as mass, potency from measured GDSC2 screens. Structure reaches transport — scored unfitted on 68 measured compounds, but on descriptor columns supplied by that measurement, and the engine's own path has never been scored. It recovers about a quarter of the measured spread, so close analogues are under-separated, not resolved. Each run then decomposes survival cell by cell. On the flagship section 99.8% of surviving tumour cells are under-dosed, not unreached: the drug arrives almost everywhere and is almost everywhere too weak. A bench assay on that section could refute it; a ranking never could.",
+    body: "A compound compiles from its own structure: two routes through the cell layer, fed by lipophilicity and hydrogen-bond donors as well as mass, potency from measured GDSC2 screens. Structure reaches transport — scored unfitted on 68 measured compounds, but on descriptor columns supplied by that measurement, and the engine's own path has never been scored. It recovers about a quarter of the measured spread, so close analogues are under-separated, not resolved. Each run then decomposes survival cell by cell. On the flagship section 99.8% of surviving tumour cells are under-dosed, not unreached: the drug arrives almost everywhere and is almost everywhere too weak. A bench assay on that section could refute it; that is the point.",
     align: "right",
   },
   {
     kicker: "04",
     eyebrow: "Spatial attribution",
     headline: "The mean is not the finding. The spread is.",
-    body: "In one section, tumor cells in the macrophage-densest quintile hold about 0.43 of drug exposure. In the sparsest, about 0.86 — a 2.0x spread inside a single tumor, where a well-mixed compartmental model returns exactly 1.0 by construction. That comparison flatters us. Distance to the tissue edge alone, with no immune input, reproduces 82% of that ratio; relocating the same macrophages at random while keeping their real clustering still returns about 1.7. What these particular macrophages add is 1.08-1.21x — smaller, and measured. A compartment expresses neither.",
+    /*
+     * TWO CORRECTIONS LANDED HERE ON 2026-09-20 AND BOTH RUN AGAINST US. This
+     * beat had the most room on the page and was the last one audited, which
+     * is the usual order in which a page goes wrong.
+     *
+     * (1) THE SECOND NULL IS NOW NAMED, BECAUSE WITHOUT IT THE BEAT DID NOT
+     * RECONCILE WITH ITSELF. The sentence said one null "returns about 1.7" and
+     * then that the attributable excess is 1.08-1.21x. 2.0 / 1.7 is 1.18, so a
+     * reader who did the division could not reach 1.08 from anything on the
+     * page — the low end comes from a SECOND primary null, the 400 µm block
+     * shuffle at 1.8522, which was not mentioned. Quoting only the
+     * clumpiness-matched null at 1.6581 also happens to be the flattering
+     * choice: it is the one that yields the LARGER excess. Both nulls are
+     * PRIMARY in results/immune_sink_impact.md sec. 5.3 and neither is a
+     * sensitivity; omitting one was recorded as a defect in
+     * results/CLAIM_INVENTORY.md sec. 3 — "quoting only the weaker null
+     * flatters the result" — and it went uncorrected for five weeks.
+     *
+     * (2) THE TERM IS NOT IN THE PRODUCT, AND THE BEAT NOW SAYS SO. This is the
+     * more serious of the two. `tmesim/molecular/immune_sink.py` is imported by
+     * exactly one file — its own validation module — so no run this product
+     * performs contains the mechanism these numbers measure. It is off BY
+     * CONSTRUCTION rather than by default (immune_sink_impact.md: "no shipped
+     * code path imports tmesim.molecular.immune_sink"), and the reason is
+     * itself a published failure: it did not improve the measured human-glioma
+     * anchor. A measurement that is sourced is not automatically a CAPABILITY,
+     * and this beat sits on a product page under a panel labelled with a run —
+     * every cue on the page said the product does this and it does not.
+     *
+     * WHAT THE BEAT STILL GETS TO SAY, because the correction is not a
+     * withdrawal: immune_sink_impact.md sec. 6 endorses the finding in almost
+     * these words — "It remains a genuine demonstration that geometry carries
+     * information a compartmental model cannot express; it is not a 2.0x
+     * demonstration." The demonstration survives; the size was already
+     * corrected here; what was missing was that it is a demonstration rather
+     * than a feature.
+     */
+    body: "In one section, tumor cells in the macrophage-densest quintile hold about 0.43 of drug exposure. In the sparsest, about 0.86 — a 2.0x spread inside a single tumor, where a well-mixed compartmental model returns exactly 1.0 by construction. That flatters us. Tissue-edge distance alone, with no immune input, reproduces 82% of it; nulls preserving the macrophages' clustering return 1.66 and 1.85. What these macrophages add is 1.08-1.21x — smaller, and measured. A compartment expresses neither. No shipped run carries the immune drug-loss term this needs: it did not improve the measured human-glioma anchor.",
     align: "left",
   },
   {
@@ -904,11 +971,23 @@ export const SECTION_COPY: readonly SectionCopy[] = [
           detail:
             "0.718 was scored on the paper's donor counts, in a convention the model does not use. Redone on the engine's, 45 of 71 rows pin exactly and 26 have no published structure — until those are obtained, R² sits anywhere in that interval. It contains 0.718: nothing refuted, nothing confirmed, and a band that wide settles nothing. It still recovers only ~24% of the measured spread, from one cell line, under-separating a congeneric series ~4-fold. Its predecessor scored 0.022, below the whole interval; we published that refutation, then its replacement, and now this.",
         },
+        /*
+         * THE NULL COUNT WAS WRONG HERE UNTIL 2026-09-20, IN THE DIRECTION
+         * THAT HELPS US. The row said "A null preserving the macrophages' own
+         * clustering returns ~1.7" — one null, rounded. There are TWO primary
+         * nulls in results/immune_sink_impact.md sec. 5.3, 1.6581 and 1.8522,
+         * and the omitted one is the SECOND, which yields the SMALLER excess
+         * (1.081x against 1.208x). So the singular and the rounding between
+         * them concealed the low end of this row's own verdict column: nothing
+         * on the page divided into 2.0 to give 1.08. Both now appear here and
+         * in beat 04, at their measured precision, and the row came out 15
+         * characters shorter for it.
+         */
         {
           label: "Spatial spread",
           state: "1.08–1.21×, NOT 2.0×",
           detail:
-            "A well-mixed model's 1.0 is not what bounds the raw 2.0×. A null preserving the macrophages' own clustering returns ~1.7, and tissue-edge distance alone — no immune input — reproduces 82% of it.",
+            "A well-mixed model's 1.0 is not what bounds the raw 2.0×. Two spatially-aware nulls return 1.66 and 1.85, and tissue-edge distance alone — no immune input — reproduces 82% of it.",
         },
         {
           label: "Spot platforms",
@@ -1009,33 +1088,135 @@ export const SECTION_COPY: readonly SectionCopy[] = [
      * caveat.
      *
      * NO NUMBER BELOW IS QUOTED FROM A RUN. Every figure traces to a results/
-     * file: 12.8x / 10.5x to results/breast_kp_validation.md, ~14x and the
-     * direction of the error to results/kyle2004_penetration.md sec. 0 item 3
-     * (whose own words are "the model makes the drug look like it penetrates
-     * better than it does"), and 34 of 38 to results/synthesised_positions.md
-     * sec. 5. The barrier row and the shape statement are deliberately
-     * NUMBERLESS — see the citation guardrail at the head of this file.
+     * file: 12.8x / 10.5x to results/breast_kp_validation.md; 7 of 12 and
+     * 57.2 % to results/verdict_inversion_census.md sec. 0 and sec. 1; the
+     * band-threshold reversal to results/mechanism_attribution_audit_2026-09-20
+     * .md sec. 3.3 (0.2918082 against a shipped 0.1, and p50 = 0.2918052);
+     * 2.2-3.0x, 2.45x and the direction of the error to
+     * results/kyle2004_penetration.md sec. 6's CORRECTED block of 2026-08-22
+     * (whose own words on the direction are "the model makes the drug look
+     * like it penetrates better than it does"); and 34 of 38 to
+     * results/synthesised_positions.md sec. 5. The barrier row and the shape
+     * statement are deliberately NUMBERLESS — see the citation guardrail at the
+     * head of this file.
+     *
+     * A TRAP THIS ROW SET AND SPRANG, RECORDED BECAUSE IT WILL RECUR: the 14x
+     * was cited to sec. 0 item 3 of that file, and sec. 0 item 3 still says
+     * 14x. The correction lives in sec. 6, in a quoted block, and the file's
+     * own conclusions were never re-pointed at it. Citing a results/ file by
+     * section is not the same as reading the file, and a number can be stale in
+     * one paragraph of its own source while being correct in another.
      */
     ledger: {
       caption: "What the answer above rests on",
       rows: [
+        /*
+         * UPGRADED 2026-09-20 FROM "CAN INVERT IT" TO A MEASURED FACT, AND THE
+         * DIRECTION OF THE EDIT IS THE POINT: the row got WORSE for us.
+         *
+         * "Can invert" was written when the evidence was one compound on one
+         * section (results/permeability_split.md). results/verdict_inversion_
+         * census.md (2026-08-25) ran the whole shipped panel and the answer is
+         * not a possibility: the dominant limiter inverts for 7 of the 12
+         * scored compounds, and the one the page's own lead is read from —
+         * beat 03's section, beat 03's verdict — is one of them, with 57.2 %
+         * of its tumour cells changing label. The census's own words: "The
+         * single most-quoted run in this repository has a headline verdict
+         * that is not robust to a term the model does not have."
+         *
+         * A hedge that a later measurement has settled is no longer a hedge.
+         * It reads as caution and functions as concealment, because a reader
+         * who is told a thing CAN happen assumes nobody has checked whether it
+         * does. Somebody checked. The row says what they found.
+         *
+         * WHAT IS NOT CLAIMED, and the census is explicit about it (sec. 4):
+         * the corrected arm is not the truth either. Making it honest needs a
+         * per-compound wall permeability that swings entirely on an unmeasured
+         * vessel radius. So the row says the verdict is not DETERMINED by the
+         * data — not that the other answer is right.
+         *
+         * 12.8× / 10.5× stays, and now leads the row as the property of the law
+         * rather than trailing it. It is the external anchor that says no single
+         * constant repairs the law; what follows is what that costs the reader.
+         *
+         * A SECOND, INDEPENDENT ROUTE TO THE SAME REVERSAL WAS ADDED THE SAME
+         * DAY, AND ITS SOURCE SAYS IT IS DISCLOSED NOWHERE.
+         * results/mechanism_attribution_audit_2026-09-20.md sec. 3.3 sweeps
+         * `unreached_ratio`, the constant that divides "never arrived" from
+         * "arrived too weak". It ships at 0.1 and the file calls it, in its own
+         * words, "an admittedly conventional constant". Beat 03's verdict
+         * inverts DOSE -> DELIVERY at 0.2918082 — which is not an arbitrary
+         * number either: it is the median surviving cell's own E/IC50 (p50 =
+         * 0.2918052), i.e. the verdict says DOSE because slightly more than half
+         * the survivors sit above a line we chose, and moving that line to the
+         * middle of the distribution it is cutting moves the answer.
+         *
+         * THAT IS A WEAKER CLAIM THAN THE CENSUS'S AND IT IS WORTH MORE, WHICH
+         * IS WHY IT EARNED THE LINE. The census needs a physics term the model
+         * does not have; this needs nothing at all. Two independent routes to
+         * one reversal is a different statement from one route — it is the
+         * difference between "a missing term could overturn this" and "this
+         * verdict is not determined by the tissue". The row's label and verdict
+         * column changed to carry that: it is no longer a row about the
+         * delivery law, it is a row about what the verdict rests on, and the
+         * delivery law is one of the two things it rests on.
+         *
+         * NOT WRITTEN, because it is the product's disclosure rather than this
+         * page's: the audit's actual complaint is that the Studio panel prints
+         * the threshold's VALUE and never says how close the run is to it. That
+         * belongs beside the number, in app/web/js/ui/. This page owes the
+         * reader the fact, not the fix.
+         */
         {
-          label: "The verdict's delivery law",
-          state: "CAN INVERT IT",
+          label: "The 03 verdict",
+          state: "INVERTS TWO WAYS",
           detail:
-            "The verdict and the map come from a one-way vascular leak with no path from tissue back to blood. It misses human microdialysis in opposite directions — 12.8× high on one drug, 10.5× low on another — so no constant fixes both, and correcting it moves the field's shape, not its scale.",
+            "It comes from a one-way vascular leak with no path from tissue back to blood, which misses human microdialysis 12.8× high on one drug and 10.5× low on another, so no constant fixes both. Supply the missing term and the dominant limiter flips for 7 of 12 compounds, 03's included, relabelling 57.2% of its cells. Moving one conventional band threshold to the median survivor's own exposure flips it again.",
         },
+        /*
+         * THE NUMBER CHANGED ON 2026-09-20 AND THE ROW GOT SMALLER, WHICH IS
+         * THE HARDER CORRECTION TO MAKE AND THE ONE MOST LIKELY TO BE SKIPPED.
+         *
+         * It read "14× TOO SHALLOW". That figure was faithfully copied from
+         * results/kyle2004_penetration.md, and the same file corrected it on
+         * 2026-08-22 in a block the copy never picked up: the 14× is a RATIO OF
+         * TWO DIMENSIONLESS RATIOS and Kyle's near:far readout is EXPONENTIAL
+         * in the transport length, so 14× is a 2.45× error in λ (2.00–2.98×
+         * with the paper's own SDs) amplified by dlnR/dlnλ ≈ 2.9. On this
+         * product's own readout the amplification does not transfer — the map's
+         * half-distance responds to λ with exponent 0.92–1.22, near-linear
+         * against 2.92 — so the figure on the MAP is 2.2–3.0×, not 14×. This
+         * row is attached to a sentence about the map, so the map's figure is
+         * the one it owes.
+         *
+         * WHY IT WAS NOT LEFT ALONE, since 14× is the more self-critical
+         * number and nobody would have complained. Because it is not true, and
+         * a page that overstates its own error has given up the only thing that
+         * makes its understatements worth reading. It also inflates a defect
+         * the same file shows is largely INHERITED rather than independent —
+         * 3.6696 × 3.7374 = 13.71, two thirds of it the residual on the
+         * compound α is fit to — and the two anchors that bound it are
+         * disjoint (Primeau 57.71–72.13 µm, Kyle 30.73–55.68 µm), so "fit α
+         * better" is provably not the repair.
+         *
+         * NOT SAID HERE, and it is the sharper caveat: kyle2004_penetration.md
+         * also records that the anchor may not measure a LENGTH at all — zero-
+         * loss retarded diffusion reproduces the measured value at λ = ∞ — in
+         * which case inverting it to λ is invalid. It does not fit in this row
+         * and it would weaken a limit rather than a claim, so it is recorded
+         * here and left off the page rather than quietly dropped.
+         */
         {
           label: "“Arrives almost everywhere”",
-          state: "14× TOO SHALLOW",
+          state: "2.2–3.0× TOO SHALLOW",
           detail:
-            "The one perivascular gradient this engine predicts out of sample is about 14× shallower than measured, and the error flatters the drug: a shallow map under-reports how much tumour goes untreated.",
+            "The map's one out-of-sample perivascular gradient is that much too shallow, from a transport length measured 2.45× too long. The error flatters the drug: it under-reports how much tumour goes untreated.",
         },
         {
           label: "“Under-dosed”",
           state: "NOT “RAISE THE DOSE”",
           detail:
-            "Most of those cells are flagged resistant too, so more drug alone would not have killed them. And the model has never reached a delivery verdict on its own: the one it produced came from a compound whose barrier term is set to zero — an input, not a discovery.",
+            "Most of those cells are flagged resistant too, so more drug alone would not have killed them. And no delivery verdict has been reached non-degenerately: the only one came from a compound whose barrier term is zero — an input, not a discovery.",
         },
       ],
     },

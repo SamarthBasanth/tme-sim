@@ -164,11 +164,29 @@ const atkinsonMono = Atkinson_Hyperlegible_Mono({
  * a benchmark, and publishing the ones you lose is the part competitors do not
  * copy. Keep the failures clause attached to the scoring clause -- split apart,
  * the first half reads as the claim this replaced.
+ *
+ * REMOVED 2026-09-20: "Built for pharma, biotech, and research teams COMPARING
+ * CANDIDATE THERAPIES." That is cross-compound comparison framing, and it was
+ * sitting on the one surface a reader meets before the page loads -- a search
+ * result, a link unfurl, a shared card. lib/copy.ts:146-149 admits no version
+ * of it: "No ordering, ranked list, shortlist, 'top pick', 'which compound
+ * wins', pairwise call or cross-compound comparison may appear on this page in
+ * any form, hedged or not, positive or negative." The product removed the
+ * FEATURE on 2026-08-22 (23e51f6) and this string outlived it by a month.
+ * Flagged in results/claim_surface_audit_2026-08-30.md section 2.4 as
+ * PROHIBITED, with the mechanical cause named: this file does not import
+ * copy.ts, so nothing couples the guardrail to the string it governs. That is
+ * still true and is recorded in the report rather than papered over -- the
+ * coupling that would fix it is a build-time check, not a comment.
+ *
+ * What replaces it says what the product is FOR without ordering anything, and
+ * both halves are already rendered on the page itself (beat 05's last two
+ * ledger rows), so the snippet cannot drift from the body.
  */
 export const metadata: Metadata = {
   title: "Vivum — See Where the Drug Actually Goes",
   description:
-    "Vivum reconstructs real tumor tissue from spatial biology data and simulates drug transport physics through it — penetration, exposure, and delivery, scored against real measured tissue benchmarks with the failures published alongside the passes. Built for pharma, biotech, and research teams comparing candidate therapies.",
+    "Vivum reconstructs real tumor tissue from spatial biology data and simulates drug transport physics through it — penetration, exposure, and delivery, scored against real measured tissue benchmarks with the failures published alongside the passes. For research use: not for diagnostic or treatment-planning use, and patient response is not predicted.",
 };
 
 export default function RootLayout({

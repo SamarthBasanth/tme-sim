@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint",
     "audit:origins": "node scripts/audit-origins.mjs",
-    "audit:network": "node scripts/network-audit.mjs"
+    "audit:network": "node scripts/network-audit.mjs",
+    "audit:viewports": "node scripts/viewport-audit.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

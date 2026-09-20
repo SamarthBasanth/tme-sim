@@ -130,9 +130,14 @@ const AttributionOverlay = forwardRef<HTMLDivElement, AttributionOverlayProps>(
           ))}
         </dl>
 
+        {/* "can invert it" until 2026-09-20. results/verdict_inversion_census.md
+            settled it on 2026-08-25: supply the missing term and THIS run's
+            dominant limiter flips, relabelling 57.2% of its tumour cells. A
+            hedge a later measurement has resolved is not caution, it is a stale
+            claim — and this is the panel that carries the number it is about. */}
         <p className="attribution__footnote">
           Shares of surviving tumor cells, one compound, one section, one run.
-          Under the shipped delivery law — which 06 says can invert it.
+          Supply the delivery term 06 names and this verdict flips.
         </p>
       </div>
     );

@@ -43,8 +43,8 @@ const NarrativeSection = forwardRef<HTMLDivElement, NarrativeSectionProps>(
          * a progress CHANGE — so at progress 0, on first load, it has never
          * fired, and every beat is still `visibility: visible` at opacity 0.
          *
-         * Measured on the loaded page at scroll 0: Tab reached the hero's "Open
-         * the Studio" (correct), then beat 06's "Open the Studio" at y = 572 and
+         * Measured on the loaded page at scroll 0: Tab reached the hero's call
+         * to action (correct), then beat 06's at y = 572 and
          * its email link at y = 637 — both invisible, both on screen, both
          * ringed. The bug the loop fixes was therefore live for exactly as long
          * as a visitor had not yet scrolled, which is the entire window in which

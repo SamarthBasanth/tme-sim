@@ -14,6 +14,7 @@ import { ScrollProgressProvider, useScrollProgressRef } from "./ScrollProgressCo
 import { useLenis } from "@/hooks/useLenis";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { useShortViewport } from "@/hooks/useShortViewport";
 import {
   SECTION_COUNT,
   activeSectionIndex,
@@ -45,6 +46,29 @@ function Experience() {
   const reducedMotion = usePrefersReducedMotion();
   const isMobile = useIsMobile();
 
+  /*
+   * TWO INDEPENDENT REASONS TO RENDER THE FLOW LAYOUT, AND ONLY ONE OF THEM IS
+   * A PREFERENCE.
+   *
+   * `reducedMotion` is what the visitor asked for. `shortViewport` is what the
+   * layout can physically hold: below ~677px of viewport height a beat is
+   * taller than the pin that clips it, and at 320x568 five of six beats lost
+   * content off an edge — beat 02 by 180px, which is its entire IFP ledger
+   * below the first row. No amount of further tightening fixes that honestly,
+   * because the only thing left to spend at that size is a disclosure.
+   *
+   * So the page falls through to the one layout that cannot clip: normal
+   * document flow, unbounded height, same copy, same ledgers, same panels. See
+   * hooks/useShortViewport.ts for the measurement and for the threshold.
+   *
+   * COMBINED INTO ONE FLAG rather than checked twice, because the flag has to
+   * gate BOTH the render branch and the ScrollTrigger effect below. A pinned
+   * timeline created against a wrapper that is not mounted is a scroll handler
+   * running every frame over nothing.
+   */
+  const shortViewport = useShortViewport();
+  const flowLayout = reducedMotion || shortViewport;
+
   const wrapperRef = useRef<HTMLDivElement>(null);
   const sectionElRefs = useRef<Array<HTMLDivElement | null>>([]);
   const metricElRef = useRef<HTMLDivElement>(null);
@@ -54,7 +78,7 @@ function Experience() {
   const scrollCueRef = useRef<HTMLDivElement>(null);
   const lenisRef = useRef<Lenis | null>(null);
 
-  useLenis(reducedMotion, (lenis) => {
+  useLenis(flowLayout, (lenis) => {
     lenisRef.current = lenis;
   });
 
@@ -80,7 +104,7 @@ function Experience() {
   // whole timeline is trivially correct scrolling in either direction.
   // ---------------------------------------------------------------------
   useEffect(() => {
-    if (reducedMotion || !wrapperRef.current) return;
+    if (flowLayout || !wrapperRef.current) return;
 
     const ctx = gsap.context(() => {
       const trigger = ScrollTrigger.create({
@@ -159,11 +183,11 @@ function Experience() {
     }, wrapperRef);
 
     // Cleans up the ScrollTrigger instance (and anything else created
-    // inside the context) on unmount or when reducedMotion flips true.
+    // inside the context) on unmount or when flowLayout flips true.
     return () => ctx.revert();
-  }, [reducedMotion, progressRef]);
+  }, [flowLayout, progressRef]);
 
-  if (reducedMotion) {
+  if (flowLayout) {
     return <ReducedMotionExperience isMobile={isMobile} />;
   }
 
@@ -222,8 +246,26 @@ function Experience() {
                 {section.ledger ? <SectionLedger {...section.ledger} /> : null}
                 {isHero ? (
                   <>
+                    {/*
+                      THE DOOR NOW OPENS ON A WORKSPACE, NOT ON A WORKSTATION.
+                      `STUDIO_URL` is the product's origin, and `/` there is
+                      the workspace home (docs/WORKSPACE_CONTRACT.md §1) — you
+                      land on projects, open one, and the Studio opens INSIDE
+                      it with that project's runs attached. It used to serve
+                      the Studio itself, so this link dropped a first-time
+                      visitor into a three-rail workstation that assumes you
+                      already know which section, which compound and what a
+                      RunSpec is.
+
+                      The label follows the destination rather than the
+                      product's name for it. "Open the Studio" would now be
+                      wrong in the literal sense — the Studio is one click
+                      further in, and the constant is only still called
+                      STUDIO_URL because it is the deployment's origin and
+                      renaming a public env var breaks every existing deploy.
+                    */}
                     <a className="cta-button" href={STUDIO_URL}>
-                      Open the Studio
+                      Open the workspace
                     </a>
                     {/* Turns the tissue behind this text from decoration into
                         data: without a legend the measured cell types read as
@@ -242,20 +284,31 @@ function Experience() {
                    * verify unaided. Same STUDIO_URL the hero opens, so the
                    * first and last frames offer the same door.
                    *
-                   * Email survives as the secondary route, deliberately
-                   * quieter: someone who wants to talk rather than run software
-                   * still has a way through, and it is a text link rather than
-                   * a second pill so it cannot compete with the primary action.
+                   * WHAT THE SECONDARY LINK IS FOR NOW, AND IT IS NOT A
+                   * SOFTENING. A hosted deployment of this product is gated:
+                   * bound to anything but loopback it REQUIRES an access key,
+                   * and auto-generates one if the operator did not set it
+                   * (docs/DEPLOYMENT.md, and the Dockerfile's own note). The
+                   * workspace home is ungated only in the sense that it loads
+                   * — it loads in order to ask for a key. So a visitor who
+                   * takes the primary action meets a key prompt, and a page
+                   * that let them discover that on arrival would be doing the
+                   * thing this whole file exists to prevent: stating a
+                   * capability without its condition. The email route is where
+                   * the key comes from, so it now says so.
+                   *
+                   * It stays a text link rather than a second pill: it is the
+                   * condition on the primary action, not a competing one.
                    */
                   <div className="cta-row">
                     <a className="cta-button cta-button--primary" href={STUDIO_URL}>
-                      Open the Studio
+                      Open the workspace
                     </a>
                     <a
                       className="cta-link"
-                      href="mailto:samarthbasanth@gmail.com?subject=Vivum%20enquiry"
+                      href="mailto:samarthbasanth@gmail.com?subject=Vivum%20access%20key"
                     >
-                      or email us about your tissue
+                      or email us for an access key
                     </a>
                   </div>
                 ) : null}

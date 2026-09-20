@@ -44,11 +44,11 @@
    *   .specimen__note           "10x Genomics, CC BY 4.0" — the licence
    *                             attribution the data is used under
    *   .specimen__facts dt       Cells / Section / Depth
-   *   .metric-overlay__refs dt  "Well-mixed model", "Clustering-matched null"
-   *                             — the two nulls that BOUND the 2.0x, which
-   *                             MetricOverlay.tsx puts in the readout rather
-   *                             than a footnote precisely so they are not
-   *                             skipped
+   *   .metric-overlay__refs dt  "Well-mixed model", "Spatially-aware nulls"
+   *                             — the references that BOUND the raw contrast,
+   *                             which MetricOverlay.tsx puts in the readout
+   *                             rather than a footnote precisely so they are
+   *                             not skipped
    *   .*__footnote              the caveat on each readout
    *   .attribution__sub         delivery-limited / dose-limited / cell state
    *
@@ -1628,6 +1628,36 @@ body::after {
  * axis, same weight as .narrative-section h1/h2 -- the reduced-motion visitor
  * gets the identical typographic hierarchy, only without the motion.
  */
+/*
+ * `text-wrap: balance` IS APPLIED HERE AND DELIBERATELY NOT IN THE PINNED
+ * EXPERIENCE, AND THE ASYMMETRY IS A FITTING ARGUMENT RATHER THAN A
+ * TYPOGRAPHIC ONE.
+ *
+ * Balancing evens the line lengths of a short block and kills the one-word
+ * last line — the single most visible flaw in a large display setting, and
+ * these headlines are set between 32px and 53px where a rag is impossible to
+ * miss. What it can also do, occasionally, is change the NUMBER of lines.
+ *
+ * In this layout that costs nothing: it is normal document flow, its height is
+ * unbounded, and a section that grows by a line pushes the next one down. In
+ * the pinned layout a line is 13.83px to 53px out of a budget that is 13.2px
+ * at 1440x900 on beat 02 — measured — so the same declaration there would be a
+ * clipped ledger row with a typographic justification. The last ~500 lines of
+ * this file are about that budget. `balance` does not go near it.
+ *
+ * `pretty` on the body copy for the same reason and with the smaller promise:
+ * it protects the last line from an orphan without re-flowing the block.
+ */
+.reduced-motion-experience__hero-copy h1,
+.reduced-motion-section h2 {
+  text-wrap: balance;
+}
+
+.reduced-motion-experience__hero-copy p,
+.reduced-motion-section p {
+  text-wrap: pretty;
+}
+
 .reduced-motion-experience__hero-copy h1 {
   font-family: var(--font-display);
   font-stretch: 80%;
@@ -1647,8 +1677,25 @@ body::after {
   margin: 0;
 }
 
+/*
+ * THE BLOCK PADDING IS NOW A FUNCTION OF THE VIEWPORT'S HEIGHT, AND THE REASON
+ * IS THAT THIS LAYOUT ACQUIRED A NEW AUDIENCE.
+ *
+ * A flat 5rem above and below each of five sections is 800px of ground, which
+ * is a reasonable rhythm on a desktop window and is most of a phone. Until this
+ * pass that only affected a reduced-motion visitor, who had asked for
+ * something calmer; it now also lands on every viewport shorter than
+ * MIN_PINNED_VIEWPORT_HEIGHT (hooks/useShortViewport.ts), i.e. on the smallest
+ * screens the page serves, where scrolling past eight-tenths of a screen of
+ * nothing between every beat is the whole reading experience.
+ *
+ * `7.5vh` ties the rhythm to the height it is spending: 48px at 568, 55.5px at
+ * 740, 67.5px at 900, and clamped back to the original 5rem above ~1067px so
+ * nothing about the desktop composition changes. Horizontal padding is
+ * untouched — it is a measure constraint, not a rhythm one.
+ */
 .reduced-motion-section {
-  padding: 5rem clamp(1.5rem, 6vw, 6rem);
+  padding: clamp(3rem, 7.5vh, 5rem) clamp(1.5rem, 6vw, 6rem);
   max-width: 40rem;
   display: flex;
   flex-direction: column;
@@ -2090,6 +2137,37 @@ body::after {
   * {
     scroll-behavior: auto !important;
   }
+}
+
+/*
+ * THE SAME HEADER TREATMENT, KEYED ON THE LAYOUT THAT NEEDS IT RATHER THAN ON
+ * THE PREFERENCE THAT USED TO BE ITS ONLY CAUSE.
+ *
+ * The block above gives the header a solid ground because the flow layout is
+ * the only experience whose text travels underneath it — measured at 390x844,
+ * the mark overlapped running text at 34 of 61 scroll positions and the
+ * gradient scrim left it half-legible rather than clearly behind something.
+ *
+ * That was written when `prefers-reduced-motion` was the only way to reach the
+ * flow layout. It no longer is: a viewport shorter than
+ * MIN_PINNED_VIEWPORT_HEIGHT falls through to the same component tree with no
+ * preference set (hooks/useShortViewport.ts), and it would have inherited the
+ * gradient — i.e. the short-viewport fix would have shipped the exact defect
+ * this rule exists to prevent, on the one class of device least able to
+ * absorb it.
+ *
+ * So the selector now asks what is MOUNTED. `:has()` rather than a class
+ * written from an effect: the header is a sibling of <main> rendered by a
+ * server component, and an effect-written class lands a frame late, which is
+ * one frame of prose under the wordmark.
+ */
+body:has(.reduced-motion-experience) .site-header {
+  background: var(--bg);
+  border-bottom: 1px solid var(--hairline);
+}
+
+body:has(.reduced-motion-experience) .site-header::before {
+  display: none;
 }
 
 /* --------------------------------------------------------------------- */
@@ -2589,9 +2667,34 @@ body::after {
  * width a text block's height is set by the line-height RATIO and the character
  * count, not by the em, so shrinking prose here would buy almost nothing and
  * cost legibility. The leading is what is actually spent.
+ *
+ * THE SECOND CONDITION IN THE QUERY LIST, ADDED 2026-09-20, AND IT IS A CLIP
+ * THIS BLOCK'S OWN CEILING CAUSED. Everything above reasons about phones that
+ * are SHORT. A viewport can also be too NARROW for this layout at any height:
+ * at 320px the copy column is ~272px, and a beat's height goes roughly as the
+ * inverse of its column width, so the beats grow instead. Measured at 320x881,
+ * where `max-height: 880px` stops matching by one pixel and the desktop
+ * composition takes over:
+ *
+ *     beat 02   822.7px tall   clipped 56.0px off an 881px pin
+ *     beat 05   805.5px tall   clipped 38.8px
+ *     beat 06   825.8px tall   clipped 41.5px
+ *
+ * Three beats, and the same three that were clipped at 360x740 before this
+ * block existed — losing, again, the bottom rows of two ledgers. The pixel
+ * either side of the boundary is the tell: 320x880 is fine and 320x881 is not,
+ * which is a media query's edge and not a property of the content.
+ *
+ * `(max-width: 340px)` rather than a wider cut because the fit was MEASURED
+ * across widths at the same height: 360x900 lands beat 02 at 754.3 of an 874px
+ * budget and 412x915 at 771.7 of 889, both comfortably inside, so taking them
+ * through this tier would spend leading and type size to buy headroom they
+ * already have. No shipping device is between 341 and 359 CSS px wide. 320 is
+ * the floor of the range anything reports, so the cut covers the case that
+ * exists with the smallest blast radius.
  * ======================================================================= */
 
-@media (max-width: 820px) and (max-height: 880px) {
+@media (max-width: 820px) and (max-height: 880px), (max-width: 340px) {
   /*
    * A wider column is the cheapest height there is: it takes characters off
    * the wrap and therefore whole LINES off every paragraph, which is the one

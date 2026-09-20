@@ -796,7 +796,11 @@ class TestSteadyDisclosure:
         assert "exactly as wrong" in s
         # The absolute claim is bad in a direction that FLATTERS the compound,
         # and the magnitude is pinned here rather than gestured at.
-        assert "14x too shallow" in s and "3.7x too compressed" in s
+        assert "2.45x too long" in s and "3.7x too compressed" in s
+        assert "14x too shallow" not in s, (
+            "the note carries the ~14x reading that "
+            "results/kyle2004_penetration.md sec. 6 itself corrected; the "
+            "amplification does not transfer to this map")
         assert "kyle2004_penetration.md" in s
         assert "may not" in s
         # And robustness is not validation.

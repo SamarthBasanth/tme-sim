@@ -67,8 +67,8 @@ export function assertStudioUrl(): void {
       `NEXT_PUBLIC_STUDIO_URL is set to a loopback address (${raw}) in a ` +
         "production build.\n\n" +
         "That address means 'this computer' to whoever loads the page, so the " +
-        "'Open the Studio' links would point at the VISITOR'S machine, not at " +
-        "the Studio. It is inlined into the browser bundle at build time.\n\n" +
+        "'Open the workspace' links would point at the VISITOR'S machine, not " +
+        "at the product. It is inlined into the browser bundle at build time.\n\n" +
         "This usually means .env.local.example was imported into a hosting " +
         "dashboard. That file is correct for `npm run dev` and wrong for a " +
         "deployment. Set the variable to the Studio's real public URL and " +
@@ -81,8 +81,8 @@ export function assertStudioUrl(): void {
     throw new Error(
       "NEXT_PUBLIC_STUDIO_URL is not set, and this is a production build.\n\n" +
         "It is inlined into the browser bundle at build time, so leaving it " +
-        "unset would ship a page whose 'Open the Studio' links point at " +
-        "http://localhost:8000 — the VISITOR'S machine, not the Studio. The " +
+        "unset would ship a page whose 'Open the workspace' links point at " +
+        "http://localhost:8000 — the VISITOR'S machine, not the product. The " +
         "build would pass and both audits would pass; nothing would report it.\n\n" +
         "Set it to wherever the Studio is actually hosted, then rebuild:\n" +
         "  Vercel  Project Settings -> Environment Variables -> " +

@@ -868,8 +868,13 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
        * defensible candidate. All four read an absolute level. `kill_fraction`
        * and `therapeutic_coverage_1x` are no-resistance upper bounds that read
        * the IC50; `mean_tumor_auc` scales with the plasma level; and
-       * `penetration_length_um` is a fitted parameter of a gradient this repo
-       * measures as ~14x too shallow (results/kyle2004_penetration.md sec. 6).
+       * `penetration_length_um` is a fitted parameter of a gradient whose
+       * transport length this repo measures as 2.45x too long -- about
+       * 2.2-3.0x on this product's own map, NOT the 14x an earlier reading
+       * gave (results/kyle2004_penetration.md sec. 6, which corrects it: the
+       * 14x was a ratio of two dimensionless ratios run through an
+       * exponential estimator, and that amplification does not transfer
+       * here).
        * Promoting any of them would move the violation rather than fix it.
        * Four equal numbers is the honest layout for four quantities of which
        * none is the answer. */

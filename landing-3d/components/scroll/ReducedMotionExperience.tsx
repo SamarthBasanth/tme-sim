@@ -10,12 +10,33 @@ import SpecimenCaption from "@/components/ui/SpecimenCaption";
 import { STUDIO_URL } from "@/lib/env";
 
 /**
- * `prefers-reduced-motion: reduce` fallback. No Lenis, no ScrollTrigger, no
- * pinned/parallax camera — the model gets one small static render in the
- * hero (slow idle rotation only, see TumorModel's `reducedMotion` prop) and
- * every section simply flows down the page in normal document order. Each
- * section fades in (opacity only — no slide/blur/parallax) the first time
- * it enters the viewport, via IntersectionObserver rather than scroll math.
+ * The FLOW layout. No Lenis, no ScrollTrigger, no pinned/parallax camera — the
+ * model gets one small static render in the hero (slow idle rotation only, see
+ * TumorModel's `reducedMotion` prop) and every section simply flows down the
+ * page in normal document order. Each section fades in (opacity only — no
+ * slide/blur/parallax) the first time it enters the viewport, via
+ * IntersectionObserver rather than scroll math.
+ *
+ * REACHED BY TWO INDEPENDENT ROUTES, AND THE SECOND ONE IS NEWER THAN THE
+ * NAME OF THIS FILE.
+ *
+ *   1. `prefers-reduced-motion: reduce` — what the visitor asked for.
+ *   2. A viewport shorter than `MIN_PINNED_VIEWPORT_HEIGHT` — what the pinned
+ *      layout can physically hold. See hooks/useShortViewport.ts.
+ *
+ * The component is unchanged by that and so are its class names: renaming
+ * `.reduced-motion-*` across a 3,000-line stylesheet would be a large diff
+ * that changes nothing a visitor can see, and the CSS comments that explain
+ * each rule would all have to be re-pointed. What DID have to change is any
+ * rule that keyed on the PREFERENCE to style this layout — see the
+ * `body:has(.reduced-motion-experience) .site-header` block in globals.css,
+ * which would otherwise have left prose running under the wordmark on exactly
+ * the short screens route 2 exists to rescue.
+ *
+ * The property that makes it the right fallback for route 2 is the one it was
+ * never chosen for: it is in normal document flow, so its height is unbounded
+ * and nothing it contains can be clipped — which is precisely what the pinned
+ * layout cannot promise at 568px.
  */
 export default function ReducedMotionExperience({ isMobile }: { isMobile: boolean }) {
   const sectionRefs = useRef<Array<HTMLElement | null>>([]);
@@ -46,8 +67,11 @@ export default function ReducedMotionExperience({ isMobile }: { isMobile: boolea
           </span>
           <h1>{SECTION_COPY[0].headline}</h1>
           <p>{SECTION_COPY[0].body}</p>
+          {/* Same door, same label as the cinematic hero: `/` on the
+              product's origin is the workspace home, not the Studio. See the
+              note where the cinematic hero's button is rendered. */}
           <a className="cta-button" href={STUDIO_URL}>
-            Open the Studio
+            Open the workspace
           </a>
         </div>
       </div>
@@ -143,17 +167,19 @@ export default function ReducedMotionExperience({ isMobile }: { isMobile: boolea
               <p>{section.body}</p>
               {/* Mirrors the cinematic experience's closing beat exactly: the
                   primary action is the software, email is the quiet secondary
-                  route. The two experiences must offer the same door. */}
+                  route that says where the hosted instance's access key comes
+                  from. The two experiences must offer the same door, and must
+                  state the same condition on it. */}
               {i === SECTION_COPY.length - 2 && (
                 <div className="cta-row">
                   <a className="cta-button cta-button--primary" href={STUDIO_URL}>
-                    Open the Studio
+                    Open the workspace
                   </a>
                   <a
                     className="cta-link"
-                    href="mailto:samarthbasanth@gmail.com?subject=Vivum%20enquiry"
+                    href="mailto:samarthbasanth@gmail.com?subject=Vivum%20access%20key"
                   >
-                    or email us about your tissue
+                    or email us for an access key
                   </a>
                 </div>
               )}

@@ -12,8 +12,9 @@
  *
  * with no check. A deploy that forgot the variable was GREEN — the build
  * passed, the page rendered, both the origin audit and the network audit
- * passed — and shipped a public marketing site whose "Open the Studio" calls
- * to action pointed at `localhost:8000`, i.e. at the visitor's own machine.
+ * passed — and shipped a public marketing site whose "Open the workspace"
+ * calls to action pointed at `localhost:8000`, i.e. at the visitor's own
+ * machine.
  * Nothing anywhere would have reported it, and the fix would have required a
  * rebuild rather than a settings change.
  *
@@ -36,7 +37,15 @@
  */
 
 /**
- * Where the Studio is hosted. Localhost only ever in development.
+ * The product's ORIGIN. Localhost only ever in development.
+ *
+ * Still named `STUDIO_URL` after the page it used to point at. As of
+ * docs/WORKSPACE_CONTRACT.md §1 the product serves the workspace home at `/`
+ * and the Studio at `/studio`, so this value is the origin and the page's call
+ * to action lands on the workspace. The variable keeps its name because
+ * `NEXT_PUBLIC_STUDIO_URL` is set in a hosting dashboard, outside this repo:
+ * renaming it would silently unset it on every existing deployment, and an
+ * unset value is the exact failure the refusals below exist to catch.
  *
  * READS `process.env` DIRECTLY RATHER THAN VIA A LOCAL, AND THAT IS
  * LOAD-BEARING. Next inlines `process.env.NEXT_PUBLIC_STUDIO_URL` as a string

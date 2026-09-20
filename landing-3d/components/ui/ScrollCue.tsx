@@ -12,8 +12,8 @@ import { forwardRef } from "react";
  * caption over a still-ish tissue, with nothing anywhere on screen indicating
  * that any of the rest existed. The progress rail is the closest thing, and it
  * is `aria-hidden`, hidden entirely below 900px, and reads as decoration. A
- * visitor who clicks "Open the Studio" from the first frame never sees the
- * argument the page was built to make.
+ * visitor who clicks the hero's call to action from the first frame never
+ * sees the argument the page was built to make.
  *
  * WHY IT IS THIS SMALL. It is wayfinding, not a call to action — the hero
  * already has one of those, and a second competing affordance would be worse
