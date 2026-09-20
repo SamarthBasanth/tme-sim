@@ -248,6 +248,13 @@ NO_CROSS_SECTION_NOISE_FLOOR = (
     "one tissue, not the difference between two tissues. That document's own "
     "'not established' list says it does not generalise to other tissues; it is "
     "cited here as the size of a nuisance span and for nothing else."
+    " ONE cross-donor span does now exist, for ONE statistic and ONE compound, "
+    "and it is not a noise floor either: across three single-cell GBM sections "
+    "the delivery spread E_p90/E_p10 reads 1.9936 / 2.3211 / 2.5293 (1.2687x) "
+    "while the fitted penetration length spans 2.691x and F(1.0) spans 119.9x "
+    "(results/multisection_generalisation_2026-09-20.md sec. 4.2, 4.3). Three "
+    "donors is not a distribution and none of those numbers licenses a "
+    "significance test here."
 )
 
 #: Why one signature. ``results/cross_tissue.md``'s retraction, in one sentence.

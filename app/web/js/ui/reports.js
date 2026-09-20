@@ -687,7 +687,7 @@ export function createReportsPanel({ store, getSection }) {
         // results/capacity_ranking_robustness.md), and the document is now
         // about one compound on one specimen.
         h('b', 'One specimen and one compound in, one discrimination out: '
-          + 'was it delivery, or was it dose?'),
+          + 'was it delivery, was it dose, or was it the cell’s own state?'),
         ' The compound is simulated twice on the same cached reconstruction — the real run, and a resistance-off counterfactual — so the O',
         h('sub', '2'),
         '-resistance term of the attribution is measured, not asserted. The document carries its own limits: ',

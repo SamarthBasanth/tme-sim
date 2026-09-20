@@ -271,11 +271,23 @@ def verdict_stability(drug_name) -> Dict:
         "source": "results/verdict_inversion_census.md",
         "note": (
             f"{key} KEEPS its delivery/dose verdict when the missing "
-            "transvascular exchange term is switched on."
+            f"transvascular exchange term is switched on — MEASURED ON "
+            f"{VERDICT_STABILITY_SECTION} ONLY, and this run may not be on "
+            "that section. The verdict is also section-dependent independently "
+            "of this term: at byte-identical thresholds the dominant limiter "
+            "reads dose on xenium_319 and resistance on xenium_io and "
+            "gse324268 (results/multisection_generalisation_2026-09-20.md "
+            "sec. 4.1), so a HOLD here is a statement about the exchange term "
+            "on one section, never about tissue."
             if stable else
             f"{key} REVERSES its delivery/dose verdict when the missing "
-            "transvascular exchange term is switched on, so the verdict above "
-            "is one of the unstable ones."
+            f"transvascular exchange term is switched on, so the verdict above "
+            f"is one of the unstable ones. MEASURED ON "
+            f"{VERDICT_STABILITY_SECTION} ONLY. The verdict is also "
+            "section-dependent independently of this term: at byte-identical "
+            "thresholds the dominant limiter reads dose on xenium_319 and "
+            "resistance on xenium_io and gse324268 "
+            "(results/multisection_generalisation_2026-09-20.md sec. 4.1)."
         ),
     }
 

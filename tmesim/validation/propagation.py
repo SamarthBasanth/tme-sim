@@ -1253,6 +1253,31 @@ DECLARATIONS: Tuple[Declaration, ...] = (
         ),
     ),
     Declaration(
+        path="experiments/mms_e4_diagnosis.py",
+        category=Category.INERT,
+        reason=(
+            "The E4 case of the MMS suite above, isolated and driven at "
+            "several k to answer why it FAILED. Same standing and the same "
+            "reason: an exchange term would add a sink the manufactured "
+            "source does not balance, and the measured order would then be an "
+            "order of convergence to the wrong equation.\n\n"
+            "It is stronger than inert here than in the parent file. E4's "
+            "manufactured solution is spatially UNIFORM, so the discrete "
+            "Laplacian annihilates it and the case is a pure test of the time "
+            "integrator; it runs convection=False, so the explicit-upwind "
+            "branch is never entered. What it publishes is that E4's registered "
+            "k and tau satisfy 2k = 1/tau EXACTLY, which makes the leading "
+            "O(dt) coefficient identically zero -- a statement about an "
+            "algebraic degeneracy in a test problem, with no transvascular "
+            "content to carry.\n\n"
+            "The verdict it supports is that the SHIPPED SOLVER has no defect "
+            "here: it reduces exactly to backward Euler with a lagged source "
+            "(matched to 1.5e-14 relative), which is what rules a solver fault "
+            "out before any truncation argument is made. Nothing it reports "
+            "transfers to a claim about transvascular exchange."
+        ),
+    ),
+    Declaration(
         path="experiments/conservation_audit.py",
         category=Category.INERT,
         reason=(
@@ -1347,8 +1372,8 @@ EXEMPTIONS: Tuple[Exemption, ...] = (
         path="app/server/reach.py",
         reason=(
             "The module that DEFINES the steady_state_concentration alternate "
-            "solver (line 559) and then drives it from its own request handler "
-            "(line 952). Same standing as diffusion.py and moncayo_explant.py: "
+            "solver (line 582) and then drives it from its own request handler "
+            "(line 975). Same standing as diffusion.py and moncayo_explant.py: "
             "the definition site is where a flag ARRIVES, not a place that can "
             "fail to carry it, and this solver takes exchange_k explicitly. It "
             "is exempted rather than declared for the reason written against "

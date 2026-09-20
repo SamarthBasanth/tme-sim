@@ -391,11 +391,28 @@ export function createFindingPanel({ onIsolate } = {}) {
     el.appendChild(h('div.caveat.info', h('span',
       h('b', 'WHAT WOULD REFUTE THIS. '),
       `Measure ${drug} directly in this same tissue — imaging mass `
-      + 'spectrometry, or microdialysis on a matched block. The claim above '
-      + 'says drug is present essentially everywhere in the tumour and is '
-      + 'essentially everywhere below the concentration that produces half its '
-      + 'effect. Finding tumour regions with no drug in them would refute the '
-      + 'delivery half directly. ',
+      + 'spectrometry, or microdialysis on a matched block. ',
+      /* GATED ON THE DOMINANT LIMITER, which it was not until 2026-09-20.
+       * Appended unconditionally, this block told a reader that "the claim
+       * above says drug is present essentially everywhere" on a run whose
+       * claim above says the opposite -- `resistance`, which is a shipped
+       * verdict and the dominant one on two of the three glioblastoma
+       * sections measured at byte-identical thresholds
+       * (results/multisection_generalisation_2026-09-20.md sec. 4.1). A
+       * falsification test that misdescribes the claim it proposes to falsify
+       * is worse than none: it invites an experiment that cannot bear on the
+       * result. `topKey` is the same key the correctly-scoped sentence above
+       * already uses. */
+      topKey === 'dose'
+        ? 'The claim above says drug is present essentially everywhere in this '
+          + 'section and is essentially everywhere below the concentration that '
+          + 'produces half its effect. Finding tumour regions with no drug in '
+          + 'them would refute the delivery half directly. '
+        : 'The claim above is about THIS section: a measured map disagreeing '
+          + 'with it in this tissue would refute it. It is not a statement '
+          + 'about tissue in general — at byte-identical thresholds this '
+          + 'engine returns a different dominant limiter on other '
+          + 'glioblastoma sections. ',
       Number.isFinite(fold)
         ? `Finding concentrations at or above ${num(fold, 2)}x what this run `
           + 'puts in the median tumour cell would refute the potency half. '

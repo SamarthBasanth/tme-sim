@@ -247,7 +247,7 @@ export const METRICS = {
       + 'a section whose panel cannot measure hypoxia it moves by up to 0.3252 '
       + 'absolute (1.77x) purely with which cell-state route is chosen, with '
       + 'tissue, drug, transport and RNG held identical. What this run supports '
-      + 'is the delivery-versus-potency split among survivors, above — a ratio '
+      + 'is the per-cell survival split among survivors, above — a ratio '
       + 'inside one map — not this level. Full statement in Caveats, below.',
   },
   mean_tumor_auc: {

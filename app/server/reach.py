@@ -113,7 +113,12 @@ Let ``AUC(x)`` be the transport solve's exposure field (uM*s).
   point, the engine's own banding (``tmesim.cells.agents.update_cell_states``) —
   so the two cannot disagree about which cells they are talking about.
 * **The curve** — ``F(x)`` over the fixed log ladder :data:`REACH_LADDER`.
-* **The headline** — ``F(0.1)``, picked off that ladder, not recomputed.
+* **The ladder headline point** — ``F(0.1)``, picked off that ladder, not
+  recomputed. It is NOT the product headline; :data:`CONVENTION_NOTE` says so
+  and says why. It reads 0 on all three single-cell GBM sections measured at
+  dx = 30 (results/multisection_generalisation_2026-09-20.md sec. 5.5), which
+  is the de-headlining decision arriving as a measurement rather than a
+  preference.
 * **The scale-free falloff** — the same distance bins that produced ``E_ref``,
   each bin's mean AUC divided by ``E_ref``: exposure vs distance from the nearest
   vessel, normalised, with the bin distances and per-bin counts.
@@ -196,7 +201,8 @@ __all__ = [
 #: rather than a constant of nature.
 REACH_LADDER: Sequence[float] = (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0)
 
-#: The headline point of the ladder. It is a member of :data:`REACH_LADDER` and
+#: The headline point of the LADDER, not of the product — see
+#: :data:`CONVENTION_NOTE`. It is a member of :data:`REACH_LADDER` and
 #: the headline is read OFF the ladder, never recomputed.
 HEADLINE_X: float = 0.1
 
@@ -214,9 +220,21 @@ CONVENTION_NOTE: str = (
     "post-hoc selection wearing a convention's clothes, which is exactly how "
     "'1x IC50' came to be defended. The headline is instead the delivery spread "
     "(P90/P10 of tumour-cell exposure), which needs no threshold at all and "
-    "carries signal even where the map is flat. The full F(x) ladder is still "
-    "returned, and is still the evidence — read the curve, not any one point "
-    "on it."
+    "carries signal even where the map is flat. THAT PROMOTION WAS MADE ON THE "
+    "FLAGSHIP ALONE AND HAS SINCE BEEN CHECKED ON MORE THAN ONE SPECIMEN: "
+    "across three single-cell GBM sections from three donors, one compound, "
+    "byte-identical thresholds, the delivery spread reads 1.9936 / 2.3211 / "
+    "2.5293 — a spread of 1.2687x, the smallest continuous readout in that "
+    "sweep by more than a factor of two — while F(0.1) is 0 on all three and "
+    "F(1.0) differs by 119.9x between the two sections where it is computed. "
+    "On the one section solved at two grids the delivery spread moves 1.0004x "
+    "between dx = 30 and dx = 12 "
+    "(results/multisection_generalisation_2026-09-20.md sec. 4.2, 5.7). READ "
+    "THAT AT ITS ACTUAL STRENGTH: it is reproducibility of MAGNITUDE on three "
+    "specimens, NOT evidence that this statistic discriminates between "
+    "tissues, and three specimens is three specimens. The full F(x) ladder is "
+    "still returned, and is still the evidence — read the curve, not any one "
+    "point on it."
 )
 
 #: What the ratio IS protected against, at the strength each was measured, and
