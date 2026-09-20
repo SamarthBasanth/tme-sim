@@ -1,5 +1,16 @@
 # Verification routes — what this engine can be scored against, today, without a clinical outcome
 
+> ## CORRECTION (2026-09-20, same day) — R12 says "ranks first"; the source ranks it second
+>
+> R12 (line ~815) describes a second section as *"the item `results/CLAIM_INVENTORY.md` §6 ranks **first** among everything that would change this project's honest self-assessment"*. §6's list is numbered **0–5**, and that item is number **1**. Item **0** is *"Reconciling `vivum validate` with `kill_calibration_breast.md`"*, of which §6 says: *"It is also the cheapest item on this list."*
+>
+> The item is ranked **second**, above everything else but behind an unresolved disagreement between the shipping tool and the flagship report about how many drugs currently fail.
+>
+> Corrected here because this file is where the phrasing ORIGINATED: `results/multisection_generalisation_2026-09-20.md` §0 inherited it verbatim and has its own correction block. That is the whole mechanism this project keeps re-finding — a phrase travelling between documents faster than anyone re-checks it against its source, and gaining authority at each hop because it now appears in two places. Two hops is where it was caught this time.
+>
+> R12's substance is unaffected: a second section is still ranked above every other item on that list.
+
+
 **Date: 2026-09-20. Status: SURVEY. Nothing here is a result.** No number below is an
 outcome of running anything. Every number is either (a) a published measurement I
 fetched in this pass, with the URL and the sentence I am relying on recorded in §6,

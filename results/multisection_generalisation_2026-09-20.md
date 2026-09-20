@@ -1,5 +1,27 @@
 # POST-HOC REPORT OF AN EXISTING COMPUTATION — seven GBM sections, one compound, solved 2026-08-23 and read for the first time today
 
+> ## CORRECTION (2026-09-20, same day) — two statements in this file are contradicted by its own tables
+>
+> Added by a later pass in the same session. **The tables are correct; two sentences that summarise them are not.** Appended rather than edited, which is this directory's rule: a dated record is corrected in view of the reader, never rewritten underneath them.
+>
+> **1 — "`F(0.1)` = 0 everywhere" is contradicted by this file's own §5.5 and §5.6.** §4.4 item 4 reads *"`F(0.1)` = 0 everywhere, single-cell and spot alike. Stable at the value that makes it useless."* Two tables below it print otherwise:
+>
+> | section | `F(0.1)` as printed here |
+> |---|---:|
+> | `visium_10x_parent_gbm` (§5.5, §5.6) | **0.001811** |
+> | `xenium_319 @ dx 12` (§5.6) | **0.000498** |
+>
+> Six of eight entries are 0; two are not. The corrected statement is **"`F(0.1)` = 0 on six of the eight entries, and below 0.2% on the other two"** — which supports the same conclusion (the readout carries almost no information at this threshold) without asserting a uniformity the data does not show. The word doing the damage is *everywhere*: it converts a strong empirical pattern into a false universal, and a reader checking one row finds the file disagreeing with itself.
+>
+> **2 — "ranks first" overstates where `CLAIM_INVENTORY.md` §6 puts a second section.** §0 of this file says §6 ranks *"A second section, same tumour type"* **first** among everything that would change the project's honest self-assessment. §6's list is numbered **0–5**, and that item is number **1**. Item **0** is *"Reconciling `vivum validate` with `kill_calibration_breast.md`"*, which states of itself: *"It is also the cheapest item on this list."*
+>
+> So §6 ranks a second section **second**, behind an unresolved disagreement between the shipping tool and the flagship report about how many drugs fail. That does not weaken this file's reason to exist — the item is still ranked above everything else — but "first" is not what the source says, and the item actually ranked first is a live internal contradiction about a *count that is currently quoted*.
+>
+> Provenance, because it matters for how far this spreads: the "first" phrasing is inherited from `verification_routes_2026-09-20.md` R12 rather than invented here. That is the same claim-surface drift this project keeps finding — a phrasing propagating between documents faster than anyone re-checks it against the source.
+>
+> Nothing else in this file is disputed by this correction. Its central result — that the per-cell verdict takes three different values across sections under byte-identical thresholds, and that the flagship is the outlier — is unaffected by either item.
+
+
 **Status: POST-HOC REPORT OF AN EXISTING COMPUTATION. NOT a pre-registered
 test.** The computation this document describes was run on **2026-08-23** and
 written to `results/multisection_generalisation.json`. I read that file on
