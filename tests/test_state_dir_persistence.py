@@ -293,3 +293,59 @@ class TestTheDrugCatalogueIsCompiledOnce:
             api.drug_rows()
         elapsed = time.perf_counter() - t0
         assert elapsed < 1.0, f"50 warm reads took {elapsed:.3f}s"
+
+
+class TestTheBodyCapCannotBeLiedTo:
+    """The 4 MB cap was enforced on Content-Length, a client-supplied header.
+
+    Its own docstring said so honestly -- "may be absent or a lie" -- and a
+    security pass on 2026-09-20 showed the lie is free: the same body that
+    earns a 413 with a declared length sailed through under
+    `Transfer-Encoding: chunked`, because no header declares a size. Only
+    `protocol_api` used `_capped_body`; the other `request.json()` sites were
+    uncapped in practice.
+    """
+
+    @staticmethod
+    def _client():
+        os.environ["TMESIM_STUDIO_API_KEY"] = "k" * 24
+        from fastapi.testclient import TestClient
+        import app.server.api as api
+        return TestClient(api.create_app()), api.MAX_REQUEST_BODY_BYTES
+
+    def test_an_undeclared_oversized_body_is_refused(self):
+        import json as _json
+        client, cap = self._client()
+        headers = {"X-API-Key": "k" * 24, "Content-Type": "application/json"}
+        big = _json.dumps({"name": "x", "notes": "A" * (cap + 1000)}).encode()
+
+        def chunked():
+            for i in range(0, len(big), 65536):
+                yield big[i:i + 65536]
+
+        r = client.post("/api/projects", headers=headers, content=chunked())
+        assert r.status_code == 413, (
+            "a body over the cap was accepted because it declared no length; "
+            "the cap is enforced on a header the client controls")
+        # The refusal must not echo a size -- the read STOPS at the cap, so any
+        # number would be where we stopped, not how big the body was.
+        body = r.text
+        assert str(len(big)) not in body, body[:200]
+
+    def test_a_declared_oversized_body_is_still_refused(self):
+        import json as _json
+        client, cap = self._client()
+        headers = {"X-API-Key": "k" * 24, "Content-Type": "application/json"}
+        big = _json.dumps({"name": "x", "notes": "A" * (cap + 1000)}).encode()
+        assert client.post("/api/projects", headers=headers,
+                           content=big).status_code == 413
+
+    def test_ordinary_requests_are_untouched(self):
+        """The cap must not become the outage. A body-reading middleware that
+        breaks normal traffic is worse than the exhaustion it prevents."""
+        client, _ = self._client()
+        headers = {"X-API-Key": "k" * 24}
+        assert client.post("/api/projects", headers=headers,
+                           json={"name": "small one"}).status_code == 201
+        assert client.get("/api/workspace", headers=headers).status_code == 200
+        assert client.get("/healthz").status_code == 200
