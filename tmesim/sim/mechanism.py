@@ -232,24 +232,68 @@ class MechanismThresholds:
     adequate_ratio: float = 1.0
     resistant_modulation: Optional[float] = None
     stochastic_min_p_kill: Optional[float] = None
+    #: Where the hypoxia half of `resistant_modulation` came from. A real
+    #: field rather than an attribute set after construction, because this is
+    #: a frozen dataclass -- and it SHOULD be frozen: thresholds that can be
+    #: mutated after resolution are thresholds a later line can move.
+    hypoxia_source: Optional[str] = None
 
-    def resolve(self, pd: PDConfig, hill: float) -> "MechanismThresholds":
-        """Return a copy with every ``None`` replaced by its derived value."""
+    def resolve(self, pd: PDConfig, hill: float,
+                drug: Optional["DrugParams"] = None) -> "MechanismThresholds":
+        """Return a copy with every ``None`` replaced by its derived value.
+
+        ``drug`` IS LOAD-BEARING AND WAS MISSING UNTIL 2026-09-20.
+
+        The derived resistance threshold has to be the mildest penalty the KILL
+        MODEL actually applies, or the classifier draws its boundary somewhere
+        the model never goes. This read ``pd.hypoxia_resistance`` directly --
+        the global default -- while ``cells/pkpd.py`` applies a PER-DRUG
+        override when the drug carries one, and that module's docstring says in
+        so many words that any module recomputing this path MUST call
+        ``effective_hypoxia_resistance`` instead of reading the default. This
+        one did not.
+
+        MEASURED on run r_00099 (temozolomide, flagship): the threshold was
+        recorded as 0.50 from ``max(0.35, 0.50)``, while the model applies 0.80
+        to that compound, so the correct derivation is ``max(0.80, 0.50)``.
+
+        Latent on the flagship, which has no hypoxic cells at all -- but it
+        fires wherever the hypoxic band is occupied, and two independent audits
+        found it on the same day from opposite directions.
+
+        ``drug=None`` keeps the old behaviour and SAYS SO in the resolved
+        thresholds, rather than being silently indistinguishable from a drug
+        that happens to set no override.
+        """
         res = self.resistant_modulation
+        hyp_source = None
         if res is None:
-            res = max(float(pd.hypoxia_resistance),
-                      float(pd.quiescent_resistance))
+            if drug is not None:
+                from ..cells.pkpd import effective_hypoxia_resistance
+
+                hyp = float(effective_hypoxia_resistance(drug, pd))
+                hyp_source = "drug override via cells.pkpd"
+            else:
+                hyp = float(pd.hypoxia_resistance)
+                hyp_source = ("PDConfig default -- no drug was supplied, so a "
+                              "per-drug override could not be seen")
+            res = max(hyp, float(pd.quiescent_resistance))
         floor = self.stochastic_min_p_kill
         if floor is None:
             r = float(self.adequate_ratio)
             f = (r ** float(hill)) / (1.0 + r ** float(hill)) if r > 0 else 0.0
             floor = f * res
-        return MechanismThresholds(
+        out = MechanismThresholds(
             unreached_ratio=float(self.unreached_ratio),
             adequate_ratio=float(self.adequate_ratio),
             resistant_modulation=float(res),
             stochastic_min_p_kill=float(floor),
+            # Recorded so it reaches the run document: a reader who sees 0.50
+            # for a compound the model penalises at 0.80 should be able to
+            # tell whether the drug was consulted, without re-deriving it.
+            hypoxia_source=hyp_source,
         )
+        return out
 
     def as_dict(self) -> Dict:
         return {
@@ -257,6 +301,7 @@ class MechanismThresholds:
             "adequate_ratio": self.adequate_ratio,
             "resistant_modulation": self.resistant_modulation,
             "stochastic_min_p_kill": self.stochastic_min_p_kill,
+            "hypoxia_source": getattr(self, "hypoxia_source", None),
         }
 
 
@@ -421,6 +466,7 @@ def attribute(
     kill_fraction: float,
     pd: Optional[PDConfig] = None,
     thresholds: Optional[MechanismThresholds] = None,
+    drug: Optional["DrugParams"] = None,
 ) -> Dict:
     """Classify every cell, aggregate the survivals, and verify the total.
 
@@ -436,7 +482,8 @@ def attribute(
     """
     pd = pd if pd is not None else PDConfig()
     hill = float(diagnostics.get("hill", 1.0))
-    resolved = (thresholds or MechanismThresholds()).resolve(pd, hill)
+    resolved = (thresholds or MechanismThresholds()).resolve(
+        pd, hill, drug=drug)
 
     labels = classify(cell_type, diagnostics, resolved)
     rec = reconcile(labels, kill_fraction)

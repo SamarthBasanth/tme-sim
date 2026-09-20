@@ -237,3 +237,98 @@ def test_compile_is_deterministic_with_fixed_seed():
     dp_b = compile_drug.molecule_to_drugparams(
         library.get_molecule("temozolomide"), brownian_kw=kw)
     assert dp_a.diffusivity == dp_b.diffusivity
+
+
+#: Sentinel for "this descriptor was never computed", as distinct from a
+#: descriptor whose value happens to be zero. Conflating those two is the
+#: exact defect the class below guards.
+class _Absent:
+    def __repr__(self):  # pragma: no cover - debugging aid only
+        return "<absent>"
+
+
+_ABSENT = _Absent()
+
+
+class _FakeMolecule:
+    """The minimum surface ``build_profile`` touches: a ``descriptors`` dict.
+
+    A real ``Molecule`` needs RDKit and a SMILES parse; this test is about one
+    branch reached from ``descriptors``, and building a real molecule would
+    make the test depend on a chemistry toolkit to check a dictionary lookup.
+    """
+
+    def __init__(self, descriptors):
+        self.descriptors = dict(descriptors)
+        self.name = "probe"
+        self.smiles = "CCO"
+
+    def get(self, key, default=None):
+        """``build_profile`` reads mw / is_antibody / radius through this as
+        well as through ``.descriptors``; a stand-in that answers only one of
+        the two fails on an AttributeError that says nothing about the branch
+        under test."""
+        return self.descriptors.get(key, default)
+
+
+class TestAnAbsentDescriptorIsRefusedNotDefaulted:
+    """`compile_drug.build_profile` defaulted a missing logP/HBD to zero.
+
+    The two-route law's membrane term is ``log K = logP - 1.34*HBD``, so
+    ``(0, 0)`` is ``log K = 0.00`` — the **85th percentile** of membrane
+    openness across the scored benchmark. Defaulting silently asserted that an
+    unknown molecule crosses membranes more easily than four out of five known
+    ones.
+
+    MEASURED 2026-09-20 at MW 263 Da: 45.68 → 189.34 um^2/s, a **4.14x
+    inflation** — carried to the user with the law's full "scored against the
+    benchmark, r^2 = 0.718" provenance stapled to it, because the provenance
+    string does not know the descriptors were absent.
+
+    The benchmark experiment already excludes no-logP compounds as
+    UNSCOREABLE. The shipping path compiled them confidently. Both positions
+    cannot be right, and the experiment's is the correct one.
+    """
+
+    def _mol(self, **over):
+        """A descriptor dict shaped like the real one, minus what we drop."""
+        d = {"mw": 263.0, "logp": 1.2, "hbd": 1}
+        for k, v in over.items():
+            if v is _ABSENT:
+                d.pop(k, None)
+            else:
+                d[k] = v
+        return d
+
+    @pytest.mark.parametrize("missing", ["logp", "hbd"])
+    def test_a_missing_descriptor_raises_rather_than_compiling(self, missing):
+        from tmesim.molecular import compile_drug as cd
+
+        mol = _FakeMolecule(self._mol(**{missing: _ABSENT}))
+        with pytest.raises(ValueError) as exc:
+            cd.build_profile(mol, two_route=True)
+        msg = str(exc.value)
+        assert missing in msg
+        # The refusal must say what to DO, not merely that it refused.
+        assert "two_route=False" in msg, \
+            "a refusal that names no alternative is a dead end"
+
+    def test_a_genuine_zero_is_not_treated_as_absent(self):
+        """`or 0.0` swallowed a real 0.0 into the same branch as a missing
+        key, so a compound whose logP genuinely IS zero was indistinguishable
+        from one whose logP was never computed. Those are different facts."""
+        from tmesim.molecular import compile_drug as cd
+
+        prof = cd.build_profile(_FakeMolecule(self._mol(logp=0.0, hbd=0)),
+                                two_route=True)
+        assert float(prof.effective_diffusivity) > 0.0
+
+    def test_the_paracellular_path_is_still_open_without_descriptors(self):
+        """The refusal is scoped to the law that NEEDS the descriptors. A
+        caller who wants the paracellular-only answer may still have it — and
+        gets it labelled as that, rather than as the two-route result."""
+        from tmesim.molecular import compile_drug as cd
+
+        prof = cd.build_profile(_FakeMolecule(self._mol(logp=_ABSENT)),
+                                two_route=False)
+        assert float(prof.effective_diffusivity) > 0.0

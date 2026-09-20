@@ -38,8 +38,11 @@ is skipped unless both sections are cached.
 """
 from __future__ import annotations
 
+import json
 import os
+import shutil
 import sys
+import time
 
 import pytest
 
@@ -60,6 +63,7 @@ from app.server.projects import (  # noqa: E402
     ProjectStore,
     capability_report,
     compare_project,
+    run_composition,
     spec_signature,
 )
 
@@ -83,14 +87,20 @@ requires_both = pytest.mark.skipif(
 # --------------------------------------------------------------------------- #
 @pytest.fixture
 def store(tmp_path):
-    return ProjectStore(root=str(tmp_path / "projects"))
+    # runs_root is pinned to the tmp dir, NOT left to default to the real
+    # app/runs/: the thumbnail reads run documents off disk, and a test that
+    # silently read this developer's 96 real runs would pass or fail on what
+    # happens to be cached in this checkout.
+    return ProjectStore(root=str(tmp_path / "projects"),
+                        runs_root=str(tmp_path / "runs"))
 
 
 @pytest.fixture
 def client(tmp_path):
     """A TestClient whose runs AND projects are isolated from the real dirs."""
     manager = JobManager(root=str(tmp_path / "runs"), start_worker=False)
-    app = create_app(manager, ProjectStore(root=str(tmp_path / "projects")))
+    app = create_app(manager, ProjectStore(root=str(tmp_path / "projects"),
+                                           runs_root=str(tmp_path / "runs")))
     with TestClient(app) as c:
         c._manager = manager  # type: ignore[attr-defined]
         yield c
@@ -829,3 +839,424 @@ class TestRoutes:
     def test_health_reports_the_project_store(self, client):
         h = client.get("/api/health").json()
         assert "projects_dir" in h and h["projects"] == 0
+
+
+# --------------------------------------------------------------------------- #
+# 6. The workspace additions — last_opened_at, duplicate, thumbnail
+#
+# docs/WORKSPACE_CONTRACT.md §1, §3 and §4. Three things the home page needs and
+# three different ways they could lie:
+#
+#   §3 last_opened_at — by claiming an open that never happened. Every project
+#      in this store predates the field, and the only honest value for a
+#      document that never recorded one is null. Backfilling it with now() would
+#      put every old project at the top of a recency sort; backfilling it with
+#      created_at would silently redefine "opened" as "created".
+#   §1 duplicate — by copying, re-running, or disturbing a run. A project owns
+#      nothing but ids (§2); a duplicate holds the SAME ids, and app/runs/ must
+#      come out of the operation byte-identical.
+#   §4 thumbnail — by drawing a chart nobody measured. An empty stacked bar
+#      reads as "all one cell type" and a zero reads as "measured, and it was
+#      zero". Neither has been computed when no run has finished, so the only
+#      other output is a refusal carrying the true reason.
+#
+# These tests build run documents on disk by hand rather than simulating,
+# because the thumbnail reads app/runs/<id>/result.json and that file format —
+# not the JobManager's memory — is what it has to survive.
+# --------------------------------------------------------------------------- #
+#: Written into a run document and asserted as LITERALS below. They are NOT read
+#: back out of the module or out of the payload they are checking: a test whose
+#: expected value is derived from the thing under test moves with the bug.
+_THUMB_FRACTIONS = {"TUMOR": 0.5823855993347519, "STROMAL": 0.11776359233986353,
+                    "IMMUNE": 0.19480519480519481,
+                    "ENDOTHELIAL": 0.10504561352018979, "NECROTIC": 0.0}
+_THUMB_N_CELLS = 40887
+
+
+def _write_run_doc(runs_root, run_id, *, status="done", section=SECTION_A,
+                   report="default", drug="cisplatin"):
+    """Persist one run document exactly where ``JobManager._persist`` puts it."""
+    d = os.path.join(runs_root, run_id)
+    os.makedirs(d, exist_ok=True)
+    if report == "default":
+        report = {
+            "n_cells": _THUMB_N_CELLS,
+            "celltype_fractions": dict(_THUMB_FRACTIONS),
+            "celltype_counts": {"TUMOR": 23812, "STROMAL": 4815, "IMMUNE": 7965,
+                                "ENDOTHELIAL": 4295, "NECROTIC": 0},
+            "source": "xenium",
+        }
+    doc = {"run_id": run_id, "status": status, "created_at": 1000.0,
+           "spec": {"section": section, "drug": drug, "dx_um": 30.0},
+           "metrics": {"kill_fraction": 0.1}, "report": report}
+    with open(os.path.join(d, "result.json"), "w") as fh:
+        json.dump(doc, fh, indent=1)
+    return doc
+
+
+def _seed_project(store, name, specimens, *, legacy=False):
+    """Create a project and give it ``specimens`` by writing project.json.
+
+    ``legacy=True`` writes the document a pre-2026-09-20 build would have
+    written: no ``last_opened_at`` key at all. That is the migration case, and
+    it cannot be produced through the store's own writers any more.
+    """
+    p = store.create(name)
+    path = os.path.join(store.root, p["id"], "project.json")
+    with open(path) as fh:
+        doc = json.load(fh)
+    doc["specimens"] = specimens
+    if legacy:
+        doc.pop("last_opened_at", None)
+    with open(path, "w") as fh:
+        json.dump(doc, fh, indent=1)
+    return p["id"]
+
+
+def _fingerprint(path):
+    """(bytes, mtime_ns) — what "this file was not touched" actually means."""
+    st = os.stat(path)
+    with open(path, "rb") as fh:
+        return fh.read(), st.st_mtime_ns
+
+
+class TestLastOpenedAt:
+    """§3. ``updated_at`` is the document; ``last_opened_at`` is a human."""
+
+    def test_a_project_that_predates_the_field_reads_as_null(self, store):
+        pid = _seed_project(store, "legacy study", [], legacy=True)
+        on_disk = json.load(open(os.path.join(store.root, pid, "project.json")))
+        assert "last_opened_at" not in on_disk, "the legacy fixture must be legacy"
+
+        doc = store.get(pid, refresh_capability=False)
+        assert doc["last_opened_at"] is None
+        (row,) = store.list()
+        assert row["last_opened_at"] is None
+
+    def test_the_migration_is_never_now_and_never_created_at(self, store):
+        """The two wrong defaults, named, because both look harmless."""
+        pid = _seed_project(store, "legacy study", [], legacy=True)
+        created = store.get(pid, refresh_capability=False)["created_at"]
+        before = time.time()
+        value = store.get(pid, refresh_capability=False)["last_opened_at"]
+        after = time.time()
+        assert value is None
+        # not "now"
+        assert not (isinstance(value, float) and before <= value <= after)
+        # not created_at
+        assert value != created
+
+    def test_reading_a_legacy_project_rewrites_no_document(self, store):
+        """A read must not write. Backfilling on read would rewrite the whole
+        store on the first home-page load and move every mtime."""
+        pid = _seed_project(store, "legacy study", [], legacy=True)
+        path = os.path.join(store.root, pid, "project.json")
+        before = _fingerprint(path)
+
+        store.get(pid, refresh_capability=False)
+        store.list()
+        store.list()
+        store.thumbnail(pid)
+
+        assert _fingerprint(path) == before
+        assert b"last_opened_at" not in before[0]
+        assert b"last_opened_at" not in _fingerprint(path)[0]
+
+    def test_mark_opened_survives_the_round_trip(self, store):
+        pid = _seed_project(store, "S", [], legacy=True)
+        out = store.mark_opened(pid)
+        assert out["ok"] is True
+        stamped = out["last_opened_at"]
+        assert isinstance(stamped, float)
+
+        reopened = ProjectStore(root=store.root, runs_root=store.runs_root)
+        assert reopened.get(pid, refresh_capability=False)["last_opened_at"] \
+            == stamped
+        assert reopened.list()[0]["last_opened_at"] == stamped
+
+    def test_mark_opened_does_not_move_updated_at(self, store):
+        """THE distinction. ``updated_at`` says a background job attached a run;
+        it cannot say that if looking at a project counts as touching it."""
+        pid = _seed_project(store, "S", [])
+        was = store.get(pid, refresh_capability=False)["updated_at"]
+        time.sleep(0.01)
+        out = store.mark_opened(pid)
+        now = store.get(pid, refresh_capability=False)
+
+        assert now["updated_at"] == was
+        assert out["updated_at"] == was
+        assert now["last_opened_at"] > was
+        # ...and a real document change still does move it.
+        store.update(pid, notes="edited")
+        assert store.get(pid, refresh_capability=False)["updated_at"] > was
+
+    def test_mark_opened_is_idempotent_and_404s_on_a_stranger(self, store):
+        pid = _seed_project(store, "S", [])
+        first = store.mark_opened(pid)["last_opened_at"]
+        time.sleep(0.01)
+        second = store.mark_opened(pid)["last_opened_at"]
+        assert second > first
+        assert set(store.get(pid, refresh_capability=False)) == set(
+            store.get(pid, refresh_capability=False))
+        with pytest.raises(ProjectError) as exc:
+            store.mark_opened("p_99999")
+        assert exc.value.status == 404
+
+    def test_the_summary_carries_the_contract_field_names(self, store):
+        """``ProjectSummary`` is a hard interface: another agent is building
+        GET /api/workspace against these keys."""
+        _seed_project(store, "S", [])
+        (row,) = store.list()
+        for key in ("id", "name", "notes", "created_at", "updated_at",
+                    "last_opened_at", "n_specimens", "n_runs", "sections",
+                    "thumbnail"):
+            assert key in row, f"ProjectSummary lost {key!r}"
+
+
+class TestDuplicate:
+    """§1. Specimens and run REFERENCES. Nothing in app/runs/ moves."""
+
+    @staticmethod
+    def _two_specimens():
+        return [
+            {"id": "s_00001", "label": "Patient A", "section": SECTION_A,
+             "notes": "n", "created_at": 500.0,
+             "run_ids": ["r_00001", "r_00002"],
+             "capability": {"section": SECTION_A, "panel": "brain_319"}},
+            {"id": "s_00002", "label": "Patient B", "section": SECTION_B,
+             "notes": "", "created_at": 501.0, "run_ids": ["r_00003"],
+             "capability": {"section": SECTION_B, "panel": "io_480"}},
+        ]
+
+    def test_specimens_and_run_references_are_copied(self, store):
+        pid = _seed_project(store, "Original", self._two_specimens())
+        dup = store.duplicate(pid)
+
+        assert dup["id"] != pid
+        assert dup["name"] == "Original (copy)"
+        assert dup["duplicated_from"] == pid
+        assert dup["last_opened_at"] is None
+        assert [s["id"] for s in dup["specimens"]] == ["s_00001", "s_00002"]
+        assert [s["label"] for s in dup["specimens"]] == ["Patient A", "Patient B"]
+        assert [s["section"] for s in dup["specimens"]] == [SECTION_A, SECTION_B]
+        assert [s["run_ids"] for s in dup["specimens"]] == \
+            [["r_00001", "r_00002"], ["r_00003"]]
+
+        # ...and it survives the round trip.
+        reopened = ProjectStore(root=store.root, runs_root=store.runs_root)
+        got = reopened.get(dup["id"], refresh_capability=False)
+        assert [s["run_ids"] for s in got["specimens"]] == \
+            [["r_00001", "r_00002"], ["r_00003"]]
+
+    def test_the_original_document_is_not_touched(self, store):
+        pid = _seed_project(store, "Original", self._two_specimens())
+        path = os.path.join(store.root, pid, "project.json")
+        before = _fingerprint(path)
+
+        store.duplicate(pid, name="A copy")
+
+        assert _fingerprint(path) == before, \
+            "duplicate() wrote to the project it was copying FROM"
+        src = store.get(pid, refresh_capability=False)
+        assert src["name"] == "Original"
+        assert src["last_opened_at"] is None
+        assert "duplicated_from" not in src
+
+    def test_no_run_is_re_executed_or_copied(self, store):
+        """app/runs/ is the single store. A duplicate is ids, not results."""
+        runs = store.runs_root
+        for rid in ("r_00001", "r_00002", "r_00003"):
+            _write_run_doc(runs, rid, section=SECTION_A)
+        before = {name: _fingerprint(os.path.join(runs, name, "result.json"))
+                  for name in sorted(os.listdir(runs))}
+
+        pid = _seed_project(store, "Original", self._two_specimens())
+        store.duplicate(pid)
+
+        after = {name: _fingerprint(os.path.join(runs, name, "result.json"))
+                 for name in sorted(os.listdir(runs))}
+        assert after == before, "duplicate() created, copied or rewrote a run"
+        assert sorted(after) == ["r_00001", "r_00002", "r_00003"]
+
+    def test_both_projects_resolve_the_same_run(self, store):
+        """Two specimens in two projects legitimately point at ONE run id."""
+        _write_run_doc(store.runs_root, "r_00001", section=SECTION_A)
+        pid = _seed_project(store, "Original", self._two_specimens())
+        dup = store.duplicate(pid)["id"]
+
+        seen = []
+
+        def resolver(run_id):
+            seen.append(run_id)
+            return {"run_id": run_id, "status": "done",
+                    "spec": {"section": SECTION_A},
+                    "report": {"n_cells": _THUMB_N_CELLS,
+                               "celltype_fractions": dict(_THUMB_FRACTIONS)}}
+
+        a = store.thumbnail(pid, resolver)
+        b = store.thumbnail(dup, resolver)
+        assert a["run_id"] == b["run_id"] == "r_00001"
+        assert a["type_fractions"] == b["type_fractions"]
+        assert seen == ["r_00001", "r_00001"]
+
+        # The same id in both documents, read back off disk.
+        ids = lambda p: [s["run_ids"] for s in  # noqa: E731
+                         store.get(p, refresh_capability=False)["specimens"]]
+        assert ids(pid) == ids(dup) == [["r_00001", "r_00002"], ["r_00003"]]
+
+    def test_an_explicit_name_and_the_error_cases(self, store):
+        pid = _seed_project(store, "Original", [])
+        assert store.duplicate(pid, name="  Renamed  ")["name"] == "Renamed"
+        with pytest.raises(ProjectError) as exc:
+            store.duplicate(pid, name="   ")
+        assert exc.value.status == 400
+        with pytest.raises(ProjectError) as exc:
+            store.duplicate("p_99999")
+        assert exc.value.status == 404
+
+
+class TestThumbnail:
+    """§4. A measured composition, or a refusal that says why. Never a shape."""
+
+    _SPECIMEN = [{"id": "s_00001", "label": "A", "section": SECTION_A,
+                  "run_ids": ["r_00001"], "capability": {}}]
+
+    def test_a_finished_run_supplies_the_composition_it_recorded(self, store):
+        _write_run_doc(store.runs_root, "r_00001", section=SECTION_A)
+        pid = _seed_project(store, "S", self._SPECIMEN)
+
+        t = store.thumbnail(pid)
+        assert t["kind"] == "composition"
+        assert t["section"] == SECTION_A
+        # Literals, not values read back out of the payload under test.
+        assert t["n_cells"] == 40887
+        assert t["type_fractions"]["TUMOR"] == 0.5823855993347519
+        assert t["type_fractions"]["ENDOTHELIAL"] == 0.10504561352018979
+        assert t["type_fractions"]["NECROTIC"] == 0.0
+        assert set(t["type_fractions"]) == {"TUMOR", "STROMAL", "IMMUNE",
+                                            "ENDOTHELIAL", "NECROTIC"}
+        assert store.list()[0]["thumbnail"] == t
+
+    @pytest.mark.parametrize("status", ["queued", "running", "error",
+                                        "cancelled"])
+    def test_an_unfinished_run_is_never_drawn(self, store, status):
+        """A failed run still carries a report — the reconstruction succeeds
+        before the solve fails. Drawing it presents a run that did not finish
+        as one that did."""
+        _write_run_doc(store.runs_root, "r_00001", status=status,
+                       section=SECTION_A)
+        pid = _seed_project(store, "S", self._SPECIMEN)
+
+        t = store.thumbnail(pid)
+        assert t["kind"] == "none"
+        assert status in t["reason"]
+        assert "type_fractions" not in t and "n_cells" not in t
+
+    def test_no_run_at_all_refuses_with_a_true_reason(self, store):
+        empty = _seed_project(store, "no specimens", [])
+        t = store.thumbnail(empty)
+        assert t["kind"] == "none" and "no specimens" in t["reason"]
+
+        no_runs = _seed_project(store, "no runs", [
+            {"id": "s_00001", "label": "A", "section": SECTION_A,
+             "run_ids": [], "capability": {}}])
+        t = store.thumbnail(no_runs)
+        assert t["kind"] == "none" and "no run is attached" in t["reason"]
+        assert "1 specimen" in t["reason"]
+
+    def test_a_missing_run_is_reported_not_drawn_as_empty(self, store):
+        pid = _seed_project(store, "S", self._SPECIMEN)   # r_00001 never written
+        t = store.thumbnail(pid)
+        assert t["kind"] == "none"
+        assert "not in app/runs/" in t["reason"]
+
+    def test_a_finished_run_with_no_composition_says_so(self, store):
+        """Zeros are not the answer to "nothing was measured"."""
+        _write_run_doc(store.runs_root, "r_00001", report={"n_cells": 40887})
+        pid = _seed_project(store, "S", self._SPECIMEN)
+        t = store.thumbnail(pid)
+        assert t["kind"] == "none"
+        assert "celltype_fractions" in t["reason"]
+        assert "r_00001" in t["reason"]
+
+    def test_the_first_usable_run_wins_and_the_scan_stops_there(self, store):
+        """Cost: list() runs on every home-page load. The scan must not read
+        every run of every project to draw one card."""
+        specimens = [{"id": "s_00001", "label": "A", "section": SECTION_A,
+                      "run_ids": ["r_00001", "r_00002", "r_00003"],
+                      "capability": {}}]
+        pid = _seed_project(store, "S", specimens)
+        seen = []
+
+        def resolver(run_id):
+            seen.append(run_id)
+            return {"run_id": run_id, "status": "done",
+                    "spec": {"section": SECTION_A},
+                    "report": {"n_cells": _THUMB_N_CELLS,
+                               "celltype_fractions": dict(_THUMB_FRACTIONS)}}
+
+        t = store.thumbnail(pid, resolver)
+        assert t["run_id"] == "r_00001"
+        assert seen == ["r_00001"], \
+            f"the scan read {len(seen)} run(s) to draw one card: {seen}"
+
+    def test_the_cache_does_not_outlive_the_run_document(self, store):
+        """A run that finishes AFTER the first home-page load must appear. A
+        thumbnail cached against the PROJECT would not: a run finishing does
+        not touch project.json."""
+        _write_run_doc(store.runs_root, "r_00001", status="running")
+        pid = _seed_project(store, "S", self._SPECIMEN)
+        assert store.thumbnail(pid)["kind"] == "none"
+
+        time.sleep(0.01)
+        _write_run_doc(store.runs_root, "r_00001", status="done")
+        assert store.thumbnail(pid)["kind"] == "composition"
+
+        # ...and a run removed from app/runs/ stops being drawn.
+        shutil.rmtree(os.path.join(store.runs_root, "r_00001"))
+        gone = store.thumbnail(pid)
+        assert gone["kind"] == "none" and "not in app/runs/" in gone["reason"]
+
+    def test_run_composition_refuses_the_shapes_it_cannot_measure(self):
+        base = {"run_id": "r_1", "status": "done", "spec": {"section": "sec"},
+                "report": {"n_cells": 10, "celltype_fractions": {"TUMOR": 1.0}}}
+        assert run_composition(base)["type_fractions"] == {"TUMOR": 1.0}
+        assert run_composition(dict(base, status="error")) is None
+        assert run_composition(dict(base, report={})) is None
+        assert run_composition(dict(base, report={"n_cells": 10,
+                                                  "celltype_fractions": {}})) is None
+        assert run_composition(dict(base, report={
+            "celltype_fractions": {"TUMOR": 1.0}})) is None      # no n_cells
+        assert run_composition(dict(base, report={
+            "n_cells": 10, "celltype_fractions": {"TUMOR": "0.5"}})) is None
+        assert run_composition(dict(base, report={
+            "n_cells": 10, "celltype_fractions": {"TUMOR": float("nan")}})) is None
+        assert run_composition(None) is None
+
+    def test_a_run_id_is_never_a_path(self, store):
+        """SECURITY. ``%2e%2e`` was a read-and-delete traversal through
+        ProjectStore._dir (fixed f9d443d). The thumbnail opens
+        app/runs/<run_id>/result.json, so a run_id is a path segment there too,
+        and a project document is a file an operator can edit."""
+        # The runs root MUST exist, or `<root>/../result.json` fails to stat for
+        # the boring reason that `<root>` is not there and this test would pass
+        # while never reaching the traversal it is about.
+        os.makedirs(store.runs_root, exist_ok=True)
+        outside = os.path.dirname(store.runs_root.rstrip(os.sep))
+        with open(os.path.join(outside, "result.json"), "w") as fh:
+            json.dump({"run_id": "canary", "status": "done",
+                       "spec": {"section": "SECRET_SECTION"},
+                       "report": {"n_cells": 1,
+                                  "celltype_fractions": {"CANARY": 1.0}}}, fh)
+
+        for bad in ("..", "../..", "r_0000", "", "r_00001/../..",
+                    "/etc/passwd", "r_00001\x00"):
+            pid = _seed_project(store, f"bad {bad!r}", [
+                {"id": "s_00001", "label": "A", "section": SECTION_A,
+                 "run_ids": [bad], "capability": {}}])
+            t = store.thumbnail(pid)
+            blob = json.dumps(t)
+            assert "CANARY" not in blob, f"{bad!r} read a file outside app/runs/"
+            assert "SECRET_SECTION" not in blob
+            assert t["kind"] == "none", f"{bad!r} produced a thumbnail"
+            assert store._run_path(bad) is None, f"{bad!r} was turned into a path"

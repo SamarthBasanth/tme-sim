@@ -1,0 +1,492 @@
+# CI for the PRODUCT as a user meets it: two pages, the modules they load, and
+# the sentences they carry.
+#
+# WHY A SECOND WORKFLOW RATHER THAN MORE STEPS IN docker.yml.
+#
+# docker.yml's subject is the IMAGE — that it builds on amd64, that it does not
+# run as root, that .dockerignore kept the operator's tissue out of a layer. It
+# is deliberately skipped for pushes that only touch `docs/**` or `*.md`,
+# because those provably cannot change the image.
+#
+# This workflow's subject is the SHIPPED PRODUCT, and one of the three things it
+# checks — the claim surface — lives entirely in `docs/**` and `README.md`. Put
+# here, it runs on every push. Added to docker.yml, `tests/test_doc_claim_surface.py`
+# would have been skipped on exactly the pushes that change its subject: CI over
+# the claim surface that never runs when the claim surface moves. This
+# repository has shipped several checks that passed without testing their
+# subject; that is the shape of the next one, so it is avoided by construction.
+#
+# WHAT EACH JOB WOULD HAVE CAUGHT, measured on 2026-09-20 in a built container:
+#
+#   front-end  `node --check` — the obvious spelling — parses a .js file as
+#              CommonJS. Given a file with a DUPLICATE `export const a`, and
+#              given `await` outside an async function, `node --check` exited 0
+#              on both. `node --input-type=module --check` exited 1 on both.
+#              The wrong flag is a check that cannot fail on the errors it
+#              exists to catch.
+#
+#   pages      With `app/web/home.html` present on disk and no route for it,
+#              GET / served `index.html` — the Studio — and GET /studio was a
+#              404. The static mount is `StaticFiles(directory=app/web,
+#              html=True)` at "/", so "/" resolves to the DIRECTORY INDEX and
+#              Starlette never appends ".html" to a path. Adding the file is
+#              therefore not enough, and the failure is silent: both URLs
+#              answer, one with the wrong page and one with JSON.
+#
+# It NEVER pushes an image and needs no credentials.
+#
+# SHELL HAZARD, same as docker.yml: `set -e` with `pipefail` turns an
+# early-exiting consumer (`head`, `grep -m1`) into a job failure via SIGPIPE.
+# Every pipeline below reads to EOF or is guarded.
+
+name: product
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ======================================================================== #
+  # 1. Things that need no container: module syntax and the claim surface.
+  #    Seconds, not minutes, so it reports before the image job finishes.
+  # ======================================================================== #
+  front-end:
+    name: ES modules + claim surface
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # THE FLAG IS THE POINT. `node --check FILE` parses as CommonJS (or, on
+      # newer Node, as whatever it detects) and has exited 0 on real ES-module
+      # errors in this repository's own files -- see the header for the two
+      # that were planted and measured. `--input-type=module` forces the module
+      # goal, and the source then has to come from STDIN, which is why this
+      # redirects rather than passing a path.
+      #
+      # This is a PARSE, not a link: it proves every module is syntactically a
+      # module, not that its imports resolve. The `pages` job below covers the
+      # other half by fetching every file the container serves.
+      - name: Every app/web/js module parses as an ES MODULE
+        run: |
+          set -uo pipefail
+          fail=0
+          count=0
+          # `find | sort` into a while-read, NOT a glob: the tree is nested
+          # (js/ui/, js/gl/, js/editor/, js/protocol/, js/util/ and now
+          # js/home/), and a shell glob would silently miss a new subdirectory.
+          while IFS= read -r f; do
+            count=$((count + 1))
+            if ! out=$(node --input-type=module --check < "$f" 2>&1); then
+              echo "::error file=$f::does not parse as an ES module"
+              echo "$out"
+              fail=1
+            fi
+          done < <(find app/web/js -type f -name '*.js' | sort)
+          echo "checked $count modules under app/web/js/"
+          if [ "$count" -lt 40 ]; then
+            echo "::error::only $count modules found -- the tree moved and this check is no longer looking at it"
+            fail=1
+          fi
+          exit $fail
+
+      # The same treatment for anything inline. A <script type="module"> in a
+      # page is loaded by the browser as a module and is not covered by the
+      # sweep above, because it is not a .js file.
+      - name: Every page's inline module script parses as an ES MODULE
+        run: |
+          set -uo pipefail
+          fail=0
+          for page in app/web/*.html; do
+            [ -e "$page" ] || continue
+            python3 - "$page" <<'PY' > /tmp/inline.js
+          import re, sys
+          src = open(sys.argv[1], encoding="utf-8").read()
+          blocks = re.findall(
+              r'<script[^>]*type=["\']module["\'][^>]*>(.*?)</script>',
+              src, re.S | re.I)
+          sys.stdout.write("\n".join(blocks))
+          PY
+            if [ -s /tmp/inline.js ]; then
+              if node --input-type=module --check < /tmp/inline.js; then
+                echo "ok    inline module script in $page"
+              else
+                echo "::error file=$page::its inline <script type=\"module\"> does not parse as an ES module"
+                fail=1
+              fi
+            else
+              echo "ok    $page has no inline module script"
+            fi
+          done
+          exit $fail
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # tests/test_doc_claim_surface.py imports os, re and pytest and nothing
+      # else -- it reads the markdown, it does not import the application. So
+      # this needs pytest alone and stays a seconds-long job.
+      - name: Install pytest
+        run: pip install -c constraints.txt pytest
+
+      # CI over README.md, docs/** and the four root contracts. The defect it
+      # exists for is this repository's most persistent one: the engine is
+      # sound and the documents are wrong, because a sentence that was true
+      # when it was written does not notice the code moving underneath it.
+      #
+      # -p no:cacheprovider: nothing here should write into the checkout.
+      - name: The claim surface (README.md, docs/**, the root contracts)
+        run: |
+          set -euo pipefail
+          python -m pytest -q -rfE -p no:cacheprovider tests/test_doc_claim_surface.py
+
+      # Both halves of the deployment page's own count, which is a claim about
+      # itself: every TMESIM_* the server reads must appear on the page, and the
+      # number the section opens with must equal how many there are. Added here
+      # because render.yaml and the Dockerfile's ENV are deployment
+      # configuration, and the page that lists the whole environment surface is
+      # the thing they can silently falsify.
+      - name: Every TMESIM_* the server reads is on the deployment page
+        run: |
+          set -euo pipefail
+          python -m pytest -q -rfE -p no:cacheprovider \
+            tests/test_app_server.py::TestEnvVarsAreDocumented
+
+  # ======================================================================== #
+  # 2. The routes, FROM INSIDE A BUILT CONTAINER.
+  #
+  # Everything here is reachable from the repo with `python -m app.server`, and
+  # that is exactly why it is not enough: a page that works from a checkout and
+  # 404s in the image is the class of bug that ships. The mount is built from
+  # `COPY . .` filtered by .dockerignore, and .dockerignore is a file people
+  # edit.
+  # ======================================================================== #
+  pages:
+    name: both pages served from inside the image
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: vivum-product:ci
+      KEY: ci-pages-key-not-a-secret
+      CONTAINER: vivum-pages
+      # Render's default. Deliberately NOT 8000, so a regression that hardcodes
+      # the port shows up here as a container nothing can reach.
+      PORT_UNDER_TEST: '10000'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # FETCH_SECTION=0, and the reason is that this job's subject is ROUTING.
+      # The build arg changes exactly one thing -- whether `vivum acquire`
+      # downloads ~87 MB of tissue into /app/data_cache -- and touches no route,
+      # no static file, no ENV and no uid. Skipping it keeps this job off an
+      # external download that would make the page contract flaky for a reason
+      # that has nothing to do with pages. docker.yml builds the real artifact,
+      # tissue and all, and asserts what the tissue is for.
+      - name: Build image (no tissue -- this job is about routes)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          build-args: FETCH_SECTION=0
+          tags: ${{ env.IMAGE }}
+          load: true
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # $PORT IS THE WHOLE POINT OF THIS STEP. Render assigns it (default
+      # 10000) and routes to it; a container that ignores it does not fail
+      # loudly -- nothing listens where the platform routes, every request
+      # hangs, the build is green and the dashboard looks alive. The image
+      # honours it by having NO --port in its CMD, so argparse defaults --port
+      # from the environment. An explicit flag would silently re-break it.
+      - name: Start the container on $PORT (not 8000)
+        run: |
+          set -euo pipefail
+          docker run -d --name "$CONTAINER" \
+            -p "127.0.0.1:${PORT_UNDER_TEST}:${PORT_UNDER_TEST}" \
+            -e PORT="$PORT_UNDER_TEST" \
+            -e TMESIM_STUDIO_API_KEY="$KEY" \
+            "$IMAGE"
+          docker ps --filter "name=$CONTAINER"
+
+      # Poll rather than sleep, and bail the moment the container is gone --
+      # no amount of waiting fixes an exited process. The probe is /healthz
+      # WITHOUT a key, which is also the third assertion of this job: a
+      # platform health checker cannot send a header, and this repository has
+      # twice had a health check kill a container that was serving correctly.
+      - name: Wait for /healthz, unauthenticated
+        run: |
+          set -uo pipefail
+          B="http://127.0.0.1:${PORT_UNDER_TEST}"
+          deadline=$((SECONDS + 180))
+          while [ $SECONDS -lt $deadline ]; do
+            if ! docker inspect -f '{{.State.Running}}' "$CONTAINER" | grep -q true; then
+              echo "::error::container exited before answering /healthz"
+              docker logs "$CONTAINER" || true
+              exit 1
+            fi
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 "$B/healthz" || true)
+            if [ "$code" = "200" ]; then
+              echo "/healthz answered 200 on \$PORT=$PORT_UNDER_TEST after ${SECONDS}s, with no API key"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::/healthz never answered 200 on port $PORT_UNDER_TEST within 180s (last code '${code:-none}')."
+          echo "Nothing listening on the assigned port is what \$PORT being ignored looks like: check for a --port flag in the Dockerfile CMD."
+          docker logs "$CONTAINER" || true
+          exit 1
+
+      # GET *and* HEAD. HEAD /healthz returned 404 until it was registered with
+      # @app.api_route(methods=["GET", "HEAD"]) -- while the API-key middleware
+      # had already been written to exempt HEAD on that path, i.e. the gate
+      # expected a probe the router refused. A platform health check configured
+      # for HEAD would have marked a perfectly healthy service down. Nothing
+      # else in this repository probes with HEAD, so nothing else would notice.
+      #
+      # The fail-closed half is asserted too: POST /healthz must NOT be exempt.
+      # Measured 2026-09-20 in a container: 401 with no key, 405 with the key.
+      - name: /healthz answers GET and HEAD, with no API key
+        run: |
+          set -euo pipefail
+          B="http://127.0.0.1:${PORT_UNDER_TEST}"
+          get=$(curl -s -o /dev/null -w '%{http_code}' "$B/healthz")
+          head=$(curl -s -o /dev/null -w '%{http_code}' -I "$B/healthz")
+          post=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$B/healthz")
+          echo "GET=$get HEAD=$head POST(no key)=$post"
+          [ "$get" = "200" ]  || { echo "::error::GET /healthz without a key returned $get, expected 200"; exit 1; }
+          [ "$head" = "200" ] || { echo "::error::HEAD /healthz without a key returned $head, expected 200. A platform probe using HEAD would mark this service down."; exit 1; }
+          [ "$post" = "401" ] || { echo "::error::POST /healthz without a key returned $post, expected 401 -- the liveness exemption must cover GET and HEAD only"; exit 1; }
+          body=$(curl -s "$B/healthz")
+          echo "body: $body"
+          [ "$body" = '{"ok":true}' ] || { echo "::error::/healthz is ungated, so it must say nothing but {\"ok\":true}; it said: $body"; exit 1; }
+
+      # THE CONTRACT, docs/WORKSPACE_CONTRACT.md 1: / is the workspace home,
+      # /studio is the Studio, and index.html keeps working at its old URL.
+      #
+      # Adding app/web/home.html does NOT achieve this and the failure is
+      # silent. The mount is StaticFiles(directory=app/web, html=True) at "/",
+      # so "/" resolves to the directory's index.html -- the Studio -- and
+      # Starlette never appends ".html" to a path, so "/studio" is a 404.
+      # MEASURED 2026-09-20 with home.html present in the image: GET / served
+      # <title>Vivum Studio</title> and GET /studio returned 404. Both URLs
+      # answer; one serves the wrong page and one serves JSON.
+      #
+      # So the assertion is on WHICH DOCUMENT each URL serves, byte for byte
+      # against the file the contract names. A status code cannot tell these
+      # apart.
+      #
+      # If a page is ever deliberately templated at request time, these bytes
+      # will stop matching the file. The fix then is to compare a marker unique
+      # to each page -- NOT to drop to a status-code check, which is the check
+      # that was already green while the routing was wrong.
+      - name: / serves the home page and /studio serves the Studio
+        run: |
+          set -euo pipefail
+          B="http://127.0.0.1:${PORT_UNDER_TEST}"
+          fail=0
+
+          for f in app/web/home.html app/web/index.html; do
+            if [ ! -f "$f" ]; then
+              echo "::error file=$f::docs/WORKSPACE_CONTRACT.md 1 names this file as a served page and it does not exist"
+              fail=1
+            fi
+          done
+          [ "$fail" = "0" ] || exit 1
+
+          home_sum=$(sha256sum app/web/home.html | cut -d' ' -f1)
+          studio_sum=$(sha256sum app/web/index.html | cut -d' ' -f1)
+
+          serve_sum() { curl -s -m 20 "$B$1" | sha256sum | cut -d' ' -f1; }
+          code() { curl -s -o /dev/null -w '%{http_code}' -m 20 "$B$1"; }
+
+          root_code=$(code /)
+          studio_code=$(code /studio)
+          index_code=$(code /index.html)
+          scoped_code=$(code '/studio?project=p_00002')
+          echo "GET /=$root_code  /studio=$studio_code  /index.html=$index_code  /studio?project=..=$scoped_code"
+
+          # NO -L ANYWHERE. A 3xx that a redirect-follower turns into a 200 is
+          # not the contract: /studio?project=p_00002 is a link the Studio
+          # hands out, and a redirect costs a round trip on a cold instance
+          # and is the difference between a working bookmark and a bounce.
+          [ "$root_code"   = "200" ] || { echo "::error::GET / returned $root_code"; fail=1; }
+          [ "$studio_code" = "200" ] || { echo "::error::GET /studio returned $studio_code. The static mount does not append '.html' and does not know this path -- /studio needs its own route, registered BEFORE _mount_web so the mount at '/' cannot shadow it."; fail=1; }
+          [ "$index_code"  = "200" ] || { echo "::error::GET /index.html returned $index_code -- the contract says the Studio keeps working at its old URL"; fail=1; }
+          [ "$scoped_code" = "200" ] || { echo "::error::GET /studio?project=p_00002 returned $scoped_code"; fail=1; }
+
+          root_sum=$(serve_sum /)
+          studio_sum_served=$(serve_sum /studio)
+
+          if [ "$root_sum" != "$home_sum" ]; then
+            echo "::error::GET / did not serve app/web/home.html."
+            if [ "$root_sum" = "$studio_sum" ]; then
+              echo "It served app/web/index.html -- the Studio. That is StaticFiles(html=True) resolving '/' to the directory index; adding home.html cannot change it. '/' needs an explicit route returning home.html, registered before _mount_web."
+            fi
+            fail=1
+          else
+            echo "ok    / serves app/web/home.html"
+          fi
+
+          if [ "$studio_sum_served" != "$studio_sum" ]; then
+            echo "::error::GET /studio did not serve app/web/index.html."
+            fail=1
+          else
+            echo "ok    /studio serves app/web/index.html"
+          fi
+
+          # The one check that needs no knowledge of either file: the two URLs
+          # must not be the same document. It is what stays true if both pages
+          # are later templated.
+          [ "$root_sum" != "$studio_sum_served" ] || { echo "::error::/ and /studio served BYTE-IDENTICAL documents -- the workspace home and the Studio are the same page"; fail=1; }
+
+          exit $fail
+
+      # THE OTHER HALF OF "IT WORKS FROM THE REPO AND 404s IN THE IMAGE".
+      #
+      # Every file under app/web/ must be reachable at its own path. This is a
+      # sweep, not a sample, because the failures it catches are per-file: a
+      # .dockerignore pattern that swallows a new subdirectory, a module that
+      # was never committed, a case-different filename that works on a
+      # case-insensitive macOS checkout and 404s on the runner's ext4.
+      #
+      # app/web/js/home/ is exactly the shape that gets missed: a whole new
+      # subtree, every file of which one page needs and the other does not
+      # load at all.
+      - name: Every file in app/web/ is served by the container
+        run: |
+          set -uo pipefail
+          B="http://127.0.0.1:${PORT_UNDER_TEST}"
+          fail=0
+          n=0
+          missing=0
+          while IFS= read -r f; do
+            n=$((n + 1))
+            url="${f#app/web}"
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$B$url")
+            if [ "$code" != "200" ]; then
+              echo "::error file=$f::served as $url with HTTP $code, expected 200"
+              missing=$((missing + 1))
+              fail=1
+            fi
+          done < <(find app/web -type f | sort)
+          echo "$n files under app/web/, $missing not served"
+          if [ "$n" -lt 50 ]; then
+            echo "::error::only $n files found under app/web -- the front end moved and this sweep is no longer looking at it"
+            fail=1
+          fi
+          # A module has to be served as JavaScript, not downloaded as text: a
+          # wrong content-type makes <script type="module"> refuse to execute
+          # and the page renders blank with only a console error.
+          for m in js/main.js js/api.js; do
+            ct=$(curl -s -o /dev/null -w '%{content_type}' -m 20 "$B/$m")
+            echo "content-type $m: $ct"
+            case "$ct" in
+              *javascript*) ;;
+              *) echo "::error::/$m is served as '$ct'; a module with a non-JavaScript content type is refused by the browser"; fail=1 ;;
+            esac
+          done
+          exit $fail
+
+      # The static pages must load WITHOUT the key -- they have to render in
+      # order to prompt for one -- while every /api/ route still needs it.
+      # Gating the pages by accident breaks first load completely and gating
+      # nothing hands the whole API away; this asserts both at once.
+      - name: The pages are ungated and the API is not
+        run: |
+          set -euo pipefail
+          B="http://127.0.0.1:${PORT_UNDER_TEST}"
+          for p in / /studio /index.html /home.html /ingest /css/tokens.css /js/main.js; do
+            c=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$B$p")
+            echo "no key  $p -> $c"
+            [ "$c" = "200" ] || { echo "::error::$p needs no key and returned $c"; exit 1; }
+          done
+          for p in /api/sections /api/projects /api/workspace; do
+            c=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$B$p")
+            k=$(curl -s -o /dev/null -w '%{http_code}' -m 20 -H "X-API-Key: $KEY" "$B$p")
+            echo "no key  $p -> $c    with key -> $k"
+            [ "$c" = "401" ] || { echo "::error::$p answered $c without a key, expected 401"; exit 1; }
+            [ "$k" = "200" ] || { echo "::error::$p answered $k WITH the key, expected 200"; exit 1; }
+          done
+
+      # THE CEILING THAT KEEPS A SMALL HOST ALIVE, asserted as a property of
+      # the IMAGE rather than of an operator's memory.
+      #
+      # MEASURED 2026-09-20, linux/arm64, this Dockerfile, reading
+      # app.server.api._MAX_GRID_CELLS directly:
+      #
+      #   --memory=512m            -> 46,070      "auto (cgroup v2 memory.max)"
+      #   no limit                 -> 40,000,000  "auto (no small-host limit detected)"
+      #   ENV removed, --memory=512m -> 40,000,000 "default"  <- and then:
+      #
+      # POSTing the STOCK /api/defaults spec (dx = 12 um) to that last one was
+      # accepted with 202 and the container was OOM-KILLED within a second --
+      # exit 137, /healthz unreachable. The first run a first user clicks is
+      # the one that kills a 512 MB instance. With the ENV in place the same
+      # POST is a 400 naming the ceiling and the container stays up.
+      #
+      # So: assert the image ships the default, and assert what it resolves to
+      # under a real 512 MB cgroup. An `-e` on `docker run` still overrides it,
+      # which is checked too -- this is a floor, not a lock.
+      - name: The image defaults the grid ceiling, and it binds on a small host
+        run: |
+          set -euo pipefail
+          env_line=$(docker image inspect "$IMAGE" --format '{{json .Config.Env}}')
+          echo "image env: $env_line"
+          case "$env_line" in
+            *TMESIM_MAX_GRID_CELLS*) echo "ok    the image sets a grid-ceiling default" ;;
+            *) echo "::error::the image no longer sets TMESIM_MAX_GRID_CELLS. Unset, the ceiling is 40,000,000, which permits the stock /api/defaults spec (dx = 12 um) that OOM-kills a 512 MB instance."; exit 1 ;;
+          esac
+
+          read_ceiling() {
+            docker run --rm "$@" --entrypoint python "$IMAGE" -c \
+              'from app.server.api import _MAX_GRID_CELLS as c, _MAX_GRID_CELLS_SOURCE as s; print(f"{c}|{s}")'
+          }
+
+          small=$(read_ceiling --memory=512m)
+          big=$(read_ceiling)
+          override=$(read_ceiling --memory=512m -e TMESIM_MAX_GRID_CELLS=100000)
+          echo "512 MB:   $small"
+          echo "no limit: $big"
+          echo "override: $override"
+
+          [ "$small" = "46070|auto (cgroup v2 memory.max)" ] || { echo "::error::on a 512 MB cgroup the ceiling resolved to '$small', expected '46070|auto (cgroup v2 memory.max)'"; exit 1; }
+          case "$big" in
+            "40000000|auto"*) echo "ok    a host with room is unaffected" ;;
+            *) echo "::error::with no memory limit the ceiling resolved to '$big'; the default must not narrow a host that has room"; exit 1 ;;
+          esac
+          [ "$override" = "100000|TMESIM_MAX_GRID_CELLS" ] || { echo "::error::an explicit value must still win; got '$override'"; exit 1; }
+
+          # And the same fact through the API the Studio actually reads, so a
+          # refactor that changes where the number comes from is caught too.
+          B="http://127.0.0.1:${PORT_UNDER_TEST}"
+          src=$(curl -sf -H "X-API-Key: $KEY" "$B/api/account" \
+                | python3 -c 'import json,sys; print(json.load(sys.stdin)["deployment"]["limits"]["max_grid_cells_source"])')
+          echo "GET /api/account -> deployment.limits.max_grid_cells_source = $src"
+          case "$src" in
+            auto*) echo "ok    reported as auto" ;;
+            *) echo "::error::the running server reports max_grid_cells_source='$src'; the image's ENV is not reaching it"; exit 1 ;;
+          esac
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: docker logs "$CONTAINER" || true
+
+      - name: Clean up
+        if: always()
+        run: docker rm -f "$CONTAINER" 2>/dev/null || true

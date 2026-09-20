@@ -659,6 +659,38 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       chip('computed', 'The per-cell mechanism attribution, decoded from the '
         + 'TMSM payload for this run. It is the engine\'s own label, and the '
         + 'whole label array reconciles bit-exactly with kill_fraction.')));
+
+      /* FROM THIS ONE CELL TO EVERY CELL LIKE IT.
+       *
+       * The third leg of the round trip. THE FINDING goes from a category to
+       * the cells (click a survival row, the specimen shows only that band);
+       * the Mechanism section goes back to the claim (the button above it).
+       * This goes from ONE cell to its whole category — which is the question
+       * a reader has the moment they read a label off a cell they picked:
+       * where are the others?
+       *
+       * It routes through the SAME callback the finding rows use
+       * (main.js onIsolateMechanism), so the colour mode, the top-bar control,
+       * the mechanism legend and the stage cannot disagree about what is on
+       * screen — and the legend's filter band then states the filter and
+       * offers the one action that clears it. Same words as the finding row's
+       * own title, because it is the same action (docs/UI_ARCHITECTURE.md 5).
+       *
+       * Rendered only when a callback exists, so the stub viewer and any
+       * caller that did not wire one get no dead control. */
+      if (onIsolateMechanism) {
+        derived.push(h('div.frow', { style: { marginBottom: 'var(--sp-4)' } },
+          h('button.btn.ghost.sm', {
+            type: 'button',
+            title: 'Show only these cells in the tissue view — every cell the '
+              + `run labelled ${meta.name}, and no others. It changes the `
+              + 'picture only; no number on this rail moves. The Mechanism '
+              + 'section, which this scrolls to, undoes it with "show all '
+              + 'categories".',
+            onclick: () => onIsolateMechanism(code),
+          }, 'show only these cells'),
+          h('span.grow')));
+      }
       derived.push(h('div', {
         style: {
           fontSize: 'var(--fs-sm)', lineHeight: 'var(--lh-body)',
@@ -674,13 +706,38 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
       // backend's (tmesim/sim/mechanism.py::MechanismThresholds.resolve).
       const th = (agg && agg.thresholds) || null;
       if (th) {
+        /* A DASH WEARING A UNIT IS THE SHAPE OF A MEASURED ZERO.
+         *
+         * These three rows printed `num(v, 2)` — which returns the em dash for
+         * an absent value — and then appended the unit span unconditionally,
+         * so a threshold the payload does not carry rendered as `— × kill
+         * prob.`: a null glyph with a unit on it, in a list of band edges,
+         * with no sentence anywhere saying which one was missing. This panel
+         * names that exact failure twice elsewhere in this file ("`—%` was a
+         * null glyph wearing a unit, which reads as a measured zero") and was
+         * still committing it here.
+         *
+         * Found 2026-09-20 by rendering the panel rather than by reading it.
+         * The unit now travels only with a value, the glyph is marked as one,
+         * and every absent edge is named in a sentence under the list — which
+         * matters more here than in most of the rail: the cell's LABEL was
+         * decided by these edges, so an edge that is not on screen is a
+         * verdict whose test is not on screen. */
+        const edge = (label, v, unitTxt, field) => [
+          h('dt', label),
+          h('dd', Number.isFinite(v) ? num(v, 2) : nullValue(),
+            Number.isFinite(v) ? h('span.unit', unitTxt) : null),
+          Number.isFinite(v) ? null
+            : why(`No ${label} edge: this run's attribution payload carries no `
+              + `thresholds.${field}. The band above was resolved with one, so `
+              + 'the edge exists — it is this record that does not state it. '
+              + 'Read the dash as absent, never as zero.'),
+        ];
         derived.push(h('dl.kv',
-          h('dt', 'unreached below'), h('dd', num(th.unreached_ratio, 2),
-            h('span.unit', 'E/IC50')),
-          h('dt', 'underdosed below'), h('dd', num(th.adequate_ratio, 2),
-            h('span.unit', 'E/IC50')),
-          h('dt', 'resistant at or below'), h('dd', num(th.resistant_modulation, 2),
-            h('span.unit', '× kill prob.')),
+          edge('unreached below', th.unreached_ratio, 'E/IC50', 'unreached_ratio'),
+          edge('underdosed below', th.adequate_ratio, 'E/IC50', 'adequate_ratio'),
+          edge('resistant at or below', th.resistant_modulation,
+            '× kill prob.', 'resistant_modulation'),
           why('The bands this run sorted every surviving tumour cell into. '
             + 'E is the cell\'s own time-averaged exposure and IC50 is the '
             + 'compound\'s, so E/IC50 is a ratio and carries no unit of its '
@@ -724,11 +781,22 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
         + 'Field overlay, under VIEW, to read it here.'));
     }
 
+    /* The band head and the chips inside it use two words for one idea —
+     * "derived" on the band, "computed" on every chip — because they come from
+     * two vocabularies: `.prov-band` states the KIND OF EVIDENCE, and
+     * js/ui/provenance.js::KINDS states HOW A SINGLE VALUE WAS ARRIVED AT.
+     * Both words are load-bearing where they are and neither can be renamed
+     * from this file, so the note reconciles them once, here, rather than
+     * leaving a reader to decide whether a "computed" row inside a "derived"
+     * band is a third thing. */
     cellEl.appendChild(provBand('derived',
       'derived by the model',
       'Everything in this band is a model output computed from the band above '
       + 'plus the RunSpec. None of it was measured on this cell, and none of '
-      + 'it has been scored against a measured response.',
+      + 'it has been scored against a measured response. The chips below read '
+      + '"computed" or "assumed" — that is how each single value was arrived '
+      + 'at; "derived" is what the whole band is. Nothing in it is measured, '
+      + 'whichever chip it wears.',
       ...derived));
   }
 
@@ -1256,9 +1324,39 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
   const na = (what) => h('div.dim', { style: { padding: 'var(--sp-4) var(--sp-5)' } },
     `${what} is unavailable without WebGL2.`);
 
+  /* THE RETURN LEG OF THE ROUND TRIP.
+   *
+   * Clicking a survival row on THE FINDING isolates that mechanism in the
+   * specimen, and main.js routes it through setColourMode, which calls
+   * revealMechanism() — so the rail SCROLLS from the top of RESULT down to
+   * this section. That is the right destination (this is the key for the
+   * picture the click just produced) and it is also several screens from what
+   * the reader clicked, with nothing on screen offering the way back.
+   *
+   * One control, in the section the trip lands in, pointing at the section it
+   * started from. It is a real <button>, so it is in the tab order and takes
+   * the global focus ring; it is always present rather than appearing only
+   * after an isolate, because a navigation aid that exists only in one state
+   * is one a reader cannot learn. The isolate itself is undone by "show all
+   * categories" in the legend below — see js/ui/mechanism.js. */
   const mechSect = h('details.sect', { open: true, id: 'sect-mech' },
     h('summary', sectTitle('Mechanism'), h('span.hint', 'reconciles with kill_fraction')),
-    h('div.sect-body', mechanismEl || na('Mechanism')));
+    h('div.sect-body',
+      h('div.frow', { style: { marginBottom: 'var(--sp-3)' } },
+        h('span.dim', {
+          style: { fontSize: 'var(--fs-disclosure)' },
+          title: 'This breakdown decomposes the claim stated at the top of '
+            + 'this rail. Clicking a survival row there isolates one of these '
+            + 'categories in the specimen and brings you here.',
+        }, 'decomposes the claim under'),
+        h('button.btn.ghost.sm', {
+          type: 'button',
+          title: 'Scroll back up to The finding, the panel these categories '
+            + 'decompose. Nothing about the picture changes.',
+          onclick: () => revealFinding(),
+        }, 'The finding'),
+        h('span.grow')),
+      mechanismEl || na('Mechanism')));
 
   const railBody = h('div.rail-body',
     /* ---- RESULT: what did the run find, and how much of it is measured -- */
@@ -1484,28 +1582,52 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
      *
      * Called when the operator selects the `mech` colour source: that turns the
      * breakdown into the KEY for what is on the stage, and a key you have to
-     * go looking for is not one. Opens the section if the operator closed it,
-     * then scrolls the rail body — scrollTop arithmetic on bounding rects, not
-     * scrollIntoView, for the reason spelled out in ui/rail.js: the nearest
-     * scrollable ancestor is the shell, and the shell must never scroll.
+     * go looking for is not one.
      */
-    revealMechanism() {
-      if (!mechSect.open) mechSect.open = true;
-      if (!railBody.isConnected || !railBody.clientHeight) return;
-      // Land the section's own SUMMARY below the group's sticky header, not
-      // under it. railNav gets away with a bare alignment because the thing it
-      // scrolls to IS the sticky header; a section inside the group has one
-      // sitting on top of it, and without this offset "Mechanism · reconciles
-      // with kill_fraction" was scrolled underneath RESULT and the panel
-      // appeared to have lost its title.
-      const head = mechSect.closest('.rail-group')
-        ? mechSect.closest('.rail-group').querySelector('.rg-head')
-        : null;
-      railBody.scrollTop += mechSect.getBoundingClientRect().top
-        - railBody.getBoundingClientRect().top
-        - (head ? head.getBoundingClientRect().height : 0);
-      nav.sync();
-    },
+    revealMechanism() { revealSection(mechSect); },
+    /**
+     * Bring THE FINDING back into view — the other direction of the same trip.
+     *
+     * Exposed as well as used internally so a caller that sends the reader to
+     * the mechanism breakdown can send them back by the same route, rather
+     * than a second module inventing its own scroll arithmetic against a rail
+     * it does not own.
+     */
+    revealFinding,
     benchOut,
   };
+
+  /**
+   * Scroll the rail so `sect`'s own summary sits below the sticky group
+   * header, opening it first if the operator had closed it.
+   *
+   * ONE implementation, because there are now two callers going in opposite
+   * directions and a rail that scrolls differently depending on which way you
+   * are travelling is a rail you cannot learn.
+   *
+   * scrollTop arithmetic on bounding rects, not scrollIntoView, for the reason
+   * spelled out in ui/rail.js: the nearest scrollable ancestor is the shell,
+   * and the shell must never scroll. The sticky-header offset is not optional
+   * — without it "Mechanism · reconciles with kill_fraction" is scrolled
+   * underneath RESULT and the panel appears to have lost its title.
+   */
+  function revealSection(sect) {
+    if (!sect) return;
+    if (!sect.open) sect.open = true;
+    if (!railBody.isConnected || !railBody.clientHeight) return;
+    const group = sect.closest ? sect.closest('.rail-group') : null;
+    const head = group ? group.querySelector('.rg-head') : null;
+    railBody.scrollTop += sect.getBoundingClientRect().top
+      - railBody.getBoundingClientRect().top
+      - (head ? head.getBoundingClientRect().height : 0);
+    nav.sync();
+  }
+
+  /* Looked up rather than held as a binding: `#sect-finding` is built inline
+   * in railBody and hoisting it out would move the string `'The finding'`
+   * above `const railBody =`, where tests/test_first_session.py reads the
+   * section order from. The lookup is once per click. */
+  function revealFinding() {
+    revealSection(railBody.querySelector('#sect-finding'));
+  }
 }

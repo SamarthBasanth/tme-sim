@@ -2400,3 +2400,78 @@ class TestPruneCitationProtection:
         MAX_RANGE is what stops a false positive costing every run's disk."""
         mod = self._fn()
         assert mod.MAX_RANGE < 100
+
+
+class TestTheStateDirectoryIsRelocatable:
+    """``TMESIM_STATE_DIR`` — whether a hosted instance keeps anything.
+
+    MEASURED 2026-09-20 in a real container: ``runs_dir()`` and
+    ``projects_dir()`` were both hardcoded off the repository root, putting
+    them at ``/app/app/runs`` and ``/app/app/projects`` — siblings under
+    ``/app/app``, whose parent also holds ``server/`` and ``web/``. Render
+    allows ONE persistent disk per service, and mounting it at the only
+    directory containing both would hide the application. So a hosted instance
+    destroyed every run and every project on each deploy.
+
+    Survivable for runs, which are re-derivable from the RunSpec each carries.
+    NOT survivable for projects: a workspace that forgets is worse than no
+    workspace, because it invites the investment and then loses it. The whole
+    point of the landing page is that work has somewhere to live.
+    """
+
+    def test_unset_is_byte_identical_to_the_old_behaviour(self, monkeypatch):
+        """The compatibility bar. No existing installation moves."""
+        from app.server.cache import repo_root, runs_dir
+        from app.server.projects import projects_dir
+
+        monkeypatch.delenv("TMESIM_STATE_DIR", raising=False)
+        assert runs_dir() == os.path.join(repo_root(), "app", "runs")
+        assert projects_dir() == os.path.join(repo_root(), "app", "projects")
+
+    def test_both_stores_move_under_one_directory(self, monkeypatch, tmp_path):
+        """ONE directory, because Render allows one disk. Two env vars would
+        not have solved the problem that motivated this."""
+        from app.server.cache import runs_dir
+        from app.server.projects import projects_dir
+
+        root = tmp_path / "state"
+        monkeypatch.setenv("TMESIM_STATE_DIR", str(root))
+        assert runs_dir() == str(root / "runs")
+        assert projects_dir() == str(root / "projects")
+        # Created on demand, so a fresh disk needs no preparation.
+        assert os.path.isdir(runs_dir()) and os.path.isdir(projects_dir())
+
+    def test_neither_store_shadows_the_application(self, monkeypatch, tmp_path):
+        """The actual defect. Both stores must sit under a directory that
+        holds NOTHING ELSE, so a single mount covers both and hides no code."""
+        from app.server.cache import runs_dir
+        from app.server.projects import projects_dir
+
+        root = tmp_path / "state"
+        monkeypatch.setenv("TMESIM_STATE_DIR", str(root))
+        runs, projects = runs_dir(), projects_dir()
+        assert os.path.commonpath([runs, projects]) == str(root)
+        # Nothing but the two stores may appear under the mount point.
+        assert sorted(os.listdir(root)) == ["projects", "runs"]
+
+    def test_it_is_read_per_call_not_cached_at_import(
+            self, monkeypatch, tmp_path):
+        """An operator exporting it after the process loaded must still be
+        obeyed, and a test must not need a module reload to exercise it."""
+        from app.server.cache import runs_dir
+
+        monkeypatch.setenv("TMESIM_STATE_DIR", str(tmp_path / "a"))
+        first = runs_dir()
+        monkeypatch.setenv("TMESIM_STATE_DIR", str(tmp_path / "b"))
+        assert runs_dir() != first
+
+    def test_a_blank_value_is_not_a_directory_called_empty(
+            self, monkeypatch):
+        """`TMESIM_STATE_DIR=` must read as unset, not as the process's CWD.
+        An empty confinement value elsewhere in this server is honoured as a
+        deliberate refusal; here the safe reading is the opposite, and the
+        difference is worth pinning."""
+        from app.server.cache import repo_root, runs_dir
+
+        monkeypatch.setenv("TMESIM_STATE_DIR", "   ")
+        assert runs_dir() == os.path.join(repo_root(), "app", "runs")

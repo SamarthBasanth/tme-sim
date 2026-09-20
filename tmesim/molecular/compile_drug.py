@@ -187,11 +187,48 @@ def build_profile(
     # compound faster than paracellular-only, never slower.
     two_route_out = None
     if two_route:
+        # REFUSE A MISSING DESCRIPTOR. DO NOT DEFAULT IT TO ZERO.
+        #
+        # This read `descriptors.get("logp", 0.0) or 0.0` and the same for
+        # `hbd`, so a compound whose descriptors could not be computed was
+        # compiled AS IF logP = 0 and HBD = 0. That is not a neutral default:
+        # `log K = logP - 1.34*HBD`, so (0, 0) is log K = 0.00, the 85th
+        # PERCENTILE of membrane openness across the scored benchmark. The
+        # silent assumption is that an unknown molecule crosses membranes more
+        # easily than four out of five known ones.
+        #
+        # MEASURED 2026-09-20 at MW 263 Da: 45.68 -> 189.34 um^2/s, a 4.14x
+        # inflation -- delivered with the full "scored against 68 compounds,
+        # r^2 = 0.718" provenance stapled to it, because the provenance string
+        # does not know the descriptors were absent.
+        #
+        # The benchmark experiment already excludes compounds with no logP as
+        # UNSCOREABLE. The shipping path compiled them confidently. Those two
+        # positions cannot both be right, and the experiment's is the correct
+        # one: a number nobody can check is not better than no number.
+        #
+        # `or 0.0` also swallowed a legitimate 0.0 into the same branch as a
+        # missing key, so a genuine logP of zero was indistinguishable from an
+        # absent one.
+        missing = [k for k in ("logp", "hbd")
+                   if descriptors.get(k) is None]
+        if missing:
+            raise ValueError(
+                "cannot compile through the two-route law without "
+                + " and ".join(missing)
+                + ": the law's membrane term is log K = logP - 1.34*HBD, so an "
+                "absent descriptor is not a missing detail, it is the term "
+                "itself. Defaulting it to zero silently asserts a membrane "
+                "openness at the 85th percentile of the scored benchmark "
+                "(measured 4.14x inflation at MW 263 Da). Supply the "
+                "descriptor, or compile with two_route=False and read the "
+                "paracellular-only result for what it is."
+            )
         two_route_out = _two_route.two_route_diffusivity(
             interstitial_D,
             radius_nm,
-            float(descriptors.get("logp", 0.0) or 0.0),
-            float(descriptors.get("hbd", 0) or 0),
+            float(descriptors["logp"]),
+            float(descriptors["hbd"]),
             temperature_K=temperature_K,
             **(two_route_kw or {}),
         )

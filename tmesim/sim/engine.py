@@ -398,6 +398,11 @@ def simulate_response(
             kill_fraction,
             pd=cfg.pd,
             thresholds=thresholds,
+            # The SAME DrugParams the kill model ran on. Without it the
+            # classifier derives its resistance threshold from the global
+            # default and misses any per-drug override -- see
+            # MechanismThresholds.resolve.
+            drug=drug,
         )
 
     return SimulationResult(

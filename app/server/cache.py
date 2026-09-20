@@ -235,8 +235,43 @@ def private_makedirs(path: str) -> str:
     return path
 
 
+def state_dir() -> Optional[str]:
+    """The operator-chosen persistent root, or ``None``.
+
+    Read per call rather than cached at import, so a test can set it
+    and so a value exported after the module loaded still takes.
+    """
+    raw = os.environ.get("TMESIM_STATE_DIR", "").strip()
+    return os.path.abspath(raw) if raw else None
+
+
 def runs_dir() -> str:
-    """Absolute path to ``app/runs/`` (created on demand)."""
+    """Absolute path to the run store (created on demand).
+
+    A HOSTED INSTANCE KEEPS NOTHING WITHOUT THIS.
+
+    Measured 2026-09-20 in a real container: this path and
+    ``projects.projects_dir()`` were both hardcoded off ``repo_root()``, which
+    puts them at ``/app/app/runs`` and ``/app/app/projects`` -- siblings under
+    ``/app/app``, whose parent also holds ``server/`` and ``web/``. Render
+    allows ONE persistent disk per service, and mounting it at the only
+    directory that contains both would hide the application. So every run and
+    every project a hosted user created was destroyed on the next deploy.
+
+    That is survivable for runs, which are re-derivable from a RunSpec. It is
+    not survivable for PROJECTS, which are the thing a user is asked to
+    organise their work into -- a workspace that forgets is worse than no
+    workspace, because it invites the investment and then loses it.
+
+    ``TMESIM_STATE_DIR`` is one directory an operator can point a single disk
+    at; ``runs/`` and ``projects/`` become children of it, so one mount covers
+    both and neither shadows the code. Unset, the behaviour is byte-identical
+    to before -- the local single-user workflow this was built for is
+    untouched, and no existing installation moves.
+    """
+    root = state_dir()
+    if root:
+        return private_makedirs(os.path.join(root, "runs"))
     return private_makedirs(os.path.join(repo_root(), "app", "runs"))
 
 

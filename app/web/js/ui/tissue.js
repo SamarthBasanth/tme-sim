@@ -106,6 +106,26 @@ function remedyFor(message) {
   return '';
 }
 
+/* The four states the ingest gate can be closed in, each as the sentence that
+ * is shown beside the button. The gate is unchanged — nothing may be registered
+ * until a scan of the CURRENT path has come back without a refusal — and what
+ * is new is only that the closed state says which of the four it is in.
+ * "Scan first" is a different instruction from "scan AGAIN", and the button
+ * could not tell them apart. */
+const WHY_UNSCANNED = 'Ingest opens once a scan of this directory comes back '
+  + 'without a refusal. Scan first: it reads filenames and the gene panel and '
+  + 'registers nothing.';
+const WHY_STALE = 'Ingest is closed: the report below describes the directory '
+  + 'that was scanned, not the one now in the field. Scan again.';
+const WHY_REFUSED = 'Ingest is closed: the server refused this directory. Its '
+  + 'own reason is below, in full.';
+const WHY_REGISTERED = 'Ingest is closed: this directory is registered. A '
+  + 'second press would only collide with the id it just took — point the '
+  + 'field at another directory to load one more.';
+
+/** The fields inside the collapsed "Name and depth" block. */
+const FOLDED_FIELDS = new Set(['t-id', 't-label', 't-deep']);
+
 /**
  * Is this record spot transcriptomics?
  *
@@ -155,6 +175,69 @@ export const DEIDENTIFIED_ONLY = (
 );
 
 /**
+ * A section's measured scale, with the right noun on the count.
+ *
+ * `n_cells` on a VISIUM record is a count of SPOTS, not of cells: cache.py's
+ * `_ingested_metadata` copies `n_cells_ingested` into `n_spots` for exactly
+ * that platform, and tmesim/data/ingest.py states that a Visium row "is a
+ * ~55 um spot pooling several cells, NOT a cell". This panel printed all of
+ * them as "cells".
+ *
+ * MODULE SCOPE, AND EXPORTED, since 2026-09-20. It was a closure inside
+ * `createTissuePanel`, which meant the one line in the product that says what a
+ * specimen actually IS — platform, count, extent, panel size — existed only on
+ * the panel an operator opens to ingest their own tissue. The picker on the
+ * other rail, where a section is CHOSEN, said nothing but the label until after
+ * the run. `js/ui/spec.js` now renders this under the section select, so the
+ * consequence of the choice is legible before it is made and the two surfaces
+ * cannot word it differently.
+ *
+ * Takes any GET /api/sections row, built-in or ingested.
+ */
+export function sectionScaleRow(rec) {
+  const spot = isSpot(rec);
+  const n = Number.isFinite(rec.n_spots) ? rec.n_spots
+    : (Number.isFinite(rec.n_cells) ? rec.n_cells : null);
+  const ext = Array.isArray(rec.extent_um) && rec.extent_um.length >= 2
+    ? rec.extent_um : null;
+  const bits = [];
+  if (rec.platform || rec.source) {
+    bits.push(h('span.mono', String(rec.platform || rec.source)));
+    bits.push(h('span.dim', '·'));
+  }
+  bits.push(n === null
+    ? h('span.dim', 'count not stated')
+    : h('span', h('span.mono', int(n)),
+      h('span.unit', spot ? 'spots' : 'cells')));
+  bits.push(h('span.dim', '·'));
+  // The extent used to be `(array || []).map(...).join(' × ') + ' mm'`, which
+  // on a record without one printed the string " mm" — a unit with no number
+  // in front of it, which is worse than a dash.
+  bits.push(ext === null
+    ? h('span.dim', 'extent not stated')
+    : h('span', h('span.mono', `${num(ext[0] / 1000, 2)} × ${num(ext[1] / 1000, 2)}`),
+      h('span.unit', 'mm')));
+  if (Number.isFinite(rec.n_genes)) {
+    bits.push(h('span.dim', '·'));
+    bits.push(h('span', h('span.mono', int(rec.n_genes)),
+      h('span.unit', 'genes')));
+  }
+  return h('div.frow', {
+    style: {
+      gap: 'var(--sp-3)', flexWrap: 'wrap', padding: 'var(--sp-1) 0',
+      fontSize: 'var(--fs-xs)', color: 'var(--fg-2)',
+    },
+    title: spot
+      ? 'A Visium row is a ~55 um spot pooling several cells, so this is a '
+        + 'count of spots. The cells a run works on are PLACED from the '
+        + 'per-spot deconvolved fractions and do not exist until the section '
+        + 'is reconstructed.'
+      : 'Measured at ingest time by tmesim.data.ingest and stored with the '
+        + 'section; not re-derived on this screen.',
+  }, bits);
+}
+
+/**
  * What `runnable: false` means, in the operator's terms. Set by
  * ingest_registry.register() on a `mex` bundle: it ingested and it is real, and
  * reconstruct_real accepts 'xenium' or 'visium' only, so there is no route from
@@ -176,19 +259,22 @@ export function createTissuePanel({ onRegistered }) {
   const pathIn = h('input.inp.mono', {
     id: 't-path', type: 'text', autocomplete: 'off', spellcheck: 'false',
     placeholder: '/data/xenium_run_2026_08/output-XETG00001',
-    oninput: () => { clearFieldErrors(); markStale(); },
+    oninput: () => { clearFieldErrors(); markStale(); paintNameEcho(); },
     onkeydown: (e) => { if (e.key === 'Escape') { e.stopPropagation(); pathIn.blur(); } },
   });
   const idIn = h('input.inp.mono', {
     id: 't-id', type: 'text', autocomplete: 'off', spellcheck: 'false',
     placeholder: 'defaults to the directory name',
-    oninput: () => { clearFieldErrors(); markStale(); },
+    oninput: () => { clearFieldErrors(); markStale(); paintNameEcho(); },
   });
   const labelIn = h('input.inp', {
     id: 't-label', type: 'text', autocomplete: 'off',
     placeholder: 'optional — shown in the section picker',
+    oninput: () => { paintNameEcho(); },
   });
-  const deepChk = h('input', { type: 'checkbox', id: 't-deep' });
+  const deepChk = h('input', {
+    type: 'checkbox', id: 't-deep', onchange: () => paintNameEcho(),
+  });
 
   const lbl = (text, forId, title) => h('label.lbl', { for: forId, title: title || '' }, text);
 
@@ -201,18 +287,110 @@ export function createTissuePanel({ onRegistered }) {
     return [lbl(label, forId, title), holder, errEl];
   }
 
+  /* --------------------------------------------------- naming, folded ---
+   *
+   * ONE QUESTION ON THIS PANEL, not four. A first-time operator has exactly one
+   * thing to supply — WHERE the sample is — and the other three fields all have
+   * a real default, set by app/server/ingest_registry.py::register: the id is
+   * the directory name slugified (`_make_id`), the label is
+   * `f"{platform.title()} · {sid} (ingested)"`, and detection rates are
+   * measured anyway on the ingest that matters (`register` implies a full
+   * ingest). Three fields with defaults, presented as blanks, read as three
+   * more decisions before anything can happen.
+   *
+   * THE FOLD HIDES THE WIDGETS, NEVER THE FACT. The summary prints the id and
+   * the label that WILL be used, recomputed from the path on every keystroke —
+   * which is strictly more than the open form said, because the open form
+   * showed two empty boxes and the word "defaults to the directory name"
+   * without ever naming the string. That matters here more than anywhere else
+   * on this panel: DEIDENTIFIED_ONLY, two blocks above, is about exactly these
+   * two strings leaving the machine, and it is now possible to READ the string
+   * that will leave before pressing anything.
+   *
+   * It opens itself whenever it stops being a detail: a field error inside it
+   * (`fieldError`), or a server remedy that names one of its controls
+   * (`showRefusal`).
+   */
+  const nameEcho = h('span.mono', {
+    style: { color: 'var(--fg-1)', fontWeight: '400', textTransform: 'none', letterSpacing: '0' },
+  }, 'the directory name');
+  const nameFold = h('details.span2.tnames', { id: 'sect-tissue-names' },
+    h('summary', {
+      style: { cursor: 'pointer', padding: 'var(--sp-2) 0', lineHeight: 'var(--lh-body)' },
+      title: 'Section id, label and scan depth. All three have defaults; the '
+        + 'id and the label that will actually be used are printed here.',
+    },
+    h('span.lbl', 'Name and depth'), ' — ', nameEcho),
+    h('div.fgrid', { style: { padding: 'var(--sp-3) 0 var(--sp-2)' } },
+      row('Section id', 't-id', idIn, null,
+        'Identifies the section in the picker, in every RunSpec and in every export. Defaults to the directory name, so set it to a study code if the directory name is identifying. It may not shadow a built-in specimen.'),
+      row('Label', 't-label', labelIn, null,
+        'Free text shown in the picker, and the heading of every report exported from this section. Not used by the model. Must not identify a person.'),
+      [lbl('Detection', null),
+        h('label.chk', { title: 'Reads the count matrix so the report can state the MEASURED firing rate of each marker instead of only whether the gene is on the panel. Slower. Ingesting always does this.' },
+          deepChk, h('span.lbl', 'measure detection rates')),
+        h('div.field-err.hidden')]));
+
   const formEl = h('div.fgrid',
     row('Directory', 't-path', pathIn, null,
       'An absolute path ON THE MACHINE RUNNING THIS SERVER. No tissue is uploaded from this browser; the server process reads the directory off its own disk. This path is returned by GET /api/sections to every client that can reach this server, so it must not identify a person.'),
-    row('Section id', 't-id', idIn, null,
-      'Identifies the section in the picker, in every RunSpec and in every export. Defaults to the directory name, so set it to a study code if the directory name is identifying. It may not shadow a built-in specimen.'),
-    row('Label', 't-label', labelIn, null,
-      'Free text shown in the picker, and the heading of every report exported from this section. Not used by the model. Must not identify a person.'),
-    [lbl('Detection', null),
-      h('label.chk', { title: 'Reads the count matrix so the report can state the MEASURED firing rate of each marker instead of only whether the gene is on the panel. Slower. Ingesting always does this.' },
-        deepChk, h('span.lbl', 'measure detection rates')),
-      h('div.field-err.hidden')],
+    nameFold,
   );
+
+  /** The basename of a directory path, in either slash convention. */
+  function baseName(p) {
+    const s = String(p || '').trim().replace(/[/\\]+$/, '');
+    if (!s) return '';
+    const parts = s.split(/[/\\]/);
+    return parts[parts.length - 1] || '';
+  }
+
+  /**
+   * THE SERVER'S OWN ID RULE, COPIED — and the copy is declared, the way
+   * js/ui/spec.js::gridCells declares its copy of the grid ceiling.
+   *
+   * app/server/ingest_registry.py::_make_id, verbatim:
+   *
+   *     base = sample_id or os.path.basename(os.path.abspath(path).rstrip(sep))
+   *     slug = _ID_RE.sub("_", str(base).strip().lower()).strip("_")
+   *     return slug or "ingested_sample"
+   *
+   * with `_ID_RE = re.compile(r"[^a-z0-9_]+")`.
+   *
+   * It is NOT the bare directory name: `output-XETG00001` registers as
+   * `output_xetg00001`. Printing the bare basename here would show the operator
+   * a string the server never uses, on the one panel whose job is to let them
+   * read the identifier before it leaves the machine. If that rule ever changes
+   * upstream this echo goes stale and the registered id is still whatever the
+   * server says — the result panel prints it on every ingest, in full.
+   */
+  function slugId(base) {
+    const slug = String(base || '').trim().toLowerCase()
+      .replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+    return slug || 'ingested_sample';
+  }
+
+  /** What the id and the label will be, as strings, before anything is sent. */
+  function paintNameEcho() {
+    const base = baseName(pathIn.value);
+    const id = idIn.value.trim();
+    const label = labelIn.value.trim();
+    const deep = deepChk.checked
+      ? 'detection rates measured'
+      : 'filenames and panel only';
+    if (!base && !id && !label) {
+      nameEcho.textContent = 'id from the directory name, label from the '
+        + `platform and the id · ${deep}`;
+      return;
+    }
+    const effId = base || id ? slugId(id || base) : '(no path yet)';
+    // The label default is NOT the directory name: ingest_registry.register
+    // writes `f"{record.platform.title()} · {sid} (ingested)"`, and the
+    // platform is not known until the scan has read the directory. Say the
+    // shape and leave the platform as the unknown it is.
+    const effLabel = label || `… · ${effId} (ingested)`;
+    nameEcho.textContent = `id ${effId} · label ${effLabel} · ${deep}`;
+  }
 
   /* --------------------------------------------------------- controls -- */
 
@@ -233,8 +411,24 @@ export function createTissuePanel({ onRegistered }) {
   }, 'Ingest + add to picker');
   const statusChip = h('span.chip.st-queued', 'not scanned');
 
-  const controlsEl = h('div.frow', { style: { padding: 'var(--sp-4) var(--sp-5)' } },
-    scanBtn, ingestBtn, h('span.grow'), statusChip);
+  // WHY INGEST IS OFF, IN WORDS, BESIDE THE BUTTON THAT IS OFF.
+  //
+  // The gate itself is unchanged and stays: nothing may be registered until a
+  // scan of THIS path has come back without a refusal. What was missing is the
+  // sentence. A greyed button with the reason in a `title` is a reason no
+  // keyboard user reaches and no hurried user hovers, and "Ingest + add to
+  // picker" looked broken rather than gated.
+  const ingestWhy = h('span.dim', {
+    role: 'status',
+    style: {
+      fontSize: 'var(--fs-disclosure)', lineHeight: 'var(--lh-body)',
+      flex: '1 1 100%', minWidth: '0',
+    },
+  }, '');
+
+  const controlsEl = h('div.frow', {
+    style: { padding: 'var(--sp-4) var(--sp-5)', flexWrap: 'wrap' },
+  }, scanBtn, ingestBtn, h('span.grow'), statusChip, ingestWhy);
 
   /* ---------------------------------------------------------- output -- */
 
@@ -375,7 +569,13 @@ export function createTissuePanel({ onRegistered }) {
    * run. Same rule, same reason, as the compound compiler's markStale().
    */
   function markStale() {
-    ingestBtn.disabled = true;
+    // `scanned` is cleared here too, not only the button. The flag is what
+    // setBusy() re-derives the gate from at the end of the NEXT call, so
+    // leaving it true meant a path edited after a clean scan could be ingested
+    // without a fresh one — the exact walk-around this function exists to
+    // close, held shut only by the button's own disabled state.
+    scanned = false;
+    closeGate(outEl.firstChild ? WHY_STALE : WHY_UNSCANNED);
     if (!outEl.firstChild) return;
     if (statusChip.textContent !== 'stale — scan again') {
       statusChip.className = 'chip st-queued';
@@ -391,6 +591,10 @@ export function createTissuePanel({ onRegistered }) {
     t.control.classList.add('invalid');
     t.errEl.textContent = message;
     t.errEl.classList.remove('hidden');
+    // An error on a folded field is an error nobody can see or fix. The fold
+    // is a convenience for fields that are behaving; the moment one of them is
+    // the problem it stops being one.
+    if (FOLDED_FIELDS.has(id)) nameFold.open = true;
   }
 
   /**
@@ -405,11 +609,16 @@ export function createTissuePanel({ onRegistered }) {
     clearFieldErrors();
     const remedy = remedyFor(message);
     fieldError(fieldId, remedy || 'Refused — see the reason below.');
+    // Two of the nine remedies tell the operator to change a control that is
+    // inside the fold ("Give this sample a different section id", 'Tick
+    // "measure detection rates"'). An instruction pointing at a control the
+    // reader cannot see is not a remedy, so the fold opens on those.
+    if (/section id|detection rates/i.test(remedy)) nameFold.open = true;
     statusChip.className = 'chip st-failed';
     statusChip.textContent = 'refused';
     // A refused directory is never ingestable, so the gate closes again.
     scanned = false;
-    ingestBtn.disabled = true;
+    closeGate(WHY_REFUSED);
 
     clear(outEl);
     outEl.style.opacity = '';
@@ -582,58 +791,6 @@ export function createTissuePanel({ onRegistered }) {
     return box;
   }
 
-  /**
-   * A registered section's measured scale, with the right noun on the count.
-   *
-   * `n_cells` on a VISIUM record is a count of SPOTS, not of cells: cache.py's
-   * `_ingested_metadata` copies `n_cells_ingested` into `n_spots` for exactly
-   * that platform, and tmesim/data/ingest.py states that a Visium row "is a
-   * ~55 um spot pooling several cells, NOT a cell". This panel printed all of
-   * them as "cells".
-   */
-  function scaleRow(rec) {
-    const spot = isSpot(rec);
-    const n = Number.isFinite(rec.n_spots) ? rec.n_spots
-      : (Number.isFinite(rec.n_cells) ? rec.n_cells : null);
-    const ext = Array.isArray(rec.extent_um) && rec.extent_um.length >= 2
-      ? rec.extent_um : null;
-    const bits = [];
-    if (rec.platform || rec.source) {
-      bits.push(h('span.mono', String(rec.platform || rec.source)));
-      bits.push(h('span.dim', '·'));
-    }
-    bits.push(n === null
-      ? h('span.dim', 'count not stated')
-      : h('span', h('span.mono', int(n)),
-        h('span.unit', spot ? 'spots' : 'cells')));
-    bits.push(h('span.dim', '·'));
-    // The extent used to be `(array || []).map(...).join(' × ') + ' mm'`, which
-    // on a record without one printed the string " mm" — a unit with no number
-    // in front of it, which is worse than a dash.
-    bits.push(ext === null
-      ? h('span.dim', 'extent not stated')
-      : h('span', h('span.mono', `${num(ext[0] / 1000, 2)} × ${num(ext[1] / 1000, 2)}`),
-        h('span.unit', 'mm')));
-    if (Number.isFinite(rec.n_genes)) {
-      bits.push(h('span.dim', '·'));
-      bits.push(h('span', h('span.mono', int(rec.n_genes)),
-        h('span.unit', 'genes')));
-    }
-    return h('div.frow', {
-      style: {
-        gap: 'var(--sp-3)', flexWrap: 'wrap', padding: 'var(--sp-1) 0',
-        fontSize: 'var(--fs-xs)', color: 'var(--fg-2)',
-      },
-      title: spot
-        ? 'A Visium row is a ~55 um spot pooling several cells, so this is a '
-          + 'count of spots. The cells a run works on are PLACED from the '
-          + 'per-spot deconvolved fractions and do not exist until the section '
-          + 'is reconstructed.'
-        : 'Measured at ingest time by tmesim.data.ingest and stored with the '
-          + 'section; not re-derived on this screen.',
-    }, bits);
-  }
-
   function render(res, registered) {
     clear(outEl);
     outEl.style.opacity = '';
@@ -762,11 +919,31 @@ export function createTissuePanel({ onRegistered }) {
   // Cleared by markStale() on any edit, so the gate cannot be walked around by
   // scanning one directory and ingesting another.
   let scanned = false;
+  // The sentence beside the disabled Ingest button. It is state, not decoration:
+  // every path that closes the gate names its own reason, and setBusy() restores
+  // that reason when the request it was covering finishes.
+  let whyOff_ = WHY_UNSCANNED;
+
+  /** Close the ingest gate, and say in words why it is closed. */
+  function closeGate(reason) {
+    whyOff_ = reason;
+    ingestBtn.disabled = true;
+    ingestWhy.textContent = busy ? '' : reason;
+  }
+
+  /** Open it. Only a scan of the current path that came back clean may. */
+  function openGate() {
+    whyOff_ = '';
+    scanned = true;
+    ingestBtn.disabled = busy;
+    ingestWhy.textContent = '';
+  }
 
   function setBusy(on, verb) {
     busy = on;
     scanBtn.disabled = on;
     ingestBtn.disabled = on || !scanned;
+    ingestWhy.textContent = on ? '' : (scanned ? '' : whyOff_);
     clearInterval(tick);
     if (!on) return;
     const t0 = Date.now();
@@ -828,8 +1005,7 @@ export function createTissuePanel({ onRegistered }) {
       statusChip.textContent = registered ? 'registered' : 'scanned';
       // A clean scan arms the ingest; a completed ingest disarms it again,
       // because a second press would only collide with the id it just took.
-      scanned = !registered;
-      ingestBtn.disabled = registered;
+      if (registered) { scanned = false; closeGate(WHY_REGISTERED); } else openGate();
       if (registered && res.ok) {
         toast('warn', `Section ${res.section_id} ingested — not validated`,
           'It is in the picker. Nothing has been scored against it: read its '
@@ -977,7 +1153,7 @@ export function createTissuePanel({ onRegistered }) {
       }),
       ));
       // What this specimen IS — scale, in the right noun.
-      storedEl.appendChild(scaleRow(rec));
+      storedEl.appendChild(sectionScaleRow(rec));
       // Whether it can be reached at all. `available: false` means the bytes
       // the record points at are gone or no longer ingestable; the row used to
       // look identical to a healthy one.
@@ -994,6 +1170,12 @@ export function createTissuePanel({ onRegistered }) {
       }));
     }
   }
+
+  // The two read-outs that describe a state rather than a result, painted once
+  // at construction so the panel is never blank about its own gate: the id and
+  // label that would be used, and why Ingest is not available yet.
+  paintNameEcho();
+  ingestWhy.textContent = WHY_UNSCANNED;
 
   return {
     el: root,

@@ -746,7 +746,7 @@ any directory it can read), and leave `TMESIM_STUDIO_EXPOSE_TRACEBACKS` unset.
 
 ## 4. Environment variables
 
-Eleven. There is no config file; these are the whole surface, and only five are
+Twelve. There is no config file; these are the whole surface, and only five are
 security-relevant.
 
 This section said "Six" while the code read ten — `TMESIM_MAX_GRID_CELLS` had
@@ -819,6 +819,33 @@ Two related properties worth knowing:
   declared Content-Length, before a handler buffers it. That cap used to apply
   to `/api/protocol/*` only; a 64 MB body was buffered and parsed by the other
   six POST routes.
+
+### `TMESIM_STATE_DIR`
+
+**Set this on any hosted deployment, or it keeps nothing.**
+
+`runs/` and `projects/` become children of this one directory. Unset, they sit
+at `app/runs/` and `app/projects/` exactly as they always have, so a local
+install is unaffected and nothing moves.
+
+Measured 2026-09-20 in a real container: both paths were hardcoded off the
+repository root, which puts them at `/app/app/runs` and `/app/app/projects` —
+siblings under `/app/app`, whose parent also holds `server/` and `web/`. Render
+allows **one** persistent disk per service, and mounting it at the only
+directory containing both would hide the application. So a hosted instance
+destroyed every run and every project on each deploy.
+
+That is survivable for runs, which are re-derivable from the RunSpec each one
+carries. It is not survivable for **projects**, which are the thing a user is
+asked to organise their work into. A workspace that forgets is worse than no
+workspace: it invites the investment and then loses it.
+
+```
+TMESIM_STATE_DIR=/var/lib/vivum      # one disk mounts here; both stores live under it
+```
+
+Read per call rather than cached at import, so exporting it after the process
+has loaded still takes effect, and a test can set it without a reload.
 
 ### `TMESIM_MAX_GRID_CELLS`
 

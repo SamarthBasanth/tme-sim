@@ -115,6 +115,7 @@ from __future__ import annotations
 import ast
 import importlib
 import inspect
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -967,7 +968,10 @@ def test_the_verb_that_would_have_caught_the_headline_defect():
         "results/logp_provenance.md asserts `logp` is not read on the path to "
         "`two_route_diffusivity`;"
     ), msg
-    assert "tmesim/molecular/compile_drug.py:193 reads it" in msg, msg
+    assert "tmesim/molecular/compile_drug.py:" in msg, msg
+    assert re.search(r"compile_drug\.py:\d+ reads it", msg), (
+        "the verb must cite the LINE it found the read on, not merely the "
+        f"file: {msg}")
 
 
 def test_the_descriptor_verb_is_not_fooled_by_the_permeability_leg():

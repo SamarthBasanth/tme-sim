@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Vivum — workspace</title>
+<!-- Self-hosted faces. FIRST, and deliberately not part of tokens.css: that
+     file is inlined verbatim into every generated report, which must stay a
+     single self-contained document with no resource references. Same order and
+     same two preloads as index.html — the two pages share every face. -->
+<link rel="preload" href="fonts/atkinson-next-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/atkinson-mono-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<!-- layout.css carries .topbar / .brand, which js/home/nav.js shares with the
+     Studio's top bar; components.css carries .btn, .inp, .chip, .progress,
+     .led, .notice, the <dialog> sheet contract and the access-key gate. The
+     home page consumes them and declares none of its own. -->
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/home.css">
+<!-- Byte-identical to index.html's favicon: one product, one mark. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23121619'/%3E%3Crect x='3' y='3' width='10' height='10' fill='none' stroke='%2338bcd6' stroke-width='1.6'/%3E%3Crect x='6' y='6' width='4' height='4' fill='%2338bcd6'/%3E%3C/svg%3E">
+</head>
+<body>
+<!-- Targets #home-main, not #projects. The projects section is built by
+     js/home/projectGrid.js after the workspace call returns, and on a cold
+     instance that is 20-35 s away — a skip link that points at nothing for the
+     first half-minute of every visit is worse than one that points slightly
+     higher. #home-main is in the served markup, carries tabindex="-1" so it can
+     actually take focus, and is above every state this page can be in. -->
+<a class="skip" href="#home-main">Skip to the workspace</a>
+
+<!-- ONE scroll container for the page, using base.css's `.scroll-y` primitive
+     rather than re-declaring overflow. base.css pins `html, body { overflow:
+     hidden }` and the Studio satisfies that with a fixed four-region grid; a
+     landing page is a document and is legitimately taller than the viewport at
+     200% zoom, so the shell scrolls in y, never in x, and the body still never
+     scrolls at all. -->
+<div class="home-shell scroll-y" id="home-shell">
+
+  <!-- js/home/nav.js builds its OWN <header class="topbar nav-bar"
+       role="banner"> and inserts it as the first child of this shell. This bar
+       is what the page ships with and what it keeps if that module is missing
+       or throws — a working minimum, not a placeholder: the identity, the way
+       into the Studio, and the theme toggle that keeps this page in step with
+       the one localStorage key the Studio already writes. main.js DETACHES this
+       element before calling createNav, because two role="banner" landmarks is
+       a worse defect than a plain bar, and puts it straight back if the call
+       fails. -->
+  <header class="topbar home-topbar" id="home-nav-fallback" role="banner">
+    <div class="brand">
+      <span class="name"><b>Vivum</b> <span>Workspace</span></span>
+      <span class="ver">v1</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-group last">
+      <a class="btn ghost sm" href="/studio">Open the Studio</a>
+      <button class="btn ghost sm" type="button" id="home-theme"
+        aria-pressed="false" title="Toggle light / dark theme">theme: dark</button>
+    </div>
+  </header>
+
+  <main class="home-main" id="home-main" tabindex="-1">
+
+    <h1 class="home-h1">Workspace</h1>
+    <p class="home-sub">
+      Projects held by this server, and the runs attached to them. The
+      simulator itself is the Studio; this page is the way in to it, and the
+      place work is kept between visits.
+    </p>
+
+    <noscript>
+      <div class="home-noscript">
+        <h2>JavaScript is turned off, so this page cannot list the projects.</h2>
+        <p>
+          The project list, the recent runs and the search are all drawn in the
+          browser from a single call to <code>/api/workspace</code>, and that
+          call needs JavaScript. Nothing is wrong with the server: the API is
+          still there and still answers. The Studio at <a href="/studio">/studio</a>
+          and the tissue registration page at <a href="/ingest">/ingest</a> are
+          built the same way and will not work either.
+        </p>
+        <p>
+          To check that this deployment is alive without a browser that runs
+          scripts, request <code>/api/health</code> directly — it is plain JSON
+          and it answers without a key.
+        </p>
+      </div>
+    </noscript>
+
+    <!-- The boot card is server-delivered so the FIRST paint says something
+         true rather than nothing. main.js replaces it within a frame of the
+         module executing; the <noscript> above is the correction for the case
+         where that never happens. -->
+    <div class="home-status" id="home-status" aria-live="polite" aria-busy="true">
+      <div class="boot">
+        <div class="boot-head">
+          <span class="led busy" aria-hidden="true"></span>
+          <h2 class="boot-title">Starting the workspace</h2>
+        </div>
+        <div class="progress indet" role="progressbar"
+             aria-label="Contacting the server"><i></i></div>
+        <p class="boot-why">
+          This page asks the server once for its projects and its most recent
+          runs. It needs JavaScript to make that call, and it replaces this
+          message as soon as the call returns — or explains itself if it
+          cannot.
+        </p>
+      </div>
+    </div>
+
+    <div class="home-body" id="home-body"></div>
+
+  </main>
+
+  <footer class="home-foot" id="home-foot" role="contentinfo">
+    <p class="home-foot-limit">
+      <b>Simulation output.</b> Every number in this workspace is produced by a
+      model run. No run here has been scored against a patient outcome, and
+      nothing on this page is for clinical use.
+    </p>
+    <p class="home-foot-links">
+      <a href="/studio">Studio</a>
+      <span class="home-foot-sep" aria-hidden="true">·</span>
+      <a href="/ingest">Register tissue by filesystem path</a>
+      <span class="home-foot-sep" aria-hidden="true">·</span>
+      <a href="/api/health">Server health</a>
+    </p>
+  </footer>
+
+</div>
+
+<script type="module" src="js/home/main.js"></script>
+</body>
+</html>

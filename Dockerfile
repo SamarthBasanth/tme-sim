@@ -161,6 +161,60 @@ RUN if [ "$FETCH_SECTION" = "1" ]; then \
       echo "[build] FETCH_SECTION=0 -- image ships with NO tissue; bind-mount one" ; \
     fi
 
+# --- the grid ceiling, DEFAULTED so a small host survives an ordinary request #
+#
+# Unset, the ceiling is 40,000,000 voxels -- the "no request should ever ask
+# for this" number, not the "this machine can afford it" one. On a 512 MB
+# instance, dx = 12 um on the flagship section OOM-KILLS the container: the
+# PROCESS dies, /healthz stops answering, and ONE ordinary request takes the
+# service down for everyone. dx = 12 is the value /api/defaults itself
+# proposes, so that request is the FIRST one a first user makes.
+#
+# (Two voxel counts for that spec appear in this repository and they are not
+# the same number: app/server/api.py records the measured OOM point as 286,200
+# voxels, and this server's own extent formula on xenium_319 computes ~284,498
+# today. Both are far above any ceiling that saves the container, so nothing
+# here turns on which is right -- but do not treat them as one figure.)
+#
+# A hosted deploy therefore depended on an operator remembering to set this in
+# a dashboard, and an operator who forgets gets no warning until the service is
+# dead.
+#
+# `auto` is the opt-in that this line opts into on the image's behalf. It is
+# not a guess and it does not fit a curve -- it applies the two measurements
+# recorded in app/server/api.py, and it does nothing at all unless a small host
+# is actually detected. MEASURED IN THIS IMAGE (linux/arm64, colima,
+# 2026-09-20), reading app.server.api._MAX_GRID_CELLS directly:
+#
+#   docker run --memory=512m -e TMESIM_MAX_GRID_CELLS=auto
+#       -> 46,070   source "auto (cgroup v2 memory.max)"
+#   docker run                -e TMESIM_MAX_GRID_CELLS=auto
+#       -> 40,000,000  source "auto (no small-host limit detected)"
+#   docker run                (unset, the behaviour before this line)
+#       -> 40,000,000  source "default"
+#
+# So on a host with room this line changes NOTHING except the label the Studio
+# and GET /api/account report, and on a small one it is the difference between
+# a 400 with a reason and a dead container. An operator who wants the range
+# between 46,070 and 286,200 back sets an integer here -- `-e
+# TMESIM_MAX_GRID_CELLS=100000` on `docker run`, or the dashboard variable on a
+# platform -- and an explicit value still wins, because this is only an ENV
+# default.
+#
+# THE ONE CASE THIS DOES NOT COVER, stated rather than papered over: `auto`
+# reads cgroup v2 `memory.max` and then cgroup v1 `memory.limit_in_bytes`. A
+# host that caps memory WITHOUT declaring it through either reports "not
+# declared", `auto` takes the 40,000,000 branch, and the host is unprotected.
+# Setting this variable also silences the startup line that used to say "no
+# memory limit is declared ... if this host is small, set
+# TMESIM_MAX_GRID_CELLS", because that line fires only while the ceiling is the
+# untouched default. Check GET /api/account ->
+# deployment.limits.max_grid_cells_source after a deploy; if it reads
+# "auto (no small-host limit detected)" on a host you know to be small, declare
+# the size with TMESIM_HOST_MEMORY_MB (docs/DEPLOYMENT.md §4) or set an
+# integer. docs/RUNBOOK_DEPLOY.md §H4 is that check, as one curl.
+ENV TMESIM_MAX_GRID_CELLS=auto
+
 EXPOSE 8000
 
 # Everything above this line runs as root (apt, pip, COPY). Everything the

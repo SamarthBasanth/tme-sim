@@ -127,10 +127,19 @@ function lineChart({ xs, ys, xLabel, yLabel, fmtX, fmtY, markIndex, yMax }) {
   for (let i = 0; i < n; i += 1) {
     if (!Number.isFinite(ys[i])) continue;
     const isMark = i === markIndex;
+    /* `data-i` is the SEAM between the chart and the table underneath.
+     *
+     * A point with no value is skipped, so the nth circle is not the nth row —
+     * which is exactly the kind of off-by-a-gap that would silently highlight
+     * the wrong rung while looking correct on a complete series. The index is
+     * therefore carried on the element rather than inferred from its position.
+     * See markPoint() below, which is the only reader of it. */
     const dot = svgEl('circle', {
       cx: px(i), cy: py(ys[i]), r: isMark ? 4 : 2.6,
       fill: isMark ? 'var(--accent)' : 'var(--bg-1)',
       stroke: 'var(--accent)', 'stroke-width': 2,
+      'data-i': i,
+      'data-mark': isMark ? '1' : '0',
     }, svgTitle(`${xLabel} ${fmtX(xs[i])} — ${yLabel} ${fmtY(ys[i])}`));
     kids.push(dot);
   }
@@ -156,6 +165,36 @@ function lineChart({ xs, ys, xLabel, yLabel, fmtX, fmtY, markIndex, yMax }) {
     style: 'display:block;width:100%;height:auto',
     'aria-label': `${yLabel} against ${xLabel}`,
   }, ...kids);
+}
+
+/**
+ * Put the chart's cursor on one point, or back on the convention mark.
+ *
+ * The chart and the table under it are two views of ONE series, and until now
+ * they were two pictures of it with nothing connecting them: a reader who
+ * found a row in the table had no way to see where that row sits on the curve,
+ * which is the whole reason the curve is drawn. This is the connection, and it
+ * is deliberately the only thing that moves — the permanent mark on the
+ * headline rung is restored the moment the cursor leaves, so the convention
+ * mark can never be lost by hovering.
+ *
+ * `--focus` is the cursor colour because that is what it is: the accent family
+ * is reserved for affordance, selection and focus, and this is the third of
+ * those. Nothing here is a state and nothing here is decoration.
+ *
+ * @param {SVGElement|null} svg   the chart returned by lineChart()
+ * @param {number} i              the series index to mark, or -1 for none
+ */
+function markPoint(svg, i) {
+  if (!svg || typeof svg.querySelectorAll !== 'function') return;
+  for (const c of svg.querySelectorAll('circle[data-i]')) {
+    const mine = Number(c.getAttribute('data-i')) === i;
+    const conv = c.getAttribute('data-mark') === '1';
+    c.setAttribute('r', mine ? 5 : (conv ? 4 : 2.6));
+    c.setAttribute('stroke', mine ? 'var(--focus)' : 'var(--accent)');
+    c.setAttribute('stroke-width', mine ? 3 : 2);
+    c.setAttribute('fill', (mine || conv) ? 'var(--accent)' : 'var(--bg-1)');
+  }
 }
 
 /** A prose paragraph at the disclosure floor. Every sentence on this panel goes
@@ -325,7 +364,17 @@ const fmtFrac = (v) => (Number.isFinite(v) ? pct(v, 1) + '%' : NULL_GLYPH);
  *
  * It is deliberately NOT smaller than the numbers around it. */
 function missing(why) {
-  return h('span.no-val', { title: why }, `${NULL_GLYPH} not reported`);
+  /* `.no-val` carries no rule in any stylesheet — checked 2026-09-20, zero
+   * matches across css/ — so until now this rendered as ordinary body text and
+   * a refusal was typographically indistinguishable from a value. The colour
+   * is set here, from a token, because this module owns no stylesheet; it is
+   * --warn rather than a neutral so a refusal reads as a refusal at a glance
+   * and never as a quiet number. It is NOT set smaller than the values it
+   * stands among. */
+  return h('span.no-val', {
+    title: why,
+    style: { color: 'var(--warn)', fontSize: 'var(--fs-sm)' },
+  }, `${NULL_GLYPH} not reported`);
 }
 
 /* How many points of a series the chart above could not plot. A polyline
@@ -336,7 +385,8 @@ function missingPointsNote(ys, what) {
   const n = ys.filter((v) => !Number.isFinite(v)).length;
   if (!n) return null;
   return h('div.caveat.crit', h('span',
-    h('b', `${n} OF ${ys.length} POINTS ARE MISSING FROM THIS CURVE. `),
+    h('b', `${n} OF ${ys.length} POINTS ${n === 1 ? 'IS' : 'ARE'} MISSING `
+      + 'FROM THIS CURVE. '),
     `The payload carries no value for ${n} of the ${ys.length} ${what}. `
     + 'The line is drawn through the points that exist, so it spans those gaps '
     + 'without marking them — nothing has been interpolated, estimated or '
@@ -373,17 +423,116 @@ function windowWords(ctx) {
   return 'which map produced this is not recorded';
 }
 
-/* The tag that travels with a figure. Every chart and table on this panel used
+/* -------------------------------------------------------- THE MODE BAND ---
+ * The tag that travels with a figure. Every chart and table on this panel used
  * to be mode-less: the mode was stated once, in prose, above the first of them,
  * and a reader who scrolled to the ladder or the falloff met numbers that mean
- * different things in the two modes with nothing on them saying which. Set at
- * the disclosure floor, never below it. */
+ * different things in the two modes with nothing on them saying which.
+ *
+ * REBUILT 2026-09-20, and the reason is a measurement, not a preference.
+ *
+ *   1. It was rendered into `div.figmode`, and `.figmode` CARRIES NO RULE IN
+ *      ANY STYLESHEET — zero matches across css/. So the one line saying which
+ *      of the two maps produced a figure inherited `body`: the same face, the
+ *      same 11.5 px and the same --fg-0 as ordinary prose. A label that looks
+ *      exactly like the sentence next to it is not a label.
+ *   2. It was attached to ONE figure. `modeTag` had a single call site — the
+ *      falloff curve — so the reach ladder, which is this product's central
+ *      output and whose rungs mean different things in the two modes, had
+ *      nothing on it at all. The delivery spread had nothing either.
+ *
+ * `window_mode` does not qualify these figures, it changes what they MEAN, so
+ * the mode word is set at --fs-lg: the same size as the largest number it
+ * governs (the delivery spread), never smaller, which is the house rule the
+ * capacity caveats under these same figures already follow. The second line
+ * says what the map is a statement ABOUT, because "steady_state" is an
+ * implementation word and a reader needs the question, not the enum.
+ *
+ * Styles are set from JS rather than in a stylesheet because this module owns
+ * none; every value is a token and no colour literal appears here. `.figmode`
+ * is kept as the class hook so a stylesheet owner can adopt it unchanged. */
+const MODE_BAND = {
+  [MODE.STEADY]: {
+    word: 'STEADY-STATE MAP',
+    ink: 'var(--info)',
+    fill: 'var(--info-bg)',
+    says: 'These numbers are what this geometry allows once transport has '
+      + 'settled. No exposure window enters the computation, so none of them '
+      + 'is a statement about how long the drug was present.',
+  },
+  [MODE.FINITE]: {
+    word: 'FINITE-WINDOW MAP',
+    ink: 'var(--info)',
+    fill: 'var(--info-bg)',
+    says: 'These numbers are what THIS run\'s own exposure window achieved. '
+      + 'They carry the schedule and the window length as well as the tissue; '
+      + 'a longer window moves them.',
+  },
+  [MODE.UNRECORDED]: {
+    word: 'MAP NOT RECORDED',
+    ink: 'var(--warn)',
+    fill: 'var(--warn-bg)',
+    says: 'Which of the two maps produced these numbers is not on the record '
+      + '(window_mode is absent). The two answer different questions and '
+      + 'neither is being assumed here.',
+  },
+};
+
 function modeTag(ctx, what) {
+  const m = MODE_BAND[ctx.mode] || MODE_BAND[MODE.UNRECORDED];
   return h('div.figmode', {
     title: 'Which of the two maps produced the figure directly above this '
       + 'line. The two answer different questions and are not '
       + 'interchangeable; see the banner at the top of the delivery evidence.',
-  }, `${what} — ${windowWords(ctx)}`);
+    style: {
+      background: m.fill,
+      borderLeft: `3px solid ${m.ink}`,
+      padding: 'var(--sp-3) var(--sp-5)',
+      margin: 'var(--sp-3) 0 var(--sp-4)',
+    },
+  },
+  h('div', {
+    style: {
+      fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-lg)',
+      lineHeight: 'var(--lh-tight)', fontWeight: '600', color: m.ink,
+      overflowWrap: 'anywhere',
+    },
+  }, m.word),
+  h('div', {
+    style: {
+      fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)',
+      color: 'var(--fg-1)', lineHeight: 'var(--lh-body)',
+      margin: 'var(--sp-1) 0 var(--sp-2)', overflowWrap: 'anywhere',
+    },
+  }, `${windowWords(ctx)} — ${what}`),
+  h('div', {
+    style: {
+      fontSize: 'var(--fs-sm)', color: 'var(--fg-1)',
+      lineHeight: 'var(--lh-body)',
+    },
+  }, m.says));
+}
+
+/* The provenance strip under a figure: which fields it was read from, what was
+ * done to them here, and what it may not be read as.
+ *
+ * Same defect as the mode tag above — `.figmode` has no rule — with a different
+ * consequence: these lines came out at --fg-0 in the UI face, i.e. LOUDER than
+ * the prose() paragraphs around them at --fs-disclosure/--fg-1. The hierarchy
+ * was inverted, so the field paths read as the argument and the argument read
+ * as the footnote. Mono, --fg-2, ruled off above: subordinate to the sentence,
+ * and never below --fs-disclosure, because these lines carry denominators. */
+function figNote(title, ...kids) {
+  return h('div.figmode', {
+    title,
+    style: {
+      fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)',
+      color: 'var(--fg-2)', lineHeight: 'var(--lh-body)',
+      borderTop: '1px solid var(--line-1)',
+      padding: 'var(--sp-2) 0 0', margin: 'var(--sp-2) 0 var(--sp-4)',
+      overflowWrap: 'anywhere',
+    },
+  }, ...kids);
 }
 
 /* ------------------------------------------------------ COPY A NUMBER -----
@@ -419,15 +568,29 @@ function copyBtn(getText, what) {
 
 /** The live read-out a hovered or focused row writes into. `aria-live` so a
  *  keyboard user hears the row they arrowed onto; a default line so it is never
- *  an empty box waiting to be discovered. */
+ *  an empty box waiting to be discovered.
+ *
+ *  WAS DEAD CODE. Written with the comment above, `.rung-readout` given no rule
+ *  in any stylesheet, and never called from anywhere — so the read-out this
+ *  panel documents as its accessible path through the ladder did not exist on
+ *  screen. It is wired to the ladder now (renderLadder), and it carries its own
+ *  styling for the same reason everything else here does: this module owns no
+ *  stylesheet, and every value below is a token. */
 function makeReadout(defaultText) {
   const el = h('div.rung-readout', {
     'aria-live': 'polite', role: 'status', tabindex: '-1',
+    style: {
+      fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)',
+      lineHeight: 'var(--lh-body)', color: 'var(--fg-2)',
+      background: 'var(--bg-2)', borderLeft: '3px solid var(--accent)',
+      padding: 'var(--sp-3) var(--sp-5)', margin: 'var(--sp-3) 0 0',
+      overflowWrap: 'anywhere',
+    },
   }, defaultText);
   return {
     el,
-    set(text) { el.textContent = text; },
-    reset() { el.textContent = defaultText; },
+    set(text) { el.textContent = text; el.style.color = 'var(--fg-0)'; },
+    reset() { el.textContent = defaultText; el.style.color = 'var(--fg-2)'; },
   };
 }
 
@@ -520,11 +683,10 @@ function renderVerdict(el, run) {
         : `${fmtFrac(topVal)} of SURVIVING tumour cells. `,
       MEANING[topKey] || '')));
       if (haveCounts) {
-        el.appendChild(h('div.figmode', {
-          title: 'The two numbers this percentage is made of, so it cannot '
-            + 'travel without them. mechanism.counts.'
-            + LIMITER_LABEL[topKey] + ' over mechanism.n_survived.',
-        },
+        el.appendChild(figNote(
+          'The two numbers this percentage is made of, so it cannot '
+          + 'travel without them. mechanism.counts.'
+          + LIMITER_LABEL[topKey] + ' over mechanism.n_survived.',
         `${int(topCount)} / ${int(nSurv)} surviving tumour cells `
         + `· mechanism.counts.${LIMITER_LABEL[topKey]} over `
         + 'mechanism.n_survived · NOT the same denominator as the ladder below, '
@@ -674,10 +836,9 @@ function renderSpread(el, run, ctx) {
           h('td.right.num.mono', nT !== null
             ? `${int(nT)} tumour cells`
             : missing('reach.n_tumor is absent from this payload')))))));
-    el.appendChild(h('div.figmode', {
-      title: 'Where these two numbers come from and what was done to them '
-        + 'here, so the fold-change can be checked rather than believed.',
-    },
+    el.appendChild(figNote(
+      'Where these two numbers come from and what was done to them '
+      + 'here, so the fold-change can be checked rather than believed.',
     'extra_metrics.E_p90_uM / extra_metrics.E_p10_uM · Derived in this browser: '
     + 'the two percentiles are recorded, their ratio is not, so this division is '
     + 'not in result.json and carries no provenance of its own · both are '
@@ -799,7 +960,7 @@ function renderFalloff(el, reach, ctx) {
       fmtX: (v) => num(v, 0) + 'um', fmtY: (v) => num(v, 2),
       markIndex: 0, yMax: Math.max(1, ...fv.filter(Number.isFinite)),
     }));
-    el.appendChild(modeTag(ctx, 'the curve above'));
+    el.appendChild(modeTag(ctx, 'the curve above and the table under it'));
     // missingPointsNote() returns null when nothing is missing, and
     // appendChild(null) is a TypeError that kills the rest of this render --
     // so the panel would go blank precisely on the healthy case.
@@ -840,10 +1001,9 @@ function renderFalloff(el, reach, ctx) {
             Number.isFinite(fv[i]) ? num(fv[i], 4)
               : missing('falloff.normalised_mean_auc carries no value for this bin')),
           fc ? h('td.right.num.mono', int(fc[i])) : null))))));
-    el.appendChild(h('div.figmode', {
-      title: 'What one row of the table above is, and what the first row is by '
-        + 'construction rather than by measurement.',
-    },
+    el.appendChild(figNote(
+      'What one row of the table above is, and what the first row is by '
+      + 'construction rather than by measurement.',
     `bin width ${(Number.isFinite(fall.bin_um) ? num(fall.bin_um, 0) : '?')} um`
     + (Number.isFinite(minBin)
       ? ` · a bin is usable only with at least ${int(minBin)} grid points in it`
@@ -1006,11 +1166,10 @@ function renderPotency(el, run, ctx) {
             ? int(Math.round(v * nT))
             : missing(`${field} is null or absent in this payload`))
           : null))))));
-    el.appendChild(h('div.figmode', {
-      title: 'What population these three percentages are shares of, which '
-        + 'field they were scored on, and which parts of the row were computed '
-        + 'here rather than recorded.',
-    },
+    el.appendChild(figNote(
+      'What population these three percentages are shares of, which '
+      + 'field they were scored on, and which parts of the row were computed '
+      + 'here rather than recorded.',
     (nT !== null
       ? `denominator ${int(nT)} tumour cells (reach.n_tumor) — NOT the viable `
         + 'band the ladder above counts'
@@ -1067,6 +1226,314 @@ function renderPotency(el, run, ctx) {
         + 'measurements of this tissue without that ratio attached — stated '
         + 'in full beside the verdict at the top of this panel.')));
     }
+  }
+}
+
+/* ==========================================================================
+ * THE REACH LADDER — the product's central output, and until now the least
+ * legible thing on the panel.
+ *
+ * WHAT IT IS. A ratio taken inside ONE map: what share of the viable tumour
+ * sits below X times that same map's own perivascular reference. A per-compound
+ * plasma factor is an exact linear rescale of the whole field, so it moves
+ * every point together and cancels — which is the entire reason this figure
+ * survived the withdrawal of the cross-compound ordering.
+ *
+ * WHAT WAS WRONG WITH IT, MEASURED AGAINST THE FILE'S OWN RULES:
+ *
+ *   1. NO DENOMINATOR. Every rung was quoted as a percentage "of viable
+ *      tumour" and the count that percentage is of — `reach.n_viable` — was
+ *      resolved into `ctx` at the top of render() and rendered NOWHERE. This
+ *      panel prints the denominator beside the verdict share, beside the
+ *      delivery spread and beside the coverage ladder; the one figure that had
+ *      none was the headline one. It matters more here than anywhere else:
+ *      `compute_reach` computes `F = counts / n_viable`, so the ladder's
+ *      resolution IS 1/n_viable and every rung can only land on a multiple of
+ *      it — which is why app/server/reach.py refuses the map outright below
+ *      MIN_BIN_COUNT viable cells. A rung without its denominator hides the
+ *      one number that says whether the rung is a statistic or a count.
+ *   2. A BARE DASH FOR A REFUSAL. A missing rung rendered `fmtFrac(null)`,
+ *      i.e. the em dash alone, in a column of percentages — the exact shape
+ *      this module's own `missing()` helper exists to prevent, and which it
+ *      already prevents in all three of the other tables on this panel.
+ *   3. NO GAP NOTE. `missingPointsNote()` was applied to the falloff curve and
+ *      not to this one, so a polyline spanning an absent rung read as an
+ *      interpolated value on the one chart where it must not.
+ *   4. NO MODE. `modeTag()` had a single call site, and it was the other
+ *      chart. A rung means a different thing in the two maps and the ladder
+ *      said nothing about which it was in.
+ *   5. THE CHART AND THE TABLE WERE UNCONNECTED. Two pictures of one series,
+ *      with no way to find a table row on the curve or a curve point in the
+ *      table, and no keyboard path into either.
+ *
+ * WHAT IS DELIBERATELY NOT ADDED: a single big number. There WAS a
+ * single-threshold headline here — F at 0.1x — and it was removed rather than
+ * retuned, because a number at one rung acquires an authority the convention
+ * behind it does not have. The glanceable thing added instead is the SHAPE
+ * (ladderShape below), which names two endpoints and the rung count and says
+ * in its own sentence that no rung is the answer.
+ * ========================================================================== */
+
+/** One rung, spelled out in full: threshold, share, count, denominator, map.
+ *  This is the string the live read-out speaks and the row's accessible name,
+ *  so a rung can never be read — by eye, by pointer or by screen reader —
+ *  without the two things that make it mean anything. */
+function rungLine(v, f, nViable, ctx) {
+  if (!Number.isFinite(f)) {
+    return `${fmtRatio(v)}x — not reported in this payload. `
+      + 'No value is substituted for it and the curve is not interpolated '
+      + `across it. ${windowWords(ctx)}.`;
+  }
+  const cells = nViable !== null
+    ? `: ${int(Math.round(f * nViable))} of ${int(nViable)} cells`
+    : ', over a number of cells this payload does not carry';
+  return `${fmtRatio(v)}x — ${fmtFrac(f)} of the viable tumour${cells}. `
+    + `${windowWords(ctx)}.`;
+}
+
+/**
+ * The ladder's SHAPE, in one sentence, read straight off the payload.
+ *
+ * The argument for this block is the same argument the file already makes for
+ * printing the whole ladder rather than one rung: the movement between rungs
+ * is the finding, and the movement was only available by reading eight rows or
+ * estimating a slope off an 84 px chart. This states it in words, names both
+ * endpoints with their denominator, and says in the same breath that the rung
+ * you quote is a convention — so it cannot be mistaken for a headline.
+ *
+ * It invents nothing. The endpoints are two recorded values selected by index;
+ * the direction is a comparison, not a quantity; and no difference, ratio or
+ * slope is computed, because any of those would be a browser arithmetic on a
+ * claim surface and would have to be labelled as one.
+ *
+ * Returns null when fewer than two rungs carry a value — there is no shape to
+ * describe, and describing one anyway is how a two-point line becomes a trend.
+ */
+function ladderShape(cx, cy, ctx) {
+  const idx = [];
+  for (let i = 0; i < cy.length; i += 1) if (Number.isFinite(cy[i])) idx.push(i);
+  if (idx.length < 2) return null;
+  const a = idx[0];
+  const b = idx[idx.length - 1];
+  const up = cy[b] >= cy[a];
+  let mono = true;
+  for (let k = 1; k < idx.length; k += 1) {
+    const p = cy[idx[k - 1]];
+    const q = cy[idx[k]];
+    if (up ? q < p : q > p) { mono = false; break; }
+  }
+  const dir = mono
+    ? (up ? 'rises, without reversing,' : 'falls, without reversing,')
+    : 'moves non-monotonically';
+  const nV = ctx.nViable;
+  const denom = nV !== null
+    ? ` of the ${int(nV)} viable tumour cells`
+    : ' of the viable tumour (this payload does not carry the count)';
+  return h('div', {
+    style: {
+      borderLeft: '3px solid var(--line-2)',
+      padding: '0 0 0 var(--sp-5)',
+      margin: '0 0 var(--sp-4)',
+      fontSize: 'var(--fs-sm)', lineHeight: 'var(--lh-body)',
+      color: 'var(--fg-0)',
+    },
+    title: 'The two ends of the recorded ladder and the direction between '
+      + 'them. Read off reach.curve; no difference, ratio or slope is '
+      + 'computed here.',
+  },
+  h('b', { style: { fontFamily: 'var(--font-mono)' } }, 'SHAPE — '),
+  `across the ${int(idx.length)} threshold${idx.length === 1 ? '' : 's'} this `
+  + `record carries a value for, the share ${dir} from `,
+  h('b', { style: { fontFamily: 'var(--font-mono)' } },
+    `${fmtFrac(cy[a])}${denom} at ${fmtRatio(cx[a])}x`),
+  ' to ',
+  h('b', { style: { fontFamily: 'var(--font-mono)' } },
+    `${fmtFrac(cy[b])} at ${fmtRatio(cx[b])}x`),
+  '. That movement is what the ladder shows. Which rung you quote is this '
+  + 'project\'s reporting convention — nothing in the tissue or the compound '
+  + 'picks one out — so no single rung below is the answer.');
+}
+
+/**
+ * The ladder: shape, chart, mode, table, live read-out, provenance, and the
+ * three-state capacity bound. Depends on `reach` and the resolved `ctx`.
+ *
+ * EXTRACTED FROM render() 2026-09-20. Every sentence that was already here is
+ * carried over verbatim; see the block comment above for what is new and for
+ * the one thing that is deliberately still absent.
+ */
+function renderLadder(el, reach, ctx) {
+  const curve = reach.curve || {};
+  const cx = curve.x || [];
+  const cy = curve.under_reached_fraction || [];
+  const x = reach.headline_x;
+  const nV = ctx.nViable;
+  if (cx.length && cy.length === cx.length) {
+    el.appendChild(microLabel('under-reached fraction vs threshold'));
+    /* WHAT THE READER IS LOOKING AT, BEFORE THE CHART.
+     * "Under-reached fraction" is a term this project invented, and it reads
+     * to a newcomer as "the fraction the drug did not reach" — a measurement.
+     * It is not one: it is a count of cells below a threshold, and the
+     * threshold is a convention. The chart used to arrive with only its own
+     * name above it, which is precisely the case where an invented word gets
+     * read as the meaning it merely sounds like. */
+    el.appendChild(prose(
+      'Read this as: "how much of the viable tumour sits below X times the ',
+      term(ctx.refIsConc ? 'reference concentration' : 'reference exposure'),
+      '?" Each row of the ', term('ladder'),
+      ' below is one threshold X. The curve is the point, not any one ',
+      term('rung'), ' of it — the thresholds are a reporting convention, '
+      + 'nothing in the tissue or the compound picks one out.'));
+
+    const shape = ladderShape(cx, cy, ctx);
+    if (shape) el.appendChild(shape);
+
+    const chart = lineChart({
+      xs: cx, ys: cy,
+      xLabel: 'threshold', yLabel: 'under-reached',
+      fmtX: (v) => fmtRatio(v) + 'x', fmtY: (v) => pct(v, 0) + '%',
+      markIndex: cx.indexOf(x), yMax: 1,
+    });
+    el.appendChild(chart);
+
+    // WHICH MAP THESE RUNGS ARE RUNGS OF. The ladder is built on `reach`, so
+    // `window_mode` governs it exactly as it governs the falloff curve — and
+    // this was the one figure of the three with nothing on it saying so.
+    el.appendChild(modeTag(ctx, 'the curve above and the table under it'));
+
+    // A polyline spans a gap, so an absent rung looks like an interpolated
+    // one. The falloff curve has carried this note since it was written; this
+    // curve never has, on the panel where a fabricated rung would matter most.
+    // Returns null when the series is complete — appendChild(null) throws and
+    // would blank the rest of the panel on the healthy case.
+    const gaps = missingPointsNote(cy, 'thresholds');
+    if (gaps) el.appendChild(gaps);
+
+    /* The live read-out, and it is the reason the rows below are reachable
+     * from the keyboard at all. `aria-live="polite"` so arrowing down the
+     * ladder speaks each rung in full — threshold, share, count, denominator
+     * and map — rather than announcing two numbers out of a grid. It opens on
+     * a line that names its own controls, so it is never an empty box. */
+    const readout = makeReadout(
+      'Hover a rung, or tab into the table and use the arrow keys, to read one '
+      + 'in full. Every rung is printed above; the marked one is the reporting '
+      + 'convention, not the answer.');
+
+    const rows = [];
+    const focusRow = (from, step) => {
+      if (!rows.length) return;
+      let next;
+      if (step === 'first') next = 0;
+      else if (step === 'last') next = rows.length - 1;
+      else next = Math.max(0, Math.min(rows.length - 1, from + step));
+      rows[next].focus();
+    };
+
+    // The table view. It is the accessible form of the chart above, and it is
+    // also the reason nothing on this panel needs to be estimated off a
+    // pixel: every plotted value is printed.
+    const body = cx.map((v, i) => {
+      const line = rungLine(v, cy[i], nV, ctx);
+      const isHead = v === x;
+      // Same row contract as the run history table (js/ui/history.js): a real
+      // `tabindex`, `aria-selected` for the marked row, an `aria-label` that
+      // is the whole rung, and Arrow/Home/End to move. One pattern for a
+      // selectable table row in this product, not two.
+      const tr = h('tr.sel-able', {
+        tabindex: '0',
+        'aria-selected': String(isHead),
+        'aria-label': line,
+        /* MARKED, NOT HEADLINED. `reach.headline_x` still names the rung this
+         * project's reporting convention picks out, and the mark says WHICH
+         * row that is — but no number is quoted off it anywhere on this panel
+         * any more (see the convention note below), and the wording here has
+         * to stop implying otherwise. It used to read "the threshold the
+         * headline above is read at", pointing at a headline that was
+         * removed. */
+        title: (isHead
+          ? 'This is the rung this project\'s reporting convention picks out '
+            + '(reach.headline_x). It is marked so you can see WHICH row the '
+            + 'convention is; nothing on this panel is quoted off it, and '
+            + 'nothing in the tissue or the compound selects it. '
+          : '') + line,
+        onfocus: () => { readout.set(line); markPoint(chart, i); },
+        onblur: () => { readout.reset(); markPoint(chart, -1); },
+        onmouseenter: () => { readout.set(line); markPoint(chart, i); },
+        onmouseleave: () => { readout.reset(); markPoint(chart, -1); },
+        onkeydown: (e) => {
+          if (e.key === 'ArrowDown') { e.preventDefault(); focusRow(i, 1); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); focusRow(i, -1); }
+          else if (e.key === 'Home') { e.preventDefault(); focusRow(i, 'first'); }
+          else if (e.key === 'End') { e.preventDefault(); focusRow(i, 'last'); }
+        },
+      },
+      h('td.mono' + (isHead ? '.strong' : ''), fmtRatio(v) + 'x'),
+      h('td.right.num.mono' + (isHead ? '.strong' : ''),
+        Number.isFinite(cy[i]) ? fmtFrac(cy[i])
+          : missing('reach.curve.under_reached_fraction carries no value for '
+            + 'this threshold; no value is substituted for it')),
+      /* THE COUNT, AND THE DENOMINATOR IN THE HEADER. `F = counts /
+       * n_viable` (app/server/reach.py::compute_reach), so multiplying back
+       * recovers the integer the rung was made from exactly — but it is a
+       * multiplication performed in this browser and not a recorded field,
+       * which the provenance strip under the table says in those words. */
+      nV !== null
+        ? h('td.right.num.mono', Number.isFinite(cy[i])
+          ? int(Math.round(cy[i] * nV))
+          : missing('no fraction is recorded for this threshold, so no count '
+            + 'is reconstructed for it'))
+        : null);
+      rows.push(tr);
+      return tr;
+    });
+
+    const tbl = h('table.tbl.zebra',
+      h('thead', h('tr',
+        h('th', 'below'),
+        h('th.right', 'of viable tumour'),
+        nV !== null ? h('th.right', `cells (of ${int(nV)})`) : null)),
+      // The headline threshold is marked in the table so the reader can see
+      // WHICH row the big number above was picked off. It is emphasis, not a
+      // verdict — the point of printing the whole ladder is that the choice
+      // of row is a convention.
+      h('tbody', body));
+    el.appendChild(h('div.tblwrap', { style: { margin: 'var(--sp-3) 0 0' } }, tbl));
+    el.appendChild(readout.el);
+
+    el.appendChild(figNote(
+      'Which fields this ladder is read from, what population its percentages '
+      + 'are shares of, and which column was computed here rather than '
+      + 'recorded.',
+      'reach.curve.x / reach.curve.under_reached_fraction'
+      + (nV !== null
+        ? ` · denominator ${int(nV)} VIABLE tumour cells (reach.n_viable) — `
+          + 'NOT the survivor count the verdict above is a share of, and NOT '
+          + 'the tumour cell set the coverage table below counts'
+        : ' · denominator: reach.n_viable is absent from this payload, so how '
+          + 'many viable tumour cells these shares are of is not on the '
+          + 'record and no count is reconstructed')
+      + (nV !== null
+        ? ` · F = counts / ${int(nV)}, so every rung can only land on a `
+          + `multiple of ${num(1 / nV, 6)} — the ladder's resolution is one `
+          + 'cell'
+        : '')
+      + (nV !== null
+        ? ' · Derived in this browser: the cells column is the recorded '
+          + 'fraction multiplied by that denominator, and is not itself a '
+          + 'recorded field'
+        : '')
+      + ' · a ratio between two points of one map, never a rank',
+      copyBtn(() => {
+        const lines = cx.map((v, i) => '  ' + rungLine(v, cy[i], nV, ctx));
+        return 'under-reached fraction vs threshold, run '
+          + `${ctx.runId} (${windowWords(ctx)}):\n${lines.join('\n')}\n`
+          + 'Each rung is the share of VIABLE tumour cells below X times this '
+          + 'same map\'s perivascular reference. A within-map ratio: it '
+          + 'carries no dose and no potency, it is not an absolute kill '
+          + 'fraction, and it is not comparable across compounds (Vivum: '
+          + 'single-compound, single-section). The choice of rung is a '
+          + 'reporting convention.';
+      }, 'the whole ladder')));
   }
 }
 
@@ -1140,8 +1607,6 @@ export function createReachPanel() {
       return;
     }
 
-    const x = reach.headline_x;
-
     /* ---- ONE RESOLVED DESCRIPTION OF THIS PAYLOAD, THREADED EVERYWHERE ---
      * Which map, how long a window, what the reference is a reference OF, and
      * the two cell counts every percentage on this panel is a share of. Each
@@ -1202,11 +1667,26 @@ export function createReachPanel() {
      * as finite_window: treating a missing key as the historical default is
      * how a record ends up labelled with a claim nobody verified it makes.
      * Absent is reported as unknown and says so. */
+    /* THE LEAD IS SET AT --fs-lg, LIKE A HARD STOP'S.
+     *
+     * css/components.css promotes `.caveat.crit > span > b:first-child` and
+     * `.sev-2`'s to --fs-lg for a measured reason — a caveat set smaller than
+     * the number it qualifies is small print — and lists the metric hard stops
+     * as the case it was written for. `.caveat.info` gets no such rule, so this
+     * banner's lead rendered at --fs-sm above a --fs-lg delivery spread and a
+     * --fs-xl verdict. It does not merely QUALIFY those numbers: which of the
+     * two maps produced them changes what they mean, which is a stronger claim
+     * on the reader's attention than any of the caveats already promoted.
+     * Set here rather than in a stylesheet because this module owns none. */
+    const QUESTION_LEAD = {
+      fontSize: 'var(--fs-lg)', lineHeight: 'var(--lh-tight)',
+      display: 'inline-block', marginBottom: 'var(--sp-2)',
+    };
     const wmode = reach.window_mode;
     if (wmode === 'steady_state' || wmode === 'finite_window') {
       const steady = wmode === 'steady_state';
       el.appendChild(h('div.caveat.info', h('span',
-        h('b', steady
+        h('b', { style: QUESTION_LEAD }, steady
           ? 'THIS ANSWERS: WHAT DOES THIS TISSUE’S GEOMETRY PERMIT? '
           : 'THIS ANSWERS: WHAT DID THIS EXPOSURE WINDOW ACHIEVE? '),
         steady
@@ -1225,7 +1705,8 @@ export function createReachPanel() {
         reach.window_note ? ' ' + String(reach.window_note) : '')));
     } else {
       el.appendChild(h('div.caveat', h('span',
-        h('b', 'WHICH QUESTION THIS ANSWERS IS NOT RECORDED. '),
+        h('b', { style: QUESTION_LEAD },
+          'WHICH QUESTION THIS ANSWERS IS NOT RECORDED. '),
         'This run predates the field that says whether the map below is the '
         + 'reach the geometry permits (settled transport, no window) or the '
         + 'reach one finite exposure window achieved (entangled with the '
@@ -1332,47 +1813,7 @@ export function createReachPanel() {
     }
 
     /* ---- the curve ----------------------------------------------------- */
-    const curve = reach.curve || {};
-    const cx = curve.x || [];
-    const cy = curve.under_reached_fraction || [];
-    if (cx.length && cy.length === cx.length) {
-      el.appendChild(microLabel('under-reached fraction vs threshold'));
-      /* WHAT THE READER IS LOOKING AT, BEFORE THE CHART.
-       * "Under-reached fraction" is a term this project invented, and it reads
-       * to a newcomer as "the fraction the drug did not reach" — a measurement.
-       * It is not one: it is a count of cells below a threshold, and the
-       * threshold is a convention. The chart used to arrive with only its own
-       * name above it, which is precisely the case where an invented word gets
-       * read as the meaning it merely sounds like. */
-      el.appendChild(prose(
-        'Read this as: "how much of the viable tumour sits below X times the ',
-        term(refIsConc ? 'reference concentration' : 'reference exposure'),
-        '?" Each row of the ', term('ladder'),
-        ' below is one threshold X. The curve is the point, not any one ',
-        term('rung'), ' of it — the thresholds are a reporting convention, '
-        + 'nothing in the tissue or the compound picks one out.'));
-      el.appendChild(lineChart({
-        xs: cx, ys: cy,
-        xLabel: 'threshold', yLabel: 'under-reached',
-        fmtX: (v) => fmtRatio(v) + 'x', fmtY: (v) => pct(v, 0) + '%',
-        markIndex: cx.indexOf(x), yMax: 1,
-      }));
-      // The table view. It is the accessible form of the chart above, and it is
-      // also the reason nothing on this panel needs to be estimated off a
-      // pixel: every plotted value is printed.
-      const tbl = h('table.tbl.zebra',
-        h('thead', h('tr',
-          h('th', 'below'), h('th.right', 'of viable tumour'))),
-        // The headline threshold is marked in the table so the reader can see
-        // WHICH row the big number above was picked off. It is emphasis, not a
-        // verdict — the point of printing the whole ladder is that the choice
-        // of row is a convention.
-        h('tbody', cx.map((v, i) => h('tr',
-          { title: v === x ? 'the threshold the headline above is read at' : null },
-          h('td.mono' + (v === x ? '.strong' : ''), fmtRatio(v) + 'x'),
-          h('td.right.num.mono' + (v === x ? '.strong' : ''), fmtFrac(cy[i]))))));
-      el.appendChild(h('div.tblwrap', { style: { margin: 'var(--sp-3) 0 0' } }, tbl));
-    }
+    renderLadder(el, reach, ctx);
 
     if (reach.convention) el.appendChild(prose(String(reach.convention)));
 
@@ -1394,7 +1835,23 @@ export function createReachPanel() {
      * caveat above. A record with no `window_mode` used to be told, flatly,
      * that its headline rung is bit-identical over R = 1 to 39. Nothing in
      * such a record supports that sentence. */
-    el.appendChild(h('div.caveat', h('span',
+    /* SEVERITY IS READ OFF WHAT THE ARM SAYS, not off the figure it is under.
+     *
+     * Measured 2026-09-20: this block rendered as a plain `.caveat` in all
+     * three arms, so its lead sat at --fs-sm while the STRUCTURALLY IDENTICAL
+     * capacity notes on the delivery spread and the falloff curve — same
+     * subject, same sweep, same document — rendered as `.caveat.crit` with a
+     * --fs-lg lead. The ladder is the panel's central output and carried the
+     * quietest of the three.
+     *
+     * It is not promoted unconditionally, because that would be the same error
+     * in the other direction: the STEADY arm states the ABSENCE of a limit
+     * ("every rung moves exactly 0.000e+00"), and dressing a reassurance as a
+     * hard stop teaches a reader to discount the hue. The two arms that state
+     * a limit — a 0.9427 movement over the measured range, and a record that
+     * cannot say which — take the severity their siblings already have. */
+    el.appendChild(h('div.caveat' + (ctx.mode === MODE.STEADY ? '' : '.crit'),
+      h('span',
       ctx.mode === MODE.UNRECORDED
         ? [h('b', 'WHAT TISSUE CAPACITY DOES TO THIS LADDER IS NOT RECORDED. '),
            'The engine assigns every compound a capacity of 1.0 and measured '

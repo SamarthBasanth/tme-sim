@@ -14,6 +14,7 @@
 //   GET    /api/runs/{id}/geometry          (TMSG binary)
 //   GET    /api/runs/{id}/field/{name}      (TMSF binary)
 //   POST   /api/validate
+//   GET    /api/workspace                    (the home page's boot call)
 //   GET    /api/health                       (liveness; detail only with a key)
 //   GET    /api/limits                       (what this server will refuse)
 //   GET    /api/account                      (key, deployment, usage, billing)
@@ -321,6 +322,45 @@ export async function probe() {
 export const getHealth = () => call('GET', '/api/health', { noFallback: true });
 export const getAccount = () => call('GET', '/api/account', { noFallback: true });
 export const getLimits = () => call('GET', '/api/limits', { noFallback: true });
+
+/* --- the workspace (docs/WORKSPACE_CONTRACT.md) -------------------------- *
+ * ONE call for the home page's whole first paint. Four round-trips on a cold
+ * Render instance is four chances to look broken, and the home page is now the
+ * first thing anyone sees.
+ *
+ * NOT `noFallback`: unlike /api/account, a workspace CAN be honestly rendered
+ * from js/mock.js -- the projects are fake, the shell labels the session STUB
+ * DATA exactly as the Studio does, and a visitor to a sleeping instance gets a
+ * page that explains itself instead of a dead screen. The account panel refuses
+ * to guess because its subject is "which key am I sending"; this one's subject
+ * is "what work exists", and "none that I can reach" is a true answer. */
+/** A finished run's defensible INTERVAL, where its spread is characterised.
+ *
+ *  `results/kill_calibration.md` says it plainly: absolute kill is defensible
+ *  as an interval and not as a number. The payload keeps the two KINDS of
+ *  uncertainty structurally apart -- biological spread, which shrinks only by
+ *  measuring this patient, and epistemic spread, which a better model removes
+ *  -- and refuses a merged or unlabelled interval at its own boundary. A
+ *  renderer must keep them apart too; conflating them makes the feature worse
+ *  than no feature. */
+export const getUncertainty = (id) =>
+  call('GET', `/api/runs/${encodeURIComponent(id)}/uncertainty`);
+
+export const getWorkspace = () => call('GET', '/api/workspace');
+
+/** Stamp a project as opened by a human. Idempotent; see the contract's §3 on
+ *  why this is not `updated_at`. Failure is deliberately swallowed by callers:
+ *  recency is an ANNOTATION, and refusing to open a project because we could
+ *  not record that we opened it would be absurd. */
+export const openProject = (id) =>
+  call('POST', `/api/projects/${encodeURIComponent(id)}/open`, { body: {} });
+
+/** Copy a project's specimens and their run REFERENCES. Runs are neither
+ *  re-executed nor duplicated -- a run belongs to app/runs/ and two specimens
+ *  may point at the same id. */
+export const duplicateProject = (id, name) =>
+  call('POST', `/api/projects/${encodeURIComponent(id)}/duplicate`,
+       { body: name ? { name } : {} });
 
 export const getSections = () => call('GET', '/api/sections');
 export const getDrugs = () => call('GET', '/api/drugs');

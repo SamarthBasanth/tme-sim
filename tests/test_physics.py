@@ -375,3 +375,98 @@ def test_ps_scale_calibration_residual_equals_half_spread():
                                                rel=1e-9)
     assert c["irreducible_residual"] == pytest.approx(
         c["disagreement_fold"] ** 0.5, rel=1e-12)
+
+
+# --------------------------------------------------------------------------- #
+# (7) Method of manufactured solutions — SOLVER verification
+# --------------------------------------------------------------------------- #
+# These are the fast regression guards for the full study in
+# ``experiments/mms_transport_verification.py`` / ``results/mms_transport_
+# verification.md``. They verify that the solver converges at the FORMAL ORDER
+# of the scheme it documents — second order in space for diffusion, first order
+# for the donor-cell upwind advection — against a solution known in closed form.
+# They are independent of every calibration and anchor argument in the repo.
+#
+# Both cases are STEADY manufactured solutions: the fixed point of the solver's
+# iteration is (K - L)^{-1} S, the discrete steady problem, which is exactly
+# independent of dt, so the temporal error is removed rather than bounded.
+def _mms_steady_error(dx, *, d0, reaction, vel, modes=2, amp_a=2.0, amp_b=1.0,
+                      dt=1.0, total_time=None, length=200.0):
+    """Solve one manufactured steady problem and return max |C - u| on tissue.
+
+    u = amp_a + amp_b cos(kx x) cos(ky y) with kx = ky = pi*modes/length, so
+    du/dn = 0 on every domain edge — the only boundary condition the solver can
+    impose — and u >= amp_a - amp_b > 0. The source is DERIVED,
+    S = k u - div(D grad u) + div(v u), never fitted.
+    """
+    from tmesim.core import CellPopulation, Domain, Microenvironment, TissueFields
+
+    n = int(round(length / dx))
+    assert abs(n * dx - length) < 1e-12
+    xs = (np.arange(n) + 0.5) * dx
+    X, Y = np.meshgrid(xs, xs)
+    k = np.pi * modes / length
+
+    u = amp_a + amp_b * np.cos(k * X) * np.cos(k * Y)
+    lap_u = -amp_b * 2.0 * k * k * np.cos(k * X) * np.cos(k * Y)
+    ux = -amp_b * k * np.sin(k * X) * np.cos(k * Y)
+    uy = -amp_b * k * np.cos(k * X) * np.sin(k * Y)
+
+    src = reaction * u - d0 * lap_u
+    velocity = None
+    if vel:
+        # v.n = 0 on every edge, so the solver zeroing the boundary advective
+        # flux is the CORRECT condition for this manufactured solution.
+        vx = vel * np.sin(np.pi * X / length)
+        vy = vel * np.sin(np.pi * Y / length)
+        div_v = vel * (np.pi / length) * (np.cos(np.pi * X / length)
+                                          + np.cos(np.pi * Y / length))
+        src = src + vx * ux + vy * uy + u * div_v
+        velocity = np.stack([vx, vy])
+
+    assert float(src.min()) > 0.0, "S must stay positive or the clamp can bind"
+
+    domain = Domain(nx=n, ny=n, dx=dx)
+    fields = TissueFields(ecm_density=np.zeros((n, n)),
+                          vascular_density=np.zeros((n, n)))
+    cells = CellPopulation(x=np.array([length / 2]), y=np.array([length / 2]),
+                           cell_type=np.array([0]), state=np.array([0]),
+                           sensitivity=np.array([0.5]))
+    micro = Microenvironment(domain=domain, fields=fields, cells=cells)
+    drug = DrugParams(name="mms", diffusivity=d0, clearance=reaction, binding=0.0)
+    pde = PDEConfig(dt=dt, total_time=total_time or (60.0 / reaction),
+                    convection=bool(vel), save_every=10 ** 9)
+    res = simulate_drug_transport(micro, drug, src, pde, velocity=velocity,
+                                  capture_frames=3)
+    # Guard: the run must actually have reached steady state, or the number
+    # below is leftover transient rather than discretisation error.
+    err = float(np.abs(res.final_concentration - u).max())
+    residual = float(np.abs(res.frames[2] - res.frames[1]).max())
+    assert residual < 1e-3 * err, f"not converged: residual {residual:.3e} vs err {err:.3e}"
+    assert float(res.final_concentration.min()) > 0.0
+    return err
+
+
+def _observed_orders(errs):
+    return [np.log(a / b) / np.log(2.0) for a, b in zip(errs[:-1], errs[1:])]
+
+
+def test_mms_diffusion_is_second_order():
+    """Pure diffusion converges at the formal order 2 of the 5-point finite
+    volume scheme, INCLUDING at the no-flux boundary (the Linf norm is global,
+    so a boundary that were one order worse would show up here)."""
+    errs = [_mms_steady_error(dx, d0=300.0, reaction=1.0, vel=0.0)
+            for dx in (8.0, 4.0, 2.0)]
+    ps = _observed_orders(errs)
+    assert all(1.8 <= p <= 2.2 for p in ps), f"orders {ps} from errors {errs}"
+
+
+def test_mms_upwind_advection_is_first_order():
+    """Advection converges at order 1, the formal order of the donor-cell
+    upwind flux. An order near 2 would mean the implemented flux is NOT the
+    upwind one the module documents, so the band is two-sided on purpose."""
+    errs = [_mms_steady_error(dx, d0=2.0, reaction=0.1, vel=0.2, dt=1.0,
+                              total_time=600.0)
+            for dx in (8.0, 4.0, 2.0)]
+    ps = _observed_orders(errs)
+    assert all(0.8 <= p <= 1.2 for p in ps), f"orders {ps} from errors {errs}"

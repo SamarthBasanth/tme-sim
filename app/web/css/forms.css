@@ -1,0 +1,418 @@
+/* forms.css — the Studio's SETUP RAIL, and the four unowned surfaces that sit
+   beside it.
+   ==========================================================================
+
+   WHY THIS FILE EXISTS. Everything below was referenced by shipped JS and
+   defined in no stylesheet at all: `.gridbudget` and its twelve `.gb-*`
+   children — the grid-budget refusal preview, which is the one thing in the
+   Studio that stops a run being wasted — plus the question heads the rail is
+   organised by, the notes under its controls, its two folds, the sentence
+   under its Submit button, the stage's orientation notice, the tour's
+   position read-out, and the standing description on each measurement tool.
+   They rendered as unstyled blocks: correct words, no hierarchy, and in three
+   cases a horizontal scrollbar on a rail that is not allowed to have one.
+
+   It is a FILE OF ITS OWN rather than more of components.css because
+   components.css is a 1,700-line shared surface with a live owner, and a
+   second author in it is how two halves of one stylesheet end up disagreeing.
+   Linked from index.html AFTER components.css, so these rules build on
+   `.btn`, `.chip`, `.notice`, `.tool-hint`, `.fgrid` and `.hr-lbl` and win a
+   specificity tie against them on source order — which is what the four
+   lifts at the bottom of this file depend on.
+
+   IT DECLARES NO COLOUR. Every value is a token from css/tokens.css, so both
+   themes and the `data-theme` attribute are covered once, in the palette,
+   rather than twice here.
+
+   THE SIZE RULE, which is the reason several of these were broken:
+   --fs-disclosure is the floor for ANY ELEMENT CARRYING A SENTENCE, and a
+   caveat is never set smaller than the number it qualifies. Where a note sits
+   directly under an `.inp` — which is --fs-sm — the note is --fs-sm too, not
+   the floor, because the floor would put it BELOW the value it is about. */
+
+/* ==========================================================================
+   THE GRID BUDGET
+   ==========================================================================
+
+   js/ui/spec.js builds this as question 3 of the setup form: the arithmetic,
+   the cell count, the server's ceiling, and — when the spec is over it — the
+   exact refusal the server would write, before it is submitted.
+
+   IT IS NOT A PANEL AND IT DOES NOT COLLAPSE. UI_ARCHITECTURE §2.4: a fold
+   may hide an elaboration, never a limit. The two <details> inside it hold
+   standing facts that do not move with dx and each states its claim in its own
+   summary; the estimate and the refusal preview are always open and always
+   full size. */
+
+.gridbudget {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+  margin: var(--sp-3) 0 var(--sp-4);
+  padding: var(--sp-4) var(--sp-5) var(--sp-5);
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-left: 3px solid var(--line-2);
+}
+
+.gb-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.gb-t {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tr-wide);
+  color: var(--fg-1);
+}
+
+/* "(5312 / 30) x (4180 / 30) um" — the working, shown so the count below is
+   checkable rather than asserted. A machine expression, so mono; a mark
+   rather than a sentence, so the floor. */
+.gb-arith {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+/* The headline of the block: the number the ceiling is compared against. */
+.gb-count {
+  min-width: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-tight);
+  color: var(--fg-0);
+  overflow-wrap: anywhere;
+}
+/* Its unit. §6: every number carries one. */
+.gb-u {
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+}
+/* Every prose line in the block — the ceiling, its provenance, and the dx at
+   which this section reaches it. Sentences, so --fs-sm, which is also at or
+   above every number quoted inside them. */
+.gb-line {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  overflow-wrap: anywhere;
+}
+.gb-line:empty { display: none; }
+.gb-line b { color: var(--fg-0); font-weight: 700; }
+
+/* ------------------------------------------------- the refusal preview --
+   THE THING THAT STOPS A RUN BEING WASTED. It is loud on purpose: a spec over
+   the ceiling is refused by the server, and reading that here costs nothing
+   while reading it after a submit costs the submit. It is the reserved crit
+   colour because it is a state of the spec, not decoration. */
+.gb-refusal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--crit-bg);
+  border: 1px solid var(--crit);
+  border-left-width: 3px;
+}
+.gb-r-lbl {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tr-wide);
+  color: var(--crit);
+}
+/* Reproduced from app/server/api.py's own refusal, so what you read before
+   submitting is what you would read after. Mono and pre-wrap because it is a
+   quotation of a machine, not a paraphrase of one — but at --fs-sm, because a
+   refusal is still a sentence. */
+.gb-r-msg {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-0);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.gb-r-note {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+}
+
+/* ------------------------------------------------------ the two folds --
+   The fold hides the ELABORATION, never the claim: each summary carries the
+   sentence that matters, at the same size as the body, with the numbers that
+   qualify it inside. A reader who never opens either one has still read both.
+   The triangle is drawn here because `display: list-item` with the UA marker
+   suppressed leaves no affordance at all in Chrome. */
+.gb-fold { min-width: 0; }
+.gb-fold > summary {
+  position: relative;
+  display: list-item;
+  list-style: none;
+  min-width: 0;
+  padding-left: var(--sp-7);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  cursor: pointer;
+}
+.gb-fold > summary::-webkit-details-marker { display: none; }
+.gb-fold > summary::before {
+  content: "";
+  position: absolute;
+  left: var(--sp-2);
+  top: 0.42em;
+  width: 0;
+  height: 0;
+  border-left: var(--sp-3) solid var(--fg-3);
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transition: transform var(--dur) var(--ease);
+}
+.gb-fold[open] > summary::before { transform: rotate(90deg); }
+.gb-fold > summary:hover { color: var(--fg-0); }
+.gb-fold > summary:hover::before { border-left-color: var(--fg-2); }
+.gb-fold > summary b { color: var(--fg-0); font-weight: 700; }
+.gb-fold > div {
+  min-width: 0;
+  padding: var(--sp-3) 0 var(--sp-2) var(--sp-7);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+.gb-fold > div b { color: var(--fg-1); font-weight: 700; }
+.gb-fold > div:empty { display: none; }
+
+/* ==========================================================================
+   THE SETUP RAIL'S QUESTIONS, NOTES AND FOLD
+   ========================================================================== */
+
+/* A numbered question head — "1 · on which tissue". `.hr-lbl` already gives it
+   the rule and the uppercase micro-label treatment; this is what makes a
+   QUESTION read as a rung above the rows under it, and lets the heading it
+   contains wrap rather than truncate. A rail with no heading structure below
+   the group name is a rail a screen-reader user cannot navigate, which is why
+   the <h4> inside it exists. */
+.hr-lbl.fq {
+  margin-top: var(--sp-7);
+  color: var(--fg-1);
+  font-weight: 600;
+}
+.hr-lbl.fq:first-child { margin-top: var(--sp-2); }
+.hr-lbl.fq > h4 {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* What a CHOICE will mean, painted under the control it belongs to: the
+   compound's IC50 and its penetrance, the plasma peak over that IC50, the
+   window in hours.
+   --fs-sm AND NOT THE FLOOR. These sit directly under an `.inp`, which is
+   --fs-sm, and they qualify the value inside it. At --fs-xs each one would be
+   a caveat set smaller than its own number, which is the single thing this
+   rail is not allowed to do. */
+.q-note {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+.q-note:empty { display: none; }
+.q-note b { color: var(--fg-1); font-weight: 600; }
+
+/* What the SELECTED specimen is — platform, count, extent, panel size —
+   under the picker, from the same renderer the tissue panel uses. Facts about
+   the thing chosen, each with its unit, so it holds the floor. */
+.sec-scale {
+  min-width: 0;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-disclosure);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+.sec-scale:empty { display: none; }
+.sec-scale .mono { color: var(--fg-1); }
+
+/* ------------------------------------------- the two rail-level folds --
+   `.advfold` is the nine defaults; `.tnames` is the section id, label and
+   depth on the tissue panel. Same shape, same contract: a summary that PRINTS
+   the values whether or not it is open, so folding never hides the state. */
+.advfold,
+.tnames {
+  min-width: 0;
+  margin-top: var(--sp-4);
+  border-top: 1px solid var(--line-1);
+}
+.advfold > summary,
+.tnames > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--fs-disclosure);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+.advfold > summary::-webkit-details-marker,
+.tnames > summary::-webkit-details-marker { display: none; }
+.advfold > summary::before,
+.tnames > summary::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  border-left: var(--sp-3) solid var(--fg-3);
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transition: transform var(--dur) var(--ease);
+}
+.advfold[open] > summary::before,
+.tnames[open] > summary::before { transform: rotate(90deg) translateX(1px); }
+.advfold > summary:hover,
+.tnames > summary:hover { color: var(--fg-1); }
+.advfold > summary:hover::before,
+.tnames > summary:hover::before { border-left-color: var(--fg-2); }
+/* The echoed values are the point of the summary: they are not decoration and
+   they do not shrink to fit. */
+.advfold > summary .mono,
+.tnames > summary .mono {
+  min-width: 0;
+  font-size: var(--fs-disclosure);
+  overflow-wrap: anywhere;
+}
+/* The ring is drawn inside: both rails are scroll containers and a summary
+   runs their full width, so an outset ring is clipped on one edge. Same fix
+   base.css applies to `.sect > summary`. */
+.advfold > summary:focus-visible,
+.tnames > summary:focus-visible { outline-offset: calc(-1 * var(--focus-w)); }
+
+/* ==========================================================================
+   THE SENTENCE UNDER SUBMIT
+   ==========================================================================
+
+   A greyed primary button is the only control in this rail that can be off,
+   and until this existed it said why in nothing at all. It is a BUTTON rather
+   than a caption because it is focusable — so the reason is reachable by
+   keyboard while the disabled button it explains is not — and pressing it
+   moves focus to the field that is blocking.
+
+   `.btn` is one --h-ctl row of `white-space: nowrap`, which is right for a
+   verb and wrong for "Waiting for the section catalogue (GET /api/sections)."
+   Unstyled, that is a 320px unbreakable word that pushes the setup rail into
+   a horizontal scroll — the one thing UI_ARCHITECTURE §4.3 forbids outright.
+   So it takes its own full-width line under the buttons and wraps there.
+
+   js/ui/spec.js sets the five geometry properties inline as a stopgap, with a
+   comment saying they are "the whole of it until the stylesheet exists". They
+   are declared here as well, so removing that stopgap does not silently
+   reintroduce the scrollbar. What the inline does NOT set, and this does: the
+   size and the colour. `.btn.sm` is --fs-xs, and this is a sentence. */
+.btn.submit-why {
+  flex: 1 1 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: var(--h-ctl-sm);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  white-space: normal;
+  text-align: left;
+  justify-content: flex-start;
+  color: var(--fg-1);
+}
+.btn.submit-why:hover:not(:disabled) { color: var(--fg-0); }
+
+/* ==========================================================================
+   THREE SURFACES BESIDE THE RAIL
+   ========================================================================== */
+
+/* The empty stage. It answers the three questions the tour's first card
+   answers, because the tour is skippable and a skipper must not be punished —
+   which makes it the longest piece of prose in the Studio and the one place
+   `.notice`'s 420px column is too narrow to set it in. ~560px holds the
+   paragraphs at a readable measure without reaching across the viewport.
+   It sits over the specimen surround rather than a panel, so it takes a solid
+   background and the one elevation step, instead of `.notice`'s translucent
+   fill which reads as a smudge on the void. */
+.notice-onboard {
+  max-width: 560px;
+  padding: var(--sp-6) var(--sp-7);
+  background: var(--bg-1);
+  border-color: var(--line-2);
+  box-shadow: var(--elev-1);
+  color: var(--fg-1);
+}
+.notice-onboard > div > p + p { margin-top: var(--sp-5); }
+.notice-onboard b { color: var(--fg-0); font-weight: 600; }
+/* The endpoint footnote. --fg-2, not the placeholder token: it is quiet, not
+   disabled. */
+.notice-onboard p.dim { color: var(--fg-2); }
+.notice-onboard .notice-keys { margin-top: var(--sp-6); color: var(--fg-2); }
+
+/* The tour's position, written out because the dots differ from each other by
+   background-colour alone and colour is never the only channel. A read-out of
+   two numbers, so the floor; --fg-2 rather than `.dim`'s --fg-3, which scores
+   under 3:1 on the popover in both themes. */
+.tour-count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+
+/* The standing description on a measurement tool — "what is this for", which
+   does not stop being a question once you have drawn one line. It shares
+   `.tool-hint`'s type and padding; this is what tells it apart from the
+   transient instruction underneath, which was the whole reason the second
+   class was put on the element. The description is the brighter of the two
+   and owns the space above the rule; the status line below it is the quieter. */
+.tool-hint.tool-purpose {
+  color: var(--fg-1);
+  padding-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--line-0);
+}
+/* The rule is on the DESCRIPTION rather than on the status line below it,
+   because what follows the description is not always the status line: in the
+   profile panel it is the plot, in the region panel the table, and in the
+   distance panel the statistics list. An adjacent-sibling selector matched
+   none of the three. The description closes itself; the status line stays the
+   quieter of the two wherever it lands. */
+.tool-panel > .tool-hint:not(.tool-purpose) { color: var(--fg-2); }
+
+/* ==========================================================================
+   MOTION
+   ==========================================================================
+   base.css compresses every transition to 1ms under this setting, which is
+   right for a recolour and wrong for a thing that MOVES: at 1ms a rotation
+   reads as a jump, which is the motion the setting exists to remove. The
+   three disclosure triangles this file introduces are stopped outright. Each
+   keeps its two static forms — pointing right when closed, down when open —
+   so the affordance is unchanged. */
+@media (prefers-reduced-motion: reduce) {
+  .gb-fold > summary::before,
+  .advfold > summary::before,
+  .tnames > summary::before { transition: none !important; }
+}

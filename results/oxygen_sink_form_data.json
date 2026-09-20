@@ -1,0 +1,463 @@
+{
+  "generated": "2026-09-20T08:59:43Z",
+  "script": "experiments/oxygen_sink_form.py",
+  "git_head": "f9d443d56f073b7b840daaf09c4549e74d89b2fc",
+  "python": "3.9.6",
+  "platform": "macOS-15.7.3-arm64-arm-64bit",
+  "calibrate_alpha_start": 22.223477711172563,
+  "calibrate_alpha_end": 22.223477711172563,
+  "REFERENCE_PO2_MMHG": 35.0,
+  "prior_information": {
+    "results/oxygen_sensitivity_band.md": {
+      "date": "2026-07-29",
+      "what_it_already_ran": "BOTH sink forms, on reconstruct_real('xenium', dx_um=12.0), across an 11-point consumption grid, at K=1/35. The row at the shipping default consumption=0.02 is the exact A/B this script re-runs.",
+      "known_in_advance": {
+        "linear_hypoxic_fraction_at_c0.02": 0.0,
+        "linear_mean_O2_tumor_at_c0.02": 0.3486,
+        "michaelis_menten_hypoxic_fraction_at_c0.02": 1.0,
+        "michaelis_menten_mean_O2_tumor_at_c0.02": 0.0347
+      }
+    },
+    "results/oxygen_joint_grid_test.md": {
+      "date": "2026-08-15",
+      "what_it_already_ran": "The SHIPPED (linear) configuration's median pO2 in mmHg on this section at dx=12, plus p10/p90 for two hypothetical non-shipping configurations.",
+      "known_in_advance": {
+        "shipped_linear_mean_O2_tumor": 0.348628,
+        "shipped_linear_median_pO2_mmHg": 12.107,
+        "shipped_linear_hypoxic_fraction": 0.0
+      }
+    },
+    "results/sweep/oxsupply_sections.json": {
+      "date": "2026-08-10",
+      "what_it_already_ran": "The LINEAR arm's ENTIRE per-tumour-cell pO2 percentile ladder in mmHg on this exact section at dx=12, plus the sub-2.5 and sub-10 mmHg fractions. Stored in raw JSON under sections/gbm/shipped_0.05 and NEVER surfaced in any results/*.md. Found by a prior-art sweep in this pass and read before measuring.",
+      "known_in_advance": {
+        "tumour_o2_mmhg_percentiles": {
+          "1": 10.21880049736665,
+          "5": 10.59759610495022,
+          "10": 10.859829506732337,
+          "25": 11.523922427523368,
+          "50": 12.106600909723596,
+          "75": 12.630937942385584,
+          "90": 14.004533189996282,
+          "99": 14.707176344941557
+        },
+        "tumour_frac_below_2p5mmhg": 0.0,
+        "tumour_frac_below_10mmhg": 0.0006719301192675962,
+        "mean_o2_tumour_mmhg": 12.201971805280552,
+        "n_tumour_cells": 23812
+      }
+    },
+    "consequence": "The hypoxic fraction under BOTH forms was known before measuring. Because the linear arm's hypoxic fraction (O < 0.2, i.e. < 7 mmHg) was already published as exactly 0.0, its sub-2.5 and sub-5 mmHg fractions are DERIVABLE as 0.0 and are likewise not pre-registerable. The linear arm's lower tail is entirely spent. What remains genuinely open is the Michaelis-Menten arm's DISTRIBUTION SHAPE (median, quantiles, minimum, and the split of its 100% sub-7 mmHg mass across the 2.5 and 5 mmHg thresholds), and the scoring of both arms against measured pO2.",
+    "the_linear_arm_is_fully_spent": "With oxsupply_sections.json in hand, EVERY quantity this script computes for the LINEAR arm was already on disk before it ran. The linear arm is therefore reported here as a REPRODUCTION, not as a measurement. The genuinely new measurement is the MICHAELIS-MENTEN arm's mmHg distribution on a real reconstructed section, which the prior-art sweep confirmed does not exist anywhere in the repository -- the only both-forms mmHg execution (stale_blockers_2026-09-20.md Sec.2.3) was on a synthetic 64x64 lattice and says so."
+  },
+  "confounds": {
+    "C1_the_source_constant_is_off_by_~4000x": "results/oxygen_supply_calibration.md derives OxygenConfig.supply ~ 194 /s against the shipped 0.05 -- a factor of ~3,880 -- and states that 'Every published F_state, absolute kill and kill-derived ratio on the GBM section should be read as conditional on an oxygen source constant that is ~4,000x from its measured value.' BOTH arms of this A/B sit on that same source. The A/B is therefore a controlled comparison of two SINKS on a SOURCE that is independently known to be wrong, so no arm's ABSOLUTE agreement or disagreement with a measured pO2 can be attributed to the sink alone. What the A/B does isolate is the DIFFERENCE between the two forms, because the source is byte-identical across them.",
+    "C2_the_mmHg_anchor_is_itself_contested": "REFERENCE_PO2_MMHG = 35.0 is a normal-brain-TISSUE anchor. results/oxygen_supply_calibration.md Sec.2 argues from Secomb's reference cortical values (P_cap = 58.75 mmHg, P_tiss = 47.65 mmHg) that 'a compartment-correct anchor for O = 1 would be ~55-60 mmHg, not 35, and every mmHg figure in this report would scale up by ~1.7x'. The anchor is FROZEN at the shipped 35.0 for the primary verdict. A declared-in-advance robustness pass re-scores both arms at 57.5 mmHg so the verdict's dependence on the anchor is MEASURED rather than assumed.",
+    "C3_the_median_statistic_is_mesh_sensitive": "results/oxygen_joint_grid_test.md Sec.1.4 shows the median-pO2 statistic crossing the Lally value as dx changes (2.19 -> 9.00 mmHg over dx = 30 -> 8 um for the jointly calibrated configuration). dx is therefore FROZEN at 12.0 um -- the grid-converged production spacing every published results/ number is computed at -- BEFORE looking at any output, and is not varied.",
+    "C4_cell_weighting_vs_needle_weighting": "An Eppendorf needle samples readings along a 22 mm track through space (Rampling 1994: 'Six different tracks, each with a path length of 22 mm, were recorded per patient representing 192 readings'). The engine's per-cell distribution weights by CELL DENSITY instead. These are different sampling measures. Both are reported -- per-cell AND area-weighted over the tissue grid -- rather than choosing the more favourable one."
+  },
+  "anchors": {
+    "A1_lally2006_cohort_median": {
+      "pmid": "17207315",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/17207315/",
+      "citation": "Lally BE, Rockwell S, Fischer DB, Collingridge DR, Piepmeier JM, Knisely JP. Cancer J 2006;12(6):461-6.",
+      "quote": "Tissue oxygen tension was measured intraoperatively using an Eppendorf pO2 Histograph. ... for analysis we included 13 patients with high grade gliomas (HGG) and 10 with low grade gliomas (LGG). The median tumor oxygen pressure for the entire cohort was 5.1 mmHg.",
+      "value_mmHg": 5.1,
+      "IMPORTANT_CORRECTION": "The abstract dichotomises 'the median pO2' per patient and stratifies 'patients ... with a median tumor oxygen tensions either above or below' the cut-points. 5.1 mmHg is therefore a COHORT-LEVEL median OF PER-PATIENT MEDIANS, not the median of a pooled per-reading histogram. That is a different object from the engine's per-cell distribution over one section, and this script does not pretend otherwise.",
+      "tissue": "human patient glioma, intraoperative"
+    },
+    "A2_collingridge1999_tail_exists": {
+      "pmid": "10665789",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/10665789/",
+      "citation": "Collingridge DR, Piepmeier JM, Rockwell S, Knisely JP. Radiother Oncol 1999;53(2):127-31.",
+      "quote": "This study quantifies the spatial distribution of pO2 in glioma and in the surrounding brain tissue. Both glioma and peritumoural brain contain regions at oxygen tensions less than 2.5 mmHg.",
+      "constraint": "P(pO2 < 2.5 mmHg) > 0 in human glioma tissue.",
+      "tissue": "human patient glioma, intraoperative",
+      "note": "The published abstract gives NO median, NO n and NO percentage. It supports a TAIL-EXISTENCE constraint and nothing stronger."
+    },
+    "A3_nozue1997_interlab_floor": {
+      "pmid": "9290690",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/9290690/",
+      "citation": "Nozue M, Lee I, Yuan F, ... Jain RK, Suit HD. J Surg Oncol 1997;66(1):30-8.",
+      "quote": "the median values of tumor pO2 varied from 1.5 mmHg to 5.6 mmHg among the laboratories, and pO2 of normal subcutis also varied from 28 mmHg to 38 mmHg. ... Caution needs to be exercised in using the absolute, median, or distribution of pO2 values measured by the Eppendorf 'Histograph' to compare the data between laboratories",
+      "band_mmHg": [
+        1.5,
+        5.6
+      ],
+      "tissue": "FSaII murine fibrosarcoma -- NOT glioma, NOT human",
+      "role": "Used ONLY as the measurement-noise floor: the span a single median may occupy for an identical protocol on identical tissue across six labs. It brackets Lally's 5.1 mmHg, which is why it is the acceptance band."
+    },
+    "A4_xenograft_tail_fractions_SUPPORTING_ONLY": {
+      "entries": [
+        {
+          "pmid": "15093922",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/15093922/",
+          "citation": "Pinel S, et al. Int J Radiat Oncol Biol Phys 2004;59(1):250-9.",
+          "quote": "Percentage of pO(2) values <2.5 mm Hg was reduced in rHuEPO-treated tumors as compared with control groups (37.1 +/- 19.1% vs. 58.5 +/- 27.0%; p = 0.009 for GBM Nan1; 81.6 +/- 13.4% vs. 91.5 +/- 8.3%; p = 0.035 for U87).",
+          "control_frac_below_2p5": [
+            0.585,
+            0.915
+          ]
+        },
+        {
+          "pmid": "9783885",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/9783885/",
+          "citation": "Stuben G, et al. Radiother Oncol 1998;48(2):143-8.",
+          "quote": "All three xenografts were found to be poorly oxygenated (about 80% of all pO2 values were < or =2.5 mmHg).",
+          "control_frac_below_2p5": [
+            0.8
+          ]
+        }
+      ],
+      "tissue": "human glioma cell lines XENOGRAFTED in nude mice",
+      "role": "SUPPORTING ONLY, never decisive. The host vasculature is murine and the tumour is a cell line, not a patient's tumour microenvironment. These are the ONLY published per-reading fraction-below-threshold numbers for glioma I could find; no such number exists in the open abstracts for human PATIENT glioma."
+    }
+  },
+  "pre_registration": {
+    "section": "reconstruct_real('xenium', dx_um=12.0) -- the flagship GBM Xenium section at the grid-converged production spacing",
+    "runspec": {
+      "arm_A": "OxygenConfig()  [sink_form='linear', the shipping default]",
+      "arm_B": "OxygenConfig(sink_form='michaelis_menten')  [K=1/35, the shipped default K]",
+      "held_identical": "diffusivity, supply, consumption, hypoxia_threshold, mm_half_saturation, mm_max_iter, mm_tol, the reconstruction object, the domain, the vascular field, the cell positions and the tumour mask. The two OxygenConfig dataclasses must differ in EXACTLY ONE field: sink_form. This is asserted at runtime, not claimed.",
+      "no_parameter_is_tuned": "consumption stays at its shipped 0.02 and K at its shipped 1/35 in both arms. Nothing is fitted to any anchor. If an arm misses the band it misses it."
+    },
+    "quantities": [
+      "per-tumour-cell pO2 in mmHg (O sampled at each tumour cell's grid index, exactly as physics.oxygen.label_hypoxia samples it, then to_mmhg)",
+      "the full quantile ladder: min, p1, p5, p10, p25, p50, p75, p90, p95, p99, max",
+      "P(pO2 < 2.5), P(pO2 < 5), P(pO2 < 7 == the engine's own hypoxia band), P(pO2 < 10)",
+      "the same ladder over the tissue-masked GRID (area-weighted), because an Eppendorf needle track samples space, not cells -- reported alongside the per-cell ladder rather than instead of it"
+    ],
+    "thresholds": {
+      "T1_median_band": {
+        "rule": "An arm PASSES iff its per-tumour-cell median pO2 lies within [1.5, 5.6] mmHg.",
+        "provenance": "Nozue 1997's measured inter-laboratory span of median tumour pO2 under an identical protocol (A3). It contains Lally 2006's measured human-glioma cohort median of 5.1 mmHg (A1). The band is the measurement's own noise floor, so an arm outside it is outside by more than laboratory variability can absorb.",
+        "direction_is_recorded": true
+      },
+      "T2_tail_exists": {
+        "rule": "An arm PASSES iff P(pO2 < 2.5 mmHg) > 0 among tumour cells.",
+        "provenance": "Collingridge 1999 (A2): human glioma contains regions below 2.5 mmHg. Deliberately the WEAKEST possible form of that constraint -- a single cell suffices -- so that failing it is unambiguous and cannot be argued down."
+      },
+      "T3_form_explains_the_gap": {
+        "rule": "The functional form EXPLAINS the missing hypoxia iff arm A (linear) fails T1 or T2, AND arm B (michaelis_menten) passes BOTH T1 and T2."
+      },
+      "T4_null_no_effect": {
+        "rule": "The two forms are INDISTINGUISHABLE iff |median_A - median_B| < 0.5 mmHg AND |P_A(<2.5) - P_B(<2.5)| < 0.05.",
+        "provenance": "0.5 mmHg is ~12% of the width of the T1 acceptance band (4.1 mmHg); a median difference smaller than that is smaller than the measurement can resolve. Declared so that a NULL is as interpretable as a hit."
+      },
+      "T5_refuted_by_overshoot": {
+        "rule": "The functional form DOES NOT explain the gap, by OVERSHOOT, iff arm B passes T2 but fails T1 LOW (median < 1.5 mmHg) while arm A fails T1 HIGH (median > 5.6 mmHg) -- i.e. the two forms BRACKET the measurement instead of one of them matching it.",
+        "why_declared_in_advance": "This is the outcome most likely to be rationalised after the fact as 'the MM form is directionally right'. Naming it in advance as a REFUTATION, with its own label, removes that escape. If T5 fires, it leads the report."
+      }
+    },
+    "what_would_be_reported_as_a_failure_of_this_experiment_itself": "If the Newton solve fails to converge, or if the degeneracy control (CONTROL_2 below) does not reproduce the linear arm, the A/B is void and is reported void rather than interpreted.",
+    "controls": {
+      "CONTROL_1_determinism": "Arm A solved twice must be bit-identical.",
+      "CONTROL_2_degeneracy": "michaelis_menten with K >> 1 and consumption scaled by the same K degenerates analytically to the linear sink, since c*K*O/(O+K) -> c*O as K -> inf. Running it must reproduce arm A to tight tolerance. This proves the difference between the arms is the FUNCTIONAL FORM and not a solver artefact.",
+      "CONTROL_3_input_identity": "SHA-256 of every array fed to the solver (vascular density, cell x/y/type, the derived tumour areal density, the domain parameters) taken before arm A, between the arms and after arm B. All three must match."
+    }
+  },
+  "section": {
+    "call": "reconstruct_real('xenium', dx_um=12.0)",
+    "grid": [
+      424,
+      675
+    ],
+    "dx_um": 12.0,
+    "n_cells": 40887,
+    "n_tumor_cells": 23812,
+    "n_tissue_grid_points": 193752
+  },
+  "config_diff": {
+    "sink_form": {
+      "linear": "linear",
+      "michaelis_menten": "michaelis_menten"
+    }
+  },
+  "config_shared": {
+    "diffusivity": 2000.0,
+    "consumption": 0.02,
+    "supply": 0.05,
+    "hypoxia_threshold": 0.2,
+    "mm_half_saturation": 0.02857142857142857,
+    "mm_max_iter": 50,
+    "mm_tol": 1e-09
+  },
+  "controls": {
+    "CONTROL_1_determinism": true,
+    "CONTROL_2_degeneracy_max_abs_err": 9.566109741565576e-06,
+    "CONTROL_2_pass": true,
+    "CONTROL_3_fingerprints": {
+      "before": "ea666e06b655e90a",
+      "between": "ea666e06b655e90a",
+      "after": "ea666e06b655e90a",
+      "identical": true
+    }
+  },
+  "distributions": {
+    "linear": {
+      "cells": {
+        "n": 23812,
+        "mean_mmHg": 12.154842727122835,
+        "std_mmHg": 1.0264276312200156,
+        "quantiles_mmHg": {
+          "p0": 10.166931595367199,
+          "p1": 10.335781334961371,
+          "p5": 10.560536817699505,
+          "p10": 10.815614195383613,
+          "p25": 11.48562143909799,
+          "p50": 12.081511391311832,
+          "p75": 12.583259471876556,
+          "p90": 13.888711414410857,
+          "p95": 14.147687447404392,
+          "p99": 14.543916633842949,
+          "p100": 14.747335440272268
+        },
+        "min_mmHg": 10.166931595367199,
+        "max_mmHg": 14.747335440272268,
+        "median_mmHg": 12.081511391311832,
+        "frac_below": {
+          "2.5": 0.0,
+          "5.0": 0.0,
+          "7.0": 0.0,
+          "10.0": 0.0
+        },
+        "ecdf": {
+          "0.1": 0.0,
+          "0.25": 0.0,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "2.5": 0.0,
+          "5.0": 0.0,
+          "7.0": 0.0,
+          "10.0": 0.0,
+          "14.0": 0.9156727700319167,
+          "20.0": 1.0,
+          "28.0": 1.0,
+          "35.0": 1.0
+        }
+      },
+      "grid": {
+        "n": 193752,
+        "mean_mmHg": 12.273061970900812,
+        "std_mmHg": 1.0292323836692354,
+        "quantiles_mmHg": {
+          "p0": 10.166931595367199,
+          "p1": 10.335880964355319,
+          "p5": 10.636878211880958,
+          "p10": 11.052025633998854,
+          "p25": 11.625767121459866,
+          "p50": 12.153528287123768,
+          "p75": 12.70454410963701,
+          "p90": 14.031637172942203,
+          "p95": 14.206291143881133,
+          "p99": 14.5618332124692,
+          "p100": 14.767952012763075
+        },
+        "min_mmHg": 10.166931595367199,
+        "max_mmHg": 14.767952012763075,
+        "median_mmHg": 12.153528287123768,
+        "frac_below": {
+          "2.5": 0.0,
+          "5.0": 0.0,
+          "7.0": 0.0,
+          "10.0": 0.0
+        },
+        "ecdf": {
+          "0.1": 0.0,
+          "0.25": 0.0,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "2.5": 0.0,
+          "5.0": 0.0,
+          "7.0": 0.0,
+          "10.0": 0.0,
+          "14.0": 0.8937714191337379,
+          "20.0": 1.0,
+          "28.0": 1.0,
+          "35.0": 1.0
+        }
+      },
+      "solve_time_s": 5.943475246429443
+    },
+    "michaelis_menten": {
+      "cells": {
+        "n": 23812,
+        "mean_mmHg": 1.1882488172466161,
+        "std_mmHg": 0.5515641093499276,
+        "quantiles_mmHg": {
+          "p0": 0.337028025462419,
+          "p1": 0.41274748708052567,
+          "p5": 0.5244017776547554,
+          "p10": 0.6100051489610597,
+          "p25": 0.8170110417405674,
+          "p50": 1.0418643323138663,
+          "p75": 1.423770383129071,
+          "p90": 2.0357855753498098,
+          "p95": 2.27011258554308,
+          "p99": 2.924444579930623,
+          "p100": 3.77749345902535
+        },
+        "min_mmHg": 0.337028025462419,
+        "max_mmHg": 3.77749345902535,
+        "median_mmHg": 1.0418643323138663,
+        "frac_below": {
+          "2.5": 0.9780362842264404,
+          "5.0": 1.0,
+          "7.0": 1.0,
+          "10.0": 1.0
+        },
+        "ecdf": {
+          "0.1": 0.0,
+          "0.25": 0.0,
+          "0.5": 0.03779606920880228,
+          "1.0": 0.4498152192172014,
+          "2.5": 0.9780362842264404,
+          "5.0": 1.0,
+          "7.0": 1.0,
+          "10.0": 1.0,
+          "14.0": 1.0,
+          "20.0": 1.0,
+          "28.0": 1.0,
+          "35.0": 1.0
+        }
+      },
+      "grid": {
+        "n": 193752,
+        "mean_mmHg": 1.2601009159226373,
+        "std_mmHg": 0.5723757109220491,
+        "quantiles_mmHg": {
+          "p0": 0.337028025462419,
+          "p1": 0.43616725529650496,
+          "p5": 0.5674506212823561,
+          "p10": 0.6741883284376978,
+          "p25": 0.874444870697515,
+          "p50": 1.0979703414296909,
+          "p75": 1.5198206923243474,
+          "p90": 2.12704528602724,
+          "p95": 2.3353279209426985,
+          "p99": 3.249202050406988,
+          "p100": 3.7991613681748206
+        },
+        "min_mmHg": 0.337028025462419,
+        "max_mmHg": 3.7991613681748206,
+        "median_mmHg": 1.0979703414296909,
+        "frac_below": {
+          "2.5": 0.96973450596639,
+          "5.0": 1.0,
+          "7.0": 1.0,
+          "10.0": 1.0
+        },
+        "ecdf": {
+          "0.1": 0.0,
+          "0.25": 0.0,
+          "0.5": 0.02386039886039886,
+          "1.0": 0.3885430860068541,
+          "2.5": 0.96973450596639,
+          "5.0": 1.0,
+          "7.0": 1.0,
+          "10.0": 1.0,
+          "14.0": 1.0,
+          "20.0": 1.0,
+          "28.0": 1.0,
+          "35.0": 1.0
+        }
+      },
+      "solve_time_s": 51.33780074119568
+    }
+  },
+  "reproduction_check": {
+    "linear_hypoxic_fraction": {
+      "published": 0.0,
+      "measured_now": 0.0
+    },
+    "michaelis_menten_hypoxic_fraction": {
+      "published": 1.0,
+      "measured_now": 1.0
+    },
+    "linear_mean_O2_tumor": {
+      "published": 0.3486,
+      "measured_now": 0.34728122077493817
+    },
+    "michaelis_menten_mean_O2_tumor": {
+      "published": 0.0347,
+      "measured_now": 0.03394996620704618
+    },
+    "linear_median_pO2_mmHg_joint_grid_test": {
+      "published": 12.107,
+      "measured_now": 12.081511391311832
+    }
+  },
+  "scoring": {
+    "linear": {
+      "arm": "linear",
+      "median_mmHg": 12.081511391311832,
+      "T1_median_in_1.5_5.6": false,
+      "T1_direction": "HIGH",
+      "T1_verdict": "FAIL (HIGH)",
+      "frac_below_2.5_mmHg": 0.0,
+      "T2_tail_exists": false,
+      "T2_verdict": "FAIL"
+    },
+    "michaelis_menten": {
+      "arm": "michaelis_menten",
+      "median_mmHg": 1.0418643323138663,
+      "T1_median_in_1.5_5.6": false,
+      "T1_direction": "LOW",
+      "T1_verdict": "FAIL (LOW)",
+      "frac_below_2.5_mmHg": 0.9780362842264404,
+      "T2_tail_exists": true,
+      "T2_verdict": "PASS"
+    },
+    "delta_median_mmHg": 11.039647058997966,
+    "delta_tail_frac": 0.9780362842264404,
+    "T3_form_explains_gap": false,
+    "T4_null": false,
+    "T5_refuted_by_overshoot": true,
+    "verdict": "T5 REFUTED-BY-OVERSHOOT -- the functional form does NOT explain the gap; the two forms BRACKET the measurement"
+  },
+  "robustness_alternative_anchor": {
+    "p_ref_mmHg": 57.5,
+    "scale_vs_shipped": 1.6428571428571428,
+    "per_arm": {
+      "linear": {
+        "median_mmHg_at_57.5_anchor": 19.84819728572658,
+        "T1_verdict_at_57.5_anchor": "FAIL (HIGH)",
+        "p_ref_mmHg_required_to_hit_Lally_5.1": 14.774641534366683
+      },
+      "michaelis_menten": {
+        "median_mmHg_at_57.5_anchor": 1.7116342602299233,
+        "T1_verdict_at_57.5_anchor": "PASS",
+        "p_ref_mmHg_required_to_hit_Lally_5.1": 171.32748906335155
+      }
+    },
+    "both_arms_still_fail_T1": false
+  },
+  "post_hoc_diagnostics": {
+    "IS_POST_HOC_NOT_PREREGISTERED": true,
+    "support_disjointness": {
+      "michaelis_menten_max_mmHg": 3.77749345902535,
+      "linear_min_mmHg": 10.166931595367199,
+      "supports_disjoint": true,
+      "gap_mmHg": [
+        3.77749345902535,
+        10.166931595367199
+      ],
+      "lally_median_mmHg": 5.1,
+      "lally_median_lies_in_gap": true
+    },
+    "anchor_invariant_shape": {
+      "required_R": 0.4901960784313726,
+      "basis": "Lally 2006 median 5.1 mmHg with Collingridge 1999 regions below 2.5 mmHg; R = min/median is invariant under any pure rescale of REFERENCE_PO2_MMHG.",
+      "per_arm": {
+        "linear": {
+          "R_min_over_median": 0.8415281222743818,
+          "can_reach_tail_at_any_anchor": false
+        },
+        "michaelis_menten": {
+          "R_min_over_median": 0.3234855201482104,
+          "can_reach_tail_at_any_anchor": true
+        }
+      }
+    }
+  }
+}

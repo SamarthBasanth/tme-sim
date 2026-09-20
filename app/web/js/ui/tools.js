@@ -31,6 +31,24 @@ const cssv = (el, n) => getComputedStyle(el).getPropertyValue(n).trim() || '#888
 /** Canvas text in the same mono stack the DOM uses. */
 const monoFont = (el, px) => `${px}px ${cssv(el, '--font-mono') || 'monospace'}`;
 
+/**
+ * The one line at the top of a tool's panel that says what the tool TELLS YOU.
+ *
+ * Every one of these three panels used to open on an instruction — "No profile.
+ * Press L, then drag a line across the tissue." A reader who does not already
+ * know what a line profile is learns the keystroke and not the reason, and a
+ * reader who does know did not need the panel. The instruction stays, below;
+ * this is the sentence above it, and it is the only text in the three panels
+ * that is present whether or not the tool has been used, because "what is this
+ * for" does not stop being a question once you have drawn one line.
+ *
+ * `.tool-hint` carries the type and the padding today and `.tool-purpose` is
+ * the hook for telling the two apart later (see the CSS note in the report):
+ * without the second class a stylesheet cannot separate the standing
+ * description from the transient status line underneath it.
+ */
+const purpose = (...parts) => h('div.tool-hint.tool-purpose', ...parts);
+
 export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
   let tool = 'pick';
   let profile = null;         // {x0,y0,x1,y1}
@@ -177,12 +195,15 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
   const profHint = h('div.tool-hint');
   const profClear = h('button.btn.ghost.sm', {
     onclick: () => { profile = null; profileData = null; profileMark = null; paintProfile(); drawAnnot(); },
-    title: 'Discard the profile line',
+    title: 'Discard the drawn line. The plot and the statistics below empty with it.',
   }, 'clear');
   const profileEl = h('div.tool-panel',
     h('div.frow.tool-bar',
       h('span.grow'),
       profClear),
+    purpose('Reads how the selected field falls along a line you draw — the ',
+      h('b', 'gradient out from a vessel'),
+      ', as numbers rather than a colour you have to judge by eye.'),
     h('div.plot-wrap', plot),
     profStats,
     profHint,
@@ -204,13 +225,19 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     const fname = getFieldName();
 
     if (!profile) {
-      profHint.textContent = 'No profile. Press L, then drag a line across the tissue.';
+      // Names the TOOLBAR BUTTON before the keystroke. `L` is meaningless to
+      // somebody who has not opened the key map, and the key map is behind a
+      // shortcut they also do not know; the segmented control above the stage
+      // is the thing they can see from here.
+      profHint.textContent = 'Nothing drawn yet. Pick the profile tool above the stage '
+        + '(or press L), then drag a line across the tissue.';
       clear(profStats);
       paintPlot();
       return;
     }
     if (!fname) {
-      profHint.textContent = 'A profile needs a field overlay — pick one under Field overlay.';
+      profHint.textContent = 'A profile plots a FIELD, and none is selected. '
+        + 'Pick one under View > Field overlay in the right rail; the line you drew is kept.';
       clear(profStats);
       paintPlot();
       return;
@@ -350,10 +377,13 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
   const distHint = h('div.tool-hint');
   const distClear = h('button.btn.ghost.sm', {
     onclick: () => { distance = null; paintDistance(); drawAnnot(); if (onChange) onChange(); },
-    title: 'Discard the distance line',
+    title: 'Discard the measured line. The lengths below empty with it.',
   }, 'clear');
   const distanceEl = h('div.tool-panel',
     h('div.frow.tool-bar', h('span.grow'), distClear),
+    purpose('Measures the separation between two points in ',
+      h('b', 'micrometres'),
+      ', in the assay\'s own coordinates. No model, no grid, no interpolation.'),
     distStats, distHint,
   );
 
@@ -362,7 +392,8 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     distClear.disabled = !distance;
     clear(distStats);
     if (!distance) {
-      distHint.textContent = 'No measurement. Press M, then drag between two points.';
+      distHint.textContent = 'Nothing measured yet. Pick the distance tool above the stage '
+        + '(or press M), then drag between two points.';
       return;
     }
     const dx = distance.x1 - distance.x0;
@@ -386,11 +417,18 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
   const roiHint = h('div.tool-hint');
   const roiClear = h('button.btn.ghost.sm', {
     onclick: () => { rois = []; roiSeq = 0; paintRois(); drawAnnot(); },
-    title: 'Discard every region',
+    title: 'Discard every region and empty the table below.',
   }, 'clear all');
-  const roiCount = h('span.mono.dim', '0');
+  const roiCount = h('span.mono.dim', {
+    title: `Regions held. ${MAX_ROI} is the ceiling: drawing another drops the oldest.`,
+  }, '0');
   const regionEl = h('div.tool-panel',
     h('div.frow.tool-bar', roiCount, h('span.unit', `of ${MAX_ROI}`), h('span.grow'), roiClear),
+    purpose('Measures what one piece of tissue is made of and what exposure it ' +
+      'received. A section-wide number averages over tissue that is not ' +
+      'homogeneous; a region says what it is an average ', h('b', 'of'),
+      '. Two regions in the same map, for the same compound, is the comparison ' +
+      'this product defends.'),
     roiTblWrap, roiHint,
   );
 
@@ -417,7 +455,8 @@ export function createTools({ viewer, getFieldName, onChange, onRoiChange }) {
     roiCount.textContent = String(rois.length);
     clear(roiTblWrap);
     if (!rois.length) {
-      roiHint.textContent = 'No region. Press R, then drag a rectangle over the tissue.';
+      roiHint.textContent = 'Nothing drawn yet. Pick the region tool above the stage '
+        + '(or press R), then drag a rectangle over the tissue.';
       if (onRoiChange) onRoiChange(null);
       return;
     }

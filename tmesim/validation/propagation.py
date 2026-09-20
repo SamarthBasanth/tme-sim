@@ -1230,6 +1230,45 @@ DECLARATIONS: Tuple[Declaration, ...] = (
     # NO_PDE for a file that calls no solver because it IS one, and accepting
     # that verdict would have published "no transport solve happens here" about
     # the module that solves the transport steady state.
+    # --- the 2026-09-20 verification experiments ------------------------- #
+    # Both call the solver BARE, and for both that is the point rather than an
+    # oversight: their subject is the solver itself, not the product pipeline
+    # the flag travels through. Routing them through simulate_response would
+    # destroy what they measure by burying the solve under a reconstruction.
+    Declaration(
+        path="experiments/mms_transport_verification.py",
+        category=Category.INERT,
+        reason=(
+            "Method of manufactured solutions. It calls the diffusion solver "
+            "directly with a source term DERIVED from a chosen exact solution, "
+            "so the exchange flag is deliberately absent: an exchange term "
+            "would add a sink the manufactured source does not balance, and "
+            "the measured order of convergence would then be an order of "
+            "convergence to the wrong equation. The verdict it publishes is "
+            "about discretisation -- second order for diffusion, first for "
+            "upwind advection, no order loss at either boundary -- and it "
+            "says in its own 'what this does not show' that it verifies the "
+            "SOLVER and not the model. Nothing it reports transfers to a "
+            "claim about transvascular exchange."
+        ),
+    ),
+    Declaration(
+        path="experiments/conservation_audit.py",
+        category=Category.INERT,
+        reason=(
+            "Physical-invariant audit: mass balance, non-negativity, "
+            "monotonicity in dose and window, determinism, scale invariance. "
+            "It builds its own transport loops from the private numerics on "
+            "purpose, because an invariant must be checked on the operator "
+            "rather than on whatever the product pipeline happened to "
+            "configure -- a budget that closes only under the shipped default "
+            "is not a conservation result. Exchange is a SOURCE term, so "
+            "switching it on would change the budget the audit is balancing "
+            "and every invariant would have to be restated around it. Its "
+            "findings are about the operator as discretised and carry no "
+            "exchange claim."
+        ),
+    ),
     Declaration(
         path="experiments/steady_state_reach.py",
         category=Category.INERT,

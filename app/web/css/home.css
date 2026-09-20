@@ -1,0 +1,1495 @@
+/* home.css — the workspace home page (docs/WORKSPACE_CONTRACT.md).
+ *
+ * Consumes tokens.css and DECLARES NO COLOUR. Every value below is either a
+ * token, a token-derived calc(), or a layout number that is not a colour, a
+ * size on the type scale, or a step on the space scale. Verify with the
+ * contract's §7 one-liner.
+ *
+ * THE SCROLL MODEL, because it is the one thing this page does differently
+ * from the Studio. base.css pins `html, body { overflow: hidden }` and the
+ * Studio satisfies that with a fixed four-region grid whose panes each own
+ * their overflow. A landing page is a document: it is taller than the viewport
+ * at 200% zoom on a 360px phone and it should be. So `.home-shell` is the ONE
+ * scroll container, and it takes base.css's `.scroll-y` primitive in the markup
+ * rather than re-declaring overflow here — that file states rule 4.3 once and
+ * owns the three scroll names. The top bar is sticky inside it so the way out
+ * to the Studio is never scrolled away.
+ */
+
+/* ============================================================== shell ==== */
+
+.home-shell {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-0);
+}
+
+/* Both bars this page can show: the static one in home.html and the
+   `.topbar.nav-bar` js/home/nav.js inserts in its place. They are styled as one
+   thing because they ARE one thing — only one is ever in the document.
+
+   The bar WRAPS rather than scrolls. At 200% zoom on a 360px viewport (180 CSS
+   px of width) a horizontally scrolling banner hides the way out of the page
+   behind a gesture; wrapping costs a second line and hides nothing. layout.css
+   sets nowrap for the Studio's twelve-group bar — this is a different bar on a
+   different page. */
+.home-shell > .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  min-height: var(--h-bar);
+  flex-wrap: wrap;
+  white-space: normal;
+  align-items: center;
+  box-shadow: var(--elev-1);
+}
+.home-shell > .topbar > .brand { border-right: 0; padding-left: var(--sp-5); }
+.home-shell > .topbar > .topbar-group.last { gap: var(--sp-3); padding-right: var(--sp-5); }
+/* An <a> wearing .btn: components.css styles the button, this gives the link
+   the same box. */
+.home-shell > .topbar a.btn { text-decoration: none; }
+/* js/home/nav.js's own groups, which carry an unbreakable backend origin
+   (`http://127.0.0.1:8000`) in a mono span. MEASURED: at 180 CSS px that one
+   string put the status group 9px past the right edge of a bar that is
+   already allowed to wrap. Nothing is hidden and nothing is truncated — the
+   origin is how an operator tells two deployments apart — it just breaks. */
+.home-shell > .topbar .nav-status,
+.home-shell > .topbar .nav-project,
+.home-shell > .topbar .nav-links { min-width: 0; }
+/* layout.css gives every bar group `display: flex` and no wrap, which is right
+   for the Studio's twelve-group bar inside its own x-scroller. This bar wraps
+   BETWEEN groups (see above), and at 180 CSS px one group is still wider than
+   the viewport on its own, so it wraps INSIDE itself too. Same trade as the
+   bar: one more line, nothing behind a gesture. */
+.home-shell > .topbar > .topbar-group { flex-wrap: wrap; }
+/* layout.css truncates these three with `white-space: nowrap` +
+   text-overflow, and pins `.keep` groups at `flex: 0 0 auto` so the backend
+   state "must never be truncated". Both are right for the Studio's one fixed
+   --h-bar row inside its own x-scroller. This bar has no fixed height and is
+   allowed to wrap, so it honours the same intent by a different means: the
+   origin WRAPS instead of being clipped, which truncates nothing and scrolls
+   nothing. Three classes deep so it beats layout.css's `.topbar-group >
+   .mono` on specificity rather than on load order. */
+.home-shell > .topbar > .topbar-group.keep { flex-shrink: 1; overflow: visible; }
+.home-shell > .topbar .nav-backend,
+.home-shell > .topbar .nav-project-id,
+.home-shell > .topbar .nav-project-name {
+  min-width: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+/* The theme toggle and the two page links are <a>/<button>.btn already; this
+   is the only thing the bar's own links need that base.css does not give. */
+.home-shell > .topbar .nav-link { text-decoration: none; }
+
+.home-main {
+  display: block;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: var(--sp-8) var(--sp-8) 0;
+  min-width: 0;
+}
+/* No `:focus { outline: none }` here: base.css already states that rule once
+   for the whole app and draws the ring on :focus-visible. A second suppression
+   in a page stylesheet is how a focus ring goes missing on one page only. */
+
+/* ======================================================= page heading ==== */
+
+.home-h1 {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  letter-spacing: 0.01em;
+  color: var(--fg-0);
+}
+.home-sub {
+  margin-top: var(--sp-4);
+  max-width: 72ch;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+}
+.home-h2 {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  color: var(--fg-0);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-wide);
+}
+.home-h3 {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  color: var(--fg-0);
+}
+
+.home-sect { margin-top: var(--sp-8); min-width: 0; }
+.home-sect > .home-h2 {
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--line-1);
+  margin-bottom: var(--sp-6);
+}
+.home-sect:focus { outline: none; }
+
+/* Prose anywhere on this page. --fs-sm is the body size, which is above the
+   --fs-disclosure floor; nothing on this page sets a sentence below it. */
+.home-p {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  max-width: 72ch;
+}
+.home-p + .home-p { margin-top: var(--sp-5); }
+.home-p b { color: var(--fg-0); font-weight: 600; }
+
+/* Anything genuinely wider than its column takes base.css's `.scroll-x` (or
+   `.tblwrap` for a table) in the markup, so it scrolls in its own box rather
+   than pushing the page sideways — UI_ARCHITECTURE §4.3, spelled once in
+   base.css and not respelled here. */
+
+/* =============================================================== boot ==== */
+
+.home-status:empty { display: none; }
+.home-status { display: block; margin-top: var(--sp-8); }
+
+.boot {
+  border: 1px solid var(--line-2);
+  border-left: 3px solid var(--accent);
+  background: var(--bg-1);
+  padding: var(--sp-6) var(--sp-7);
+  max-width: 76ch;
+}
+.boot-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-5);
+}
+.boot-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--fg-0);
+  line-height: var(--lh-tight);
+}
+.boot-el {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--fg-1);
+  white-space: nowrap;
+}
+/* The explanation is prose about a wait, and it is never set smaller than the
+   elapsed counter it sits under. */
+.boot-why {
+  margin-top: var(--sp-5);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  max-width: 72ch;
+}
+.boot-out {
+  margin-top: var(--sp-5);
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.boot-out a.btn { text-decoration: none; }
+
+/* ============================================================ banners ==== */
+
+.hbanner {
+  border: 1px solid var(--line-2);
+  border-left-width: 3px;
+  border-left-style: solid;
+  padding: var(--sp-6) var(--sp-7);
+  max-width: 82ch;
+  background: var(--bg-1);
+}
+.hbanner + .hbanner { margin-top: var(--sp-5); }
+.hbanner > .hb-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-4);
+}
+.hbanner > .hb-head > h2 {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  color: var(--fg-0);
+}
+.hbanner > .hb-body {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  max-width: 72ch;
+}
+.hbanner > .hb-body > p + p { margin-top: var(--sp-4); }
+.hbanner > .hb-body b { color: var(--fg-0); }
+.hbanner > .hb-foot {
+  margin-top: var(--sp-5);
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.hbanner > .hb-foot a.btn { text-decoration: none; }
+.hbanner .hb-detail {
+  display: block;
+  margin-top: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  font-size: var(--fs-sm);
+  color: var(--fg-1);
+  overflow-wrap: anywhere;
+}
+
+.hbanner.stub { border-left-color: var(--synthetic); background: var(--synthetic-bg); }
+.hbanner.stub > .hb-head > h2 { color: var(--synthetic); }
+.hbanner.crit { border-left-color: var(--crit); background: var(--crit-bg); }
+.hbanner.crit > .hb-head > h2 { color: var(--crit); }
+.hbanner.warn { border-left-color: var(--warn); background: var(--warn-bg); }
+.hbanner.warn > .hb-head > h2 { color: var(--warn); }
+.hbanner.info { border-left-color: var(--info); background: var(--info-bg); }
+.hbanner.info > .hb-head > h2 { color: var(--info); }
+
+/* A module that did not load. Visible, named, and it always states what still
+   works — never a blank region and never a silent one. */
+.mount-miss {
+  border: 1px dashed var(--line-2);
+  background: var(--bg-1);
+  padding: var(--sp-5) var(--sp-6);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  max-width: 72ch;
+}
+.mount-miss > b { color: var(--warn); }
+.mount-miss > .mm-why {
+  display: block;
+  margin-top: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+.mount-miss a { color: var(--accent); }
+
+/* ======================================================== empty state ==== */
+
+.home-empty {
+  border: 1px solid var(--line-2);
+  background: var(--bg-1);
+  padding: var(--sp-8);
+  max-width: 82ch;
+}
+.home-empty > h2 {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  color: var(--fg-0);
+}
+.he-lede {
+  margin-top: var(--sp-5);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  max-width: 72ch;
+}
+.he-lede + .he-lede { margin-top: var(--sp-4); }
+.he-lede b { color: var(--fg-0); font-weight: 600; }
+
+/* The standing limit, stated to a first-time reader before the first run, not
+   in a help file afterwards. --fs-sm: the same size as everything it sits
+   next to, never smaller. */
+.he-limit {
+  margin-top: var(--sp-6);
+  border-left: 3px solid var(--warn);
+  background: var(--warn-bg);
+  padding: var(--sp-4) var(--sp-6);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-0);
+  max-width: 72ch;
+}
+
+.he-steps {
+  margin-top: var(--sp-8);
+  display: grid;
+  gap: var(--sp-7);
+}
+.he-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-6);
+  align-items: start;
+}
+.he-num {
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  background: var(--accent-bg);
+  padding: var(--sp-3) var(--sp-4);
+  min-width: var(--h-head);
+  text-align: center;
+}
+.he-step.blocked > .he-num {
+  color: var(--warn);
+  border-color: var(--warn);
+  background: var(--warn-bg);
+}
+.he-body > p {
+  margin-top: var(--sp-3);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  max-width: 68ch;
+}
+.he-body > p b { color: var(--fg-0); font-weight: 600; }
+.he-act {
+  margin-top: var(--sp-5);
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.he-act a.btn { text-decoration: none; }
+.he-foot {
+  margin-top: var(--sp-8);
+  padding-top: var(--sp-6);
+  border-top: 1px solid var(--line-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  max-width: 72ch;
+}
+.he-foot a { color: var(--accent); }
+
+/* =================================================== grid head + grid ==== */
+
+.pgrid-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--sp-6);
+  margin-bottom: var(--sp-5);
+}
+.pgrid-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.pgrid-field.grow { flex: 1 1 210px; }
+.pgrid-field > .inp { width: 100%; min-width: 0; }
+.pgrid-field > select.inp { width: 100%; }
+
+/* What the list is ACTUALLY ordered by, in words, because last_opened_at and
+   updated_at mean different things and a control that says only "recent" is
+   the control lying about which one it used. Never smaller than the counts it
+   carries: both are --fs-sm. */
+.pgrid-basis {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  max-width: 82ch;
+  padding-left: var(--sp-5);
+  border-left: 2px solid var(--line-2);
+  margin-bottom: var(--sp-5);
+}
+.pgrid-basis b { color: var(--fg-0); font-weight: 600; }
+.pgrid-count {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  margin-bottom: var(--sp-5);
+}
+.pgrid-count b { color: var(--fg-0); font-weight: 600; }
+
+.pgrid {
+  display: grid;
+  /* min() so the track can never be wider than the column. At 200% zoom on a
+     360px viewport the track collapses to 100% and the grid becomes one
+     column instead of forcing a horizontal scroll. */
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: var(--sp-6);
+  align-items: stretch;
+  min-width: 0;
+}
+.pgrid > li { display: flex; min-width: 0; }
+.pgrid > li > * { flex: 1 1 auto; min-width: 0; }
+
+.pgrid-none {
+  border: 1px solid var(--line-2);
+  background: var(--bg-1);
+  padding: var(--sp-7);
+  max-width: 72ch;
+}
+.pgrid-none > p {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+}
+.pgrid-none > p + p { margin-top: var(--sp-4); }
+.pgrid-none b { color: var(--fg-0); font-weight: 600; }
+.pgrid-none .pn-q { font-family: var(--font-mono); color: var(--fg-0); overflow-wrap: anywhere; }
+.pgrid-none > .he-act { margin-top: var(--sp-6); }
+
+/* ------------------------------------------------- the reduced card -----
+   Drawn by projectGrid.js ONLY when js/home/projectCard.js is absent or
+   returns nothing. It is deliberately plainer than the real card and says so
+   in its own footer: a placeholder that is visible and named beats a hole in
+   the grid, and beats a stand-in good enough to be mistaken for the product. */
+.pcard-min {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  border: 1px dashed var(--line-2);
+  background: var(--bg-1);
+  padding: var(--sp-6);
+  min-width: 0;
+}
+.pcard-min > h3 {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  color: var(--fg-0);
+  overflow-wrap: anywhere;
+}
+.pcard-min > h3 > .pc-unnamed { color: var(--fg-2); font-weight: 400; }
+.pcard-min .pc-id {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+.pcard-min .pc-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3) var(--sp-5);
+  font-size: var(--fs-sm);
+  color: var(--fg-1);
+}
+.pcard-min .pc-facts > span { white-space: nowrap; }
+.pcard-min .pc-when {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+}
+.pcard-min .pc-when > .pc-when-k { color: var(--fg-2); }
+.pcard-min .pc-when > .pc-never { color: var(--fg-2); }
+.pcard-min .pc-sections {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  overflow-wrap: anywhere;
+}
+.pcard-min .pc-act { margin-top: auto; padding-top: var(--sp-4); }
+.pcard-min .pc-act a.btn { text-decoration: none; }
+.pcard-min > .mount-miss { max-width: none; }
+
+/* =============================================================== foot ==== */
+
+.home-foot {
+  max-width: 1180px;
+  margin: var(--sp-8) auto 0;
+  padding: var(--sp-6) var(--sp-8) var(--sp-8);
+  border-top: 1px solid var(--line-1);
+}
+.home-foot-limit {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  max-width: 82ch;
+}
+.home-foot-limit b { color: var(--fg-0); font-weight: 700; }
+.home-foot-links {
+  margin-top: var(--sp-5);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  font-size: var(--fs-sm);
+}
+.home-foot-links a { color: var(--accent); }
+.home-foot-sep { color: var(--fg-3); }
+
+/* =========================================================== noscript ==== */
+
+.home-noscript {
+  margin-top: var(--sp-8);
+  border: 1px solid var(--crit);
+  border-left-width: 3px;
+  background: var(--crit-bg);
+  padding: var(--sp-7);
+  max-width: 82ch;
+}
+.home-noscript > h2 {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  color: var(--fg-0);
+  margin-bottom: var(--sp-5);
+}
+.home-noscript > p {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  max-width: 72ch;
+}
+.home-noscript > p + p { margin-top: var(--sp-4); }
+.home-noscript a { color: var(--accent); }
+.home-noscript code {
+  font-size: var(--fs-sm);
+  color: var(--fg-0);
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  padding: 0 var(--sp-2);
+  overflow-wrap: anywhere;
+}
+
+/* ======================================================= narrow + zoom ====
+   360px at 200% zoom is 180 CSS px of width. The page is already single-column
+   and every grid track is min()-clamped; what is left is to stop the generous
+   page gutters from eating a quarter of that width. Nothing is hidden and no
+   type size changes — a smaller caveat at a smaller viewport is still a
+   smaller caveat. */
+@media (max-width: 560px) {
+  .home-main { padding: var(--sp-7) var(--sp-6) 0; }
+  .home-foot { padding: var(--sp-6) var(--sp-6) var(--sp-7); }
+  .home-empty { padding: var(--sp-7) var(--sp-6); }
+  .he-step { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
+  .he-num { justify-self: start; }
+  .pgrid-head { gap: var(--sp-5); }
+  .pgrid-field.grow { flex: 1 1 100%; }
+  .boot, .hbanner { padding: var(--sp-6); }
+  .boot-el { margin-left: 0; }
+}
+
+/* ==========================================================================
+   THE PROJECT CARD  —  .pc
+   ==========================================================================
+
+   js/home/projectCard.js builds it and owns what it SAYS; this owns how it
+   READS. Every rule in this block is scoped to `.pc`, the real card's root,
+   so the reduced `.pcard-min` fallback above stays visibly plainer than the
+   product — a stand-in good enough to be mistaken for the real card is worse
+   than a hole in the grid, and that difference is carried in the stylesheet
+   rather than in a promise.
+
+   THE TYPE CONTRACT, stated once here because it is a rule and not a taste
+   (see the --fs-disclosure note in css/tokens.css):
+
+       a sentence          --fs-sm   (11.5px)
+       a number, a label,
+       an identifier       --fs-xs   (10.5px == --fs-disclosure, the floor)
+       anything at all     never --fs-micro
+
+   so that every qualifying sentence is set one step ABOVE the number it
+   qualifies and never below it. The pairs the card author named, and where
+   each is settled:
+
+       .pc-comp-note, .pc-comp-warn  >=  .pc-comp-val, .pc-comp-denom
+       .pc-set-note                  >=  .pc-set-item
+       .pc-confirm-text              >=  .pc-fact-v
+       .rr-failed-count              >=  .rr-count          (strip, below)
+
+   NOTHING HERE FIXES A HEIGHT ON A BLOCK THAT CARRIES A SENTENCE. A CSS
+   clamp hides characters with no keyboard route back to them; the only
+   truncation on this card is done in the TEXT by projectCard.js, which puts
+   a button next to it that undoes it. */
+
+.pc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  min-width: 0;
+  padding: var(--sp-6);
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius);
+  transition: border-color var(--dur) var(--ease);
+}
+.pc:hover { border-color: var(--line-2); }
+/* Not a colour-only signal: the focus ring from base.css is the indicator,
+   and this is the CARD saying which card that ring belongs to — the same job
+   `.chan:focus-within` does in the channel list. */
+.pc:focus-within { border-color: var(--accent-dim); }
+.pc[aria-busy="true"] { border-color: var(--accent-dim); }
+
+/* An <a> wearing .btn, anywhere on a card. base.css declares no global `a`
+   rule — deliberately — so every link on this page names its own decoration. */
+.pc a.btn { text-decoration: none; }
+
+/* ---------------------------------------------------------------- head -- */
+
+.pc > .pc-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2) var(--sp-4);
+  min-width: 0;
+  padding-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--line-1);
+}
+.pc .pc-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  color: var(--fg-0);
+  overflow-wrap: anywhere;
+}
+/* The name is a real link to /studio?project=… when there is an id, and a
+   plain span when there is not. They must not look the same: a span that
+   takes the link colour is an affordance that does nothing. */
+.pc a.pc-name-link { color: var(--accent); text-decoration: none; }
+.pc a.pc-name-link:hover { color: var(--accent-hi); text-decoration: underline; }
+.pc span.pc-name-link { color: var(--fg-0); }
+.pc .pc-id {
+  flex: 0 0 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------- the composition THUMBNAIL --
+   WORKSPACE_CONTRACT.md §4: this is a CHART OF MEASURED COMPOSITION and it
+   must never read as a rendering of tissue. Three things in this block are
+   what make that true rather than merely claimed:
+
+     * the bar is a 12px rule the full width of the card, in a bordered
+       track — the shape of a chart, not of a micrograph;
+     * every segment is separated from its neighbour by a hairline in the
+       CARD's own background, so the band reads as discrete quantities and
+       never as a continuous field;
+     * `.pc-comp-seg-rest` — the unfilled remainder when the server's
+       fractions sum below 1 — is HATCHED. A flat fill, whatever its colour,
+       is the look of a measured class; a hatch is the look of an absence,
+       and this segment is an absence. It is never given the treatment of a
+       real cell type. */
+
+.pc .pc-thumb { min-width: 0; }
+.pc .pc-comp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.pc .pc-comp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2) var(--sp-4);
+  min-width: 0;
+}
+.pc .pc-comp-title {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-wide);
+  color: var(--fg-2);
+}
+.pc .pc-comp-sect {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--fg-1);
+  overflow-wrap: anywhere;
+}
+/* The denominator the percentages are OF. Contract §6: every number carries
+   its unit and its denominator, so this is not optional furniture. */
+.pc .pc-comp-denom {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+
+.pc .pc-comp-bar {
+  display: flex;
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius);
+}
+/* Width and background arrive as inline styles from projectCard.js — the
+   width is the datum and the background is the channel token. Everything
+   else about a segment is here. */
+.pc .pc-comp-seg {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-inline-end: 1px solid var(--bg-1);
+}
+.pc .pc-comp-seg:last-child { border-inline-end: 0; }
+/* The remainder. Drawn OVER the inline background with a pseudo-element
+   rather than through `background-image`, because the inline `background`
+   shorthand resets any image a stylesheet sets and this hatch is not allowed
+   to be silently erasable. */
+.pc .pc-comp-seg-rest { position: relative; }
+.pc .pc-comp-seg-rest::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    135deg, var(--bg-1) 0 1px, transparent 1px 4px);
+}
+/* A label the renderer has no channel for. It keeps its flat fill, because it
+   IS a measured fraction and hatching it would say otherwise; the inset ring
+   marks it as named-but-unmapped, and the key row beside it says so in
+   words. */
+.pc .pc-comp-seg-unknown { box-shadow: inset 0 0 0 1px var(--bg-1); }
+
+.pc .pc-comp-key {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+/* swatch · label · value, with any note dropping to its own line under the
+   label. Colour is never the only channel: the name and the percentage are
+   both written out (UI_ARCHITECTURE §4.5). */
+.pc .pc-comp-key-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-4);
+  min-width: 0;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+}
+.pc .pc-comp-sw {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--line-2);
+}
+.pc .pc-comp-lbl {
+  min-width: 0;
+  color: var(--fg-1);
+  overflow-wrap: anywhere;
+}
+/* "(no channel for this label)" is prose, so it takes the floor and NOT the
+   --fg-3 that `.dim` would give it: --fg-3 is the disabled/placeholder token
+   and this is neither. */
+.pc .pc-comp-key-row > .pc-comp-lbl.dim {
+  grid-column: 2 / -1;
+  font-size: var(--fs-disclosure);
+  color: var(--fg-2);
+}
+.pc .pc-comp-val {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--fg-0);
+  white-space: nowrap;
+}
+/* PAIR 1. --fs-sm, one step above .pc-comp-val and .pc-comp-denom. */
+.pc .pc-comp-warn {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-0);
+  background: var(--warn-bg);
+  border-left: 3px solid var(--warn);
+  padding: var(--sp-3) var(--sp-5);
+  min-width: 0;
+}
+.pc .pc-comp-note {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  min-width: 0;
+}
+
+/* `{"kind": "none"}` — a stated absence with its reason on screen, not a grey
+   rectangle that reads as a failed image. Dashed, so it is visibly a slot
+   rather than a panel. */
+.pc .pc-thumb-none {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--bg-2);
+  border: 1px dashed var(--line-2);
+}
+.pc .pc-thumb-none-title {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-wide);
+  color: var(--fg-2);
+}
+.pc .pc-thumb-none-reason {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* --------------------------------------------------------------- facts -- */
+
+.pc .pc-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.pc .pc-fact {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-4);
+  min-width: 0;
+}
+/* The key. base.css's `.lbl` is the whole of its type — uppercase, --fs-xs,
+   --fg-2 — so this is only what the pairing needs: it sits on the FIRST
+   baseline of a value that may run to three lines, rather than floating in
+   the middle of it the way `.fgrid > .lbl` would. */
+.pc .pc-fact-k {
+  align-self: baseline;
+  min-width: 0;
+}
+.pc .pc-fact-v {
+  min-width: 0;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--fg-0);
+  overflow-wrap: anywhere;
+}
+/* §3: `last_opened_at` and `updated_at` are different facts, so they are two
+   lines and never one. */
+.pc .pc-recency > .pc-fact-v {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.pc .pc-recency-abs {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+}
+.pc .pc-recency-doc {
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+/* "not opened yet" is a stated null, not a date. It is quieter than a real
+   timestamp and it is not the crit colour, because it is not a fault. */
+.pc .pc-recency-never { color: var(--fg-2); }
+
+/* ---------------------------------------------------------------- sets -- */
+
+.pc .pc-sets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  min-width: 0;
+}
+.pc .pc-sets:empty { display: none; }
+.pc .pc-set {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+/* A SET, drawn as an unordered wrap of equal tokens. Nothing here gives a
+   member a position, a rank, a badge or a first-among-equals emphasis:
+   cross-compound ordering was withdrawn 2026-08-21, and a list whose first
+   item is styled differently is a ranking whatever its label says. */
+.pc .pc-set-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+}
+.pc .pc-set-item {
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  color: var(--fg-0);
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+.pc .pc-set-item:first-child { font-weight: inherit; }
+/* PAIR 2. The sentence that says "this is a set, not an order" is --fs-sm,
+   one step above the members it qualifies. It is the load-bearing half of
+   the withdrawal and it is never the small print. */
+.pc .pc-set-note {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+
+/* --------------------------------------------------------------- notes -- */
+
+.pc .pc-notes {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+}
+.pc .pc-notes-empty { color: var(--fg-2); }
+/* The operator's own text, shown as they typed it. No height, no clamp. */
+.pc .pc-notes-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* `.btn`'s nowrap and fixed height are right for a verb and wrong for
+   "show all 1,284 characters" in a 280px card. */
+.pc .pc-notes-more {
+  margin-left: var(--sp-3);
+  height: auto;
+  min-height: var(--h-ctl-sm);
+  padding-block: var(--sp-1);
+  white-space: normal;
+  text-align: left;
+  line-height: var(--lh-body);
+}
+
+/* ------------------------------------------------------------- actions -- */
+
+.pc > .pc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  margin-top: auto;            /* the row sits on the floor of an equal-height card */
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--line-1);
+}
+.pc .pc-action { flex: 0 0 auto; }
+.pc .pc-open { flex: 0 0 auto; }
+/* Destructive, and it says so before it is pressed rather than only after. */
+.pc .pc-del:not(:disabled):hover { color: var(--crit); background: var(--crit-bg); }
+.pc .pc-del[aria-expanded="true"] {
+  color: var(--crit);
+  background: var(--crit-bg);
+  border-color: var(--crit);
+}
+/* A handler this page did not wire, named on screen. A control that is off
+   and silent is the defect this replaces. */
+.pc .pc-missing {
+  flex: 1 1 100%;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+
+/* ------------------------------------------------------------- confirm -- */
+/* WORKSPACE_CONTRACT.md §2, at the point of deletion. `:not([hidden])` on the
+   display rule is load-bearing: a bare `display: flex` here would beat the UA
+   `[hidden] { display: none }` and leave the delete confirmation permanently
+   open on every card in the grid. */
+.pc .pc-confirm {
+  min-width: 0;
+  margin-top: var(--sp-5);
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--crit-bg);
+  border: 1px solid var(--crit);
+  border-left-width: 3px;
+}
+.pc .pc-confirm:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.pc .pc-confirm-title {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  color: var(--crit);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+/* PAIR 3. --fs-sm, above .pc-fact-v's --fs-xs. This paragraph is the product
+   telling the truth about a destructive action; it is not shortened to fit
+   and it is not set smaller than the counts inside it. */
+.pc .pc-confirm-text {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-0);
+}
+.pc .pc-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.pc .pc-confirm-cancel { flex: 0 0 auto; }
+/* "delete the project, keep the runs" is a sentence on a button. Left at
+   `.btn`'s nowrap it is a 190px unbreakable word inside a 148px card at 200%
+   zoom, which is exactly the horizontal scroll UI_ARCHITECTURE §4.3 forbids. */
+.pc .pc-confirm-go {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: auto;
+  min-height: var(--h-ctl-sm);
+  padding-block: var(--sp-2);
+  white-space: normal;
+  text-align: left;
+  line-height: var(--lh-body);
+}
+
+/* ---------------------------------------------------------- unreadable -- */
+/* A project document projects.py could not read. It gets a card, because a
+   project that has silently vanished from the grid is worse than one that
+   explains itself. Warn, not crit: the project is not lost and its runs are
+   untouched. */
+.pc.pc-unreadable {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+}
+.pc .pc-unreadable-why {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-0);
+  overflow-wrap: anywhere;
+}
+
+/* ========================================================================== 
+   THE RECENT-RUNS STRIP  —  .rr
+   ==========================================================================
+
+   The grid above answers "what work do I keep"; this answers "what did I just
+   do". It is the only thing on this page that crosses project boundaries, so
+   every row carries where it belongs.
+
+   IT WRAPS, IT NEVER SCROLLS. A row is five groups of facts and at 360px it
+   is wider than the column. Flex wrap costs a second line; an x-scroller
+   inside a list costs the reader the half of the row they cannot see, and
+   pushing it onto the body is forbidden outright. */
+
+.rr {
+  margin-top: var(--sp-8);
+  min-width: 0;
+}
+.rr a.btn { text-decoration: none; }
+
+.rr-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2) var(--sp-5);
+  min-width: 0;
+  padding-bottom: var(--sp-3);
+  margin-bottom: var(--sp-5);
+  border-bottom: 1px solid var(--line-1);
+}
+.rr-title {
+  flex: 0 0 auto;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  color: var(--fg-0);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-wide);
+}
+.rr-sub {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+/* A count of what is SHOWN, not a total. --fs-xs: a number with its
+   denominator written beside it, read as a mark.
+   MEASURED at 200% zoom on a 360px phone (180 CSS px): "5 of the most recent
+   runs shown" is 214px, and with `white-space: nowrap` it was the one element
+   on this page that pushed the shell 34px past the viewport. It wraps. The
+   denominator is not dropped to make it fit — §6 requires it — and the type
+   size does not change either. */
+.rr-count {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+/* PAIR 4. --fs-sm, above .rr-count. A strip that hid its failures would read
+   as a product that always works, so the count of them is the loudest thing
+   in this header and is never set smaller than the count it qualifies. */
+.rr-failed-count {
+  flex: 1 1 100%;
+  min-width: 0;
+  margin-top: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-0);
+  background: var(--crit-bg);
+  border-left: 3px solid var(--crit);
+}
+
+.rr-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  max-width: 72ch;
+  padding: var(--sp-6) var(--sp-7);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  background: var(--bg-1);
+  border: 1px solid var(--line-2);
+}
+/* A refusal says what to do next (§6). */
+.rr-empty-next { color: var(--fg-2); }
+
+.rr-list {
+  min-width: 0;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius);
+}
+.rr-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2) var(--sp-5);
+  min-width: 0;
+  padding: var(--sp-4) var(--sp-6);
+  border-top: 1px solid var(--line-0);
+}
+.rr-list > .rr-row:first-child { border-top: 0; }
+.rr-row:hover { background: var(--bg-2); }
+/* An inset rule rather than a border, so a failed row's text stays on the
+   same left edge as every other row. */
+.rr-row-failed {
+  background: var(--crit-bg);
+  box-shadow: inset 3px 0 0 var(--crit);
+}
+.rr-row-failed:hover { background: var(--crit-bg); }
+
+.rr-status { flex: 0 0 auto; align-self: center; }
+.rr-run {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.rr a.rr-run:hover { color: var(--accent-hi); text-decoration: underline; }
+/* No run id to link to. Not an affordance, so not the link colour. */
+.rr span.rr-run { color: var(--fg-2); }
+
+.rr-where,
+.rr-what,
+.rr-when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+}
+.rr-when { margin-left: auto; color: var(--fg-2); }
+.rr-lbl { flex: 0 0 auto; }
+.rr-proj,
+.rr-spec {
+  min-width: 0;
+  color: var(--fg-0);
+  overflow-wrap: anywhere;
+}
+.rr-sect,
+.rr-drug {
+  min-width: 0;
+  font-family: var(--font-mono);
+  color: var(--fg-0);
+  overflow-wrap: anywhere;
+}
+.rr-sep { flex: 0 0 auto; color: var(--fg-3); }
+.rr-runtime {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.rr-why {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: auto;
+  min-height: var(--h-ctl-sm);
+  padding-block: var(--sp-1);
+  white-space: normal;
+  line-height: var(--lh-body);
+}
+/* Same `:not([hidden])` reasoning as .pc-confirm: the reason block is closed
+   until asked for, and a bare display rule would open every one of them. */
+.rr-reason {
+  min-width: 0;
+  margin-top: var(--sp-3);
+  padding: var(--sp-4) var(--sp-6);
+  background: var(--bg-2);
+  border-left: 3px solid var(--crit);
+}
+.rr-reason:not([hidden]) {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+/* What the server said, verbatim — its own line breaks kept, and never set
+   smaller than the row it explains. */
+.rr-reason-text {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-0);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.rr-reason-pending {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+.rr-reason-src {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  min-width: 0;
+}
+
+/* ==========================================================================
+   THE GRID'S REMAINING STRUCTURE
+   ========================================================================== */
+
+.pgrid-body { min-width: 0; }
+.pgrid-region { min-width: 0; }
+/* The create control lives in the controls bar as well as in the empty state:
+   a returning user needs it and a first-time user needs the other one, and
+   they are not alternatives. It has no label above it, so it aligns to the
+   bottom of the row rather than to the top of a label that is not there. */
+.pgrid-new { justify-content: flex-end; flex: 0 0 auto; }
+
+/* ==========================================================================
+   THE FOUR DIALOGS  —  .cp-*
+   ==========================================================================
+
+   js/home/createProject.js injects a <dialog> per task and removes it on
+   close. `dialog` itself is already a sheet (components.css); this is what
+   makes the four of them one thing.
+
+   THE SIZE FLOOR IN A SHEET IS --fs-sm, NOT THE DISCLOSURE FLOOR. The body of
+   every one of these dialogs runs at --fs-sm, so a note, an error or a caveat
+   left at --fs-xs would be set SMALLER than the sentence it is correcting.
+   createProject.js lifts them inline; the same values are declared here so the
+   stylesheet is correct on its own and an inline style that is later removed
+   does not silently demote a refusal. */
+
+/* [open] rather than a bare rule: an unqualified `display` on a <dialog>
+   beats the UA's `dialog:not([open]) { display: none }` and paints a closed
+   sheet onto the page. */
+.cp-dlg[open] {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cp-head { flex: 0 0 auto; }
+.cp-head > h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cp-body { min-width: 0; }
+.cp-close { flex: 0 0 auto; }
+
+/* One accent per task, so the destructive sheet is never mistaken for the
+   creative one at a glance. Border colour only — the words in the head say
+   which dialog this is, and this agrees with them. */
+.cp-dlg-create > .cp-head { border-bottom-color: var(--accent-dim); }
+.cp-dlg-edit > .cp-head,
+.cp-dlg-dup > .cp-head { border-bottom-color: var(--line-2); }
+.cp-dlg-del > .cp-head { border-bottom-color: var(--crit); }
+.cp-dlg-del > .cp-head > h2 { color: var(--crit); }
+
+.cp-form { min-width: 0; }
+.cp-grid { min-width: 0; }
+/* The label sits beside a control that has a note under it, so it aligns to
+   the control's first line rather than to the middle of the pair.
+   `.fgrid > .lbl` is (0,2,0); this matches it and wins on source order. */
+.cp-grid > .cp-label {
+  align-self: start;
+  padding-top: var(--sp-2);
+  white-space: normal;
+}
+.cp-control { min-width: 0; }
+.cp-control > .inp { width: 100%; }
+.cp-name { width: 100%; }
+.cp-section { width: 100%; }
+.cp-notes {
+  width: 100%;
+  line-height: var(--lh-body);
+  resize: vertical;
+}
+/* Prose that qualifies the control above it. The floor, and --fg-2 rather
+   than the placeholder token. */
+.cp-note {
+  font-size: var(--fs-disclosure);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  min-width: 0;
+}
+/* A refusal that has to say what to do next, so it is set at the size of the
+   input text it is correcting and not at `.field-err`'s --fs-micro. */
+.cp-err {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.cp-form-err {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  min-width: 0;
+}
+.cp-tech { overflow-wrap: anywhere; }
+.cp-refusal {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  min-width: 0;
+}
+
+/* Which project this sheet is about, pinned above the form so a rename or a
+   delete can never be read against the wrong row. */
+.cp-ident {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+  padding-bottom: var(--sp-4);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  border-bottom: 1px solid var(--line-1);
+  overflow-wrap: anywhere;
+}
+.cp-ident-name {
+  min-width: 0;
+  color: var(--fg-0);
+  overflow-wrap: anywhere;
+}
+
+/* WHAT GOES, AND WHAT STAYS — the two halves of the truth about a duplicate
+   and about a delete. They share a box style because they are the same KIND
+   of statement; the caveat beside each (`.cp-keep`) is what carries the
+   severity. */
+.cp-copies,
+.cp-lose {
+  min-width: 0;
+  padding: var(--sp-5) var(--sp-6);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+}
+.cp-copies-head,
+.cp-lose-head {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tr-wide);
+}
+/* base.css strips every list; this one is genuinely a list of distinct
+   things and reads as one. */
+.cp-list { list-style: disc; }
+.cp-list > li {
+  margin-bottom: var(--sp-2);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.cp-list > li:last-child { margin-bottom: 0; }
+/* RUNS ARE NOT DELETED / NOT DUPLICATED. §2, and the one sentence in these
+   sheets that must never be set below the counts inside it. */
+.cp-keep {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  min-width: 0;
+}
+
+/* What the button will do, updated as the form changes. */
+.cp-summary {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  overflow-wrap: anywhere;
+}
+.cp-spec { min-width: 0; }
+.cp-spec-chk { align-items: center; }
+.cp-del-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cp-foot {
+  gap: var(--sp-4);
+  justify-content: flex-start;
+  min-width: 0;
+}
+.cp-submit { flex: 0 0 auto; }
+.cp-cancel { flex: 0 0 auto; }
+/* `confirmable()` swaps this label to "delete p_00002?" while armed, which is
+   longer than the button. Wrapping beats a clipped verb. */
+.cp-delete {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: auto;
+  min-height: var(--h-ctl);
+  padding-block: var(--sp-2);
+  white-space: normal;
+  line-height: var(--lh-body);
+}
+
+/* ==========================================================================
+   NARROW AND ZOOMED — the same rules as the block above, extended to the
+   surfaces this file just gained. NOTHING HERE CHANGES A TYPE SIZE: a smaller
+   caveat at a smaller viewport is still a smaller caveat.
+   ========================================================================== */
+@media (max-width: 560px) {
+  .pc { padding: var(--sp-5); }
+  /* 86px of label column out of ~148 CSS px is most of the row. The key goes
+     above its value instead, which costs a line and clips nothing. */
+  .pc .pc-fact { grid-template-columns: minmax(0, 1fr); }
+  .pc .pc-comp-denom { margin-left: 0; }
+  .rr-count { margin-left: 0; }
+  .rr-when { margin-left: 0; }
+  .rr-row { padding: var(--sp-4) var(--sp-5); }
+  .rr-empty { padding: var(--sp-5) var(--sp-6); }
+  .pgrid-new { justify-content: flex-start; flex: 1 1 100%; }
+}
+
+/* base.css compresses every transition to 1ms under this setting, which is
+   right for a recolour and wrong for a thing that MOVES. The two rotations
+   this file introduces are stopped outright rather than made instant. */
+@media (prefers-reduced-motion: reduce) {
+  .pc { transition: none; }
+}

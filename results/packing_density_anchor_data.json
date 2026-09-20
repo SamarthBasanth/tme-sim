@@ -1,0 +1,890 @@
+{
+  "route": "R4 of results/verification_routes_2026-09-20.md",
+  "date": "2026-09-20",
+  "paper": {
+    "pmid": 22672469,
+    "pmc": "PMC3407510",
+    "doi": "10.1186/1471-2407-12-214",
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3407510/"
+  },
+  "calibrate_alpha_start": 22.223477711172563,
+  "phi_shipped": 0.7892,
+  "measurement_noise_floor_rel": 0.28284271247461906,
+  "compile": [
+    {
+      "drug": "5-fluorouracil",
+      "mw": 130.077,
+      "logp": -0.89,
+      "logp_source": "lipophilicity.EXPERIMENTAL_LOGP, Hansch 1995 via PubChem/HSDB 3228",
+      "interstitial_D_um2s": 323.8001167799329,
+      "membrane_permeability_um_s": 0.045688449773192974,
+      "membrane_resistance_ratio": 740.6464868310558,
+      "hindrance": 0.15216449877134858,
+      "impermeable_hindrance": 0.15115445288971746,
+      "transcellular_gain": 1.0066822105622522
+    },
+    {
+      "drug": "doxorubicin",
+      "mw": 543.52,
+      "logp": 1.27,
+      "logp_source": "lipophilicity.EXPERIMENTAL_LOGP, Hansch 1995",
+      "interstitial_D_um2s": 184.7402230881013,
+      "membrane_permeability_um_s": 1.7897872779093665e-05,
+      "membrane_resistance_ratio": 1173845.5749987832,
+      "hindrance": 0.15115514739176203,
+      "impermeable_hindrance": 0.15115445288971746,
+      "transcellular_gain": 1.0000045946515719
+    },
+    {
+      "drug": "gemcitabine",
+      "mw": 263.2,
+      "logp": -1.4,
+      "logp_source": "NOT an engine value and NOT scored: gemcitabine has no entry in lipophilicity.EXPERIMENTAL_LOGP. Irrelevance demonstrated by sensitivity S6.",
+      "interstitial_D_um2s": 247.95758367071016,
+      "membrane_permeability_um_s": 2.3322653758566032e-05,
+      "membrane_resistance_ratio": 1147125.5875430822,
+      "hindrance": 0.15115512716018314,
+      "impermeable_hindrance": 0.15115445288971746,
+      "transcellular_gain": 1.0000044608045136
+    }
+  ],
+  "mapping": [
+    {
+      "pert": "EGTA",
+      "line": "HCT-8Ea",
+      "na_control_pct": 50.0,
+      "na_treated_pct": 40.0,
+      "na_control_sd": 7.3,
+      "na_treated_sd": 1.6,
+      "na_ratio": 0.8,
+      "phi_control": 0.7892,
+      "phi_treated": 0.63136,
+      "sentence": "at this dose mean packing density (+/-SD) was reduced from 50 +/- 7.3% to 40 +/- 1.6% and from 40 +/- 6.8% to 31 +/- 4.5%, in MCC derived from HCT-8Ea and HCT-8E11 cells respectively"
+    },
+    {
+      "pert": "EGTA",
+      "line": "HCT-8E11",
+      "na_control_pct": 40.0,
+      "na_treated_pct": 31.0,
+      "na_control_sd": 6.8,
+      "na_treated_sd": 4.5,
+      "na_ratio": 0.775,
+      "phi_control": 0.7892,
+      "phi_treated": 0.61163,
+      "sentence": "at this dose mean packing density (+/-SD) was reduced from 50 +/- 7.3% to 40 +/- 1.6% and from 40 +/- 6.8% to 31 +/- 4.5%, in MCC derived from HCT-8Ea and HCT-8E11 cells respectively"
+    },
+    {
+      "pert": "bortezomib",
+      "line": "HCT-8Ea",
+      "na_control_pct": 53.2,
+      "na_treated_pct": 44.6,
+      "na_control_sd": 5.5,
+      "na_treated_sd": 5.7,
+      "na_ratio": 0.8383458646616542,
+      "phi_control": 0.7892,
+      "phi_treated": 0.6616225563909774,
+      "sentence": "Table 1, 'MCC Packing Density (% nuclear area)', HCT-8Ea: 0 uM = 53.2 +/- 5.5, 1.0 uM = 44.6 +/- 5.7*"
+    },
+    {
+      "pert": "bortezomib",
+      "line": "HCT-8E11",
+      "na_control_pct": 50.8,
+      "na_treated_pct": 42.5,
+      "na_control_sd": 3.8,
+      "na_treated_sd": 3.8,
+      "na_ratio": 0.8366141732283465,
+      "phi_control": 0.7892,
+      "phi_treated": 0.6602559055118111,
+      "sentence": "Table 1, 'MCC Packing Density (% nuclear area)', HCT-8E11: 0 uM = 50.8 +/- 3.8, 1.0 uM = 42.5 +/- 3.8*"
+    }
+  ],
+  "table": [
+    {
+      "row": 1,
+      "pert": "EGTA",
+      "line": "HCT-8Ea",
+      "drug": "5-fluorouracil",
+      "measured_lo": 3.3,
+      "measured_hi": 4.4,
+      "measured_geomid": 3.81051177665153,
+      "predicted": 1.847326624922916,
+      "fold_error": 0.48479751099109475,
+      "primary": true,
+      "lumped": "printed once for 5-FU and gemcitabine",
+      "note": null,
+      "sentence": "EGTA pre-treatment improved penetration of 5-fluorouracil and gemcitabine (measured at 6 h) by ~3.3-4.4 fold in MCC derived from HCT-8Ea cells"
+    },
+    {
+      "row": 2,
+      "pert": "EGTA",
+      "line": "HCT-8Ea",
+      "drug": "gemcitabine",
+      "measured_lo": 3.3,
+      "measured_hi": 4.4,
+      "measured_geomid": 3.81051177665153,
+      "predicted": 1.8536606936079891,
+      "fold_error": 0.48645977292763676,
+      "primary": false,
+      "lumped": "same printed value as row 1",
+      "note": null,
+      "sentence": "EGTA pre-treatment improved penetration of 5-fluorouracil and gemcitabine (measured at 6 h) by ~3.3-4.4 fold in MCC derived from HCT-8Ea cells"
+    },
+    {
+      "row": 3,
+      "pert": "EGTA",
+      "line": "HCT-8E11",
+      "drug": "5-fluorouracil",
+      "measured_lo": 1.5,
+      "measured_hi": 1.9,
+      "measured_geomid": 1.688194301613413,
+      "predicted": 1.9604347332681744,
+      "fold_error": 1.1612613141713488,
+      "primary": true,
+      "lumped": "printed once for 5-FU and gemcitabine",
+      "note": null,
+      "sentence": "and by ~1.5-1.9 fold in MCC derived from HCT-8E11 cells"
+    },
+    {
+      "row": 4,
+      "pert": "EGTA",
+      "line": "HCT-8E11",
+      "drug": "gemcitabine",
+      "measured_lo": 1.5,
+      "measured_hi": 1.9,
+      "measured_geomid": 1.688194301613413,
+      "predicted": 1.9676235385561225,
+      "fold_error": 1.1655195949160935,
+      "primary": false,
+      "lumped": "same printed value as row 3",
+      "note": null,
+      "sentence": "and by ~1.5-1.9 fold in MCC derived from HCT-8E11 cells"
+    },
+    {
+      "row": 5,
+      "pert": "EGTA",
+      "line": "HCT-8Ea",
+      "drug": "doxorubicin",
+      "measured_lo": 2.0,
+      "measured_hi": 2.0,
+      "measured_geomid": 2.0,
+      "predicted": 1.8536605658103882,
+      "fold_error": 0.9268302829051941,
+      "primary": true,
+      "lumped": "printed once for both cell lines",
+      "note": "data not shown; no sucrose internal standard in doxorubicin runs",
+      "sentence": "EGTA also led to ~2-fold increase in penetration of doxorubicin (p = 0.02 for HCT-8E11, p = 0.002 for HCT-8Ea; data not shown)"
+    },
+    {
+      "row": 6,
+      "pert": "EGTA",
+      "line": "HCT-8E11",
+      "drug": "doxorubicin",
+      "measured_lo": 2.0,
+      "measured_hi": 2.0,
+      "measured_geomid": 2.0,
+      "predicted": 1.9676233935129894,
+      "fold_error": 0.9838116967564947,
+      "primary": true,
+      "lumped": "printed once for both cell lines",
+      "note": "data not shown; no sucrose internal standard in doxorubicin runs",
+      "sentence": "EGTA also led to ~2-fold increase in penetration of doxorubicin (p = 0.02 for HCT-8E11, p = 0.002 for HCT-8Ea; data not shown)"
+    },
+    {
+      "row": 7,
+      "pert": "bortezomib",
+      "line": "HCT-8Ea",
+      "drug": "5-fluorouracil",
+      "measured_lo": 1.7,
+      "measured_hi": 1.7,
+      "measured_geomid": 1.7,
+      "predicted": 1.677092033954372,
+      "fold_error": 0.986524725855513,
+      "primary": true,
+      "lumped": null,
+      "note": null,
+      "sentence": "Bortezomib pre-treatment improved penetration of 5-fluorouracil by ~1.7-fold and gemcitabine by ~3-fold in MCC derived from HCT-8Ea cells"
+    },
+    {
+      "row": 8,
+      "pert": "bortezomib",
+      "line": "HCT-8Ea",
+      "drug": "gemcitabine",
+      "measured_lo": 3.0,
+      "measured_hi": 3.0,
+      "measured_geomid": 3.0,
+      "predicted": 1.6821437630205187,
+      "fold_error": 0.5607145876735062,
+      "primary": true,
+      "lumped": null,
+      "note": null,
+      "sentence": "Bortezomib pre-treatment improved penetration of 5-fluorouracil by ~1.7-fold and gemcitabine by ~3-fold in MCC derived from HCT-8Ea cells"
+    },
+    {
+      "row": 9,
+      "pert": "bortezomib",
+      "line": "HCT-8E11",
+      "drug": "5-fluorouracil",
+      "measured_lo": 2.0,
+      "measured_hi": 2.0,
+      "measured_geomid": 2.0,
+      "predicted": 1.6846963925244003,
+      "fold_error": 0.8423481962622001,
+      "primary": true,
+      "lumped": "printed once for both drugs",
+      "note": null,
+      "sentence": "and increased penetration of both drugs by ~2-fold in MCC derived from HCT-8E11 cells at 6 h"
+    },
+    {
+      "row": 10,
+      "pert": "bortezomib",
+      "line": "HCT-8E11",
+      "drug": "gemcitabine",
+      "measured_lo": 2.0,
+      "measured_hi": 2.0,
+      "measured_geomid": 2.0,
+      "predicted": 1.6898052986581698,
+      "fold_error": 0.8449026493290849,
+      "primary": true,
+      "lumped": "printed once for both drugs",
+      "note": null,
+      "sentence": "and increased penetration of both drugs by ~2-fold in MCC derived from HCT-8E11 cells at 6 h"
+    },
+    {
+      "row": 11,
+      "pert": "bortezomib",
+      "line": "HCT-8Ea",
+      "drug": "doxorubicin",
+      "measured_lo": 1.8,
+      "measured_hi": 1.8,
+      "measured_geomid": 1.8,
+      "predicted": 1.6821436610958713,
+      "fold_error": 0.934524256164373,
+      "primary": false,
+      "lumped": "printed once for both cell lines",
+      "note": "data not shown; no sucrose internal standard in doxorubicin runs",
+      "sentence": "Penetration of doxorubicin was also increased by about 1.8-fold at 6 h (p = 0.02 for HCT-8Ea, p = 0.005 for HCT-8E11, data not shown)"
+    },
+    {
+      "row": 12,
+      "pert": "bortezomib",
+      "line": "HCT-8E11",
+      "drug": "doxorubicin",
+      "measured_lo": 1.8,
+      "measured_hi": 1.8,
+      "measured_geomid": 1.8,
+      "predicted": 1.6898051955798992,
+      "fold_error": 0.9387806642110551,
+      "primary": false,
+      "lumped": "printed once for both cell lines",
+      "note": "data not shown; no sucrose internal standard in doxorubicin runs",
+      "sentence": "Penetration of doxorubicin was also increased by about 1.8-fold at 6 h (p = 0.02 for HCT-8Ea, p = 0.005 for HCT-8E11, data not shown)"
+    }
+  ],
+  "criteria": {
+    "n_primary": 8,
+    "gmfe_engine": 1.2677646957020625,
+    "gmfe_null_phi_blind": 2.187822009974954,
+    "P1_accuracy": {
+      "value": 1.2677646957020625,
+      "bar": 2.0,
+      "pass_": true,
+      "demoted": true
+    },
+    "P2_anti_vacuity": {
+      "value": 1.2677646957020625,
+      "bar": 1.7502576079799632,
+      "gmfe_null": 2.187822009974954,
+      "pass_": true
+    },
+    "P3_dispersion": {
+      "measured_spread": 2.2571523745873394,
+      "predicted_spread": 1.1732351914364418,
+      "log_fraction_explained": 0.196246489758319,
+      "bar": 0.5,
+      "pass_": false
+    },
+    "P4_direction": {
+      "value": true,
+      "counted": false,
+      "why": "vacuous by construction: phi falls in every row and hindrance is monotone decreasing in phi"
+    },
+    "verdict": "FAIL",
+    "P5_admissibility": {
+      "n_primary": 8,
+      "n_inadmissible": 0,
+      "implied_phi_min": 0.7242227759630324,
+      "implied_phi_max": 0.9293134811903374
+    }
+  },
+  "S1_implied_phi": [
+    {
+      "row": 1,
+      "pert": "EGTA",
+      "line": "HCT-8Ea",
+      "drug": "5-fluorouracil",
+      "measured": 3.81051177665153,
+      "phi_implied": 0.9293134811903374,
+      "admissible_band": [
+        0.5,
+        1.0
+      ],
+      "admissible": true,
+      "primary": true
+    },
+    {
+      "row": 2,
+      "pert": "EGTA",
+      "line": "HCT-8Ea",
+      "drug": "gemcitabine",
+      "measured": 3.81051177665153,
+      "phi_implied": 0.9277730908553723,
+      "admissible_band": [
+        0.5,
+        1.0
+      ],
+      "admissible": true,
+      "primary": false
+    },
+    {
+      "row": 3,
+      "pert": "EGTA",
+      "line": "HCT-8E11",
+      "drug": "5-fluorouracil",
+      "measured": 1.688194301613413,
+      "phi_implied": 0.7242227759630324,
+      "admissible_band": [
+        0.4,
+        1.0
+      ],
+      "admissible": true,
+      "primary": true
+    },
+    {
+      "row": 4,
+      "pert": "EGTA",
+      "line": "HCT-8E11",
+      "drug": "gemcitabine",
+      "measured": 1.688194301613413,
+      "phi_implied": 0.7230223352215228,
+      "admissible_band": [
+        0.4,
+        1.0
+      ],
+      "admissible": true,
+      "primary": false
+    },
+    {
+      "row": 5,
+      "pert": "EGTA",
+      "line": "HCT-8Ea",
+      "drug": "doxorubicin",
+      "measured": 2.0,
+      "phi_implied": 0.8155227675626857,
+      "admissible_band": [
+        0.5,
+        1.0
+      ],
+      "admissible": true,
+      "primary": true
+    },
+    {
+      "row": 6,
+      "pert": "EGTA",
+      "line": "HCT-8E11",
+      "drug": "doxorubicin",
+      "measured": 2.0,
+      "phi_implied": 0.7948989409806109,
+      "admissible_band": [
+        0.4,
+        1.0
+      ],
+      "admissible": true,
+      "primary": true
+    },
+    {
+      "row": 7,
+      "pert": "bortezomib",
+      "line": "HCT-8Ea",
+      "drug": "5-fluorouracil",
+      "measured": 1.7,
+      "phi_implied": 0.795016442956785,
+      "admissible_band": [
+        0.532,
+        1.0
+      ],
+      "admissible": true,
+      "primary": true
+    },
+    {
+      "row": 8,
+      "pert": "bortezomib",
+      "line": "HCT-8Ea",
+      "drug": "gemcitabine",
+      "measured": 3.0,
+      "phi_implied": 0.9195324812817762,
+      "admissible_band": [
+        0.532,
+        1.0
+      ],
+      "admissible": true,
+      "primary": true
+    },
+    {
+      "row": 9,
+      "pert": "bortezomib",
+      "line": "HCT-8E11",
+      "drug": "5-fluorouracil",
+      "measured": 2.0,
+      "phi_implied": 0.8481639579850333,
+      "admissible_band": [
+        0.508,
+        1.0
+      ],
+      "admissible": true,
+      "primary": true
+    },
+    {
+      "row": 10,
+      "pert": "bortezomib",
+      "line": "HCT-8E11",
+      "drug": "gemcitabine",
+      "measured": 2.0,
+      "phi_implied": 0.8467580776337957,
+      "admissible_band": [
+        0.508,
+        1.0
+      ],
+      "admissible": true,
+      "primary": true
+    },
+    {
+      "row": 11,
+      "pert": "bortezomib",
+      "line": "HCT-8Ea",
+      "drug": "doxorubicin",
+      "measured": 1.8,
+      "phi_implied": 0.8157493057083078,
+      "admissible_band": [
+        0.532,
+        1.0
+      ],
+      "admissible": true,
+      "primary": false
+    },
+    {
+      "row": 12,
+      "pert": "bortezomib",
+      "line": "HCT-8E11",
+      "drug": "doxorubicin",
+      "measured": 1.8,
+      "phi_implied": 0.8139790988265123,
+      "admissible_band": [
+        0.508,
+        1.0
+      ],
+      "admissible": true,
+      "primary": false
+    }
+  ],
+  "S2_identity_mapping": {
+    "rows": [
+      {
+        "row": 1,
+        "phi_control": 0.5,
+        "predicted": 1.2492409428170126,
+        "measured": 3.81051177665153,
+        "primary": true
+      },
+      {
+        "row": 2,
+        "phi_control": 0.5,
+        "predicted": 1.249999492266305,
+        "measured": 3.81051177665153,
+        "primary": false
+      },
+      {
+        "row": 3,
+        "phi_control": 0.4,
+        "predicted": 1.194310514417238,
+        "measured": 1.688194301613413,
+        "primary": true
+      },
+      {
+        "row": 4,
+        "phi_control": 0.4,
+        "predicted": 1.19480486409581,
+        "measured": 1.688194301613413,
+        "primary": false
+      },
+      {
+        "row": 5,
+        "phi_control": 0.5,
+        "predicted": 1.2499994770317058,
+        "measured": 2.0,
+        "primary": true
+      },
+      {
+        "row": 6,
+        "phi_control": 0.4,
+        "predicted": 1.1948048541728393,
+        "measured": 2.0,
+        "primary": true
+      },
+      {
+        "row": 7,
+        "phi_control": 0.532,
+        "predicted": 1.2246517129891508,
+        "measured": 1.7,
+        "primary": true
+      },
+      {
+        "row": 8,
+        "phi_control": 0.532,
+        "predicted": 1.2253805632545067,
+        "measured": 3.0,
+        "primary": true
+      },
+      {
+        "row": 9,
+        "phi_control": 0.508,
+        "predicted": 1.2080581257468141,
+        "measured": 2.0,
+        "primary": true
+      },
+      {
+        "row": 10,
+        "phi_control": 0.508,
+        "predicted": 1.2086995957561484,
+        "measured": 2.0,
+        "primary": true
+      },
+      {
+        "row": 11,
+        "phi_control": 0.532,
+        "predicted": 1.2253805486130822,
+        "measured": 1.8,
+        "primary": false
+      },
+      {
+        "row": 12,
+        "phi_control": 0.508,
+        "predicted": 1.2086995828723068,
+        "measured": 1.8,
+        "primary": false
+      }
+    ],
+    "gmfe": 1.7944422209259727,
+    "beats_null": false
+  },
+  "S3_solver_verification": {
+    "quasi_steady_analytic": 0.8427628336863724,
+    "quasi_steady_numeric": 0.8422746765884346,
+    "quasi_steady_rel_err": 0.0005792342500470037,
+    "grid_coarse": 0.7675634752212172,
+    "grid_fine": 0.7674312535204652,
+    "grid_rel_diff": 0.00017229126406496283
+  },
+  "S3_transient_band": {
+    "rows": [
+      {
+        "thickness_um": 40.0,
+        "c2_over_cinf_control": 0.9955218600029042,
+        "c2_over_cinf_treated": 0.9997436357673788,
+        "transient_ratio": 1.0042407665106041,
+        "r_D": 1.847326624922916,
+        "amplification": 0.5436184121216292
+      },
+      {
+        "thickness_um": 60.0,
+        "c2_over_cinf_control": 0.9732201892675818,
+        "c2_over_cinf_treated": 0.9984636750218239,
+        "transient_ratio": 1.0259381032500359,
+        "r_D": 1.847326624922916,
+        "amplification": 0.5553636749499269
+      },
+      {
+        "thickness_um": 100.0,
+        "c2_over_cinf_control": 0.8854803454486879,
+        "c2_over_cinf_treated": 0.9814224237874254,
+        "transient_ratio": 1.108350319498195,
+        "r_D": 1.847326624922916,
+        "amplification": 0.5999752856614857
+      },
+      {
+        "thickness_um": 150.0,
+        "c2_over_cinf_control": 0.7624618242255151,
+        "c2_over_cinf_treated": 0.9296413629820452,
+        "transient_ratio": 1.219262831849117,
+        "r_D": 1.847326624922916,
+        "amplification": 0.6600147561344185
+      },
+      {
+        "thickness_um": 200.0,
+        "c2_over_cinf_control": 0.657544472442401,
+        "c2_over_cinf_treated": 0.8622894995315927,
+        "transient_ratio": 1.31137821952739,
+        "r_D": 1.847326624922916,
+        "amplification": 0.7098789146624843
+      },
+      {
+        "thickness_um": 300.0,
+        "c2_over_cinf_control": 0.5054638145096295,
+        "c2_over_cinf_treated": 0.7296501462752558,
+        "transient_ratio": 1.4435259762029027,
+        "r_D": 1.847326624922916,
+        "amplification": 0.7814135068091367
+      },
+      {
+        "thickness_um": 400.0,
+        "c2_over_cinf_control": 0.40478381011001574,
+        "c2_over_cinf_treated": 0.6205054648554358,
+        "transient_ratio": 1.5329305405934819,
+        "r_D": 1.847326624922916,
+        "amplification": 0.8298102349157919
+      },
+      {
+        "thickness_um": 600.0,
+        "c2_over_cinf_control": 0.2814646287524442,
+        "c2_over_cinf_treated": 0.4656676402681357,
+        "transient_ratio": 1.654444618253269,
+        "r_D": 1.847326624922916,
+        "amplification": 0.89558857428491
+      },
+      {
+        "thickness_um": 800.0,
+        "c2_over_cinf_control": 0.2082804897468202,
+        "c2_over_cinf_treated": 0.364172361226416,
+        "transient_ratio": 1.7484708321412796,
+        "r_D": 1.847326624922916,
+        "amplification": 0.9464871065853006
+      },
+      {
+        "thickness_um": 1200.0,
+        "c2_over_cinf_control": 0.12303338497074146,
+        "c2_over_cinf_treated": 0.23946171135367475,
+        "transient_ratio": 1.946314908027777,
+        "r_D": 1.847326624922916,
+        "amplification": 1.0535846134459257
+      },
+      {
+        "thickness_um": 1600.0,
+        "c2_over_cinf_control": 0.07328094280918777,
+        "c2_over_cinf_treated": 0.16429340803778444,
+        "transient_ratio": 2.24196635222856,
+        "r_D": 1.847326624922916,
+        "amplification": 1.2136274776649805
+      },
+      {
+        "thickness_um": 2400.0,
+        "c2_over_cinf_control": 0.02253871220634422,
+        "c2_over_cinf_treated": 0.07627842500148128,
+        "transient_ratio": 3.384329339810744,
+        "r_D": 1.847326624922916,
+        "amplification": 1.832014595660344
+      },
+      {
+        "thickness_um": 3200.0,
+        "c2_over_cinf_control": 0.005459067575053042,
+        "c2_over_cinf_treated": 0.03179247707040171,
+        "transient_ratio": 5.823792549425037,
+        "r_D": 1.847326624922916,
+        "amplification": 3.1525516228988733
+      }
+    ],
+    "D_control_um2s": 49.270882471922626,
+    "r_D": 1.847326624922916,
+    "note": "UNSCORED. The paper reports neither slab thickness nor membrane area; this arm therefore has free parameters and could be made to produce almost any ratio. Reported as a band only.",
+    "reaches_largest_measured": true
+  },
+  "D1_law_discrimination": {
+    "laws": {
+      "hasselman_johnson_shipped": {
+        "gmfe": 1.2668441363658904,
+        "predicted_spread": 1.1697123886525067,
+        "log_fraction_explained": 0.19255266583964817,
+        "predicted": [
+          1.8536649528178126,
+          1.96762837252119,
+          1.8536649528178126,
+          1.96762837252119,
+          1.6821471599423445,
+          1.6821471599423445,
+          1.6898087340276982,
+          1.6898087340276982
+        ]
+      },
+      "naive_volume_exclusion": {
+        "gmfe": 1.3160439402068127,
+        "predicted_spread": 1.1477419885255156,
+        "log_fraction_explained": 0.1692615718472909,
+        "predicted": [
+          1.7487666034155598,
+          1.842362428842505,
+          1.7487666034155598,
+          1.842362428842505,
+          1.6052060892268623,
+          1.6052060892268623,
+          1.61168925279027,
+          1.61168925279027
+        ]
+      },
+      "maxwell_garnett_2d": {
+        "gmfe": 1.2512015678967277,
+        "predicted_spread": 1.1833447981553031,
+        "log_fraction_explained": 0.20678562172809847,
+        "predicted": [
+          1.9179661183497938,
+          2.0453546146975485,
+          1.9179661183497938,
+          2.0453546146975485,
+          1.7284519422285192,
+          1.7284519422285192,
+          1.7368614088461296,
+          1.7368614088461296
+        ]
+      }
+    },
+    "note": "POST-HOC diagnostic, not a pre-registered criterion. It asks whether this measurement could distinguish the shipped functional form from cruder ones, i.e. what the test is capable of seeing."
+  },
+  "D2_dispersion_location": {
+    "cells": [
+      {
+        "pert": "EGTA",
+        "line": "HCT-8Ea",
+        "na_ratio": 0.8,
+        "predicted_spread": 1.003428706543834,
+        "measured_spread": 1.905255888325765,
+        "predicted_mean": 1.8504935953666521,
+        "measured": [
+          3.81051177665153,
+          2.0
+        ]
+      },
+      {
+        "pert": "EGTA",
+        "line": "HCT-8E11",
+        "na_ratio": 0.775,
+        "predicted_spread": 1.0036668704766474,
+        "measured_spread": 1.1846977555181848,
+        "predicted_mean": 1.964029063390582,
+        "measured": [
+          1.688194301613413,
+          2.0
+        ]
+      },
+      {
+        "pert": "bortezomib",
+        "line": "HCT-8Ea",
+        "na_ratio": 0.8383458646616542,
+        "predicted_spread": 1.0030121954930735,
+        "measured_spread": 1.7647058823529411,
+        "predicted_mean": 1.6796178984874452,
+        "measured": [
+          1.7,
+          3.0
+        ]
+      },
+      {
+        "pert": "bortezomib",
+        "line": "HCT-8E11",
+        "na_ratio": 0.8366141732283465,
+        "predicted_spread": 1.0030325381810274,
+        "measured_spread": 1.0,
+        "predicted_mean": 1.6872508455912851,
+        "measured": [
+          2.0,
+          2.0
+        ]
+      }
+    ],
+    "max_within_cell_measured_spread": 1.905255888325765,
+    "max_within_cell_predicted_spread": 1.0036668704766474,
+    "note": "POST-HOC diagnostic. Within-drug response ratios only; this is a statement about the engine's dispersion, NOT a cross-compound ordering."
+  },
+  "S4_no_doxorubicin": {
+    "n": 6,
+    "gmfe": 1.3511500164315915,
+    "gmfe_null": 2.25427027417753,
+    "P2_pass": true,
+    "log_fraction_explained": 0.19175054837626782,
+    "P3_pass": false
+  },
+  "S5_range_endpoints": {
+    "lo": {
+      "gmfe": 1.263706964143471,
+      "gmfe_null": 2.1173220470072365,
+      "P1_pass": true,
+      "P2_pass": true,
+      "log_fraction_explained": 0.20262992244454972,
+      "P3_pass": false
+    },
+    "hi": {
+      "gmfe": 1.2718354565355323,
+      "gmfe_null": 2.260669393253849,
+      "P1_pass": true,
+      "P2_pass": true,
+      "log_fraction_explained": 0.16800109054729742,
+      "P3_pass": false
+    }
+  },
+  "S6_gemcitabine_logp": {
+    "base_logp": -1.4,
+    "alt_logp": 0.5,
+    "predicted_base": 1.8536606936079891,
+    "predicted_alt": 1.8533267734879257,
+    "rel_change": 0.00018014090778040116
+  },
+  "S7_by_perturbation": {
+    "EGTA": {
+      "n": 4,
+      "gmfe": 1.2731053552365366,
+      "gmfe_null": 2.2522491535825626,
+      "P1_pass": true,
+      "P2_pass": true,
+      "measured_spread": 2.2571523745873394,
+      "predicted_spread": 1.0651193822289509,
+      "log_fraction_explained": 0.07749241900670731
+    },
+    "bortezomib": {
+      "n": 4,
+      "gmfe": 1.2624464401612137,
+      "gmfe_null": 2.1252378493369832,
+      "P1_pass": true,
+      "P2_pass": true,
+      "measured_spread": 1.7647058823529411,
+      "predicted_spread": 1.0075805408686018,
+      "log_fraction_explained": 0.013296065474273484
+    }
+  },
+  "packing_sd_propagation": [
+    {
+      "pert": "EGTA",
+      "line": "HCT-8Ea",
+      "nominal": 1.847326624922916,
+      "low": 1.1037267281885292,
+      "high": 2.453973616955227
+    },
+    {
+      "pert": "EGTA",
+      "line": "HCT-8E11",
+      "nominal": 1.9604347332681744,
+      "low": 0.7284051461011433,
+      "high": 2.97605051776324
+    },
+    {
+      "pert": "bortezomib",
+      "line": "HCT-8Ea",
+      "nominal": 1.677092033954372,
+      "low": 0.7854303037543973,
+      "high": 2.4903493591427983
+    },
+    {
+      "pert": "bortezomib",
+      "line": "HCT-8E11",
+      "nominal": 1.6846963925244003,
+      "low": 1.0597839355043632,
+      "high": 2.268398637865342
+    }
+  ],
+  "calibrate_alpha_end": 22.223477711172563
+}

@@ -25,7 +25,30 @@ export function createOverlays(viewer) {
   // inflated by roughly the square of it. Same words, same card, one line
   // down, marked as an assertion about the image. Nothing is shortened.
   const barNote = h('div.sb-note.hidden', h('span.sb-mark', '!'), h('span.sb-txt', ''));
-  const scalebar = h('div.ov.ov-scalebar.ov-card.scalebar', barEl, barTxt, barNote);
+  /*
+   * `.interactive`, and it is not cosmetic.
+   *
+   * `.ov` is `pointer-events: none` (css/layout.css) so that a drag begun
+   * anywhere on the stage reaches the canvas. The consequence nobody had
+   * followed through: an element that is not a hit target is never hovered, and
+   * an element that is never hovered NEVER SHOWS ITS `title`. This module sets
+   * eight of them — the scale bar's explanation of why the dots are not life
+   * size, the legend's explanation of what a narrowed window does to the
+   * picture, the per-field provenance chips — and every one of them was
+   * unreachable. A disclosure nobody can open is not a disclosure.
+   *
+   * Turning the two BOTTOM-CORNER cards into hit targets costs one thing: a
+   * pan-drag that STARTS inside them no longer pans. It costs nothing to a drag
+   * that starts on the canvas and crosses them, because main.js takes
+   * `setPointerCapture` on pointerdown, so every later event in that gesture is
+   * retargeted to the canvas whatever it is over.
+   *
+   * The hover READ-OUT is deliberately left non-interactive: it is the card the
+   * pointer is nearest while hovering cells, and making it a hit target would
+   * carve a dead rectangle out of the one gesture it exists to serve. What it
+   * needs to say, it says in visible text instead.
+   */
+  const scalebar = h('div.ov.ov-scalebar.ov-card.scalebar.interactive', barEl, barTxt, barNote);
 
   function updateScalebar() {
     const zoom = viewer.cam.zoom;            // css px per um
@@ -61,8 +84,23 @@ export function createOverlays(viewer) {
   const legRamp = h('div.l-ramp');
   const legTicks = h('div.l-ticks');
   const legNote = h('div.l-note');
-  const legend = h('div.ov.ov-legend.ov-card.legend.hidden', { role: 'figure', 'aria-label': 'Field legend' },
-    legTitle, legFrame, legRamp, legTicks, legNote);
+  // `.interactive` for the same reason as the scale bar above: without it this
+  // card's four explanatory `title`s, and the provenance chip inside it, can
+  // never be opened by anybody.
+  const legend = h('div.ov.ov-legend.ov-card.legend.hidden.interactive', {
+    role: 'figure',
+    'aria-label': 'Field legend',
+    // What the card IS, for a reader who has never met it. The per-line titles
+    // below explain the exceptions; this one explains the card.
+    title: 'The key to the colours on the tissue. Each band of the ramp is a '
+      + 'value of the selected field overlay, in the unit printed beside the '
+      + 'title, and the ramp is mapped across the CURRENT WINDOW rather than '
+      + 'the full served range — when those differ this card says so and prints '
+      + 'the served range underneath. Change the field under View > Field '
+      + 'overlay in the right rail; change the window under View > Window / '
+      + 'level, or with W.',
+  },
+  legTitle, legFrame, legRamp, legTicks, legNote);
 
   let legendField = null, legendName = null;
   // Set only while the field texture is holding a TIME-LAPSE frame. The series
@@ -146,7 +184,15 @@ export function createOverlays(viewer) {
 
   function updateReadout(info, fieldName, pinned) {
     if (!info) {
-      fill(roBody, h('div.r-empty', 'hover a cell'));
+      // "hover a cell" names the gesture and not the reward, which is exactly
+      // backwards for the one card a stranger meets before they have done
+      // anything. Two lines instead of one: what the gesture gives you, and
+      // what the click after it gives you. This card cannot carry a `title`
+      // (see the scale bar's note on `.interactive`), so anything it has to
+      // say has to be visible.
+      fill(roBody,
+        h('div.r-empty', 'hover a cell → its type, position, local mix'),
+        h('div.r-empty', 'click → pins it, and fills Selected cell'));
       readout.style.borderColor = '';
       return;
     }
@@ -220,24 +266,64 @@ export function createOverlays(viewer) {
   /* ------------------------------------------------------ empty state -- */
   // NOT `.interactive`: the notice spans the full width of the top strip at
   // z-index 3 and contains nothing clickable, so pointer-events:auto only
-  // meant it swallowed drags that started in that band.
+  // meant it swallowed drags that started in that band. That constraint is
+  // load-bearing for the copy below — nothing in here may be a button or a
+  // link, because pointer-events:none would silently eat the click. Controls
+  // are NAMED, never offered.
+  //
   // Two notices, one slot. The default is the first-run orientation; the other
   // is set by whoever CLEARED the stage, because an empty stage that used to
   // hold a picture has to say why it is empty — "No geometry loaded" over a
   // stage that was full of cells a second ago reads as a bug, and the operator
   // goes looking for the cells rather than reading the reason the run gave.
   // Both are prose at the same size: the reason is not a footnote.
-  const emptyHead = h('h3', 'No geometry loaded');
-  const emptyDefault = h('p',
-    'Submit a RunSpec, or open a completed run from the history dock, to load its cell geometry over ',
-    h('code.badge-code', 'GET /api/runs/{id}/geometry'), '.');
+  //
+  // WHY THE DEFAULT IS THE PRODUCT PITCH AND NOT A STATUS LINE
+  // ----------------------------------------------------------
+  // This is what a first-time operator with an empty project actually sees:
+  // main.js calls `setEmpty(true)` at boot and only clears it once geometry
+  // arrives, so on a server with no finished run this notice IS the first
+  // screen — it occupies the stage, which is the largest surface in the
+  // application. It used to read "No geometry loaded / Submit a RunSpec ... to
+  // load its cell geometry over GET /api/runs/{id}/geometry": a sentence that
+  // answers "what went wrong" for somebody who already knows what a RunSpec
+  // is, and answers nothing at all for the reader it is in front of.
+  //
+  // It now answers the same three questions the tour's first card answers —
+  // what this does, what it does NOT do, what to press — because the tour is
+  // skippable and a skipper must not be punished. Every claim here is the
+  // project's standing limit (ui/provenance.js::STANDING_LIMITS), set at the
+  // same size as the claim it qualifies. The endpoint is kept, last, as the
+  // technical footnote it always was.
+  const emptyHead = h('h3', 'Nothing on the stage yet');
+  const emptyDefault = h('div',
+    h('p',
+      'Vivum reconstructs a real, measured tumour tissue section and solves ' +
+      'drug transport through it. This stage is that result: for ',
+      h('b', 'one'), ' compound on ', h('b', 'one'), ' section, where the drug ' +
+      'reaches and where it does not.'),
+    h('p',
+      'It does not predict what a patient will do. These sections carry no ' +
+      'treatment-response label, so nothing here has been scored against a ' +
+      'patient outcome — ', h('b', 'not for clinical use'),
+      '. The defensible reading is a ratio inside one map, between regions, ' +
+      'for one compound. The absolute level is not, and neither is setting ' +
+      'one compound beside another: that was measured and withdrawn.'),
+    h('p',
+      'To put something here: choose a section and a compound in the left ' +
+      'rail and press ', h('b', 'Submit run'), ' — or reopen a finished run ' +
+      'from the history dock below. ', h('b', 'tour'),
+      ' in the top bar walks the whole loop, and remembers where you stopped.'),
+    h('p.dim',
+      'Geometry arrives over ',
+      h('code.badge-code', 'GET /api/runs/{id}/geometry'), '.'));
   const emptyWhy = h('p.hidden');
   const emptyKeys = h('p.notice-keys',
     h('kbd', 'wheel'), ' zoom · ', h('kbd', 'drag'), ' pan · ',
     h('kbd', 'click'), ' pin a cell · ', h('kbd', 'F'), ' fit · ',
     h('kbd', '?'), ' all keys');
   const empty = h('div.ov.ov-empty',
-    h('div.notice', emptyHead, emptyDefault, emptyWhy, emptyKeys));
+    h('div.notice.notice-onboard', emptyHead, emptyDefault, emptyWhy, emptyKeys));
 
   return {
     nodes: [empty, scalebar, legend, readout],
@@ -251,7 +337,13 @@ export function createOverlays(viewer) {
      */
     setEmpty(on, why) {
       empty.classList.toggle('hidden', !on);
-      emptyHead.textContent = (why && why.head) || 'No geometry loaded';
+      // "Nothing on the stage yet" rather than "No geometry loaded" as the
+      // DEFAULT head. The technical phrasing is right for the `why` branch,
+      // where a caller is reporting a failure to an operator who was already
+      // driving the application; it is wrong as the greeting for a server that
+      // has simply never run anything, which is the branch a stranger meets.
+      // A caller that supplies its own head still gets it verbatim.
+      emptyHead.textContent = (why && why.head) || 'Nothing on the stage yet';
       emptyWhy.textContent = (why && why.body) || '';
       emptyWhy.classList.toggle('hidden', !(why && why.body));
       emptyDefault.classList.toggle('hidden', !!(why && why.body));

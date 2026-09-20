@@ -59,6 +59,8 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
+import warnings
+
 import numpy as np
 from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import factorized
@@ -358,12 +360,62 @@ def simulate_drug_transport(
             )
         vx, vy = velocity[0], velocity[1]
         # Explicit upwind CFL check (diffusion is implicit -> no diffusion CFL).
+        #
+        # TWO QUANTITIES, AND THEY ARE NOT THE SAME NUMBER.
+        #
+        # `max_speed` is a max over CELLS of the POINTWISE SUM. The condition
+        # that actually guarantees positivity takes the two component maxima
+        # INDEPENDENTLY and allows half as much:
+        #
+        #     dt * (max|vx| + max|vy|) / dx  <=  1/2
+        #
+        # They coincide only when the two maxima sit in the same cell. A
+        # divergent cross -- four neighbours each flowing away, no single cell
+        # carrying both components -- separates them by exactly 2x: every face
+        # of the centre cell is outflow, the step removes 2*v*dt/dx of its
+        # content, and the guard below sees only v. MEASURED 2026-09-20: at
+        # CFL = 1, which this guard ACCEPTS, the undershoot is -100% of the
+        # peak, and the clamp at the end of the step then CREATES mass equal to
+        # everything injected. The measured undershoot follows -(2*CFL - 1) to
+        # 4.0e-07.
+        #
+        # THE REFUSAL IS DELIBERATELY NOT TIGHTENED TO THE STRICT BOUND. On all
+        # five real sections, at dx = 80/30/12 and dt = 0.5/10, the measured
+        # raw undershoot before any clamp is 0.000e+00: real Darcy velocity
+        # fields are smooth, so their component maxima are near-colocated and
+        # the two quantities nearly agree. Refusing at 1/2 would reject this
+        # product's own shipped default spec, which has never produced an
+        # undershoot -- a guard that refuses the thing it is meant to protect
+        # is not a stricter guard, it is a broken one.
+        #
+        # What IS reported is the margin, because the margin is gone: at the
+        # shipped dx = 12 um and dt = 10 s the strict quantity is 0.6506,
+        # already past 1/2, and refining the grid erodes it further. Production
+        # is currently safe by the smoothness of the flow field and not by this
+        # check, and that distinction belongs in the record rather than in
+        # somebody's memory.
         max_speed = float(np.max(np.abs(vx) + np.abs(vy))) if velocity.size else 0.0
         cfl = max_speed * dt / dx
         if cfl > 1.0:
             raise ValueError(
                 f"Advection CFL violated: dt*(|vx|+|vy|)/dx = {cfl:.3f} > 1. "
                 f"Reduce pde.dt below {dx / max_speed:.4g} s or disable convection."
+            )
+        strict_speed = (float(np.max(np.abs(vx))) + float(np.max(np.abs(vy)))
+                        if velocity.size else 0.0)
+        strict_cfl = strict_speed * dt / dx
+        if strict_cfl > 0.5:
+            warnings.warn(
+                "advection is past the STRICT positivity bound: "
+                f"dt*(max|vx| + max|vy|)/dx = {strict_cfl:.4f} > 0.5. The "
+                f"necessary CFL check above passed at {cfl:.4f} <= 1 and the "
+                "solve proceeds, because on real Darcy fields the two maxima "
+                "are near-colocated and no undershoot has been measured. But "
+                "the guarantee is gone: positivity now rests on the smoothness "
+                "of this velocity field, not on the check. If the "
+                "post-step max(C, 0) clamp ever fires, this is why.",
+                RuntimeWarning,
+                stacklevel=2,
             )
     else:
         vx = vy = None

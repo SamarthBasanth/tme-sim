@@ -82,7 +82,9 @@ can support, and how the two tissues differ — not an ordering.
 """
 from __future__ import annotations
 
+import copy
 import json
+import math
 import os
 import re
 import threading
@@ -97,17 +99,21 @@ from .cache import (
     private_makedirs,
     redact_exception,
     repo_root,
+    runs_dir,
     state_route_support,
 )
 from .delivery_law import delivery_law
 
 __all__ = [
     "PROJECT_ID_RE",
+    "RUN_ID_RE",
     "ProjectError",
     "ProjectStore",
     "PROJECT_STORE",
     "projects_dir",
     "capability_report",
+    "run_composition",
+    "THUMBNAIL_NEVER_FABRICATES",
     "spec_signature",
     "compare_project",
     "RELATIVE_EXPOSURE_CLAIM",
@@ -118,6 +124,17 @@ __all__ = [
 
 PROJECT_ID_RE = re.compile(r"^p_\d{5}$")
 SPECIMEN_ID_RE = re.compile(r"^s_\d{5}$")
+
+#: A run id, for the SAME reason ``PROJECT_ID_RE`` exists: the thumbnail reads
+#: ``app/runs/<run_id>/result.json`` straight off disk, so a ``run_id`` is a path
+#: segment there and is validated before it is ever joined to a root. The ids in
+#: a project document arrive through ``attach_run``, which today refuses an id
+#: the JobManager cannot resolve — but a document is a file, an operator can edit
+#: it, and the traversal fixed in ``ProjectStore._dir`` was exactly a guard that
+#: existed and was not wired to the boundary that needed it. ``\d{5,}`` and not
+#: ``\d{5}``: ``JobManager.submit`` formats ``r_{counter:05d}``, which is five
+#: digits only until the 100,000th run.
+RUN_ID_RE = re.compile(r"^r_\d{5,}$")
 
 #: The figures this module quotes, kept as named constants so the message and
 #: the evidence cannot drift apart. Both are from results/cell_state_impact.md
@@ -203,7 +220,36 @@ class ProjectError(Exception):
 # Paths
 # --------------------------------------------------------------------------- #
 def projects_dir() -> str:
-    """Absolute path to ``app/projects/`` (created on demand)."""
+    """Absolute path to the project store (created on demand).
+
+    A HOSTED INSTANCE KEEPS NOTHING WITHOUT THIS.
+
+    Measured 2026-09-20 in a real container: this path and
+    ``projects.projects_dir()`` were both hardcoded off ``repo_root()``, which
+    puts them at ``/app/app/runs`` and ``/app/app/projects`` -- siblings under
+    ``/app/app``, whose parent also holds ``server/`` and ``web/``. Render
+    allows ONE persistent disk per service, and mounting it at the only
+    directory that contains both would hide the application. So every run and
+    every project a hosted user created was destroyed on the next deploy.
+
+    That is survivable for runs, which are re-derivable from a RunSpec. It is
+    not survivable for PROJECTS, which are the thing a user is asked to
+    organise their work into -- a workspace that forgets is worse than no
+    workspace, because it invites the investment and then loses it.
+
+    ``TMESIM_STATE_DIR`` is one directory an operator can point a single disk
+    at; ``runs/`` and ``projects/`` become children of it, so one mount covers
+    both and neither shadows the code. Unset, the behaviour is byte-identical
+    to before -- the local single-user workflow this was built for is
+    untouched, and no existing installation moves.
+
+    See ``app/server/cache.py::state_dir``, which this shares.
+    """
+    from .cache import state_dir
+
+    root = state_dir()
+    if root:
+        return private_makedirs(os.path.join(root, "projects"))
     return private_makedirs(os.path.join(repo_root(), "app", "projects"))
 
 
@@ -414,6 +460,94 @@ def capability_report(section_id: str) -> Dict:
 
 
 # --------------------------------------------------------------------------- #
+# Thumbnail — a project's card art, and the one thing it must never be
+# --------------------------------------------------------------------------- #
+#: What ``{"kind": "none"}`` is for. A thumbnail is the most glanceable thing on
+#: the home page and therefore the easiest place in the product to publish a
+#: number nobody computed: an empty stacked bar reads as "this tissue is all
+#: one type", and zeros read as "measured, and it was zero". Neither is true
+#: when no run has finished. So the ONLY two outputs are a composition lifted
+#: verbatim out of a finished run's own reconstruction report, or a refusal with
+#: a reason — never a placeholder shaped like data.
+#:
+#: The same rule ``_composition_rows`` already applies to the comparison table:
+#: results/cell_state_impact.md §3.1 — "UNMEASURED and assigned to no cell" is
+#: NOT the statement "computed and found to be zero" and must not be rendered as
+#: if it were.
+THUMBNAIL_NEVER_FABRICATES = (
+    "A thumbnail is either a cell-type composition read verbatim from a finished "
+    "run's reconstruction report, or kind='none' with the reason no composition "
+    "exists. It is never an empty chart and never zeros: an empty bar reads as "
+    "'all one cell type' and a zero reads as 'measured, and it was zero', and "
+    "neither has been computed when no run has finished."
+)
+
+
+def run_composition(run: Dict) -> Optional[Dict]:
+    """The thumbnail block of ONE run view, or ``None`` if it cannot supply one.
+
+    ``run`` is a ``RunResult`` view — the dict ``Job.result_view()`` returns and
+    the dict ``app/runs/<run_id>/result.json`` stores; they are the same shape,
+    which is what lets the store read a thumbnail off disk without importing the
+    JobManager.
+
+    Composition lives in ``run["report"]``, written by the reconstruction and
+    persisted by ``JobManager._persist``: ``celltype_fractions`` (the marker-gated
+    per-type fractions), ``n_cells`` (the segmented cell count) and the section on
+    ``run["spec"]``. Nothing here is recomputed and nothing is defaulted — a
+    missing field returns ``None`` so the caller emits ``kind='none'`` with a
+    reason, per :data:`THUMBNAIL_NEVER_FABRICATES`.
+
+    ``status != "done"`` returns ``None`` unconditionally. A failed or cancelled
+    run can still carry a ``report`` (the reconstruction succeeds before the solve
+    fails), and showing that tissue on a card would present a run that did not
+    finish as one that did.
+    """
+    if not isinstance(run, dict) or run.get("status") != "done":
+        return None
+    report = run.get("report")
+    if not isinstance(report, dict):
+        return None
+    fractions = report.get("celltype_fractions")
+    if not isinstance(fractions, dict) or not fractions:
+        return None
+    clean: Dict[str, float] = {}
+    for label, value in fractions.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        v = float(value)
+        if not math.isfinite(v):
+            continue
+        clean[str(label)] = v
+    if not clean:
+        return None
+    n_cells = report.get("n_cells")
+    if isinstance(n_cells, bool) or not isinstance(n_cells, (int, float)):
+        return None
+    section = (run.get("spec") or {}).get("section")
+    if not isinstance(section, str) or not section:
+        section = report.get("source")
+    if not isinstance(section, str) or not section:
+        return None
+    return {
+        "kind": "composition",
+        "section": section,
+        "n_cells": int(n_cells),
+        "type_fractions": clean,
+        "run_id": run.get("run_id"),
+        "measured": (
+            "Cell positions are segmented from the spatial assay; the cell-TYPE "
+            "call is a marker-gated classification of measured transcripts. This "
+            "is a chart of composition, not a picture of the tissue."
+        ),
+    }
+
+
+def _no_thumbnail(reason: str) -> Dict:
+    return {"kind": "none", "reason": reason}
+
+
+# --------------------------------------------------------------------------- #
 # The store
 # --------------------------------------------------------------------------- #
 class ProjectStore:
@@ -426,10 +560,22 @@ class ProjectStore:
     project behind, and every mutation is serialised by one lock.
     """
 
-    def __init__(self, root: Optional[str] = None):
+    def __init__(self, root: Optional[str] = None,
+                 runs_root: Optional[str] = None):
         self.root = root or projects_dir()
         private_makedirs(self.root)
         self._lock = threading.RLock()
+        # ``app/runs/`` is READ, never written, and only to build a thumbnail.
+        # Left None it is resolved lazily by ``runs_dir()`` -- resolving it here
+        # would create app/runs/ as a side effect of importing this module,
+        # which is the JobManager's job and not the project store's.
+        self.runs_root = runs_root
+        # run_id -> ((st_mtime_ns, st_size), (run_stub | None, composition | None))
+        # See ``_run_doc_composition`` for what this does and does not go stale
+        # on. Values are small by construction: a composition and a two-field
+        # stub, never a run body.
+        self._composition_cache: Dict[
+            str, Tuple[Tuple[int, int], Tuple[Optional[Dict], Optional[Dict]]]] = {}
 
     # -- paths -------------------------------------------------------------- #
     def _dir(self, project_id: str) -> str:
@@ -462,6 +608,22 @@ class ProjectStore:
     def _path(self, project_id: str) -> str:
         return os.path.join(self._dir(project_id), "project.json")
 
+    def _run_path(self, run_id: str) -> Optional[str]:
+        """Absolute path of a run's ``result.json``, or ``None`` for a bad id.
+
+        SECURITY: ``run_id`` IS A PATH SEGMENT AND IS VALIDATED HERE, for the
+        same reason and in the same shape as :meth:`_dir`. ``%2e%2e`` reached
+        ``_dir`` as a literal ``..`` inside one segment and was a read-AND-DELETE
+        primitive (fixed f9d443d); this method only ever reads, but an id from a
+        project document that an operator hand-edited would otherwise choose
+        which file the home page parses. A bad id is not an exception here: it
+        is a run this store cannot find, which the caller reports as a true
+        ``kind='none'`` reason.
+        """
+        if not RUN_ID_RE.match(run_id or ""):
+            return None
+        return os.path.join(self.runs_root or runs_dir(), run_id, "result.json")
+
     # -- io ----------------------------------------------------------------- #
     def _read(self, project_id: str) -> Optional[Dict]:
         try:
@@ -489,10 +651,33 @@ class ProjectStore:
                 f"project {project_id!r} is not a JSON object", status=500)
         doc.setdefault("id", project_id)
         doc.setdefault("specimens", [])
+        # MIGRATION, and the only shape it may take. Every project written
+        # before 2026-09-20 has no ``last_opened_at`` key, and the field means
+        # "a human looked at it" -- so the ONLY honest value for a document that
+        # never recorded one is null. Not ``time.time()`` (that would claim an
+        # open that did not happen, and would put every old project at the top
+        # of a recency sort forever), and not ``created_at`` (creating a project
+        # is not opening it, and the home page renders null as "not opened yet").
+        #
+        # setdefault and NOT a write: a read must not rewrite a document. Backing
+        # this default into every project.json on read would rewrite the whole
+        # store on the first home-page load, move every mtime, and -- since
+        # _write stamps updated_at -- reorder a workspace sorted by it.
+        doc.setdefault("last_opened_at", None)
         return doc
 
-    def _write(self, doc: Dict) -> Dict:
-        doc["updated_at"] = time.time()
+    def _write(self, doc: Dict, touch: bool = True) -> Dict:
+        """Persist ``doc``. ``touch=False`` leaves ``updated_at`` exactly as read.
+
+        Exactly one caller passes ``touch=False``: :meth:`mark_opened`. If
+        stamping ``last_opened_at`` also moved ``updated_at``, the two fields
+        would rise together on every open and the whole distinction the contract
+        draws in §3 would be gone — a workspace sorted by ``updated_at`` is
+        supposed to be able to say "a background job touched this", and it
+        cannot say that if looking at a project counts as touching it.
+        """
+        if touch:
+            doc["updated_at"] = time.time()
         d = self._dir(doc["id"])
         private_makedirs(d)
         tmp = os.path.join(d, "project.json.tmp")
@@ -511,8 +696,23 @@ class ProjectStore:
                       and os.path.exists(self._path(n)))
 
     # -- projects ----------------------------------------------------------- #
-    def list(self) -> List[Dict]:
-        """Every project, newest first, as a summary row."""
+    def list(self, thumbnails: bool = True,
+             resolve_run: Optional[Callable[[str], Optional[Dict]]] = None,
+             ) -> List[Dict]:
+        """Every project, newest first, as a summary row.
+
+        ``thumbnails=True`` (the default, because ``GET /api/projects`` is the
+        home page's project feed and the contract's ``ProjectSummary`` carries
+        the field) adds ``thumbnail`` to each row. See :meth:`thumbnail` for what
+        that costs and what it caches; the short version is that it is one
+        ``stat`` per attached run plus one JSON parse per run document that has
+        changed since it was last read, and that it stops at the first finished
+        run of a project rather than scanning them all.
+
+        ``thumbnails=False`` is for callers that want the rows and not the art —
+        ``len(store.list())`` in the health route and in ``account.py`` is the
+        live example, and it should not pay for 96 stat calls to learn a count.
+        """
         out = []
         with self._lock:
             for pid in self._ids():
@@ -523,7 +723,10 @@ class ProjectStore:
                     continue
                 if doc is None:
                     continue
-                out.append(self._summary(doc))
+                row = self._summary(doc)
+                if thumbnails:
+                    row["thumbnail"] = self._thumbnail(doc, resolve_run)
+                out.append(row)
         out.sort(key=lambda p: p.get("created_at") or 0, reverse=True)
         return out
 
@@ -536,6 +739,9 @@ class ProjectStore:
             "notes": doc.get("notes"),
             "created_at": doc.get("created_at"),
             "updated_at": doc.get("updated_at"),
+            # NEW (contract §3). A SEPARATE field from updated_at: null means
+            # "not opened yet" -- never an old date, never now.
+            "last_opened_at": doc.get("last_opened_at"),
             "n_specimens": len(specimens),
             "n_runs": sum(len(s.get("run_ids") or []) for s in specimens),
             "sections": [s.get("section") for s in specimens],
@@ -561,23 +767,28 @@ class ProjectStore:
         if not name:
             raise ProjectError("name: required, a non-empty project name")
         with self._lock:
-            existing = self._ids()
-            n = 0
-            for pid in existing:
-                try:
-                    n = max(n, int(pid.split("_")[-1]))
-                except ValueError:
-                    pass
-            project_id = f"p_{n + 1:05d}"
+            now = time.time()
             doc = {
-                "id": project_id,
+                "id": self._next_id(),
                 "name": name,
                 "notes": str(notes or ""),
-                "created_at": time.time(),
-                "updated_at": time.time(),
+                "created_at": now,
+                "updated_at": now,
+                # Creating a project is NOT opening it.
+                "last_opened_at": None,
                 "specimens": [],
             }
             return self._write(doc)
+
+    def _next_id(self) -> str:
+        """Next free ``p_NNNNN``. Call under ``self._lock``."""
+        n = 0
+        for pid in self._ids():
+            try:
+                n = max(n, int(pid.split("_")[-1]))
+            except ValueError:
+                pass
+        return f"p_{n + 1:05d}"
 
     def update(self, project_id: str, name: Optional[str] = None,
                notes: Optional[str] = None) -> Dict:
@@ -612,6 +823,245 @@ class ProjectStore:
                 "store; deleting a project detaches runs, it never deletes them."
             ),
         }
+
+    # -- recency ------------------------------------------------------------ #
+    def mark_opened(self, project_id: str) -> Dict:
+        """Stamp ``last_opened_at``. A HUMAN looked at this project.
+
+        Idempotent in the only sense that matters for a recency stamp: calling it
+        twice is not an error and leaves the document in the same shape, with the
+        later timestamp.
+
+        **It does not move ``updated_at``**, and that is the whole point of the
+        field (contract §3). ``updated_at`` answers "did the project DOCUMENT
+        change" — a specimen added, a run attached by a background job, the notes
+        edited. ``last_opened_at`` answers "did someone look". A workspace sorted
+        by ``updated_at`` puts a project on top because a job attached a run to
+        it; sorted by ``last_opened_at`` it is on top because you were working on
+        it. Bump both on an open and the first sentence stops being true.
+        """
+        with self._lock:
+            doc = self.get(project_id, refresh_capability=False)
+            doc["last_opened_at"] = time.time()
+            self._write(doc, touch=False)
+        return {
+            "ok": True,
+            "id": project_id,
+            "last_opened_at": doc["last_opened_at"],
+            # Returned so a caller can SEE that it did not move.
+            "updated_at": doc.get("updated_at"),
+            "reason": (
+                "last_opened_at means a human looked at this project; updated_at "
+                "means the project document changed. Opening is not a change, so "
+                "updated_at is deliberately untouched here."
+            ),
+        }
+
+    # -- duplication -------------------------------------------------------- #
+    def duplicate(self, project_id: str, name: Optional[str] = None) -> Dict:
+        """Copy a project's specimens and their run REFERENCES into a new project.
+
+        **Runs are neither re-executed nor copied.** ``app/runs/`` is the single
+        store for run results and binary payloads (module docstring, contract
+        §2), a specimen holds ``run_id``s into it, and a duplicate holds the same
+        ids. Two specimens in two projects legitimately point at the same run —
+        that is what makes this operation cheap, and it is also why deleting
+        either project still deletes no run.
+
+        What is copied verbatim, and why nothing is restamped: each specimen
+        keeps its ``id``, ``label``, ``notes``, ``created_at``, ``run_ids`` and
+        its captured ``capability`` block. ``created_at`` on a specimen records
+        when that section was bound and its panel inspected; moving it to now
+        would claim an inspection that did not happen. The new PROJECT gets a new
+        ``created_at``, a null ``last_opened_at`` (nobody has opened it) and
+        ``duplicated_from``, so the copy's provenance is on the document rather
+        than only in someone's memory.
+
+        The copy is a deep copy: mutating the duplicate's specimens can never
+        reach the original's in-memory document, and neither project.json is
+        shared.
+        """
+        with self._lock:
+            src = self.get(project_id, refresh_capability=False)
+            if name is None:
+                new_name = f"{src.get('name') or project_id} (copy)"
+            else:
+                new_name = str(name).strip()
+                if not new_name:
+                    raise ProjectError("name: must not be empty")
+            now = time.time()
+            doc = {
+                "id": self._next_id(),
+                "name": new_name,
+                "notes": str(src.get("notes") or ""),
+                "created_at": now,
+                "updated_at": now,
+                "last_opened_at": None,
+                "specimens": copy.deepcopy(src.get("specimens") or []),
+                "duplicated_from": project_id,
+                "duplicated_at": now,
+                "duplicated_reason": (
+                    "specimens and their run IDS were copied. No run was "
+                    "re-executed and no run was copied: app/runs/ is the single "
+                    "store and both projects now reference the same run ids."
+                ),
+            }
+            return self._write(doc)
+
+    # -- thumbnail ---------------------------------------------------------- #
+    def thumbnail(self, project_id: str,
+                  resolve_run: Optional[Callable[[str], Optional[Dict]]] = None,
+                  ) -> Dict:
+        """The card art for one project (contract §4), or a reasoned refusal.
+
+        ``{"kind": "composition", "section", "n_cells", "type_fractions"}`` from
+        a run that actually finished, or ``{"kind": "none", "reason"}``. Never
+        anything else — see :data:`THUMBNAIL_NEVER_FABRICATES`.
+
+        ``resolve_run`` maps a ``run_id`` to its ``RunResult`` view, exactly as
+        :func:`compare_project` takes one. Passed in (the API has a live
+        JobManager) the manager is the truth and nothing is cached here. Omitted,
+        the store reads ``app/runs/<run_id>/result.json`` itself and memoises per
+        run document — see :meth:`_run_doc_composition`.
+        """
+        with self._lock:
+            doc = self.get(project_id, refresh_capability=False)
+            return self._thumbnail(doc, resolve_run)
+
+    def _thumbnail(self, doc: Dict,
+                   resolve_run: Optional[Callable[[str], Optional[Dict]]],
+                   ) -> Dict:
+        """``_thumbnail`` on an already-read document. Call under ``self._lock``.
+
+        COST, because this runs on every home-page load and a home page that
+        takes a second to paint is a worse product than one without card art:
+        the scan STOPS at the first run that can supply a composition, so the
+        common project pays one stat and (once per changed run document) one JSON
+        parse. It is O(runs of this project) only in the case where NO run can
+        supply one, which is exactly the case that returns ``kind='none'`` and so
+        cannot be cached against the project document — a run finishing does not
+        touch project.json, so a thumbnail cached on the project's mtime would
+        stay ``none`` after the run that should have filled it finished.
+
+        The FIRST such run, not the newest: a thumbnail is an identity, and one
+        that changes every time a background job finishes is a card that flickers
+        for no information. Picking the newest would also force a parse of every
+        run document to find out which one that is.
+        """
+        specimens = doc.get("specimens") or []
+        if not specimens:
+            return _no_thumbnail(
+                "this project has no specimens yet, so no tissue has been "
+                "reconstructed. Add a specimen and run it.")
+        run_ids = [rid for s in specimens for rid in (s.get("run_ids") or [])]
+        if not run_ids:
+            return _no_thumbnail(
+                f"no run is attached to any of this project's {len(specimens)} "
+                "specimen(s), so nothing has been reconstructed yet.")
+
+        missing = 0
+        statuses: Dict[str, int] = {}
+        done_without_composition: List[str] = []
+        for rid in run_ids:
+            if resolve_run is not None:
+                run = resolve_run(rid)
+                comp = run_composition(run) if run is not None else None
+            else:
+                run, comp = self._run_doc_composition(rid)
+            if comp is not None:
+                return comp
+            if run is None:
+                missing += 1
+                continue
+            status = str(run.get("status") or "unknown")
+            statuses[status] = statuses.get(status, 0) + 1
+            if status == "done":
+                done_without_composition.append(rid)
+
+        n = len(run_ids)
+        parts = [f"none of the {n} run(s) attached to this project can supply a "
+                 "measured composition"]
+        if statuses:
+            parts.append("attached run status: " + ", ".join(
+                f"{k} x{v}" for k, v in sorted(statuses.items())))
+        if done_without_composition:
+            parts.append(
+                f"run(s) {sorted(done_without_composition)} finished but their "
+                "report carries no celltype_fractions/n_cells, so there is no "
+                "composition to draw")
+        if missing:
+            parts.append(
+                f"{missing} attached run id(s) are not in app/runs/ — a run was "
+                "removed or its id is malformed; the project still references it")
+        parts.append("No chart is drawn from this: " + THUMBNAIL_NEVER_FABRICATES)
+        return _no_thumbnail(". ".join(parts) + ".")
+
+    def _run_doc_composition(self, run_id: str,
+                             ) -> Tuple[Optional[Dict], Optional[Dict]]:
+        """``(run_view, composition)`` read from ``app/runs/<id>/result.json``.
+
+        Memoised on ``(st_mtime_ns, st_size)`` of that file, which is what makes
+        the home page affordable: a run document is written ONCE, by
+        ``JobManager._persist`` via ``os.replace``, so a cache hit is a single
+        ``stat`` and a miss is the only time 20 kB of JSON is parsed.
+
+        WHAT GOES STALE. Nothing that this store can observe: the key moves the
+        moment the file does, a deleted run drops out of the cache through the
+        ``OSError`` path, and a run id that was never on disk is not cached at
+        all. The one theoretical stale case is a rewrite that lands on the SAME
+        nanosecond mtime AND the same byte length, which ``os.replace`` does not
+        produce. What is NOT cached here is the choice of run — see
+        :meth:`_thumbnail`: the first run that can supply a composition wins and
+        keeps winning, by design, so a later run finishing does not repaint the
+        card. That is a stable identity, not a stale read.
+
+        A STUB of the run — ``{"run_id", "status"}`` and nothing else — is
+        returned alongside, so a refusal can state the true reason (``queued``,
+        ``error``, finished-but-no-report) rather than a bare "no thumbnail".
+        It is a stub deliberately: the cache must be able to answer the
+        no-composition case WITHOUT reparsing, because that is the case that
+        scans every run of the project, and holding whole 20 kB run bodies in a
+        cache that exists to make a page load would be the wrong trade.
+        """
+        path = self._run_path(run_id)
+        if path is None:
+            self._composition_cache.pop(run_id, None)
+            return None, None
+        try:
+            st = os.stat(path)
+        except (OSError, ValueError):
+            # ValueError: a NUL in the id reaches the syscall as "embedded null
+            # byte" and would be a 500 out of a home-page load. RUN_ID_RE
+            # already refuses it; this is the second layer, because the
+            # traversal fixed in f9d443d was a guard that existed and was not
+            # wired to the boundary that needed it.
+            self._composition_cache.pop(run_id, None)
+            return None, None
+        key = (st.st_mtime_ns, st.st_size)
+        cached = self._composition_cache.get(run_id)
+        if cached is not None and cached[0] == key:
+            stub, comp = cached[1]
+            return stub, comp
+        run = self._read_run_doc(path)
+        if run is None:
+            stub, comp = None, None
+        else:
+            stub = {"run_id": run.get("run_id") or run_id,
+                    "status": run.get("status")}
+            comp = run_composition(run)
+        self._composition_cache[run_id] = (key, (stub, comp))
+        return stub, comp
+
+    @staticmethod
+    def _read_run_doc(path: str) -> Optional[Dict]:
+        """Parse one ``result.json``. An unreadable run is a run we cannot draw,
+        not a 500: the home page must still load."""
+        try:
+            with open(path) as fh:
+                doc = json.load(fh)
+        except (OSError, ValueError):
+            return None
+        return doc if isinstance(doc, dict) else None
 
     # -- specimens ---------------------------------------------------------- #
     @staticmethod
@@ -1062,8 +1512,15 @@ def _composition_rows(entries: List[Dict]) -> List[Dict]:
         same_panel,
         ("Same panel on both sides." if same_panel else
          "The gate differs across panels (see the fraction rows), but note that "
-         "in results/heldout_patient.md §1.1 the fraction FELL 0.43x while this "
-         "density ROSE 2.67x on the same pair of sections. They point in "
+         # 0.67x / 4.19x, NOT the 0.43x / 2.67x this used to cite. Those are
+         # the superseded mean_z reading (results/endothelial_density.md:215);
+         # heldout_patient.md §1.1's own table, under the matched_null_z gate
+         # that ships, reads 10.50% -> 7.07% (0.67x) and 154 -> 645 cells/mm2
+         # (4.19x). Same qualitative finding, wrong numbers against the
+         # section being cited -- and the correct pair is STRONGER, since the
+         # divergence is wider than the retired one claimed.
+         "in results/heldout_patient.md §1.1 the fraction FELL 0.67x while this "
+         "density ROSE 4.19x on the same pair of sections. They point in "
          "opposite directions; quoting only one of them is how that report's "
          "conclusion gets inverted."))
     add("mean_vascular_density", "Mean vascular density", "frac",

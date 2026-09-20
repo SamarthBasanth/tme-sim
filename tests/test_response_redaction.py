@@ -466,6 +466,36 @@ def handler():
 # --------------------------------------------------------------------------- #
 EXEMPTIONS: Tuple[Exemption, ...] = (
     Exemption(
+        path="app/server/cross_section.py",
+        qualname="cross_section_payload",
+        caught="ProjectError",
+        expr="str(exc)",
+        reason=(
+            "A DELIBERATE REFUSAL, and the same one api.py::_project_errors "
+            "already travels unchanged. ProjectError carries the status it "
+            "means and a message written FOR THE OPERATOR -- 'this specimen "
+            "is not comparable because its panel carries no hypoxia-response "
+            "transcript' is the entire answer, and redacting it to a stable "
+            "sentence plus a reference id would replace a usable refusal with "
+            "a lookup. The view's whole purpose is to render a backend "
+            "comparability verdict in place of a number, so the verdict's own "
+            "words are the payload. It is raised by the project store, never "
+            "built from a filesystem path or a third-party traceback."
+        ),
+    ),
+    Exemption(
+        path="app/server/cross_section.py",
+        qualname="build_cross_section_router.get_cross_section",
+        caught="ProjectError",
+        expr="str(exc.message)",
+        reason=(
+            "The HTTP half of the refusal above. `.message` is the store's "
+            "authored sentence, not `str(exception)` over an arbitrary cause, "
+            "so this cannot pick up a path or a library's error text. Same "
+            "class, same reasoning, same precedent in api.py."
+        ),
+    ),
+    Exemption(
         path="app/server/cache.py",
         qualname="log_internal",
         caught="<param>",

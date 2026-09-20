@@ -354,3 +354,200 @@ def test_state_kwargs_reach_the_marker_route():
     t = reconstruction_report(tight)["cell_state"]["fractions_tumor"]["viable"]
     w = reconstruction_report(wide)["cell_state"]["fractions_tumor"]["viable"]
     assert w > t, "a wider window must call more cells proliferative at this sparsity"
+
+
+# --------------------------------------------------------------------------- #
+# The KILL MULTIPLIERS themselves — the largest unvalidated priors in the engine
+#
+# `results/cell_state_multipliers_2026-09-20.md` is the claim surface these four
+# tests defend. Until they existed nothing in the suite pinned the multipliers,
+# their count, their per-drug resolution, or the boundedness statement that
+# `results/kill_calibration.md` section 5 derives FROM them ("relabelling cells
+# can move absolute kill only 2.00x"). That sentence is arithmetic on the
+# multiplier VALUES, so a value change silently invalidates a published number
+# with no test going red. These make it go red.
+# --------------------------------------------------------------------------- #
+def _uniform_exposure_micro(states, exposure_ratio=1.0, ic50=5.0, sensitivity=1.0):
+    """4 cells, one per state, at IDENTICAL exposure — isolates the multiplier."""
+    from tmesim.core import (
+        CellPopulation, Domain, Microenvironment, TissueFields, TransportResult,
+    )
+
+    n = len(states)
+    domain = Domain(nx=n, ny=1, dx=10.0)
+    duration = 1000.0
+    auc = np.full((1, n), exposure_ratio * ic50 * duration)
+    transport = TransportResult(
+        auc=auc, final_concentration=np.zeros((1, n)),
+        times=np.array([0.0, duration]),
+        mean_concentration_history=np.array([0.0, 0.0]),
+    )
+    cells = CellPopulation(
+        x=(np.arange(n) + 0.5) * 10.0,
+        y=np.full(n, 5.0),
+        cell_type=np.full(n, int(CellType.TUMOR), dtype=np.int8),
+        state=np.asarray(states, dtype=np.int8),
+        sensitivity=np.full(n, float(sensitivity)),
+    )
+    micro = Microenvironment(
+        domain=domain,
+        fields=TissueFields(ecm_density=domain.zeros(),
+                            vascular_density=domain.zeros()),
+        cells=cells,
+    )
+    return micro, transport
+
+
+def test_the_kill_path_applies_exactly_three_state_multipliers_and_no_fourth():
+    """Cell state reaches the kill through ONE channel with exactly three values.
+
+    Every downstream bound in `results/` (and every report that swaps states on a
+    frozen transport result) rests on this. At identical exposure and identical
+    sensitivity the per-cell kill probability must be the Hill term times exactly
+    `1.0 / effective_hypoxia_resistance / quiescent_resistance / 0.0`. A fourth
+    distinct value, or any state-dependent term the multiplier does not explain,
+    breaks the decomposition rather than merely shifting it.
+    """
+    from tmesim.cells.pkpd import apply_drug_kill, effective_hypoxia_resistance
+    from tmesim.core import DrugParams, PDConfig
+
+    order = [CellState.VIABLE, CellState.HYPOXIC, CellState.QUIESCENT,
+             CellState.DEAD]
+    micro, transport = _uniform_exposure_micro([int(s) for s in order])
+    drug = DrugParams(name="probe", ic50=5.0, hill=1.5)
+    pd_cfg = PDConfig()
+
+    diag = {}
+    p = apply_drug_kill(micro, transport, pd_cfg, drug,
+                        rng=np.random.default_rng(0), diagnostics=diag)
+    p_hill = float(diag["p_hill"][0])
+    assert p_hill > 0.0
+
+    expected = {
+        CellState.VIABLE: 1.0,
+        CellState.HYPOXIC: effective_hypoxia_resistance(drug, pd_cfg),
+        CellState.QUIESCENT: float(pd_cfg.quiescent_resistance),
+        CellState.DEAD: 0.0,
+    }
+    for i, s in enumerate(order):
+        assert p[i] == pytest.approx(p_hill * expected[s], rel=1e-12), (
+            f"{s.name}: kill probability is not p_hill x {expected[s]}"
+        )
+    # Exactly three non-zero multipliers, and they are the documented ones.
+    live = sorted({round(float(p[i]) / p_hill, 12) for i, s in enumerate(order)
+                   if s is not CellState.DEAD})
+    assert live == sorted({1.0, expected[CellState.HYPOXIC],
+                           expected[CellState.QUIESCENT]}), live
+
+
+def test_the_shipped_multiplier_values_are_pinned_to_the_published_claim():
+    """The VALUES `results/` quotes. Change one and this goes red by design.
+
+    `results/kill_calibration.md` section 5 and
+    `results/cell_state_multipliers_2026-09-20.md` both quote x0.80 / x0.50 and
+    derive a 2.00x bound from them; `results/cell_state_impact.md` section 3.1
+    quotes the global x0.35. None of those documents has a test behind it, so a
+    revision to `PDConfig` would leave three published numbers wrong and every
+    check green. This is that check.
+    """
+    from tmesim.core import PDConfig
+    from tmesim.core.config import DRUG_LIBRARY, TMZ_HYPOXIA_RESISTANCE
+
+    pd_cfg = PDConfig()
+    assert pd_cfg.quiescent_resistance == 0.5, (
+        "quiescent_resistance moved; results/cell_state_multipliers_2026-09-20.md "
+        "and the 2.00x bound in results/kill_calibration.md section 5 are now wrong"
+    )
+    assert pd_cfg.hypoxia_resistance == 0.35, (
+        "the GLOBAL hypoxia_resistance moved; results/cell_state_impact.md "
+        "section 3.1 quotes x0.35 for cisplatin and doxorubicin"
+    )
+    assert pd_cfg.max_kill_rate == 1.0
+    assert TMZ_HYPOXIA_RESISTANCE == 0.80, (
+        "temozolomide's per-drug override moved; the x0.8 in "
+        "results/kill_calibration.md section 5 is now wrong"
+    )
+    assert DRUG_LIBRARY["temozolomide-like"].hypoxia_resistance == 0.80
+    # And it really is the ONLY drug that overrides.
+    overriding = {n for n, d in DRUG_LIBRARY.items()
+                  if d.hypoxia_resistance is not None}
+    assert overriding == {"temozolomide-like"}, overriding
+
+
+def test_hypoxia_multiplier_resolution_is_per_drug_not_global():
+    """A per-drug override must win, and must be what the kill path actually used.
+
+    `cells.pkpd.effective_hypoxia_resistance` is the only sanctioned resolver;
+    reading `pd.hypoxia_resistance` directly silently ignores temozolomide's
+    override. The diagnostics the kill emits must report the multiplier it
+    applied, not the global default, or every attribution built on them is
+    describing a run that did not happen.
+    """
+    from tmesim.cells.pkpd import apply_drug_kill, effective_hypoxia_resistance
+    from tmesim.core import PDConfig
+    from tmesim.core.config import DRUG_LIBRARY
+
+    pd_cfg = PDConfig()
+    tmz = DRUG_LIBRARY["temozolomide-like"]
+    dox = DRUG_LIBRARY["doxorubicin-like"]
+    assert effective_hypoxia_resistance(tmz, pd_cfg) == 0.80
+    assert effective_hypoxia_resistance(dox, pd_cfg) == pd_cfg.hypoxia_resistance
+
+    for drug in (tmz, dox):
+        micro, transport = _uniform_exposure_micro(
+            [int(CellState.HYPOXIC), int(CellState.VIABLE)], ic50=drug.ic50)
+        diag = {}
+        p = apply_drug_kill(micro, transport, pd_cfg, drug,
+                            rng=np.random.default_rng(0), diagnostics=diag)
+        eff = effective_hypoxia_resistance(drug, pd_cfg)
+        assert diag["hypoxia_resistance"] == eff
+        assert p[0] == pytest.approx(p[1] * eff, rel=1e-12)
+
+
+def test_relabelling_bound_is_one_over_the_smallest_reachable_multiplier():
+    """The BOUNDEDNESS claim, as arithmetic rather than as prose.
+
+    `results/kill_calibration.md` section 5 states that because the multipliers
+    are bounded, no revision of WHICH cells carry which label can move absolute
+    kill by more than 2.00x. The general statement is
+    `1 / min(reachable multipliers)`, it is TIGHT (both endpoints are attainable
+    by labelling every cell), and it is DRUG-SPECIFIC: 2.00x holds for
+    temozolomide (min(0.80, 0.50)) and is 2.857x for a drug on the global 0.35.
+    The published 2.00x is therefore not a property of the engine but of one
+    drug's override, which is exactly the thing an unvalidated prior can change.
+    """
+    from tmesim.cells.pkpd import apply_drug_kill, effective_hypoxia_resistance
+    from tmesim.core import PDConfig
+    from tmesim.core.config import DRUG_LIBRARY
+
+    pd_cfg = PDConfig()
+    n = 64
+    rng = np.random.default_rng(3)
+    for key, expected_bound in (("temozolomide-like", 2.0),
+                                ("doxorubicin-like", 1.0 / 0.35)):
+        drug = DRUG_LIBRARY[key]
+        r_hyp = effective_hypoxia_resistance(drug, pd_cfg)
+        floor = min(r_hyp, float(pd_cfg.quiescent_resistance))
+        assert 1.0 / floor == pytest.approx(expected_bound, rel=1e-12)
+
+        def mean_p(states):
+            micro, transport = _uniform_exposure_micro(
+                states, exposure_ratio=0.05, ic50=drug.ic50)
+            return float(apply_drug_kill(
+                micro, transport, pd_cfg, drug,
+                rng=np.random.default_rng(0)).mean())
+
+        all_viable = mean_p([int(CellState.VIABLE)] * n)
+        assert all_viable > 0.0
+        # Both endpoints attainable -> the bound is TIGHT, not merely an upper
+        # limit, so a report may quote it as the movement and not only as a cap.
+        worst = int(CellState.QUIESCENT if pd_cfg.quiescent_resistance <= r_hyp
+                    else CellState.HYPOXIC)
+        all_worst = mean_p([worst] * n)
+        assert all_viable / all_worst == pytest.approx(1.0 / floor, rel=1e-12)
+        # And no mixed labelling can beat it.
+        for _ in range(20):
+            mixed = rng.choice(
+                [int(CellState.VIABLE), int(CellState.HYPOXIC),
+                 int(CellState.QUIESCENT)], size=n).tolist()
+            assert all_viable / mean_p(mixed) <= 1.0 / floor + 1e-12

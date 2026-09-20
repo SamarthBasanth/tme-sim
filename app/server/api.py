@@ -1601,21 +1601,37 @@ SPOT_SPATIAL_REFUSAL = (
     "with uniform jitter. The per-cell attenuation spread and the "
     "immune-neighbourhood structure ratio would measure that jitter, not the "
     "tissue (results/immune_sink_impact.md §5.6). THE DELIVERY MAP IS INVALID "
-    "HERE TOO, AND FOR THE SAME REASON. The exposure field is solved on the "
-    "grid, but its SOURCE is a density over ENDOTHELIAL CELL POSITIONS, and on "
-    "a spot section those positions are synthesised exactly like every other "
-    "cell's. The falloff curve bins by distance to the nearest endothelial "
-    "cell (validation.vessel_profile.direct_vessel_distance_um), the "
-    "perivascular reference is the first bin of that curve, and the delivery "
-    "spread is a percentile ratio over the resulting field - so all three "
-    "measure the 12-pseudo-cells-per-spot synthesis, not this tissue's "
-    "vascular architecture. Read NOTHING on this section as a statement about "
-    "where its vessels are. (An earlier version of this sentence, written on "
-    "2026-08-21, claimed the exposure map and its falloff DID survive this "
-    "refusal because they are solved on the grid. That was wrong: it confused "
-    "where the PDE is discretised with where its source term comes from. The "
-    "same sentence previously named the cross-drug RANKING as what survived, "
-    "which was withdrawn the same day - results/pk_ranking_robustness.md, "
+    "HERE TOO - BUT NOT BY THE ROUTE THIS SENTENCE USED TO NAME. The falloff "
+    "curve bins by distance to the nearest endothelial cell "
+    "(validation.vessel_profile.direct_vessel_distance_um), the perivascular "
+    "reference is the first bin of that curve, and the delivery spread is a "
+    "percentile ratio over the exposure field - and all three move under a "
+    "pure change of the placement seed. MEASURED 2026-09-20 on all four "
+    "built-in Visium sections: a reseed alone moves penetration_length_um by "
+    "up to 19.4% (visium_gbm3: 301.2 -> 331.8 -> 242.7 um). A quantity that "
+    "moves that far when nothing about the tissue changed is a statement "
+    "about the synthesis, not about this tissue. Read NOTHING here as a "
+    "statement about where its vessels are. "
+    "THE MECHANISM, corrected 2026-09-20. This paragraph said the exposure "
+    "field's SOURCE is a density over synthesised ENDOTHELIAL CELL POSITIONS. "
+    "On a spot section that is FALSE: reconstruct.real_fields builds the "
+    "vascular field as a KDE over the MEASURED endothelial SPOT fraction, "
+    "vascular_density_from_cells is called ZERO times on these sections "
+    "(against once on the xenium_319 control), and vascular_density, "
+    "ecm_density and tissue_mask are all BITWISE IDENTICAL across placement "
+    "seeds. The real route is CONVECTION: physics.pressure rasterises TUMOUR "
+    "cell positions into the interstitial pressure field, which advects the "
+    "drug. With convection ON - the shipped default - 100% of tissue pixels "
+    "move under a reseed (p99 1.76%, max 2.82%); with convection OFF the "
+    "field is bitwise identical. The refusal stands; only its reason was "
+    "wrong, and a refusal defended by a false reason is one relaxation away "
+    "from being dropped by someone who checks it. "
+    "(An earlier version, written 2026-08-21, claimed the exposure map and "
+    "its falloff DID survive this refusal because they are solved on the "
+    "grid. That was wrong too: it confused where the PDE is discretised with "
+    "where its source term comes from. The same sentence previously named the "
+    "cross-drug RANKING as what survived, which was withdrawn the same day - "
+    "results/pk_ranking_robustness.md, "
     "results/capacity_ranking_robustness.md.)"
 )
 
@@ -2449,7 +2465,15 @@ def create_app(manager: Optional[JobManager] = None,
             "runs_dir": jobs.root,
             "runs": by_status,
             "projects_dir": store.root,
-            "projects": len(store.list()),
+            # thumbnails=False -- a COUNT must not pay for a picture.
+            # list() now computes a composition thumbnail per project by
+            # reading run documents off disk. That is 0.078 ms on this store
+            # and 176 ms cold at 1,250 run documents that cannot supply one.
+            # /api/health is polled by a platform health checker; a liveness
+            # route whose cost grows with the run store is a liveness route
+            # that eventually reports death for a healthy process. This file
+            # has already killed a container twice by getting health wrong.
+            "projects": len(store.list(thumbnails=False)),
             "reconstruction_cache": RECON_CACHE.stats(),
             "pde_dt_s": PDE_DT_S,
         })
@@ -2460,6 +2484,40 @@ def create_app(manager: Optional[JobManager] = None,
     from .protocol_api import build_protocol_router
 
     app.include_router(build_protocol_router(jobs))
+
+    # /api/uncertainty/* and /api/runs/{id}/uncertainty -- the interval this
+    # project's own findings have been asking for. results/kill_calibration.md
+    # says it plainly: "Absolute kill is defensible as an INTERVAL, not as a
+    # number, and the interval is wide." That sentence lived in a prose caveat
+    # inside a results document, while every metric the engine emitted was a
+    # single value.
+    #
+    # It re-reads a finished run's stored fields and re-propagates two MEASURED
+    # spans through that run's own Hill. Nothing is re-simulated. The two kinds
+    # of uncertainty are kept structurally separate and a merged or unlabelled
+    # interval is refused at the boundary, because conflating them would make
+    # the feature worse than no feature: one of them shrinks with a better
+    # model and the other only shrinks by measuring this patient.
+    from .uncertainty_api import build_uncertainty_router
+
+    app.include_router(build_uncertainty_router(jobs))
+
+    # /api/cross-section — ONE compound, MANY sections. The only cross-run
+    # comparison this product draws.
+    #
+    # Ordering two different COMPOUNDS was withdrawn 2026-08-21 and stays
+    # withdrawn. The same compound on two specimens is a different question and
+    # a legitimate one, and the interesting output is the DISAGREEMENT: a
+    # compound whose reach verdict flips between two patients' tissue is the
+    # most informative thing this engine currently says.
+    #
+    # The module audits its own finished PAYLOAD for a second compound at any
+    # depth, rather than trusting its input filter -- the filter is what a
+    # future edit would relax, and one grid on one colour scale is a ranking
+    # however the compounds got there.
+    from .cross_section import build_cross_section_router
+
+    app.include_router(build_cross_section_router(jobs=jobs))
 
     # /api/limits and /api/account — the deployment's own surface. See
     # app/server/account.py for why these are a separate module, and why the
@@ -2511,6 +2569,26 @@ def create_app(manager: Optional[JobManager] = None,
     app.include_router(build_account_router(
         jobs=jobs, store=store, reports=reports, limits=_limits,
         cache=RECON_CACHE, started_at=_PROCESS_STARTED_AT))
+
+    # The workspace router (docs/WORKSPACE_CONTRACT.md). Bound to the SAME job
+    # manager and the SAME project store as the routes above, so the workspace
+    # is a view of this process's state and not a second reading of the disk.
+    # It mounts THREE routes, and two of them are project routes:
+    #
+    #   GET  /api/workspace                     the home page's boot call
+    #   POST /api/projects/{id}/open            stamps last_opened_at
+    #   POST /api/projects/{id}/duplicate       copies specimens + run ids
+    #
+    # The last two are not beside the other eleven project routes above
+    # because they exist only because the home page exists -- nothing in the
+    # Studio opens or duplicates a project. This comment is here so the next
+    # reader grepping this file for a project route finds them anyway.
+    #
+    # Gated by the api_key middleware for exactly one reason: they are under
+    # /api/. Nothing about this router opts in, and nothing could forget to.
+    from .workspace import build_workspace_router
+
+    app.include_router(build_workspace_router(jobs=jobs, store=store))
 
     # The UI, mounted LAST so /api always wins.
     _mount_web(app)
@@ -2834,18 +2912,70 @@ placeholder is shown instead.</p>
 
 
 def _mount_web(app: FastAPI) -> None:
-    """Serve ``app/web/`` at ``/`` if the front end exists."""
+    """Serve ``app/web/`` — the workspace home at ``/``, the Studio at
+    ``/studio``, and everything else as a static asset.
+
+    THE ROUTE TABLE IS ``docs/WORKSPACE_CONTRACT.md`` §1.
+
+    Until 2026-09-20 this mounted ``StaticFiles(html=True)`` at ``/`` and that
+    was the whole routing story: ``/`` served ``index.html``, the Studio, which
+    is the product's HARDEST screen. A first-time visitor landed on a
+    three-rail workstation that assumes you already know which section you
+    want, which compound, and what a RunSpec is.
+
+    Now ``/`` is the workspace and the Studio is one click in. Three
+    properties, each load-bearing:
+
+    * **``/index.html`` keeps working, byte for byte.** The static mount still
+      serves it, so every existing bookmark and every link anyone has shared
+      survives. That is the contract's compatibility bar and it is checked by
+      ``tests/test_home_page.py``.
+    * **``/studio`` is an explicit route**, not a redirect, so the Studio has a
+      URL that reads like what it is and can carry ``?project=``.
+    * **Both are ungated**, like every static asset. A page must be able to
+      load in order to prompt for a key; a key gate in front of the login
+      screen is a loop.
+
+    The explicit routes are declared BEFORE the catch-all mount because
+    starlette matches in registration order — a ``StaticFiles`` mount at ``/``
+    swallows every path under it, so anything registered after it is
+    unreachable. That ordering is the entire mechanism here, and reversing it
+    fails silently: the routes still exist, they are simply never matched.
+    """
     web_dir = os.path.join(repo_root(), "app", "web")
     index = os.path.join(web_dir, "index.html")
-    if os.path.isdir(web_dir) and os.path.exists(index):
-        from fastapi.staticfiles import StaticFiles
+    home = os.path.join(web_dir, "home.html")
+    if not (os.path.isdir(web_dir) and os.path.exists(index)):
+        # No front end built. Keep the original behaviour exactly: a single
+        # placeholder page at `/` explaining what is missing, rather than a
+        # bare 404 that looks like the server is broken.
+        @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+        def _placeholder() -> str:
+            return _PLACEHOLDER
 
-        app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
         return
 
-    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-    def _placeholder() -> str:
-        return _PLACEHOLDER
+    from fastapi.staticfiles import StaticFiles
+
+    def _page(path: str):
+        return FileResponse(path, media_type="text/html",
+                            headers={"Cache-Control": "no-cache"})
+
+    # The Studio, at a name of its own. Registered whether or not home.html
+    # exists, so this route does not silently depend on the other page.
+    @app.get("/studio", response_class=HTMLResponse, include_in_schema=False)
+    def studio_page():
+        return _page(index)
+
+    if os.path.exists(home):
+        # The workspace. `/` only becomes the home page when the home page is
+        # actually on disk -- a half-deployed image serves the Studio at `/`
+        # exactly as it always did, rather than 500ing on the front door.
+        @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+        def home_page():
+            return _page(home)
+
+    app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
 
 
 _app: Optional[FastAPI] = None

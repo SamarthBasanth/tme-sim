@@ -205,14 +205,45 @@ CLAIM_SET_LOG = (
 #: where the missing term would not have mattered much. Every compound that
 #: inverts loses most of its exposure under the split (mean AUC ON/OFF
 #: 0.062-0.633); every compound that holds keeps most of it (0.693-0.927).
-#: These four are the ones that held.
+#: These five are the ones that held.
+#:
+#: CISPLATIN WAS MISSING FROM THIS SET UNTIL 2026-09-20, and the omission made
+#: the citation below false. The census's own table records cisplatin's
+#: limiter column as "—" (delivery OFF, dose ON, limiter does NOT invert), so
+#: for four weeks this code told a cisplatin user their verdict reverses while
+#: the document it cites says it does not. Five scored compounds hold; four
+#: were listed.
+#:
+#: It holds NARROWLY, and that is disclosed separately rather than by quietly
+#: leaving it out. A mechanism audit on 2026-09-20 measured cisplatin flipping
+#: at an exchange scale of 0.05431 against the measured ratio of 0.05443 — it
+#: keeps its verdict by 0.22% of exposure. Omitting it was defensible caution
+#: badly expressed: a set that disagrees with the source it names is not
+#: caution, it is a second undocumented finding wearing the first one's
+#: citation.
+#:
+#: Note also that cisplatin breaks the mechanical rule stated just above.
+#: It holds while keeping 0.054 of its exposure, not 0.693-0.927. The rule
+#: describes the other four and is not a law.
 #:
 #: Kept HERE and not in the browser because it is a measured result, not a
 #: display choice: a client-side list has no provenance, cannot be asserted
 #: against, and would not survive into result.json with the run it describes.
 VERDICT_STABLE_COMPOUNDS: frozenset = frozenset({
-    "vincristine", "doxorubicin", "methotrexate", "etoposide",
+    "vincristine", "doxorubicin", "methotrexate", "etoposide", "cisplatin",
 })
+
+#: Compounds that hold their verdict by a margin too thin to lean on, with the
+#: measured margin. Reported ALONGSIDE `stable: True` rather than instead of
+#: it: the census is the source of the verdict, and this is the source of how
+#: much room it has.
+VERDICT_NARROW_HOLD: Dict[str, str] = {
+    "cisplatin": (
+        "it holds by 0.22% of exposure: measured to flip at an exchange scale "
+        "of 0.05431 against this run's measured ratio of 0.05443. Treat it as "
+        "holding, not as safe."
+    ),
+}
 
 #: Measured on the flagship only. Naming the section stops the flag being read
 #: as a property of the compound anywhere.
@@ -235,6 +266,7 @@ def verdict_stability(drug_name) -> Dict:
     return {
         "compound": key,
         "stable": stable,
+        "narrow_hold": VERDICT_NARROW_HOLD.get(key),
         "measured_on": VERDICT_STABILITY_SECTION,
         "source": "results/verdict_inversion_census.md",
         "note": (

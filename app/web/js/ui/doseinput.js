@@ -193,6 +193,64 @@ function ic50Provenance(f) {
   return `${f.ic50Source}${n}`;
 }
 
+/**
+ * THE SAME RATIO, BEFORE THE RUN — for the dose field in the setup form.
+ *
+ * WHY IT LIVES IN THIS MODULE. Everything above is written for a RunResult, and
+ * a RunResult only exists after the operator has already spent the run. The
+ * ratio it prints is fixed the moment the dose is typed, which means the panel
+ * that explains it is one screen too late: `plasma_peak` is a field of the
+ * RunSpec on the LEFT of this app, and until this function existed nothing
+ * beside that field said what it was a fraction of. `js/ui/spec.js` calls this
+ * under its dose row so the wording exists exactly once — the same rule the
+ * header of this file states for the two result panels.
+ *
+ * WHAT IT MAY NOT DO. It may not predict the verdict. What a sub-IC50 ratio
+ * IMPLIES is read off the run's delivery law (`lawClause` above), and no run
+ * has happened yet, so the implication is named as pending rather than guessed:
+ * under the gradient-exchange source the verdict would be arithmetic, under the
+ * shipped one-way leak it would not, and this function knows neither. It prints
+ * the two numbers, their quotient, and where the half that is not an input came
+ * from. Nothing else.
+ *
+ * NO THRESHOLD, for the reason at the top of this file. The only comparison is
+ * against 1.0, which is definitional rather than chosen.
+ *
+ * @param {{peak_uM:number, ic50_uM:number, ic50Source?:string|null,
+ *          drug?:string|null, userCompound?:boolean}} d
+ * @returns {Node|null} null when either half is missing — a half-known ratio is
+ *   not a weaker version of this disclosure, it is a different and unfounded
+ *   one, which is the same rule `doseFraming()` applies.
+ */
+export function plasmaPeakNote(d) {
+  const peak = d && Number(d.peak_uM);
+  const ic50 = d && Number(d.ic50_uM);
+  if (!Number.isFinite(peak) || !Number.isFinite(ic50) || peak <= 0 || ic50 <= 0) {
+    return null;
+  }
+  const ratio = peak / ic50;
+  const under = ratio < 1;
+  const src = d.ic50Source
+    ? String(d.ic50Source)
+    : 'a constant this catalogue carries no provenance for';
+  return h('div', {
+    style: { lineHeight: 'var(--lh-body)', color: 'var(--fg-2)' },
+  },
+  h('span.mono.strong', { style: { color: 'var(--fg-0)' } },
+    `plasma_peak / IC50 = ${conc(peak)} uM / ${conc(ic50)} uM = ${num(ratio, 3)}`),
+  ' — the peak plasma concentration entered above is ',
+  h('b', under ? `${num(1 / ratio, 1)}x under` : `${num(ratio, 2)}x`),
+  ' the concentration that produces half this compound\'s effect',
+  ` (IC50 ${conc(ic50)} uM, ${src}`,
+  d.userCompound
+    ? ' — a compound you compiled, so this half of the ratio is your own '
+      + 'number or a flagged placeholder'
+    : '',
+  '), which is not a RunSpec field. The ratio is fixed here, before any tissue '
+  + 'is read. What follows from it depends on the delivery law the run uses '
+  + 'and is stated on the result, not predicted here.');
+}
+
 /** The mono ratio strip — the number, beside the words. Same shape as the
  *  delivery-spread strip in reach.js so the two read as one family. */
 function ratioStrip(f, big) {

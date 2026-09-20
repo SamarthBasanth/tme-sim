@@ -14,9 +14,12 @@
 import { h, clear, fill, append, debounce } from '../util/dom.js';
 import * as api from '../api.js';
 import { toast, notifyError } from './toast.js';
-import { railGroup, railNav } from './rail.js';
+import { railGroup, railNav, sectTitle } from './rail.js';
 import { createCompoundPanel } from './compound.js';
-import { createTissuePanel, NOT_VALIDATED, NOT_RUNNABLE } from './tissue.js';
+import {
+  createTissuePanel, NOT_VALIDATED, NOT_RUNNABLE, sectionScaleRow,
+} from './tissue.js';
+import { plasmaPeakNote } from './doseinput.js';
 import { dur, num, int } from '../util/fmt.js';
 
 const MODES = {
@@ -32,6 +35,60 @@ const MODES = {
 const STATE_MODE_DEFAULT = 'oxygen';
 
 const NO_DRUG = '— none (reconstruction only)';
+
+/* ===================================================== the three questions ===
+ *
+ * WHAT THIS FORM ASKED FOR, BEFORE 2026-09-20. Fourteen controls — twenty tab
+ * stops — in one flat grid, every one of them arriving pre-filled from
+ * GET /api/defaults and every one of them presented as a decision:
+ *
+ *   section · dx · drug · sensitivity_mode · vascular_mode · oxygen_mode ·
+ *   state_mode · mgmt set · mgmt · plasma_peak · half_life_s · n_doses ·
+ *   dose_interval_s · total_time_s
+ *
+ * Nine of the fourteen have a defensible default that a first-time operator has
+ * no basis to move and no way to evaluate: the four mode segments select
+ * pipeline routes, MGMT is a per-patient scalar that is null unless you have
+ * one, and three of the four PK fields are the shape of the plasma curve rather
+ * than its height. Presenting nine defaults as nine blanks is what makes this
+ * screen read as a form to be filled rather than a question to be answered.
+ *
+ * WHAT FOLDS, AND WHAT THAT COSTS. Nothing is removed and nothing moves to
+ * another surface; the nine go behind ONE `<details>` whose summary PRINTS
+ * EVERY ONE OF THEIR VALUES, so the fold hides the widgets and never the
+ * state. It opens itself when a validator error lands on a field inside it, and
+ * its summary counts how many of them differ from the stock defaults the
+ * session booted with. docs/UI_ARCHITECTURE.md §2.2 argues against splitting
+ * this form into four `<details>` — "four header strips and buys nothing" —
+ * and that argument is about four; this is one, and it buys back six rows and
+ * ten tab stops on the first screen a stranger sees.
+ *
+ * WHAT STAYS VISIBLE is the set that changes the answer: which specimen, which
+ * compound, how much of it, for how long, and on what mesh — the last of which
+ * stays because it is the one field whose cost is quadratic and the only one
+ * the server refuses a run over.
+ */
+const QUESTIONS = [
+  ['1', 'Which specimen?'],
+  ['2', 'Which therapy?'],
+  ['3', 'At what resolution?'],
+];
+
+/** The ids inside the folded block, for the auto-open rule in renderDiags(). */
+const FOLDED_FIELDS = new Set(['f-mgmt', 'f-pk-half', 'f-pk-n', 'f-pk-int']);
+
+/** A validator diagnostic's `path` -> the form control that field is edited in.
+ *
+ * Module scope since 2026-09-20: it was a literal inside renderDiags(), and the
+ * submit gate needs the same mapping to answer "press here to go to the thing
+ * that is wrong". Two copies of this object would disagree the first time a
+ * field moved. */
+const FIELD_OF_PATH = {
+  section: 'f-section', dx_um: 'f-dx', drug: 'f-drug', mgmt: 'f-mgmt',
+  total_time_s: 'f-total',
+  'pk.plasma_peak': 'f-pk-peak', 'pk.half_life_s': 'f-pk-half',
+  'pk.n_doses': 'f-pk-n', 'pk.dose_interval_s': 'f-pk-int',
+};
 
 /* ========================================================== grid budget ===
  *
@@ -312,13 +369,60 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
   const gbCeil = h('div.gb-line');
   const gbRefusal = h('div.gb-refusal.hidden');
   const gbFacts = h('div.gb-line');
-  const gbMem = h('div.gb-line');
-  const gbRun = h('div.gb-line');
 
-  // Sits in the form, directly under GRID DX and above DRUG, because it is
-  // about this section crossed with this dx and those are the two controls
-  // immediately above it. It is not a section of its own: it has no state to
-  // configure and collapsing it would hide a limit (UI_ARCHITECTURE.md §2.4).
+  /* TWO STANDING FACTS, EACH BEHIND ITS OWN CLAIM.
+   *
+   * The block above this — the arithmetic, the count, the ceiling, and the
+   * refusal the server would write — is the part that stops a run being wasted,
+   * and it is never folded, never conditional and never smaller than anything
+   * around it.
+   *
+   * These two are different in kind. They do not move with dx: one is a
+   * measurement of what a 512 MB host does, the other is the single runtime
+   * this repository records. Both were rendered in full on every repaint, which
+   * put ~190 words of unchanging prose between GRID DX and the bottom of the
+   * form and cost the refusal preview above them the attention they were
+   * spending.
+   *
+   * The FOLD HIDES THE ELABORATION, NOT THE CLAIM. Each summary carries the
+   * sentence that matters — "a grid under the ceiling can still kill the
+   * server", and whether the recorded runtime is this spec's — at the same type
+   * size as the body, with the numbers that qualify inside. A reader who never
+   * opens either one has still read both claims. */
+  const gbMemBody = h('div');
+  const gbMem = h('details.gb-line.gb-fold',
+    h('summary', {
+      style: { cursor: 'pointer', lineHeight: 'var(--lh-body)' },
+      title: 'The measurement is recorded in app/server/api.py.',
+    },
+    h('b', 'A grid under the ceiling can still kill the server.'),
+    ' Measured: dx = 12 um OOM-kills a 512 MB host at under 1 % of the '
+    + 'default ceiling.'),
+    gbMemBody);
+
+  const gbRunTail = h('span');
+  const gbRunBody = h('div');
+  const gbRun = h('details.gb-line.gb-fold',
+    h('summary', {
+      style: { cursor: 'pointer', lineHeight: 'var(--lh-body)' },
+      title: 'docs/DEPLOYMENT.md, the container acceptance run.',
+    },
+    h('b', 'Runtime: '),
+    'this repository records exactly one end-to-end Studio run time. ',
+    gbRunTail),
+    gbRunBody);
+
+  // Sits directly under GRID DX, as the whole of question 3, because it is
+  // about this section crossed with this dx — the control immediately above it
+  // and the one chosen at the top of the form. (It used to sit between GRID DX
+  // and DRUG, when those two were adjacent; the questions reordered around it
+  // and it stayed attached to the field it is about.)
+  //
+  // IT IS STILL NOT A SECTION OF ITS OWN, and the whole block is still
+  // uncollapsed: it has no state to configure, and collapsing the estimate or
+  // the refusal preview would hide a limit (UI_ARCHITECTURE.md §2.4). The two
+  // <details> inside it hold standing facts that do not move with dx, and each
+  // one states its claim in its own summary — see the comment on gbMem.
   const gridBudget = h('div.span2.gridbudget',
     h('div.gb-head', h('span.gb-t', 'Grid budget'), h('span.grow'), gbChip),
     gbArith, gbCount, gbCeil, gbRefusal, gbFacts, gbMem, gbRun);
@@ -353,12 +457,56 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     return [lbl(label, forId, title), holder, errEl];
   }
 
-  const formEl = h('div.fgrid',
-    row('Section', 'f-section', h('div', sectionSel, sectionCaveats), null,
-      'GET /api/sections'),
-    row('Grid dx', 'f-dx', dxInp, 'um', 'reconstruction grid pitch'),
-    gridBudget,
-    row('Drug', 'f-drug', drugSel, null, 'GET /api/drugs; null = reconstruction only'),
+  /* -------------------------------------------- what a choice will mean --
+   *
+   * Four read-outs, painted under the control they belong to, every one of them
+   * from a payload the server already sent and not one of them a prediction:
+   *
+   *   sectionScale  what this specimen IS — platform, count, extent, panel
+   *                 size — rendered by tissue.js::sectionScaleRow, so the
+   *                 picker and the ingest panel cannot word it differently.
+   *                 The picker used to say nothing but the label until the run
+   *                 came back.
+   *   drugNote      the two numbers that decide whether a compound can reach
+   *                 anything: its IC50 with provenance, and its BBB
+   *                 penetrance. Both were crammed into the <option> text,
+   *                 where they are unreadable and gone the moment the list
+   *                 closes.
+   *   doseNote      plasma_peak over that IC50 — js/ui/doseinput.js's own
+   *                 wording, moved to the field that fixes the ratio. It
+   *                 predicts no verdict; see plasmaPeakNote().
+   *   windowNote    total_time_s in hours, because 21600 is not a duration
+   *                 anyone reads.
+   */
+  const noteStyle = {
+    // No font-size. These qualify the value in the control directly above
+    // them, `.inp` is --fs-sm, and a qualifier set smaller than the number it
+    // qualifies is the one thing this rail may not do. Inheriting body prose
+    // size makes them exactly equal.
+    lineHeight: 'var(--lh-body)', color: 'var(--fg-2)',
+    margin: 'var(--sp-1) 0 var(--sp-2)',
+  };
+  const sectionScale = h('div.sec-scale');
+  const drugNote = h('div.span2.q-note', { style: noteStyle });
+  const doseNote = h('div.span2.q-note', { style: noteStyle });
+  const windowNote = h('div.span2.q-note', { style: noteStyle });
+
+  /* ------------------------------------------------------ the fold ------
+   * The nine defaults. See the QUESTIONS comment at the top of this file for
+   * why they fold and what the fold is forbidden from hiding. */
+  const advValues = h('span.mono', {
+    style: {
+      color: 'var(--fg-1)', fontWeight: '400', textTransform: 'none',
+      letterSpacing: '0',
+    },
+  }, '—');
+  const advCount = h('span.chip.st-queued', {
+    title: 'How many of the nine fields in this block differ from the spec '
+      + 'this session booted with (GET /api/defaults).',
+  }, 'all default');
+
+  const advBody = h('div.fgrid', { style: { padding: 'var(--sp-3) 0 var(--sp-2)' } },
+    h('div.span2.hr-lbl', 'Model routes'),
     [lbl('Sensitivity', null), segs.sensitivity_mode, h('div.field-err.hidden')],
     [lbl('Vascular', null), segs.vascular_mode, h('div.field-err.hidden')],
     [lbl('Oxygen', null), segs.oxygen_mode, h('div.field-err.hidden')],
@@ -370,13 +518,61 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
           mgmtChk, h('span.lbl', 'set')),
         h('div.with-unit.grow', mgmtInp, unit('log2 CPM'))),
       null, 'per-patient scalar; spatial MGMT was measured and found to be noise'),
-    h('div.span2.hr-lbl', 'Pharmacokinetics'),
-    row('Plasma peak', 'f-pk-peak', pkPeak, 'uM'),
-    row('Half life', 'f-pk-half', pkHalf, 's'),
-    row('Doses', 'f-pk-n', pkN, 'n'),
-    row('Interval', 'f-pk-int', pkInt, 's'),
-    h('div.span2.hr-lbl', 'Integration'),
+    h('div.span2.hr-lbl', 'Dose schedule'),
+    row('Half life', 'f-pk-half', pkHalf, 's', 'pk.half_life_s — plasma elimination half life'),
+    row('Doses', 'f-pk-n', pkN, 'n', 'pk.n_doses — how many doses in the course'),
+    row('Interval', 'f-pk-int', pkInt, 's', 'pk.dose_interval_s — time between doses'),
+  );
+
+  const advFold = h('details.span2.advfold', { id: 'sect-spec-defaults' },
+    h('summary', {
+      style: {
+        cursor: 'pointer', padding: 'var(--sp-3) 0',
+        lineHeight: 'var(--lh-body)',
+      },
+      title: 'Nine fields that arrive from GET /api/defaults and change the '
+        + 'model route, the MGMT scalar and the shape of the plasma curve. '
+        + 'Their values are printed here whether this is open or closed.',
+    },
+    h('span.lbl', 'Defaults in use'), ' ', advCount, ' ', advValues),
+    advBody);
+
+  const qHead = (n) => {
+    const [num_, text] = QUESTIONS[n];
+    return h('div.span2.hr-lbl.fq',
+      // A heading, not a styled div: this rail had no heading structure at all
+      // below the group name, so a screen-reader user had no route from the top
+      // of the form to "at what resolution". `font: inherit` keeps the UA
+      // heading styles out of a row whose type is already set by .hr-lbl —
+      // the same reset rail.js::sectTitle documents for .sect-h.
+      h('h4', {
+        style: {
+          font: 'inherit', margin: '0', letterSpacing: 'inherit',
+          textTransform: 'inherit', color: 'inherit',
+        },
+      }, `${num_} · ${text}`));
+  };
+
+  const formEl = h('div.fgrid',
+    qHead(0),
+    row('Section', 'f-section', h('div', sectionSel, sectionScale, sectionCaveats), null,
+      'GET /api/sections'),
+
+    qHead(1),
+    row('Drug', 'f-drug', drugSel, null, 'GET /api/drugs; null = reconstruction only'),
+    drugNote,
+    row('Plasma peak', 'f-pk-peak', pkPeak, 'uM',
+      'pk.plasma_peak — the peak concentration the plasma curve reaches. It is '
+      + 'a concentration, not an administered dose.'),
+    doseNote,
     row('Total time', 'f-total', totalInp, 's', 'simulated wall time of the treatment course'),
+    windowNote,
+
+    qHead(2),
+    row('Grid dx', 'f-dx', dxInp, 'um', 'reconstruction grid pitch'),
+    gridBudget,
+
+    advFold,
   );
 
   /* ----------------------------------------------------------- editor -- */
@@ -436,10 +632,17 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
 
   /* ------------------------------------------------------------ submit -- */
 
+  // The shortcut is main.js's, bound on window and live even while a field has
+  // focus (`wireKeys`: the Ctrl/Cmd+Enter branch is tested BEFORE the "is the
+  // operator typing" early return). It is printed here because a keyboard path
+  // nobody is told about is not a keyboard path.
+  const SUBMIT_KEYS = /Mac|iPhone|iPad/.test(
+    (typeof navigator !== 'undefined' && navigator.userAgent) || '') ? '⌘⏎' : 'Ctrl+Enter';
+
   const submitBtn = h('button.btn.primary', {
     id: 'btn-submit-run',
     onclick: () => onSubmit(store.get().spec),
-    title: 'POST /api/runs',
+    title: `POST /api/runs — ${SUBMIT_KEYS} submits from anywhere in the Studio`,
   }, 'Submit run');
   const validateBtn = h('button.btn', { onclick: () => runValidate(true), title: 'POST /api/validate' }, 'Validate');
   // Validation state is a STATUS, so it wears the st-* vocabulary. It used to
@@ -447,8 +650,140 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
   // fact that a JSON object passed a schema check.
   const okBadge = h('span.chip.st-queued', 'unvalidated');
 
-  const submitRow = h('div.frow', { style: { padding: 'var(--sp-4) var(--sp-5)' } },
-    submitBtn, validateBtn, h('span.grow'), okBadge);
+  /* WHY SUBMIT IS OFF, IN WORDS, AND AS A WAY TO THE THING THAT IS WRONG.
+   *
+   * The gate is not touched. `submitBtn.disabled` is still set by the server's
+   * own verdict on POST /api/validate, and the one branch that deliberately
+   * leaves it ENABLED — our own validator outage, where blocking the operator
+   * on our failure would be the wrong refusal — still does.
+   *
+   * What was missing is the sentence. A greyed primary button is the only
+   * control in this rail that can be off, and it said why in nothing at all:
+   * not a title, not a label, not a line. A first-time operator whose
+   * catalogue has not loaded sees a dead Submit and no way to learn that the
+   * reason is that no section is chosen.
+   *
+   * It is a BUTTON, not a caption, for two reasons: it is focusable, so the
+   * reason is reachable by keyboard while the disabled button it explains is
+   * not, and pressing it moves focus to the field that is blocking — which is
+   * the actual next action in every case. */
+  const submitWhy = h('button.btn.ghost.sm.submit-why', {
+    type: 'button', hidden: true,
+    onclick: () => focusBlocker(),
+    // `.btn` is one --h-ctl row of `white-space: nowrap`, which is right for a
+    // verb and wrong for a sentence: unstyled, "Waiting for the section
+    // catalogue (GET /api/sections)." is a 320 px word that pushes the rail
+    // into a horizontal scroll — the one thing docs/UI_ARCHITECTURE.md §4.3
+    // forbids outright. It takes its own full-width line under the buttons and
+    // wraps there. `.submit-why` is named for the stylesheet owner; until it
+    // exists these five properties are the whole of it.
+    style: {
+      flex: '1 1 100%', maxWidth: '100%',
+      height: 'auto', minHeight: 'var(--h-ctl-sm)',
+      whiteSpace: 'normal', textAlign: 'left', justifyContent: 'flex-start',
+      lineHeight: 'var(--lh-body)', padding: 'var(--sp-2) var(--sp-3)',
+    },
+  }, '');
+
+  const submitKeys = h('span.hint.mono', {
+    title: `${SUBMIT_KEYS} submits the current RunSpec from anywhere in the `
+      + 'Studio, including from inside a field.',
+  }, SUBMIT_KEYS);
+
+  const submitRow = h('div.frow', {
+    style: { padding: 'var(--sp-4) var(--sp-5)', flexWrap: 'wrap' },
+  },
+  submitBtn, validateBtn, submitKeys, h('span.grow'), okBadge, submitWhy);
+
+  /* ------------------------------------------------- the submit state --
+   *
+   * Four states, one of which is "nothing is wrong". Each one owns a sentence
+   * and the control that answers it; `setBlock()` is the only writer of
+   * `submitBtn.disabled` in this file, so the button and its explanation
+   * cannot disagree.
+   *
+   * The SECTION gate is evaluated here rather than pushed in by a caller,
+   * because it is a property of the form and not of any response: a RunSpec
+   * with no `section` names no specimen, and at boot — before the first
+   * validation lands — the button was enabled over exactly that spec.
+   */
+  let submitting_ = false;
+  let blockWhy_ = '';
+  let blockTarget_ = null;
+
+  function sectionMissing() {
+    const spec = store.get().spec || {};
+    if (spec.section) return '';
+    // Three states, and they are not the same sentence. "The catalogue has not
+    // arrived" is a wait; "the catalogue arrived with nothing runnable in it"
+    // is a dead end with a next action; "pick one" is neither. Saying the
+    // second while the first is true would be this panel making a claim about
+    // a request that has not come back.
+    if (!sectionsSeen_) return 'Waiting for the section catalogue (GET /api/sections).';
+    const selectable = Array.from(sectionSel.options).some((o) => !o.disabled);
+    return selectable
+      ? 'Choose a section first — this RunSpec names no specimen.'
+      : 'GET /api/sections returned no section this Studio can run. Ingest one '
+        + 'under Your tissue.';
+  }
+
+  /** Set (or clear) the reason Submit is off, and the control that fixes it. */
+  function setBlock(why, target) {
+    blockWhy_ = why || '';
+    blockTarget_ = why ? (target || null) : null;
+    applySubmit();
+  }
+
+  function applySubmit() {
+    const missing = sectionMissing();
+    const why = missing || blockWhy_;
+    const target = missing ? sectionSel : blockTarget_;
+    submitBtn.disabled = submitting_ || !!why;
+    submitBtn.textContent = submitting_ ? 'Submitting…' : 'Submit run';
+    // While the run is being posted the button says so itself, so a second
+    // sentence beside it would be noise about a state that lasts one request.
+    submitWhy.hidden = submitting_ || !why;
+    submitWhy.textContent = why;
+    submitWhy.title = target
+      ? 'Press to go to the control that is blocking the run.'
+      : '';
+  }
+
+  /** The control the current block is about. Derived, never stored: the
+   *  section gate can take over from a validator error and back again, and a
+   *  target cached at the moment one of them fired outlives it. */
+  function currentTarget() {
+    return sectionMissing() ? sectionSel : blockTarget_;
+  }
+
+  /**
+   * The control the FIRST validator error is about, or the editor.
+   *
+   * A path the form has no control for is not a dead end: every field of the
+   * RunSpec is editable in the source buffer, so an error on one the form does
+   * not render (an unrecognised key, a nested PK field the form flattens) still
+   * has somewhere to send the operator.
+   */
+  function blockerFor(errors) {
+    for (const e of errors || []) {
+      const id = FIELD_OF_PATH[e.path];
+      const t = id && fieldEls.get(id);
+      if (t && t.control) return t.control;
+    }
+    return ta;
+  }
+
+  /** Put the cursor on whatever is blocking the run. */
+  function focusBlocker() {
+    const t = currentTarget();
+    if (!t) return;
+    // A control inside a closed <details> cannot take focus, so anything that
+    // folds is opened before it is asked to.
+    if (t === ta) srcSect.open = true;
+    if (FOLDED_FIELDS.has(t.id)) advFold.open = true;
+    try { t.scrollIntoView({ block: 'nearest' }); } catch { /* older engines */ }
+    t.focus();
+  }
 
   /* ------------------------------------------------------- job monitor -- */
 
@@ -511,10 +846,28 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
   // row itself is outside the scroll on purpose — it is the one control whose
   // reachability must not depend on scroll position.
   // See docs/UI_ARCHITECTURE.md section 2.2.
+
+  // THE SOURCE EDITOR IS CLOSED ON ARRIVAL, since 2026-09-20.
+  //
+  // It is the same RunSpec the form above it holds, in JSON, kept in two-way
+  // sync — so on the first screen a stranger sees, the Setup rail asked them to
+  // read the same twelve fields twice, the second time as source code with a
+  // line gutter. It is roughly a third of the rail's height and it is not a
+  // decision; it is a second view of decisions taken above.
+  //
+  // Nothing about it is hidden or moved. It keeps its section, its place in the
+  // Define group and its summary; it opens on a click, on Ctrl/Cmd+L
+  // (`focusEditor`, wired in main.js::wireKeys), and BY ITSELF whenever the
+  // buffer stops parsing or the validator points at a line in it — the two
+  // states where the form cannot show you what is wrong.
+  const srcSect = h('details.sect', { id: 'sect-source' },
+    h('summary', sectTitle('Source'), h('span.hint', 'JSON · two-way sync')),
+    h('div.sect-body', { style: { padding: '0' } }, editorEl));
+
   const body = h('div.rail-body',
     railGroup('define', 'Define', 'RunSpec v1',
       h('details.sect', { open: true },
-        h('summary', 'Specimen, therapy, model', h('span.hint', 'form')),
+        h('summary', sectTitle('Specimen, therapy, model'), h('span.hint', '3 questions')),
         h('div.sect-body', formEl)),
       // Both BYO panels sit directly under the form that picks a section and a
       // drug, because that is the moment an operator discovers the list does
@@ -524,13 +877,11 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       // ordinary path.
       tissuePanel.el,
       compoundPanel.el,
-      h('details.sect', { open: true },
-        h('summary', 'Source', h('span.hint', 'JSON · two-way sync')),
-        h('div.sect-body', { style: { padding: '0' } }, editorEl))),
+      srcSect),
 
     railGroup('job', 'Commit', 'POST /api/runs',
       h('details.sect', { open: true, id: 'sect-job' },
-        h('summary', 'Active job', h('span.hint', '/status poll')),
+        h('summary', sectTitle('Active job'), h('span.hint', '/status poll')),
         h('div.sect-body', jobEl))),
   );
 
@@ -607,12 +958,207 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       }, `${s.label}${s.available ? '' : '  [unavailable]'}${own}${noRun}${mark}`));
     }
     sections_ = sections;
+    sectionsSeen_ = true;
     // A section row is the most natural place for the server to publish the
     // ceiling — the refusal is per-section arithmetic — so the rows are swept
     // for it before the budget is painted. No row carries it today.
     for (const s of sections || []) if (adoptCeiling(s, 'GET /api/sections')) break;
     paintSectionCaveats();
     paintGridBudget();
+    paintNotes();
+    // The catalogue landing can only ever RELAX the section block, never add
+    // one; recompute so the commit bar stops saying "waiting" the moment it is
+    // no longer waiting.
+    applySubmit();
+  }
+
+  /* ------------------------------------------- the consequence read-outs --
+   *
+   * Everything below paints from a payload the server already sent. Nothing is
+   * computed, nothing is predicted, and every branch that has no number to
+   * print says so rather than printing a shape with nothing in it.
+   */
+
+  // Last list from GET /api/drugs. Kept for the same reason `sections_` is: the
+  // facts that decide whether a compound can reach anything — its IC50 and its
+  // penetrance — arrive with the catalogue and were being spent on one line of
+  // <option> text that is unreadable and gone the moment the list closes.
+  let drugs_ = [];
+
+  /** The spec this session booted with, for the fold's "N changed" count. */
+  let stock_ = null;
+  /** How many folded fields were off-default at the last paint. */
+  let changed_ = 0;
+  /** Has GET /api/sections come back at all? See sectionMissing(). */
+  let sectionsSeen_ = false;
+
+  function paintNotes() {
+    /* --- 1. the specimen: what it IS. -------------------------------- */
+    clear(sectionScale);
+    const sec = (sections_ || []).find((x) => x.id === sectionSel.value) || null;
+    // appendChild(null) is a TypeError that takes the whole render with it, so
+    // the nullable branch is guarded at the call site, here, not inside.
+    if (sec) sectionScale.appendChild(sectionScaleRow(sec));
+
+    /* --- 2. the compound, and the dose against its potency. ---------- */
+    clear(drugNote);
+    clear(doseNote);
+    const chosen = drugSel.value;
+    const drug = chosen ? (drugs_ || []).find((d) => d.name === chosen) || null : null;
+    if (!chosen) {
+      drugNote.appendChild(h('span',
+        h('b', 'No compound — reconstruction only. '),
+        'The section is reconstructed and nothing is transported: no delivery '
+        + 'map, no mechanism attribution, no kill. The dose and the window '
+        + 'below still size the run, and every panel on the Read rail that '
+        + 'describes a therapy stays empty.'));
+    } else if (!drug) {
+      drugNote.appendChild(h('span',
+        'This spec names ', h('span.mono.strong', chosen),
+        ', which is not in the catalogue this Studio loaded (GET /api/drugs). '
+        + 'Its IC50 and penetrance are unknown here, so the ratio below is not '
+        + 'shown. The server decides whether the name resolves.'));
+    } else {
+      const bbb = Number(drug.bbb_penetrance);
+      const bits = [];
+      bits.push(Number.isFinite(Number(drug.ic50_uM))
+        ? h('span', h('span.lbl', 'IC50 '),
+          h('span.mono.strong', num(drug.ic50_uM, 1)), h('span.unit', 'uM'),
+          drug.ic50_source ? h('span', ` — ${drug.ic50_source}`) : null)
+        : h('span', 'This server states no IC50 for this compound.'));
+      bits.push(h('div',
+        h('span.lbl', 'BBB penetrance '),
+        Number.isFinite(bbb)
+          ? h('span', h('span.mono.strong', num(bbb, 2)),
+            h('span.unit', 'of plasma'))
+          : h('span.dim', 'not stated'),
+        // The one value of this field that decides the run before it starts.
+        // js/ui/reach.js states the same arithmetic on the result: a zero
+        // penetrance gives an identically zero source term, so the exposure
+        // field is zero everywhere and the reach map is refused. Saying it
+        // here costs nothing; discovering it after a reconstruction costs the
+        // run.
+        Number.isFinite(bbb) && bbb === 0
+          ? h('span', ' — ', h('b', 'zero'),
+            '. The source term is then identically zero at every vessel, so '
+            + 'the exposure field is zero everywhere and the reach map is '
+            + 'refused. That is the compound\'s parameterisation, not a '
+            + 'finding this run will make.')
+          : null));
+      if (drug.is_user_compound) {
+        bits.push(h('div',
+          h('b', 'This is a compound you compiled. '),
+          `Every transport parameter except molecular weight and TPSA is a `
+          + `prediction (${drug.predicted_fields ?? '?'}/`
+          + `${drug.total_fields ?? '?'} fields), and setting it beside another `
+          + 'compound is not defensible — compound ordering was measured and '
+          + 'withdrawn.'));
+      }
+      append(drugNote, bits);
+
+      // The ratio that is fixed the moment the dose is typed. One wording,
+      // authored in js/ui/doseinput.js, which is also where the result rail
+      // reads it from.
+      const note = plasmaPeakNote({
+        peak_uM: parseFloat(pkPeak.value),
+        ic50_uM: drug.ic50_uM,
+        ic50Source: drug.ic50_source,
+        userCompound: !!drug.is_user_compound,
+      });
+      if (note) doseNote.appendChild(note);
+    }
+
+    /* --- 2b. the window, in hours rather than in seconds. ------------ */
+    clear(windowNote);
+    const tot = parseFloat(totalInp.value);
+    windowNote.appendChild(Number.isFinite(tot) && tot > 0
+      ? h('span',
+        h('span.mono.strong', `${int(tot)} s = ${dur(tot)}`),
+        ' of simulated treatment time. The solve runs over this window, and '
+        + 'every exposure figure the run reports is an average or a total '
+        + 'across it, so changing it moves them.')
+      : h('span', 'Enter a positive number of seconds to set the window.'));
+
+    /* --- 3. the nine folded defaults, printed whether open or shut. -- */
+    paintFoldSummary();
+
+    // An empty note is still a grid row and still carries its margins, so a
+    // spec with no drug left two ghost gaps between DRUG and PLASMA PEAK.
+    // `display:none` takes it out of the grid entirely.
+    for (const el of [sectionScale, drugNote, doseNote, windowNote]) {
+      el.style.display = el.firstChild ? '' : 'none';
+    }
+  }
+
+  /** Which option of a segmented control is pressed, or '' if none is. */
+  function segValue(key) {
+    const btn = Array.from(segs[key].children)
+      .find((b) => b.getAttribute('aria-pressed') === 'true');
+    return btn ? btn.dataset.val : '';
+  }
+
+  /**
+   * The folded block's summary line: every value it holds, and how many of them
+   * have been moved off the spec this session booted with.
+   *
+   * This is the whole licence for folding them. A `<details>` that hid nine
+   * values would be a menu; one that prints all nine in its summary hides the
+   * widgets and nothing else.
+   */
+  function paintFoldSummary() {
+    const mg = mgmtChk.checked && mgmtInp.value !== ''
+      ? `MGMT ${num(parseFloat(mgmtInp.value), 2)} log2 CPM`
+      : 'MGMT unset';
+    const halfS = parseFloat(pkHalf.value);
+    const intS = parseFloat(pkInt.value);
+    const nDose = parseFloat(pkN.value);
+    const parts = [
+      segValue('sensitivity_mode') || 'sensitivity —',
+      segValue('vascular_mode') || 'vascular —',
+      segValue('oxygen_mode') || 'oxygen —',
+      segValue('state_mode') || 'state —',
+      mg,
+      Number.isFinite(halfS) ? `half life ${dur(halfS)}` : 'half life —',
+      Number.isFinite(nDose) ? `${int(nDose)} dose${nDose === 1 ? '' : 's'}` : 'doses —',
+      Number.isFinite(intS) ? `every ${dur(intS)}` : 'interval —',
+    ];
+    advValues.textContent = parts.join(' · ');
+
+    // "Changed" is measured against the spec this session booted with, and only
+    // when there is one. With no snapshot the chip says so rather than
+    // claiming everything is default — the two are not the same statement.
+    if (!stock_) {
+      advCount.className = 'chip st-queued';
+      advCount.textContent = '9 fields';
+      return;
+    }
+    const cur = readForm();
+    // null and undefined are the same statement here (MGMT unset), and a
+    // number that arrived as a string from an <input> is the same value as the
+    // one in the snapshot.
+    const same = (a, b) => (a === null || a === undefined
+      ? (b === null || b === undefined)
+      : (a === b || Number(a) === Number(b)));
+    const sp = stock_.pk || {};
+    const cp = cur.pk || {};
+    let n = 0;
+    for (const k of ['sensitivity_mode', 'vascular_mode', 'oxygen_mode', 'state_mode']) {
+      if (!same(cur[k], stock_[k])) n++;
+    }
+    if (!same(cur.mgmt, stock_.mgmt)) n++;
+    for (const k of ['half_life_s', 'n_doses', 'dose_interval_s']) {
+      if (!same(cp[k], sp[k])) n++;
+    }
+    advCount.className = 'chip ' + (n ? 'assumed' : 'st-queued');
+    advCount.textContent = n
+      ? `${n} of 9 changed`
+      : '9 fields, all default';
+    // A field that has just been moved off its default is not a detail any
+    // more, so the block opens ONCE on that transition — on the transition and
+    // not on the state, or a fold the operator deliberately closed would spring
+    // back open on their next keystroke anywhere in the form.
+    if (n && !changed_) advFold.open = true;
+    changed_ = n;
   }
 
   // The picker's own caveat line, repainted whenever the selection changes.
@@ -693,7 +1239,11 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       : null;
     const n = gridCells(extent, dx);
 
-    for (const el of [gbArith, gbCount, gbCeil, gbRefusal, gbFacts, gbMem, gbRun]) clear(el);
+    // gbMem and gbRun are <details>: clearing the element itself would take
+    // the summary — the claim — with it, and reset an open fold to shut on
+    // every keystroke in dx. Only their bodies are repainted.
+    for (const el of [gbArith, gbCount, gbCeil, gbRefusal, gbFacts,
+      gbMemBody, gbRunBody, gbRunTail]) clear(el);
     gbRefusal.classList.add('hidden');
 
     const chip = (klass, text, title) => {
@@ -826,8 +1376,7 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     }
 
     /* --- grid size is not the same as memory. Measured, and recorded. ---- */
-    gbMem.appendChild(h('span',
-      h('b', 'A grid under the ceiling can still kill the server. '),
+    gbMemBody.appendChild(h('span',
       'app/server/api.py records the measurement: on a 512 MB instance '
       + '(Render\'s free tier), flagship Xenium GBM, in a real container, ',
       h('span.mono.strong', 'dx = 30 um'), ' peaks at 220 MiB, and ',
@@ -842,9 +1391,18 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     const st = store.get();
     const matches = matchesRecordedRun(st && st.spec);
     const r = RECORDED_RUN;
-    gbRun.appendChild(h('span',
-      h('b', 'Runtime: '),
-      'this repository records exactly one end-to-end Studio run time — ',
+    // The half of this claim that MOVES WITH THE FORM goes in the summary, so
+    // "that is not this spec" is read whether or not the fold is opened. It is
+    // the half that decides whether the number means anything here.
+    append(gbRunTail, [
+      h('span.mono.strong', `${num(r.seconds, 2)} s`),
+      matches
+        ? h('span', ' — ', h('b', 'that is this spec.'))
+        : h('span', ' — ', h('b', 'that is NOT this spec, and it does not '
+          + 'transfer.')),
+    ]);
+    gbRunBody.appendChild(h('span',
+      'Measured ',
       h('span.mono.strong', `${num(r.seconds, 2)} s`),
       ` on ${r.host} (${r.where}), for the stock defaults spec: `,
       h('span.mono', `${r.spec.section} · ${r.spec.drug} · dx ${r.spec.dx_um} um`
@@ -861,6 +1419,10 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
   }
 
   function setDrugs(drugs) {
+    // Kept, not just rendered: the IC50 and the penetrance in these rows are
+    // what the note under the picker and the ratio under the dose field are
+    // made of, and a <select> remembers none of it.
+    drugs_ = Array.isArray(drugs) ? drugs : [];
     clear(drugSel);
     drugSel.appendChild(h('option', { value: '' }, NO_DRUG));
     for (const d of drugs) {
@@ -896,6 +1458,10 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
           : '',
       }, label + suffix));
     }
+    // The picker is repainted by main.js on every compound change, and the
+    // selection survives it — so the notes have to be repainted with it or
+    // they describe the previous catalogue.
+    paintNotes();
   }
 
   function toForm(spec) {
@@ -925,6 +1491,7 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     syncing = false;
     paintSectionCaveats();
     paintGridBudget();
+    paintNotes();
   }
 
   function readForm() {
@@ -985,6 +1552,13 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     // point is that the operator sees the cost while turning the dial, not
     // 340 ms later when the debounced validator lands, and not after Submit.
     paintGridBudget();
+    // Same reason the budget is painted live: the ratio under the dose field
+    // and the window in hours are both answers to what the operator is typing
+    // RIGHT NOW, not to what the validator will say about it in 340 ms.
+    paintNotes();
+    // The section block is a property of the form, so it answers on the
+    // keystroke rather than 340 ms later when the debounced validator lands.
+    applySubmit();
     scheduleValidate();
   }
 
@@ -1000,7 +1574,13 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       renderDiags([{ path: '', message: 'JSON parse error: ' + err.message, line: guessErrLine(text, err) }], []);
       okBadge.className = 'chip st-failed';
       okBadge.textContent = 'unparsed';
-      submitBtn.disabled = true;
+      // The form is deliberately LEFT ALONE on a parse failure (see the sync
+      // contract at the top of this file), which means the form cannot show
+      // what is wrong — so the editor that can is opened rather than left shut
+      // with a dead button above it.
+      srcSect.open = true;
+      setBlock('The RunSpec source does not parse — fix the line marked in '
+        + 'Source.', ta);
       paintGutter();
       return;
     }
@@ -1052,6 +1632,10 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
   }
 
   function focusLine(n) {
+    // The Source section is closed by default and focus cannot enter a closed
+    // <details>, so every route INTO the editor opens it first. Without this a
+    // click on a diagnostic silently did nothing.
+    srcSect.open = true;
     if (!n) { ta.focus(); return; }
     const lines = ta.value.split('\n');
     let pos = 0;
@@ -1146,15 +1730,12 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       errEl.classList.add('hidden');
       errEl.textContent = '';
     }
-    const idFor = {
-      section: 'f-section', dx_um: 'f-dx', drug: 'f-drug', mgmt: 'f-mgmt',
-      total_time_s: 'f-total',
-      'pk.plasma_peak': 'f-pk-peak', 'pk.half_life_s': 'f-pk-half',
-      'pk.n_doses': 'f-pk-n', 'pk.dose_interval_s': 'f-pk-int',
-    };
     for (const e of errors) {
-      const id = idFor[e.path];
+      const id = FIELD_OF_PATH[e.path];
       if (!id) continue;
+      // An error on a folded field is an error nobody can see. The fold is a
+      // convenience for fields that are behaving.
+      if (FOLDED_FIELDS.has(id)) advFold.open = true;
       const t = fieldEls.get(id);
       if (!t) continue;
       t.control.setAttribute('aria-invalid', 'true');
@@ -1203,12 +1784,16 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       } else {
         okBadge.textContent = 'valid';
       }
-      submitBtn.disabled = !ok;
+      setBlock(ok ? '' : `${errors.length} error`
+        + `${errors.length === 1 ? '' : 's'} from the validator — press to go `
+        + 'to the first one.', ok ? null : blockerFor(errors));
     } catch (err) {
       store.set({ validating: false });
       okBadge.className = 'chip st-failed';
       okBadge.textContent = 'validate failed';
-      submitBtn.disabled = false;   // do not block the operator on our own outage
+      // Do not block the operator on our own outage: the server is the thing
+      // that refuses a spec, and it has not been asked yet.
+      setBlock('');
       if (explicit) notifyError('POST /api/validate failed', err);
     }
   }
@@ -1249,6 +1834,15 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     api.getLimits().then((lim) => {
       if (adoptCeiling(lim, 'GET /api/limits')) paintGridBudget();
     }).catch(() => { /* stays unknown; the panel says so */ });
+    // THE FIRST SPEC THIS SESSION SEES IS THE STOCK ONE, and the folded block
+    // counts its nine fields against it. Only the first, and only when it
+    // parses as an object: main.js calls loadSpec() again to restore a run's
+    // own spec (and on a catalogue refresh, with the CURRENT spec), and
+    // adopting one of those as "the defaults" would silently redefine what
+    // "changed" means halfway through a session.
+    if (!stock_ && spec && typeof spec === 'object') {
+      try { stock_ = JSON.parse(JSON.stringify(spec)); } catch { stock_ = null; }
+    }
     store.set({ spec, specText: serialise(spec), specTextValid: true });
     setEditorText(serialise(spec));
     toForm(spec);
@@ -1364,6 +1958,15 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     }
   }
 
+  // THE PANEL IS BUILT BEFORE ANY CATALOGUE HAS LANDED, and for the first
+  // seconds — or for the whole session, if /api/sections and /api/defaults both
+  // fail, which is the case main.js catches and toasts — the spec names no
+  // section. Submit was ENABLED over that spec, because nothing had set its
+  // disabled property yet. It is evaluated once here so the button's first
+  // state is a computed one rather than an unset one.
+  applySubmit();
+  paintNotes();
+
   return {
     el: root,
     setSections, setDrugs, loadSpec, track, validate: () => runValidate(true),
@@ -1372,10 +1975,12 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
     /** Repaint the ingested-section list (GET /api/sections, `ingested` rows). */
     refreshTissue: () => tissuePanel.refresh(),
     get trackedId() { return tracked; },
-    focusEditor: () => ta.focus(),
+    /** Ctrl/Cmd+L, from main.js::wireKeys. The section it lives in is closed
+     *  by default now, and focus cannot enter a closed <details>. */
+    focusEditor: () => { srcSect.open = true; ta.focus(); },
     setSubmitting(on) {
-      submitBtn.disabled = on;
-      submitBtn.textContent = on ? 'Submitting…' : 'Submit run';
+      submitting_ = on;
+      applySubmit();
     },
   };
 }

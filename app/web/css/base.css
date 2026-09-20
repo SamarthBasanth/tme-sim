@@ -184,8 +184,16 @@ hr.rule {
 .chan:focus-within { background: var(--bg-2); box-shadow: inset 2px 0 0 var(--focus); }
 
 /* --- scrollbars: thin, chromeless, always-visible track ------------------ */
-.scroll { overflow: auto; overscroll-behavior: contain; }
-.scroll-x { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
+/* The app's three scroll primitives, and the ONLY three. Rule 4.3 — the body
+   never scrolls horizontally, wide content scrolls inside its own container —
+   is spelled here and nowhere else. `layout.css` carried a fourth name,
+   `.overflow-x`, which was these same declarations under a different word with
+   no call sites; it is gone.
+   Any block that can be wider than its column (a table, a code listing, a
+   diagram, a sweep grid) takes `.scroll-x`, or `.tblwrap` if it is a table. */
+.scroll   { overflow: auto; overscroll-behavior: contain; min-height: 0; min-width: 0; }
+.scroll-x { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; max-width: 100%; }
+.scroll-y { overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; min-height: 0; }
 * { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
 ::-webkit-scrollbar { width: var(--sp-6); height: var(--sp-6); }
 ::-webkit-scrollbar-track { background: transparent; }

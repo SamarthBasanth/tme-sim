@@ -538,6 +538,148 @@ def test_quiescent_cells_sit_exactly_on_the_threshold_and_are_kept():
     assert list(got) == [SURVIVED_RESISTANT, SURVIVED_RESISTANT]
 
 
+# --------------------------------------------------------------------------- #
+# 4. What the attribution's own checks do NOT cover.
+#
+# Added 2026-09-20 with results/mechanism_attribution_audit_2026-09-20.md. Each
+# of these pins a fact the audit measured and that nothing else in the suite
+# states. They are not aspirational: every one of them passes against the code
+# as it ships, and two of them describe a limitation rather than a virtue. The
+# point is that the limitation is now asserted, so it cannot quietly change or
+# quietly be claimed away.
+# --------------------------------------------------------------------------- #
+def test_reconciliation_is_blind_to_the_survival_split():
+    """Bit-exact reconciliation is evidence about the TOTAL, not about the WHY.
+
+    ``reconcile`` rebuilds ``kill_fraction`` from ``KILLED + ALREADY_DEAD`` over
+    ``labels != NOT_TUMOR``. The four survival categories — the delivery / dose
+    / resistance / chance split that IS the product's headline sentence — never
+    enter that arithmetic. So an attribution whose survival labels are pure
+    noise reconciles exactly as bit-exactly as the real one.
+
+    js/ui/finding.js tells a reader every figure on the first screen is "read
+    off run.mechanism, which reconciles bit-exactly with the engine's own
+    labels". That sentence is true and it is not evidence for the split beside
+    it. This test is what stops the two being conflated in code: if someone
+    later strengthens reconcile() to constrain the split, this fails and says
+    so, and the audit that quotes this blindness has to be updated with it.
+    """
+    rng = np.random.default_rng(0)
+    truth = np.array([KILLED] * 30 + [ALREADY_DEAD] * 5
+                     + [SURVIVED_UNREACHED] * 40 + [SURVIVED_UNDERDOSED] * 15
+                     + [SURVIVED_RESISTANT] * 8 + [SURVIVED_STOCHASTIC] * 2
+                     + [NOT_TUMOR] * 25, dtype=np.uint8)
+    kill_fraction = 1.0 - (100 - 35) / 100
+    base = reconcile(truth, kill_fraction)
+    assert base["bit_exact"] is True and base["n_tumor"] == 100
+
+    survivals = np.array([SURVIVED_UNREACHED, SURVIVED_UNDERDOSED,
+                          SURVIVED_RESISTANT, SURVIVED_STOCHASTIC],
+                         dtype=np.uint8)
+    scrambled = truth.copy()
+    idx = np.where(np.isin(scrambled, survivals))[0]
+    scrambled[idx] = rng.choice(survivals, size=idx.size)
+    # The split is now a different claim about the same run ...
+    assert not np.array_equal(scrambled, truth)
+    # ... and every number reconcile() reports is unchanged, bit for bit.
+    noise = reconcile(scrambled, kill_fraction)
+    assert noise["bit_exact"] is True
+    assert noise["kill_fraction_from_labels"] == base["kill_fraction_from_labels"]
+    assert noise["n_tumor"] == base["n_tumor"]
+    assert noise["n_killed"] == base["n_killed"]
+    assert noise["abs_difference"] == 0.0
+
+    # The strongest form of it: put ALL survivors in one bucket and then in
+    # another. Both "100% delivery-limited" and "100% chance" reconcile.
+    for code in survivals:
+        one = truth.copy()
+        one[idx] = code
+        assert reconcile(one, kill_fraction)["bit_exact"] is True
+
+
+def test_per_drug_hypoxia_override_is_invisible_to_the_derived_threshold():
+    """KNOWN DEFECT, asserted so it cannot be claimed away silently.
+
+    ``MechanismThresholds.resolve`` derives ``resistant_modulation`` as
+    ``max(pd.hypoxia_resistance, pd.quiescent_resistance)`` and documents it as
+    "the mildest resistance penalty the kill model itself applies". For
+    temozolomide that sentence is false. ``DrugParams.hypoxia_resistance`` is a
+    PER-DRUG override (``core.config.TMZ_HYPOXIA_RESISTANCE = 0.80``,
+    literature-derived) and ``pkpd.effective_hypoxia_resistance`` makes it win
+    over the global 0.35, so the mildest penalty actually applied to a TMZ run
+    is 0.80 — while the band is derived at 0.5 from a PDConfig that run did not
+    use. ``engine.simulate_response`` passes ``pd=cfg.pd`` and not the drug, so
+    the override cannot reach the derivation even in principle.
+
+    Consequence, and it is the label that moves: a hypoxic TMZ cell with
+    sensitivity 1.0 has ``modulation = 0.80``, above the 0.5 band, so an
+    adequately-exposed one is reported to the user as CHANCE — "its neighbour
+    with identical inputs died" — when the kill model demonstrably suppressed
+    its kill probability by 20% for being hypoxic.
+    """
+    from tmesim.cells.pkpd import effective_hypoxia_resistance
+    from tmesim.core.config import DRUG_LIBRARY, TMZ_HYPOXIA_RESISTANCE
+
+    tmz = DRUG_LIBRARY["temozolomide-like"]
+    pd_cfg = PDConfig()
+    applied = effective_hypoxia_resistance(tmz, pd_cfg)
+    assert applied == TMZ_HYPOXIA_RESISTANCE == 0.8      # what the kill uses
+    assert pd_cfg.hypoxia_resistance == 0.35             # what resolve() reads
+
+    th = MechanismThresholds().resolve(pd_cfg, hill=1.2)
+    assert th.resistant_modulation == 0.5
+    assert th.resistant_modulation < applied, (
+        "the band is meant to be the MILDEST penalty the model applies; for "
+        "temozolomide the model applies a milder one than the band knows about")
+
+    # A hypoxic TMZ cell, sensitivity 1.0, exposure well past IC50.
+    hypoxic = _diag(ratio=[4.0], modulation=[applied], p_kill=[0.8 * applied])
+    assert list(classify(np.array([int(CellType.TUMOR)]), hypoxic, th)) == \
+        [SURVIVED_STOCHASTIC]
+    # Under the resistance the band DOES know about, the identical cell is
+    # RESISTANCE-limited. The two answers differ only by which config was read.
+    th_applied = MechanismThresholds(resistant_modulation=applied).resolve(
+        pd_cfg, hill=1.2)
+    assert list(classify(np.array([int(CellType.TUMOR)]), hypoxic,
+                         th_applied)) == [SURVIVED_RESISTANT]
+
+
+def test_below_ic50_no_biology_can_reach_the_resistance_or_chance_bands():
+    """The documented precedence has an undocumented consequence.
+
+    Exposure bands bind first, so ``ratio < adequate_ratio`` is decided before
+    ``modulation`` is looked at ONCE. A cell can therefore be arbitrarily
+    resistant — modulation 1e-6, kill probability zero — and still be reported
+    as DOSE-limited, i.e. as a cell a bigger dose would have handled.
+
+    This is not a corner case on the flagship section: every surviving
+    temozolomide cell there is sub-IC50, so RESISTANCE and CHANCE are
+    unreachable for that whole run by construction and the four-category
+    verdict is really a two-band cut on one axis. ``joint_limited`` counts these
+    cells, which is the honest disclosure; what it does not do is stop the
+    dominant-limiter sentence being read as "resistance was not the problem".
+    """
+    th = MechanismThresholds().resolve(PDConfig(), hill=1.0)
+    ratios = [0.099, 0.1, 0.5, 0.999]
+    diag = _diag(ratio=ratios,
+                 modulation=[1e-6] * 4,      # as resistant as a cell can be
+                 p_kill=[0.0] * 4)
+    got = classify(np.full(4, int(CellType.TUMOR)), diag, th)
+    assert list(got) == [SURVIVED_UNREACHED, SURVIVED_UNDERDOSED,
+                         SURVIVED_UNDERDOSED, SURVIVED_UNDERDOSED]
+    assert SURVIVED_RESISTANT not in list(got)
+    assert SURVIVED_STOCHASTIC not in list(got)
+
+    # And the aggregate says so: 100% of the survivals roll up as exposure, with
+    # the over-determination reported beside it rather than in the split.
+    out = attribute(np.full(4, int(CellType.TUMOR)), diag, kill_fraction=0.0,
+                    pd=PDConfig())
+    assert out["survival_breakdown"]["resistance"] == 0.0
+    assert out["survival_breakdown"]["chance"] == 0.0
+    assert out["joint_limited"]["count"] == 4
+    assert out["joint_limited"]["fraction_of_exposure_limited"] == 1.0
+
+
 def test_done_is_not_announced_before_the_payloads_are_on_disk(client):
     """`done` is the signal the UI acts on, so it must not precede the writes.
 

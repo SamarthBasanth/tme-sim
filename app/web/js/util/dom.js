@@ -1,7 +1,23 @@
 // dom.js — a ~60-line hyperscript. No framework, no build step.
 
 /**
- * h('div.cls#id', {attrs}, ...children) -> HTMLElement
+ * h('div#id.cls.cls2', {attrs}, ...children) -> HTMLElement
+ *
+ * **THE ID COMES BEFORE THE CLASSES.** The selector is matched by
+ * `/^(tag)?(#id)?((\.class)*)$/` below, so `div.cls#id` does NOT match and
+ * `h()` THROWS `bad selector`. There is no partial success: the throw
+ * propagates out of whatever was building that subtree, so one reversed
+ * selector takes a whole panel with it — a grid that renders nothing at all
+ * looks exactly like a page still loading.
+ *
+ * Until 2026-09-20 the example above was written the other way round, with
+ * the classes ahead of the id — the order this function rejects. That
+ * documented example is what produced the bug: a new call site copied it, and
+ * the home page's project grid built nothing at all. The bad form is
+ * deliberately not reproduced here, because an example gets copied more
+ * readily than prose gets read. Guarded by
+ * `tests/test_first_session.py::test_no_module_passes_h_a_selector_it_would_reject`.
+ *
  * Attributes: strings/numbers set as attributes; `on*` set as listeners;
  * `style` accepts an object; `dataset` accepts an object; booleans toggle.
  */

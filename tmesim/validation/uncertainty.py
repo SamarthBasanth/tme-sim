@@ -61,6 +61,17 @@ Design
 
 Run: ``python -m tmesim.validation.uncertainty`` (writes ``results/uncertainty.md``
 and ``results/uncertainty.png``).
+
+Section 7 is a DIFFERENT OBJECT from sections 1-6
+-------------------------------------------------
+Everything above is an EXPERT prior on an analyst choice. Section 7
+(:func:`kill_fraction_interval` and friends) carries only spans that were
+**measured** and are **recorded** in ``results/``, keeps the BIOLOGICAL
+(between-patient potency) and EPISTEMIC (cell-state route) bars strictly apart
+because a measurement removes one and cannot touch the other, and refuses to
+emit a band for anything whose spread has not been characterised. Record:
+``results/uncertainty_band_2026-09-20.md``. Do not read a section-7 interval as
+a section-1 prior, or the reverse.
 """
 from __future__ import annotations
 
@@ -1028,6 +1039,931 @@ def write_report(res: Dict, resolution: Optional[Dict] = None,
     with open(path, "w") as fh:
         fh.write(text)
     return path
+
+
+# ===========================================================================
+# 7. THE INTERVAL AS A FIRST-CLASS OUTPUT.
+#    (record: results/uncertainty_band_2026-09-20.md)
+# ===========================================================================
+# Sections 1-6 above are EXPERT priors on analyst choices, and say so loudly.
+# THIS section is a different object and must not be confused with it: it
+# carries only spans that were MEASURED and are RECORDED in results/, and it
+# refuses to emit a band for anything else.
+#
+# results/kill_calibration.md sec 5.1 states the finding this section exists to
+# ship: "Absolute kill is defensible as an INTERVAL, not as a number, and the
+# interval is wide" -- temozolomide 0.0048-0.1442, a 30x span. That sentence has
+# until now lived only in a prose caveat in a results document. The engine
+# reports the single-valued point everywhere a reader can actually see it.
+#
+# THE TWO BARS ARE DIFFERENT KINDS AND THIS MODULE KEEPS THEM APART.
+#
+#   BIOLOGICAL -- the inter-culture potency spread. n = 40 patient-derived GBM
+#     cultures really do differ from one another by that much. A better model
+#     does NOT shrink it: it is variation between patients, not error in us. It
+#     shrinks by ONE route only -- measuring THIS patient's own ex-vivo
+#     sensitivity, which collapses the between-patient spread to a within-assay
+#     one.
+#
+#   EPISTEMIC -- the cell-state route span. Three routes to a state label give
+#     three different F_state on the SAME cells, with the tissue, the drug, the
+#     transport solve and the RNG all held identical (results/
+#     cell_state_impact.md sec 3.2: "Nothing physical changed between those
+#     columns; only the label on each cell did"). That is OUR IGNORANCE. A
+#     measurement -- Ki-67 IHC on a serial section, a hypoxia-response gene on
+#     the panel, a pO2 reading -- REMOVES it.
+#
+# Conflating them would make this feature worse than no feature: it would tell a
+# reader that a better model narrows a bar that no model can narrow, and that a
+# bar a single serial-section stain would delete is a permanent property of the
+# tumour. So the combined band is never reported without its two components
+# beside it, and ``assert_kinds_separated`` is a callable guard over that.
+#
+# WHAT THIS DOES NOT DO. It does not make absolute kill fraction a defensible
+# output. It is not a licence to quote the point, the band, or either endpoint
+# as a prediction, and every interval it produces carries ``quotable = False``
+# with the reason attached. The interval is published as the SIZE OF THE
+# REFUSAL: a reader who sees only ``kill_fraction = 0.1122`` has no way to know
+# that the characterised uncertainty around it spans a factor of thirty. Nothing
+# here ranks one compound against another, and nothing here can: every entry
+# point takes exactly ONE finished run for ONE compound.
+
+#: The two kinds, and what each one means for a reader deciding what to do next.
+BIOLOGICAL = "biological"
+EPISTEMIC = "epistemic"
+
+KIND_MEANING: Dict[str, Dict[str, str]] = {
+    BIOLOGICAL: {
+        "label": "biological variation between patients",
+        "is_it_our_error": "no",
+        "does_a_better_model_shrink_it": "no",
+        "what_shrinks_it": (
+            "measuring THIS patient's own drug sensitivity (an ex-vivo "
+            "viability assay on this tumour), which replaces a between-patient "
+            "spread with a within-assay one"
+        ),
+    },
+    EPISTEMIC: {
+        "label": "our ignorance about the model",
+        "is_it_our_error": "yes",
+        "does_a_better_model_shrink_it": "yes",
+        "what_shrinks_it": (
+            "a measurement that settles which cell-state route is right on this "
+            "section: Ki-67 IHC/IF on a serial section registered to the Xenium "
+            "coordinates, any hypoxia-response gene (CA9/ADM/NDRG1/SLC2A1) on "
+            "the panel, or a measured pO2 (results/cell_state_impact.md sec 5.1)"
+        ),
+    },
+}
+
+#: Provenance grades a recorded span can carry, and whether a band may be built
+#: from one. A quoted round-number literature range is NOT a characterised
+#: spread and is refused rather than dressed up as one.
+BANDABLE_GRADES = ("measured_between_patient", "measured_between_cell_line")
+REFUSED_GRADES = ("quoted_literature_range",)
+
+
+@dataclass(frozen=True)
+class RecordedSpan:
+    """One MEASURED span, transcribed from a dated record in ``results/``.
+
+    Every field is either copied from that record or derived from it by
+    arithmetic that the record itself performs. Nothing here is a prior, an
+    analyst choice or a judgement about transfer -- those live in section 1 and
+    are labelled as such there.
+    """
+
+    name: str
+    kind: str                      # BIOLOGICAL | EPISTEMIC
+    grade: str                     # one of BANDABLE_GRADES / REFUSED_GRADES
+    quantity: str                  # what the endpoints are endpoints OF
+    lo: float
+    hi: float
+    point: float
+    unit: str
+    population: str                # WHO or WHAT the spread is across
+    n: Optional[int]
+    source_document: str
+    source_section: str
+    measurement: str
+    caveat: str = ""
+
+    @property
+    def bandable(self) -> bool:
+        return self.grade in BANDABLE_GRADES
+
+    def as_dict(self) -> Dict:
+        d = {
+            "name": self.name,
+            "kind": self.kind,
+            "kind_meaning": KIND_MEANING[self.kind],
+            "grade": self.grade,
+            "bandable": self.bandable,
+            "quantity": self.quantity,
+            "lo": self.lo,
+            "hi": self.hi,
+            "point": self.point,
+            "unit": self.unit,
+            "population": self.population,
+            "n": self.n,
+            "source_document": self.source_document,
+            "source_section": self.source_section,
+            "measurement": self.measurement,
+            "caveat": self.caveat,
+        }
+        return d
+
+
+# --- the BIOLOGICAL bar: intrinsic potency, per compound --------------------
+# Endpoints are IC50s, NOT kill fractions. That is deliberate. The recorded kill
+# endpoints (temozolomide 0.0048-0.0831 etc.) were measured at the 2026-08-12
+# configuration and two physics changes have moved every kill since (d77d169
+# area-conserving vessel source, fd2a9e7 two-route transport; see the banner at
+# the head of results/kill_calibration.md). Re-emitting those absolutes would be
+# exactly the claim-surface drift this project keeps having. The IC50 band is a
+# property of the MEASUREMENT and does not move with the engine, so it is what
+# is stored -- and it is re-propagated through the run's OWN Hill and the run's
+# OWN exposure distribution every time a band is asked for.
+POTENCY_SPAN: Dict[str, RecordedSpan] = {
+    "temozolomide": RecordedSpan(
+        name="intrinsic_potency_between_patient",
+        kind=BIOLOGICAL,
+        grade="measured_between_patient",
+        quantity="2-D-anchored IC50",
+        lo=151.1, hi=1882.0, point=362.1, unit="uM",
+        population="40 patient-derived GBM cultures (ex-vivo, 2-D monolayer)",
+        n=40,
+        source_document="results/kill_calibration.md",
+        source_section="4 (table) + 'How to read the error bar'",
+        measurement=(
+            "median ex-vivo viability 82.4% at 100 uM, inter-culture IQR "
+            "62.1-97.1% (PMID 37620410 / GEO GSE232173, BJC2023 Supplemental "
+            "Table 2, n = 40); the IQR of the measured viability inverted "
+            "through the model's own Hill (hill = 1.2) into an IQR of implied "
+            "IC50. HIGH viability = weak kill = HIGH (weak) IC50."
+        ),
+        caveat=(
+            "The response variable is itself an operator-REPRODUCIBILITY table "
+            "with %CV median 8.3% and max 42.9%, so the bar is if anything "
+            "optimistic. The anchored point (362.1 uM) sits inside GDSC's own "
+            "between-line IQR (302-1442 uM), so it is a re-centring and not a "
+            "contradiction of the library value."
+        ),
+    ),
+    "cisplatin": RecordedSpan(
+        name="intrinsic_potency_between_cell_line",
+        kind=BIOLOGICAL,
+        grade="measured_between_cell_line",
+        quantity="2-D anchored IC50",
+        lo=8.929, hi=84.7, point=24.55, unit="uM",
+        population="34 GDSC2 glioma MONOLAYER CELL LINES -- not patients",
+        n=34,
+        source_document="results/kill_calibration.md",
+        source_section="4 (table); code: kill_calibration.gdsc_glioma_ic50_band",
+        measurement=(
+            "between-line IQR of the fitted GDSC2 IC50 over 34 glioma monolayer "
+            "lines, about the median 24.55 uM. GDSC is itself a monolayer assay, "
+            "so its fitted IC50 is already the 2-D-appropriate potency."
+        ),
+        caveat=(
+            "THE POPULATION IS NOT PATIENTS. This is spread across immortalised "
+            "cell lines, which is a proxy for between-patient variation and not a "
+            "measurement of it. results/kill_calibration.md sec 4 states it "
+            "directly: cisplatin 'gets no new anchor', and its error bar is 'the "
+            "spread of the anchor source, not a re-anchoring'. Do not quote it as "
+            "a between-patient bar."
+        ),
+    ),
+    "doxorubicin": RecordedSpan(
+        name="intrinsic_potency_quoted_range",
+        kind=BIOLOGICAL,
+        grade="quoted_literature_range",
+        quantity="2-D IC50 (quoted range, NOT a measured distribution)",
+        lo=0.1, hi=1.0, point=0.5, unit="uM",
+        population="unspecified glioma cell lines in the quoting literature",
+        n=None,
+        source_document="results/kill_calibration.md",
+        source_section="4 (table)",
+        measurement=(
+            "a quoted literature range, 0.1-1 uM. results/kill_calibration.md "
+            "sec 4: 'a quoted literature range in glioma lines, 0.1-1 uM, NOT a "
+            "measurement in this disease'."
+        ),
+        caveat=(
+            "REFUSED as a band. Two round numbers a decade apart are not a "
+            "characterised spread: there is no population, no n, no quantile and "
+            "no dispersion statistic behind them. Reporting 0.1-1 uM as an error "
+            "bar would manufacture a distribution out of a citation."
+        ),
+    ),
+}
+
+# --- the third quantity: a DIFFERENT question, deliberately not combined ----
+# results/kill_calibration.md sec 4 draws this distinction and it is worth
+# keeping: the wide bar answers "where does THIS patient sit in the measured GBM
+# distribution", the narrow one answers "how well is the TYPICAL GBM's intrinsic
+# potency pinned down". The second is EPISTEMIC-STATISTICAL -- it shrinks as n
+# grows -- and folding it into the biological bar would be a category error in
+# the other direction.
+COHORT_MEDIAN_SPAN: Dict[str, RecordedSpan] = {
+    "temozolomide": RecordedSpan(
+        name="cohort_median_potency_ci",
+        kind=EPISTEMIC,
+        grade="measured_between_patient",
+        quantity="2-D-anchored IC50, 95% CI on the COHORT MEDIAN",
+        lo=218.0, hi=545.0, point=362.1, unit="uM",
+        population="the median of the same 40 cultures (a sampling interval)",
+        n=40,
+        source_document="results/kill_calibration.md",
+        source_section="4 ('a second, tighter bar answers a different question')",
+        measurement=(
+            "10,000 bootstrap resamples of n = 40 give a 95% CI on the cohort "
+            "median viability of 71.8-88.4%, i.e. IC50 218-545 uM."
+        ),
+        caveat=(
+            "NOT the same question as the wide bar and NOT combined with it "
+            "anywhere in this module. It shrinks with more patients measured, "
+            "which is why it is filed EPISTEMIC even though its subject is "
+            "biological. Quote it when asking how well cohort-typical potency is "
+            "pinned down; quote the wide bar when predicting for one patient "
+            "whose own sensitivity has not been measured."
+        ),
+    ),
+}
+
+# --- the EPISTEMIC bar: which cell-state route -------------------------------
+#: Section this span was measured on. It does not transfer: it is three routes
+#: run on ONE section's own cells, and the panel's gene content decides which
+#: routes are even admissible there.
+STATE_SPAN_SECTIONS = ("xenium_319", "xenium_gbm")
+
+#: F_state = mean over tumour cells of the PDConfig resistance multiplier, per
+#: route, from results/cell_state_impact.md sec 3.1/3.2 band occupancies:
+#:   oxygen          10.04 / 89.96 / 0.00 %  -> 0.1004 + 0.5*0.8996 = 0.5502
+#:   markers         29.80 / 70.20 / 0.00 %  -> 0.2980 + 0.5*0.7020 = 0.6490
+#:   vessel_distance 91.08 /  8.67 / 0.26 %  -> 0.9108 + 0.5*0.0867 + 0.35*0.0026
+#:                                            = 0.9550
+F_STATE_BY_ROUTE = {
+    "oxygen": 0.5502,
+    "markers": 0.6490,
+    "vessel_distance": 0.9550,
+}
+#: The shipping default, and the endpoint the span is measured FROM.
+F_STATE_DEFAULT_ROUTE = "oxygen"
+
+STATE_ROUTE_SPAN = RecordedSpan(
+    name="cell_state_route",
+    kind=EPISTEMIC,
+    grade="measured_between_cell_line",  # measured; population = model routes
+    quantity="F_state (mean resistance multiplier over tumour cells)",
+    lo=F_STATE_BY_ROUTE["oxygen"], hi=F_STATE_BY_ROUTE["vessel_distance"],
+    point=F_STATE_BY_ROUTE["oxygen"], unit="dimensionless",
+    population="3 cell-state ROUTES on the SAME cells of ONE section",
+    n=3,
+    source_document="results/cell_state_impact.md",
+    source_section="3.1 / 3.2, propagated in results/kill_calibration.md sec 5.1",
+    measurement=(
+        "oxygen (shipping default) 0.5502, markers 0.6490, vessel_distance "
+        "0.9550 -- band occupancies measured on the 319-gene flagship Xenium "
+        "section at dx = 12 um with the tissue, the drug, the transport solve "
+        "and the RNG all held identical. 'Nothing physical changed between "
+        "those columns; only the label on each cell did.'"
+    ),
+    caveat=(
+        "ONE-SIDED. The shipping default sits at the BOTTOM of the measured "
+        "span, so this bar only ever widens the prediction UPWARD (x1.0000 to "
+        "x1.7357). It is applied as a LINEAR scaling on kill, which is exact "
+        "only because the Hill term carries no state dependence; results/"
+        "kill_calibration.md sec 5.1 checked it against cell_state_impact sec "
+        "3.2 and found it ~1.3% GENEROUS, so the band is very slightly wide. "
+        "Measured on ONE section: no route clears its own measurability bar "
+        "there (results/cell_state_impact.md sec 5), which is why the quantity "
+        "it bands is refused as a result rather than published as one."
+    ),
+)
+
+#: The multiplicative factor the span becomes when applied to a kill fraction.
+#: 0.9550 / 0.5502 -- the same arithmetic results/kill_calibration.md sec 5.1
+#: performs (0.0326 x 1.7357 = 0.0566, its recorded state endpoint).
+STATE_SPAN_FACTOR = (1.0, F_STATE_BY_ROUTE["vessel_distance"]
+                     / F_STATE_BY_ROUTE[F_STATE_DEFAULT_ROUTE])
+
+# --- PRE-REGISTERED thresholds (written before any measurement) --------------
+#: A band is built by RE-EVALUATING the run's own kill at the band-edge IC50s.
+#: That recomputation must first reproduce the run's recorded kill_fraction, or
+#: it is describing a different run. Tolerance is the exact Bernoulli sampling
+#: scale of the engine's own draw: sigma = sqrt(sum p(1-p)) / n_tumour.
+REPRODUCTION_SIGMA_GATE = 4.0
+
+#: The band is shipped default-on only if it costs less than this fraction of
+#: the run it annotates. Measured in results/uncertainty_band_2026-09-20.md.
+DEFAULT_ON_COST_FRACTION = 0.01
+
+
+@dataclass(frozen=True)
+class FinishedRun:
+    """The per-cell state of ONE finished run for ONE compound.
+
+    ``E_uM`` and ``modulation`` are TUMOUR-CELL arrays, in the same order, taken
+    from the run itself -- ``E_uM`` is ``auc_per_cell / duration`` exactly as
+    :func:`tmesim.cells.pkpd.apply_drug_kill` forms it, and ``modulation`` is
+    that call's ``sensitivity * resistance``. Nothing is re-simulated.
+    """
+
+    compound: str
+    section_id: str
+    kill_fraction: float          # the engine's REALISED Bernoulli value
+    E_uM: np.ndarray
+    modulation: np.ndarray
+    ic50_uM: float
+    hill: float
+    max_kill_rate: float = 1.0
+    state_mode: str = "oxygen"
+    dx_um: Optional[float] = None
+    run_id: Optional[str] = None
+
+    @property
+    def n_tumor(self) -> int:
+        return int(np.asarray(self.E_uM).size)
+
+
+def finished_run_from_result(micro, result, drug, *, compound: str,
+                             section_id: str, pd_cfg=None, oxygen_cfg=None,
+                             state_mode: str = "oxygen",
+                             run_id: Optional[str] = None) -> "FinishedRun":
+    """Build a :class:`FinishedRun` from an engine result — the DEFAULT-ON path.
+
+    This is the cheap in-process constructor: everything it needs is already in
+    the ``SimulationResult`` the engine just returned. ``result.fields['auc']``
+    is the exposure field the kill was applied from and ``result.fields['oxygen']``
+    is the ENGINE'S OWN oxygen solve (``simulate_response`` re-bands cells from
+    it before killing, so the reconstruction's oxygen is the wrong field to use
+    here and is not used). Nothing is re-simulated; measured cost is in
+    ``results/uncertainty_band_2026-09-20.md``.
+
+    The banding below is :func:`tmesim.cells.agents.update_cell_states`'s, and
+    the modulation is :func:`tmesim.cells.pkpd.apply_drug_kill`'s
+    ``sensitivity * resistance``. Neither is trusted on the strength of that
+    claim: :func:`reproduction_check` re-derives the run's own kill fraction
+    from these arrays and every band is gated on it.
+    """
+    from ..cells.pkpd import effective_hypoxia_resistance
+    from ..core import CellType
+    from ..core.config import OxygenConfig, PDConfig
+
+    pd_cfg = pd_cfg if pd_cfg is not None else PDConfig()
+    oxygen_cfg = oxygen_cfg if oxygen_cfg is not None else OxygenConfig()
+
+    cells = micro.cells
+    col, row = micro.domain.to_index(cells.x, cells.y)
+    times = np.asarray(result.transport.times, dtype=np.float64)
+    duration = float(times[-1]) if times.size and times[-1] > 0.0 else 1.0
+    E = np.asarray(result.fields["auc"], dtype=np.float64)[row, col] / duration
+    o2 = np.asarray(result.fields["oxygen"], dtype=np.float64)[row, col]
+
+    thr = float(oxygen_cfg.hypoxia_threshold)
+    resistance = np.ones(o2.size, dtype=np.float64)
+    resistance[o2 < thr] = float(effective_hypoxia_resistance(drug, pd_cfg))
+    resistance[(o2 >= thr) & (o2 < 2.0 * thr)] = float(pd_cfg.quiescent_resistance)
+
+    tumor = np.asarray(cells.cell_type) == int(CellType.TUMOR)
+    modulation = np.asarray(cells.sensitivity, dtype=np.float64) * resistance
+    return FinishedRun(
+        compound=compound,
+        section_id=section_id,
+        kill_fraction=float(result.kill_fraction),
+        E_uM=E[tumor],
+        modulation=modulation[tumor],
+        ic50_uM=float(drug.ic50),
+        hill=float(drug.hill),
+        max_kill_rate=float(pd_cfg.max_kill_rate),
+        state_mode=state_mode,
+        dx_um=float(micro.domain.dx),
+        run_id=run_id,
+    )
+
+
+def _p_kill(E: np.ndarray, modulation: np.ndarray, ic50: float, hill: float,
+            max_kill: float) -> np.ndarray:
+    """The engine's own per-cell kill probability, at an arbitrary IC50.
+
+    Byte-for-byte the expression in :func:`tmesim.cells.pkpd.apply_drug_kill`
+    (including its ``1e-300`` guard), so a band edge is the same function of the
+    same exposure as the point it brackets -- only the IC50 differs.
+    """
+    E = np.asarray(E, dtype=np.float64)
+    E_h = np.power(np.maximum(E, 0.0), float(hill))
+    E50_h = float(ic50) ** float(hill)
+    p_hill = float(max_kill) * E_h / (E50_h + E_h + 1e-300)
+    return np.clip(p_hill * np.asarray(modulation, dtype=np.float64), 0.0, 1.0)
+
+
+def expected_kill_at_ic50(run: FinishedRun, ic50_uM: float) -> float:
+    """Expected kill fraction if intrinsic potency were ``ic50_uM``.
+
+    Delivery, cell state and the exposure distribution are the RUN'S OWN and are
+    untouched: only the potency constant moves. This is the propagation
+    ``results/kill_calibration.md`` sec 4 performs, re-done on this run.
+    """
+    return float(np.mean(_p_kill(run.E_uM, run.modulation, ic50_uM,
+                                 run.hill, run.max_kill_rate)))
+
+
+def reproduction_check(run: FinishedRun) -> Dict:
+    """PRE-REGISTERED GATE: does the re-evaluation reproduce the run's own kill?
+
+    The engine draws kills stochastically and this module reports the
+    expectation, so the residual should be Bernoulli sampling noise and nothing
+    else. ``sigma`` is that sampling scale exactly. Outside
+    :data:`REPRODUCTION_SIGMA_GATE` sigma the arrays do not describe this run and
+    every band built from them is refused.
+    """
+    p = _p_kill(run.E_uM, run.modulation, run.ic50_uM, run.hill,
+                run.max_kill_rate)
+    n = p.size
+    expected = float(np.mean(p)) if n else float("nan")
+    sigma = float(np.sqrt(np.sum(p * (1.0 - p))) / n) if n else float("nan")
+    delta = expected - float(run.kill_fraction)
+    z = delta / sigma if sigma > 0 else float("inf")
+    return {
+        "expected_kill": expected,
+        "recorded_kill_fraction": float(run.kill_fraction),
+        "abs_delta": abs(delta),
+        "bernoulli_sigma": sigma,
+        "z": float(z),
+        "gate_sigma": REPRODUCTION_SIGMA_GATE,
+        "passed": bool(abs(z) <= REPRODUCTION_SIGMA_GATE),
+        "n_tumor": int(n),
+    }
+
+
+def _refusal(metric: str, reason: str, **extra) -> Dict:
+    out = {
+        "metric": metric,
+        "status": "UNCHARACTERISED",
+        "band": None,
+        "quotable": False,
+        "reason": reason,
+    }
+    out.update(extra)
+    return out
+
+
+#: Metrics a finished run reports for which NO measured span exists anywhere in
+#: ``results/``. Each one states what would have to be measured. A band here
+#: would have to be invented, so none is offered.
+UNCHARACTERISED_METRICS: Dict[str, str] = {
+    "penetration_index": (
+        "No MEASURED span exists. Neither recorded span touches transport: the "
+        "potency span is an IC50 (a pharmacodynamic constant) and the "
+        "cell-state span is a resistance multiplier, and the Hill term carries "
+        "no state dependence -- so neither moves the exposure field at all. The "
+        "only interval this repository has for penetration_index is the "
+        "posterior-predictive CI in sections 1-6 of this module, which is "
+        "propagated from EXPERT priors on analyst choices, not from measured "
+        "spreads, and is labelled as such. It also carries a systematic "
+        "RESOLUTION BIAS (a shift of every draw the same way, not a widening) "
+        "which cannot be expressed as a band at all. Reporting either as a "
+        "measured error bar would launder an analyst choice into a measurement."
+    ),
+    "penetration_length_um": (
+        "No MEASURED span exists; same reason as penetration_index. It is a fit "
+        "to the run's own AUC-vs-distance field, which neither recorded span "
+        "moves."
+    ),
+    "mean_tumor_auc": (
+        "No MEASURED span exists. This is an exposure, set by transport and the "
+        "PK schedule; neither recorded span moves it. results/codon_transport_"
+        "capacity_gap-era work found no per-compound tissue-capacity term, so "
+        "there is not even a withdrawn candidate to point at."
+    ),
+    "therapeutic_coverage_1x": (
+        "No MEASURED span exists as a WIDTH. The potency span does move this "
+        "metric (coverage is exposure measured in IC50 units, so a different "
+        "IC50 rescales the threshold) -- but coverage is a fraction of cells "
+        "above a threshold, not a mean of a smooth per-cell function, so the "
+        "band-edge re-evaluation used for kill_fraction has never been checked "
+        "against the engine for it. An unchecked propagation is not a measured "
+        "band. This is the one refusal here that is a TODO rather than a "
+        "data gap: the check is cheap and this metric should get a band once it "
+        "has been done."
+    ),
+}
+
+
+def assert_kinds_separated(interval: Dict) -> None:
+    """GUARD: the biological and epistemic components must stay distinguishable.
+
+    The whole value of this feature is that it says WHICH bar a measurement
+    would remove. A payload that merges the two, or drops one, or loses the
+    labelling, is worse than no payload -- so this is asserted rather than
+    trusted, and :mod:`tests.test_uncertainty_band` plants a merged payload and
+    watches it fail.
+    """
+    comps = interval.get("components")
+    if not isinstance(comps, dict):
+        raise AssertionError(
+            "interval has no 'components' block: the two kinds have been merged "
+            "into a single undifferentiated bar")
+    kinds = {c.get("kind") for c in comps.values() if isinstance(c, dict)}
+    present = {k for k in kinds if k in (BIOLOGICAL, EPISTEMIC)}
+    if len(present) < len(kinds) or not present:
+        raise AssertionError(
+            f"interval components carry unlabelled or unknown kinds: {kinds!r}")
+    for name, c in comps.items():
+        if not isinstance(c, dict):
+            raise AssertionError(f"component {name!r} is not a labelled block")
+        for field_name in ("kind", "kind_meaning", "source_document",
+                           "what_shrinks_it"):
+            if not c.get(field_name):
+                raise AssertionError(
+                    f"component {name!r} is missing {field_name!r}: a bar whose "
+                    f"kind cannot be read is indistinguishable from the other "
+                    f"kind")
+    if interval.get("quotable") is not False:
+        raise AssertionError(
+            "an absolute-kill interval must carry quotable=False: the interval "
+            "is the size of the refusal, not a licence to quote it")
+
+
+def kill_fraction_interval(run: FinishedRun) -> Dict:
+    """The interval that replaces ``kill_fraction``'s point, for ONE run.
+
+    Returns a payload with the two components kept SEPARATE and labelled, the
+    combined band, and ``quotable = False`` with the reason. Refuses -- rather
+    than fabricating a band -- whenever a span is missing or does not apply.
+
+    The combination is the one ``results/kill_calibration.md`` sec 5.1 performs:
+    the lower edge is the potency edge alone (the cell-state span is one-sided
+    upward from the shipping default, so it contributes nothing below), and the
+    upper edge is the potency upper edge scaled by the state factor.
+    """
+    t0 = time.perf_counter()
+    compound = str(run.compound).strip().lower()
+    repro = reproduction_check(run)
+
+    out: Dict = {
+        "metric": "kill_fraction",
+        "compound": compound,
+        "section_id": run.section_id,
+        "run_id": run.run_id,
+        "point": float(run.kill_fraction),
+        "quotable": False,
+        "not_quotable_reason": (
+            "Absolute kill fraction is not a defensible output of this "
+            "simulator and this interval does not make it one. There is no "
+            "measured drug response for this tissue -- it is an untreated "
+            "resection -- so neither the point nor either endpoint has ever "
+            "been scored against an outcome. results/cell_state_impact.md sec 5 "
+            "recommends not quoting an absolute kill fraction as a result on "
+            "this section at all, because NO cell-state route clears its own "
+            "measurability bar there. This interval is published as the SIZE OF "
+            "THAT REFUSAL, so that a reader who sees the point also sees how "
+            "wide the characterised uncertainty around it is."
+        ),
+        "reproduction": repro,
+        "components": {},
+        "refusals": [],
+        "band": None,
+        "covers_kinds": [],
+        "excluded": list(NOT_COVERED),
+    }
+
+    if not repro["passed"]:
+        out["status"] = "REFUSED"
+        out["reason"] = (
+            f"the per-cell arrays do not reproduce this run's recorded "
+            f"kill_fraction: |z| = {abs(repro['z']):.2f} > "
+            f"{REPRODUCTION_SIGMA_GATE:.1f} sigma of the engine's own Bernoulli "
+            f"sampling scale ({repro['bernoulli_sigma']:.2e}). They describe a "
+            f"different run, so every band built from them would be a band "
+            f"around the wrong number."
+        )
+        out["cost_s"] = time.perf_counter() - t0
+        return out
+
+    # --- BIOLOGICAL component: intrinsic potency ---------------------------
+    pot = POTENCY_SPAN.get(compound)
+    if pot is None:
+        out["refusals"].append(_refusal(
+            "kill_fraction.biological",
+            f"no recorded potency span exists for {compound!r}. The three "
+            f"compounds with one are "
+            f"{sorted(POTENCY_SPAN)!r}; for anything else the between-patient "
+            f"spread has never been measured in this repository, and a band "
+            f"would have to be invented.",
+            kind=BIOLOGICAL))
+    elif not pot.bandable:
+        out["refusals"].append(_refusal(
+            "kill_fraction.biological",
+            f"the recorded potency span for {compound!r} is graded "
+            f"{pot.grade!r} and is refused as a band. {pot.caveat}",
+            kind=BIOLOGICAL, span=pot.as_dict()))
+    else:
+        # lower IC50 = more potent = HIGHER kill, so the IC50 lower edge is the
+        # kill UPPER edge. The inversion is easy to get backwards; it is done
+        # once, here.
+        kill_at_potent = expected_kill_at_ic50(run, pot.lo)
+        kill_at_weak = expected_kill_at_ic50(run, pot.hi)
+        km = KIND_MEANING[pot.kind]
+        out["components"]["potency"] = {
+            "kind": pot.kind,
+            "kind_meaning": km,
+            "what_shrinks_it": km["what_shrinks_it"],
+            "does_a_better_model_shrink_it": km["does_a_better_model_shrink_it"],
+            "lo": float(min(kill_at_potent, kill_at_weak)),
+            "hi": float(max(kill_at_potent, kill_at_weak)),
+            "point": float(run.kill_fraction),
+            "span_x": (float(max(kill_at_potent, kill_at_weak)
+                             / min(kill_at_potent, kill_at_weak))
+                       if min(kill_at_potent, kill_at_weak) > 0 else float("inf")),
+            "ic50_lo_uM": pot.lo, "ic50_hi_uM": pot.hi,
+            "ic50_anchor_uM": pot.point, "ic50_run_uM": float(run.ic50_uM),
+            "population": pot.population,
+            "source_document": pot.source_document,
+            "source_section": pot.source_section,
+            "measurement": pot.measurement,
+            "caveat": pot.caveat,
+            "how_propagated": (
+                "the recorded IC50 endpoints re-evaluated through THIS run's own "
+                "Hill on THIS run's own per-cell exposure and cell state -- the "
+                "recorded kill endpoints are NOT re-quoted, because they were "
+                "measured at a physics configuration two commits ago"
+            ),
+        }
+
+    # --- EPISTEMIC component: which cell-state route -----------------------
+    if run.section_id not in STATE_SPAN_SECTIONS:
+        out["refusals"].append(_refusal(
+            "kill_fraction.epistemic",
+            f"the cell-state route span was measured on "
+            f"{STATE_SPAN_SECTIONS[0]!r} and does not transfer to "
+            f"{run.section_id!r}. It is three routes run on ONE section's own "
+            f"cells, and which routes are even admissible is decided by that "
+            f"panel's gene content (results/cell_state_impact.md sec 1). Three "
+            f"sections on three panels is a sample size of three and nothing "
+            f"transfers between them.",
+            kind=EPISTEMIC))
+    elif run.state_mode != F_STATE_DEFAULT_ROUTE:
+        out["refusals"].append(_refusal(
+            "kill_fraction.epistemic",
+            f"the span is measured FROM the shipping default route "
+            f"({F_STATE_DEFAULT_ROUTE!r}); this run used "
+            f"{run.state_mode!r}, so the recorded x1.0000-x1.7357 factor is "
+            f"anchored to the wrong endpoint for it.",
+            kind=EPISTEMIC))
+    else:
+        f_lo, f_hi = STATE_SPAN_FACTOR
+        sp = STATE_ROUTE_SPAN
+        km = KIND_MEANING[sp.kind]
+        f_state_run = float(np.mean(run.modulation))
+        out["components"]["cell_state_route"] = {
+            "kind": sp.kind,
+            "kind_meaning": km,
+            "what_shrinks_it": km["what_shrinks_it"],
+            "does_a_better_model_shrink_it": km["does_a_better_model_shrink_it"],
+            "lo": float(run.kill_fraction * f_lo),
+            "hi": float(run.kill_fraction * f_hi),
+            "point": float(run.kill_fraction),
+            "span_x": float(f_hi / f_lo),
+            "factor_lo": float(f_lo), "factor_hi": float(f_hi),
+            "one_sided": True,
+            "f_state_by_route": dict(F_STATE_BY_ROUTE),
+            # PRE-REGISTERED PR-3: reported, NOT gated. No defensible tolerance
+            # exists -- results/cell_state_impact.md sec 2.2 measures the oxygen
+            # route's VIABLE-fraction swing across mask x dx as UNBOUNDED.
+            "f_state_this_run": f_state_run,
+            "f_state_recorded_default_route": F_STATE_BY_ROUTE["oxygen"],
+            "f_state_disclosure": (
+                "reported, not gated: this run's own F_state is "
+                f"{f_state_run:.4f} against the recorded {F_STATE_BY_ROUTE['oxygen']:.4f} "
+                "for the same route. No pass/fail threshold is applied because "
+                "none is defensible -- results/cell_state_impact.md sec 2.2 "
+                "measures this route's band occupancy as UNBOUNDED across mask x "
+                "dx, so any tolerance here would be invented."
+            ),
+            "population": sp.population,
+            "source_document": sp.source_document,
+            "source_section": sp.source_section,
+            "measurement": sp.measurement,
+            "caveat": sp.caveat,
+            "how_propagated": (
+                "linear scaling of this run's kill by the recorded F_state ratio "
+                "0.9550/0.5502; exact only because the Hill term carries no "
+                "state dependence, and measured ~1.3% generous in results/"
+                "kill_calibration.md sec 5.1"
+            ),
+        }
+
+    comps = out["components"]
+    out["covers_kinds"] = sorted({c["kind"] for c in comps.values()})
+    if not comps:
+        out["status"] = "UNCHARACTERISED"
+        out["reason"] = (
+            "no recorded span applies to this run, so no band is offered. The "
+            "refusals below say what is missing; none of them is filled in with "
+            "a default."
+        )
+        out["cost_s"] = time.perf_counter() - t0
+        return out
+
+    pot_c = comps.get("potency")
+    st_c = comps.get("cell_state_route")
+    if pot_c and st_c:
+        lo = pot_c["lo"]
+        hi = pot_c["hi"] * st_c["factor_hi"]
+        out["status"] = "BANDED"
+        out["combination"] = (
+            "lower edge = the potency lower edge alone (the cell-state span is "
+            "one-sided upward from the shipping default and contributes nothing "
+            "below); upper edge = the potency upper edge scaled by the "
+            "cell-state factor. The same combination results/kill_calibration.md "
+            "sec 5.1 performs."
+        )
+    elif pot_c:
+        lo, hi = pot_c["lo"], pot_c["hi"]
+        out["status"] = "BANDED_PARTIAL"
+        out["combination"] = (
+            "BIOLOGICAL TERM ONLY. The epistemic (cell-state) term is refused "
+            "for this run, so this band is NARROWER than the characterised "
+            "uncertainty, not equal to it."
+        )
+    else:
+        lo, hi = st_c["lo"], st_c["hi"]
+        out["status"] = "BANDED_PARTIAL"
+        out["combination"] = (
+            "EPISTEMIC TERM ONLY. The biological (potency) term is refused for "
+            "this compound, so this band is NARROWER than the characterised "
+            "uncertainty, not equal to it."
+        )
+
+    out["band"] = {
+        "lo": float(lo), "hi": float(hi),
+        "span_x": float(hi / lo) if lo > 0 else float("inf"),
+    }
+    out["cost_s"] = time.perf_counter() - t0
+    assert_kinds_separated(out)
+    return out
+
+
+def kill_ceiling_interval(run: FinishedRun) -> Dict:
+    """The kill CEILING's interval -- PURELY EPISTEMIC, and that is the point.
+
+    The ceiling is the kill fraction as exposure -> infinity: the Hill term
+    saturates and the per-cell probability tends to ``max_kill_rate x
+    sensitivity x resistance``. Intrinsic potency drops out of it entirely, so
+    this metric carries the epistemic bar and NO biological bar at all -- the
+    cleanest demonstration in the feature that the two are different objects and
+    not two halves of one number.
+    """
+    t0 = time.perf_counter()
+    point = float(run.max_kill_rate * np.mean(run.modulation))
+    out: Dict = {
+        "metric": "kill_ceiling",
+        "compound": str(run.compound).strip().lower(),
+        "section_id": run.section_id,
+        "run_id": run.run_id,
+        "point": point,
+        "quotable": False,
+        "not_quotable_reason": (
+            "results/cell_state_impact.md sec 5: stop quoting an absolute kill "
+            "fraction OR a kill ceiling as a result on this section -- no "
+            "cell-state route clears its own measurability bar there."
+        ),
+        "components": {},
+        "refusals": [],
+        "band": None,
+    }
+    if run.section_id not in STATE_SPAN_SECTIONS:
+        out["status"] = "UNCHARACTERISED"
+        out["refusals"].append(_refusal(
+            "kill_ceiling.epistemic",
+            f"the cell-state route span does not transfer to "
+            f"{run.section_id!r} (see kill_fraction_interval).",
+            kind=EPISTEMIC))
+        out["cost_s"] = time.perf_counter() - t0
+        return out
+
+    sp = STATE_ROUTE_SPAN
+    km = KIND_MEANING[sp.kind]
+    lo = float(run.max_kill_rate * F_STATE_BY_ROUTE["oxygen"])
+    hi = float(run.max_kill_rate * F_STATE_BY_ROUTE["vessel_distance"])
+    out["components"]["cell_state_route"] = {
+        "kind": sp.kind,
+        "kind_meaning": km,
+        "what_shrinks_it": km["what_shrinks_it"],
+        "does_a_better_model_shrink_it": km["does_a_better_model_shrink_it"],
+        "lo": lo, "hi": hi, "point": point,
+        "span_x": float(hi / lo),
+        "f_state_by_route": dict(F_STATE_BY_ROUTE),
+        "f_state_this_run": float(np.mean(run.modulation)),
+        "population": sp.population,
+        "source_document": sp.source_document,
+        "source_section": sp.source_section,
+        "measurement": sp.measurement,
+        "caveat": sp.caveat,
+        "how_propagated": (
+            "the recorded per-route F_state IS the ceiling (with uniform "
+            "sensitivity the ceiling is entirely the state labelling), so no "
+            "propagation is needed -- the endpoints are the measurement"
+        ),
+    }
+    out["refusals"].append(_refusal(
+        "kill_ceiling.biological",
+        "none exists and none is needed: intrinsic potency does not enter the "
+        "ceiling at all (the Hill term is saturated there), so the "
+        "between-patient potency spread contributes exactly zero width to this "
+        "metric. This is a structural absence, not a data gap.",
+        kind=BIOLOGICAL))
+    out["status"] = "BANDED"
+    out["covers_kinds"] = [EPISTEMIC]
+    out["band"] = {"lo": lo, "hi": hi, "span_x": float(hi / lo)}
+    # The endpoints are the RECORDED per-route measurement; this run's own
+    # F_state is recomputed from its own cells. They need not coincide, and when
+    # they do not the point can fall just outside its own band. That is reported
+    # rather than patched: widening a measured endpoint to swallow a point would
+    # be tuning a record to fit a run. See PR-3 in
+    # results/uncertainty_band_2026-09-20.md.
+    inside = bool(lo <= point <= hi)
+    out["point_inside_band"] = inside
+    if not inside:
+        out["point_outside_band_disclosure"] = (
+            f"this run's own ceiling is {point:.4f}, {100 * abs(point - lo) / lo:.2f}% "
+            f"from the recorded {F_STATE_DEFAULT_ROUTE!r}-route endpoint "
+            f"{lo:.4f}, so it sits outside the band. The band endpoints are the "
+            f"measurement (results/cell_state_impact.md sec 3.2) and are not "
+            f"moved to contain it; the gap is the difference between this run's "
+            f"configuration and the dx = 12 um run the routes were measured on."
+        )
+    out["cost_s"] = time.perf_counter() - t0
+    assert_kinds_separated(out)
+    return out
+
+
+#: What NO interval in this module covers, ever. Copied from the honesty section
+#: of results/uncertainty.md and results/kill_calibration.md sec 6 so a consumer
+#: of the JSON reads it without opening either file.
+NOT_COVERED = (
+    "MODEL-FORM ERROR -- the interval is computed INSIDE one fixed model "
+    "structure (first-order sink, D_eff = D(1-alpha*ECM), a KDE-smoothed "
+    "endothelial density standing in for a vessel network never imaged, a Hill "
+    "kill on AUC). Plausibly the LARGEST term, and not in these bars.",
+    "THE ABSENCE OF OUTCOME VALIDATION -- the section is an untreated "
+    "resection. Nothing here has been scored against a measured response, so "
+    "this is not a claim that the true value falls in the band 90% of the time.",
+    "DELIVERY / TRANSPORT UNCERTAINTY -- alpha is fit once on ONE doxorubicin "
+    "penetration anchor and sets the perivascular sink for every compound. Its "
+    "span is not measured, so it is not in the band (sections 1-6 of this "
+    "module put an EXPERT prior on it instead, which is a different object).",
+    "MGMT -- results/mgmt_scalar.md measures a further 2.9-5.0x scale-down of "
+    "temozolomide kill on real sections. Not applied, so a temozolomide band "
+    "here is an UPPER BOUND in the MGMT dimension on top of its stated width.",
+    "SECTION- AND PATIENT-LEVEL DATA UNCERTAINTY -- one section, one "
+    "segmentation, no replicate.",
+    "CROSS-COMPOUND COMPARISON -- withdrawn 2026-08-21 and not reinstated "
+    "here in any form. Every entry point in this section takes exactly ONE run "
+    "for ONE compound.",
+)
+
+
+def run_interval_report(run: FinishedRun,
+                        point_metrics: Optional[Dict[str, float]] = None) -> Dict:
+    """Every metric of one finished run: banded where characterised, refused
+    where not.
+
+    ``point_metrics`` are the run's other single-valued outputs. They come back
+    with their point AND an explicit statement that no measured span exists for
+    them -- which is the honest answer, and the one a UI needs in order to show
+    a bare number without implying it is tight.
+    """
+    t0 = time.perf_counter()
+    intervals = {
+        "kill_fraction": kill_fraction_interval(run),
+        "kill_ceiling": kill_ceiling_interval(run),
+    }
+    refused: Dict[str, Dict] = {}
+    for name, reason in UNCHARACTERISED_METRICS.items():
+        rec = _refusal(name, reason)
+        if point_metrics and name in point_metrics:
+            rec["point"] = float(point_metrics[name])
+        refused[name] = rec
+    return {
+        "run_id": run.run_id,
+        "compound": str(run.compound).strip().lower(),
+        "section_id": run.section_id,
+        "n_tumor": run.n_tumor,
+        "intervals": intervals,
+        "uncharacterised": refused,
+        "kind_meaning": KIND_MEANING,
+        "not_covered": list(NOT_COVERED),
+        "cross_compound": (
+            "REFUSED. No ranking, ordering or comparison of one compound "
+            "against another is produced here, in any form (withdrawn "
+            "2026-08-21). One run, one compound."
+        ),
+        "cost_s": time.perf_counter() - t0,
+    }
+
 
 
 # ===========================================================================

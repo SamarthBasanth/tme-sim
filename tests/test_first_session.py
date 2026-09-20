@@ -953,3 +953,60 @@ def test_every_figure_on_the_reach_panel_carries_a_capacity_note(
         assert "CANNOT REACH" in text
     else:
         assert "CAPACITY-SENSITIVE" in text
+
+
+def test_no_module_passes_h_a_selector_it_would_reject():
+    """`h('div.cls#id')` THROWS, and the throw takes a whole panel with it.
+
+    `util/dom.js`'s selector is `/^(tag)?(#id)?((\\.class)*)$/` — the id must
+    precede the classes. A reversed selector is not a styling bug: `h()` raises
+    `bad selector`, the exception propagates out of whatever was building that
+    subtree, and the panel renders NOTHING. A grid that builds nothing at all
+    is indistinguishable from a page still loading, which is how this survived
+    long enough to reach a browser.
+
+    It happened on 2026-09-20 in `js/home/projectGrid.js`, and the source was
+    `dom.js`'s OWN DOCSTRING, which demonstrated the rejected order. The
+    docstring is fixed; this makes the next copy of it fail in CI instead of in
+    front of a user.
+
+    Static, over every module, because the defect is only observable at the
+    moment the offending branch runs — a test that merely boots the page would
+    miss a selector on a path that needs data to reach.
+    """
+    import re as _re
+
+    js_root = os.path.join(WEB, "js")
+    # tag, then at least one .class, then a #id -> the rejected order.
+    bad_order = _re.compile(r"""h\(\s*['"][a-zA-Z0-9-]*\.[^'"#]*#[^'"]*['"]""")
+    offenders = []
+    for root, _dirs, files in os.walk(js_root):
+        for name in sorted(files):
+            if not name.endswith(".js"):
+                continue
+            path = os.path.join(root, name)
+            with open(path) as fh:
+                for i, line in enumerate(fh, 1):
+                    if bad_order.search(line):
+                        rel = os.path.relpath(path, REPO)
+                        offenders.append(f"{rel}:{i}: {line.strip()[:90]}")
+    assert not offenders, (
+        "h() is passed a selector with the id AFTER the classes; it throws "
+        "`bad selector` and takes the surrounding render with it. Put the id "
+        "first:\n  " + "\n  ".join(offenders))
+
+
+def test_that_check_can_actually_fire():
+    """Anti-vacuity: the pattern must match the real defect and not the fix.
+
+    Without this, narrowing the regex to nothing would look like a clean
+    codebase forever.
+    """
+    import re as _re
+
+    bad_order = _re.compile(r"""h\(\s*['"][a-zA-Z0-9-]*\.[^'"#]*#[^'"]*['"]""")
+    assert bad_order.search("h('button.btn.primary#pgrid-create', {")
+    assert bad_order.search('h("div.cls#id")')
+    assert not bad_order.search("h('button#pgrid-create.btn.primary', {")
+    assert not bad_order.search("h('div.cls')")
+    assert not bad_order.search("h('div#id')")

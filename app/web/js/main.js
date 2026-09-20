@@ -84,6 +84,37 @@ let accountPanel = null;
 let wl = null;
 let tools = null;
 
+/* --- project context (docs/WORKSPACE_CONTRACT.md §8) ---------------------- *
+ * THE COMPATIBILITY BAR IS THE DESIGN HERE, not a constraint on it. Every
+ * line of the project-context code in this file is unreachable unless the URL
+ * that opened this page carried `?project=`. There is no stored project, no
+ * "last project" restored from localStorage, no default and no inference from
+ * the run history: a Studio opened without the parameter runs exactly the code
+ * it ran before any of this existed, because a user who never visits the
+ * workspace home must notice no change at all.
+ *
+ * The URL is also the ONLY persistence, and deliberately so. It survives a
+ * reload by construction (nothing in app/web/js rewrites location), it is
+ * visible in the address bar as well as the top bar, and it can never
+ * resurrect a context in a tab the user opened by hand — which a stored id
+ * would, and that is the failure mode where a run gets filed under a project
+ * nobody meant to be in.
+ *
+ * `ok` is false until the project has actually been fetched. It is the flag
+ * the attach offer reads, so an id that did not resolve can never be offered
+ * as a filing destination. */
+const PROJECT_PARAM = 'project';
+/* `?run=` is the home page's recent-runs strip linking a SPECIFIC run rather
+ * than merely its project (js/home/recentRuns.js, `studioHrefForRun`). It is a
+ * convention that post-dates the contract's §8 and it is honoured here on the
+ * same terms as `?project=`: absent, it costs one synchronous read of
+ * location.search and changes nothing. */
+const RUN_PARAM = 'run';
+/* `runIds` is an Array, not a Set, so the whole of this object stays
+ * structured-cloneable — `window.__tmesim.projectContext` hands a copy of it
+ * to headless checks, and a Set crosses that boundary as `{}`. */
+const projectCtx = { id: null, name: null, ok: false, why: null, runIds: [] };
+
 async function boot() {
   initTheme();
 
@@ -305,6 +336,14 @@ async function boot() {
     notifyError('Failed to load catalogue (/api/sections, /api/drugs, /api/defaults)', err);
   }
 
+  // --- project context, docs/WORKSPACE_CONTRACT.md §8 -------------------
+  // The two lines that decide whether ANY of it runs. With no `?project=` in
+  // the URL this is one synchronous read of location.search that returns null
+  // — no fetch, no await, no DOM inserted, no listener bound — and the rest of
+  // boot() proceeds exactly as it did before the workspace existed.
+  const ctxProjectId = projectIdFromUrl();
+  if (ctxProjectId) await enterProject(ctxProjectId);
+
   specPanel.refreshCompounds();
   specPanel.refreshTissue();
 
@@ -317,7 +356,15 @@ async function boot() {
   // here 404s on geometry load and leaves the viewer looking broken with only
   // a small corner toast explaining why -- confirmed live: the newest run in
   // this workstation's own history was a protocol run and did exactly that.
-  const done = store.get().runs.find((r) => r.status === 'done' && r.spec && r.spec.kind !== 'protocol');
+  //
+  // `?run=` takes this slot when it is present and resolvable (see
+  // openDeepLinkRun). With no `?run=` in the URL `deepLinkRunIdFromUrl()` is
+  // one synchronous read that returns null, `deepOpened` is false, and the
+  // line below is the line that was always here.
+  const deepRunId = deepLinkRunIdFromUrl();
+  const deepOpened = deepRunId ? await openDeepLinkRun(deepRunId) : false;
+  const done = !deepOpened
+    && store.get().runs.find((r) => r.status === 'done' && r.spec && r.spec.kind !== 'protocol');
   if (done) openRun(done.run_id);
 
   // AFTER the auto-open, deliberately. A run still in flight has no geometry
@@ -360,6 +407,411 @@ function stubViewer() {
     visible: [1, 1, 1, 1, 1], rampName: 'viridis', dirty: false,
     setVisible() {}, setColorMode() {}, setRamp() {}, fit() {},
   };
+}
+
+/* ================================================== project context ==== */
+
+/**
+ * The project id this page was opened with, or null.
+ *
+ * Returns null for an absent parameter AND for a present-but-empty one
+ * (`?project=`), because an empty id is not a project — asking the server for
+ * `/api/projects/` would be a different route entirely, and a blank chip in
+ * the top bar reading "Project —" is exactly the "unsure which project this
+ * run lands in" state the contract forbids.
+ */
+function urlParam(name) {
+  try {
+    const v = new URLSearchParams(window.location.search).get(name);
+    const id = (v || '').trim();
+    return id || null;
+  } catch {
+    // A URL this browser cannot parse is not a reason to fail to start.
+    return null;
+  }
+}
+const projectIdFromUrl = () => urlParam(PROJECT_PARAM);
+/** The run id this page was deep-linked to, or null. See RUN_PARAM. */
+const deepLinkRunIdFromUrl = () => urlParam(RUN_PARAM);
+
+/**
+ * Put a group into the top bar immediately after the brand.
+ *
+ * The brand is the leftmost thing on the bar, so "just after it" is the first
+ * place a reader's eye lands after the product name — which is where the
+ * answer to "which project is this?" has to be. Nothing else in the bar moves;
+ * `.topbar` is a flex row and the existing groups simply shift right.
+ *
+ * `node` is checked rather than trusted: `insertBefore(null, …)` and
+ * `appendChild(null)` are TypeErrors that would kill the rest of boot().
+ */
+function mountTopbarGroup(node) {
+  const bar = $('.topbar');
+  if (!bar || !node) return null;
+  const brand = $('.topbar .brand');
+  // insertBefore(node, null) is a legal append, so the no-brand case needs no
+  // separate branch.
+  bar.insertBefore(node, brand ? brand.nextSibling : null);
+  return node;
+}
+
+/** The way out of a project and back to the workspace home. */
+function workspaceLink(label) {
+  return h('a.btn.ghost.sm', {
+    href: '/',
+    // `.btn` was written for <button>; an <a> would otherwise arrive
+    // underlined and in the UA's link blue, which is the one colour tokens.css
+    // does not own.
+    style: { textDecoration: 'none' },
+    title: 'Back to the workspace home. Leaving a project changes nothing that '
+      + 'belongs to it — the Studio works with no project at all, and no run, '
+      + 'specimen or association is touched by going back.',
+  }, label);
+}
+
+/**
+ * The top bar's answer to "which project is this run about to land in?".
+ *
+ * `.keep` — `flex: 0 0 auto` — for the same reason the Run and Cells groups
+ * have it, and it is MEASURED rather than assumed: a plain `.topbar-group` is
+ * shrinkable AND `overflow: hidden`, so at 200% zoom in a 1280px window the
+ * first version of this group was driven to ZERO WIDTH and the project label
+ * was clipped out of existence rather than truncated. A project name that
+ * disappears at a zoom level is the "unsure which project this run lands in"
+ * state with extra steps.
+ *
+ * So the ID never gives way and the NAME does, with an ellipsis and the full
+ * label on hover: a project with a long name gives up its prose, not its
+ * identity.
+ */
+function showProjectContext(id, name) {
+  const label = name ? `${id} · ${name}` : id;
+  mountTopbarGroup(h('div.topbar-group.keep', {
+    id: 'hdr-project-group',
+    title: `This Studio is scoped to project ${label}.\n\n`
+      + 'A run submitted here is NOT filed under it automatically. When a run '
+      + 'finishes you are offered a specimen to attach it to, and nothing is '
+      + 'attached until you pick one.',
+  },
+    workspaceLink('← workspace'),
+    h('span.lbl', 'Project'),
+    h('span.mono.strong', { id: 'hdr-project', style: { flex: '0 0 auto' } }, id),
+    name
+      ? h('span.dim.mono', {
+          title: label,
+          style: {
+            flex: '0 1 auto',
+            minWidth: 0,
+            maxWidth: '24ch',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          },
+        }, name)
+      : null));
+}
+
+/**
+ * The same slot, for an id that did not resolve.
+ *
+ * The Studio degrades to the ordinary no-project workstation — but it says so
+ * in the place where the project name would have been, which is the only place
+ * a reader would otherwise have looked and found nothing. A silent drop would
+ * leave `?project=p_00099` in the address bar over a Studio that is filing
+ * nothing under it.
+ */
+function showProjectUnavailable(id, why) {
+  // `.keep` for the same reason as the success case, and more sharply: a
+  // failure notice clipped to zero width at 200% zoom is a silent failure,
+  // which is the one thing this branch exists not to be.
+  mountTopbarGroup(h('div.topbar-group.keep', {
+    id: 'hdr-project-group',
+    title: `Project ${id} could not be opened: ${why}\n\n`
+      + 'The Studio is running without a project context. Runs still execute '
+      + 'and are still stored in app/runs/; none of them will be offered for '
+      + 'filing, because there is no project to file them under.',
+  },
+    workspaceLink('← workspace'),
+    h('span.lbl', 'Project'),
+    // Not a chip: `.chip` is --fs-micro, and this is the failure notice for
+    // the identifier beside it, which is --fs-sm. A caveat is never set
+    // smaller than the thing it qualifies.
+    h('span.mono.strong', { id: 'hdr-project', style: { color: 'var(--warn)' } },
+      `${id} — unavailable`)));
+}
+
+/**
+ * Enter a project: resolve it, show it, stamp it.
+ *
+ * ORDER MATTERS, and it is the reverse of the contract's prose. §8 lists the
+ * `/open` stamp first; it is done LAST here, only once the project has been
+ * fetched, because `last_opened_at` means "a human looked at it" (§3) and an
+ * id that 404s was never looked at. Stamping first would write recency onto
+ * whatever the id happened to hit.
+ *
+ * The stamp itself is fire-and-forget and its failure is swallowed, which is
+ * the contract's own instruction and js/api.js's: recency is an ANNOTATION,
+ * and refusing to open a project because we could not record that we opened it
+ * would be absurd.
+ *
+ * @returns {Promise<boolean>} whether the Studio is now scoped to a project.
+ */
+async function enterProject(id) {
+  let doc = null;
+  try {
+    doc = await api.getProject(id);
+  } catch (err) {
+    // THREE FAILURES, THREE SENTENCES. Telling a reader "no such project"
+    // because the backend is asleep would send them to the workspace home to
+    // look for a project that is fine, and telling them "the server is down"
+    // about an id they mistyped would send them nowhere at all.
+    const stub = !!(api.api && api.api.stub);
+    const status = err && err.status;
+    const why = stub
+      ? 'the backend is not answering, so this session is running on STUB DATA '
+        + '(js/mock.js) and can see no projects at all. Projects are never '
+        + 'synthesised — a fabricated study on screen is worse than no study.'
+      : status === 404
+        ? 'the server has no project with that id. It may have been deleted, or '
+          + 'the link may be mistyped.'
+        : `GET /api/projects/${id} failed — ${(err && err.message) || err}`;
+    projectCtx.id = id;
+    projectCtx.name = null;
+    projectCtx.ok = false;
+    projectCtx.why = why;
+    projectCtx.runIds = [];
+    showProjectUnavailable(id, why);
+    toast('warn', `Project ${id} could not be opened`,
+      'The Studio has started WITHOUT a project context: ' + why + ' '
+      + 'Everything else works exactly as it does with no project at all — '
+      + 'runs still execute and are still stored in app/runs/ — but a finished '
+      + 'run will not be offered for filing, because there is no project to '
+      + 'file it under. The address bar still carries ?project=' + id + ', so '
+      + 'a reload retries it; the "← workspace" link in the top bar leaves '
+      + 'it behind.', 0);
+    return false;
+  }
+
+  projectCtx.id = doc.id || id;
+  projectCtx.name = doc.name || null;
+  projectCtx.ok = true;
+  projectCtx.why = null;
+  // Every run id this project's specimens carry, flattened. Used once, at
+  // boot, to decide whether a `?run=` deep link belongs here — see
+  // openDeepLinkRun. It is a snapshot and is not kept current, which is
+  // correct for the one question it answers.
+  projectCtx.runIds = (doc.specimens || []).flatMap((s) => s.run_ids || []);
+  showProjectContext(projectCtx.id, projectCtx.name);
+  if (projectsPanel && projectsPanel.setContext) projectsPanel.setContext(projectCtx.id);
+  api.openProject(projectCtx.id).catch(() => { /* swallowed on purpose — see above */ });
+  return true;
+}
+
+/**
+ * A run finished while the Studio is scoped to a project: OFFER to file it.
+ *
+ * OFFERED, NEVER FILED. A run that appears under someone's specimen without
+ * their say-so is the product making a filing decision on their behalf, and a
+ * cross-specimen comparison is built entirely out of those decisions — a
+ * comparison whose inputs were chosen by the UI is not the operator's result.
+ * So this renders a question with a specimen picker in it and stops.
+ *
+ * The specimens are re-fetched rather than read from the doc captured at boot,
+ * because a specimen may have been added (in the projects dialog, or on the
+ * workspace home in another tab) during the run — which on a minutes-long
+ * reconstruction is the normal case, not the corner case.
+ *
+ * Only specimens bound to THIS run's section are offered. The server refuses
+ * the rest with a 409 (app/server/projects.py attach_run: "a specimen is a
+ * patient; filing another patient's run under it would corrupt every
+ * cross-specimen comparison"), and offering a choice that is going to be
+ * refused is a worse interface than not offering it.
+ */
+async function offerRunToProject(runId) {
+  // The guard that keeps the whole feature off a Studio with no `?project=`,
+  // and off one whose project id did not resolve.
+  if (!projectCtx.ok || !projectCtx.id || !runId) return;
+  const pid = projectCtx.id;
+  const pLabel = projectCtx.name ? `${pid} · ${projectCtx.name}` : pid;
+
+  let doc = null;
+  try {
+    doc = await api.getProject(pid);
+  } catch (err) {
+    toast('warn', `${runId} finished — it could not be offered for filing`,
+      `GET /api/projects/${pid} failed: ${(err && err.message) || err}. The run `
+      + 'itself is unaffected and is stored in app/runs/; open the projects '
+      + 'dialog to attach it by hand once the server answers again.', 12000);
+    return;
+  }
+
+  const specimens = doc.specimens || [];
+  const already = specimens.find((s) => (s.run_ids || []).includes(runId));
+  if (already) {
+    toast('info', `${runId} is already filed under ${already.id}`,
+      `It was attached to ${already.id} · ${already.label || already.section} `
+      + 'before it finished, so there is nothing to decide.', 5000);
+    return;
+  }
+
+  const runs = store.get().runs || [];
+  const active = store.get().activeRun;
+  const run = runs.find((r) => r.run_id === runId)
+    || (active && active.run_id === runId ? active : null);
+  const section = run && run.spec ? run.spec.section : null;
+  const fit = specimens.filter((s) => s.section === section);
+
+  if (!fit.length) {
+    toast('warn', `${runId} finished — no specimen in ${pid} can hold it`,
+      h('div', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' } },
+        h('div', `This run was computed on section ${section || NULL_GLYPH}, and `
+          + `${pLabel} has no specimen bound to that section. A specimen is one `
+          + "tissue: the server refuses to file a run under a specimen bound to "
+          + 'a different section, because doing so would corrupt every '
+          + 'cross-specimen comparison built on this project.'),
+        h('div', 'The run is finished and stored in app/runs/ either way — '
+          + 'nothing about it depends on being filed.'),
+        h('div', { style: { display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap' } },
+          h('button.btn.sm', {
+            onclick: () => { if (projectsPanel) projectsPanel.open(); },
+          }, 'add a specimen'))),
+      0);
+    return;
+  }
+
+  let card = null;
+  const sel = h('select.inp.sm', {
+    'aria-label': `specimen to file run ${runId} under`,
+    style: { maxWidth: '280px' },
+  }, fit.map((s) => h('option', { value: s.id },
+    `${s.id} · ${s.label || s.section} · ${(s.run_ids || []).length} run(s) attached`)));
+
+  const attachBtn = h('button.btn.sm.primary', {
+    onclick: async () => {
+      const sid = sel.value;
+      if (!sid) return;
+      attachBtn.disabled = true;
+      try {
+        const out = await api.attachRun(pid, sid, runId);
+        toast('ok',
+          out && out.attached === false
+            ? `${runId} was already attached to ${sid}`
+            : `${runId} filed under ${sid}`,
+          'A project owns ids, not results: the run stays in app/runs/, it was '
+          + 'neither moved nor copied, and detaching it later deletes nothing.',
+          5000);
+        if (card) card.remove();
+        // Only if it is on screen. reload() is two network calls and a full
+        // re-render; doing that to a closed dialog is work nobody asked for.
+        if (projectsPanel && projectsPanel.el && projectsPanel.el.open) projectsPanel.reload();
+      } catch (err) {
+        attachBtn.disabled = false;
+        notifyError(`POST /api/projects/${pid}/specimens/${sid}/runs failed`, err);
+      }
+    },
+  }, 'attach');
+
+  const body = h('div', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' } },
+    h('div', `${pLabel} — ${fit.length} specimen${fit.length === 1 ? '' : 's'} `
+      + `on section ${section}.`),
+    h('div', 'Nothing has been filed. Attaching records this run id under the '
+      + 'specimen you pick; the run itself stays in app/runs/ and is neither '
+      + 'moved nor copied.'),
+    h('div', { style: { display: 'flex', gap: 'var(--sp-3)', alignItems: 'center', flexWrap: 'wrap' } },
+      sel,
+      attachBtn,
+      h('button.btn.ghost.sm', {
+        title: 'Leave the run unfiled. It stays in app/runs/ and in the run '
+          + 'history, and it can be attached later from the projects dialog.',
+        onclick: () => { if (card) card.remove(); },
+      }, 'not now')));
+
+  // Sticky. A filing decision that expires after nine seconds is a filing
+  // decision made by a timer.
+  card = toast('info', `Run ${runId} finished — file it under ${pid}?`, body, 0);
+}
+
+/**
+ * Say, stickily, why the run in the address bar is not the run on screen.
+ *
+ * The parameter is deliberately LEFT IN THE URL. Rewriting it away would make
+ * the address bar agree with the screen by deleting the evidence, and a reload
+ * would then look like a Studio nobody asked anything of. It also means a
+ * transient failure heals on reload.
+ */
+function explainRunDeepLink(runId, why) {
+  toast('warn', `Run ${runId} was not opened`,
+    why + ' The Studio opened the way it would have with no run in the address '
+    + 'bar' + (projectCtx.ok ? `, still scoped to ${projectCtx.id}` : '')
+    + '. Nothing was deleted, and no other run has been put on screen in its '
+    + 'place — whatever the viewer is showing is named in the Run field above.',
+    0);
+}
+
+/**
+ * Open the run named by `?run=`.
+ *
+ * WHY THIS IS NOT JUST `openRun(id)`: the id comes from a link somebody else
+ * built, so all three ways it can be wrong have to be answered rather than
+ * rendered. An unknown id would otherwise reach openRun and produce a
+ * `GET /api/runs/{id} failed` toast that names our plumbing instead of the
+ * reader's problem; a protocol run would 404 on geometry and leave the viewer
+ * looking broken (the same trap `boot`'s auto-open and `reattachLiveRun`
+ * already document); and a run from OUTSIDE the project in the same URL would
+ * sit on the stage under that project's name in the top bar, which is a run
+ * mislabelled by the interface.
+ *
+ * The third case is refused but not overruled: the "open it anyway" button
+ * does open it, because it is a legitimate thing to want and the reader has
+ * now been told what they are looking at.
+ *
+ * @returns {Promise<boolean>} true when it opened the run, and the caller's
+ *   own boot-time auto-open must stand down.
+ */
+async function openDeepLinkRun(runId) {
+  const run = (store.get().runs || []).find((r) => r.run_id === runId);
+
+  if (!run) {
+    explainRunDeepLink(runId,
+      'this server has no run with that id. That is what an id looks like '
+      + 'after its run was deleted, and also what a link from a DIFFERENT '
+      + 'deployment looks like — app/runs/ is per-deployment and is not '
+      + 'shared between them.');
+    return false;
+  }
+
+  if (run.spec && run.spec.kind === 'protocol') {
+    explainRunDeepLink(runId,
+      'it is a protocol (TPL) run. A protocol run is a sweep, not one '
+      + 'reconstruction, so it has no single geometry payload for this viewer '
+      + 'to open. Its points are individually openable from the protocol '
+      + 'workspace (press P).');
+    return false;
+  }
+
+  if (projectCtx.ok && !projectCtx.runIds.includes(runId)) {
+    toast('warn', `Run ${runId} is not filed under ${projectCtx.id}`,
+      h('div', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' } },
+        h('div', `The address bar asks for run ${runId} inside project `
+          + `${projectCtx.id}, but no specimen of ${projectCtx.id} carries that `
+          + 'run id. It has not been opened: a run from outside this project, '
+          + 'on the stage, under this project\'s name in the top bar, is a run '
+          + 'the interface has mislabelled.'),
+        h('div', 'It may simply not be filed anywhere yet — a finished run is '
+          + 'offered for filing, never filed automatically, so a run you have '
+          + 'not filed is in exactly this state.'),
+        h('div', { style: { display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap' } },
+          h('button.btn.sm', {
+            title: 'Open it on the stage anyway. The top bar will still name '
+              + 'this project, and this run is still not part of it.',
+            onclick: () => { openRun(runId); },
+          }, 'open it anyway'))),
+      0);
+    return false;
+  }
+
+  await openRun(runId);
+  return true;
 }
 
 /* ========================================================== chrome ===== */
@@ -1285,8 +1737,16 @@ async function selectField(name) {
 function trackRun(id) {
   specPanel.track(id, async (doneId, status) => {
     await refreshRuns();
-    if (status === 'done') openRun(doneId);
-    else if (status === 'failed') {
+    if (status === 'done') {
+      openRun(doneId);
+      // §8.3. Deliberately NOT awaited and deliberately after openRun: the
+      // offer is about filing, the viewer is about the result, and a reader
+      // should be looking at their run while they decide. Returns immediately
+      // when the Studio has no project — see the guard at the top of it — so
+      // this line is a no-op for every Studio opened without `?project=`, and
+      // the shape of the call above is unchanged.
+      offerRunToProject(doneId);
+    } else if (status === 'failed') {
       // Paint the chip BEFORE handing over, because openRun's own GET can
       // fail: a run that has failed must not be left reading `running`
       // because the request that would have said so failed too.
@@ -1434,6 +1894,15 @@ window.__tmesim = {
   get account() { return accountPanel; },
   get tools() { return tools; },
   get wl() { return wl; },
+  // A COPY, `runIds` included: a headless check may read what the Studio is
+  // scoped to, and may not write it. A bare spread would hand out the live
+  // array by reference, which is a copy that isn't one. The context comes from
+  // the URL and nowhere else.
+  get projectContext() { return { ...projectCtx, runIds: [...projectCtx.runIds] }; },
+  projectIdFromUrl,
+  deepLinkRunIdFromUrl,
+  offerRunToProject,
+  openDeepLinkRun,
   api,
   benchmark850k,
   runBenchmark,

@@ -33,11 +33,35 @@
 //   3. COMPOSITION    — where a user actually sees that patient B is more
 //                       vascularised than patient A, with the two rows that
 //                       moved in OPPOSITE directions on the real pair
-//                       (endothelial fraction 0.43x, areal density 2.67x —
+//                       (endothelial fraction 0.67x, areal density 4.19x —
 //                       heldout_patient.md §1.1) sitting adjacent on purpose.
 //
 // Every verdict, reason and caveat string comes from the backend verbatim. This
 // module decides layout and emphasis; it never decides comparability.
+//
+// WHAT THIS DIALOG IS FOR NOW (docs/WORKSPACE_CONTRACT.md §8)
+// ----------------------------------------------------------
+// It used to be the ONLY door to the project store, so it carried the whole of
+// it: a `new project name` box, a per-row delete, and a project list that was
+// the only place a project could be seen. There is a workspace home now, and
+// two doors to the same lifecycle is two places for the same disclosure to
+// drift out of — specifically §2's, that DELETING A PROJECT DOES NOT DELETE
+// ITS RUNS, which has to be stated at the point of the click and is therefore
+// stated where the click is.
+//
+// So the lifecycle hands off and this dialog keeps the half the home page does
+// not do:
+//
+//   handed off to `/`   create · rename · duplicate · delete · browse
+//   kept here           specimens, the run associations on each, and the
+//                       cross-specimen comparison — the things you do INSIDE
+//                       one project, beside the run you just produced
+//
+// The project list stays, because the comparison needs something to be a
+// comparison OF and switching it must not cost a page load. What each row
+// gained instead of a delete button is a link that reloads the Studio scoped
+// to that project (`?project=<id>`), which is the one thing only this page can
+// offer: it is already the Studio.
 
 import { h, clear, fill, $ } from '../util/dom.js';
 import { chip } from './provenance.js';
@@ -77,12 +101,18 @@ function ratioText(r) {
   return num(r, r >= 100 ? 0 : 2) + 'x';
 }
 
-export function createProjectsPanel({ store }) {
+export function createProjectsPanel({ store, projectId = null }) {
   let projects = [];
   let project = null;         // the full document for the selected project
   let comparison = null;
   let metric = 'kill_fraction';
   let busy = false;
+  // The project THE STUDIO ITSELF is scoped to, from `?project=` — null in the
+  // ordinary no-project Studio, which is every Studio that was ever opened
+  // before the workspace home existed. It is a label and a default selection
+  // here, never a restriction: the dialog still shows every project, because a
+  // comparison you cannot reach is not a comparison.
+  let contextId = projectId || null;
 
   /* ---------------------------------------------------------------- shell */
 
@@ -101,15 +131,60 @@ export function createProjectsPanel({ store }) {
   }, Object.keys(METRIC_LABEL).map((k) =>
     h('option', { value: k, selected: k === metric }, METRIC_LABEL[k])));
 
+  /** A link out to the workspace home, where a project's lifecycle lives. */
+  function homeLink(label, title) {
+    return h('a.btn.ghost.sm', {
+      href: '/',
+      // `.btn` was written for <button>; an <a> would otherwise arrive
+      // underlined and in the UA's link blue, the one colour tokens.css does
+      // not own.
+      style: { textDecoration: 'none' },
+      title,
+    }, label);
+  }
+
+  /**
+   * A link that reloads the Studio scoped to a project.
+   *
+   * The href is built from the CURRENT path on purpose. This page is served at
+   * `/` today and at `/studio` once the workspace contract's routes land
+   * (§1), and a hard-coded path would be wrong on exactly one of those two
+   * days. `?project=` is the whole of the Studio's project state, so the same
+   * link is also what a bookmark of this view would be.
+   */
+  function studioLink(id) {
+    return h('a.btn.ghost.sm', {
+      href: `${window.location.pathname}?project=${encodeURIComponent(id)}`,
+      style: { textDecoration: 'none' },
+      title: `Reload the Studio scoped to ${id}. A run you finish there is `
+        + 'OFFERED for filing under one of its specimens when it completes — '
+        + 'offered, never filed for you.',
+      'aria-label': `Open project ${id} in the Studio`,
+      // The row behind this link is itself a click target that SELECTS the
+      // project. Without this, following the link would also fire a select
+      // and a network round-trip on a page that is being navigated away from.
+      onclick: (e) => e.stopPropagation(),
+    }, 'open in Studio');
+  }
+
   const dlg = h('dialog#proj-dlg',
     h('div.panel-head',
       h('h2', 'Projects'),
-      h('span.hint', 'multi-patient studies'),
+      // Was "multi-patient studies". The grouping key is the SPECIMEN — a
+      // string the operator chose, which must not be a patient identifier —
+      // and the rail two hundred lines below already refuses to name the unit
+      // "patient" for exactly that reason. The header was the last place in
+      // this file still doing it.
+      h('span.hint', 'specimens and the cross-specimen comparison'),
       h('span.vrule'),
       h('span.lbl', 'project'), titleEl,
       h('span.grow'),
       h('span.lbl', 'read on'), metricSel,
       h('button.btn.ghost.sm', { onclick: () => reload(), title: 'GET /api/projects' }, 'refresh'),
+      homeLink('workspace home \u2192',
+        'Create, rename, duplicate and delete projects on the workspace home. '
+        + 'This dialog no longer does any of those: one place for a lifecycle '
+        + 'is one place for its disclosures.'),
       h('button.btn.ghost.sm', { id: 'proj-close', onclick: () => dlg.close() }, 'close')),
     h('div.proj-body', railEl, h('div.proj-div'), mainEl));
 
@@ -120,6 +195,14 @@ export function createProjectsPanel({ store }) {
 
   const btn = h('button.btn.ghost.sm', {
     id: 'btn-projects',
+    // DELIBERATELY UNCHANGED, tooltip included. The top bar is the Studio's
+    // persistent chrome — the part you see without opening anything — and
+    // docs/WORKSPACE_CONTRACT.md §8 says a user who never visits the
+    // workspace home notices no change. Re-pointing this dialog (see the note
+    // at the top of this file) necessarily changes what is INSIDE it; it does
+    // not get to change the shell on the way. So the hand-off is stated in the
+    // dialog's own head row and rail, where the reader who opened it is
+    // already looking, and this string stays byte-for-byte what it was.
     title: 'Projects: group runs by patient and compare across specimens',
     onclick: open,
   }, 'projects');
@@ -149,7 +232,13 @@ export function createProjectsPanel({ store }) {
       projects = [];
     }
     if (project && !projects.some((p) => p.id === project.id)) project = null;
-    if (!project && projects.length) await select(projects[0].id);
+    // Open on the project THE STUDIO IS IN, when it is in one. The dialog and
+    // the top bar naming different projects is precisely the "unsure which
+    // project this run lands in" state the contract's §8 exists to prevent,
+    // and the newest-first first row is not a reason to create it.
+    const preferred = contextId && projects.some((p) => p.id === contextId)
+      ? contextId : (projects.length ? projects[0].id : null);
+    if (!project && preferred) await select(preferred);
     else if (project) await select(project.id);
     else { comparison = null; render(); }
   }
@@ -221,25 +310,36 @@ export function createProjectsPanel({ store }) {
   function renderRail() {
     clear(railEl);
 
+    /* the Studio's own scope, when it has one — stated before the list, so
+       the list is read as "and here is everywhere else", not as a menu of
+       equals one of which is silently special. */
+    if (contextId) {
+      const inList = projects.find((p) => p.id === contextId);
+      railEl.appendChild(h('div.caveat.info', h('span',
+        h('b', 'This Studio is scoped to '),
+        h('span.mono.strong', contextId),
+        inList && inList.name ? ` · ${inList.name}` : '',
+        '. A run you finish in this tab is offered for filing under one of '
+        + 'its specimens — offered, never filed for you. Selecting another '
+        + 'project below changes what is COMPARED here; it does not change '
+        + 'where this tab\'s runs are offered. Use "open in Studio" for that.')));
+    }
+
     /* projects */
     railEl.appendChild(h('div.hr-lbl', `Projects · ${projects.length}`));
-    const nameIn = h('input.inp.sm', { placeholder: 'new project name',
-      'aria-label': 'new project name' });
+    // WHAT CHANGED: a `new project name` box and a `create` button stood here,
+    // and every row carried a delete. Both are the workspace home's now — see
+    // the note at the top of this file. The link is not a consolation prize
+    // for a removed feature; it is the removal being honest about where the
+    // feature went.
     railEl.appendChild(h('div.proj-new',
-      nameIn,
-      h('button.btn.sm.primary', {
-        onclick: async () => {
-          const name = nameIn.value.trim();
-          if (!name) { toast('warn', 'Name the project', 'A study needs a name before it can hold specimens.'); return; }
-          const p = await guard('POST /api/projects',
-            () => api.createProject(name));
-          if (!p) return;
-          nameIn.value = '';
-          toast('ok', 'Project created', `${p.id} · ${p.name}`, 3000);
-          await reload();
-          await select(p.id);
-        },
-      }, 'create')));
+      homeLink('workspace home \u2192',
+        'Projects are created, renamed, duplicated and deleted on the '
+        + 'workspace home, where deleting one can say what it does and does '
+        + 'not delete at the point of the click: a project owns run IDS, so '
+        + 'deleting it never deletes a run.'),
+      h('span.hint', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } },
+        'create · rename · duplicate · delete')));
 
     if (!projects.length) {
       railEl.appendChild(h('div.caveat.info', h('span',
@@ -249,39 +349,40 @@ export function createProjectsPanel({ store }) {
         // identifier. A UI that names the unit "patient" invites one.
         'No projects yet. A project groups runs by SPECIMEN so a compound ' +
         'panel on one specimen can be compared against the same panel on ' +
-        'another.')));
+        'another. Create the first one on the workspace home — the link above.')));
     }
     for (const p of projects) {
       const on = project && p.id === project.id;
+      const here = contextId === p.id;
       railEl.appendChild(h('div.proj-item', {
         class: on ? 'on' : null,
         tabindex: '0',
         onclick: () => select(p.id),
-        onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(p.id); } },
+        // `e.target !== e.currentTarget` because the row now contains its own
+        // focusable control. Without the guard, Enter on the link inside would
+        // ALSO be swallowed by preventDefault here and turn a navigation into
+        // a selection — the same class of mis-aimed-click defect the delete
+        // button that used to sit here was given a two-step confirm for.
+        onkeydown: (e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(p.id); }
+        },
       },
         h('div.proj-item-top',
           h('span.mono.strong', p.id),
           h('span.grow', p.name || NULL_GLYPH),
-          // Two-step: the `×` sits inside a row whose whole surface is a click
-          // target for SELECTING the project, so a mis-aimed selection click
-          // used to delete the study instead. See js/ui/confirm.js.
-          confirmable(h('button.btn.ghost.sm.danger', {
-            title: 'Delete this project. Runs are NOT deleted.',
-            'aria-label': `Delete project ${p.id}`,
-          }, '×'), {
-            confirmLabel: `delete ${p.id}?`,
-            armedTitle: `Deletes the study ${p.id} and its specimen list. Its `
-              + 'runs stay in app/runs/. Press again to confirm; Escape cancels.',
-            onConfirm: async () => {
-              const out = await guard(`DELETE /api/projects/${p.id}`,
-                () => api.deleteProject(p.id));
-              if (!out) return;
-              toast('ok', `${p.id} deleted`,
-                `${(out.runs_retained || []).length} run(s) retained in app/runs/ — a project owns ids, not results.`, 5000);
-              if (project && project.id === p.id) project = null;
-              await reload();
-            },
-          })),
+          // Deleting a project moved to the workspace home. It is not that the
+          // button was dangerous here — it had a two-step confirm — but that
+          // §2's consequence ("deleting a project does not delete its runs")
+          // has to be stated at the point of deletion, and it can only be
+          // stated in one place without drifting.
+          here
+            ? h('span.chip.st-running', {
+                title: 'This tab is already scoped to this project. A run that '
+                  + 'finishes here is offered for filing under one of its '
+                  + 'specimens.',
+              }, 'this tab')
+            : studioLink(p.id)),
         h('div.proj-item-sub.mono',
           `${int(p.n_specimens)} specimen${p.n_specimens === 1 ? '' : 's'} · `,
           `${int(p.n_runs)} run${p.n_runs === 1 ? '' : 's'} · `,
@@ -410,11 +511,11 @@ export function createProjectsPanel({ store }) {
     if (!project) {
       mainEl.appendChild(h('div.notice',
         h('h3', 'No project selected'),
-        h('p', 'Create a project, add two sections as specimens, and run the ' +
-          'SAME compound at the SAME spec on each. The comparison then puts ' +
-          'that one compound side by side across the two specimens, and the ' +
-          'two tissues side by side under it. It does not order compounds ' +
-          'against each other.')));
+        h('p', 'Create a project on the workspace home, then come back here, ' +
+          'add two sections as specimens, and run the SAME compound at the ' +
+          'SAME spec on each. The comparison then puts that one compound side ' +
+          'by side across the two specimens, and the two tissues side by side ' +
+          'under it. It does not order compounds against each other.')));
       return;
     }
     if (!comparison) {
@@ -607,11 +708,27 @@ export function createProjectsPanel({ store }) {
 
   render();
 
+  /**
+   * Tell the dialog which project the STUDIO is scoped to.
+   *
+   * Called by js/main.js once `?project=` has actually resolved to a project —
+   * never for an id that 404'd, because a context line naming a project that
+   * does not exist is worse than no context line.
+   */
+  function setContext(id) {
+    contextId = id || null;
+    // Only repaint what is already on screen. The dialog fetches on open, so a
+    // context set before it was ever opened is picked up by the first reload().
+    if (dlg.open) render();
+  }
+
   return {
     el: dlg,
     button: btn,
     open,
     reload,
+    setContext,
     get projectId() { return project ? project.id : null; },
+    get contextId() { return contextId; },
   };
 }

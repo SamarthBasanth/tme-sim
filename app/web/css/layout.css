@@ -1,13 +1,57 @@
 /* layout.css — the workstation shell.
    Fixed viewport, four regions, nothing scrolls the body. Rails and the dock
-   are resizable by drag; each pane owns its own overflow. */
+   are resizable by drag; each pane owns its own overflow.
+
+   ========================================================================
+   THE TWO MODES, AND WHY THERE ARE EXACTLY TWO
+   ========================================================================
+
+   WORKSTATION (>= 900px wide) — three rails and a dock, as docs/
+   UI_ARCHITECTURE.md section 2 specifies. Unchanged in intent; what changed is
+   that its tracks can now GIVE WAY (see `.body`).
+
+   STACKED (< 900px) — one column, scrolled by `.body`. Not a fallback and not
+   an accident: measured 2026-09-20, the three-rail grid had a hard floor of
+   316 + 4 + 240 + 4 + 348 = 912px, and `html, body { overflow: hidden }` meant
+   every pixel past the viewport was DESTROYED rather than scrolled. Measured
+   clipping of the READ rail — the rail carrying the answer:
+
+       viewport        rail-right right edge     lost off the right
+       1440 x 900      1440                      0
+        768 x 1024      912                    144px
+        720 x 450       912                    192px   (1440x900 at 200% zoom)
+        390 x 844       912                    522px
+        360 x 740       912                    552px
+
+   So a 200% zoom on an ordinary laptop silently removed 192px of the READ
+   rail with no scrollbar, no cue, and no route back. Below 900px the three
+   columns cannot coexist with a usable specimen viewport, so they stop being
+   columns. Nothing is hidden, nothing is collapsed, nothing moves into a
+   menu: the same four regions appear in the same order, one under the other,
+   in the order the product's own sentence reads them — the specimen you are
+   looking at, what the run said about it, what will run next, and the archive
+   of other runs.
+
+   THE HEIGHT AXIS IS A REAL AXIS. Every rule in this file used to be keyed on
+   width while three of the four region sizes were HEIGHT constants: --h-bar 30,
+   --h-status 21, --dock-h 214. At 1440x900 the dock is 24% of the body; at the
+   same window zoomed to 200% (450px tall) it was 54% — the shelf outgrew the
+   instrument, because 214px is 214px whatever the window does. The dock track
+   is now floored AND ceilinged against the stage's own floor, in the one
+   expression that says it (`.body`), with no viewport units and no second
+   breakpoint.
+   ======================================================================== */
 
 .shell {
   position: fixed;
   inset: 0;
   display: grid;
-  grid-template-rows: var(--bar-h) 1fr var(--status-h);
+  grid-template-rows: var(--h-bar) 1fr var(--h-status);
   background: var(--bg-0);
+  /* The shell IS the viewport. Nothing may escape it, and nothing inside it
+     may make the document scroll — every pane owns its own overflow. */
+  min-width: 0;
+  min-height: 0;
 }
 
 /* ---------------------------------------------------------------- top bar */
@@ -20,7 +64,23 @@
   border-bottom: 1px solid var(--line-2);
   min-width: 0;
   white-space: nowrap;
+  /* MEASURED: the bar's content is 924px wide and it was given no overflow at
+     all, so below ~924px the tail of it was cut off by `body { overflow:
+     hidden }`. The tail is `.topbar-group.last` — protocol, tour, keys, theme —
+     and UI_ARCHITECTURE.md section 2.1 makes that group the ONLY place a
+     workspace can be opened from. At 768px the theme toggle was gone; at 390px
+     so were the keyboard map and the protocol workspace, with no scrollbar and
+     no indication anything was missing.
+     Rule 4.3 is "wide content scrolls inside its own container", so it does —
+     the same treatment `.stage-toolbar` has always had. The scrollbar is hidden
+     because a 30px bar cannot spare 10px for a track; the launcher group is
+     pinned instead (below), which is a better cue than a scrollbar anyway. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
+.topbar::-webkit-scrollbar { height: 0; }
 .topbar > * { display: flex; align-items: center; }
 
 /* No logo mark. The accent is reserved for interactive affordance, selection
@@ -60,7 +120,22 @@
   overflow: hidden;
 }
 .topbar-group.keep { flex: 0 0 auto; }
-.topbar-group.last { border-right: 0; flex: 0 0 auto; }
+/* The launcher group. Pinned to the right edge of the scroller rather than
+   merely last in it: these four are the only route to the protocol workspace,
+   the tour, the keyboard map and the theme, and a control you have to discover
+   a horizontal scroll to reach is a control most operators never find. Sticky
+   works here because the parent is the scroll container. The border and the
+   opaque fill are what stop the groups sliding under it from reading as
+   overlapping text. */
+.topbar-group.last {
+  border-right: 0;
+  flex: 0 0 auto;
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--bg-2);
+  border-left: 1px solid var(--line-1);
+}
 .topbar-group > .mono,
 .topbar-group > .dim {
   overflow: hidden;
@@ -74,8 +149,37 @@
 .body {
   grid-row: 2;
   display: grid;
-  grid-template-columns: var(--rail-l) 4px minmax(240px, 1fr) 4px var(--rail-r);
-  grid-template-rows: minmax(160px, 1fr) 4px var(--dock-h);
+  /* ELASTIC TRACKS, not fixed ones.
+     Was: `var(--rail-l) 4px minmax(240px, 1fr) 4px var(--rail-r)` — three
+     tracks that never gave way, summing to a 912px floor the shell could not
+     honour and could not scroll.
+     Each rail is now `minmax(floor, its token)`: at any width where the
+     operator's dragged size fits, it gets exactly that size and nothing here
+     is felt; under pressure the two rails shrink toward the SAME floors
+     js/main.js already clamps their splitters to (240 / 250), so CSS and the
+     drag handle agree about the minimum instead of disagreeing silently.
+     The floors sum to 240 + 4 + 320 + 4 + 250 = 818px, which is below the
+     900px stacked breakpoint — so in workstation mode the grid always fits
+     the window exactly and there is nothing left to clip. */
+  grid-template-columns:
+    minmax(240px, var(--rail-l))
+    4px
+    minmax(320px, 1fr)
+    4px
+    minmax(250px, var(--rail-r));
+  /* The height axis, expressed as the invariant instead of as a constant.
+     The dock gets its dragged height whenever the stage can still have its
+     own 160px floor, and gives way when it cannot: `100% - 164px` is the
+     stage floor plus the splitter, measured against the body's own height,
+     so it needs no viewport units and no height breakpoint. 90px is the same
+     floor js/main.js clamps the dock splitter to.
+     At 1440x900 this changes nothing (214px, as before). At 960x540 the dock
+     stops taking 44% of the body. At any height the stage keeps its floor and
+     the rows stop summing past the track. */
+  grid-template-rows:
+    minmax(160px, 1fr)
+    4px
+    minmax(90px, min(var(--dock-h), calc(100% - 164px)));
   grid-template-areas:
     "left  sl stage sr right"
     "left  sl hh    sr right"
@@ -84,13 +188,18 @@
   min-width: 0;
   background: var(--bg-0);
 }
-.rail-left  { grid-area: left;  }
-.rail-right { grid-area: right; }
-.stage      { grid-area: stage; }
-.dock       { grid-area: dock;  }
+
+/* Region placement and the one rule each region adds to it. Previously split
+   across two blocks twenty lines apart (`grid-area` here, borders there), so
+   every region had two declarations and nothing said they were the same
+   thing. */
 .split-l    { grid-area: sl; }
 .split-r    { grid-area: sr; }
-.split-h    { grid-area: hh; }
+.split-h    { grid-area: hh; cursor: row-resize; }
+.stage      { grid-area: stage; }
+.dock       { grid-area: dock;  }
+.rail-left  { grid-area: left;  border-right: 1px solid var(--line-2); }
+.rail-right { grid-area: right; border-left:  1px solid var(--line-2); }
 
 .rail {
   display: flex;
@@ -100,8 +209,19 @@
   background: var(--bg-1);
   overflow: hidden;
 }
-.rail-left  { border-right: 1px solid var(--line-2); }
-.rail-right { border-left:  1px solid var(--line-2); }
+/* The pinned foot of a rail — the SETUP rail's commit bar (Submit run,
+   Validate, the validation badge). UI_ARCHITECTURE.md section 2.2: it is
+   pinned "because it is the one control whose reachability must not depend on
+   scroll position". js/ui/spec.js currently builds it as an unclassed <div>
+   with two inline-styled properties, which is why no stylesheet could reach
+   it; this class carries exactly those two declarations, so applying it is a
+   no-op on screen and makes the element addressable. See the stacked-mode
+   block at the foot of this file for what it then buys. */
+.rail-foot {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--line-2);
+  background: var(--bg-2);
+}
 .rail-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -145,7 +265,6 @@
   z-index: 4;
 }
 .split-l, .split-r { cursor: col-resize; }
-.split-h { cursor: row-resize; }
 .split::after {
   content: "";
   position: absolute;
@@ -163,6 +282,7 @@
   min-height: 0;
   min-width: 0;
   background: var(--bg-void);
+  /* `grid-area` for this one is set with the other regions above. */
 }
 .stage-toolbar {
   position: relative;
@@ -288,7 +408,12 @@
   grid-template-columns: minmax(320px, 1.35fr) 1px minmax(300px, 1fr);
   min-height: 0;
   min-width: 0;
-  background: var(--bg-1);
+  /* Tertiary: the dock recedes one surface step onto the shell, so it reads as
+     a shelf under the instrument rather than a fourth equal panel.
+     This was `var(--bg-1)` here and `var(--bg-0)` in a second `.dock` block
+     twenty-five lines below — same selector, same specificity, later in the
+     file, so the first declaration had never once painted anything. Dead. */
+  background: var(--bg-0);
   border-top: 1px solid var(--line-2);
   /* Each column has a floor (`minmax`'s first value) that the track never
      shrinks below; with the reports column mounted (reports.css) the three
@@ -305,12 +430,26 @@
 }
 .dock > .panel { min-width: 0; min-height: 0; background: transparent; }
 .dock-div { background: var(--line-2); }
-/* Tertiary: the dock recedes one surface step onto the shell, and its titles
-   drop to the secondary foreground. Its own heads stay at panel level so the
-   column boundaries survive. */
-.dock { background: var(--bg-0); }
-.dock .panel-head { background: var(--bg-1); }
-.dock .panel-head h2 { color: var(--fg-2); }
+/* The dock's titles drop to the secondary foreground; its own heads stay at
+   panel level so the column boundaries survive.
+   ONE block per selector. `.dock .panel-head` and `.dock .panel-head h2` were
+   each declared twice, sixty lines apart — the second pair added the
+   truncation that keeps `generate report` inside a 300px column, and nothing
+   connected it to the colour treatment it was overriding half of. */
+.dock .panel-head {
+  background: var(--bg-1);
+  min-width: 0;
+  overflow: hidden;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-3) 0 var(--sp-4);
+}
+.dock .panel-head h2 {
+  color: var(--fg-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dock .panel-head .btn.sm { padding: 0 var(--sp-3); }
 .dock .panel-body { background: var(--bg-0); }
 /* A dock column is 240-320 px holding a seven-column table. `.tbl` is
    `width: 100%`, so every cell was ellipsing to "xeniu" / "palbo" / "unifo" /
@@ -367,15 +506,11 @@
 .dock .cmp-metrics { overflow-x: auto; }
 .dock .cmp-metrics > .tbl { min-width: max-content; }
 
-/* The reports head carries a title and TWO buttons in a 300 px column and was
-   19 px over: the overflow escaped into the dock's own horizontal scroll and
-   clipped `generate report` at the viewport edge. Recovered from the head's
-   own gaps and padding — one step down the same scale — rather than by
-   shortening a label (`refresh reports` is named for its object on purpose:
-   the dock has two `refresh` buttons hitting different endpoints). */
-.dock .panel-head { min-width: 0; overflow: hidden; gap: var(--sp-3); padding: 0 var(--sp-3) 0 var(--sp-4); }
-.dock .panel-head .btn.sm { padding: 0 var(--sp-3); }
-.dock .panel-head h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* (The reports head carries a title and TWO buttons in a 300px column and was
+   19px over, clipping `generate report` at the viewport edge. The tightened
+   gap and padding that recovered it — one step down the same scale, rather
+   than shortening a label — are now in the single `.dock .panel-head` block
+   above with the colour treatment they were half-overriding.) */
 
 /* ----------------------------------------------------------- status strip */
 .statusbar {
@@ -383,13 +518,25 @@
   display: flex;
   align-items: center;
   gap: 0;
-  height: var(--status-h);
+  height: var(--h-status);
   background: var(--bg-2);
   border-top: 1px solid var(--line-2);
   font-size: var(--fs-xs);
   color: var(--fg-2);
-  overflow: hidden;
+  /* Was `overflow: hidden`, which is not rule 4.3 — it is the opposite of it.
+     MEASURED: the strip's content is 936px wide, so below that everything
+     from `lod` rightwards (vbo, index, api latency and the message cell) was
+     destroyed rather than scrolled: 546px of instrument health gone at 390px,
+     216px gone at 720px, and the panel this document calls "the single owner
+     of that information" owning none of it. Scroll, like the stage toolbar
+     and the top bar. The scrollbar is hidden because a 21px strip cannot
+     spare 10px for a track. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
+.statusbar::-webkit-scrollbar { height: 0; }
 .statusbar .cell {
   display: flex; align-items: center; gap: var(--sp-3);
   padding: 0 var(--sp-5);
@@ -436,7 +583,14 @@
    --fg-2 now (5.32 light / 5.24 dark). Nothing else about the hint changes: it
    is still the quietest thing in the header row, and still truncates. */
 .panel-head .hint {
-  font-size: var(--fs-micro);
+  /* --fs-disclosure, not --fs-micro. MEASURED 2026-09-20: this slot carries
+     "what will run", "showing", "access, API and billing for this deployment"
+     — sentences, and in the rails the only words telling a first-time reader
+     what the panel under them is for. --fs-micro is for marks of a few
+     characters: chips, units, timestamps. The rule in tokens.css is on the
+     PROPERTY (is it prose?), not on an opinion about whether this particular
+     prose matters, and this is prose. It costs 1px inside a 24px row. */
+  font-size: var(--fs-disclosure);
   color: var(--fg-2);
   font-family: var(--font-mono);
   /* A panel-head is a fixed `--h-head` row (see tokens.css 3.3): it does not
@@ -496,7 +650,10 @@
 .sect > summary .hint {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: var(--fs-micro);
+  /* Same reason as `.panel-head .hint`: "what this run says, in cells",
+     "not collapsible for a reason", "provenance on every value",
+     "the discrimination", "click a cell · measured vs derived". Sentences. */
+  font-size: var(--fs-disclosure);
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
@@ -508,12 +665,66 @@
 }
 .sect-body { padding: var(--sp-5) var(--sp-5) var(--sp-6); }
 
-/* no horizontal body scroll, ever: wide content gets its own container */
-.overflow-x {
-  overflow-x: auto;
-  overflow-y: hidden;
-  max-width: 100%;
+/* ======================================= SHARED LAYOUT PRIMITIVES ====
+   Generic, unowned, media-query-free classes that any module (including a new
+   surface with its own stylesheet) can use instead of inventing a fifth
+   spelling of the same box. They declare NO colour — every one of them is
+   geometry — and they are all safe at 200% zoom because none of them fixes a
+   width in pixels.
+
+     .wrap        a centred reading column. Caps at 78ch, never at a pixel
+                  width, so it holds ~70 characters per line at any zoom and
+                  collapses to full width with its gutters intact on a phone.
+     .grid-auto   a card/column grid that reflows with no breakpoint at all:
+                  as many 240px-floor tracks as fit, then one per row. This is
+                  what the dock and the rails should have been.
+     .hstack      a horizontal row that WRAPS rather than overflowing. The
+                  default failure of a flex row is to push its tail off the
+                  side of the shell, where `overflow: hidden` eats it; this one
+                  cannot.
+     .micro-head  an in-panel sub-heading (h4-level) at the disclosure floor.
+                  js/ui/reach.js currently builds four of these as inline
+                  styles on an <h4> at --fs-micro, which is a rule the CSP
+                  comment in this file says we do not do and a size the
+                  disclosure floor says we do not use for prose.
+     .rail-foot   the pinned foot of a rail (defined with `.rail` above).
+
+   base.css owns `.scroll`, `.scroll-x`, `.scroll-y` and `.grow`; components.css
+   owns `.stack`. Use those rather than adding a sixth. */
+.wrap {
+  width: 100%;
+  max-width: 78ch;
+  margin-inline: auto;
+  padding-inline: var(--sp-7);
 }
+.grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: var(--sp-6);
+  min-width: 0;
+}
+.hstack {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.micro-head {
+  margin: var(--sp-4) 0 var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-disclosure);
+  font-weight: 400;
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+
+/* (`.overflow-x` lived here and was a second spelling of base.css's
+   `.scroll-x` — same two declarations, a different name, and zero call sites
+   in js/ or index.html for either. One name for one thing: use `.scroll-x`
+   for any wide block that must scroll inside itself, or `.tblwrap` around a
+   table. Rule 4.3 is unchanged; there is one fewer way to spell it.) */
 
 /* ======================================================= rail groups ==== */
 /* A rail carried ten flat, unlabelled <details> sections and 2350 px of content
@@ -636,7 +847,10 @@
 .rail-group > .rg-head .rg-note {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: var(--fs-micro);
+  /* "display only — never the run", "drawn on the specimen". Sentences, and
+     the VIEW note in particular is the one line separating a display setting
+     from a result. See `.panel-head .hint`. */
+  font-size: var(--fs-disclosure);
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
@@ -650,3 +864,182 @@
    indentation, because indentation costs horizontal space a 316 px rail has
    none of. */
 .rail-group .sect:last-child { border-bottom: 0; }
+
+
+/* ========================================================================
+   STACKED — below 900px the three-rail layout cannot work, so it stops
+   pretending to.
+   ========================================================================
+
+   WHAT WAS HAPPENING. The grid's floor was 912px and `html, body { overflow:
+   hidden }` is the shell's contract, so under 912px the excess was not
+   scrolled, it was deleted: 144px of the READ rail at 768px, 192px at 200%
+   zoom on a 1440x900 laptop, 522px at 390px. No scrollbar, no cue, no route
+   back. That is not a narrow layout, it is a layout with a hole in it.
+
+   WHAT IT BECOMES, AND WHY THAT AND NOT A TAB BAR OR A MENU. One column,
+   scrolled by `.body`, carrying the same four regions in the same order the
+   product's own sentence reads them (UI_ARCHITECTURE.md section 1):
+
+       SPECIMEN   the primary object — first, and given the most height
+       SETUP      what will run, and the commit bar that runs it
+       READ       what the run said about it — the payoff of the primary verb
+       RUNS       the archive of other runs
+
+   THE ORDER IS SETUP-BEFORE-READ AND IT IS NOT THE RAIL RANKING. In the
+   three-column view READ outranks SETUP (the PRIMACY block above: "the answer"
+   beats "the question"), and that ranking is about visual weight when both are
+   on screen at once. In a column, rank becomes scroll distance, and the two
+   rails are not the same size: MEASURED at 390px, SETUP is 1,360px tall and
+   READ is 6,458px. Putting READ second puts `Submit run` 7,000px down a
+   page — and section 2.2 pins that control precisely "because it is the one
+   control whose reachability must not depend on scroll position". Ordering by
+   rank would have broken the rule the rank is there to serve. This order is
+   also the product's own sentence read forwards: look at the specimen, decide
+   what to run, run it, read what it said, compare it with the others.
+
+   Nothing is hidden, nothing is collapsed by default, nothing moves behind a
+   control, and no feature becomes unreachable — section 6 licenses none of
+   those and this pass takes none of them. The three-rail layout is not
+   replaced; it is what this window becomes when it is too narrow to hold it,
+   and it comes straight back at 900px.
+
+   Two things are load-bearing here and are easy to lose:
+
+   1. NO NESTED SCROLLERS. `.body` becomes the single scroller and the rails
+      give up theirs. A 2,350px rail inside a 900px scroller inside a fixed
+      shell is three scrollbars deep and the wheel lands in whichever one the
+      pointer happens to be over — the definition of clunky. Each rail is a
+      block in one column instead.
+   2. THE COMMIT BAR STAYS REACHABLE. Section 2.2 pins it "because it is the
+      one control whose reachability must not depend on scroll position". In
+      a single column it would otherwise be ~1,400px down. It is sticky to the
+      bottom of the viewport for exactly as long as the SETUP rail is on
+      screen, which is the same guarantee expressed for a column.
+
+   The sticky ladder — region head at 0, its navigator under it, its group
+   headers under that — is what keeps "where am I" answerable while the whole
+   instrument is one scroll. 24 + 24 = 48px of it, all from --h-head.
+   ======================================================================== */
+@media (max-width: 899px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto;
+    grid-template-areas:
+      "stage"
+      "left"
+      "right"
+      "dock";
+    /* The one scroller. The body still never scrolls horizontally. */
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+  }
+
+  /* Nothing to drag when there are no columns and the rows are content-sized.
+     display:none also takes them out of the tab order, which is correct — a
+     `role="separator"` that separates nothing is a stop on the keyboard path
+     that does nothing when you get there. */
+  .split { display: none; }
+
+  /* The specimen keeps the largest share and a floor of its own.
+     `clamp`, and every one of the three numbers is load-bearing — this was
+     `max(260px, 42vh)` and that flat 260px floor caused a real overlap.
+     MEASURED at 720x450 (a 1440x900 laptop at 200% zoom): a 260px stage put
+     the SETUP rail's top at y=290 with the fold at y=429, leaving 139px of
+     head-room for a 149px commit bar. `position: sticky` may not leave its
+     containing block, so instead of pinning to the fold the bar clamped to the
+     TOP of its own rail and painted over the rail's header and first fields.
+     The pin was covering the form it commits. 40vh with a 160px floor leaves
+     the bar room at every viewport from 195x422 up; the 420px ceiling stops a
+     tall window handing the whole first screen to the specimen before the
+     answer is reachable. */
+  .stage { min-height: clamp(160px, 40vh, 420px); }
+
+  /* Rails become blocks in the one column. They keep every section, every
+     default-open <details> and every caveat; what they give up is a scrollbar
+     they are no longer the scroller for.
+
+     `min-height: auto` is load-bearing and is NOT tidy-up. MEASURED: with the
+     workstation rule's `min-height: 0` still in force, an `auto` grid track
+     resolves to `minmax(auto, max-content)` whose BASE size is the item's
+     automatic minimum — which `min-height: 0` sets to zero. The four rows then
+     split the leftover 378px equally, and the SETUP rail, the READ rail and
+     the dock each rendered as a 126px window onto 2,300px of content with no
+     scrollbar of their own and no way to reach the rest. `auto` restores the
+     content-based minimum, the rows take their real height, and `.body` — the
+     one scroller — scrolls them. */
+  .rail,
+  .dock,
+  .dock > .panel {
+    overflow: visible;
+    min-height: auto;
+  }
+  .rail-left  { border-right: 0; }
+  .rail-right { border-left:  0; }
+  .rail-left, .rail-right { border-top: 1px solid var(--line-2); }
+  .rail-body {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  /* The sticky ladder. Each rail is its own containing block for these, so
+     the READ rail's header cannot stick over the SETUP rail's content. */
+  .rail > .panel-head {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .rail-nav {
+    position: sticky;
+    top: var(--h-head);
+    z-index: 4;
+  }
+  .rail-group > .rg-head { top: calc(var(--h-head) * 2); }
+
+  /* Submit run / Validate, kept off the floor of a 1,400px column.
+     `.rail-foot` is the class js/ui/spec.js should carry on that element (see
+     its definition above); `:last-child` is the selector that reaches it
+     TODAY, while it is still an unclassed <div>. Both, so this is correct
+     before and after that change and needs no coordination to land. */
+  .rail-left > .rail-foot,
+  .rail-left > :last-child {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+  }
+
+  /* The dock's three panels are complements, not alternatives (section 2.5),
+     so they stay three panels — stacked rather than side by side, because
+     three 300px columns in a 360px window is the same clipping defect one
+     level down. Each keeps its own scroll and a ceiling, so a 200-run history
+     cannot push the rest of the instrument off the end of the page. */
+  .dock { grid-template-columns: minmax(0, 1fr); }
+  .dock > .panel + .panel { border-top: 1px solid var(--line-2); }
+  .dock .panel-body { max-height: min(52vh, 360px); }
+  .dock-div { display: none; }
+
+  /* The comparison column's reason for wrapping instead of scrolling was that
+     it is the narrowest track in the dock. Full width, it is not. */
+  .dock .cmp-fields > .tbl { font-size: var(--fs-sm); }
+}
+
+/* ------------------------------------------------------------------------
+   TOO SHORT FOR A PIN.
+   The stacked block above is keyed on WIDTH, and the commit bar's pin is a
+   HEIGHT problem — the exact pairing that hides this class of bug. Below
+   ~440px of viewport height there is not enough room above the fold for a
+   specimen, a rail header and a pinned commit bar at the same time, whatever
+   the width is. `position: sticky` does not fail gracefully in that state: it
+   clamps to the top of its containing block and paints the bar over the form
+   it commits.
+   So the PIN is what goes, not the bar and not the form. A commit bar you
+   scroll to is a documented degradation of section 2.2; a commit bar floating
+   over the fields it submits is a rendering defect. Everything stays on
+   screen, in order, and reachable.
+   ------------------------------------------------------------------------ */
+@media (max-width: 899px) and (max-height: 440px) {
+  .stage { min-height: 160px; }
+  .rail-left > .rail-foot,
+  .rail-left > :last-child { position: static; }
+}

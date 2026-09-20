@@ -6,9 +6,18 @@ the other thing — **the shortest sequence of commands that ends in a finished
 simulation, with nothing in it that has not been executed.**
 
 Every command below was run, in this order, on **macOS 14 / arm64 with a
-colima-backed Docker daemon (linux/arm64, 4 CPUs, 5.7 GB)** on **2026-08-22**,
-and every output quoted is copied from that session. Where a number is
-machine-specific it says so.
+colima-backed Docker daemon (linux/arm64, 4 CPUs, 5.7 GB)**, and every output
+quoted is copied from a real session. Where a number is machine-specific it
+says so.
+
+**Two sessions, and the second one moved numbers the first one recorded.**
+Paths A and B were executed on **2026-08-22**. §H (hosted) and every build
+figure in §A1 were executed on **2026-09-20**, on the same machine, against the
+same Dockerfile plus the one line §H4 exists for. The 2026-08-22 image size and
+build times were measured *before* the Dockerfile grew its build-time
+`vivum acquire` step and are no longer what the default build produces; §A1 now
+carries the 2026-09-20 figures and says what changed. Nothing else was
+re-measured, so treat a §A/§B number as of 2026-08-22 unless it says otherwise.
 
 **One substitution in those transcripts, and only one.** That session ran under
 the name **Codon**; the product was renamed back to **Vivum** later on
@@ -28,10 +37,16 @@ has gone green, treat amd64 as open. See `docs/DEPLOYMENT.md` §1c.
 
 | | use it when | ends at |
 |---|---|---|
+| **H. Hosted (Render)** | someone who is not you needs a URL | §H4, a live instance you have verified |
 | **A. Docker** | you want the shipped artifact, isolation, and a non-root uid | §A6, a `done` run |
 | **B. Local venv** | you are developing, or Docker is not available | §B3, a `done` run |
 
-Both end in the same place. Path A is what a field tester should get.
+A and B end in the same place. Path A is what a field tester should get on
+their own machine; **path H is the ten-minute one**, and it is the only one
+that puts the product somewhere a person can click.
+
+Read §H0 before §H1. It is one paragraph and it is the difference between a
+demo and a place to keep work.
 
 ---
 
@@ -57,6 +72,229 @@ onto an occupied port, `docker run` still exits 0, the container still says
 `running`, and every request you make reaches the *other* process — see
 `docs/DEPLOYMENT.md` §1c for the measured version of that trap.
 
+§0 is for paths A and B. **Path H publishes no local port and you can skip it.**
+
+---
+
+## H. Hosted, on Render — ten minutes
+
+`render.yaml` in the repository root is this deployment as code. Read it: every
+line of it is a thing that used to be a setting someone had to remember, and
+the two that matter most fail *silently* when forgotten.
+
+### H0. What you are deploying, and the one thing it cannot yet do
+
+**A hosted instance is a place to DEMONSTRATE this product, not a place to keep
+work.** Read this paragraph before you promise anyone otherwise.
+
+`render.yaml` declares no disk, so the container filesystem is discarded on
+every deploy and every restart — and with `autoDeployTrigger: commit`, that is
+every push. Everything the server writes lives under `/app/app`: run results and
+their binary payloads in `app/runs/`, the project store in `app/projects/`,
+plus reports, compounds and resolved uploads. All of it goes.
+
+Adding a disk does not currently fix it, and it is worth knowing why before
+anyone spends an afternoon on it. Render allows **one disk per service**. The
+two directories that hold work are siblings, and their common parent
+`/app/app` also contains `server/` and `web/` — mount a disk there and you hide
+the application's own code and the front end, and the service does not start.
+Neither path is configurable: `app/server/cache.py::runs_dir` and
+`app/server/projects.py::projects_dir` both build from `repo_root()` with no
+environment override. So one disk can persist run history **or** the project
+store, and a project whose runs were discarded is a set of dangling ids. The
+commented-out block in `render.yaml` is that half-measure, with its two unverified
+assumptions named.
+
+Two things this deploy *does* do that a bare container would not:
+
+* **It can actually run a simulation.** The image fetches one tissue section
+  from its original source at build time (`ARG FETCH_SECTION=1`), so a hosted
+  instance has tissue with no host to bind-mount from. Adding **your own**
+  tissue to a hosted instance is a different problem, because a section
+  registers **by filesystem path on the server's own machine** — see §H6.
+* **It will not die on the first run.** See §H4, which is the check for that.
+
+### H1. What is manual and what is automatic
+
+Everything in the left column happens once, by a human, in a browser. Nothing
+in it is triggered by pushing code.
+
+| Manual, once | Automatic, from then on |
+|---|---|
+| Connect the repo and create the Blueprint (§H2) | Render reads `render.yaml` and creates the service |
+| — | The API key is generated by Render and kept in the service's environment |
+| — | `healthCheckPath: /healthz` is set from the file, not the dashboard |
+| — | `docker build` runs on Render's builder; `.dockerignore` applies |
+| — | One tissue section is fetched from source during the build |
+| — | `$PORT` is assigned by Render and honoured by the image |
+| — | The grid ceiling defaults to `auto` from the image's `ENV` |
+| Read the key out of the dashboard (§H3) | — |
+| Run the four checks in §H4 and read them | — |
+| — | Every push to the linked branch rebuilds and redeploys |
+| Change `autoDeployTrigger` to `checksPass` once anyone depends on this (§H5) | — |
+
+The asymmetry is deliberate. Every automatic row used to be a manual one, and
+two of them — the health-check path and the grid ceiling — have each taken a
+service down in this project's history when a human forgot.
+
+### H2. Create the Blueprint (manual)
+
+Render dashboard → **New** → **Blueprint** → pick this repository → apply.
+Render reads `render.yaml` from the repository root and creates one web
+service, `vivum-studio`.
+
+Nothing about this is triggered by a push. A Blueprint is created once by
+hand; after that, pushes deploy.
+
+**Choose the instance size here.** The image protects itself on a small one
+(§H4) rather than assuming a large one, so a 512 MB instance is a legitimate
+choice — it will refuse a grid it cannot afford instead of dying. It is the
+resolution that costs you, not the service.
+
+The first build fetches one tissue section over the network and installs the
+whole scipy/rdkit stack. For scale, **measured 2026-09-20 on this repository's
+own machine** (macOS/arm64, colima, 4 CPUs, builder cache empty, base image
+already pulled):
+
+```
+docker build -t vivum-deploy:audit .          exit 0, 83 s
+docker images                                 1.54 GB
+docker build --build-arg FETCH_SECTION=0 .    exit 0, 19 s   (no tissue)
+```
+
+Render builds `linux/amd64` on its own hardware, so treat those as an order of
+magnitude, not a prediction. What they *do* establish is that the build is
+minutes, not hours, and that the tissue step is most of the difference.
+
+### H3. Read the key (manual)
+
+Dashboard → the service → **Environment** → `TMESIM_STUDIO_API_KEY`.
+
+`render.yaml` sets `generateValue: true` on it, and that is not a convenience.
+The image's `CMD` binds `0.0.0.0`, which `app/server/__main__.py` treats as
+non-loopback: with no key set it **auto-generates one and prints it exactly
+once to stdout, persisting it nowhere**. On a platform whose logs roll, the
+service is then unusable by everyone including the person who deployed it.
+Render minting the value instead means it is sitting in the dashboard,
+readable and rotatable, and the startup banner says `[set via
+TMESIM_STUDIO_API_KEY]` rather than `[generated (not persisted -- save it
+now)]`.
+
+**Before you give that key to anyone, read `docs/DEPLOYMENT.md` §2.** It
+authenticates `POST /api/sections/scan`; it does not *confine* it. Treat it as
+closer to read access as the server's uid than to a password.
+
+### H4. Verify, in four curls
+
+Do all four. Each one corresponds to a failure this project has actually had,
+and every one of them is silent — the dashboard says "live" for all four.
+
+```bash
+B=https://<your-service>.onrender.com; K="X-API-Key: <the key from H3>"
+
+curl -s -o /dev/null -w "%{http_code}\n" $B/healthz                 # 200
+curl -s -o /dev/null -w "%{http_code}\n" -I $B/healthz              # 200  (HEAD)
+curl -s -o /dev/null -w "%{http_code}\n" $B/                        # 200, no key
+curl -s -H "$K" $B/api/account | python3 -m json.tool | grep grid   # see below
+```
+
+1. **`/healthz`, not `/api/health`.** Every `/api/` route is behind the key and
+   a platform health checker cannot send a header. Pointed at `/api/health` a
+   check got 401 forever, concluded the service never came up, and killed a
+   container that was serving correctly. `render.yaml` sets the right path; this
+   confirms it arrived.
+2. **HEAD, not just GET.** `HEAD /healthz` returned **404** until the route was
+   registered for both methods — while the key middleware had already been
+   written to exempt HEAD on that path, so the gate was expecting a probe the
+   router refused. A health check configured for HEAD would have marked a
+   perfectly healthy service down. Nothing else in this repository probes with
+   HEAD.
+3. **The page loads without a key.** Static assets are deliberately ungated so
+   the page can render and *prompt* for the key. A 401 here means first load is
+   broken for everyone.
+4. **The grid ceiling actually bound.** This is the one that decides whether the
+   first run a visitor clicks takes the service down.
+
+For (4), the field to read is
+`deployment.limits.max_grid_cells_source`. **Measured 2026-09-20 in a real
+container, reading `app.server.api._MAX_GRID_CELLS` directly:**
+
+| the container | ceiling | `max_grid_cells_source` |
+|---|---|---|
+| `--memory=512m` | **46,070** | `auto (cgroup v2 memory.max)` |
+| no memory limit | 40,000,000 | `auto (no small-host limit detected)` |
+| `-e TMESIM_MAX_GRID_CELLS=100000` | 100,000 | `TMESIM_MAX_GRID_CELLS` |
+
+The image sets `ENV TMESIM_MAX_GRID_CELLS=auto`, so a small host is protected
+without anyone remembering.
+
+**What that is worth was measured the same day, by turning it back off.**
+`docker run --memory=512m -e TMESIM_MAX_GRID_CELLS=` — an empty value, which
+restores the untouched default and is exactly how an image without this `ENV`
+behaves. With the ceiling back at 40,000,000, a POST of the stock
+`/api/defaults` spec (`dx_um = 12`, the value the product itself proposes) was
+accepted with `202`, and the container was
+**OOM-killed within a second**: `State.OOMKilled=true`, exit **137**, `/healthz`
+unreachable. Not the run failing; the process. With the `ENV` in place the same
+POST is a **400** naming the 46,070 ceiling and the container is still serving.
+The first click a first user makes was the one that killed the instance.
+
+If line (4) reads `auto (no small-host limit detected)` on an instance you know
+to be small, the host is capping memory without declaring it through cgroup v2
+`memory.max` or cgroup v1 `memory.limit_in_bytes`. Fix it by declaring the size
+with `TMESIM_HOST_MEMORY_MB`, or by setting an integer ceiling outright — both
+in `docs/DEPLOYMENT.md` §4. Note that setting the variable at all silences the
+startup line that used to say "no memory limit is declared … if this host is
+small, set `TMESIM_MAX_GRID_CELLS`", because that warning fires only while the
+ceiling is the untouched default. That is why this check is a step in a runbook
+rather than a line in a log.
+
+### H5. Redeploys, and when to make them stricter
+
+`autoDeployTrigger: commit` means every push to the linked branch rebuilds and
+redeploys. That is the right setting while the product is being built, because
+a deploy is how you find out.
+
+**Change it to `checksPass` the moment anyone else depends on the URL.** The
+two workflows in `.github/workflows/` are what that setting would then gate:
+
+* `docker.yml` — the image on `linux/amd64`: that it builds at all, that it
+  does not run as root, that `.dockerignore` kept the operator's tissue and
+  unpublished compounds out of a layer.
+* `product.yml` — the product a visitor meets: both HTML pages served **from
+  inside a built container**, every `app/web/js/**` module parsing as an ES
+  module, every file under `app/web/` reachable at its own URL, `$PORT`
+  honoured, `/healthz` answering GET and HEAD unauthenticated, and the claim
+  surface (`README.md`, `docs/**`, the four root contracts).
+
+`product.yml` is a separate workflow on purpose: `docker.yml` skips pushes that
+only touch `docs/**`, which is exactly where the claim surface lives.
+
+### H6. Your own tissue on a hosted instance
+
+A section registers **by filesystem path on the server's own machine**. Nothing
+is transferred to the server; the bytes are read where they lie. A hosted
+container has no filesystem of yours to read, so §A7's bind mount has no
+equivalent here — that path exists on a machine you control, and a hosted
+instance is not one.
+
+The honest position: use a hosted instance for the section the image carries,
+and use path A on your own machine for your own tissue. Read
+`docs/DEPLOYMENT.md` §0 first either way — a spatial-transcriptomics export
+carries identifiers in the **directory name**, the section id and label, and in
+files this product never reads but which travel with the directory.
+
+### H7. When it is wrong, it is usually one of these
+
+| Symptom | Almost certainly |
+|---|---|
+| Every request hangs; the dashboard says live | `$PORT` is being ignored. The `CMD` must carry **no** `--port`; `app/server/__main__.py` defaults `--port` from the environment. A flag there overrides the platform and nothing listens where it routes. |
+| The service is killed and restarted in a loop, logs full of 401 | The health check is pointed at `/api/health` instead of `/healthz`. `render.yaml` sets it; a dashboard edit can override it. |
+| Health check fails, but every request you make works | The probe uses HEAD. See §H4 (2). |
+| The instance dies mid-run, exit 137 | OOM. §H4 (4). |
+| `/studio` is a 404 while `/` works | The static mount does not append `.html` to a path and does not know `/studio`; it needs its own route registered before the mount at `/`. `product.yml` fails on exactly this. |
+| Projects you created yesterday are gone | §H0. There is no disk. |
+
 ---
 
 ## A. Docker
@@ -67,15 +305,44 @@ onto an occupied port, `docker run` still exits 0, the container still says
 docker build -t vivum-studio .
 ```
 
-Exits 0. Measured on the machine above: **58 s** for `docker build --no-cache`
-(every layer re-run, wheels re-downloaded) and **51 s** for an ordinary build
-reusing the apt layer. Both produce an image `docker images` reports as
-**1.38 GB**.
+Exits 0. **Re-measured 2026-09-20** on the machine above, because the figures
+this section used to carry were taken before the Dockerfile grew its build-time
+`vivum acquire` step and were no longer what the default build produces:
+
+| | exit | wall clock | `docker images` |
+|---|---|---|---|
+| builder cache empty, base image already pulled | 0 | **83 s** | **1.54 GB** |
+| rebuild after a one-line Dockerfile edit (pip layer cached, tissue re-fetched) | 0 | 48 s | 1.54 GB |
+| `--build-arg FETCH_SECTION=0` (no tissue) | 0 | 19 s | — |
+
+Those are wall-clock on a shared laptop, not benchmarks: a repeat of the third
+row later the same day, while several other builds and test runs were using the
+same machine, took **187 s** for the identical command and the identical result.
+Read the column as an order of magnitude and the `exit` column as the fact.
+
+This section previously read **58 s / 51 s / 1.38 GB**. Those were honest
+measurements of an image that did not yet fetch a tissue section at build time;
+the ~160 MB and the extra ~30 s are that step, and `docker images` is where they
+show up. The default build is `FETCH_SECTION=1`, so 1.54 GB is what you get
+unless you ask for the other one.
+
+> **Check the exit code. Do not grep the output for a success string.** A
+> previous session in this repository read a build log for "Compiled
+> successfully" while the build was exiting 1 the whole time. In `zsh`,
+> `${PIPESTATUS[0]}` is empty — redirect to a file and test `$?`.
 
 > Do not read a size out of `docker image inspect --format '{{.Size}}'`. On this
-> containerd-snapshotter daemon it reported **301,296,504 bytes** for the same
-> image — a 4.6x under-report, because that field is compressed content size.
-> CI reads that field. Cross-check against `docker images`.
+> containerd-snapshotter daemon it reported **365,591,455 bytes** for the
+> 1.54 GB image measured above — a 4.2x under-report, because that field is
+> compressed content size (it was 301,296,504 against 1.38 GB in the earlier
+> session; the ratio is a property of the graph driver, not of the image).
+> `.github/workflows/docker.yml` reads that field and prints both. Cross-check
+> against `docker images`.
+
+> `docker build --progress=plain` is a **BuildKit** flag. This daemon ships the
+> legacy builder with no `buildx` component, where it exits **125** with
+> `unknown flag: --progress` — in under a second, which reads exactly like a
+> fast build if you are only watching the clock.
 
 ### A2. Start it
 
@@ -396,6 +663,24 @@ that was not actually run.
 | 7 | Startup banner (and any auto-generated key) is reordered behind uvicorn when stdout is a pipe; the `PYTHONUNBUFFERED` fix exists only in the `Dockerfile` | `app/server/__main__.py::main` | documented here and in §1b; **not fixed in code** |
 
 Nothing in the container failed to build, start, or run.
+
+### And what the 2026-09-20 session found
+
+| # | What | Where | Status |
+|---|---|---|---|
+| 8 | On a 512 MB container the stock `/api/defaults` spec was **accepted** and OOM-killed the process in about a second — exit 137, `/healthz` unreachable. The first run a first user clicks. | image had no ceiling default | fixed — `ENV TMESIM_MAX_GRID_CELLS=auto` in the `Dockerfile`; the same POST is now a 400 naming the ceiling |
+| 9 | §A1's **1.38 GB / 58 s / 51 s** were measured before the build-time tissue fetch existed and no longer described the default build | `docs/RUNBOOK_DEPLOY.md` | fixed — re-measured, and what changed is stated |
+| 10 | `GET /` served the **Studio** even with `app/web/home.html` present in the image, and `GET /studio` was a **404** | `app/server/api.py::_mount_web` | fixed the same day, elsewhere — `StaticFiles(html=True)` resolves `/` to the directory index and never appends `.html`, so both URLs needed explicit routes ahead of the mount. Re-measured after they landed: `/` serves `home.html` and `/studio` serves `index.html`, byte for byte, and `/studio?project=…` is 200. `product.yml` asserts exactly that, and was red on this before the fix. |
+| 11 | A hosted instance keeps nothing: no disk, and one disk cannot cover `app/runs/` and `app/projects/` because neither path is configurable | `cache.py::runs_dir`, `projects.py::projects_dir` | **open** — stated in §H0 and in `render.yaml` rather than worked around |
+| 12 | `node --check` — the obvious spelling of an ES-module syntax check — parsed a duplicate `export const` and an `await` outside an async function **without error** | CI that did not exist yet | fixed by construction — `product.yml` uses `node --input-type=module --check`, confirmed by planting the duplicate export in a real module and watching the wrong flag stay green |
+
+There is one thing this session could not settle, and it is the same one §A
+could not: **nothing here has been deployed to Render.** `render.yaml` was
+checked against the Blueprint specification and its keys are current, and the
+image it deploys was built and exercised — but no account is attached to this
+repository, so §H2 and §H3 are the two steps in this runbook that have been
+written and not run. Everything in §H4 was executed against a local container
+on the port a platform would assign.
 
 Finding 7 is the one still open in code. It is documented rather than worked
 around because the fix is a decision about the server's own output discipline —

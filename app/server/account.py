@@ -195,7 +195,14 @@ def build_account_router(
                 "kind": "current inventory, not a meter",
                 "runs_by_status": by_status,
                 "runs_total": sum(by_status.values()),
-                "projects": len(store.list()),
+                # thumbnails=False: this is a COUNT. The default computes a
+                # composition thumbnail per project by reading run documents
+                # off disk -- measured by the store's own author at 0.078 ms on
+                # the real store but 176 ms cold at 1,250 run documents none of
+                # which can supply one. Paying that to produce an integer, on a
+                # route a platform health checker polls every ~10 s, is how a
+                # liveness endpoint becomes the thing that fails.
+                "projects": len(store.list(thumbnails=False)),
                 "reports": n_reports,
                 "reconstruction_cache": (
                     cache.stats() if cache is not None else None),
