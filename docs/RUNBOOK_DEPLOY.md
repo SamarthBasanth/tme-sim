@@ -336,15 +336,27 @@ files this product never reads but which travel with the directory.
 **The disk, in two checks.** Both are one line each and answer different
 questions.
 
-*Is persistence actually on?* The startup banner prints where run history
-lives. On a service with the disk wired up it reads:
+*Is persistence actually on?* **Ask the running service, from anywhere.**
+`GET /api/health` reports the two paths it is actually using, so this needs no
+dashboard and no log access:
 
-```
-  run history /var/lib/vivum/runs
+```bash
+curl -s -H "X-API-Key: $KEY" https://<service>/api/health \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["runs_dir"]); print(d["projects_dir"])'
 ```
 
-If it reads `/app/app/runs`, `TMESIM_STATE_DIR` is not set on this service and
-**nothing is being kept** — every deploy destroys it. The most likely cause is
+Persistence is on when those read `/var/lib/vivum/runs` and
+`/var/lib/vivum/projects`. If they read `/app/app/runs` and
+`/app/app/projects`, `TMESIM_STATE_DIR` is not set on this service and
+**nothing is being kept** — every deploy destroys it. The startup banner prints
+the same fact as `run history …` if you do have log access.
+
+Measured on the live service 2026-09-20, immediately after a push that added
+the `disk:` block to `render.yaml`: `/app/app/runs`. The file had no effect,
+which is the §H1 asymmetry doing exactly what it says — **a service created by
+hand in the dashboard auto-deploys on push and ignores this file.** Do not
+infer from a green deploy that a `render.yaml` change was applied; ask the
+service. The most likely cause is
 the one in the header of `render.yaml`: a service created by hand in the
 dashboard auto-deploys on push but **ignores `render.yaml` entirely**, so the
 `disk:` block and the variable below it never applied. Check

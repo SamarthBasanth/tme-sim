@@ -494,18 +494,53 @@ export function createProjectGrid(opts = {}) {
     const shown = sorted(projects.filter((p) => matches(p, tokens)));
     const n = projects.length;
 
+    // THIS LINE IS NOT THE SUM OF THE CARDS, AND IT MUST SAY SO.
+    //
+    // Each card reports the runs ATTACHED to that project, and each card is a
+    // true statement about its own project. `totals.runs` reports the runs
+    // that EXIST. Contract §2 -- a project "owns nothing but ids" -- means one
+    // run in app/runs/ can be reached from any number of projects, and
+    // `POST /api/projects/{id}/duplicate` exists to make that ordinary, so
+    // adding the cards up can legitimately exceed this number. (Until
+    // 2026-09-20 the server summed the cards here and this number was the
+    // wrong one: a single duplicate of a two-run project reported four runs on
+    // a server holding two.)
+    //
+    // So the word `distinct` is load-bearing. Without it the two numbers are
+    // irreconcilable on their face and the SMALLER, CORRECT one is the one
+    // that looks broken. `abbr.gloss` (css/components.css) is the existing
+    // quiet mark for this -- a dotted underline and `cursor: help`, no colour
+    // and no weight change -- so the caveat is reachable without setting
+    // anything smaller than the number it qualifies (contract §6).
     const tail = [];
     const specimens = cnum(facts.totals && facts.totals.specimens);
     const runs = cnum(facts.totals && facts.totals.runs);
-    if (specimens !== null) tail.push(`${int(specimens)} specimen${specimens === 1 ? '' : 's'}`);
-    if (runs !== null) tail.push(`${int(runs)} run${runs === 1 ? '' : 's'}`);
+    if (specimens !== null) {
+      tail.push(h('span', `${int(specimens)} specimen${specimens === 1 ? '' : 's'}`));
+    }
+    if (runs !== null) {
+      tail.push(h('abbr.gloss', {
+        title: 'Distinct runs: the runs that exist in app/runs/, counted once '
+          + 'each. A project holds run IDS, not runs, so one run reachable '
+          + 'from two projects is ONE run here while appearing on both of '
+          + 'their cards — which is why adding the per-project counts up can '
+          + 'give a larger number than this one. Deleting a project deletes '
+          + 'none of them.',
+      }, `${int(runs)} distinct run${runs === 1 ? '' : 's'}`));
+    }
+
+    const holding = [];
+    for (const part of tail) {
+      if (holding.length) holding.push(' and ');
+      holding.push(part);
+    }
 
     fill(countNote, tokens.length
       ? [h('b', `${int(shown.length)} of ${int(n)}`),
          ` project${n === 1 ? '' : 's'} match this search.`]
       : [h('b', `${int(n)}`),
-         ` project${n === 1 ? '' : 's'} on this server`
-         + (tail.length ? `, holding ${tail.join(' and ')}.` : '.')]);
+         ` project${n === 1 ? '' : 's'} on this server`,
+         ...(holding.length ? [', holding ', ...holding, '.'] : ['.'])]);
 
     if (!shown.length) { fill(listRegion, noMatchBlock()); return; }
 

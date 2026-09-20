@@ -176,3 +176,57 @@ class TestTheServerRefusesRatherThanCrashes:
         assert "Traceback" not in proc.stderr, (
             "the operator got a traceback instead of a diagnosis:\n"
             + proc.stderr[-2000:])
+
+
+class TestTheServerAcceptsItsOwnDefaults:
+    """`GET /api/defaults` must return a spec `POST /api/runs` will take.
+
+    MEASURED ON THE LIVE DEPLOYMENT 2026-09-20. It did not. `/api/defaults`
+    served `dx_um = 12.0`; the same server answered that spec with 400,
+    because `TMESIM_MAX_GRID_CELLS=auto` resolves to 100,000 on a 512 MB host
+    and 12 um on `xenium_319` is ~284,498 voxels. The first click a hosted
+    visitor makes failed.
+
+    Nothing coupled the two: `default_spec` was a literal, and the ceiling is
+    read from the environment at import. This is the coupling.
+    """
+
+    @staticmethod
+    def _reloaded(ceiling: str):
+        import importlib
+        os.environ["TMESIM_MAX_GRID_CELLS"] = ceiling
+        import app.server.api as api
+        return importlib.reload(api)
+
+    @pytest.mark.parametrize("ceiling", ["100000", "250000", "1000000",
+                                         "40000000"])
+    def test_the_defaults_validate_under_every_ceiling(self, ceiling):
+        prior = os.environ.get("TMESIM_MAX_GRID_CELLS")
+        try:
+            api = self._reloaded(ceiling)
+            spec = api.default_spec()
+            verdict = api.validate_spec(spec)
+            assert verdict["ok"] is True, (
+                f"with TMESIM_MAX_GRID_CELLS={ceiling} the server serves "
+                f"defaults it then refuses (dx_um={spec['dx_um']}): "
+                f"{verdict['errors']}")
+        finally:
+            if prior is None:
+                os.environ.pop("TMESIM_MAX_GRID_CELLS", None)
+            else:
+                os.environ["TMESIM_MAX_GRID_CELLS"] = prior
+            self._reloaded(prior or "40000000")
+
+    def test_an_unconstrained_server_still_offers_12um(self):
+        """No existing installation moves. The coarsening is for hosts that
+        would otherwise refuse, and nowhere else."""
+        prior = os.environ.get("TMESIM_MAX_GRID_CELLS")
+        try:
+            api = self._reloaded("40000000")
+            assert api.default_spec()["dx_um"] == 12.0
+        finally:
+            if prior is None:
+                os.environ.pop("TMESIM_MAX_GRID_CELLS", None)
+            else:
+                os.environ["TMESIM_MAX_GRID_CELLS"] = prior
+            self._reloaded(prior or "40000000")

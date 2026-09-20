@@ -325,7 +325,10 @@ def workspace_payload(jobs, store) -> Dict:
     cards: List[Dict] = []
     compounds_by_project: Dict[str, List[str]] = {}
     n_specimens_total = 0
-    n_runs_total = 0
+    # A SET, not a counter, and that is the whole point. See the `totals`
+    # block at the bottom of this function for why runs are counted this way
+    # and specimens deliberately are not.
+    run_ids_total: set = set()
 
     for row in summaries:
         pid = row.get("id")
@@ -340,8 +343,15 @@ def workspace_payload(jobs, store) -> Dict:
         if row.get("unreadable"):
             continue
 
+        # Specimens ARE summed. A specimen is not a shared object: it lives
+        # inside the project document, `ProjectStore` has no specimen store,
+        # and `add_specimen` allocates its id as max+1 of THAT project's ids --
+        # so `s_00001` exists in nearly every project and two projects'
+        # `s_00001` are two different patients. Contract §1 draws the line in
+        # the duplicate row itself: specimens are COPIED, runs are not.
+        # Deduplicating these by id would report one specimen for a workspace
+        # holding two.
         n_specimens_total += int(row.get("n_specimens") or 0)
-        n_runs_total += int(row.get("n_runs") or 0)
 
         try:
             # refresh_capability=False: see the module docstring. A capability
@@ -377,6 +387,16 @@ def workspace_payload(jobs, store) -> Dict:
                 compounds_complete = False
                 continue
             for run_id in (specimen.get("run_ids") or []):
+                # Counted HERE, off the document, and before the job lookup:
+                # a dangling id is still a run this workspace references, and
+                # `totals.runs` has always reported it (see
+                # tests/test_workspace.py::test_a_dangling_run_id_is_skipped_
+                # not_fatal). Only `str` is counted -- a non-string entry in a
+                # hand-edited document is not a run id, cannot resolve to a
+                # job, and may not even be hashable, and a `set.add` TypeError
+                # here would take the whole home page down.
+                if isinstance(run_id, str):
+                    run_ids_total.add(run_id)
                 job = jobs.get(run_id) if isinstance(run_id, str) else None
                 if job is None:
                     # A dangling id: the association survives in the project
@@ -440,13 +460,34 @@ def workspace_payload(jobs, store) -> Dict:
         "recent_runs": cards[:MAX_RECENT_RUNS],
         "sections_available": sections_available(),
         "drugs_available": drugs_available(),
-        # Workspace quantities, not server-wide ones: each is the sum of what
-        # the project cards themselves show, so the header strip and the cards
-        # can never disagree. The server's total run count (including runs
-        # attached to no project) is GET /api/health's `runs` block.
+        # Workspace quantities, not server-wide ones. The server's total run
+        # count (including runs attached to no project) is GET /api/health's
+        # `runs` block.
+        #
+        # `runs` IS NOT THE SUM OF THE CARDS, and it must not be. Contract §2:
+        # a project "owns nothing but ids", so one run in app/runs/ may be
+        # referenced by any number of projects -- contract §1 makes that
+        # ordinary on purpose, since `POST /api/projects/{id}/duplicate` copies
+        # run ids and re-executes nothing. Summing each row's `n_runs` counted
+        # a shared run once per project holding it: MEASURED at 4 on a server
+        # holding 2 after a single duplicate, and it grows with every copy.
+        # So this counts DISTINCT ids.
+        #
+        # It costs nothing extra. The ids come out of the `store.get()` this
+        # function already performs per project for the run cards and the
+        # compound set; no read, no stat and no lock acquisition was added.
+        # What it does NOT include is a project whose document could not be
+        # read between `list()` and `get()` -- a mid-request DELETE, or the
+        # logged fault above. That project has no readable ids, so it
+        # contributes none, exactly as it already contributes no run cards and
+        # no compound set. Its row and its own `n_runs` still render.
+        #
+        # `specimens` stays a SUM, for the reason stated where it is
+        # accumulated: specimen ids are per-project and collide by
+        # construction, so deduplicating them would UNDERCOUNT.
         "totals": {
             "projects": len(summaries),
-            "runs": n_runs_total,
+            "runs": len(run_ids_total),
             "specimens": n_specimens_total,
         },
         # `stub` is a CLIENT-side state: app/web/js/api.js sets `api.stub` when

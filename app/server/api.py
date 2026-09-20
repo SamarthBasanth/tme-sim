@@ -535,6 +535,91 @@ def _known_drugs() -> List[str]:
 STUDIO_DEFAULT_TOTAL_TIME_S = 3600.0 * 6
 
 
+def _default_dx_um(section: str, preferred: float = 12.0) -> float:
+    """``preferred``, coarsened until THIS server will accept it.
+
+    THE DEFECT THIS CLOSES, measured on the live deployment 2026-09-20.
+    ``GET /api/defaults`` handed a first-time user ``dx_um = 12.0``. On a
+    512 MB host, where ``TMESIM_MAX_GRID_CELLS=auto`` resolves to 100,000,
+    ``POST /api/runs`` answered that very spec with 400:
+
+        dx_um = 12 um on this section gives a grid of ~284,498 voxels, above
+        the 100,000 ceiling this server is configured with ...
+
+    So the hosted product's FIRST CLICK FAILED. The defaults route and the
+    validator disagreed about what this server can run, and nothing coupled
+    them -- ``default_spec`` was a literal and the ceiling is resolved from the
+    environment at import.
+
+    This is the residue of a good fix. The same POST used to OOM-kill the
+    container in about a second (findings table, row 8); the ceiling turned a
+    crash into a refusal, which is strictly better and is why the ceiling
+    exists. But converting a crash into a refusal left the defaults still
+    pointing at the thing that gets refused, and a refusal on the primary
+    action is a product defect even when the refusal is correct.
+
+    UNCONSTRAINED SERVERS DO NOT MOVE. With the shipped ceiling (40,000,000)
+    every built-in section clears ``preferred`` by orders of magnitude, so this
+    returns 12.0 unchanged and no existing installation sees a different
+    default. It coarsens ONLY where the alternative is handing the user a spec
+    the same server will reject.
+
+    It is NOT a claim that the coarser grid is converged. 12 um is not
+    converged either -- see :func:`default_spec` -- and every report carries
+    that in its own limits block. This changes which un-converged resolution a
+    constrained host offers first, nothing more.
+
+    AND ON THE SMALLEST TIER IT CANNOT EVEN REACH THE LADDER. Measured for
+    ``xenium_319`` (8087.8 x 5065.4 um) at a 100,000 ceiling: the smallest dx
+    that fits is 20.24 um, so this returns 21. The FINEST rung this repo has
+    run a convergence ladder on is 20 um, which needs ~102,433 voxels and does
+    not fit. So on a 512 MB host there is NO dx that both satisfies the memory
+    ceiling and sits on a rung anyone has studied -- the two constraints have
+    no overlap on this section, by about 2.4%.
+
+    Nothing here papers over that. ``validate_spec`` already answers the
+    returned spec with "dx_um = 21 um is coarser than every rung this repo has
+    run a convergence ladder on", the run proceeds carrying that warning, and
+    the honest reading of a hosted demo is that it demonstrates the pipeline
+    rather than producing a number anyone should quote. A ceiling of ~110,000
+    would put 20 um in reach; whether the tier survives that is an unmeasured
+    question and must not be assumed from this comment.
+    """
+    row = next((r for r in list_sections() if r["id"] == section), None)
+    extent = (row or {}).get("extent_um")
+    if not extent:
+        return preferred
+    try:
+        ex, ey = float(extent[0]), float(extent[1])
+    except (TypeError, ValueError, IndexError):
+        return preferred
+    if ex <= 0 or ey <= 0:
+        return preferred
+
+    # The validator's own arithmetic: n = (ex/dx) * (ey/dx). Inverted, the
+    # smallest dx that fits is sqrt(ex*ey / ceiling). Derived from the same
+    # expression rather than guessed, so the two cannot disagree about the
+    # boundary -- which is the whole failure being fixed.
+    if (ex / preferred) * (ey / preferred) <= _MAX_GRID_CELLS:
+        return preferred
+
+    import math
+    dx = math.sqrt((ex * ey) / float(_MAX_GRID_CELLS))
+    # Up to a whole micrometre: a defaults panel reading "20.24 um" implies a
+    # precision this number does not have, and rounding DOWN would re-cross
+    # the ceiling it was computed from.
+    dx = float(math.ceil(dx))
+    # Then confirm against the real check, stepping coarser if the rounding or
+    # any future rule still refuses. Bounded, and it falls back to `preferred`
+    # rather than looping or inventing an absurd grid: a defaults route that
+    # cannot find a good answer must not become a defaults route that hangs.
+    for _ in range(64):
+        if (ex / dx) * (ey / dx) <= _MAX_GRID_CELLS:
+            return dx
+        dx += 1.0
+    return preferred
+
+
 def default_spec() -> Dict:
     """A valid ``RunSpec`` carrying the current production defaults.
 
@@ -565,7 +650,7 @@ def default_spec() -> Dict:
             section = first
     return {
         "section": section,
-        "dx_um": 12.0,
+        "dx_um": _default_dx_um(section),
         "drug": "temozolomide",
         "sensitivity_mode": "uniform",
         "vascular_mode": "discrete",

@@ -296,6 +296,109 @@ def test_a_dangling_run_id_is_skipped_not_fatal(runs_root, store):
     assert out["projects"][0]["n_runs"] == 1   # the card itself
 
 
+def test_totals_runs_counts_a_shared_run_once(runs_root, store):
+    """``totals.runs`` is how many runs EXIST, not how many references do.
+
+    Contract §2: "a project owns nothing but ids". A run lives in ``app/runs/``
+    and any number of projects may hold its id -- contract §1 makes that
+    ordinary on purpose ("a run belongs to the store, and two specimens may
+    reference the same run id"). Summing each project's ``n_runs`` therefore
+    counts a shared run once per project holding it, and the header reports a
+    workspace with more runs in it than the server has.
+
+    Built WITHOUT ``duplicate()``, so what is covered is cross-project sharing
+    itself and not one route's behaviour.
+    """
+    write_run(runs_root, "r_00001", report=a_report())
+    mgr = manager(runs_root)
+
+    for name in ("arm A", "arm B"):
+        p = store.create(name)
+        store.add_specimen(p["id"], SECTION_A, label="patient A")
+        sid = store.get(p["id"], refresh_capability=False)["specimens"][0]["id"]
+        attach(store, mgr, p["id"], sid, "r_00001")
+
+    out = payload(mgr, store)
+
+    # ONE run exists on this server, and both projects can reach it.
+    assert sorted(os.listdir(runs_root)) == ["r_00001"]
+    assert len(mgr.list()) == 1
+    assert [r["n_runs"] for r in out["projects"]] == [1, 1]
+    assert len({c["run_id"] for c in out["recent_runs"]}) == 1
+
+    assert out["totals"]["runs"] == 1, (
+        "the header counted one run once per project that holds its id")
+    # Projects are not shared, and a specimen is a per-project record.
+    assert out["totals"]["projects"] == 2
+    assert out["totals"]["specimens"] == 2
+
+
+def test_totals_runs_does_not_move_when_a_project_is_duplicated(runs_root,
+                                                                store):
+    """``duplicate`` is the route that makes sharing routine, and it is where
+    this was found: duplicating a project holding two runs reported FOUR runs
+    on a server holding two.
+
+    "Runs are NOT re-executed and NOT copied" (contract §1). A number that
+    doubles when nothing was created is not a count of runs.
+    """
+    for rid in ("r_00001", "r_00002"):
+        write_run(runs_root, rid, report=a_report())
+    mgr = manager(runs_root)
+
+    p = store.create("original")
+    store.add_specimen(p["id"], SECTION_A, label="patient A")
+    sid = store.get(p["id"], refresh_capability=False)["specimens"][0]["id"]
+    for rid in ("r_00001", "r_00002"):
+        attach(store, mgr, p["id"], sid, rid)
+
+    before = payload(mgr, store)
+    assert before["totals"]["runs"] == 2
+
+    store.duplicate(p["id"])
+    after = payload(mgr, store)
+
+    # Nothing was created on disk or in the manager.
+    assert sorted(os.listdir(runs_root)) == ["r_00001", "r_00002"]
+    assert len(mgr.list()) == 2
+    assert after["totals"]["runs"] == 2, (
+        "duplicating a project invented runs in the workspace header")
+    # The CARDS are unchanged and are not wrong: each project really does hold
+    # two run ids. The header is simply not their sum, and must not be.
+    assert [r["n_runs"] for r in after["projects"]] == [2, 2]
+    assert after["totals"]["specimens"] == 2
+
+
+def test_totals_specimens_is_a_sum_and_has_to_stay_one(runs_root, store):
+    """The mirror-image error, guarded so the fix above cannot travel to a
+    number where distinct-counting would be WRONG.
+
+    A specimen is not a shared object: it lives inside the project document,
+    ``ProjectStore`` has no specimen store, and its id is allocated per project
+    -- ``add_specimen`` takes max+1 of THAT project's ids. So ``s_00001``
+    exists in very nearly every project on the server, and two projects'
+    ``s_00001`` are two different patients. Contract §1 draws the line in the
+    duplicate row itself: specimens are COPIED, runs are not.
+
+    Counting distinct specimen ids would report one specimen for a workspace
+    holding two.
+    """
+    a = store.create("unrelated A")
+    b = store.create("unrelated B")
+    store.add_specimen(a["id"], SECTION_A, label="patient A")
+    store.add_specimen(b["id"], SECTION_B, label="patient B")
+
+    sa = store.get(a["id"], refresh_capability=False)["specimens"][0]
+    sb = store.get(b["id"], refresh_capability=False)["specimens"][0]
+    # Two different patients on two different sections -- and the SAME id.
+    assert sa["id"] == sb["id"] == "s_00001"
+    assert sa["section"] != sb["section"]
+
+    out = payload(manager(runs_root), store)
+    assert out["totals"]["specimens"] == 2, (
+        "two unrelated specimens were collapsed into one by their id")
+
+
 def test_an_unreadable_project_document_does_not_500(runs_root, store):
     """``ProjectStore.list()`` reports a corrupt document as a row with
     ``unreadable`` set rather than dropping it. The workspace must carry that
@@ -379,6 +482,13 @@ def test_a_project_that_vanishes_between_the_list_and_the_read_is_skipped(
             gone = [p for p in out["projects"] if p["id"] == "p_00001"][0]
             assert "compounds" not in gone
             assert names.count("here a moment ago") == 1
+            # Its row survives with its own `n_runs: 3`, but `totals.runs`
+            # counts DISTINCT ids read off the documents -- and this project's
+            # document could not be read, so it contributes none. The header
+            # under-reports rather than guessing, and it does so for exactly
+            # the project whose cards and compound set it has already dropped.
+            assert gone["n_runs"] == 3
+            assert out["totals"]["runs"] == 0
             # THE DIFFERENCE BETWEEN THE TWO BRANCHES. A deleted project is
             # traffic and is not logged; a fault removes a project's runs from
             # the page and MUST leave a record, or the page is wrong and
@@ -1065,7 +1175,16 @@ def test_duplicate_copies_specimens_and_run_ids_but_runs_are_not_copied(
         ws_out = http.get("/api/workspace").json()
         assert ws_out["totals"]["projects"] == 2
         assert ws_out["totals"]["specimens"] == 2
-        assert ws_out["totals"]["runs"] == 4
+        # TWO, not four. This assertion read `== 4` until 2026-09-20 and was
+        # green over the defect it should have caught: the header summed each
+        # project's `n_runs`, so duplicating a project doubled the workspace's
+        # run count while the three assertions above proved no run had been
+        # created. `totals.runs` counts DISTINCT ids -- see
+        # test_totals_runs_does_not_move_when_a_project_is_duplicated.
+        assert ws_out["totals"]["runs"] == len(runs_before) == 2
+        # The per-project rows are unchanged and are NOT wrong: each project
+        # really does hold both ids. The header is simply not their sum.
+        assert [row["n_runs"] for row in ws_out["projects"]] == [2, 2]
         by_project = {}
         for card in ws_out["recent_runs"]:
             by_project.setdefault(card["project_id"], set()).add(card["run_id"])

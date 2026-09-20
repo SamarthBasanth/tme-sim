@@ -470,6 +470,75 @@ class TestTheHomePageActuallyBoots:
             browser.close()
             p.stop()
 
+    def test_the_header_total_is_reconcilable_with_the_cards(self, home_server):
+        """§2 + §6. The header counts runs that EXIST; a card counts the runs
+        ATTACHED to its project. Contract §2 -- a project "owns nothing but
+        ids" -- lets one run be reached from many projects, so the cards can
+        sum to MORE than the header, and until 2026-09-20 the server resolved
+        that tension the wrong way round: it summed the cards, and a single
+        `duplicate` of a two-run project reported four runs on a server holding
+        two.
+
+        With the server corrected, the page now shows two numbers that do not
+        add up, and the SMALLER, CORRECT one is the one that looks broken. So
+        the header must name what it is counting and say why -- §6, the number
+        carries its denominator -- rather than leaving the user to guess.
+
+        The payload below is that exact situation: two projects, two run ids,
+        both projects holding both. 2 + 2 on the cards, 2 in the header.
+        """
+        shared = ["r_00001", "r_00002"]
+        p, browser, pg, errors = self._open(home_server, route={
+            "projects": [
+                {"id": "p_00001", "name": "Arm A", "notes": "",
+                 "created_at": 1.0, "updated_at": 2.0, "last_opened_at": None,
+                 "n_specimens": 1, "n_runs": len(shared),
+                 "sections": ["xenium_319"], "compounds": ["temozolomide"],
+                 "thumbnail": None},
+                {"id": "p_00002", "name": "Arm A (copy)", "notes": "",
+                 "created_at": 3.0, "updated_at": 3.0, "last_opened_at": None,
+                 "n_specimens": 1, "n_runs": len(shared),
+                 "sections": ["xenium_319"], "compounds": ["temozolomide"],
+                 "thumbnail": None},
+            ],
+            "recent_runs": [], "sections_available": 3, "drugs_available": 12,
+            # TWO runs exist. Four references to them.
+            "totals": {"projects": 2, "runs": len(shared), "specimens": 2},
+            "server": {"contract": "v1", "stub": False},
+        })
+        try:
+            assert not errors, f"raised while rendering: {errors[:2]}"
+
+            note = pg.eval_on_selector(".pgrid-count", "e => e.innerText")
+
+            # The cards really do sum to more than the header. If this stops
+            # being true the test below is no longer testing anything, so it
+            # is asserted rather than assumed.
+            body = pg.eval_on_selector("body", "e => e.innerText")
+            assert "2 runs attached" in body, (
+                "the per-project cards no longer report attached runs, so "
+                f"there is nothing left to reconcile. Body: {body[:300]!r}")
+
+            assert "2 distinct runs" in note, (
+                "the workspace header reports a run count that the project "
+                "cards sum to MORE than, and does not say why. A user adding "
+                "the cards up gets 4 and is shown 2, with nothing on the page "
+                f"reconciling them. Header reads: {note!r}")
+
+            gloss = pg.eval_on_selector_all(
+                ".pgrid-count abbr[title]", "els => els.map(e => e.title)")
+            assert gloss, (
+                "the qualifier has no explanation attached; `distinct` on its "
+                "own does not tell anyone which runs were counted once")
+            assert any("counted once" in t and "two projects" in t
+                       for t in gloss), (
+                "the gloss does not say that a run reachable from two "
+                f"projects is counted once here. Titles: {gloss!r}")
+        finally:
+            browser.close()
+            p.stop()
+
+
     def test_a_populated_workspace_renders_its_projects(self, home_server):
         """The path the outage actually broke: `projectGrid` construction."""
         p, browser, pg, errors = self._open(home_server, route={
