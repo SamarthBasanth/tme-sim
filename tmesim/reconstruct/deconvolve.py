@@ -50,30 +50,61 @@ from ..data.real.visium import load_sample
 # MEASURED 2026-09-20, darwin 24.6.0 / CPython 3.9 / pandas 2.3.3 / numpy
 # 2.0.2, peak RSS rise of one cold `deconvolve_sample(sample_id)` per process
 # (``resource.getrusage(RUSAGE_SELF).ru_maxrss``, which is BYTES on darwin and
-# KiB on Linux). Three or more cold runs per section; the MAXIMUM observed is
-# recorded. Full table and method in results/scref_memory_2026-09-20.md.
+# KiB on Linux). Three cold runs per section before, five or six after; the
+# MAXIMUM observed is recorded. Full table and method in
+# results/scref_signatures_2026-09-20.md.
 #
-# THE POINT OF THIS TABLE. Fixing the reference loader was not enough and the
-# numbers say so plainly: `load_reference()` went from a measured 1,961 MiB
-# peak to 610 MiB, and the figures below barely moved, because the dominant
-# term is `build_signatures` densifying a ~19,000 x 3,589 submatrix to float64
-# TWICE. A Visium section needs ~3 GB on this machine whatever the reference
-# loader does, so a 512 MB container cannot serve one at any `dx_um`. That is
-# what the refusal below has to say, and it must not imply otherwise.
+# THESE NUMBERS WERE RE-MEASURED AND THEY MOVED, so the reasoning attached to
+# them moved too. The code they described densified a 17,828 x 3,589 reference
+# submatrix to float64 twice in `build_signatures`, and a 4,764 x 17,828 spot
+# matrix twice more here. All four are gone -- streamed in chunks,
+# bit-identically -- and the peak fell by 2.2x to 3.3x. Before and after are
+# both measured HERE, same harness, same host, same session, three cold runs
+# before and five or six after, maximum of each:
+#
+#     section         | before  | after   | before/after
+#     GBM1            | 2716.8  | 1227.9  | 2.2x
+#     GBM2            | 3099.8  |  939.0  | 3.3x
+#     GBM3            | 2567.3  |  922.2  | 2.8x
+#     10x_parent_gbm  | 2923.5  | 1215.7  | 2.4x
+#
+# The "before" column is NOT the table in results/scref_memory_2026-09-20.md
+# (GBM1 3,454.8 / GBM2 3,151.8 / GBM3 3,156.1 / 10x_parent_gbm 3,146.1). That
+# file measured the same code and got 13-21 % more, and the run-to-run spread
+# within each of my own triples is up to 1,400 MiB, so the two are consistent
+# without being the same measurement. Do not average them and do not compute a
+# ratio across the two tables; the ratios above are within-harness.
+#
+# WHAT THE DOMINANT TERM IS NOW, because the refusal message has to name it
+# correctly and the old one named `build_signatures`. Staged, cold, GBM1:
+#
+#     imports                     109.7 MiB peak
+#     load_sample(visium)         743.4     (+633.7)   <-- now the largest
+#     reference_gene_symbols      772.7     ( +29.3)
+#     build_signatures           1280.8     (+507.8 transient, 184 resident)
+#     CSR column subset + NNLS   1280.8     (  +0.0)
+#
+# `load_sample` is now the biggest single term and it lives in
+# `tmesim/data/real/visium.py`, which this module does not own. A Visium
+# section still needs ~0.9 to 1.2 GB on this machine, so a 512 MB container
+# still cannot serve one at any `dx_um` -- the gap is 1.7x to 2.4x rather than
+# 6x, but it is a gap, and the refusal below must not imply it has closed.
 MEASURED_VISIUM_PEAK_MIB: Dict[str, float] = {
-    "GBM1": 3454.8,
-    "GBM2": 3151.8,
-    "GBM3": 3156.1,
-    "10x_parent_gbm": 3146.1,
+    "GBM1": 1227.9,
+    "GBM2": 939.0,
+    "GBM3": 922.2,
+    "10x_parent_gbm": 1215.7,
 }
 
 #: The CHEAPEST Visium deconvolution ever measured here, across every section
-#: and every run (GBM1, post-memo run: 2,924.0 MiB). Used as the threshold for
-#: a sample with no measurement of its own -- an ingested section, say. It is
+#: and every run (GBM2, run 4: 869.9 MiB -- the same section whose maximum is
+#: 939.0; the run-to-run spread is the allocator, not the workload). Used as
+#: the threshold for a sample with no measurement of its own -- an ingested
+#: section, say. It is
 #: deliberately the minimum and not the mean: this is the figure below which
 #: NOTHING measured here has ever fitted, so refusing under it never refuses a
 #: run that was observed to succeed.
-MEASURED_VISIUM_MIN_MIB = 2924.0
+MEASURED_VISIUM_MIN_MIB = 869.9
 
 
 class DeconvolutionTooLargeForHost(MemoryError):
@@ -99,9 +130,9 @@ def check_visium_memory_budget(sample_id: str) -> None:
 
     This is the refusal that ``TMESIM_MAX_GRID_CELLS`` cannot make. That
     ceiling counts VOXELS, and every megabyte measured above is spent before a
-    grid exists -- on the Visium matrix, the scRNA reference and the signature
-    densification. Shrinking ``dx_um`` does not move any of it, so a visitor
-    who picks a Visium section walks straight past the grid ceiling.
+    grid exists -- on the Visium section itself and on the scRNA reference.
+    Shrinking ``dx_um`` does not move any of it, so a visitor who picks a
+    Visium section walks straight past the grid ceiling.
 
     Refuses only against a DECLARED limit (cgroup v2 -> v1 ->
     ``TMESIM_HOST_MEMORY_MB``, read by ``app/server/account.py::memory_limit``).
@@ -127,16 +158,16 @@ def check_visium_memory_budget(sample_id: str) -> None:
         f"{h['rss_bytes'] / mib:,.0f} MiB already resident)."
         f"\n\nThis is NOT a grid-size problem. TMESIM_MAX_GRID_CELLS counts "
         f"voxels and every byte above is spent before a grid exists, so no "
-        f"choice of dx_um avoids it. The measured cost is dominated by "
-        f"densifying the scRNA reference to float64 in build_signatures, not "
-        f"by the requested resolution."
+        f"choice of dx_um avoids it. The measured cost is dominated by loading "
+        f"the Visium section itself -- its spot x gene matrix and image "
+        f"metadata -- not by the requested resolution."
         f"\n\nOptions: (1) choose a Xenium section -- the Xenium path does not "
         f"load this reference at all, so none of the cost above applies to it "
         f"(its own cost was not measured in this pass); "
         f"(2) run Visium on an instance with more memory; or (3) set "
         f"{_OVERRIDE_ENV}=1 to attempt it anyway and accept that the container "
         f"may be OOM-killed. Measurements: "
-        f"results/scref_memory_2026-09-20.md."
+        f"results/scref_signatures_2026-09-20.md."
     )
 
 # ---------------------------------------------------------------------------
@@ -174,11 +205,21 @@ def _normalize_columns_to_unit_sum(mat: np.ndarray) -> np.ndarray:
     """Library-size normalize each COLUMN (cell) to sum 1 over the given genes.
 
     Cells with zero counts over the shared genes are left as all-zero.
+
+    The division is written with ``out=``/``where=`` rather than as
+    ``out[:, nz] = mat[:, nz] / colsums[nz]``. That expression built TWO extra
+    whole-matrix temporaries -- the boolean-fancy-index copy ``mat[:, nz]`` and
+    the quotient -- each the size of ``mat`` (488 MiB on the shipped
+    reference), for a form that computes the identical numbers. Every element
+    is still the single IEEE-754 double division ``mat[i, j] / colsums[j]``,
+    which is correctly rounded and therefore bit-identical to what the slice
+    form produced; ``where=nz`` leaves the zero-sum columns at the ``0.0`` that
+    ``np.zeros_like`` already put there, which is what the slice form did too.
     """
     colsums = mat.sum(axis=0)
     out = np.zeros_like(mat, dtype=np.float64)
     nz = colsums > 0
-    out[:, nz] = mat[:, nz] / colsums[nz]
+    np.divide(mat, colsums, out=out, where=nz)
     return out
 
 
@@ -278,7 +319,15 @@ def _build_signatures_uncached(
     shared_genes: Sequence[str],
     reference: Tuple,
 ) -> Tuple[np.ndarray, List[str]]:
-    """:func:`build_signatures` with the memo removed. Unchanged arithmetic."""
+    """:func:`build_signatures` with the memo removed. Unchanged arithmetic.
+
+    "Unchanged" is meant literally and is TESTED, not asserted: the streamed
+    path below is byte-for-byte identical to the dense one it replaced
+    (``np.array_equal`` on the signature matrix, and on ``deconvolve_sample``'s
+    output end to end). See :func:`_signatures_streamed` for why that is not
+    luck, and the dense fallback for what happens when the argument it rests on
+    does not hold.
+    """
     expr_df, labels_df, _ = reference
 
     # Collapse labels -> coarse CellType (drop unmapped cells).
@@ -292,36 +341,282 @@ def _build_signatures_uncached(
     shared_genes = list(shared_genes)
     ref_index = expr_df.index
     # First occurrence wins for any duplicate symbol in the reference index.
-    present = ref_index[~ref_index.duplicated()]
-    present_set = set(present)
-    ref_sub = expr_df.loc[~ref_index.duplicated()]  # dedupe rows
-    ref_sub = ref_sub[cells_kept]                    # keep mapped cells
+    dup = ref_index.duplicated()
+    present_set = set(ref_index[~dup])
 
     G = len(shared_genes)
     row_of = {g: i for i, g in enumerate(shared_genes)}
-    # Dense reference submatrix over the shared/found genes.
     found = [g for g in shared_genes if g in present_set]
     found_rows = np.array([row_of[g] for g in found], dtype=int)
-    ref_found = ref_sub.loc[found].to_numpy(dtype=np.float64)  # (n_found, n_cells)
-
-    # Library-size normalize each cell over the shared genes (comparable columns).
-    ref_norm = _normalize_columns_to_unit_sum(ref_found)
 
     type_names: List[str] = []
-    cols: List[np.ndarray] = []
+    groups: List[np.ndarray] = []
     mapped_vals = mapped.to_numpy()
     for ct in _TYPE_ORDER:
         sel = mapped_vals == ct
         if not sel.any():
             continue
-        mean_found = ref_norm[:, sel].mean(axis=1)  # (n_found,)
-        full = np.zeros(G, dtype=np.float64)
-        full[found_rows] = mean_found
-        cols.append(full)
+        # Positions into ``cells_kept``, i.e. into the selected column block.
+        groups.append(np.flatnonzero(sel))
         type_names.append(ct.name)
+    if not groups:
+        return np.zeros((G, 0)), []
 
-    signatures = np.column_stack(cols) if cols else np.zeros((G, 0))
+    gene_pos, cell_pos = _positional_selection(expr_df, found, cells_kept)
+    signatures = None
+    if gene_pos is not None:
+        signatures = _signatures_streamed(
+            expr_df, gene_pos, cell_pos, groups, found_rows, G
+        )
+    if signatures is None:
+        signatures = _signatures_dense(
+            expr_df, dup, cells_kept, found, groups, found_rows, G
+        )
     return signatures, type_names
+
+
+def _positional_selection(
+    expr_df, found: List[str], cells_kept,
+) -> "Tuple[np.ndarray | None, np.ndarray | None]":
+    """Resolve the label selections to POSITIONS, or refuse to.
+
+    The dense path expressed the same selection with pandas labels::
+
+        ref_sub = expr_df.loc[~expr_df.index.duplicated()]   # whole-matrix copy
+        ref_sub = ref_sub[cells_kept]                        # whole-matrix copy
+        ref_sub.loc[found]                                   # and a third
+
+    On the shipped reference the first two select EVERYTHING -- the index has
+    zero duplicated symbols and every one of the 3,589 cells carries a mappable
+    label -- so they were two 321 MiB copies of a 23,460 x 3,589 int32 frame
+    that changed nothing (MEASURED: 999.6 then 1,320.9 MiB resident, up from
+    678.3). Positions let the one selection that does narrow the matrix be
+    applied while the float64 block is filled, instead of three times before.
+
+    Returns ``(None, None)`` -- meaning "use the dense path" -- when the label
+    selection is not unambiguously positional: duplicate column labels, where
+    ``ref_sub[cells_kept]`` would fan a barcode out into several columns, or a
+    requested cell that is not a column at all. Row labels cannot fail here
+    (``found`` was built from this index), but the lookup is guarded anyway.
+    """
+    cols = expr_df.columns
+    if not cols.is_unique:
+        return None, None
+    cell_pos = np.asarray(cols.get_indexer(cells_kept), dtype=np.intp)
+    if cell_pos.size and int(cell_pos.min()) < 0:
+        return None, None
+    first: Dict[str, int] = {}
+    for i, g in enumerate(expr_df.index):
+        if g not in first:
+            first[g] = i          # first occurrence wins, as ~duplicated() does
+    try:
+        gene_pos = np.fromiter(
+            (first[g] for g in found), dtype=np.intp, count=len(found)
+        )
+    except KeyError:  # pragma: no cover - `found` is built from this index
+        return None, None
+    return gene_pos, cell_pos
+
+
+#: Gene rows per streamed chunk. The chunk is the only thing the streamed build
+#: holds beyond the (G, 4) result, so this constant IS the peak.
+#:
+#: MEASURED, not chosen: cold peak of ``build_signatures(shared_genes)`` in its
+#: own process, four runs per value (the figure below is the MAXIMUM, and it
+#: includes ``load_reference()``'s own ~610 MiB, which is the floor underneath
+#: all of them):
+#:
+#:     chunk rows |   250 |   500 |  1000 |  2000 |  4000 |  8000 | dense
+#:     peak (MiB) | 579.0 | 620.1 | 601.9 | 684.3 | 786.1 | 1064.9| 1612.2
+#:     wall   (s) |  4.05 |  4.13 |  4.23 |  4.50 |  3.98 |  4.26 |   4.20
+#:
+#: 1,000 is the measured optimum that is not also the slowest. Every value in
+#: that sweep, including 8,000 and the dense fallback, produced a
+#: BIT-IDENTICAL signature matrix -- which is the point: the result does not
+#: depend on the chunking, so this constant is a memory knob and nothing else.
+#:
+#: That is true because :func:`_chunk_bounds` keeps it true. The floor is TWO
+#: rows, not one, and a lone trailing row is absorbed; see that function and
+#: premise 2 of :func:`_signatures_streamed` for the measured reason.
+_SIGNATURE_CHUNK_ROWS = 1000
+
+#: Above this, a float64 cannot hold every integer, and the exactness argument
+#: in :func:`_signatures_streamed` stops being true. Checked, not assumed.
+_EXACT_INT_LIMIT = 2.0 ** 53
+
+
+def _chunk(expr_df, gene_pos, cell_pos, a: int, b: int, identity_cells: bool):
+    """Gene rows ``gene_pos[a:b]`` x columns ``cell_pos``, as a numpy array.
+
+    ``DataFrame.take`` rather than ``expr_df.to_numpy()[gene_pos[a:b]]``: on
+    the shipped single-block frame ``to_numpy()`` happens to be a free view,
+    but on a frame with more than one block it silently materialises the WHOLE
+    matrix, which is the allocation this function exists to avoid. ``take``
+    costs one chunk whatever the block layout is.
+    """
+    ch = expr_df.take(gene_pos[a:b], axis=0).to_numpy()
+    if not identity_cells:
+        ch = ch[:, cell_pos]
+    return ch
+
+
+def _signatures_streamed(
+    expr_df, gene_pos: np.ndarray, cell_pos: np.ndarray,
+    groups: List[np.ndarray], found_rows: np.ndarray, G: int,
+) -> "np.ndarray | None":
+    """Per-type mean signatures without ever holding the dense float64 matrix.
+
+    Returns ``None`` if the exactness argument below does not hold, in which
+    case the caller runs the dense path instead.
+
+    WHY THIS IS BIT-IDENTICAL, AND WHERE THAT STOPS BEING TRUE
+    ----------------------------------------------------------
+    Floating-point addition is not associative, so a reduction rewritten into a
+    different ORDER is not entitled to the same bits. Two reorderings happen
+    here and each needs its own argument; neither is "it was close enough".
+
+    1. **The column sums are accumulated over gene chunks in int64, not summed
+       once in float64.** This is exact rather than approximately equal. The
+       reference holds non-negative integer counts, so every partial sum -- in
+       any order -- is an integer, and an integer below 2**53 is represented
+       EXACTLY by a float64. A sum of exactly-representable integers whose
+       every partial result is also exactly representable is computed with zero
+       rounding error, and a computation with no rounding error cannot depend
+       on the order it was done in. So the chunked int64 total converts to the
+       same float64 that ``mat.sum(axis=0)`` produced. MEASURED on the shipped
+       reference: largest column sum 1,445,849, i.e. 2**53 / 1,445,849 = 6.2e9
+       times of headroom, and ``np.array_equal`` against the dense float64
+       column sums is True.
+
+       The two premises are CHECKED each call, not assumed: integer dtype and
+       no negative entry (without which partial sums are not bounded by the
+       total), plus the 2**53 ceiling on the result. Any failure returns
+       ``None`` and the dense path runs.
+
+    2. **Each per-type mean is computed over a chunk of GENE ROWS at a time.**
+       The reduction runs along axis 1 (cells) and row i of the result depends
+       on row i alone, so splitting the rows leaves every individual reduction
+       with the same values in the same order. What is NOT split is the
+       reduction itself -- a chunked sum along axis 1 would be a genuine
+       reordering and is not done.
+
+       That argument is sound and it is STILL not sufficient, which is the
+       sharpest thing measured in this pass. ``block[:, idx]`` is an
+       advanced-index copy, and numpy 2.0.2 picks its memory ORDER from the
+       shape: with two or more rows the copy comes back non-C-contiguous, and
+       ``.mean(axis=1)`` then reduces along a strided axis sequentially; with
+       exactly ONE row the copy is contiguous and the same call reduces
+       pairwise instead. Same values, same order of operands, different
+       summation tree. MEASURED on the full 17,828-gene panel, a one-row chunk
+       against the shipped one: 45.7 % of signature entries differ, max
+       absolute 2.4e-17, max relative 3.6e-15 (7 ulp) -- and it does NOT stop
+       there, because 69.9 % of GBM3's 7,100 spot fractions then differ too,
+       max absolute 2.3e-15, max relative 6.0e-13. Invisible to any tolerance,
+       real in the bits, and it propagates. So a chunk of fewer than 2 rows is
+       refused below rather than clamped, and the standing guard against the
+       property silently changing under a numpy upgrade is the test that
+       compares this function to :func:`_signatures_dense` on the real
+       reference with ``np.array_equal`` -- not this paragraph.
+
+    The element-wise division is not a reduction and needs no argument:
+    ``value / colsum`` is one correctly-rounded IEEE-754 double division either
+    way.
+    """
+    if not all(np.issubdtype(dt, np.integer) for dt in expr_df.dtypes):
+        return None          # premise 1 needs integers
+    n = int(gene_pos.size)
+    identity_cells = bool(np.array_equal(cell_pos, np.arange(cell_pos.size)))
+    bounds = _chunk_bounds(n, _SIGNATURE_CHUNK_ROWS)
+
+    # Pass 1: column sums, exactly, in int64.
+    colsums = np.zeros(int(cell_pos.size), dtype=np.int64)
+    for a, b in bounds:
+        ch = _chunk(expr_df, gene_pos, cell_pos, a, b, identity_cells)
+        if ch.size and int(ch.min()) < 0:
+            return None      # premise 1 needs non-negative counts
+        colsums += ch.sum(axis=0, dtype=np.int64)
+        del ch
+    cs = colsums.astype(np.float64)
+    if cs.size and float(cs.max()) >= _EXACT_INT_LIMIT:
+        return None          # premise 1 needs every total below 2**53
+    nz = cs > 0
+
+    # Pass 2: normalize each chunk in place and reduce it into the signatures.
+    signatures = np.zeros((G, len(groups)), dtype=np.float64)
+    for a, b in bounds:
+        block = _chunk(expr_df, gene_pos, cell_pos, a, b, identity_cells)
+        block = block.astype(np.float64)
+        np.divide(block, cs, out=block, where=nz)
+        if not nz.all():
+            block[:, ~nz] = 0.0   # zero-count cells stay all-zero, as before
+        rows = found_rows[a:b]
+        for k, idx in enumerate(groups):
+            signatures[rows, k] = block[:, idx].mean(axis=1)
+        del block
+    return signatures
+
+
+def _chunk_bounds(n: int, step: int) -> List[Tuple[int, int]]:
+    """Row-chunk ``(start, stop)`` pairs. NO CHUNK MAY HAVE EXACTLY ONE ROW.
+
+    That invariant is the whole function. Premise 2 of
+    :func:`_signatures_streamed` holds only while every chunk provokes the same
+    memory-order choice out of ``block[:, idx]`` that the full matrix does, and
+    numpy 2.0.2 makes a different choice for a one-row array than for any
+    other. Two ways to end up with a lone row, both closed here:
+
+    * ``step`` set below 2. Raised to 2 rather than refused: this is a MEMORY
+      knob, and answering "you asked for the smallest possible chunk" with the
+      dense 1.6 GB path would be the opposite of what was asked for.
+    * ``n % step == 1``, which leaves a single trailing row -- the quiet one.
+      With the shipped 1,000 and the shipped 17,828-gene panel the remainder is
+      828 and nothing goes wrong, so a panel of 17,001 genes would have been
+      the first anyone heard of it. The final chunk absorbs the orphan instead.
+
+    ``n == 1`` is the one case where a one-row chunk is correct, because the
+    dense path is then a one-row matrix too and makes the same choice.
+    """
+    if n <= 0:
+        return []
+    if n == 1:
+        return [(0, 1)]
+    step = max(int(step), 2)
+    bounds: List[Tuple[int, int]] = []
+    a = 0
+    while a < n:
+        b = min(a + step, n)
+        if n - b == 1:
+            b = n          # absorb the orphan rather than leave it alone
+        bounds.append((a, b))
+        a = b
+    return bounds
+
+
+def _signatures_dense(
+    expr_df, dup: np.ndarray, cells_kept, found: List[str],
+    groups: List[np.ndarray], found_rows: np.ndarray, G: int,
+) -> np.ndarray:
+    """The original whole-matrix build. Kept as the fallback, arithmetic verbatim.
+
+    This is what ran before the streamed path existed and it is what still runs
+    when :func:`_signatures_streamed` declines (see its docstring for the three
+    conditions). It peaks at a MEASURED 2,503 MiB on the shipped reference
+    against the streamed path's 748 MiB, which is the whole reason it is no
+    longer the default -- but it is the definition of the answer, so it stays.
+    """
+    ref_sub = expr_df.loc[~dup]     # dedupe rows
+    ref_sub = ref_sub[cells_kept]   # keep mapped cells
+    ref_found = ref_sub.loc[found].to_numpy(dtype=np.float64)  # (n_found, n_cells)
+    del ref_sub
+
+    # Library-size normalize each cell over the shared genes (comparable columns).
+    ref_norm = _normalize_columns_to_unit_sum(ref_found)
+    del ref_found
+
+    signatures = np.zeros((G, len(groups)), dtype=np.float64)
+    for k, idx in enumerate(groups):
+        signatures[found_rows, k] = ref_norm[:, idx].mean(axis=1)
+    return signatures
 
 
 def deconvolve_spot(spot_expr: np.ndarray, signatures: np.ndarray) -> np.ndarray:
@@ -408,15 +703,59 @@ def deconvolve_sample(
     # this frame staying alive across it.
     signatures, type_names = build_signatures(shared_genes)
 
-    # Dense spot x shared-gene matrix, then per-spot NNLS.
-    expr_sub = expr[:, np.asarray(shared_cols, dtype=int)].toarray().astype(np.float64)
+    # Per-spot NNLS, one spot's dense vector at a time.
+    #
+    # THE SECOND DOUBLE DENSIFICATION, and it was the larger one. This read
+    #
+    #     expr[:, cols].toarray().astype(np.float64)
+    #
+    # which builds the whole (S, G_shared) matrix as int64 and then AGAIN as
+    # float64: MEASURED 648 MiB each, 1,296 MiB together, for GBM1's 4,764
+    # spots x 17,828 shared genes -- and the loop below then reads one row of
+    # it at a time. The CSR it came from holds 15.2 M nonzeros in a 174 M-entry
+    # matrix, so ~91 % of those bytes were zeros with nothing to say.
+    #
+    # Scattering one row into a reused buffer is bit-identical rather than
+    # merely close: `toarray()` writes each stored value into a zero matrix and
+    # so does this, and the int64 -> float64 conversion is the same
+    # element-wise cast whether it happens on the dense matrix or on the value
+    # being written. `sum_duplicates()` is what makes that true -- an
+    # un-canonicalised CSR row can list an index twice, which `toarray()` SUMS
+    # and a scatter assignment would silently resolve to the last write. It is
+    # a no-op on a canonical matrix.
+    expr_sub = expr[:, np.asarray(shared_cols, dtype=int)].tocsr()
     S = expr_sub.shape[0]
     K = signatures.shape[1]
     fractions = np.zeros((S, K), dtype=np.float64)
-    for i in range(S):
-        fractions[i] = deconvolve_spot(expr_sub[i], signatures)
+    for i, spot in enumerate(iter_spot_vectors(expr_sub, len(shared_genes))):
+        fractions[i] = deconvolve_spot(spot, signatures)
 
     return coords_um, fractions, type_names
+
+
+def iter_spot_vectors(csr, n_genes: int):
+    """Yield each CSR row as a dense float64 vector, reusing one buffer.
+
+    Stands in for ``csr.toarray().astype(np.float64)`` and yields exactly its
+    rows. Factored out of :func:`deconvolve_sample` so that the test which
+    pins it against ``toarray`` exercises THIS code rather than a copy of it
+    that could drift -- the failure mode where a check passes against both the
+    fixed and the broken version.
+
+    THE BUFFER IS REUSED AND IS NOT YOURS. Each yielded array is the same
+    object, cleared and refilled; a caller that wants to keep one must copy it.
+    ``deconvolve_spot`` consumes it immediately and does not retain it.
+    """
+    csr.sum_duplicates()   # toarray() SUMS repeated entries; a scatter would
+                           # keep only the last. No-op when already canonical.
+    indptr, indices, data = csr.indptr, csr.indices, csr.data
+    buf = np.zeros(int(n_genes), dtype=np.float64)
+    for i in range(csr.shape[0]):
+        lo, hi = int(indptr[i]), int(indptr[i + 1])
+        cols_i = indices[lo:hi]
+        buf[cols_i] = data[lo:hi]
+        yield buf
+        buf[cols_i] = 0.0   # reset only what was touched: O(nnz), not O(G)
 
 
 if __name__ == "__main__":
