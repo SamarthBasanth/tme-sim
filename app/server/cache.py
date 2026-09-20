@@ -245,6 +245,68 @@ def state_dir() -> Optional[str]:
     return os.path.abspath(raw) if raw else None
 
 
+def state_dir_problem() -> Optional[str]:
+    """Why ``TMESIM_STATE_DIR`` cannot be used, as one operator sentence, or
+    ``None`` if it is unset or usable.
+
+    MEASURED 2026-09-20, in a container, on the configuration this variable
+    exists to enable. A platform disk is mounted at a path the image does not
+    contain, so the mount point is created ROOT-OWNED; the image runs as uid
+    10001; and the first thing the process does with the value is
+    ``private_makedirs(<root>/runs)`` while printing its startup banner. The
+    result was ``PermissionError: [Errno 13] ... '/var/lib/vivum/runs'`` and a
+    dead container -- the whole service down, at boot, because of a setting
+    whose only job is to make projects survive a redeploy.
+
+    A traceback is the wrong answer to that. It names ``os.makedirs`` and a
+    frozen importlib frame, and the one fact the operator needs -- the running
+    uid is not the mount's owner -- appears nowhere in it. This reduces it to
+    the sentence, and the caller decides whether to die.
+
+    NOT a permission to continue silently. Falling back to the ephemeral
+    default here would leave the operator believing work is being kept while
+    every redeploy destroys it, which is strictly worse than not starting: the
+    product asks people to organise work into projects, and a workspace that
+    forgets betrays that invitation quietly. Refuse loudly, name the fix.
+    """
+    root = state_dir()
+    if root is None:
+        return None
+
+    # The check is a real write, not os.access(). os.access answers for the
+    # REAL uid against the permission bits and is wrong under exactly the
+    # conditions that matter here -- a root-squashing network mount, a
+    # read-only filesystem, an ACL the mode bits do not describe. The only
+    # trustworthy test of "can this process create its stores here" is to
+    # create something and remove it.
+    probe = os.path.join(root, ".vivum-write-probe")
+    try:
+        os.makedirs(root, mode=PRIVATE_DIR_MODE, exist_ok=True)
+        with open(probe, "w", encoding="utf-8") as fh:
+            fh.write("")
+        os.unlink(probe)
+    except OSError as exc:
+        try:
+            st = os.stat(root)
+            owner = f"uid {st.st_uid}:gid {st.st_gid}, mode {oct(st.st_mode & 0o777)}"
+        except OSError:
+            owner = "could not stat it"
+        return (
+            f"TMESIM_STATE_DIR is set to {root}, and this process cannot "
+            f"write there: {type(exc).__name__}: {exc}. "
+            f"It runs as uid {os.getuid()}:gid {os.getgid()}; that directory "
+            f"is owned by {owner}. "
+            "A platform disk mounted at a path the image does not already "
+            "contain is created root-owned, which is this failure exactly. "
+            "Fix it by mounting the disk where the image pre-creates an "
+            "owned directory (this image: /var/lib/vivum), or by chowning the "
+            "mount to the running uid. "
+            "Refusing to start rather than falling back, because the fallback "
+            "is destroyed on every redeploy and you would not be told."
+        )
+    return None
+
+
 def runs_dir() -> str:
     """Absolute path to the run store (created on demand).
 

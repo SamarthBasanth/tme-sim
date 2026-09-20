@@ -170,7 +170,8 @@ def main(argv=None) -> int:
 
     import uvicorn
 
-    from .cache import DATA_ROOTS_VAR, RECON_CACHE, runs_dir
+    from .cache import (DATA_ROOTS_VAR, RECON_CACHE, runs_dir,
+                        state_dir_problem)
 
     # SECURITY: same trade as the API key immediately above, for the same
     # reason and by the same rule. POST /api/sections/scan resolves and reads
@@ -188,6 +189,21 @@ def main(argv=None) -> int:
     if not is_loopback and DATA_ROOTS_VAR not in os.environ:
         os.environ[DATA_ROOTS_VAR] = os.path.join(root, "data_cache")
         roots_generated = True
+
+    # BEFORE the banner, because the banner is what used to crash. The first
+    # use of TMESIM_STATE_DIR is `runs_dir()` three lines down, and an
+    # unwritable state directory turned that into a PermissionError traceback
+    # out of os.makedirs -- a dead service, at boot, with the actual cause
+    # (running uid is not the mount's owner) named nowhere in the output.
+    #
+    # Exit 78 is EX_CONFIG from sysexits.h: the configuration is wrong, as
+    # opposed to a crash. A platform that distinguishes them can; one that
+    # does not still gets the sentence on stderr.
+    problem = state_dir_problem()
+    if problem is not None:
+        print(f"REFUSING TO START: {problem}", file=sys.stderr)
+        sys.stderr.flush()
+        return 78
 
     print(f"Vivum Studio backend")
     print(f"  repo        {root}")

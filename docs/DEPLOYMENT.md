@@ -403,17 +403,35 @@ container. Note the `ENTRYPOINT` is `python -m app.server`, so
 docker exec <container> vivum acquire
 ```
 
-**Writable state does not survive container replacement.** Run history,
-`app/runs/_ingested_sections.json` (the file §1d tells you to populate),
-`app/projects/`, `app/reports/` and `app/uploads/` all live inside the
-image's filesystem. Mount them if you want them to persist:
+**Writable state does not survive container replacement — unless you set
+`TMESIM_STATE_DIR`.** Run history, `app/runs/_ingested_sections.json` (the file
+§1d tells you to populate), `app/projects/`, `app/reports/` and `app/uploads/`
+otherwise live inside the image's filesystem and go when the container does.
+
+Corrected 2026-09-20: this section used to say only the first half, and
+recommended mounting `app/runs/` alone. That advice keeps run payloads and
+still loses the **project store**, leaving a workspace of dangling ids — worse
+than losing both, because it looks like it worked. One variable now points all
+three stores at a single root:
 
 ```bash
 docker run -p 127.0.0.1:8000:8000 \
   -v $(pwd)/data_cache:/app/data_cache \
-  -v vivum_runs:/app/app/runs \
+  -v vivum_state:/var/lib/vivum \
+  -e TMESIM_STATE_DIR=/var/lib/vivum \
   vivum-studio
 ```
+
+`/var/lib/vivum` is not an arbitrary choice. A volume mounted at a path the
+image does not contain is created **root-owned**, and this container runs as
+uid 10001, so the server cannot create its stores there — measured, and it
+exits at boot rather than starting without persistence. The image pre-creates
+and chowns `/var/lib/vivum` precisely so the mount inherits uid 10001. Point
+the variable elsewhere and, if the directory is not writable, the server
+refuses to start with a sentence naming the uid, the owner and the fix
+(`app/server/cache.py::state_dir_problem`). Verified end to end: a project
+created through the API survived `docker rm -f` and a brand-new container on
+the same volume.
 
 **The container runs as `vivum`, uid 10001 — not root.** It used to run as
 root, which was the exact opposite of the control §2 names for

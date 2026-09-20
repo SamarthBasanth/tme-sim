@@ -126,6 +126,40 @@ ENV HOME=/home/vivum
 RUN mkdir -p data_cache app/runs \
     && chown -R vivum:vivum /app/data_cache /app/app
 
+# --- THE PERSISTENT-DISK MOUNT POINT, PRE-CREATED AND PRE-OWNED ------------ #
+# This directory is empty in the image and stays empty unless a disk is
+# mounted over it. It exists for one reason, and it is not cosmetic.
+#
+# MEASURED 2026-09-20. Mounting a fresh volume at a path the image does NOT
+# contain gets you a mount point created by the container runtime, owned by
+# root. This image runs as vivum (uid 10001). The server's first act with
+# TMESIM_STATE_DIR is to mkdir `runs/` inside it, so the result was:
+#
+#   PermissionError: [Errno 13] Permission denied: '/var/lib/vivum/runs'
+#
+# and an exited container -- the entire service dead at boot, caused by the
+# one setting whose whole purpose is to stop a redeploy destroying people's
+# projects. Whoever enabled persistence would have taken the site down.
+#
+# When the path DOES exist in the image, the runtime propagates its ownership
+# and mode to the empty volume, so uid 10001 owns the mount and the stores are
+# created normally. Re-measured on the same image with this line present:
+# runs/, projects/ and reports/ all created 0700 vivum:vivum, healthz 200, and
+# a project created through the API survived `docker rm -f` + a brand-new
+# container on the same volume with its created_at byte-identical.
+#
+# So: mount the disk HERE. render.yaml pins the same path, and
+# app/server/cache.py::state_dir_problem refuses to start with an explanatory
+# sentence if some other path is used and turns out to be unwritable.
+#
+# NOT SET AS AN ENV HERE, deliberately. An image that always pointed
+# TMESIM_STATE_DIR at /var/lib/vivum would silently relocate the stores for
+# every local `docker run` that mounts nothing, and the directory would then
+# live inside the container's writable layer -- which is discarded exactly the
+# way the default already is, but now in a place nobody looks. The variable is
+# the operator's to set, next to the disk they set it for.
+RUN mkdir -p /var/lib/vivum && chown vivum:vivum /var/lib/vivum
+
 # --- the one tissue section, FETCHED FROM SOURCE AT BUILD TIME -------------- #
 # Without this the image starts fine and can run NOTHING: .dockerignore
 # excludes data_cache/ (5.3 GB locally), so a hosted container has no tissue and

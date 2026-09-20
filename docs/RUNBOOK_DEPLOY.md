@@ -82,28 +82,65 @@ onto an occupied port, `docker run` still exits 0, the container still says
 line of it is a thing that used to be a setting someone had to remember, and
 the two that matter most fail *silently* when forgotten.
 
-### H0. What you are deploying, and the one thing it cannot yet do
+### H0. What you are deploying, and what it now keeps
 
-**A hosted instance is a place to DEMONSTRATE this product, not a place to keep
-work.** Read this paragraph before you promise anyone otherwise.
+**Corrected 2026-09-20.** This section previously opened "a hosted instance is
+a place to DEMONSTRATE this product, not a place to keep work", and explained
+at length why a disk could not fix it. That was true when it was written and is
+no longer true. It is corrected here rather than quietly rewritten, because the
+old paragraph is exactly the kind of text people act on — someone reading it
+would not have added the disk that now works.
 
-`render.yaml` declares no disk, so the container filesystem is discarded on
-every deploy and every restart — and with `autoDeployTrigger: commit`, that is
-every push. Everything the server writes lives under `/app/app`: run results and
-their binary payloads in `app/runs/`, the project store in `app/projects/`,
-plus reports, compounds and resolved uploads. All of it goes.
+**What changed.** `TMESIM_STATE_DIR` makes `runs/`, `projects/` and `reports/`
+children of ONE directory (`app/server/cache.py::state_dir`). The old obstacle
+was real: Render allows one disk per service, the stores were siblings under
+`/app/app`, and that parent also holds `server/` and `web/`, so mounting it
+would hide the application. One configurable root removes the obstacle
+entirely. `render.yaml` now declares the disk and sets the variable.
 
-Adding a disk does not currently fix it, and it is worth knowing why before
-anyone spends an afternoon on it. Render allows **one disk per service**. The
-two directories that hold work are siblings, and their common parent
-`/app/app` also contains `server/` and `web/` — mount a disk there and you hide
-the application's own code and the front end, and the service does not start.
-Neither path is configurable: `app/server/cache.py::runs_dir` and
-`app/server/projects.py::projects_dir` both build from `repo_root()` with no
-environment override. So one disk can persist run history **or** the project
-store, and a project whose runs were discarded is a set of dangling ids. The
-commented-out block in `render.yaml` is that half-measure, with its two unverified
-assumptions named.
+**The part that was not obvious, and cost a dead container to find.** A volume
+mounted at a path the image does not already contain is created **root-owned**.
+This image runs as `vivum` (uid 10001). The first thing the server does with
+`TMESIM_STATE_DIR` is `mkdir` inside it, so the result was:
+
+```
+PermissionError: [Errno 13] Permission denied: '/var/lib/vivum/runs'
+```
+
+and an exited container — **the whole service dead at boot, caused by the one
+setting whose purpose is to stop a redeploy destroying people's projects.**
+Whoever turned persistence on would have taken the site down.
+
+Two changes answer it. The image pre-creates `/var/lib/vivum` owned by uid
+10001, so the mounted volume inherits that ownership. And
+`app/server/cache.py::state_dir_problem` tests the directory with a real write
+at boot and, if it cannot, exits **78** (`EX_CONFIG`) with one sentence naming
+the running uid, the directory's owner, and the fix — instead of a traceback
+out of `os.makedirs`. It deliberately does **not** fall back to the ephemeral
+default: a fallback would look like working persistence and lose the work
+anyway.
+
+**What is measured, and what is still open.** Measured 2026-09-20 in the built
+image under `--memory=512m`, on a volume mounted at `/var/lib/vivum`:
+
+| Checked | Result |
+|---|---|
+| Mount ownership under `USER vivum` | inherited uid 10001; `runs/`, `projects/`, `reports/` created `0700` |
+| Boot | `/healthz` 200 in ~2s, `OOMKilled=false` |
+| Route table | `/` workspace, `/studio` Studio, `/index.html` Studio |
+| Banner | `run history /var/lib/vivum/runs` |
+| Survives a redeploy | project created via API, container `rm -f`'d and replaced on the same volume, project present with `created_at` byte-identical |
+| Unwritable state dir | exit 78, one sentence, no traceback |
+
+**Still open, and do not assume otherwise: that was Docker's volume semantics,
+not Render's.** No Render account is attached to this repository, so Render's
+own disk ownership is unverified from here. If Render mounts disks root-owned
+regardless of the image, this service refuses to start and says so in one line
+— see §H7 for the check and the two fixes.
+
+**One more thing a hosted instance still does not do:** adding *your own*
+tissue, because a section registers **by filesystem path on the server's own
+machine** — see §H6.
 
 Two things this deploy *does* do that a bare container would not:
 
@@ -293,7 +330,45 @@ files this product never reads but which travel with the directory.
 | Health check fails, but every request you make works | The probe uses HEAD. See §H4 (2). |
 | The instance dies mid-run, exit 137 | OOM. §H4 (4). |
 | `/studio` is a 404 while `/` works | The static mount does not append `.html` to a path and does not know `/studio`; it needs its own route registered before the mount at `/`. `product.yml` fails on exactly this. |
-| Projects you created yesterday are gone | §H0. There is no disk. |
+| Projects you created yesterday are gone | The disk, or the variable that points at it. See the two checks below. |
+| The service will not start and the log says `REFUSING TO START` | The disk is mounted somewhere this process cannot write. This is the good failure — the sentence names the running uid and the mount's owner. See below. |
+
+**The disk, in two checks.** Both are one line each and answer different
+questions.
+
+*Is persistence actually on?* The startup banner prints where run history
+lives. On a service with the disk wired up it reads:
+
+```
+  run history /var/lib/vivum/runs
+```
+
+If it reads `/app/app/runs`, `TMESIM_STATE_DIR` is not set on this service and
+**nothing is being kept** — every deploy destroys it. The most likely cause is
+the one in the header of `render.yaml`: a service created by hand in the
+dashboard auto-deploys on push but **ignores `render.yaml` entirely**, so the
+`disk:` block and the variable below it never applied. Check
+dashboard → the service → Settings; a Blueprint-managed service says so. Fix it
+by adding the disk and the variable in the dashboard, or by recreating the
+service from the Blueprint (§H2).
+
+*Did the mount come up root-owned?* If Render mounts disks root-owned
+regardless of the image, the service refuses to start and the log carries one
+sentence naming `uid 10001`, the directory's actual owner, and this fix. Two
+options, in order:
+
+1. Mount the disk at **`/var/lib/vivum`**, which the image pre-creates and
+   chowns to uid 10001 (`Dockerfile`). A volume mounted on a path the image
+   already owns inherits that ownership — measured. This is what `render.yaml`
+   does and why the path is not arbitrary.
+2. If the platform overrides that anyway, the mount has to be chowned to 10001
+   before the app starts. That needs a root step ahead of `USER vivum`, which
+   this image deliberately does not have — treat it as a change to make
+   consciously, not a quick patch.
+
+Do **not** "fix" it by unsetting `TMESIM_STATE_DIR` to get the service back up.
+That starts cleanly and silently returns you to losing every project on every
+deploy, which is the failure this whole section exists to prevent.
 
 ---
 
@@ -671,7 +746,7 @@ Nothing in the container failed to build, start, or run.
 | 8 | On a 512 MB container the stock `/api/defaults` spec was **accepted** and OOM-killed the process in about a second — exit 137, `/healthz` unreachable. The first run a first user clicks. | image had no ceiling default | fixed — `ENV TMESIM_MAX_GRID_CELLS=auto` in the `Dockerfile`; the same POST is now a 400 naming the ceiling |
 | 9 | §A1's **1.38 GB / 58 s / 51 s** were measured before the build-time tissue fetch existed and no longer described the default build | `docs/RUNBOOK_DEPLOY.md` | fixed — re-measured, and what changed is stated |
 | 10 | `GET /` served the **Studio** even with `app/web/home.html` present in the image, and `GET /studio` was a **404** | `app/server/api.py::_mount_web` | fixed the same day, elsewhere — `StaticFiles(html=True)` resolves `/` to the directory index and never appends `.html`, so both URLs needed explicit routes ahead of the mount. Re-measured after they landed: `/` serves `home.html` and `/studio` serves `index.html`, byte for byte, and `/studio?project=…` is 200. `product.yml` asserts exactly that, and was red on this before the fix. |
-| 11 | A hosted instance keeps nothing: no disk, and one disk cannot cover `app/runs/` and `app/projects/` because neither path is configurable | `cache.py::runs_dir`, `projects.py::projects_dir` | **open** — stated in §H0 and in `render.yaml` rather than worked around |
+| 11 | A hosted instance keeps nothing: no disk, and one disk cannot cover `app/runs/` and `app/projects/` because neither path is configurable | `cache.py::runs_dir`, `projects.py::projects_dir` | fixed 2026-09-20 — `TMESIM_STATE_DIR` makes `runs/`, `projects/` and `reports/` children of one root, so one disk covers all three. Enabling it then **killed the container at boot**: a volume mounted where the image has no directory is root-owned, the image runs as uid 10001, `PermissionError` out of `os.makedirs`. Answered by pre-creating and chowning `/var/lib/vivum` in the image, and by `state_dir_problem` exiting 78 with a sentence instead of a traceback. Proven by creating a project, destroying the container and replacing it on the same volume. Render's own disk ownership remains unverified — §H7. |
 | 12 | `node --check` — the obvious spelling of an ES-module syntax check — parsed a duplicate `export const` and an `await` outside an async function **without error** | CI that did not exist yet | fixed by construction — `product.yml` uses `node --input-type=module --check`, confirmed by planting the duplicate export in a real module and watching the wrong flag stay green |
 
 There is one thing this session could not settle, and it is the same one §A
