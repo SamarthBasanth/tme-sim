@@ -280,6 +280,11 @@ async function boot() {
   // pin-clear and falls back to its own horizontal scroll (layout.css); mark
   // the edges so that is visible instead of reading as controls that vanished.
   wireEdgeShadow($('.stage-toolbar'));
+  // The top bar scrolls the same way and had no cue at all, which is half of
+  // why the route back to the workspace could be covered without anyone
+  // noticing: between ~337 and ~464 px the link could be reached by scrolling
+  // the bar, and `scrollbar-width: none` meant nothing said so.
+  wireEdgeShadow($('.topbar'));
 
   if (viewer) { wireCanvas(canvas); setTool('pick'); }
   syncColourControl();
@@ -322,19 +327,53 @@ async function boot() {
       0);
   }
 
+  /* THE COMPOUND LIST NO LONGER HOLDS THE WHOLE WORKSTATION HOSTAGE.
+   *
+   * MEASURED ON THE LIVE DEPLOYMENT 2026-09-20: `GET /api/drugs` did not
+   * answer inside 420 s while `/healthz` answered the same container in
+   * 0.2 s. Building that catalogue runs 80 Brownian diffusivity simulations
+   * (5.2 s of 6.5 s locally, minutes on a throttled host), and this line
+   * awaited it together with two calls that return immediately. So the
+   * Studio rendered SECTION — RUN — CELLS — and booted no further: no
+   * project context, no runs, no deep link. One slow endpoint, and the
+   * product did not start.
+   *
+   * `Promise.all` was the wrong shape for a reason worth stating: the three
+   * calls are not equally load-bearing. Sections and defaults are what the
+   * page IS; the drug list fills one picker. Awaiting them together made the
+   * page as slow as its least important input.
+   *
+   * Sections and defaults are awaited. The compound list is started at the
+   * same moment — so nothing is serialised and the fast path is unchanged —
+   * and installed whenever it lands. A failure there costs the picker, not
+   * the session. */
+  const drugsPromise = api.getDrugs();
+  drugsPromise.catch(() => { /* answered below; never an unhandled rejection */ });
+
   try {
-    const [sections, drugs, defaults] = await Promise.all([
-      api.getSections(), api.getDrugs(), api.getDefaults(),
+    const [sections, defaults] = await Promise.all([
+      api.getSections(), api.getDefaults(),
     ]);
-    store.set({ sections, drugs });
+    store.set({ sections });
     specPanel.setSections(sections);
-    specPanel.setDrugs(drugs);
-    reportsPanel.setDrugs(drugs);
     specPanel.loadSpec(defaults);
     paintSectionHeader(defaults.section);
   } catch (err) {
-    notifyError('Failed to load catalogue (/api/sections, /api/drugs, /api/defaults)', err);
+    notifyError('Failed to load catalogue (/api/sections, /api/defaults)', err);
   }
+
+  drugsPromise.then((drugs) => {
+    store.set({ drugs });
+    specPanel.setDrugs(drugs);
+    reportsPanel.setDrugs(drugs);
+  }).catch((err) => {
+    // Named separately from the block above, because the consequence is
+    // different and the user should be told which one they have: the page
+    // works, the compound picker does not.
+    notifyError('Failed to load the compound list (/api/drugs). Everything '
+      + 'else on this page is live; the compound picker will be empty until '
+      + 'this call succeeds — reloading retries it', err);
+  });
 
   // --- project context, docs/WORKSPACE_CONTRACT.md §8 -------------------
   // The two lines that decide whether ANY of it runs. With no `?project=` in
@@ -343,6 +382,7 @@ async function boot() {
   // boot() proceeds exactly as it did before the workspace existed.
   const ctxProjectId = projectIdFromUrl();
   if (ctxProjectId) await enterProject(ctxProjectId);
+  else showWorkspaceExit();
 
   specPanel.refreshCompounds();
   specPanel.refreshTissue();
@@ -453,6 +493,36 @@ function mountTopbarGroup(node) {
   // separate branch.
   bar.insertBefore(node, brand ? brand.nextSibling : null);
   return node;
+}
+
+/** The way out when there is NO project context.
+ *
+ * Until 2026-09-20 the `← workspace` link was mounted ONLY by
+ * `showProjectContext` / `showProjectUnavailable`, so a Studio opened at
+ * `/studio` with no `?project=` had no exit at all. The only route back was
+ * `projects` -> dialog -> `workspace home →`: two clicks, behind a button
+ * that does not say "leave", and the dialog is where a user goes to CHOOSE a
+ * project rather than to abandon one.
+ *
+ * That is not a trap — the link exists once you find the dialog — but it made
+ * the escape hatch conditional on the URL carrying a project, which is exactly
+ * backwards: the user most likely to want the workspace is the one who
+ * arrived at the Studio without going through it.
+ *
+ * Same group id as the project-scoped version on purpose, so the sticky lane
+ * layout.css reserves for the exit applies identically. Nothing else is
+ * mounted: with no project there is no name to show and no scope to describe,
+ * and inventing a "no project" chip would add furniture to the one bar that
+ * has already been measured as too full.
+ */
+function showWorkspaceExit() {
+  if ($('#hdr-project-group')) return;
+  mountTopbarGroup(h('div.topbar-group.keep', {
+    id: 'hdr-project-group',
+    title: 'This Studio is not scoped to a project. Runs you submit are still '
+      + 'stored in the run store; they are simply not associated with a '
+      + 'project until you attach them from the workspace home.',
+  }, workspaceLink('← workspace')));
 }
 
 /** The way out of a project and back to the workspace home. */
