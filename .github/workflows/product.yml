@@ -139,8 +139,25 @@ jobs:
       # tests/test_doc_claim_surface.py imports os, re and pytest and nothing
       # else -- it reads the markdown, it does not import the application. So
       # this needs pytest alone and stays a seconds-long job.
+      #
+      # THE REASONING ABOVE IS RIGHT ABOUT THE TEST AND WAS WRONG ABOUT PYTEST,
+      # which is why this workflow had never once run green. `tests/conftest.py`
+      # is collected automatically for anything under `tests/`, and it imports
+      # numpy and the whole `tmesim` package at module level. So the minimal
+      # install produced `ModuleNotFoundError: No module named 'numpy'` from
+      # conftest before a single assertion ran. The fix keeps the intent --
+      # `--noconftest` on the step below -- rather than installing a numerical
+      # stack to read markdown.
       - name: Install pytest
         run: pip install -c constraints.txt pytest
+
+      # The env-var step further down DOES import the application
+      # (tests/test_app_server.py pulls numpy, fastapi and app.server), so it
+      # gets the real dependency set. Kept as a separate install so the
+      # markdown job above still fails in seconds when a document drifts,
+      # instead of waiting on a build.
+      - name: Install the application for the step that imports it
+        run: pip install -c constraints.txt -e '.[app]'
 
       # CI over README.md, docs/** and the four root contracts. The defect it
       # exists for is this repository's most persistent one: the engine is
@@ -151,7 +168,8 @@ jobs:
       - name: The claim surface (README.md, docs/**, the root contracts)
         run: |
           set -euo pipefail
-          python -m pytest -q -rfE -p no:cacheprovider tests/test_doc_claim_surface.py
+          python -m pytest -q -rfE -p no:cacheprovider --noconftest \
+            tests/test_doc_claim_surface.py
 
       # Both halves of the deployment page's own count, which is a claim about
       # itself: every TMESIM_* the server reads must appear on the page, and the
