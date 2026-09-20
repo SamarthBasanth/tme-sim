@@ -46,7 +46,15 @@
   position: fixed;
   inset: 0;
   display: grid;
-  grid-template-rows: var(--h-bar) 1fr var(--h-status);
+  /* ROW 1 IS `auto`, NOT `var(--h-bar)`, AND THAT IS THE WHOLE POINT.
+     `--h-bar` is 30px and it stays the bar's FLOOR (`.topbar` below); what it
+     may no longer be is a ceiling. The launcher group is allowed to wrap onto
+     a second line when the window is too narrow to hold it on one (see
+     `.topbar-group.last`), and with a fixed 30px row that second line was
+     drawn into a box that `overflow-y: hidden` then deleted — the same
+     height-budget-for-a-width-problem mistake this file already carries two
+     comments about. The row takes the bar's real height instead. */
+  grid-template-rows: auto 1fr var(--h-status);
   background: var(--bg-0);
   /* The shell IS the viewport. Nothing may escape it, and nothing inside it
      may make the document scroll — every pane owns its own overflow. */
@@ -63,7 +71,45 @@
   background: var(--bg-2);
   border-bottom: 1px solid var(--line-2);
   min-width: 0;
+  /* `--h-bar` as a FLOOR. The bar is 30px at every width where its launcher
+     fits on one line — MEASURED: 431px and up, i.e. 335.1 + the 96px lane.
+     Below that it is 41px, because the alternative is deleting the launcher's
+     second row (see `.shell`). One extra row, bounded, and only on a phone. */
+  min-height: var(--h-bar);
   white-space: nowrap;
+
+  /* THE EXIT LANE.
+     The route out of the Studio — the `← workspace` link js/main.js mounts
+     just after the brand — is the ONLY link back to `/`. Everything else on
+     this bar is a control for the screen you are already on. The launcher
+     group is `position: sticky; right: 0` with an OPAQUE fill and a higher
+     stacking order, so anything it reaches paints under it and stops being
+     clickable; at `scrollLeft: 0` the left of the bar cannot move out of the
+     way, so "scroll it into view" is not a route.
+
+     MEASURED 2026-09-20 (Chromium, the self-hosted faces loaded, project
+     context present):
+
+         `← workspace`            x 127.5 .. 203.6   (76.1px, never moves)
+         `.topbar-group.last`     335.1px, sticky to the right edge
+
+     so the launcher's left edge is `width - 335.1` and it reaches the link at
+     `width < 538.7px`. Measured: clear at 539, FIRST CONTACT at 538 (0.7px of
+     it), the link's own midpoint covered at 500 — which is the "~505px" this
+     was first reported at, because that is where clicking the middle stopped
+     working — the link ENTIRELY covered at 464, and, because 335.1 > 320,
+     covered at every scroll position of the bar at and below 336. That last
+     band is the hard trap: on a 320px phone no gesture reached it at all.
+
+     This lane is the fix: the launcher may never occupy the left
+     `--topbar-exit` of the viewport, and wraps onto another line rather than
+     take it. The link plus the group's 8px left padding measures 84.1px, so
+     96px holds the whole control with ~12px to spare — enough that a font
+     that loads a little wider than Atkinson Next does not eat the clearance.
+     It is a hand-measured number, so it is ALSO an assertion in
+     scripts/studio-viewport-audit.mjs, which fails if the exit is ever
+     covered by so much as a pixel at any of the widths it tests. */
+  --topbar-exit: 96px;
   /* MEASURED: the bar's content is 924px wide and it was given no overflow at
      all, so below ~924px the tail of it was cut off by `body { overflow:
      hidden }`. The tail is `.topbar-group.last` — protocol, tour, keys, theme —
@@ -91,6 +137,19 @@
   gap: var(--sp-4);
   border-right: 1px solid var(--line-1);
   flex: 0 0 auto;
+}
+/* In STACKED mode the brand stands down, and it is the only thing on this bar
+   that can. It is 119.5px of pure identity — a wordmark and a version string,
+   nothing interactive, nothing that is the only way to do anything, and the
+   document <title> carries the same two words. What those 119.5px buy is the
+   exit lane: with the brand present the `← workspace` link starts at x=127.5
+   and is therefore INSIDE the launcher's reach at every width below 538.7px
+   (see `.topbar`); with it gone the link starts at x=0 and sits in the lane
+   the launcher is now forbidden to take.
+   The breakpoint is the file's existing one, not a new hand-measured number:
+   below 900px this is no longer a three-rail workstation at all. */
+@media (max-width: 899px) {
+  .brand { display: none; }
 }
 .brand .name {
   font-size: var(--fs-md);
@@ -135,6 +194,66 @@
   z-index: 1;
   background: var(--bg-2);
   border-left: 1px solid var(--line-1);
+  /* AND IT MAY NOT REACH THE EXIT LANE.
+     This group is six buttons wide — account, projects, protocol, tour, keys,
+     theme, MEASURED 335.1px — and it was pinned to the right edge with no
+     bound at all. Two consequences, both shipped:
+       * it painted over the `← workspace` link below 538.7px, and over the
+         whole bar below 335px, where 335.1px of sticky furniture does not fit
+         a 320px window at ANY scroll position;
+       * its own `theme` button hung 15.1px off the right of a 320px viewport,
+         so the group did not fit the screen it was pinned to either.
+     `max-width` bounds it against the VIEWPORT rather than against the
+     scroller it lives in (`100%` here is the 1230px scroll content, which is
+     not the constraint). `flex-wrap` then does the rest, and does it with no
+     breakpoint: the group is one line at every width where one line fits, and
+     takes a second only when the alternative is covering the way out.
+     Nothing is hidden, nothing moves into a menu, and all six controls stay
+     pinned — they just stop being a single row. */
+  flex-wrap: wrap;
+  align-content: center;
+  row-gap: var(--sp-3);
+  max-width: calc(100vw - var(--topbar-exit));
+}
+/* The route out, pinned the way the launcher is pinned, and for the same
+   reason it was pinned: a control you have to discover a horizontal scroll to
+   reach is a control most operators never find. `left: 0` holds it at the
+   bar's left edge while the readouts scroll under it, and `z-index: 2` puts
+   it above the launcher's 1 — if the two are ever driven into each other by a
+   font or a label this file did not anticipate, the failure is a covered
+   `theme` button and not a Studio with no way out.
+   Selected by `href` because the element is built in js/main.js
+   (`workspaceLink`) and carries no class of its own; `#hdr-project-group` is
+   the id that function's two callers both mount. */
+#hdr-project-group {
+  /* `overflow: hidden` — inherited from `.topbar-group` — is not cosmetic
+     here: an `overflow` other than `visible` makes this box the sticky child's
+     own scroll container, and a container that does not scroll gives `left: 0`
+     nothing to stick to, so the pin below would be dead CSS that reads as a
+     guarantee. The group needs no clipping of its own — the project id is
+     `flex: 0 0 auto` and the name carries its own `overflow: hidden` +
+     ellipsis from js/main.js. */
+  overflow: visible;
+  /* The group is pinned too, and ONLY so that the link's pin survives a long
+     scroll. `position: sticky` may not leave its containing block, and the
+     link's containing block is this group — MEASURED at 320px: with the group
+     scrolling normally the link held to `scrollLeft` 150 and was gone by 300,
+     out of a 679px range. Pinning the group makes the constraint rectangle
+     the bar itself, so the link holds across the whole range.
+     No z-index: this group is positioned but stays BELOW `.last` (z-index 1)
+     in paint order, so at a width where the two are driven into each other
+     the launcher's buttons win and only the project READOUT goes under —
+     which is what a readout is for. The opaque fill is what stops the brand
+     showing through the group's letters once the bar is scrolled. */
+  position: sticky;
+  left: 0;
+  background: var(--bg-2);
+}
+#hdr-project-group > a[href="/"] {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg-2);
 }
 .topbar-group > .mono,
 .topbar-group > .dim {

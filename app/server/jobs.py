@@ -465,6 +465,16 @@ RUN_REFUSALS = frozenset({
     "CompoundRefused",  # a SMILES the compiler will not stand behind
     "CompoundError",    # a bad request against the compound store
     "ProjectError",     # a bad request against the project store
+    # Added 2026-09-20. Both are raised BEFORE a large allocation, by
+    # tmesim/data/real/scref_gbm.py, when the measured requirement does not
+    # fit the detected memory limit. Without them here the user is handed a
+    # reference id and the measured explanation goes only to stderr -- for a
+    # refusal whose entire value is the numbers it quotes, that is the same as
+    # not refusing. Both messages are authored strings over integers and an
+    # environment variable name: no filesystem paths, no third-party
+    # traceback text, nothing the redactor exists to withhold.
+    "ReferenceTooLargeForHost",
+    "DeconvolutionTooLargeForHost",
 })
 
 

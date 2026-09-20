@@ -283,6 +283,29 @@ _PROCESS_STARTED_AT = time.time()
 # --------------------------------------------------------------------------- #
 _drug_rows_cache: Optional[List[Dict]] = None
 
+#: SINGLE-FLIGHT. Compiling the library is one job, and it must be done by one
+#: thread at a time no matter how many callers arrive.
+#:
+#: MEASURED ON THE LIVE DEPLOYMENT 2026-09-20. `GET /api/drugs` did not answer
+#: inside 120 s, repeatedly, while `/healthz` answered the same container in
+#: 0.2 s and the same image answered in 0.012 s on a laptop. The memo made
+#: this look impossible, but the memo is only consulted at ENTRY: before the
+#: first result exists, every concurrent caller ran the whole compile
+#: independently. The startup warm thread is one of those callers.
+#:
+#: On a free tier with a fraction of a CPU, that is a pile-up that feeds
+#: itself: a client times out, the server keeps computing, the client retries,
+#: and the retry starts another full compile while the abandoned ones still
+#: hold the CPU. The Studio's boot does
+#: `Promise.all([getSections, getDrugs, getDefaults])`, so the whole
+#: workstation waits on the slowest of them.
+#:
+#: With the lock, N callers cost one compile: the first computes, the rest
+#: block and then read the memo. This changes no result -- `drug_rows()`
+#: returns the same rows either way -- it changes only how many times the
+#: machine is asked to produce them.
+_drug_rows_lock = threading.Lock()
+
 
 def drug_rows(force: bool = False) -> List[Dict]:
     """``GET /api/drugs`` payload: the real library, compiled once and memoised.
@@ -305,6 +328,25 @@ def drug_rows(force: bool = False) -> List[Dict]:
     global _drug_rows_cache
     if _drug_rows_cache is not None and not force:
         return _drug_rows_cache + _user_compound_rows()
+
+    # Serialise the compile. The re-check inside the lock is what makes this
+    # single-flight rather than merely serialised: everyone who queued while
+    # the first caller worked finds the memo populated and returns it instead
+    # of repeating work that is already done.
+    #
+    # `_user_compound_rows()` stays OUTSIDE the memo, exactly as before: the
+    # library is fixed for the life of the process, an operator's own compiled
+    # compounds are not.
+    with _drug_rows_lock:
+        if _drug_rows_cache is not None and not force:
+            return _drug_rows_cache + _user_compound_rows()
+        return _compile_drug_rows()
+
+
+def _compile_drug_rows() -> List[Dict]:
+    """The compile itself. Split out so the memo/lock dance above reads as one
+    thing and the body below is unchanged from when it was inline."""
+    global _drug_rows_cache
 
     from tmesim.molecular.binding_site_barrier import apply_barrier_to_drugparams
     from tmesim.molecular.breast_library import get_molecule_breast
@@ -902,6 +944,37 @@ def validate_spec(spec: Dict) -> Dict:
             # `dx` is cleared above when it is non-positive, so both of the
             # remaining checks have to re-test it: a dx of -1 is an ERROR, and
             # crashing on it here would turn a 400 into a 500.
+            # THE REFUSAL THE GRID CEILING STRUCTURALLY CANNOT MAKE.
+            # TMESIM_MAX_GRID_CELLS counts VOXELS; a Visium reconstruction
+            # spends its memory on the spot matrix, the scRNA reference and a
+            # signature densification, all of which are sized by the PANEL and
+            # not by dx. Measured 2026-09-20: ~3.9-4.3 GB at dx=30 on a host
+            # declaring 512 MB, and coarsening dx moves none of it. So a
+            # visitor choosing a Visium section walked straight past the
+            # ceiling and OOM-killed the container.
+            #
+            # Done HERE, at submit time, rather than left to raise inside the
+            # job: this file's own rule is that a deliberate refusal is a 400
+            # the user reads, not a started-then-failed run they have to open
+            # a log to understand.
+            #
+            # It refuses only against a DECLARED limit (cgroup v2 -> v1 ->
+            # TMESIM_HOST_MEMORY_MB). An ordinary workstation declares none
+            # and is untouched.
+            if source == "visium" and section_id:
+                try:
+                    from tmesim.reconstruct.deconvolve import (
+                        check_visium_memory_budget,
+                    )
+                    check_visium_memory_budget(section_id)
+                except MemoryError as exc:
+                    errors.append(str(exc))
+                except Exception:  # noqa: BLE001
+                    # A budget check that cannot run must never be the reason
+                    # a valid spec is refused. The job-time refusal still
+                    # stands behind it.
+                    pass
+
             if dx is not None and source == "visium" and dx < 50.0:
                 warnings.append(
                     f"dx_um = {dx:g} um over-resolves a 100 um Visium spot "
@@ -1826,6 +1899,96 @@ def create_app(manager: Optional[JobManager] = None,
     ]
     if _allowed_hosts and "*" not in _allowed_hosts:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=_allowed_hosts)
+
+    class _CapRequestBodyASGI:
+        """Enforce the body cap on the BYTES THAT ARRIVE, not on what the
+        client says will arrive.
+
+        WHY THIS EXISTS ALONGSIDE the Content-Length pre-check below. That
+        check is honest about being a pre-check -- its own docstring says the
+        header "is client-supplied and may be absent or a lie". A security
+        pass on 2026-09-20 showed the lie is cheap to tell: the same
+        multi-megabyte body that gets a 413 with a Content-Length sails
+        through under ``Transfer-Encoding: chunked``, because no header
+        declares a size. Only ``protocol_api`` used ``_capped_body``; the
+        other ``await request.json()`` sites were uncapped in practice.
+
+        So the cap is moved to where it cannot be lied to. This reads the body
+        itself, stopping at ``MAX_REQUEST_BODY_BYTES + 1`` -- bounded by
+        construction, so the defence cannot become the exhaustion it prevents
+        -- and either refuses with 413 or REPLAYS the buffered bytes to the
+        application so every downstream ``request.json()`` behaves exactly as
+        before.
+
+        Raw ASGI rather than ``@app.middleware("http")`` deliberately:
+        BaseHTTPMiddleware cannot read the stream and still hand an intact
+        stream onward, which is precisely the operation needed here.
+
+        GET/HEAD/OPTIONS pass through untouched, for the reason the pre-check
+        gives: refusing a body on a liveness probe is a new way to fail a
+        health check, and this file has done that twice already.
+        """
+
+        def __init__(self, app, max_bytes: int):
+            self.app = app
+            self.max_bytes = max_bytes
+
+        async def __call__(self, scope, receive, send):
+            if (scope.get("type") != "http"
+                    or scope.get("method") in ("GET", "HEAD", "OPTIONS")):
+                return await self.app(scope, receive, send)
+
+            chunks = []
+            total = 0
+            more = True
+            while more:
+                message = await receive()
+                if message["type"] == "http.disconnect":
+                    # Hand it on unchanged; the app decides what a disconnect
+                    # means. Swallowing it here would hang the request.
+                    chunks.append(message)
+                    break
+                body = message.get("body", b"")
+                total += len(body)
+                if total > self.max_bytes:
+                    return await self._refuse(send, total)
+                chunks.append(message)
+                more = bool(message.get("more_body", False))
+
+            sent = False
+
+            async def replay():
+                nonlocal sent
+                if chunks:
+                    return chunks.pop(0)
+                # The stream is exhausted. Anything further is a disconnect --
+                # returning a body message with more_body would deadlock a
+                # handler waiting for the end.
+                sent = True
+                return {"type": "http.disconnect"}
+
+            return await self.app(scope, replay, send)
+
+        async def _refuse(self, send, seen: int):
+            payload = json.dumps({"detail": {
+                "message": (f"request body exceeds the "
+                            f"{self.max_bytes} B limit"),
+                "reason": ("a RunSpec, a report request and a compound "
+                           "definition are all kilobytes. This was measured "
+                           "on the bytes received, so declaring no length "
+                           "does not raise the limit."),
+            }}).encode("utf-8")
+            # The size SEEN is deliberately not echoed: the read stops at the
+            # cap, so it is not the body's real size, and printing a number
+            # that is merely "where we stopped" invites the reader to treat it
+            # as a measurement.
+            await send({"type": "http.response.start", "status": 413,
+                        "headers": [(b"content-type", b"application/json"),
+                                    (b"content-length",
+                                     str(len(payload)).encode())]})
+            await send({"type": "http.response.body", "body": payload})
+
+    app.add_middleware(_CapRequestBodyASGI, max_bytes=MAX_REQUEST_BODY_BYTES)
 
     @app.middleware("http")
     async def _cap_request_body(request: Request, call_next):

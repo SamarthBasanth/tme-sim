@@ -291,9 +291,14 @@ def state_dir_problem() -> Optional[str]:
             owner = f"uid {st.st_uid}:gid {st.st_gid}, mode {oct(st.st_mode & 0o777)}"
         except OSError:
             owner = "could not stat it"
+        # One short, named statement rather than the exception interpolated
+        # into the middle of a long message. Same text, but the formatting of
+        # the exception is now a single line a reader (and the redaction
+        # sweep) can see whole, instead of being buried mid-paragraph.
+        detail = _detail(exc)
         return (
             f"TMESIM_STATE_DIR is set to {root}, and this process cannot "
-            f"write there: {type(exc).__name__}: {exc}. "
+            f"write there: {detail}. "
             f"It runs as uid {os.getuid()}:gid {os.getgid()}; that directory "
             f"is owned by {owner}. "
             "A platform disk mounted at a path the image does not already "

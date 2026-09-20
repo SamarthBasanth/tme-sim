@@ -466,6 +466,33 @@ def handler():
 # --------------------------------------------------------------------------- #
 EXEMPTIONS: Tuple[Exemption, ...] = (
     Exemption(
+        path="app/server/api.py",
+        qualname="validate_spec",
+        caught="MemoryError",
+        expr="str(exc)",
+        reason=(
+            "A DELIBERATE REFUSAL whose entire value is the numbers in it, "
+            "raised by tmesim/reconstruct/deconvolve.py::"
+            "check_visium_memory_budget BEFORE any large allocation. The "
+            "message names the measured requirement for that section, the "
+            "detected limit, and WHERE the limit was detected (cgroup v2 -> "
+            "v1 -> TMESIM_HOST_MEMORY_MB). Replacing it with a stable "
+            "sentence and a reference id would leave the user knowing only "
+            "that something was too big.\n\n"
+            "It exists because TMESIM_MAX_GRID_CELLS structurally cannot "
+            "make this refusal: that ceiling counts VOXELS, and the memory "
+            "measured here is spent on the Visium matrix, the scRNA "
+            "reference and a signature densification -- all sized by the "
+            "PANEL, none by dx. A visitor choosing a Visium section walked "
+            "straight past the grid ceiling and OOM-killed the container.\n\n"
+            "The text is authored over integers and an environment variable "
+            "name. No filesystem path, no third-party traceback: the classes "
+            "are raised by this repo, and the same two names are declared in "
+            "jobs.py::RUN_REFUSALS and executor.py::REFUSAL_NAMES, which a "
+            "guard pins equal."
+        ),
+    ),
+    Exemption(
         path="app/server/cross_section.py",
         qualname="cross_section_payload",
         caught="ProjectError",

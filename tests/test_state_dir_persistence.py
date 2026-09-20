@@ -23,6 +23,7 @@ import os
 import re
 import stat
 import subprocess
+import time
 
 import pytest
 
@@ -230,3 +231,65 @@ class TestTheServerAcceptsItsOwnDefaults:
             else:
                 os.environ["TMESIM_MAX_GRID_CELLS"] = prior
             self._reloaded(prior or "40000000")
+
+
+class TestTheDrugCatalogueIsCompiledOnce:
+    """`GET /api/drugs` did not answer inside 120 s on the live deployment.
+
+    MEASURED 2026-09-20, repeatedly, while `/healthz` answered the SAME
+    container in 0.2 s and the same image answered in 0.012 s on a laptop.
+
+    The memo made that look impossible, but the memo is consulted only at
+    ENTRY: before the first result exists, every concurrent caller ran the
+    whole compile independently. The startup warm thread is one such caller,
+    and the Studio's boot does `Promise.all([getSections, getDrugs,
+    getDefaults])`, so the whole workstation waits on it. On a fraction of a
+    CPU the retries pile up faster than the work completes.
+    """
+
+    def test_concurrent_callers_compile_the_library_once(self):
+        import threading as _t
+        import app.server.api as api
+
+        calls = {"n": 0}
+        real = api._compile_drug_rows
+
+        def counting():
+            calls["n"] += 1
+            time.sleep(0.25)   # make the window wide enough to collide in
+            return real()
+
+        prior = api._drug_rows_cache
+        api._drug_rows_cache = None
+        api._compile_drug_rows = counting
+        try:
+            out = []
+            threads = [_t.Thread(target=lambda: out.append(api.drug_rows()))
+                       for _ in range(8)]
+            for th in threads:
+                th.start()
+            for th in threads:
+                th.join()
+        finally:
+            api._compile_drug_rows = real
+            api._drug_rows_cache = prior
+
+        assert calls["n"] == 1, (
+            f"8 concurrent callers ran the compile {calls['n']} times. Each "
+            "one is seconds of work; on a throttled host they starve each "
+            "other and no caller finishes.")
+        assert len(out) == 8
+        assert all(r == out[0] for r in out), "callers disagreed about the rows"
+
+    def test_the_memo_still_short_circuits_without_touching_the_lock(self):
+        """The warm path must not pay for the fix. A lock acquired on every
+        read would put contention on the common case to protect the rare one.
+        """
+        import app.server.api as api
+        api.drug_rows()                      # ensure warm
+        assert api._drug_rows_cache is not None
+        t0 = time.perf_counter()
+        for _ in range(50):
+            api.drug_rows()
+        elapsed = time.perf_counter() - t0
+        assert elapsed < 1.0, f"50 warm reads took {elapsed:.3f}s"

@@ -107,6 +107,8 @@ from .delivery_law import delivery_law
 __all__ = [
     "PROJECT_ID_RE",
     "RUN_ID_RE",
+    "MAX_NAME_CHARS",
+    "MAX_NOTES_CHARS",
     "ProjectError",
     "ProjectStore",
     "PROJECT_STORE",
@@ -135,6 +137,49 @@ SPECIMEN_ID_RE = re.compile(r"^s_\d{5}$")
 #: ``\d{5}``: ``JobManager.submit`` formats ``r_{counter:05d}``, which is five
 #: digits only until the 100,000th run.
 RUN_ID_RE = re.compile(r"^r_\d{5,}$")
+
+# --------------------------------------------------------------------------- #
+# FREE-TEXT LIMITS, and why a store that only checked for EMPTY was a DoS.
+#
+# ``create``/``update``/``duplicate``/``add_specimen``/``update_specimen``
+# validated their text for emptiness and nothing else, so a name was refused at
+# zero characters and accepted at twenty million. That is not a cosmetic gap,
+# because of where the text GOES: ``_summary`` puts ``notes`` in every row of
+# ``store.list()``, and ``store.list()`` is what ``GET /api/workspace`` returns
+# -- the SINGLE boot call for the home page.
+#
+# Measured against a running server on 2026-09-20:
+#
+#     POST /api/projects  {"name": "pwn", "notes": "N" * 20_971_520}  -> 201
+#     GET  /api/workspace                             163 B -> 20,972,002 B
+#
+# One accepted request, and the front door of the product serves a 21 MB boot
+# payload to every visitor, from disk, across restarts, until someone finds the
+# directory and deletes it by hand.
+#
+# THE BODY CAP DID NOT STOP IT, and that is the other half worth writing down:
+# ``api.py::_cap_request_body`` refuses on ``Content-Length``, and a request
+# sent ``Transfer-Encoding: chunked`` has none. That is a defect in a different
+# file. These caps are deliberately NOT a restatement of it -- a request-size
+# limit answers "how much may you send me", and this answers "how much am I
+# willing to persist and then hand to every future reader". The second question
+# is this module's to answer, and its answer must hold even when the first one
+# is wrong.
+#
+# The numbers: a study name is a label, not a document -- 200 characters is
+# longer than any real one and short enough that a thousand projects cost
+# 200 KB. Notes are prose and people paste protocol text into them, so 20,000
+# characters (~4 pages) is generous; 1,000 projects at the cap is 20 MB, which
+# is the point at which the operator has a store problem rather than an
+# attacker. Counted in CHARACTERS, not bytes: the limit has to be explicable to
+# the person typing into the field, and ``len()`` on a ``str`` is the number a
+# UI can enforce too.
+# --------------------------------------------------------------------------- #
+#: Longest project name / specimen label, in characters.
+MAX_NAME_CHARS = 200
+
+#: Longest project notes / specimen notes, in characters.
+MAX_NOTES_CHARS = 20_000
 
 #: The figures this module quotes, kept as named constants so the message and
 #: the evidence cannot drift apart. Both are from results/cell_state_impact.md
@@ -762,10 +807,41 @@ class ProjectStore:
                         pass
         return doc
 
+    @staticmethod
+    def _text(value, field: str, limit: int, *, required: bool = False,
+              strip: bool = True, required_msg: Optional[str] = None) -> str:
+        """One gate for every free-text field this store will persist.
+
+        A ``staticmethod`` on the store rather than a module function because
+        the rule it enforces is the store's: these limits exist to bound what
+        ``list()`` -- and therefore ``GET /api/workspace`` -- can be made to
+        return. See the MAX_* constants for the measurement.
+
+        The refusal names the field, the limit and what was sent, because a
+        400 that says only "too long" cannot be acted on by whoever is typing.
+
+        EVERY message keeps the ``"<field>: <what is wrong>"`` shape, which is
+        load-bearing: ``app/web/js/home/createProject.js::attachFieldError``
+        parses that prefix to decide which input to mark red, and a message
+        that loses it is silently demoted to a form-level error.
+        """
+        text = str(value or "")
+        if strip:
+            text = text.strip()
+        if required and not text:
+            raise ProjectError(
+                required_msg or f"{field}: required, a non-empty {field}")
+        if len(text) > limit:
+            raise ProjectError(
+                f"{field}: {len(text)} characters, above the {limit}-character "
+                f"limit. This field is stored and returned in every workspace "
+                f"listing, so its size is bounded on purpose.")
+        return text
+
     def create(self, name: str, notes: str = "") -> Dict:
-        name = (name or "").strip()
-        if not name:
-            raise ProjectError("name: required, a non-empty project name")
+        name = self._text(name, "name", MAX_NAME_CHARS, required=True,
+                          required_msg="name: required, a non-empty project name")
+        notes = self._text(notes, "notes", MAX_NOTES_CHARS, strip=False)
         with self._lock:
             now = time.time()
             doc = {
@@ -795,11 +871,12 @@ class ProjectStore:
         with self._lock:
             doc = self.get(project_id, refresh_capability=False)
             if name is not None:
-                if not str(name).strip():
-                    raise ProjectError("name: must not be empty")
-                doc["name"] = str(name).strip()
+                doc["name"] = self._text(
+                    name, "name", MAX_NAME_CHARS, required=True,
+                    required_msg="name: must not be empty")
             if notes is not None:
-                doc["notes"] = str(notes)
+                doc["notes"] = self._text(notes, "notes", MAX_NOTES_CHARS,
+                                          strip=False)
             return self._write(doc)
 
     def delete(self, project_id: str) -> Dict:
@@ -884,11 +961,18 @@ class ProjectStore:
         with self._lock:
             src = self.get(project_id, refresh_capability=False)
             if name is None:
-                new_name = f"{src.get('name') or project_id} (copy)"
+                # TRUNCATE rather than refuse: the caller supplied no name, so
+                # a 400 here would be a refusal they cannot act on -- and
+                # duplicating a project whose name is already AT the cap would
+                # otherwise be impossible, because " (copy)" pushes it over.
+                suffix = " (copy)"
+                stem = str(src.get("name") or project_id)
+                room = MAX_NAME_CHARS - len(suffix)
+                new_name = f"{stem[:room]}{suffix}"
             else:
-                new_name = str(name).strip()
-                if not new_name:
-                    raise ProjectError("name: must not be empty")
+                new_name = self._text(
+                    name, "name", MAX_NAME_CHARS, required=True,
+                    required_msg="name: must not be empty")
             now = time.time()
             doc = {
                 "id": self._next_id(),
@@ -1080,6 +1164,11 @@ class ProjectStore:
         if section not in all_sections():
             raise ProjectError(
                 f"section: unknown id {section!r}. Known ids: {sorted(all_sections())}")
+        # BEFORE capability_report, which reads the section off disk: refusing
+        # oversize text must not cost a disk read first.
+        if label is not None:
+            label = self._text(label, "label", MAX_NAME_CHARS)
+        notes = self._text(notes, "notes", MAX_NOTES_CHARS, strip=False)
         cap = capability_report(section)
         with self._lock:
             doc = self.get(project_id, refresh_capability=False)
@@ -1117,11 +1206,12 @@ class ProjectStore:
             doc = self.get(project_id, refresh_capability=False)
             spec = self._find_specimen(doc, specimen_id)
             if label is not None:
-                if not str(label).strip():
-                    raise ProjectError("label: must not be empty")
-                spec["label"] = str(label).strip()
+                spec["label"] = self._text(
+                    label, "label", MAX_NAME_CHARS, required=True,
+                    required_msg="label: must not be empty")
             if notes is not None:
-                spec["notes"] = str(notes)
+                spec["notes"] = self._text(notes, "notes", MAX_NOTES_CHARS,
+                                           strip=False)
             self._write(doc)
         return spec
 

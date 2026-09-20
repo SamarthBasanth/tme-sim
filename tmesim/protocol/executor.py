@@ -91,6 +91,13 @@ REFUSAL_NAMES = frozenset({
     "CompoundRefused",
     "CompoundError",
     "ProjectError",
+    # Added 2026-09-20 alongside app/server/jobs.py::RUN_REFUSALS, which a
+    # guard pins this set equal to. A sweep cell reaches the same loaders a
+    # run does, so a host that cannot hold a Visium deconvolution refuses
+    # here too -- and the refusal's whole value is the measured MiB it
+    # quotes, which redaction would replace with a reference id.
+    "ReferenceTooLargeForHost",
+    "DeconvolutionTooLargeForHost",
 })
 
 
