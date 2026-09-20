@@ -185,6 +185,59 @@
  * law-independent". The page's lead IS a mechanism verdict, so the page owes
  * the same disclosure the product already makes. It is on beat 06.
  *
+ * THE PAGE'S LEAD IS READ OFF THE ONE SECTION OF THREE THAT GIVES THAT ANSWER,
+ * AND THAT SECTION IS THE MOST PENETRABLE OF THE THREE. Computed 2026-08-23,
+ * read for the first time 2026-09-20; see
+ * results/multisection_generalisation_2026-09-20.md and
+ * results/multisection_claim_surface_2026-09-20.md. Temozolomide, ONE RunSpec,
+ * seven registered glioblastoma sections. Four are Visium spot sections whose
+ * own payload refuses the delivery map, so the arm is THREE sections from three
+ * donors. With `mech_thresholds` byte-identical on every row the dominant
+ * limiter reads `dose` on the flagship `xenium_319` (share 0.9985) and
+ * `resistance` on both `xenium_io` (0.6090) and `gse324268` (0.6629).
+ * `gse324268` is typed by the SAME marker map and the same one-gene endothelial
+ * gate as the flagship, so the disagreement is not a panel artefact. Fitted
+ * penetration length is 277.69 um on the flagship against 133.16 and 103.18 --
+ * the specimen this page's lead is read from is the most drug-penetrable of the
+ * set, which is the same direction as beat 06's 2.2-3.0x row and independent of
+ * it.
+ *
+ * WHAT IT LICENSES AND WHAT IT FORBIDS. It does NOT license softening beat 03:
+ * that sentence already says "On the flagship section", and it is true there.
+ * It DOES forbid any sentence presenting the flagship's answer as what tissue
+ * generally does, and it forbids the page's old binary "delivery or potency" as
+ * a description of what the product RETURNS -- `resistance` is a shipped
+ * verdict and it is the majority answer on this arm. And it adds a THIRD route
+ * to beat 06's inversion row: the first two are modelling choices (a transport
+ * term the model lacks, a conventional band threshold); this one is TISSUE,
+ * which is a different kind of fact and the one the project had itself ranked
+ * as the most valuable failure available to it.
+ *
+ * THE BOUNDS, AND THEY ARE NOT OPTIONAL. Three sections, three donors, ONE
+ * compound, ONE configuration, dx = 30 um -- and NEITHER section carrying the
+ * flip was ever solved at a second grid, so whether the flip survives a change
+ * of mesh is UNTESTED. Three is not a sample and no statistical claim exists or
+ * is available. Never write "replicated" or "validated across patients", and
+ * never quote a figure computed over SEVEN sections: the seven-section spreads
+ * in that file are a quarantined counterfactual, printed once as the
+ * counterfactual they are.
+ *
+ * WHAT SURVIVED THE SAME TEST, AND IT MUST TRAVEL WITH THE ABOVE, because a
+ * correction that only runs downhill is the flinch this file already names. The
+ * delivery spread E_p90/E_p10 -- the statistic app/server/reach.py promoted to
+ * headline in place of F(0.1), on the flagship alone -- reads 1.9936 / 2.3211 /
+ * 2.5293 across the three donors, a spread of 1.2687x. That is the smallest
+ * continuous readout in the sweep by more than a factor of two (penetration
+ * length 2.691x, F(1.0) 119.9x), and on the one section solved at two grids it
+ * moves 1.0004x between dx = 30 and dx = 12. F(0.1), the one that was
+ * de-headlined, is 0 on all three. So the promotion picked a statistic that
+ * behaves the same way on more than one specimen -- and that is
+ * REPRODUCIBILITY OF MAGNITUDE and nothing more. It is NOT evidence the
+ * statistic discriminates between tissues, and a page that upgraded it to
+ * "holds across patients" would commit the error this file exists to prevent.
+ * No number from that sweep is rendered on the page today and this pass adds
+ * none; this paragraph records what a future edit MAY say and exactly how far.
+ *
  * A DELIVERY VERDICT HAS NEVER BEEN DEMONSTRATED NON-DEGENERATELY, AND THE
  * PAGE MUST NOT IMPLY THREE WORKING SETTINGS. It is tempting to say the
  * discriminator has three settings — dose, delivery, resistance — because all
@@ -198,6 +251,15 @@
  * Say two demonstrated settings and one the product can currently only be
  * handed — the qualified version is the one a sceptical reader trusts, and the
  * unqualified version is refuted by a file in this repo.
+ * REINFORCED 2026-09-20 BY A SEVEN-SECTION SWEEP, AND THE DIRECTION IS
+ * FAVOURABLE TO THE GUARDRAIL RATHER THAN TO THE PAGE. In
+ * results/multisection_generalisation_2026-09-20.md sec. 5.3 the `delivery`
+ * share never exceeds 0.001817 on ANY of the seven sections and is dominant on
+ * none of them, while `dose` and `resistance` each dominate somewhere. So the
+ * two demonstrated settings are now demonstrated on INDEPENDENT tissue rather
+ * than on one section, and the un-demonstrated one stayed un-demonstrated under
+ * a seven-fold larger test. That is a reason to keep saying "two", not a reason
+ * to promote the third.
  *
  * A NUMBER THE PRODUCT COMPUTED ONCE IS NOT A CITATION. Every figure on this
  * page must trace to a results/ file, and "the panel printed it and someone
@@ -1042,8 +1104,50 @@ export const SECTION_COPY: readonly SectionCopy[] = [
      * substance and is still the sentence that makes this beat honest: it is a
      * promise that the limits TRAVEL with the output. As of this pass it is
      * more than a promise here, because the limits are now literally below it.
+     *
+     * "DELIVERY OR POTENCY" WENT ON 2026-09-20 AND MUST NOT COME BACK AS A
+     * DESCRIPTION OF WHAT THE PRODUCT RETURNS. It was the page's binary, and it
+     * named the ONE setting the model has never produced non-degenerately while
+     * omitting one it produces routinely. The measurement that settled it is
+     * results/multisection_generalisation_2026-09-20.md sec. 4.1, 5.3: on the
+     * three single-cell glioblastoma sections, one compound, byte-identical
+     * thresholds, the dominant limiter is `dose` on the flagship and
+     * `resistance` on the other two — so on the MAJORITY of that arm the verdict
+     * a user gets back is neither half of the old phrase. Meanwhile `delivery`
+     * is dominant on none of the seven sections and never exceeds a 0.001817
+     * share, which is the same finding as the degeneracy guardrail at the head
+     * of this file, arriving from a different direction.
+     *
+     * IT WAS DELETED, NOT REPLACED, AND THE DELETION IS WHAT PAID FOR THE
+     * DISCLOSURE IN THE LEDGER BELOW. The obvious repair was to substitute the
+     * two settings the model HAS produced — "too weak a dose, or a cell its own
+     * state protects". That was written, measured, and withdrawn: it is 29
+     * characters longer, and beat 06 had 13.2px of worst-case headroom at
+     * 360x700 against a ledger detail line of ~13.8px, so it clipped beat 06 by
+     * 21.6px at 360x700 and 9.3px at 360x740 (npm run audit:viewports, exit 1,
+     * both viewports named). Retracting an overclaim is the one edit that frees
+     * vertical space without costing disclosure — this file's own rule, applied
+     * on 2026-08-21 to beat 05's lead — and here it is the only room that
+     * existed. Measured after: beat 06 worst case 692.8 of 700 at 360x700, 7.2px
+     * spare, down from 13.2px. THE MARGIN IS NOW UNDER HALF A DETAIL LINE. The
+     * next edit that needs a line on beat 06 has nothing left to sell and must
+     * take it out of the layout.
+     *
+     * WHAT THE DELETION COSTS, NAMED SO IT IS NOT DISCOVERED LATER: a reader
+     * arriving at beat 06 out of order no longer learns from this sentence what
+     * shape the verdict takes. Beat 03 directly above is where that lives, and
+     * its eyebrow stays "Delivery or potency" because that is the QUESTION the
+     * discriminator asks, not a claim about the answers it returns.
+     *
+     * A FUTURE EDIT MUST NOT "RESTORE THE SYMMETRY" by putting a compound list
+     * back into this sentence. Two ways it could go wrong and both are
+     * forbidden: naming delivery again reinstates the false binary this block
+     * exists to record, and naming all three settings violates the
+     * three-settings prohibition at the head of this file. If room is ever
+     * bought, what belongs here is the two DEMONSTRATED settings and nothing
+     * else.
      */
-    body: "Vivum runs where your tissue already is: the solve is a single process on your own machine, and it sends no tissue or compound data anywhere. De-identified tissue only. Bring a section and a compound, and get back a per-cell verdict — delivery or potency — the map that is the evidence for it, and the limits below attached to both, on your tissue, with your numbers in them.",
+    body: "Vivum runs where your tissue already is: the solve is a single process on your own machine, and it sends no tissue or compound data anywhere. De-identified tissue only. Bring a section and a compound, and get back a per-cell verdict, the map that is the evidence for it, and the limits below attached to both, on your tissue, with your numbers in them.",
     align: "center",
     /*
      * WHY A SECOND LEDGER EXISTS, AND WHY IT IS HERE RATHER THAN ON BEAT 05.
@@ -1166,12 +1270,41 @@ export const SECTION_COPY: readonly SectionCopy[] = [
          * the threshold's VALUE and never says how close the run is to it. That
          * belongs beside the number, in app/web/js/ui/. This page owes the
          * reader the fact, not the fix.
+         *
+         * A THIRD ROUTE WAS ADDED 2026-09-20 AND IT IS THE ONE THAT IS NOT A
+         * MODELLING CHOICE. The first two routes are both ours — a term the
+         * model does not have, and a band threshold we picked. The third is the
+         * tissue: results/multisection_generalisation_2026-09-20.md sec. 4.1
+         * runs this compound unchanged on two further glioblastoma sections at
+         * byte-identical thresholds and the dominant limiter comes back
+         * `resistance` on both, where 03's section says `dose`. One of the two
+         * is typed by the SAME marker map and the same one-gene endothelial
+         * gate as 03's, so it is not a panel artefact.
+         *
+         * THE ROW SAYS "ANOTHER SECTION OF THE SAME TUMOUR" AND CARRIES NO
+         * COUNT, AND THE OMISSION IS DELIBERATE. "2 of 2" would read as a
+         * statistic and there is no statistic here: n = 3 donors, ONE compound,
+         * ONE configuration, and neither section carrying the flip was ever
+         * solved at a second grid, so whether it survives a change of mesh is
+         * untested. The categorical fact — that it flips at all, on tissue
+         * rather than on a knob of ours — is the whole content, and it is the
+         * thing this project's own route list had ranked as the most valuable
+         * failure available to it.
+         *
+         * WHAT DID NOT FIT, AND IT IS THE INTERPRETIVE HALF: that of the three
+         * routes this row now names, the first two are modelling choices and
+         * only this one is tissue. That clause was written, measured and
+         * withdrawn for room (see the beat 06 body block above for the
+         * measurement); it is in the guardrail at the head of this file
+         * instead. If beat 06 is ever given a line, this is what it should buy
+         * first — a reader who takes away three routes without knowing that one
+         * of them is not ours has the weaker half of the row.
          */
         {
           label: "The 03 verdict",
-          state: "INVERTS TWO WAYS",
+          state: "INVERTS THREE WAYS",
           detail:
-            "It comes from a one-way vascular leak with no path from tissue back to blood, which misses human microdialysis 12.8× high on one drug and 10.5× low on another, so no constant fixes both. Supply the missing term and the dominant limiter flips for 7 of 12 compounds, 03's included, relabelling 57.2% of its cells. Moving one conventional band threshold to the median survivor's own exposure flips it again.",
+            "It comes from a one-way vascular leak with no path from tissue back to blood, which misses human microdialysis 12.8× high on one drug and 10.5× low on another, so no constant fixes both. Supply the missing term and the dominant limiter flips for 7 of 12 compounds, 03's included, relabelling 57.2% of its cells. Moving one conventional band threshold to the median survivor's own exposure flips it again. And so does another section of the same tumour.",
         },
         /*
          * THE NUMBER CHANGED ON 2026-09-20 AND THE ROW GOT SMALLER, WHICH IS
@@ -1205,6 +1338,30 @@ export const SECTION_COPY: readonly SectionCopy[] = [
          * which case inverting it to λ is invalid. It does not fit in this row
          * and it would weaken a limit rather than a claim, so it is recorded
          * here and left off the page rather than quietly dropped.
+         *
+         * A SECOND, INDEPENDENT REASON THIS SENTENCE FLATTERS THE DRUG WAS
+         * MEASURED ON 2026-09-20 AND IS NOT ON THE PAGE. RECORDED AS A KNOWN
+         * OMISSION RATHER THAN AN OVERSIGHT, AND IT IS THE FIRST THING THIS
+         * BEAT SHOULD BUY IF IT IS EVER GIVEN ROOM.
+         * The 2.2-3.0x above is an error in the transport LENGTH — a property
+         * of the model. This is a property of the SPECIMEN: of the three
+         * single-cell glioblastoma sections in
+         * results/multisection_generalisation_2026-09-20.md sec. 4.3 the
+         * flagship's fitted penetration length is 277.69 um against 133.16 and
+         * 103.18, so the tissue this page's lead is read from is the MOST
+         * drug-penetrable of the set. The two effects compound and neither is
+         * inside the other's measurement — one says the map is too shallow, the
+         * other says the tissue the map was made on is the easiest one we have.
+         * The clause "So does the specimen — of three glioblastoma sections,
+         * 03's is the most penetrable." was written and withdrawn for room; the
+         * measurement that forced the withdrawal is in the beat 06 body block
+         * above. Note which way this cut: the omitted clause is a disclosure
+         * that costs us, so its absence is the page reading SOFTER than the
+         * evidence, which is the failure mode this file treats as the serious
+         * one.
+         * IF IT IS EVER ADDED, KEEP IT QUALITATIVE ("the most penetrable of
+         * three") and do NOT quote 2.69x: a max/min over three sections is not
+         * an error bar and a fold printed beside 2.2-3.0x would be read as one.
          */
         {
           label: "“Arrives almost everywhere”",

@@ -14,7 +14,11 @@ glioblastoma section (**40,887 measured cells**) and a breast carcinoma section
 transport question about ONE compound on ONE tissue: when this compound failed
 here, did the drug never arrive, or did it arrive and stay too weak? Those two
 look identical in a survival curve and need opposite fixes; Vivum separates
-them, cell by cell.
+them, cell by cell — and reports a third answer, `resistance` (exposure was
+adequate and the cell survived anyway), when that is what the run says. On two
+of the three registered single-cell GBM sections, `resistance` is what it says;
+see *What is contingent* below before assuming the flagship's answer is the
+usual one.
 
 **The single output this project will defend is a RATIO INSIDE ONE MAP: the
 relative exposure between REGIONS of one section, for one compound.** A
@@ -247,6 +251,7 @@ archived under [`archive/synthetic_era/`](archive/synthetic_era/README.md).
 | GBM section (flagship) | 10x Xenium GBM FFPE, Human Brain 319-gene panel (CC BY 4.0) | **40,887 cells**, true µm coordinates |
 | Breast section (flagship) | 10x Xenium breast, Janesick 2023 (PMID 38114474), Rep1 | **167,780 cells** (89,785 tumour) |
 | GBM, held-out patient | 10x Xenium GBM FFPE, Immuno-Oncology 480-gene panel | **816,769 cells**, 6.2× the cell density |
+| GBM, third donor | Xenium, GEO `GSM9572843` (`GSE324268`, tumor 07) — registered, no scripted conversion | **851,509 cells** |
 | Spot spatial | 4 Visium GBM sections (10x public + GSE194329) | 1,775–4,764 spots each |
 | Cell reference | Darmanis 2017, GEO GSE84465 | 23,460 genes × 3,589 annotated cells |
 | Niche architecture | Ivy GAP (Puchalski 2018) | 270 RNA-seq samples, 7 anatomic structures |
@@ -332,6 +337,39 @@ check on the **data**, not on any Vivum model.
 Real measurements whose verdict depends on a configuration choice that is itself
 unvalidated, or that rests on one section.
 
+**The per-cell verdict is SECTION-DEPENDENT, and the flagship is the outlier.**
+Temozolomide was solved on seven registered GBM sections on 2026-08-23 under one
+RunSpec — `dx = 30 µm`, 6 h window, `sensitivity_mode = uniform`,
+`vascular_mode = discrete`, `oxygen_mode = pde`, `transvascular_exchange = False`
+— and the output was read for the first time on 2026-09-20. Across the three
+**single-cell** sections, with `mech_thresholds` byte-identical on every row, the
+dominant limiter takes **two different values**: `dose` on `xenium_319` (share
+0.9985), `resistance` on `xenium_io` (0.6090) and on `gse324268` (0.6629). The
+flagship is the one section that returns the answer this page's own framing is
+written around, and it disagrees with `gse324268`, which is typed by the **same**
+marker map and the same one-gene endothelial gate — so this is not a panel
+artefact. The flagship is also the **most drug-penetrable** of the three: fitted
+penetration length 277.69 µm against 133.16 and 103.18. Read the bounds before
+quoting any of it — **four of the seven are Visium spot sections whose own
+payload refuses the delivery map, so this is a three-section arm plus four
+refusals, n = 3 donors, ONE compound, ONE configuration, and neither section
+carrying the flip was ever solved at a second grid.** No statistical claim is
+made or available.
+→ [`results/multisection_generalisation_2026-09-20.md`](results/multisection_generalisation_2026-09-20.md)
+§4.1, §4.5, and [`results/multisection_claim_surface_2026-09-20.md`](results/multisection_claim_surface_2026-09-20.md)
+for what it did and did not change on this page.
+
+**What SURVIVED the same test, and it is the delivery spread.** `E_p90/E_p10` —
+the statistic `app/server/reach.py` promoted to headline in place of `F(0.1)` —
+reads **1.9936 / 2.3211 / 2.5293** on those three donors, a spread of
+**1.2687×**, the smallest of every continuous readout in that sweep by more than
+a factor of two (the next is penetration length at 2.691×, the largest is
+`F(1.0)` at 119.9×). On the one section solved at two grids it moves **1.0004×**
+between dx = 30 and dx = 12. The de-headlined `F(0.1)` is **0 on all three**.
+That is reproducibility of magnitude across three donors, not evidence that the
+statistic discriminates between tissues, and three specimens is three specimens.
+→ [`results/multisection_generalisation_2026-09-20.md`](results/multisection_generalisation_2026-09-20.md) §4.2, §5.7
+
 **The GBM 3-D:2-D kill panel passes 3/3 — under the shipped configuration only.**
 Temozolomide 0.2518 (band 0.1590–0.4622), cisplatin 0.2739 (0.2086–1.5004),
 doxorubicin 0.2081 (0.0575–1.0000), from a model never fitted to any 3-D-vs-2-D
@@ -386,12 +424,17 @@ across drugs. `kill_fraction` is a covariance, not a scalar multiple, so the
 "drug-independent per-cell multiplier" premise is false in general. Worse, the
 oxygen → resistance map is genuinely **drug-dependent** in code:
 `TMZ_HYPOXIA_RESISTANCE = 0.80` (`tmesim/core/config.py:264`) against a global
-`hypoxia_resistance = 0.35` (`:238`). That drug-dependence is inert **today only
-because the GBM section's hypoxic fraction is 0.0000 at every grid spacing
-tested** — a non-empty hypoxic band would activate it and the near-invariance
-above would have to be re-measured.
+`hypoxia_resistance = 0.35` (`:238`). That drug-dependence is inert **on the
+flagship section only, because `xenium_319`'s hypoxic fraction is 0.0000 at every
+grid spacing tested** — and the trigger this line names as hypothetical has
+already fired: under the shipped configuration at dx = 30 µm the other two
+registered single-cell GBM sections read **34.18 %** (`xenium_io`) and **18.88 %**
+(`gse324268`) hypoxic tumour fraction, and on both of them `resistance` — not
+`dose` — is the dominant limiter. So the near-invariance above is **untested**
+there and has to be re-measured, not assumed.
 → [`results/oxygen_level_shift.md`](results/oxygen_level_shift.md) §4,
-[`results/grid_convergence_gbm.md`](results/grid_convergence_gbm.md) §2.1
+[`results/grid_convergence_gbm.md`](results/grid_convergence_gbm.md) §2.1,
+[`results/multisection_generalisation_2026-09-20.md`](results/multisection_generalisation_2026-09-20.md) §4.1
 
 **The top-1 pick is not decision-grade.** Correcting the delivery law changes the
 top-1 GBM pick outright, changes the top-3 set, and swaps 4 of 45 pairs — two of
@@ -555,9 +598,16 @@ on Pruijn's HT-29 measurements alone, and Pruijn's own paper reports its
 asymptote coefficients moving up to 100-fold across SiHa, HCT8-Ea and HCT8-Ra, so
 this is the cheapest unbought evidence in the project and the only item on this
 list that changes what a *ranking* means; (1) a **second section of the same
-tumour type** —
-almost every defensible claim above is *n* = 1 in tissue, and this is the cheapest
-large improvement available; (2) any external anchor that scores the solver on the
+tumour type** — **partly bought on 2026-08-23, and the headline verdict did not
+survive it.** Two further registered GBM sections were solved on temozolomide
+under one RunSpec and the per-cell dominant limiter came back `resistance` on
+both where the flagship says `dose` (*What is contingent*, above). What is still
+unbought is the part that would make it evidence rather than a warning: more
+than one compound, more than one configuration, a second grid on a section that
+carries the flip, and a section that tests a *scored claim* rather than the
+headline verdict. Almost every defensible claim above remains *n* = 1 in tissue,
+because no scored anchor has been re-run on the other two;
+(2) any external anchor that scores the solver on the
 strength of a solve **and passes** — there are three such anchors and all three
 fail, and [`results/external_anchor_survey.md`](results/external_anchor_survey.md)
 §5 reports that nothing public measures a spatially resolved free-interstitial
@@ -599,11 +649,15 @@ constant for the discrete-vessel referent.
   thinned to matched depth. The defensible position survived the test: MGMT is a
   per-patient **scalar**, and is available as one.
   → [`results/mgmt_spatial.md`](results/mgmt_spatial.md), [`results/mgmt_scalar.md`](results/mgmt_scalar.md)
-* **The oxygen field's constants are uncalibrated, and the hypoxic band is
-  currently empty.** GBM's hypoxic fraction is 0.0000 at every grid spacing
-  tested under the shipped configuration; under a literature-derived `supply` it
-  is 40–71 %. Treat any hypoxic fraction as a configuration output, not a
-  measurement.
+* **The oxygen field's constants are uncalibrated, and the hypoxic band is empty
+  on the FLAGSHIP SECTION, not on GBM.** `xenium_319`'s hypoxic fraction is
+  0.0000 at every grid spacing tested under the shipped configuration; under a
+  literature-derived `supply` it is 40–71 %. It is not a property of the disease
+  or of the configuration: the same shipped configuration at dx = 30 µm returns
+  **34.18 %** on `xenium_io` and **18.88 %** on `gse324268`, both registered
+  sections
+  ([`results/multisection_generalisation_2026-09-20.md`](results/multisection_generalisation_2026-09-20.md) §4.1).
+  Treat any hypoxic fraction as a configuration output, not a measurement.
 * **Reduced biology.** No adaptive resistance, no immune dynamics, and systemic PK
   is a simplified sustained plasma level. Active efflux (P-gp / BCRP) **is**
   implemented from literature efflux ratios and is opt-in — but default-off is the
@@ -657,6 +711,7 @@ wins. The molecular layer's own contract: [`MOLECULAR_CONTRACT.md`](MOLECULAR_CO
 | Where did every byte of data come from? | [`docs/DATA_INVENTORY.md`](docs/DATA_INVENTORY.md) |
 | What open data exists to validate this, and what does not? | [`results/DATA_HUNT.md`](results/DATA_HUNT.md) |
 | Which delivery metric is defensible, and why was the old one retired? | [`results/delivery_metrics.md`](results/delivery_metrics.md) |
+| Does the per-cell verdict hold on a second section of the same tumour? | [`results/multisection_generalisation_2026-09-20.md`](results/multisection_generalisation_2026-09-20.md) — no, and the flagship is the outlier |
 | Is the solver trustworthy? | [`results/numerical_rigor.md`](results/numerical_rigor.md) + its correction block |
 | Is the grid fine enough? | [`results/grid_convergence_gbm.md`](results/grid_convergence_gbm.md), [`results/grid_convergence_breast.md`](results/grid_convergence_breast.md) |
 | Scripting drug/dose/sweep experiments | [`PROTOCOL_LANGUAGE.md`](PROTOCOL_LANGUAGE.md) + Studio's protocol tab |
