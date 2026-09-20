@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -58,6 +59,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.server import cache as cache_mod  # noqa: E402
 from app.server.api import create_app  # noqa: E402
 from app.server.jobs import JobManager  # noqa: E402
+from app.server import projects as projects_mod  # noqa: E402
 from app.server.projects import (  # noqa: E402
     ProjectError,
     ProjectStore,
@@ -1260,3 +1262,214 @@ class TestThumbnail:
             assert "SECRET_SECTION" not in blob
             assert t["kind"] == "none", f"{bad!r} produced a thumbnail"
             assert store._run_path(bad) is None, f"{bad!r} was turned into a path"
+
+
+# --------------------------------------------------------------------------- #
+# A specimen id is not a path segment — and that is why there is no
+# SPECIMEN_ID_RE
+# --------------------------------------------------------------------------- #
+class TestASpecimenIdReachesNothingThatNeedsAGuard:
+    """SECURITY, and the standing evidence behind a DELETED regex.
+
+    ``app/server/projects.py`` defined ``SPECIMEN_ID_RE`` for weeks and applied
+    it to nothing. That is the exact shape of the traversal this file already
+    suffered — ``PROJECT_ID_RE`` guarded only the directory listing while
+    ``_dir`` joined a request-supplied id onto the store root, giving
+    ``%2e%2e`` a read-AND-DELETE primitive (fixed f9d443d). The regex was
+    deleted rather than wired, because a specimen id reaches nothing a regex
+    could protect.
+
+    A deletion is only safe while that stays true, so the premise is PINNED
+    here rather than asserted in a comment: the day someone joins a specimen id
+    to a path, opens it, or makes it a dict key, this class goes red and the id
+    needs the treatment ``run_id`` gets in ``ProjectStore._run_path``.
+    """
+
+    #: Every shape the traversal that bit ``_dir`` came in, plus the
+    #: key-shadowing shapes a dict lookup would have been vulnerable to.
+    HOSTILE = ("..", "../..", "%2e%2e", "/etc/passwd", "s_00001/../..",
+               "s_00001\x00", "....//", "__proto__", "constructor",
+               "specimens", "id", "s_" + "9" * 200, "", "S_00001", "s_1")
+
+    @staticmethod
+    def _seed(store):
+        return _seed_project(store, "traversal", [
+            {"id": "s_00001", "label": "A", "section": SECTION_A,
+             "run_ids": ["r_00001"], "capability": {}}])
+
+    def test_no_specimen_id_ever_reaches_os_path_join(self, store):
+        """The load-bearing one. ``os.path.join`` is instrumented AS THIS MODULE
+        SEES IT, so any future line that builds a path out of a specimen id is
+        caught whether or not the resulting path escapes anything."""
+        pid = self._seed(store)
+        marker = "MARKER_SPECIMEN_ID_../../.."
+        seen = []
+        real_join = projects_mod.os.path.join
+
+        def spy(*parts):
+            seen.append(parts)
+            return real_join(*parts)
+
+        projects_mod.os.path.join = spy
+        try:
+            for call in (
+                lambda: ProjectStore._find_specimen(
+                    store.get(pid, refresh_capability=False), marker),
+                lambda: store.update_specimen(pid, marker, label="x"),
+                lambda: store.remove_specimen(pid, marker),
+                lambda: store.attach_run(pid, marker, "r_00001",
+                                         {"spec": {"section": SECTION_A}}),
+                lambda: store.detach_run(pid, marker, "r_00001"),
+            ):
+                with pytest.raises(ProjectError) as exc:
+                    call()
+                assert exc.value.status == 404
+        finally:
+            projects_mod.os.path.join = real_join
+
+        # The premise, checked rather than assumed: the instrumentation must
+        # have been REACHED, or this test passes by observing nothing.
+        assert seen, "os.path.join was never called; the spy was not installed"
+        hits = [p for p in seen if any(marker in str(x) for x in p)]
+        assert hits == [], (
+            f"a specimen id was joined into a filesystem path: {hits}")
+
+    def test_a_hostile_specimen_id_neither_reads_nor_deletes_a_neighbour(
+            self, store):
+        """The canary sits one level above the store root — exactly the object
+        ``%2e%2e`` reached through ``_dir``."""
+        os.makedirs(store.root, exist_ok=True)
+        outside = os.path.dirname(store.root.rstrip(os.sep))
+        canary = os.path.join(outside, "project.json")
+        with open(canary, "w") as fh:
+            json.dump({"id": "CANARY", "name": "CANARY_SECRET",
+                       "specimens": [{"id": "s_00001", "label": "SECRET_LABEL",
+                                      "section": "SECRET_SECTION"}]}, fh)
+
+        pid = self._seed(store)
+        for bad in self.HOSTILE:
+            for call in (
+                lambda b=bad: store.update_specimen(pid, b, label="x"),
+                lambda b=bad: store.remove_specimen(pid, b),
+                lambda b=bad: store.detach_run(pid, b, "r_00001"),
+            ):
+                with pytest.raises(ProjectError) as exc:
+                    call()
+                blob = str(exc.value)
+                assert "SECRET_LABEL" not in blob, f"{bad!r} read the canary"
+                assert "CANARY_SECRET" not in blob
+            assert os.path.exists(canary), f"{bad!r} DELETED the canary"
+
+        # ...and the real document is untouched: still one specimen, still its
+        # run association.
+        doc = store.get(pid, refresh_capability=False)
+        assert [s["id"] for s in doc["specimens"]] == ["s_00001"]
+        assert doc["specimens"][0]["run_ids"] == ["r_00001"]
+        # ...and nothing named after a hostile id was created under the root.
+        assert sorted(os.listdir(store.root)) == [pid]
+
+    def test_the_regex_is_gone_and_did_not_come_back_unwired(self):
+        """An unused guard that looks like protection is its own hazard: the
+        next reader assumes it is doing something. If a ``SPECIMEN_ID_RE`` is
+        ever reintroduced it must be APPLIED, not merely defined."""
+        assert not hasattr(projects_mod, "SPECIMEN_ID_RE"), (
+            "SPECIMEN_ID_RE is back. If it is needed it must be wired to the "
+            "boundary that needs it -- and note ^s_\\d{5}$ is exactly-five "
+            "digits, which would brick the 100,000th specimen for the reason "
+            "RUN_ID_RE documents with \\d{5,}.")
+        with open(os.path.join(_REPO, "app", "server", "projects.py")) as fh:
+            src = fh.read()
+        for name in ("PROJECT_ID_RE", "RUN_ID_RE"):
+            # Every id regex this module defines is APPLIED somewhere in it:
+            # one definition, at least one call site, ignoring prose mentions.
+            applied = re.findall(rf"{name}\s*\.\s*(?:match|search|findall)\(",
+                                 src)
+            assert applied, f"{name} is defined and never applied"
+
+
+class TestASpecimenIdIsNotAPathOverHTTP:
+    """The same question at the boundary that actually took the traversal.
+
+    ``httpx`` normalises ``..`` out of a request path CLIENT-side, so a
+    ``TestClient`` call is not evidence about this at all — it turns
+    ``/api/projects/p_00001/specimens/..`` into ``DELETE /api/projects/p_00001``
+    and deletes the project, which looks exactly like a traversal and is not
+    one. The literal segment therefore has to be pushed through a raw ASGI
+    scope.
+    """
+
+    @staticmethod
+    def _raw(app, path, method="GET", body=b""):
+        """Drive the ASGI app with a literal, un-normalised ``raw_path``.
+
+        ``body`` is sent with a JSON content type because PATCH parses its body
+        BEFORE it looks the specimen up: with an empty body it answers 400 and
+        never reaches the id at all, which would be a PATCH row that tests
+        nothing.
+        """
+        import asyncio
+
+        got = []
+
+        async def go():
+            headers = [(b"host", b"testserver")]
+            if body:
+                headers += [(b"content-type", b"application/json"),
+                            (b"content-length", str(len(body)).encode())]
+            scope = {"type": "http", "asgi": {"version": "3.0"},
+                     "http_version": "1.1", "method": method, "scheme": "http",
+                     "path": path, "raw_path": path.encode(), "root_path": "",
+                     "query_string": b"", "headers": headers,
+                     "client": ("testclient", 123),
+                     "server": ("testserver", 80)}
+
+            async def receive():
+                return {"type": "http.request", "body": body,
+                        "more_body": False}
+
+            async def send(msg):
+                got.append(msg)
+
+            await app(scope, receive, send)
+
+        asyncio.run(go())
+        status = next((m["status"] for m in got
+                       if m["type"] == "http.response.start"), None)
+        body = b"".join(m.get("body", b"") for m in got
+                        if m["type"] == "http.response.body")
+        return status, body.decode("utf-8", "replace")
+
+    def test_a_literal_dotdot_in_the_specimen_slot_is_a_404(self, tmp_path):
+        from app.server.api import create_app
+
+        store = ProjectStore(root=str(tmp_path / "projects"),
+                             runs_root=str(tmp_path / "runs"))
+        pid = _seed_project(store, "S", [
+            {"id": "s_00001", "label": "A", "section": SECTION_A,
+             "run_ids": [], "capability": {}}])
+        doc_path = os.path.join(store.root, pid, "project.json")
+
+        manager = JobManager(root=str(tmp_path / "runs"), start_worker=False)
+        app = create_app(manager, store)
+        try:
+            # The premise: the same route with a REAL id answers 200, so a 404
+            # below is the id being rejected and not the route being absent.
+            ok, _ = self._raw(app, f"/api/projects/{pid}/specimens/s_00001")
+            assert ok == 200, "the positive control did not route; test is void"
+
+            patch_body = json.dumps({"label": "x"}).encode()
+            for bad in ("..", "%2e%2e", "%2fetc%2fpasswd", "s_00001%00",
+                        "....//", "__proto__"):
+                for method in ("GET", "PATCH", "DELETE"):
+                    status, body = self._raw(
+                        app, f"/api/projects/{pid}/specimens/{bad}", method,
+                        patch_body if method == "PATCH" else b"")
+                    assert status in (404, 405), \
+                        f"{method} {bad!r} -> {status}: {body[:200]}"
+                assert os.path.exists(doc_path), \
+                    f"{bad!r} deleted the project document"
+        finally:
+            manager.shutdown()
+
+        assert [s["id"] for s in store.get(
+            pid, refresh_capability=False)["specimens"]] == ["s_00001"]

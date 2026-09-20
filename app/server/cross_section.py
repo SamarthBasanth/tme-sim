@@ -433,6 +433,36 @@ def available_compounds(jobs) -> Dict:
     "best" mark (``docs/WORKSPACE_CONTRACT.md`` §6). The only number beside a
     compound is how many SECTIONS it has been run on, which is a count of
     tissue and not a statement about the compound.
+
+    Why ``n_runs`` below is NOT the over-count fixed in ``workspace.py``
+    -------------------------------------------------------------------
+    ``workspace.py``'s ``totals.runs`` summed each project's ``n_runs`` and
+    reported **960 runs on a store holding 32**, because contract §2 lets a run
+    id belong to any number of projects at once. The shape here looks the same
+    and is not, for two independent reasons — both checked 2026-09-20 rather
+    than assumed, and both pinned by
+    ``tests/test_cross_section.py::TestNRunsIsNotTheWorkspaceOvercount``:
+
+    1. **These slots cannot share a run id.** A slot is keyed by ``drug``, and
+       ``drug`` is ``_drug_of(run)`` — a pure function of ONE run's own spec.
+       One run therefore lands in exactly one slot, and the slots partition the
+       store. That is the difference from a project, which owns ids it did not
+       create and which another project may own too.
+
+    2. **There is no cross-slot sum to be wrong.** This function emits one row
+       per compound and no totals block. ``workspace.py``'s defect was in the
+       SUM, not in the per-row ``n_runs`` — those rows were right there too.
+
+    The ``set`` is still load-bearing, so do not "simplify" it to a list and a
+    ``+= 1``: ``JobManager.list()`` is ``[self._jobs[i] for i in
+    reversed(self._order)]``, and ``_restore`` appends to ``_order`` using the
+    ``run_id`` written INSIDE each ``result.json`` — a file, hand-editable, and
+    restored per directory. Two run directories declaring the same id put that
+    id in ``_order`` twice and ``list()`` hands back the SAME ``Job`` object
+    twice. MEASURED on a real ``JobManager``: two such directories gave
+    ``len(jobs.list()) == 2`` with both entries ``r_00001``, and a list-based
+    accumulator reported **2 runs for a compound with 1**. The set already
+    counts distinct ids, which is what the column claims.
     """
     per_compound: Dict[str, Dict[str, set]] = {}
     for run in _run_views(jobs):
@@ -449,6 +479,9 @@ def available_compounds(jobs) -> Dict:
         {
             "compound": name,
             "n_sections": len(slot["sections"]),
+            # DISTINCT run ids, by construction — see the docstring. This is
+            # NOT the `workspace.py` over-count wearing the same clothes: no
+            # run id is in two slots, and no row is summed with another.
             "n_runs": len(slot["runs"]),
             "n_signatures": len(slot["signatures"]),
             "sections": sorted(slot["sections"]),

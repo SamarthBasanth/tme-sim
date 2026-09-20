@@ -670,6 +670,103 @@ class TestTheViewCannotRenderTwoCompounds:
         assert all(c.startswith("xs-") for c in classes), sorted(classes)
 
 
+# --------------------------------------------------------------------------- #
+# `n_runs` is not the workspace over-count wearing the same clothes
+# --------------------------------------------------------------------------- #
+class TestNRunsIsNotTheWorkspaceOvercount:
+    """``app/server/workspace.py`` summed each project's ``n_runs`` and reported
+    **960 runs on a store holding 32**, because ``docs/WORKSPACE_CONTRACT.md``
+    §2 lets one run id belong to any number of projects. ``available_compounds``
+    has a ``len(slot["runs"])`` that LOOKS identical.
+
+    It is not, and this class is the reason the next reader must not "fix" it
+    into a bug. Two independent facts, each asserted separately so a failure
+    says which one stopped being true.
+    """
+
+    def test_no_run_id_is_ever_in_two_slots(self):
+        """Fact 1. A slot is keyed by ``drug`` and ``drug`` is a pure function
+        of ONE run's spec, so the slots PARTITION the store — unlike projects,
+        which own ids they did not create and which another project may own.
+
+        Asserted through its one OBSERVABLE consequence rather than by
+        re-deriving the slots here: if any run reached two slots, the rows
+        would sum above the store's distinct run count. That over-count is
+        precisely the 960-on-32 defect, so the equality below is the thing
+        workspace.py could not have claimed.
+        """
+        views = [make_run("r_00001", "sec_a", drug="temozolomide"),
+                 make_run("r_00002", "sec_b", drug="temozolomide"),
+                 make_run("r_00003", "sec_a", drug="irinotecan"),
+                 make_run("r_00004", "sec_b", drug="irinotecan"),
+                 make_run("r_00005", "sec_c", drug="lomustine")]
+        rows = xs.available_compounds(FakeJobs(views))["compounds"]
+
+        # The premise, checked rather than assumed: more than one slot, or
+        # "nothing was double-counted" is true for an uninteresting reason.
+        assert len(rows) == 3, [r["compound"] for r in rows]
+        assert {_drug_of(v) for v in views} == {r["compound"] for r in rows}
+
+        distinct = len({v["run_id"] for v in views})
+        assert sum(r["n_runs"] for r in rows) == distinct == 5, (
+            f"rows sum to {sum(r['n_runs'] for r in rows)} on a store holding "
+            f"{distinct} distinct run(s) -- a run reached more than one slot")
+
+    def test_there_is_no_cross_slot_sum_to_be_wrong(self):
+        """Fact 2. workspace.py's defect was in the SUM, not in the per-row
+        ``n_runs`` — those rows were right there too. This function emits rows
+        and no totals block, so the defective construct does not exist here."""
+        out = xs.available_compounds(FakeJobs(
+            [make_run("r_00001", "sec_a", drug="temozolomide")]))
+        assert "totals" not in out
+        assert set(out) == {"compounds", "ordering", "axis", "generated_at"}
+        row_keys = set(out["compounds"][0])
+        assert not (row_keys & {"total_runs", "runs_total"}), row_keys
+
+    def test_a_run_seen_twice_is_counted_once(self):
+        """The ``set`` is load-bearing and must survive a "simplification".
+
+        ``JobManager.list()`` is ``[self._jobs[i] for i in
+        reversed(self._order)]`` and ``_restore`` appends to ``_order`` using
+        the ``run_id`` written INSIDE each ``result.json``. Two run directories
+        declaring the same id therefore hand the SAME ``Job`` back twice. Built
+        here on a REAL ``JobManager`` rather than a fake, because the claim is
+        about that class's restore path and a fake would only restate it.
+        """
+        import json
+        import tempfile
+
+        from app.server.jobs import JobManager
+
+        tmp = tempfile.mkdtemp()
+        try:
+            runs = os.path.join(tmp, "runs")
+            for d in ("r_00001", "r_00002"):
+                os.makedirs(os.path.join(runs, d))
+                with open(os.path.join(runs, d, "result.json"), "w") as fh:
+                    json.dump({"run_id": "r_00001", "status": "done",
+                               "spec": {"section": "sec_a",
+                                        "drug": "temozolomide"},
+                               "metrics": {"kill_fraction": 0.1}}, fh)
+            manager = JobManager(root=runs, start_worker=False)
+            try:
+                listed = manager.list()
+                # The premise, checked rather than assumed: if list() did not
+                # actually yield the run twice, this test proves nothing.
+                assert [j.run_id for j in listed] == ["r_00001", "r_00001"], \
+                    f"the duplicate was not constructed: {[j.run_id for j in listed]}"
+
+                (row,) = xs.available_compounds(manager)["compounds"]
+                assert row["n_runs"] == 1, (
+                    "n_runs counted one run twice -- the accumulator stopped "
+                    "being a set of ids")
+                assert row["n_sections"] == 1
+            finally:
+                manager.shutdown()
+        finally:
+            shutil.rmtree(tmp)
+
+
 def test_calibrate_alpha_is_unchanged_at_the_END_of_this_file():
     from tmesim.validation.calibration import calibrate_alpha
 

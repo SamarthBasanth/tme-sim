@@ -125,7 +125,55 @@ __all__ = [
 ]
 
 PROJECT_ID_RE = re.compile(r"^p_\d{5}$")
-SPECIMEN_ID_RE = re.compile(r"^s_\d{5}$")
+
+# THERE IS DELIBERATELY NO ``SPECIMEN_ID_RE``. One was defined here until
+# 2026-09-20 and was never applied to anything, which is precisely the shape of
+# the bug this file already had once: ``PROJECT_ID_RE`` existed, guarded only
+# the directory LISTING, and left ``_dir`` to join a request-supplied id onto
+# the store root -- a read-and-delete traversal (fixed f9d443d, see ``_dir``).
+# A third regex sitting unused beside the two live ones reads like protection
+# and is not, so it is gone rather than left to be trusted.
+#
+# It was deleted rather than wired because a specimen id REACHES NOTHING a
+# regex could protect, and that was MEASURED 2026-09-20 rather than assumed:
+#
+#   * It is never a path segment. Instrumenting ``os.path.join`` inside this
+#     module across a GET and a DELETE on ``/api/projects/{id}/specimens/{sid}``
+#     recorded 28 join calls and ZERO of them containing the specimen id. Every
+#     join in this file takes ``project_id``, ``run_id`` or ``self.root``.
+#   * It is never a dict key. :meth:`ProjectStore._find_specimen` is a linear
+#     scan over a LIST comparing ``spec.get("id") == specimen_id``; there is no
+#     mapping for an id to shadow an entry of.
+#   * It reaches a response body only AFTER that scan matched, so the value
+#     echoed by ``attach_run``/``detach_run``/``remove_specimen`` is by
+#     construction a server-allocated id. The one exception is the 404 message,
+#     which repr-quotes it into a JSON body.
+#   * Nothing accepts one from a request except the path parameter. ``create``
+#     takes name and notes and always writes ``specimens: []``; ``add_specimen``
+#     allocates ``s_{n+1:05d}`` itself; ``duplicate`` deep-copies ids this
+#     store allocated. A client cannot put an id of its choosing into a
+#     document.
+#
+# Hostile ids (``%2e%2e``, ``%2fetc%2fpasswd``, ``s_00001%00``, ``....//``,
+# ``__proto__``, a 200-digit id) were driven through all five specimen routes
+# against a canary planted one level above the store root: every one 404s, the
+# canary was neither read nor deleted, and the store was unchanged. A literal
+# ``..`` needs a raw ASGI scope to test at all -- httpx normalises it out of
+# the path client-side -- and through that it is also a 404.
+#
+# Wiring it would also have been ACTIVELY WRONG as written: ``^s_\d{5}$`` is
+# exactly-five digits, so it would have made every specimen from the 100,000th
+# on unaddressable -- the trap ``RUN_ID_RE`` below documents and avoids with
+# ``\d{5,}``. A guard that protects nothing and bricks a document is worse than
+# no guard.
+#
+# What would change this: the day a specimen id is joined to a path, opened,
+# or used as a dict key, it needs the same treatment ``run_id`` gets in
+# :meth:`_run_path`. That premise is PINNED, not left to this comment --
+# ``tests/test_projects.py::TestASpecimenIdReachesNothingThatNeedsAGuard``
+# instruments ``os.path.join`` as this module sees it and goes red the moment a
+# specimen id reaches one. A guard that actually fires, rather than one that
+# only looks like it does.
 
 #: A run id, for the SAME reason ``PROJECT_ID_RE`` exists: the thumbnail reads
 #: ``app/runs/<run_id>/result.json`` straight off disk, so a ``run_id`` is a path
