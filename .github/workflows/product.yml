@@ -183,11 +183,24 @@ jobs:
       # IT EXITS 2 WHEN IT CANNOT RUN, so adding it here cannot manufacture a
       # false green: no browser is a failure, not a pass. That is why it is
       # safe to wire in without `continue-on-error`.
+      # Installed WHERE THE AUDIT LOOKS. scripts/studio-viewport-audit.mjs
+      # resolves `landing-3d/node_modules/playwright/index.mjs` first and falls
+      # back to an npx cache path and a bare require. Playwright is NOT a
+      # dependency of landing-3d and is not in its lockfile — it resolves on a
+      # workstation only because something installed it globally — so
+      # `npm ci` alone would leave the audit unable to run. It would then exit
+      # 2 and fail this job, correctly but uselessly.
+      #
+      # --no-save keeps it out of package.json: the marketing site does not
+      # depend on a browser automation library, and adding it there to satisfy
+      # CI would be the tail wagging the dog.
       - name: Install Playwright for the viewport audit
         run: |
           set -euo pipefail
           npm --prefix landing-3d ci --no-audit --no-fund
-          npx --yes playwright install --with-deps chromium
+          npm --prefix landing-3d install --no-save --no-audit --no-fund playwright
+          npm --prefix landing-3d exec -- playwright install --with-deps chromium
+          test -f landing-3d/node_modules/playwright/index.mjs
 
       - name: The Studio shell is reachable at every width (14 x 2)
         run: |
