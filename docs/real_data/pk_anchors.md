@@ -4,7 +4,9 @@
 were previously checked against a *single* drug (doxorubicin ~40-50 µm,
 `results/pk_reality.md`). This compendium collects **real, published,
 quantitative** tissue-pharmacokinetics measurements for **multiple drugs** so the
-transport engine can be validated against reality more broadly. Every number is
+transport engine can be **scored** against reality more broadly. (Scored, not
+"validated": these anchors are a test the engine can fail, and some of them it
+does — `results/CLAIM_INVENTORY.md` §1e.) Every number is
 traced to a peer-reviewed paper and its PubMed ID was verified against PubMed.
 
 **Attribution.** The numbers below were retrieved and verified using PubMed.

@@ -897,12 +897,21 @@ pins both behaviours.
 so $c\,A_{\mathrm{ref}}$ is a single un-calibrated lumped constant and the *absolute*
 hypoxic fraction is very sensitive to it. With the mask fixed, mean O₂ on the real
 section rises to $\approx 0.56$ and **the predicted hypoxic tumor fraction is
-$0.0$ at every $\Delta x$** — which, for a tumor type partly defined by
-pseudopalisading necrosis, is no more credible than the $0.94$ the coarse grid used
-to report. Both the old ladder ($0.94 \to 0.07$ over $\Delta x = 30 \to 8\ \mu m$)
+$0.0$ at every $\Delta x$ ON THIS SECTION** (`xenium_319`) — which, for a tumor
+type partly defined by pseudopalisading necrosis, is no more credible than the
+$0.94$ the coarse grid used to report. **It is a property of this section, not
+of the model:** at $\Delta x = 30\ \mu m$ under the same shipped configuration the
+two other registered single-cell GBM sections report $34.18\%$ (`xenium_io`) and
+$18.88\%$ (`gse324268`), and on both of those the dominant per-cell limiter is
+`resistance` rather than `dose`
+(`results/multisection_generalisation_2026-09-20.md` §4.1 — one compound, one
+configuration, n = 3 donors, and the four Visium sections in the same sweep are
+refused, not counted). Both the old ladder ($0.94 \to 0.07$ over $\Delta x = 30 \to 8\ \mu m$)
 and the new $0.0$ are un-calibrated model output. What the two fixes establish is
 that the answer no longer depends on the numerical grid — **not** that its level is
-calibrated. Nothing downstream should rest on the absolute hypoxic fraction until
+calibrated, and **not** that it is the same answer on another donor. The grid
+statement is measured on this section and on the synthetic tissue; neither of the
+two other registered GBM sections has ever been solved at a second $\Delta x$. Nothing downstream should rest on the absolute hypoxic fraction until
 `consumption` is anchored to a measurement.
 
 ### 4.3 Oxygen → cell-state banding

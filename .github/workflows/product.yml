@@ -165,6 +165,35 @@ jobs:
           python -m pytest -q -rfE -p no:cacheprovider \
             tests/test_app_server.py::TestEnvVarsAreDocumented
 
+      # ------------------------------------------------------------------ #
+      # THE SHELL AT EVERY WIDTH A PERSON MIGHT OPEN IT AT.
+      #
+      # Every responsive rule in layout.css was justified by a number someone
+      # measured once by hand and could not measure again. That is how the
+      # route back to the workspace shipped COVERED below 538.7px by 335.1px
+      # of sticky top-bar furniture -- and, at <=336px, covered at every
+      # scroll position, with the bar's scrollbar hidden so nothing said it
+      # scrolled. Invisible to every check this project had.
+      #
+      # The script separates three states a bounding box conflates: SCROLLED
+      # (fine), CLIPPED (overflow:hidden with nothing to scroll it back --
+      # invisible to scrollWidth), and COVERED (hit-tested with
+      # elementsFromPoint). Sole routes are sampled at 1px.
+      #
+      # IT EXITS 2 WHEN IT CANNOT RUN, so adding it here cannot manufacture a
+      # false green: no browser is a failure, not a pass. That is why it is
+      # safe to wire in without `continue-on-error`.
+      - name: Install Playwright for the viewport audit
+        run: |
+          set -euo pipefail
+          npm --prefix landing-3d ci --no-audit --no-fund
+          npx --yes playwright install --with-deps chromium
+
+      - name: The Studio shell is reachable at every width (14 x 2)
+        run: |
+          set -euo pipefail
+          node scripts/studio-viewport-audit.mjs
+
   # ======================================================================== #
   # 2. The routes, FROM INSIDE A BUILT CONTAINER.
   #

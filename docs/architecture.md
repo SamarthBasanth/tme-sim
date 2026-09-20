@@ -51,8 +51,10 @@ Two orthogonal inputs meet at the engine:
   plus `validation.calibration.calibrated_drugparams` and the binding-site barrier.
 
 Nothing in the engine knows about genes, drugs by name, or datasets. That
-separation is what lets the reconstruction and the pharmacology be validated
-independently of each other.
+separation is what lets the reconstruction and the pharmacology be **scored**
+independently of each other. (Scored, not "validated" — `docs/outreach/README.md`
+names that word as the one to police, and §9 records how much of this project's
+reconstruction-level validation has been retracted.)
 
 ---
 
@@ -79,6 +81,20 @@ numpy/pandas. Provenance for every byte is in [`real_data/`](real_data/).
   `gene_panel.json` and looks it up in `_DATASETS`. An unrecognised cache is
   reported as `"UNREGISTERED Xenium cache at <path>"` rather than borrowing another
   section's provenance. The two panels share only **60 genes**.
+
+  **A THIRD single-cell GBM section is registered, and this list used to stop at
+  two.** `gse324268` — GEO `GSM9572843` (`GSE324268`, tumor 07), **851,509 cells**
+  over 10.6 × 14.4 mm — is in `tmesim/data/section_catalog.py` and in
+  `app/server/cache.py`'s `SECTIONS`, and §7 of this document now quotes it. It
+  registers **by filesystem path** (`vivum ingest <dir> --register`); GEO ships it
+  in a format this repo has no conversion script for, which is why the catalog
+  marks it MANUAL with no one-command recipe. Two consequences worth stating
+  because they are easy to misread as bugs: its base-panel name
+  (`Xenium Human Brain Gene Expression`) is **not** a key in `_DATASETS`, so the
+  loader stamps it `UNREGISTERED Xenium cache at <path>` — the designed refusal
+  above, working; and its marker map is selected by panel *content*, which lands
+  it on the same `brain_319` map as the default section, so a disagreement
+  between those two is not a panel artefact.
 - **`visium.list_samples() / sample_info(id) / load_sample(id) -> dict`** — the
   four real **Visium** GBM sections (`10x_parent_gbm`, `GBM1`, `GBM2`, `GBM3`):
   MEX matrix + `spatial/` positions + scalefactors, converted to µm. Cache:
@@ -407,7 +423,7 @@ consumes.
 Solved on the **real** vascular field, so hypoxia appears where the measured
 endothelium is sparse. `label_hypoxia` bands cells by `o < t` (HYPOXIC),
 `t ≤ o < 2t` (QUIESCENT), `o ≥ 2t` (VIABLE) with `t = OxygenConfig.hypoxia_threshold`.
-The resulting hypoxic fraction is **grid-sensitive** — see §7.
+The resulting hypoxic fraction is **grid-sensitive and donor-sensitive** — see §7.
 
 ### 4.3 Interstitial fluid pressure — the Jain effect
 
@@ -530,11 +546,25 @@ ladder spread is 49.7 % and docetaxel sits −3.4 % from its Richardson limit
 (`results/grid_convergence_breast.md`). `docs/MATHEMATICAL_MODEL.md` §10.5 states it
 directly: *"there is no Δx at which this pipeline has been shown to be grid-converged."
 
-**The hypoxic fraction is grid-sensitive and only order-of-magnitude.** The same
-Visium tissue reports 100% hypoxic at dx = 100 µm and 0% at dx = 12 µm; the Xenium
-section reported ≈94% coarse and ≈13% at dx = 12 µm. Earlier attribution of small
-predicted kills to hypoxic resistance was wrong — they are driven mainly by limited
-delivered exposure versus these drugs' IC50s.
+**The hypoxic fraction is grid-sensitive AND donor-sensitive, and is only
+order-of-magnitude.** The same Visium tissue reports 100% hypoxic at dx = 100 µm
+and 0% at dx = 12 µm; the Xenium section reported ≈94% coarse and ≈13% at
+dx = 12 µm. **It is not only the mesh.** Holding dx fixed at 30 µm under the
+shipped configuration, three registered single-cell GBM sections report
+**0.00%** (`xenium_319`), **34.18%** (`xenium_io`) and **18.88%** (`gse324268`)
+(`results/multisection_generalisation_2026-09-20.md` §4.1). The earlier
+attribution of small predicted kills to hypoxic resistance was wrong **on
+`xenium_319`**, the flagship section, where delivered exposure against IC50 is
+the binding constraint — but **the attribution does not travel**: on the other
+two sections the dominant limiter is `resistance`, not `dose`, at
+byte-identical thresholds (`mech_thresholds` is the same dict on every row).
+Two bounds on that, both of which hold: it is one compound (temozolomide), one
+configuration and **n = 3 donors**, because the same sweep refuses the delivery
+map on its four Visium sections — a three-section arm plus four refusals. And
+even on `xenium_319` the `dose` label is not a clean counterfactual:
+**92.69%** of its exposure-limited survivals sit at or below the resistance
+threshold as well (`mech_joint_limited`, 19,596 cells), so raising the dose
+alone would not have killed them.
 
 ---
 
@@ -778,8 +808,26 @@ bands.
   `τ_tissue/T_window` bound on how large the schedule effect can be.
 - **Reduced biology.** No adaptive resistance, no immune dynamics, no explicit
   drug-combination synergy beyond spatial complementarity.
-- **One section per tumor, no replicates.** Where a claim rests on a single
-  section, the write-ups say so.
+- **One section per tumor, no *scored* replicate.** Where a claim rests on a
+  single section, the write-ups say so, and every scored anchor in
+  `vivum validate` is still n = 1 in tissue — not one of them has been re-run on
+  a second section. What does exist is one **unscored** sweep: seven registered
+  GBM sections, one compound (temozolomide), one configuration, solved
+  2026-08-23 and first read 2026-09-20
+  ([`../results/multisection_generalisation_2026-09-20.md`](../results/multisection_generalisation_2026-09-20.md)).
+  Two things came out of it and they point in opposite directions.
+  *What generalised:* the pipeline completed on **7 of 7** runnable sections with
+  no crash and no metric refusal (6.4–57.1 s), and the per-cell attribution
+  reconciled against the engine's own `kill_fraction` **bit-exactly on 8 of 8**
+  entries with **zero** `UNATTRIBUTED` cells — the *consistency* of the
+  attribution generalises without qualification, and this document had not said
+  so anywhere. *What did not:* its **answer**. At byte-identical thresholds the
+  dominant per-cell limiter reads `dose` on `xenium_319` and `resistance` on
+  `xenium_io` and `gse324268`. Read both with the bounds: **n = 3 donors** on
+  that arm, because the other four sections are Visium spot data where the
+  delivery map is refused in code rather than reported — a three-section arm
+  plus four refusals — and neither section that flips has been solved at a
+  second `dx`, so whether the flip survives a change of mesh is untested.
 
 The design principle behind all of the above: **the modules that could flatter the
 result and the modules that check it are separate, and the checking modules are

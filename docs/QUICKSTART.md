@@ -8,7 +8,7 @@ aspirational.
 
 This page assumes no prior familiarity with the codebase's internal module
 layout. If you want the full scientific picture — what is real, what is
-validated, and what is not — read [`README.md`](../README.md) and
+**scored**, and what is not — read [`README.md`](../README.md) and
 [`results/SESSION_AUDIT.md`](../results/SESSION_AUDIT.md) next; this page is
 only about getting the tool running.
 

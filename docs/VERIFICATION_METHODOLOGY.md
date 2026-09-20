@@ -587,7 +587,9 @@ section-wide — a **5.0× rate ratio**, permutation **p = 0.0078**, surviving d
 > **Superseded 2026-09-03 — the case study is intact, the numbers are not.**
 > `results/state_validation.md` has since been regenerated and its §2.3 now rests on **zero
 > positive cells out of zero**: under the shipping `geometric` mask the HYPOXIC band is empty at
-> every Δx, so the contrast has no cells and every statistic above returns `nan`. The
+> every Δx **on `xenium_319`, the section that test runs on** — it is not empty on every section
+> (§10a), and the emptiness is what leaves the contrast with no cells, so every statistic above
+> returns `nan`. The
 > methodological point this section makes — that a significant-looking result can be declined on
 > power grounds, from the same table that produced it — is *strengthened*, not weakened, by the
 > regeneration. Take the figures from that file; the ones above are the historical instance.
@@ -885,9 +887,19 @@ measurement.** Both are bookkeeping.
 > **0.00% in every row** — not 13.43% in one. The section's argument (a bookkeeping choice moves a
 > state fraction more than any physics does) survives the regeneration and is if anything sharper.
 > Quote the current numbers from that file, not from here. The report states the consequence: under the current shipping
-default the HYPOXIC state is *empty at every Δx*, so the hypoxia-resistance multiplier has no cells
-to act on; the 86% quiescent / 13.4% hypoxic split quoted in an earlier results file comes from the
-legacy convention that the reconstruction layer has since abandoned.
+default the HYPOXIC state is *empty at every Δx on `xenium_319`*, so the hypoxia-resistance
+multiplier has no cells to act on **there**; the 86% quiescent / 13.4% hypoxic split quoted in an
+earlier results file comes from the legacy convention that the reconstruction layer has since
+abandoned.
+>
+> **That emptiness is a property of the section, not of the default.** At Δx = 30 µm the same
+> shipping configuration gives a hypoxic tumour fraction of **34.18%** on `xenium_io` and **18.88%**
+> on `gse324268`, and on both of those the dominant per-cell limiter is `resistance` — so the
+> multiplier does have cells to act on, on two registered sections, and the verdict changes
+> accordingly (`results/multisection_generalisation_2026-09-20.md` §4.1). Read the bounds with it:
+> one compound, one configuration, n = 3 donors, and the four Visium sections in that sweep are
+> refused rather than counted. Neither section that flips has been solved at a second Δx, so
+> whether the flip survives a change of mesh is untested.
 
 Downstream, ~89% of one drug's kill ceiling derives from the quiescent band via a ×0.5 multiplier
 applied to a label with no measured support and a 165× convention-dependent size. The report draws

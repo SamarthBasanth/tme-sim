@@ -577,11 +577,17 @@ concentration and no microenvironment) and `moncayo_explant.{md,png}`.
    > survives on the scale-invariance argument above, which is structural and
    > number-independent. Read §3a, §3b and §4 of that file for the current values;
    > they are not copied here, because copying them is how this item went stale.
-2. **Hypoxic fraction is grid-sensitive** and only order-of-magnitude. The same
-   Visium tissue reports 100% at dx = 100 µm and 0% at dx = 12 µm. Two
-   grid-dependence bugs were partially cancelling; both are fixed and the tissue
-   mask is now `geometric` (dx-independent). Do not quote a hypoxic fraction as a
-   measurement.
+2. **Hypoxic fraction is grid-sensitive AND donor-sensitive**, and only
+   order-of-magnitude. The same Visium tissue reports 100% at dx = 100 µm and 0%
+   at dx = 12 µm. Two grid-dependence bugs were partially cancelling; both are
+   fixed and the tissue mask is now `geometric` (dx-independent). **The mesh was
+   never the whole story.** Holding dx fixed at 30 µm under the shipped
+   configuration, the three registered single-cell GBM sections report 0.00%
+   (`xenium_319`), 34.18% (`xenium_io`) and 18.88% (`gse324268`)
+   (`results/multisection_generalisation_2026-09-20.md` §4.1 — one compound, one
+   configuration, n = 3 donors, the four Visium sections in that sweep refused
+   rather than counted). Do not quote a hypoxic fraction as a measurement, and do
+   not quote one section's as the model's.
 3. **α uses the e-fold convention** `L = d_half / ln 2`. Fitting the raw
    half-distance inflates α by exactly `1/ln²2 = 2.081×`, and the earlier 309.6 was
    that convention error. Absolute µM·s figures from before the fix are not
