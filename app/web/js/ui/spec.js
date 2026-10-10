@@ -20,6 +20,7 @@ import {
   createTissuePanel, NOT_VALIDATED, NOT_RUNNABLE, sectionScaleRow,
 } from './tissue.js';
 import { plasmaPeakNote } from './doseinput.js';
+import { createPreviewPanel } from './preview.js';
 import { dur, num, int } from '../util/fmt.js';
 
 const MODES = {
@@ -294,6 +295,13 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       if (onSectionsChanged) onSectionsChanged(sectionId || null);
     },
   });
+
+  // The coarse-solve preview. Owned by ./preview.js, mounted in the Commit
+  // group below. It is handed the SPEC AS THE FORM HOLDS IT, unedited, so what
+  // is previewed is what Submit would send — the server substitutes its own
+  // coarse dx_um and refuses any spec whose pair it has not measured, and no
+  // copy of those rules lives in the browser.
+  const previewPanel = createPreviewPanel({ getSpec: () => store.get().spec });
 
   /* ------------------------------------------------------------- form -- */
 
@@ -641,7 +649,12 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
 
   const submitBtn = h('button.btn.primary', {
     id: 'btn-submit-run',
-    onclick: () => onSubmit(store.get().spec),
+    // THE PREVIEW IS DROPPED THE INSTANT THE REAL SOLVE STARTS, before the
+    // POST, not after it answers. A preview number kept beside a real one is
+    // one readout with two live values, and the gap between them is not a
+    // finding — it is the measured grid difference, which is already stated
+    // next to the preview in its own words.
+    onclick: () => { previewPanel.supersede(); onSubmit(store.get().spec); },
     title: `POST /api/runs — ${SUBMIT_KEYS} submits from anywhere in the Studio`,
   }, 'Submit run');
   const validateBtn = h('button.btn', { onclick: () => runValidate(true), title: 'POST /api/validate' }, 'Validate');
@@ -880,6 +893,14 @@ export function createSpecPanel({ store, onSubmit, onDrugsChanged, onSectionsCha
       srcSect),
 
     railGroup('job', 'Commit', 'POST /api/runs',
+      // The preview sits in COMMIT, above the active job, because the question
+      // it answers — "roughly what will this say" — is a question about a
+      // decision that has not been taken yet. It is deliberately NOT in the
+      // Read rail: that rail reports RESULTS, with provenance chips, exports
+      // and copy-a-quotable-sentence buttons, and an unquotable number does
+      // not belong on the surface whose job is to produce quotable ones.
+      // js/ui/preview.js carries the full argument.
+      previewPanel.el,
       h('details.sect', { open: true, id: 'sect-job' },
         h('summary', sectTitle('Active job'), h('span.hint', '/status poll')),
         h('div.sect-body', jobEl))),

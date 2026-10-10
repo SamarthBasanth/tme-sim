@@ -2921,6 +2921,14 @@ def create_app(manager: Optional[JobManager] = None,
     # tests/test_browse_confinement.py both ways.
     app.include_router(build_browse_router())
 
+    # The fast preview: a COARSE SOLVE at dx=30, not a model. Mounted before
+    # _mount_web for the same reason as the two above. It serves exactly one
+    # readout -- the delivery spread -- and refuses everything else with a
+    # measurement; see preview.py for why the penetration index is NOT
+    # previewable despite the study recommending it.
+    from .preview import build_preview_router
+    app.include_router(build_preview_router(jobs=jobs))
+
     # The login portal (docs/AUTH_CONTRACT.md §1). Registered here, BEFORE
     # _mount_web, because /login has to win over the StaticFiles mount at `/`
     # -- starlette matches in registration order, so a route declared after
