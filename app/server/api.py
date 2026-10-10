@@ -2135,22 +2135,22 @@ def create_app(manager: Optional[JobManager] = None,
                               and auth_service.user_for_request(request)
                               is not None)
                 if not key_ok and not session_ok:
-                    # THE WORDING IS UNCHANGED ON PURPOSE, and it is now
-                    # BOTH credentials are named, because a refusal that
-                    # lists one of the two ways in sends a reader to fetch
-                    # a key they may not need. Corrected 2026-10-09 when
-                    # sessions landed; the test below pins it exactly.
-                    # and this sentence names only the header.
+                    # BOTH CREDENTIALS ARE NAMED, because a refusal that
+                    # lists only one of the two ways in sends a reader off to
+                    # find a key when signing in would have done. Widened
+                    # 2026-10-09 when sessions landed.
                     #
+                    # The sentence is ONE STRING in two files on purpose.
                     # tests/test_api_hostile_input.py::
                     # test_a_near_miss_key_is_refused_exactly_like_no_key
-                    # asserts this body with exact dict equality, as the
-                    # observable half of "a near-miss key is refused
-                    # identically to no key" -- so widening the sentence, or
-                    # adding a field naming the other credential, is a change
-                    # to that file and not to this one. Left for its owner
-                    # rather than edited around; the front end keys off the
-                    # 401 status and sends the user to /login.
+                    # asserts this body with exact dict equality -- that is
+                    # the observable half of "a near-miss key is refused
+                    # identically to no key", the thing that stops the key
+                    # being binary-searched a character at a time -- so
+                    # rewording it here, or adding a field, is a change to
+                    # that file too and the two must move together. The front
+                    # end keys off the 401 status and not the words, and
+                    # sends the user to /login.
                     return JSONResponse(
                         {"detail": "missing or incorrect credentials: send an X-API-Key header, or sign in at /login for a browser session"},
                         status_code=401,
@@ -2294,30 +2294,54 @@ def create_app(manager: Optional[JobManager] = None,
         return jsonable(out)
 
     @app.get("/ingest", response_class=HTMLResponse, include_in_schema=False)
-    def ingest_page() -> str:
-        """Server-rendered form over ``POST /api/sections/scan``.
+    def ingest_page():
+        """The bring-your-own-tissue page -- ``app/web/ingest.html``.
 
-        **Why this exists.** ``results/first_user_readiness.md`` found that
-        bring-your-own-tissue works end to end through the API and the CLI but
-        appears NOWHERE in ``app/web/`` — the Studio's section picker is a
-        read-only list from ``GET /api/sections``. So a researcher who will not
-        hand-POST JSON cannot load their own sample, which is the entire value
-        proposition. This page closes that with no front-end change: it is one
-        self-contained document served from the backend, and it calls the same
-        endpoint ``curl`` would.
+        **THIS URL SERVES THE SAME PAGE AS ``/tissue``, and that is the whole
+        decision recorded here.** Until 2026-10-10 this route returned a
+        ~190-line HTML document built as a Python string in this file, whose
+        entire input was one ``<input type=text>`` into which the operator
+        typed, from memory, an absolute path on the server's own disk.
+        ``app/server/browse.py`` then added ``GET /api/browse`` and a page that
+        NAVIGATES those directories instead, and registered it at ``/tissue``.
+        Two pages did one job and the worse one owned the URL every pointer
+        names.
 
-        It adds NO capability and NO new trust boundary — every request it makes
-        is one ``POST /api/sections/scan`` that any client could already make,
-        under the same ``X-API-Key`` gate. It renders ``capability_text``
-        verbatim (the exact report ``vivum ingest`` prints) rather than
-        re-deriving a summary, so this surface can never disagree with the CLI
-        about what a sample can support.
+        The old page is DELETED and the better page answers here -- rather than
+        this path redirecting, or retiring -- because ``/ingest`` is
+        load-bearing in places no code reads: the startup banner
+        (``app/server/__main__.py``), ``README.md``, ``docs/QUICKSTART.md``,
+        ``docs/DEPLOYMENT.md`` sec. 0/2/4, ``docs/WORKSPACE_CONTRACT.md``
+        sec. 1, ``app/web/home.html``, ``app/web/js/home/projectGrid.js``, and
+        whatever bookmarks and runbooks were made from those. A **200 with the
+        page** leaves every one of them literally correct. A 3xx would leave
+        them working only for a client that follows redirects -- a browser
+        does, the ``curl`` in a runbook and a link checker do not -- and would
+        change the status code on a path this repository's own tests assert
+        answers 200 anonymously. Retiring it was never an option: a documented
+        path that 404s is the defect, not the cleanup.
 
-        This is a stopgap, not the destination: the Studio picker itself should
-        learn to ingest. Registered sections appear in ``GET /api/sections``
-        immediately, so a Studio reload picks them up.
+        **It is not a second copy of ``/tissue``.** Both routes read the one
+        file ``app/web/`` + :data:`browse.BROWSE_PAGE`, and that name is
+        imported from the module that owns the page rather than spelled again
+        here, so the two URLs cannot drift into serving two documents. The
+        same file is additionally served as an ordinary static asset at
+        ``/ingest.html`` by the catch-all mount; both named routes exist so
+        that the URL a person is handed has no file extension in it.
+
+        The not-built fallback is the shape ``/login`` and :data:`_PLACEHOLDER`
+        already use. The retired page's one real virtue was that it needed no
+        front-end build, and this keeps the honest half of that -- a path the
+        banner prints answers either way -- without keeping a second
+        implementation of the feature behind it.
         """
-        return _INGEST_PAGE
+        from .browse import BROWSE_PAGE
+
+        page = os.path.join(repo_root(), "app", "web", BROWSE_PAGE)
+        if os.path.exists(page):
+            return FileResponse(page, media_type="text/html",
+                                headers={"Cache-Control": "no-cache"})
+        return HTMLResponse(_INGEST_NOT_BUILT)
 
     @app.get("/api/drugs")
     def get_drugs() -> List[Dict]:
@@ -3064,185 +3088,39 @@ def _binary(jobs: JobManager, run_id: str, payload: str, label: str):
     })
 
 
-#: The bring-your-own-tissue page served at ``GET /ingest``. Self-contained on
-#: purpose: it is served by the backend and must work whether or not
-#: ``app/web/`` has been built, so it carries its own CSS and script and pulls
-#: in nothing external. The only endpoint it touches is
-#: ``POST /api/sections/scan``.
-_INGEST_PAGE = """<!doctype html><meta charset="utf-8">
-<title>Vivum Studio &mdash; bring your own tissue</title>
+#: Shown at ``GET /ingest`` only when ``app/web/ingest.html`` is not present in
+#: this deployment. Same approach as :data:`_PLACEHOLDER` and
+#: ``auth.py::_LOGIN_PLACEHOLDER``: a path the startup banner prints must not
+#: 404 because the front end was not built, and the honest thing to serve there
+#: is what is missing plus the routes that still answer. It names no absolute
+#: path and carries no deployment state, because this route is ungated.
+_INGEST_NOT_BUILT = """<!doctype html><meta charset="utf-8">
+<title>Vivum &mdash; bring your own tissue</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
  body{background:#101214;color:#d8dadd;font:13px/1.6 ui-monospace,Menlo,monospace;
       margin:0;padding:32px}
  h1{font-size:15px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
-    margin:0 0 6px;color:#f0f2f4}
- .sub{color:#8b9199;margin:0 0 20px;max-width:76ch}
- .b{border:1px solid #2a2e33;padding:16px;max-width:76ch;margin:0 0 16px}
- label{display:block;margin:10px 0 3px;color:#9aa1a9}
- input[type=text]{width:100%;box-sizing:border-box;background:#0a0c0e;
-   border:1px solid #2a2e33;color:#d8dadd;padding:7px 8px;font:inherit}
- .row{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
- button{background:#1b2733;border:1px solid #33506e;color:#cfe2f6;padding:7px 14px;
-   font:inherit;cursor:pointer}
- button:hover:not([disabled]){background:#22344a}
- button[disabled]{opacity:.5;cursor:default}
- .chk{color:#9aa1a9;font-size:12px}
- pre{background:#0a0c0e;border:1px solid #2a2e33;padding:12px;overflow-x:auto;
-   white-space:pre;margin:0}
- .err{border-color:#6e3333;color:#f0b8b8}
- .ok{color:#9ad7a0}
- code{color:#7fb6e8} a{color:#7fb6e8}
- .note{color:#8b9199;font-size:12px;max-width:76ch}
+    margin:0 0 14px;color:#f0f2f4}
+ .b{border:1px solid #2a2e33;padding:16px;max-width:76ch}
+ code{color:#7fb6e8} a{color:#7fb6e8} p{margin:0 0 12px}
 </style>
-<h1>Bring your own tissue</h1>
-<p class="sub">Point this at a directory holding a 10x Xenium or Visium export
-(or a bare MEX triple plus a coordinates table) and it will tell you what the
-sample <em>is</em> and what it <strong>cannot</strong> support. Registering adds
-it to the section list, so it becomes selectable in Studio after a reload.
-Same endpoint as <code>POST /api/sections/scan</code> and the same report
-<code>vivum ingest</code> prints &mdash; this page just saves you the
-<code>curl</code>.</p>
-
 <div class="b">
- <label for="path">Sample directory (absolute path on the machine running this
- server)</label>
- <input type="text" id="path" spellcheck="false"
-        placeholder="/data/xenium_run_2026_08/output-XETG00001">
-
- <label for="sid">Section id (optional &mdash; defaults to the directory name)</label>
- <input type="text" id="sid" spellcheck="false">
-
- <label for="label">Label shown in the picker (optional)</label>
- <input type="text" id="label" spellcheck="false">
-
- <label for="key">X-API-Key (only if this server was started with one)</label>
- <input type="text" id="key" spellcheck="false" autocomplete="off">
-
- <div class="row">
-  <button id="scan">Scan &mdash; read only</button>
-  <button id="reg">Scan + register</button>
-  <label class="chk"><input type="checkbox" id="deep"> measure detection rates
-   (full ingest &mdash; slower, but turns &ldquo;the gene is on the panel&rdquo;
-   into a measured firing rate)</label>
- </div>
+<h1>Bring your own tissue &mdash; page not built</h1>
+<p>The API is serving. <code>app/web/ingest.html</code> is not present in this
+deployment, so this is shown instead of a 404 on a path the startup banner
+prints.</p>
+<p>Nothing is missing on the server side. A section is registered BY
+FILESYSTEM PATH on the machine running this server &mdash; the bytes are read
+where they lie and are never copied or transferred anywhere &mdash; and the
+routes that do it still answer. <code>GET /api/browse</code> lists the names in
+one directory this server is allowed to read,
+<code>POST /api/sections/scan</code> reports what a directory holds and what it
+cannot support, and the same call carrying <code>register</code> adds it to the
+section list.</p>
+<p><code>vivum ingest &lt;directory&gt;</code> does the same job from a terminal
+and prints the same capability report.</p>
 </div>
-
-<div id="out"></div>
-<p class="note">Registering never shadows a built-in section, and a directory
-that is not ingestable is answered with a reason rather than a broken section.
-Remove an ingested section with
-<code>DELETE /api/sections/&lt;id&gt;</code>.</p>
-
-<script>
-(function () {
-  var out = document.getElementById("out");
-  var els = ["path", "sid", "label", "key", "deep", "scan", "reg"]
-    .reduce(function (a, k) { a[k] = document.getElementById(k); return a; }, {});
-
-  function esc(s) {
-    return String(s).replace(/[&<>]/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c];
-    });
-  }
-  function box(cls, html) { return '<div class="b ' + cls + '">' + html + "</div>"; }
-  function show(html) { out.innerHTML = html; }
-
-  function render(res, registered) {
-    var html = "";
-    if (res.error) {
-      html += box("err", "<strong>Not ingested.</strong> " + esc(res.error));
-    } else if (registered && res.ok) {
-      html += box("", '<span class="ok">Registered as <code>' +
-        esc(res.section_id) + "</code>.</span> Reload Studio and it will be in " +
-        "the section picker." +
-        (res.section && res.section.runnable === false
-          ? " <strong>Inspectable only:</strong> the reconstruction pipeline " +
-            "has no route for this platform."
-          : ""));
-    }
-    var det = res.detection || (res.section ? {
-      platform: res.section.platform, layout: res.section.layout,
-      confidence: res.section.detect_confidence,
-      issues: res.section.detect_issues
-    } : null);
-    if (det) {
-      var bits = [];
-      if (det.platform) bits.push("platform " + esc(det.platform));
-      if (det.layout) bits.push("layout " + esc(det.layout));
-      if (det.confidence !== undefined && det.confidence !== null) {
-        bits.push("confidence " + esc(det.confidence));
-      }
-      if (bits.length) html += box("", bits.join(" &middot; "));
-      var iss = det.issues || det.detect_issues;
-      if (iss && iss.length) {
-        html += box("err", "<strong>Issues</strong><pre>" +
-          esc(iss.join("\\n")) + "</pre>");
-      }
-    }
-    if (res.capability_text) {
-      html += "<pre>" + esc(res.capability_text) + "</pre>";
-    }
-    if (!html) {
-      html = box("", "The server returned no capability report:<pre>" +
-        esc(JSON.stringify(res, null, 1)) + "</pre>");
-    }
-    show(html);
-  }
-
-  function go(registered) {
-    var path = els.path.value.trim();
-    if (!path) { show(box("err", "Enter a sample directory path.")); return; }
-    var body = {
-      path: path,
-      measure_detection_rates: !!els.deep.checked,
-      register: !!registered
-    };
-    if (els.sid.value.trim()) body.section_id = els.sid.value.trim();
-    if (els.label.value.trim()) body.label = els.label.value.trim();
-    var headers = { "Content-Type": "application/json" };
-    if (els.key.value.trim()) headers["X-API-Key"] = els.key.value.trim();
-
-    els.scan.disabled = els.reg.disabled = true;
-    show(box("", (registered ? "Ingesting" : "Scanning") + " &hellip; " +
-      (body.measure_detection_rates || registered
-        ? "a full ingest of a large section can take a minute."
-        : "this reads filenames and the panel only.")));
-
-    fetch("/api/sections/scan", {
-      method: "POST", headers: headers, body: JSON.stringify(body)
-    }).then(function (r) {
-      return r.json().then(function (j) { return { status: r.status, body: j }; });
-    }).then(function (r) {
-      if (r.status === 401) {
-        show(box("err", "401 &mdash; this server is running with an API key. " +
-          "Paste it into the X-API-Key field above."));
-        return;
-      }
-      if (r.status === 403 && r.body && r.body.detail && r.body.detail.message) {
-        // Path confinement (TMESIM_STUDIO_DATA_ROOTS). The server already
-        // wrote a sentence telling the operator what to do; show THAT, not a
-        // JSON blob of it.
-        show(box("err", "403 &mdash; " + esc(r.body.detail.message)));
-        return;
-      }
-      if (r.status >= 400) {
-        show(box("err", esc(r.status + " " +
-          (r.body && r.body.detail ? JSON.stringify(r.body.detail) : ""))));
-        return;
-      }
-      render(r.body, registered);
-    }).catch(function (e) {
-      show(box("err", "Request failed: " + esc(e)));
-    }).then(function () {
-      els.scan.disabled = els.reg.disabled = false;
-    });
-  }
-
-  els.scan.addEventListener("click", function () { go(false); });
-  els.reg.addEventListener("click", function () { go(true); });
-})();
-</script>
 """
 
 

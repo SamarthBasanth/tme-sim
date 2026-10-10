@@ -141,6 +141,7 @@ a research tool, not a diagnostic product. Concretely:
 | `POST` | `/api/sections/scan` | `{path, measure_detection_rates?, register?, section_id?, label?}` → `ScanResult` — ingest ANY directory |
 | `DELETE` | `/api/sections/{id}` | remove an **ingested** section; **400** for a built-in one |
 | `GET`  | `/api/sections/{id}/capability` | → `Capability` — what this panel can support, before a project exists |
+| `GET`  | `/api/browse` | `?path=&q=&show_hidden=` → `{confined, places, path, crumbs, entries[], n_entries, truncated, diagnosis}` — the NAMES in one server-side directory; registers nothing |
 | `GET`  | `/api/projects` | → `Project[]` (summary; newest first) |
 | `POST` | `/api/projects` | `{name, notes}` → `Project` — **201** |
 | `GET`  | `/api/projects/{id}` | → `Project` with its `Specimen[]` (capability refreshed on read) |
@@ -167,9 +168,105 @@ a research tool, not a diagnostic product. Concretely:
 | `POST` | `/api/protocol/upload` | `{filename, content \| content_base64}` or multipart `file` → `{path, preview}` |
 | `GET`  | `/api/limits` | → what this server refuses; see below |
 | `GET`  | `/api/account` | → this deployment: key, limits, usage inventory, billing |
+| `POST` | `/api/preview` | `RunSpec` (+ optional `readout`) → ONE coarse readout with its measured agreement — **synchronous, and not a run** |
+| `GET`  | `/api/preview/agreement` | → the error bar and the refusals, having solved nothing |
+| `POST` | `/api/memo` | `RunSpec` or `{spec, allow_scaling?}` → `{mode, is_solve: false, …}` — **always 200**; a miss is an answer |
+| `GET`  | `/api/auth/me` | → `{authenticated, via, user, …}` — **never 401**; the page asks this to decide what to draw |
+| `POST` | `/api/auth/login` | `{email, password}` → sets the `vivum_session` cookie |
+| `POST` | `/api/auth/logout` | → clears it; **200 even with no session** |
+| `POST` | `/api/auth/signup` | `{email, password}` + the operator's bootstrap token → `201`, and does NOT sign you in |
+| `POST` | `/api/auth/password` | `{old_password, new_password}` → session only; the key cannot change an account's password |
 
 `status` ∈ `queued | running | done | failed | cancelled`. On `failed`, `RunResult.error`
 carries the message; the UI must surface it, never swallow it.
+
+### Pages — the routes that are not `/api/`
+
+Registered on the app BEFORE the `StaticFiles` mount at `/`, because starlette
+matches in registration order and a mount at `/` swallows every path under it.
+The route table for the first three is `docs/WORKSPACE_CONTRACT.md` §1.
+
+| Path | Serves | Notes |
+|---|---|---|
+| `/` | `app/web/home.html` | the workspace home. Falls back to the Studio when `home.html` is absent, rather than 500ing on the front door |
+| `/studio` | `app/web/index.html` | the Studio. `/index.html` keeps working byte for byte, so every old bookmark survives |
+| `/ingest` | `app/web/ingest.html` | bring-your-own-tissue. **The same page `/tissue` serves** |
+| `/tissue` | `app/web/ingest.html` | the same page under a name that says what it is |
+| `/login` | `app/web/login.html` | sign-in (`docs/AUTH_CONTRACT.md` §1) |
+| `/healthz` | `{"ok": true}` | liveness, GET **and HEAD**. Point a platform health check HERE, not at `/api/health` |
+| `/docs`, `/redoc`, `/openapi.json` | FastAPI's own | the map of the API. Ungated — see below |
+
+**`/ingest` and `/tissue` are one page at two URLs, and the duplication is the
+URL and not the page.** Until 2026-10-10 `/ingest` served a different,
+self-contained form built as a Python string in `app/server/api.py`, whose only
+input was a text box you typed an absolute server path into from memory;
+`/tissue` served the directory browser that replaced it. Two pages did one job.
+The form is deleted and both routes now read the one file
+`app/web/ingest.html`, with the filename imported from `app/server/browse.py`
+(`BROWSE_PAGE`) so the two URLs cannot drift apart. `/ingest` keeps answering
+**200 with the page** rather than redirecting, because it is the path named in
+the startup banner, `README.md`, `docs/QUICKSTART.md`, `docs/DEPLOYMENT.md` §0,
+`docs/WORKSPACE_CONTRACT.md` §1 and the home page's own links — a 200 leaves all
+of them literally correct, while a 3xx would only work for a client that
+follows redirects. Each page route falls back to a served "not built" notice if
+its file is missing, so a backend deployed ahead of the front end says what is
+absent instead of 404ing a path the banner printed.
+
+### Authentication — two credentials, one gate
+
+`docs/AUTH_CONTRACT.md` IS THE SPECIFICATION; this is the part of it the front
+end codes to. The gate is middleware in `create_app` and is installed **only
+when `TMESIM_STUDIO_API_KEY` is set** — unset means no gate at all, which is the
+local single-user default.
+
+When it is installed it accepts **EITHER** credential:
+
+* **`X-API-Key`** — the pre-existing shared secret. Every documented `curl`
+  flow, `render.yaml` and CI depend on it, and nothing about that path changed.
+* **the `vivum_session` cookie** — issued by `POST /api/auth/login`, HMAC-signed,
+  14 days, no refresh-on-use. It identifies the person at the keyboard and
+  **partitions nothing**: projects, runs and specimens stay shared, which is why
+  `/api/auth/me` ships `shared_workspace: true` and a sentence saying so.
+
+The key is tested first because it is the cheap test. A session fault of any
+kind — no cookie, a tampered or expired one, a deleted or disabled account, an
+unreadable store — reads as "no session" and falls through to the key, so the
+gate fails closed exactly as it did before sessions existed.
+
+Refused requests get **401** with
+`{"detail": "missing or incorrect credentials: send an X-API-Key header, or
+sign in at /login for a browser session"}` — the same body for a wrong key, a
+truncated key and no key at all, so the key cannot be binary-searched a
+character at a time. The front end keys off the status, not the sentence, and
+sends the user to `/login`.
+
+**The ungated paths, and nothing else:**
+
+| Path | Why it must answer without a credential |
+|---|---|
+| `/healthz`, `/api/health` (GET/HEAD) | a platform health checker cannot send a header. `/healthz` returns a literal `{"ok": true}`; `/api/health` returns that much to an anonymous caller and the runs directory, run counts and cache statistics only to one holding the key — the ROUTE is exempt, the DATA is not |
+| `/login`, `/api/auth/*` (any method) | a credential gate in front of the page that obtains the credential is a loop |
+| every non-`/api/` GET/HEAD | the pages and static assets above. A page must be able to load in order to prompt for a key |
+
+Two consequences stated so they are decisions rather than oversights:
+
+* **Exempting the `/api/auth/*` PREFIX moves the burden into those handlers.**
+  `POST /api/auth/logout` and `POST /api/auth/password` are not public
+  operations; the middleware has simply stopped protecting them, and each
+  re-establishes its own credential — the password route's 401 is its own.
+* **Everything else fails closed.** Any `/api/` path, and any request whose
+  method is not GET/HEAD/OPTIONS at any path, needs a credential. So a future
+  non-`/api/` route that mutates state is authenticated by default rather than
+  exposed by default. OPTIONS stays exempt because a CORS preflight cannot carry
+  the header.
+
+The gate decides on `get_route_path(request.scope)` — the same string the router
+dispatches on — and never on `request.url.path`, which is rebuilt from the
+client-supplied `Host` header and can be made to not start with `/api/` while
+the router still dispatches the endpoint (GHSA-86qp-5c8j-p5mr, which was live
+here).
+
+`docs/DEPLOYMENT.md` §2 carries the operator's view of the same facts.
 
 ### The deployment's own surface — `GET /api/limits`, `GET /api/account`
 
@@ -177,7 +274,8 @@ Every other route in this contract answers a question about TISSUE. These two
 answer questions about the INSTANCE, and they are the backing for Studio's
 Account panel (`app/web/js/ui/account.js`, server side `app/server/account.py`).
 
-Both are gated like any `/api/` route. That is deliberate: a key fingerprint, a
+Both are gated like any `/api/` route — either credential, see
+**Authentication** above. That is deliberate: a key fingerprint, a
 usage count and a deployment's refusal thresholds are operational detail about
 a machine. The "how do I get a key" copy that an UNAUTHENTICATED visitor needs
 therefore lives in the client, because by definition that visitor cannot call
@@ -419,6 +517,131 @@ solver replaces the plasma curve by its window mean, which makes `every`, `repea
 regenerated to remove. This is the one solver setting the protocol path changes
 relative to `/api/runs`.
 
+### The fast preview — `POST /api/preview`, `GET /api/preview/agreement`
+
+**A coarser solve shown fast, and not a model.** `POST /api/preview` runs the
+SAME solver on `dx = 30 um` instead of the shipped `dx = 12 um`, synchronously,
+and returns ONE readout: the delivery spread `E_p90/E_p10` over the tumour cell
+set. Median wall clock 8.6678 s against 58.7711 s for the real run. It is
+synchronous on purpose — a preview with its own queue, poll and cancel would be
+a second run-shaped object a client could mistake for a run.
+
+Body is a `RunSpec`, plus an optional `readout`. `dx_um` is **required and is
+the dx the REAL run will use**, because the payload has to name which measured
+pair it is quoting.
+
+```jsonc
+// 200
+{ "is_preview": true, "quotable": false, "preview_label": "PREVIEW - A COARSER SOLVE, …",
+  "readout": "E_p90_over_p10", "readout_name": "delivery spread  P90 / P10",
+  "value": 3.41, "unit": "x", "null_reason": null, "n_tumor": 12043,
+  "derivation": "extra_metrics.E_p90_uM / extra_metrics.E_p10_uM from a dx = 30 um solve …",
+  "agreement": { /* the measured dx = 30 vs dx = 12 figures */ },
+  "preview_dx_um": 30.0, "target_dx_um": 12.0, "preview_grid": [170, 271],
+  "preview_wall_clock_s": 8.67, "section": "xenium_319", "drug": "temozolomide",
+  "refused": [ {"readout": "…", "why": "…"} ],
+  "caveats": [ /* the engine's own, verbatim */ ], "claim_set": { /* … */ },
+  "superseded_by": "the real run. …" }
+```
+
+**Nothing is enqueued, nothing is persisted, no `run_id` is minted** — the
+module calls `execute_run` directly and drops `_payloads`. So a preview number
+cannot be opened in the Read rail, attached to a Specimen, exported, put in a
+report or counted on a project card, which are the four routes by which a fast
+number becomes a quoted one. `quotable: false` and the `agreement` block are
+both checked on the FINISHED body before it is returned; a body that has lost
+either is not served.
+
+Every refusal is a measurement, not a preference, and each carries its own
+figure:
+
+| Refused | The measurement |
+|---|---|
+| spot (Visium) sections | `dx_um` is not a lever there at all — a preview at 30 and a run at 12 are both clamped to 100 um and are the IDENTICAL solve at the IDENTICAL cost |
+| `penetration_length_um` | disagrees by up to 16.0405 % (17.3158 um) over the 12 pairs |
+| `penetration_index` | has NO settled `dx = 30` / `dx = 12` agreement: this repository's own three measurements of nominally the same section are 1.04 %, 26.0 % and 102 % apart, in two directions |
+| any absolute level | `median_auc_over_peak` agrees to 0.3215 % — the best of any readout — and is still refused, because agreement is not defensibility |
+| anything whose name contains `kill` | never a defensible output here, at any resolution |
+| a pair nobody measured | the envelope is `dx = 30` vs `dx = 12`, two Xenium sections, six compounds — 12 pairs. Outside it this refuses rather than widening the tolerance |
+
+Refusals come back as `{"error": "<the sentence>", …}` with the fields naming
+what was asked (`readout`, `field`, `dx_um`, `previewable`); the default status
+is **422**, with **409** for a run already at `dx = 30` and **503** when the
+measured agreement is not on this server at all. That last one is the design:
+the figures are read at request time from
+`experiments/exact_memo/coarse_baseline.json` and are deliberately NOT copied
+into the source, so **if the measurement is gone the feature is gone** rather
+than the error bar being gone.
+
+`GET /api/preview/agreement` serves the same error bar and the same refusal
+list having solved nothing, so a surface can show what a preview would and
+would not tell you before spending the seconds — and so the ABSENCE of a
+measurement is readable rather than only discoverable by being refused:
+
+```
+{available, agreement, unavailable_reason, preview_dx_um, target_dx_um,
+ previewable, preview_label, measured_sections, measured_compounds,
+ spot_refusal, refused[]}
+```
+
+### The exact memo — `POST /api/memo`
+
+**Answer a `RunSpec` without solving it, in the two cases where that is exact.**
+There is no RunSpec-keyed run cache in this backend, so re-submitting a solved
+spec re-solves it. This route answers from the store instead, and it is not a
+model:
+
+* **`exact_memo`** — the stored record of a run whose RunSpec, server-side
+  solver constants, engine fingerprint and claim-set version all match. The
+  numbers are bit-identical to a re-solve.
+* **`algebraic_scale`** — another run's numbers rearranged by an exact algebraic
+  identity for a change of dose and/or half-life. In the shipped
+  (`time_resolved: false`) path the whole PK block reaches the solver as ONE
+  float, `plasma_mean`, and the transport chain is linear in it with `C(0) = 0`,
+  so every exposure ratio is invariant and every magnitude is proportional. The
+  payload states where it is bit-identical (a dose-only change by a power of
+  two) and where it agrees only to a measured number of ULPs.
+* **`miss`** — nothing answers this spec exactly and **nothing was
+  approximated**.
+
+Body is a bare `RunSpec`, or `{"spec": <RunSpec>, "allow_scaling": <bool>}` — a
+RunSpec has no `spec` key, so the two forms are unambiguous. **`allow_scaling`
+defaults to `false`.** A caller that asked whether the answer is already known
+and was handed an algebraic rearrangement of a DIFFERENT run would have been
+told something it did not ask about, and that is the one distinction this
+surface must never blur.
+
+**Always 200.** A miss is an answer ("nothing here answers this; submit it"),
+not an error, and every shape of non-answer carries the same
+`mode` / `reason` / `disclosure` fields so a client has one branch to write. The
+spec goes through `/api/validate`'s own validator first, so this surface can
+never answer a spec the run surface would reject; a rejected spec comes back as
+a miss carrying the full `validate` verdict.
+
+```jsonc
+{ "mode": "exact_memo",            // exact_memo | algebraic_scale | miss
+  "is_solve": false,               // always, in every mode
+  "scaling_requested": false,
+  "spec": { /* … */ }, "key": "…", "shape_key": "…", "key_components": { /* … */ },
+  "disclosure": "NOT A SOLVE: this is the stored record of run r_00007, …",
+  "source_run_id": "r_00007",      // absent on a miss
+  "validate_warnings": [] }
+```
+
+`is_solve: false` and `disclosure` exist because a memo hit and a fresh solve
+agree on every NUMBER and do **not** agree on provenance: a hit carries the
+original execution's `run_id`, its timestamps and its payload endpoints. A
+client that recorded a hit as a new run would mint a second citation to one
+execution. An `algebraic_scale` additionally carries `derivation` (the two
+plasma means, their ratio, `bit_exact`, the identity in words, and the
+`measured_by` script), `readouts`, `copied_verbatim` and **`refused`** — the
+readouts the identity does not cover, which were NOT estimated: anything
+compared against a threshold (`therapeutic_coverage_*`), anything through the
+Hill kill model, and the exponential-plus-floor FIT (`penetration_length_um`).
+
+This route deliberately does **not** hook `POST /api/runs`. A memo on the
+submit path would make a second click return the first click's `run_id`.
+
 ### Generic sample ingestion — `POST /api/sections/scan`
 
 The seven built-in sections are hardcoded rows. This route is how a **new specimen** —
@@ -475,7 +698,7 @@ capability report is real, but `reconstruct_real` accepts `xenium` or `visium` o
 
 > `path` is a **server-side filesystem path** — nothing is uploaded, the bytes are read
 > where they lie — and this route reads **any path the server process can read**. The
-> server binds to `127.0.0.1` by default; do not expose this route without the API-key gate
+> server binds to `127.0.0.1` by default; do not expose this route without the credential gate
 > and a reverse proxy in front (`docs/DEPLOYMENT.md` §1b, §3). Note also that a registered
 > path is echoed back to every client as `cache_dir` on `GET /api/sections`, so the path,
 > the `section_id` and the `label` must all be study codes rather than anything that
@@ -516,6 +739,76 @@ One honest asymmetry: rates here are over **all cells**, because phenotyping has
 yet at ingest time, while `reconstruct.cell_state` re-measures over **TUMOR cells only**.
 On the 319 panel that is 1.34% here vs 1.42% at run time — same verdict, different number,
 and both are labelled.
+
+### Finding the tissue — `GET /api/browse`
+
+The other half of the same capability. A section registers **by filesystem
+path**, so the input to `POST /api/sections/scan` is an absolute path on the
+machine running this server — and until this route existed the interaction was
+typing it from memory into a text box. This lets the operator NAVIGATE the
+server's directories instead. **It adds no capability:** registration is still
+`POST /api/sections/scan`, and this adds a way to FIND a directory and not one
+new thing you can do to one.
+
+It cannot be a file picker, and that is what the product does rather than a
+limitation of this route. An `<input type="file">` cannot express "that
+directory over there on the host" at all: it would either be a lie about what
+happens or a multi-gigabyte transfer of data that is already on the right
+machine.
+
+```jsonc
+// GET /api/browse?path=/data/study7&q=xen&show_hidden=0
+{ "confined": true,                      // is TMESIM_STUDIO_DATA_ROOTS set?
+  "places": [ {"name": "data_cache", "path": "/app/data_cache",
+               "why": "allowed by TMESIM_STUDIO_DATA_ROOTS"} ],
+  "path": "/data/study7",                // the ONE absolute path in the body, resolved
+  "crumbs": [ {"name": "data", "path": "/data"} ],
+  "entries": [ {"name": "s042", "kind": "dir"}, {"name": "notes.txt", "kind": "file"} ],
+  "n_entries": 2, "truncated": false,
+  "diagnosis": { /* the registry's own `detect` verdict, paths stripped */ } }
+```
+
+* **An entry is `{name, kind}` and nothing else** — no size, no timestamp, no
+  owner, no path. A size column would make this a read primitive over
+  directories it is only meant to let you walk. `kind` is `dir`, `file`, `link`
+  or `unknown`; **a symlink is never followed** to compute a type, because
+  `stat`ing the target of a link pointing out of the allowlist is precisely the
+  disclosure the allowlist exists to prevent. Clicking one issues an ordinary
+  request and is refused if it leaves.
+* **Entries carry no paths.** The caller gets `path` (the one directory it asked
+  about, resolved) and child NAMES, and composes the next request itself.
+* **No `path` returns the navigation anchors and no listing** — the allowlisted
+  roots when `TMESIM_STUDIO_DATA_ROOTS` is set, otherwise a handful of plausible
+  starting points. `confined: true` with an EMPTY `places` is the
+  set-but-usable-for-nothing state and refuses everything by design: an operator
+  who set the variable asked for confinement, and a typo must not hand back the
+  behaviour they were switching off.
+* `q` is a case-insensitive substring filter applied **before** the 500-entry
+  cap, so a big directory stays navigable rather than merely truncated. Over the
+  cap the body says `truncated: true` and `diagnosis` is **omitted** — the
+  registry's `detect` walks every child, and a directory too big to list is too
+  big to walk.
+* `show_hidden` is off by default (`1`/`true`/`yes`/`on` to enable).
+
+**Confinement is `TMESIM_STUDIO_DATA_ROOTS` through the same
+`cache.confine_scan_path` the scan route uses, and there is no second
+mechanism.** The check is on the `realpath`, so `..`, a leading `~` and every
+symlink are resolved BEFORE the decision and the directory opened is the
+directory that was allowed. The allowed roots ARE disclosed, as navigation
+anchors, to a caller that already holds the credential — you cannot navigate to
+a place you are not told exists — while the 403 refusal still never names the
+allowlist.
+
+Refusals, all in the `{code, message}` shape the scan route already uses:
+**403** `path_outside_data_roots` (naming the caller's own text, the environment
+variable and the way out) and `directory_unreadable`; **400** `path_not_a_path`;
+**404** `no_such_directory` and `not_a_directory`. A 404 echoes the caller's own
+text and never the resolved path. When `TMESIM_STUDIO_DATA_ROOTS` is unset this
+route warns **once per process** on stderr, separately from the scan route's
+warning, because an operator told "scan is unconfined" has not been told that a
+directory browser is unconfined too.
+
+The page that drives this route is `/ingest` and `/tissue` (see **Pages**).
 
 ### Projects, specimens, and the cross-specimen comparison
 

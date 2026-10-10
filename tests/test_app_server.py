@@ -295,14 +295,24 @@ class TestStaticEndpoints:
 
 
 class TestIngestPage:
-    """``GET /ingest`` -- the server-rendered bring-your-own-tissue form.
+    """``GET /ingest`` -- the bring-your-own-tissue page.
 
     ``results/first_user_readiness.md`` found the ingest path fully working
     through the API and the CLI but exposed NOWHERE a user could click, so a
     researcher who would not hand-POST JSON could not load their own sample.
-    This page is that surface, served from the backend so it needs no front-end
-    build. These tests pin the two things that make it useful: it is reachable,
-    and it drives the real endpoint rather than a parallel implementation.
+    The first answer to that was a self-contained form built as a Python string
+    in ``api.py``, whose only input was a text box you typed an absolute
+    server-side path into from memory. ``app/server/browse.py`` then shipped
+    ``GET /api/browse`` and a page that NAVIGATES the server's directories, at
+    ``/tissue``; two pages did one job and the worse one owned the URL every
+    pointer names.
+
+    The form is deleted (2026-10-10) and the browser answers at BOTH URLs. What
+    these tests pin is the state that cleanup has to leave behind: ``/ingest``
+    still answers 200 -- it is in the startup banner, the README, QUICKSTART,
+    DEPLOYMENT sec. 0 and the home page's links -- it is the SAME page as
+    ``/tissue`` rather than a second implementation, and the credential a
+    non-loopback deployment needs is still reachable from it.
     """
 
     def test_page_is_served(self, client):
@@ -310,20 +320,47 @@ class TestIngestPage:
         assert r.status_code == 200
         assert "text/html" in r.headers["content-type"]
 
-    def test_page_drives_the_real_scan_endpoint(self, client):
-        body = client.get("/ingest").text
-        # The whole point: one fetch, to the endpoint curl would have used.
-        assert "/api/sections/scan" in body
-        assert body.count("fetch(") == 1
-        # Carries its own assets -- no external host, and no dependency on
-        # app/web/ having been built.
-        assert "http://" not in body and "https://" not in body
-        assert "<script" in body and "src=" not in body
+    def test_ingest_and_tissue_are_one_page_not_two(self, client):
+        """One page, two URLs. The duplication is the URL, not the page."""
+        a = client.get("/ingest")
+        b = client.get("/tissue")
+        assert a.status_code == b.status_code == 200
+        assert a.content == b.content, (
+            "/ingest and /tissue must serve the same bytes -- two pages for "
+            "one job is the defect this cleanup removed")
+        # ...and it is the browser page, not something that merely answers.
+        assert "/api/browse" in a.text or "js/ingest/main.js" in a.text
+
+    def test_the_page_is_a_file_and_not_a_string_in_the_server(self, client):
+        """The retired form lived in ``api.py``; this one is on disk.
+
+        Checked both ways round, because either half alone passes vacuously: a
+        served body identical to ``app/web/ingest.html`` would still be
+        consistent with a second copy sitting in the module, and an absent
+        constant proves nothing about what the route returns.
+        """
+        with open(os.path.join(_REPO, "app", "web", "ingest.html"), "rb") as fh:
+            on_disk = fh.read()
+        assert client.get("/ingest").content == on_disk
+
+        with open(os.path.join(_REPO, "app", "server", "api.py")) as fh:
+            source = fh.read()
+        assert "_INGEST_PAGE" not in source, (
+            "the inline ingest form is back in api.py")
 
     def test_page_offers_the_api_key_a_remote_deployment_needs(self, client):
-        # Non-loopback deployments always have a key (see __main__), and /api/*
-        # is gated while this page is not -- so it must be able to send one.
-        assert "X-API-Key" in client.get("/ingest").text
+        """Non-loopback deployments always have a key (see ``__main__``), and
+        ``/api/*`` is gated while this page is not -- so the page must be able
+        to send one.
+
+        The field moved out of the HTML and into the module the page loads, so
+        this asks the server for that module rather than grepping the markup
+        it no longer appears in. Served by the catch-all static mount, which is
+        how the page gets it too.
+        """
+        net = client.get("/js/ingest/net.js")
+        assert net.status_code == 200, "the page's only network module 404s"
+        assert "X-API-Key" in net.text
 
     def test_scan_answers_a_bad_directory_instead_of_500ing(self, client, tmp_path):
         empty = tmp_path / "not_a_sample"

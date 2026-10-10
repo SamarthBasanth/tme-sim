@@ -48,7 +48,7 @@ carries identifiers in more places than the obvious columns. Before you run
    identifier, and registering it hands that identifier to everyone who can
    reach the server. Copy or rename to a study code first.
 2. **The section id and the label.** You choose both (`--id` / `--label`, or the
-   corresponding fields on the `/ingest` form), and both default to something
+   corresponding fields on the `/ingest` page), and both default to something
    derived from the directory name. Both are shown in the Studio section picker,
    and the label is the `<h1>` of every exported report.
 3. **Sample identifiers inside the export.** A Space Ranger metrics CSV has a
@@ -680,7 +680,13 @@ If the thing in front of Vivum does not check who the caller is, Vivum must.
   single backend in ~10 lines of config; this project deliberately doesn't
   bundle one, to avoid maintaining certificate/domain logic orthogonal to the
   simulator itself).
-* **Multi-user accounts.** One shared key, not per-user identity. See §1b.
+* **Per-user data partitioning.** There are accounts now — the login portal,
+  `docs/AUTH_CONTRACT.md` — and a session identifies the person at the keyboard.
+  It partitions **nothing**: projects, runs and specimens are shared by everyone
+  who can sign in to this deployment, `GET /api/workspace` returns the same
+  workspace to all of them, and there are no roles. `/api/auth/me` ships
+  `shared_workspace: true` so a client cannot invent a private space the server
+  does not have. See §1b and `TMESIM_SESSION_SECRET` in §4.
 * **Confining `POST /api/sections/scan` to a directory root — on a loopback
   bind, unless you turn it on.** The key makes `scan` **authenticated, not
   safe**. It takes an arbitrary `path` in the request body, so with no
@@ -810,13 +816,44 @@ ordering you'd expect, and it is available only on `python -m app.server`
 
 ### What the key does NOT cover, stated so it is a decision
 
-With `TMESIM_STUDIO_API_KEY` set, four routes still answer an anonymous caller:
-`/openapi.json`, `/docs`, `/redoc` and `/ingest`. They sit outside `/api/` and
-serve GET, so the gate's fail-closed rule lets them through **by design** — the
-front end has to be able to load without a key in order to prompt for one.
+First, what the key IS as of 2026-10-09: **one of two credentials, not the only
+one.** With the login portal (`docs/AUTH_CONTRACT.md`) the gate accepts
+`X-API-Key` **or** a `vivum_session` cookie issued by `POST /api/auth/login`.
+Nothing about the key path changed — every `curl` flow, `render.yaml` and CI on
+this page work exactly as before — and a session fault of any kind (no cookie, a
+tampered or expired one, a deleted account, an unreadable store) falls through to
+the key, so the gate still fails closed. What a session does NOT do is partition
+anything: see `TMESIM_SESSION_SECRET` below and §2.
 
-Audited 2026-09-03 with the gate on: none of them carries the key, an absolute
-host path, the runs directory, run counts or cache statistics.
+Second, with `TMESIM_STUDIO_API_KEY` set, these still answer an **anonymous**
+caller, in three groups:
+
+1. **Every non-`/api/` GET or HEAD.** That is the pages — `/`, `/studio`,
+   `/ingest` and `/tissue` — every static asset under `app/web/`, and
+   `/openapi.json`, `/docs` and `/redoc`. They sit outside `/api/` and serve
+   GET, so the gate's fail-closed rule lets them through **by design**: the
+   front end has to be able to load without a key in order to prompt for one.
+2. **`/healthz` and `/api/health`, on GET and HEAD.** A platform health checker
+   is configured in a dashboard and cannot send a header. `/healthz` returns a
+   literal `{"ok": true}`. `/api/health` returns that much to an anonymous
+   caller and the runs directory, run counts and cache statistics **only** to
+   one holding a credential — the route is exempt from the gate, the data is
+   not.
+3. **`/login` and every `/api/auth/*` path, on any method.** A credential gate
+   in front of the page that obtains the credential is a loop. Exempting the
+   prefix moves the burden into those handlers, and that is where it could go
+   wrong quietly: `POST /api/auth/logout` and `POST /api/auth/password` are not
+   public operations, they are routes the middleware has stopped protecting, and
+   each re-establishes its own credential — the password route's 401 is its own,
+   and sign-up requires this very key as its bootstrap token (§4).
+
+Everything else fails closed: any `/api/` path, and any request whose method is
+not GET/HEAD/OPTIONS at **any** path, needs a credential. OPTIONS is exempt
+because a CORS preflight cannot carry the header.
+
+Audited 2026-09-03 with the gate on, re-checked 2026-10-10 after the pages
+moved: `/openapi.json`, `/docs`, `/redoc` and `/ingest` carry none of the key,
+an absolute host path, the runs directory, run counts or cache statistics.
 `tests/test_api_hostile_input.py::test_the_ungated_documentation_routes_disclose_no_operational_detail`
 pins that. So `/openapi.json` hands a stranger the **map** of the API and not
 its state.
@@ -824,8 +861,10 @@ its state.
 Whether a private deployment wants to publish that map is a judgement, not a
 defect, which is why it is written down here rather than silently changed. If
 you do not want it, put this deployment behind a reverse proxy that refuses
-those four paths — there is no flag, because a flag would be a fifth thing to
-get wrong.
+`/openapi.json`, `/docs` and `/redoc` — there is no flag, because a flag would
+be one more thing to get wrong. Do **not** refuse `/ingest`, `/tissue` or
+`/login` on the same reasoning: those are the product, and `/login` is how
+anyone gets a session at all.
 
 Two related properties worth knowing:
 
