@@ -45,6 +45,8 @@ __all__ = [
     "unregister",
     "scan",
     "load_store",
+    "diagnose",
+    "registered_at",
 ]
 
 #: Sidecar in ``app/runs/`` holding the ingested-section table.
@@ -301,3 +303,133 @@ def ingested_genes(section_id: str) -> List[str]:
     """Panel gene symbols recorded at ingest time, or ``[]``."""
     rec = load_store().get(section_id)
     return list(rec.get("genes") or []) if rec else []
+
+
+# --------------------------------------------------------------------------- #
+# The diagnosis, for a surface that is BROWSING rather than registering
+#
+# `scan()` above is the full answer: it detects the layout AND builds the
+# capability report, which costs a read of features.tsv.gz (and, with
+# `measure_detection_rates`, a whole ingest). That is the right cost once a
+# person has decided WHICH directory they mean.
+#
+# A directory browser asks a cheaper question about every directory it shows:
+# is this a recognised bundle, and if not, why not? `ingest.detect` already
+# answers exactly that from filenames alone -- the registry has always
+# produced this diagnosis, and nothing but `vivum ingest` and the scan route
+# ever surfaced it, so a browser would show a bare "not ingestable" where the
+# engine had a sentence naming the missing file.
+#
+# Two things this adds on top of `detect`:
+#
+# 1. **Every absolute path is removed from the text.** `_detect_visium` writes
+#    issues like f"{sp}: no scalefactors_json.json" where `sp` is an absolute
+#    path; `_detect_xenium` names a tarball by basename only. Browsing is a
+#    read of NAMES (see app/server/browse.py) and a diagnosis that smuggled a
+#    resolved absolute path back out would defeat that -- and would be swept
+#    up by tests/test_response_redaction.py for good reason. The stripped form
+#    is also simply better copy: "spatial: no scalefactors_json.json" is the
+#    sentence a person reading a file list wants.
+# 2. **It says whether this directory is ALREADY a section.** The store is
+#    keyed by path, so this is the one place that can answer it, and it is the
+#    difference between a browser that offers to register the same sample
+#    twice and one that tells you it is already done.
+# --------------------------------------------------------------------------- #
+
+#: Keys of ``detect()`` that are safe to publish verbatim -- scalars and
+#: enumerations, no paths. ``files`` and ``path`` are deliberately absent.
+_DIAGNOSIS_KEYS = ("platform", "layout", "confidence")
+
+
+def _strip_paths(text: str, *prefixes: str) -> str:
+    """Remove the directory's own absolute path from a diagnosis sentence.
+
+    Longest prefix first, so a realpath and an abspath of the same directory
+    (which differ only when a symlink is involved) cannot leave half of one
+    behind. ``<prefix>/x`` becomes ``x`` and a bare ``<prefix>`` becomes
+    ``this directory``, which is what the sentence meant in both cases.
+    """
+    out = str(text)
+    for prefix in sorted({p for p in prefixes if p}, key=len, reverse=True):
+        out = out.replace(prefix + os.sep, "")
+        out = out.replace(prefix, "this directory")
+    return out
+
+
+def registered_at(path: str) -> Optional[str]:
+    """The id of the ingested section already registered at ``path``, or None.
+
+    Compared on ``realpath`` at BOTH ends: the store records the path the
+    operator registered and a browser arrives with the path it resolved, and
+    those are the same directory reached two ways whenever a symlink is in
+    play. A string comparison would offer to re-register a sample that is
+    already in the list.
+    """
+    try:
+        target = os.path.realpath(os.path.expanduser(str(path)))
+    except (OSError, ValueError):
+        return None
+    for sid, rec in load_store().items():
+        stored = rec.get("cache_dir")
+        if not stored:
+            continue
+        try:
+            same = os.path.realpath(stored) == target
+        except (OSError, ValueError):
+            continue
+        if same:
+            return sid
+    return None
+
+
+def diagnose(path: str) -> Dict:
+    """Why ``path`` is, or is not, a recognised tissue bundle. Names only.
+
+    Returns ``{platform, layout, confidence, ingestable, issues, notes,
+    samples, registered_as, error}``. ``samples`` maps a CHILD DIRECTORY NAME
+    to its own detection summary for every child that is itself a recognised
+    bundle -- which is what ``detect`` already walks the directory to find, so
+    a browser gets it for the same cost rather than probing each child again.
+
+    Never raises: an unreadable directory is an answer. An UNEXPECTED failure
+    is redacted (``cache.redact_exception``) because this is an HTTP surface;
+    the detection issues are deliberate refusals and pass through verbatim,
+    minus the absolute paths described above.
+    """
+    abs_path = os.path.abspath(os.path.expanduser(str(path)))
+    out: Dict = {
+        "platform": "unknown", "layout": None, "confidence": 0.0,
+        "ingestable": False, "issues": [], "notes": [], "samples": {},
+        "registered_as": registered_at(abs_path), "error": None,
+    }
+    try:
+        real_path = os.path.realpath(abs_path)
+    except (OSError, ValueError):
+        real_path = abs_path
+    try:
+        from tmesim.data.ingest import detect
+
+        det = detect(abs_path)
+    except Exception as exc:  # noqa: BLE001 - report, never 500
+        out["error"] = _internal(exc, "this directory could not be inspected")
+        return out
+
+    for key in _DIAGNOSIS_KEYS:
+        if key in det:
+            out[key] = det[key]
+    out["ingestable"] = bool(det.get("ingestable"))
+    out["issues"] = [_strip_paths(s, real_path, abs_path)
+                     for s in (det.get("issues") or [])]
+    out["notes"] = [_strip_paths(s, real_path, abs_path)
+                    for s in (det.get("notes") or [])]
+    for child in det.get("contained_samples") or []:
+        name = child.get("name")
+        if not name:
+            continue
+        out["samples"][str(name)] = {
+            "platform": child.get("platform"),
+            "layout": child.get("layout"),
+            "confidence": child.get("confidence"),
+            "registered_as": registered_at(os.path.join(abs_path, str(name))),
+        }
+    return out

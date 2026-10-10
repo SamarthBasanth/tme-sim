@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Vivum — bring your own tissue</title>
+<!-- Self-hosted faces, same order and same two preloads as home.html and
+     index.html: one product, one typeface, no external host. -->
+<link rel="preload" href="fonts/atkinson-next-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/atkinson-mono-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<!-- layout.css carries .topbar / .brand; components.css carries .btn, .inp,
+     .chip and the <details> contract. This page consumes them and declares
+     only its own two-pane layout below — the shared sheets are not ours to
+     edit, and a page-specific grid does not belong in them anyway. -->
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23121619'/%3E%3Crect x='3' y='3' width='10' height='10' fill='none' stroke='%2338bcd6' stroke-width='1.6'/%3E%3Crect x='6' y='6' width='4' height='4' fill='%2338bcd6'/%3E%3C/svg%3E">
+<style>
+/* ---------------------------------------------------------------------------
+   This page's own layout. Everything here is a two-pane grid, a file list and
+   the spacing between them; every colour, size, rule and control is a token or
+   a shared component class. base.css pins `html, body { overflow: hidden }`
+   and expects a shell that scrolls its own panes, which .ti-shell is.
+   --------------------------------------------------------------------------- */
+.ti-shell { display: flex; flex-direction: column; height: 100vh; min-height: 0; }
+
+.ti-main {
+  flex: 1 1 auto; min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1px; background: var(--line-1);
+}
+.ti-pane { background: var(--bg-1); min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.ti-pane > * { padding: var(--sp-7) var(--sp-8); }
+@media (max-width: 900px) {
+  .ti-main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; }
+  .ti-shell { height: auto; min-height: 100vh; }
+  body { overflow-y: auto; }
+}
+
+.ti-intro { padding: var(--sp-7) var(--sp-8) var(--sp-5); background: var(--bg-0);
+  border-bottom: 1px solid var(--line-1); }
+.ti-h1 { font-size: var(--fs-md); color: var(--fg-0); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tr-wide); margin: 0 0 var(--sp-4); }
+.ti-sub { color: var(--fg-2); font-size: var(--fs-sm); line-height: var(--lh-body);
+  max-width: 96ch; margin: 0; }
+.ti-sub code, .rp-path, code { font-family: var(--font-mono); color: var(--accent); }
+.ti-sub a { color: var(--accent); }
+
+/* ------------------------------------------------- the browser pane ------- */
+.tb { display: flex; flex-direction: column; gap: var(--sp-5); }
+.tb.busy { opacity: 0.6; }
+.tb-bar { display: flex; gap: var(--sp-4); align-items: center; flex-wrap: wrap; }
+.tb-bar .inp { flex: 1 1 14ch; min-width: 12ch; }
+.tb-check, .rp-check, .kg-check {
+  display: flex; gap: var(--sp-4); align-items: baseline;
+  color: var(--fg-2); font-size: var(--fs-xs); line-height: var(--lh-body);
+}
+.tb-check input, .rp-check input, .kg-check input { flex: 0 0 auto; }
+
+.tb-places { display: flex; gap: var(--sp-4); flex-wrap: wrap; align-items: center; }
+.tb-places-label { font-size: var(--fs-micro); color: var(--fg-3);
+  text-transform: uppercase; letter-spacing: var(--tr-wide); }
+.tb-place {
+  display: flex; flex-direction: column; gap: 1px; text-align: left;
+  background: var(--bg-2); border: 1px solid var(--line-1); border-radius: var(--radius);
+  color: var(--fg-1); font: inherit; padding: var(--sp-3) var(--sp-5); cursor: pointer;
+}
+.tb-place:hover { background: var(--bg-3); border-color: var(--line-2); }
+.tb-place[aria-pressed="true"] { border-color: var(--accent-dim); background: var(--accent-bg); }
+.tb-place-name { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--fg-0); }
+.tb-place-why { font-size: var(--fs-micro); color: var(--fg-3); }
+
+.tb-crumbs { display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center;
+  font-family: var(--font-mono); font-size: var(--fs-sm); }
+.tb-crumb { background: none; border: 0; padding: 0 var(--sp-2); font: inherit;
+  color: var(--accent); cursor: pointer; border-radius: var(--radius); }
+.tb-crumb:hover { background: var(--bg-3); }
+.tb-crumb.here { color: var(--fg-0); padding: 0 var(--sp-2); }
+.tb-sep { color: var(--fg-3); }
+
+.tb-list { display: flex; flex-direction: column;
+  border: 1px solid var(--line-1); border-radius: var(--radius); overflow: hidden; }
+.tb-row {
+  display: flex; gap: var(--sp-5); align-items: baseline; text-align: left;
+  background: none; border: 0; border-bottom: 1px solid var(--line-0);
+  padding: var(--sp-4) var(--sp-5); font: inherit; color: var(--fg-0);
+  cursor: pointer; width: 100%;
+}
+.tb-row:last-child { border-bottom: 0; }
+.tb-row:hover { background: var(--bg-3); }
+.tb-row.file { color: var(--fg-2); cursor: default; }
+.tb-row.file:hover { background: none; }
+.tb-kind { font-family: var(--font-mono); color: var(--fg-3); width: 2ch; flex: 0 0 auto; }
+.tb-name { font-family: var(--font-mono); font-size: var(--fs-sm);
+  overflow-wrap: anywhere; }
+.tb-note { font-size: var(--fs-micro); color: var(--fg-3); }
+
+.tb-status { min-height: var(--h-status); display: flex; flex-direction: column;
+  gap: var(--sp-3); color: var(--fg-2); font-size: var(--fs-xs);
+  line-height: var(--lh-body); margin: 0; }
+.tb-refusal, .rp-refusal {
+  color: var(--crit); background: var(--crit-bg);
+  border: 1px solid var(--crit); border-radius: var(--radius);
+  padding: var(--sp-5); font-size: var(--fs-sm); line-height: var(--lh-body);
+  margin: 0; overflow-wrap: anywhere;
+}
+.tb-hint, .rp-hint, .kg-hint { color: var(--fg-2); font-size: var(--fs-xs);
+  line-height: var(--lh-body); margin: 0; }
+.tb-typed > summary { color: var(--fg-2); font-size: var(--fs-xs); cursor: pointer; }
+.tb-typed-row { display: flex; gap: var(--sp-4); margin-top: var(--sp-4); }
+.tb-typed-row .inp { flex: 1 1 auto; }
+
+/* -------------------------------------------------- the report pane ------- */
+.rp { display: flex; flex-direction: column; gap: var(--sp-6); }
+.rp-title { font-size: var(--fs-xs); color: var(--fg-2); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tr-wide); margin: 0 0 var(--sp-3); }
+.rp-path { display: block; font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.rp-chips { display: flex; gap: var(--sp-4); flex-wrap: wrap; }
+.chip.ok-chip { color: var(--ok); background: var(--ok-bg); }
+.chip.no-chip { color: var(--crit); background: var(--crit-bg); }
+.chip.bundle { color: var(--accent); background: var(--accent-bg); }
+.chip.registered { color: var(--ok); background: var(--ok-bg); }
+.rp-lines h3, .rp-sub { font-size: var(--fs-xs); color: var(--fg-1); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tr-wide); margin: 0 0 var(--sp-4); }
+.rp-lines ul { list-style: none; display: flex; flex-direction: column; gap: var(--sp-4); }
+.rp-lines li { font-size: var(--fs-sm); line-height: var(--lh-body);
+  padding-left: var(--sp-6); border-left: 2px solid var(--line-2); }
+.rp-lines li.issue { border-left-color: var(--warn); color: var(--fg-0); }
+.rp-lines li.note { border-left-color: var(--line-2); color: var(--fg-2); }
+.rp-already, .rp-contained, .rp-working, .rp-ok {
+  font-size: var(--fs-sm); line-height: var(--lh-body); margin: 0; color: var(--fg-1);
+}
+.rp-ok { color: var(--ok); }
+.rp-actions { display: flex; flex-direction: column; gap: var(--sp-5); }
+.rp-field { display: flex; flex-direction: column; gap: var(--sp-3); margin-bottom: var(--sp-5); }
+.rp-field label { font-size: var(--fs-xs); color: var(--fg-2); }
+.rp-naming > summary { color: var(--fg-2); font-size: var(--fs-xs); cursor: pointer;
+  margin-bottom: var(--sp-5); }
+.rp-pre {
+  font-family: var(--font-mono); font-size: var(--fs-sm); line-height: var(--lh-body);
+  background: var(--bg-0); border: 1px solid var(--line-1); border-radius: var(--radius);
+  padding: var(--sp-6); overflow-x: auto; white-space: pre; color: var(--fg-1); margin: 0;
+}
+.rp-out { display: flex; flex-direction: column; gap: var(--sp-5); }
+
+/* ---------------------------------------------------- the key gate -------- */
+.kg { background: var(--bg-2); border: 1px solid var(--line-2);
+  border-radius: var(--radius); padding: var(--sp-7); display: flex;
+  flex-direction: column; gap: var(--sp-5); margin: 0 var(--sp-8) var(--sp-7); }
+.kg[hidden] { display: none; }
+.kg-title { font-size: var(--fs-sm); color: var(--fg-0); font-weight: 600; margin: 0; }
+.kg-msg { font-size: var(--fs-sm); color: var(--fg-1); line-height: var(--lh-body); margin: 0; }
+.kg-row { display: flex; gap: var(--sp-4); }
+.kg-row .inp { flex: 1 1 auto; max-width: 42ch; }
+
+.ti-noscript { margin: var(--sp-8); padding: var(--sp-7);
+  border: 1px solid var(--warn); border-radius: var(--radius);
+  background: var(--warn-bg); font-size: var(--fs-sm); line-height: var(--lh-body); }
+.ti-noscript h2 { font-size: var(--fs-sm); margin: 0 0 var(--sp-5); }
+</style>
+</head>
+<body>
+<a class="skip" href="#tissue-main">Skip to the directories</a>
+
+<div class="ti-shell">
+
+  <header class="topbar" role="banner">
+    <div class="brand">
+      <span class="name"><b>Vivum</b> <span>Tissue</span></span>
+      <span class="ver">v1</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-group last">
+      <a class="btn ghost sm" href="/">Workspace</a>
+      <a class="btn ghost sm" href="/studio">Studio</a>
+    </div>
+  </header>
+
+  <div class="ti-intro">
+    <h1 class="ti-h1">Bring your own tissue</h1>
+    <!-- The honest sentence about where the bytes are, first, because it is
+         the thing every visitor gets wrong: there is no transfer here and
+         there cannot be one. A Xenium bundle is gigabytes of matrices, the
+         server reads it in place, and a section is registered and kept BY
+         PATH. So the input is a directory on the server's own disk, and the
+         fix for "type it from memory" is to let the server show you its
+         directories -- not to pretend the file is somewhere else. -->
+    <p class="ti-sub">
+      Point this at a directory on <strong>the machine running this
+      server</strong> holding a 10x Xenium or Space Ranger export (or a bare
+      MEX triple beside a coordinates table). The bytes stay where they are and
+      are read in place — a section is registered by its path, so nothing is
+      copied or transferred anywhere. Browse the server's directories below
+      instead of typing a path: each one is checked as it is listed, and the
+      panel on the right says what the sample <em>is</em> and what it
+      <strong>cannot</strong> support before anything is added. It drives
+      <code>POST /api/sections/scan</code> — the same endpoint and the same
+      report as <code>vivum ingest</code>.
+    </p>
+  </div>
+
+  <noscript>
+    <div class="ti-noscript">
+      <h2>JavaScript is turned off, so the directories cannot be listed.</h2>
+      <p>
+        This page reads the server's directory names from
+        <code>GET /api/browse</code> and registers a section with
+        <code>POST /api/sections/scan</code>, both from the browser. Nothing is
+        wrong with the server: those endpoints still answer, and
+        <code>vivum ingest &lt;directory&gt;</code> does the same job from a
+        terminal. The older self-contained form at <a href="/ingest">/ingest</a>
+        needs JavaScript too.
+      </p>
+    </div>
+  </noscript>
+
+  <div id="tissue-gate"></div>
+
+  <main class="ti-main" id="tissue-main" tabindex="-1">
+    <!-- LEFT: which directory. RIGHT: what it is. js/ingest/main.js owns the
+         rule that the left pane is the only thing that decides "which". -->
+    <div class="ti-pane" id="tissue-browse"></div>
+    <div class="ti-pane" id="tissue-report"></div>
+  </main>
+
+</div>
+
+<script type="module" src="js/ingest/main.js"></script>
+</body>
+</html>

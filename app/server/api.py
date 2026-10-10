@@ -2835,9 +2835,22 @@ def create_app(manager: Optional[JobManager] = None,
     #
     # Gated by the api_key middleware for exactly one reason: they are under
     # /api/. Nothing about this router opts in, and nothing could forget to.
+    from .browse import build_browse_router
     from .workspace import build_workspace_router
 
     app.include_router(build_workspace_router(jobs=jobs, store=store))
+
+    # A server-side directory browser, so registering a section is navigation
+    # rather than typing an absolute path from memory. It adds NO capability:
+    # registration is still POST /api/sections/scan, the route that already
+    # owns the ingest, the refusals and the confinement.
+    #
+    # PLACEMENT IS LOAD-BEARING. `include_router` appends, and `_mount_web`
+    # below mounts StaticFiles at `/`, which matches every path. A line added
+    # after it leaves the route registered and never matched — the kind of
+    # break that shows up as a 404 nobody can explain. Pinned by
+    # tests/test_browse_confinement.py both ways.
+    app.include_router(build_browse_router())
 
     # The UI, mounted LAST so /api always wins.
     _mount_web(app)
