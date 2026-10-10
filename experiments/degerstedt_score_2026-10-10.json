@@ -1,0 +1,90 @@
+{
+  "prereg_sha256": "bd1c6447f31c55ed3edeb938b6e03e8426cd0652dc67cc96a08a9b00332d2c7b",
+  "alpha": 22.223477711172563,
+  "doxorubicin_descriptors": {
+    "mw": 543.525,
+    "logp": 0.001,
+    "hbd": 6.0,
+    "tpsa": 206.07,
+    "radius_hydrodynamic_nm": 0.5386
+  },
+  "engine_geometry": {
+    "phi_cell": 0.7892,
+    "cell_radius_um": 7.8517,
+    "S_over_V_per_um": 0.30153979392997693
+  },
+  "engine_permeability_terms_um_s": {
+    "two_route.membrane_permeability_um_s": 9.63424115672293e-07,
+    "two_route_log_k_membrane": -8.039000000000001,
+    "permeability.membrane_permeability": 17.07427760724692,
+    "internal_spread_fold": 17722493.47872324
+  },
+  "measurement_um_s": {
+    "P_cell_HD_HepG2": 0.0009,
+    "P_cell_LD_HepG2": 0.000649,
+    "k_cell_HD_per_min": 0.0163,
+    "radius_um_implied_by_eq2": 9.938650306748468,
+    "P_MDCK_microvessel_unverified_at_source": 0.0032
+  },
+  "TEST_0": {
+    "verdict": "PASS",
+    "decided": "before computation, by reading"
+  },
+  "TEST_1": {
+    "R1_measured_over_engine": 934.1680214969139,
+    "pass": true,
+    "predicted_band": [
+      400.0,
+      2000.0
+    ]
+  },
+  "TEST_2": {
+    "R2_engine_over_measured": 18971.419563607687,
+    "pass": true,
+    "straddle": true
+  },
+  "TEST_3": {
+    "D_eff_shipped_um2s": 27.92558262333494,
+    "D_eff_at_measured_P_um2s": 27.9320271563264,
+    "D_eff_at_infinite_P_um2s": 169.01712603358436,
+    "relative_change": 0.00023077523854682114,
+    "transcellular_gain_shipped": 1.0000002473143568,
+    "transcellular_gain_at_measured_P": 1.0002310226099778,
+    "membrane_resistance_ratio_shipped": 21807755.388224155,
+    "membrane_resistance_ratio_at_measured_P": 23344.57494410838,
+    "pass": true
+  },
+  "TEST_4": {
+    "k_struct_per_s": 0.0002868258242933264,
+    "k_eff_alpha_per_s": 0.005035489904182864,
+    "alpha_amplification_on_k": 17.555915394261188,
+    "ceiling_from_engine_own_P": {
+      "P_um_s": 9.63424115672293e-07,
+      "k_ceiling_tissue_per_s": 2.9051070930699354e-07,
+      "k_ceiling_interstitial_per_s": 1.3781342946252065e-06
+    },
+    "ceiling_from_measured_P_HD": {
+      "P_um_s": 0.0009,
+      "k_ceiling_tissue_per_s": 0.0002713858145369792,
+      "k_ceiling_interstitial_per_s": 0.0012874089873670743
+    },
+    "ceiling_from_measured_P_LD": {
+      "P_um_s": 0.000649,
+      "k_ceiling_tissue_per_s": 0.000195699326260555,
+      "k_ceiling_interstitial_per_s": 0.0009283649253347012
+    },
+    "ceiling_from_MDCK_unverified": {
+      "P_um_s": 0.0032,
+      "k_ceiling_tissue_per_s": 0.0009649273405759263,
+      "k_ceiling_interstitial_per_s": 0.004577454177305153
+    },
+    "outcome": "B_partial_overlap",
+    "predicted_outcome": "B",
+    "as_predicted": true,
+    "predicted_band_hit": true,
+    "k_eff_alpha_over_ceiling_interstitial": 3.9113366098842626,
+    "k_eff_alpha_over_ceiling_tissue": 18.554727750874115,
+    "k_eff_alpha_over_ceiling_MDCK_interstitial": 1.1000634215299487,
+    "engine_own_binding_over_its_own_P_ceiling_interstitial": 162.3541368002331
+  }
+}

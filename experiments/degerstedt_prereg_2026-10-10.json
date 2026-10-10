@@ -1,0 +1,98 @@
+{
+  "frozen_utc_date": "2026-10-10",
+  "alpha_at_freeze": 22.223477711172563,
+  "subject": "The engine's doxorubicin CELL-MEMBRANE permeability, scored against the apparent cell permeability measured by Degerstedt 2024 (PMID 37824040, PMC10927899, CC BY 4.0).",
+  "disclosure_this_prereg_is_not_blind": {
+    "note": "Full disclosure: the engine values and the measured value were BOTH in hand when these criteria were frozen, and a back-of-envelope conversion of P_cell into a tissue sink rate had already been done by hand. What this pre-registration buys is therefore NOT blindness; it is that the DECISION RULES and the predicted directions/bands below cannot be moved after the numbers land. A reader who wants a blind test should treat TEST 1 and TEST 2 as bookkeeping and TEST 3 and TEST 4 as the registered predictions, since neither of those had been computed with the real shipped inputs at freeze time.",
+    "in_hand_at_freeze": {
+      "engine_two_route_P_mem_um_s": 9.63424115672293e-07,
+      "engine_permeability_py_P_um_s": 17.07427760724692,
+      "phi_cell": 0.7892,
+      "cell_radius_um": 7.8517,
+      "alpha": 22.223477711172563,
+      "measured_P_cell_HD_um_s": 0.0009
+    }
+  },
+  "calibration_guard": {
+    "expression": "tmesim.validation.calibration.calibrate_alpha()",
+    "must_equal": 22.223477711172563
+  },
+  "hard_constraints_acknowledged": [
+    "No parameter is tuned to hit this anchor.",
+    "alpha is NOT changed; it is asserted live.",
+    "Nothing under tmesim/ is edited.",
+    "A failure is a recorded failure.",
+    "No absolute kill fraction is produced; no cross-compound ranking claim is made (WITHDRAWN 2026-08-21)."
+  ],
+  "TEST_0_commensurability_gate": {
+    "decided_by": "reading the primary source BEFORE any computation",
+    "criteria_all_must_hold": [
+      "both quantities are in um/s",
+      "both are defined as a flux per unit concentration difference across a CELL membrane",
+      "the length scale converting a first-order rate into a permeability is a cell volume/area ratio in both"
+    ],
+    "verdict_recorded_at_freeze": "PASS",
+    "evidence": {
+      "paper_eq2": "P_cell = (k_cell x V_cell)/(A_cell x 60), V/A = r/3",
+      "paper_k_cell_units": "min^-1 (stated verbatim)",
+      "engine_entry_point": "two_route.two_route_factor: biot = sigma_c/(cell_radius_um * P), i.e. 1/P is an interfacial resistance in series with the inclusion interior -> P is flux per unit concentration difference across the cell membrane, um/s"
+    },
+    "if_this_had_failed": "every test below is VOID and the answer is reported as 'the comparison is not commensurable'"
+  },
+  "TEST_1_the_ratio": {
+    "quantity": "R1 = P_cell_measured_HD / P_mem_engine_two_route",
+    "predicted_direction": "engine LOWER, i.e. R1 > 1",
+    "predicted_band": [
+      400.0,
+      2000.0
+    ],
+    "prior": "the scouting pass reported 935x; this re-derives it",
+    "pass_if": "R1 > 1 and 400 <= R1 <= 2000"
+  },
+  "TEST_2_which_engine_term": {
+    "quantity": "R2 = P_permeability_py_engine / P_cell_measured_HD",
+    "predicted_direction": "engine HIGHER, i.e. R2 > 1e4",
+    "status": "value was in hand at freeze; registered for the record, not as a blind prediction",
+    "registered_consequence_if_R1_gt_1_and_R2_gt_1": "the engine carries TWO shipped doxorubicin 'membrane permeability' numbers that STRADDLE the measurement, so no one-sided statement of the form 'the engine's permeability is X-fold off' is available, and the headline must be the INTERNAL INCONSISTENCY rather than a single gap"
+  },
+  "TEST_3_consequence_for_the_shipped_transport_number": {
+    "procedure": "re-call two_route.two_route_diffusivity for doxorubicin with membrane_permeability_um_s overridden to the measured 9.00e-4 um/s, every other input at its shipped value, and difference the resulting effective_D against the shipped compile. Also compute the P -> infinity ceiling.",
+    "predicted_direction": "shipped D_eff moves UP, negligibly",
+    "predicted_band": "|delta D_eff| / D_eff < 0.02",
+    "reason_stated_in_advance": "the dimensionless membrane resistance sigma_c/(a*P) is 2.18e7 at the shipped P, so a ~934x rise in P leaves it near 2.3e4, still >> 1, and the inclusion phase stays effectively impermeable",
+    "pass_if": "relative change < 0.02",
+    "registered_consequence_of_a_pass": "the 10^3 permeability gap has NO consequence for any shipped doxorubicin transport number, which forbids calling it 'the most consequential number' on D_eff grounds and forces the alpha argument to stand entirely on its own"
+  },
+  "TEST_4_the_alpha_test": {
+    "why": "calibration.py attributes a ~300x sink to 'rapid cellular uptake plus high-capacity intracellular / DNA binding' and explicitly declines to use permeability as the proxy. The scouting pass claims the measurement REFRAMES alpha as a patch for a measurably wrong permeability. This test decides that.",
+    "construction": "membrane-limited uptake cannot remove extracellular solute faster than P * (S/V). At the ENGINE's own geometry, S/V_tissue = 3*phi/a. Report BOTH conventions: k_ceiling_tissue = P * 3*phi/a and k_ceiling_interstitial = k_ceiling_tissue/(1-phi). The interstitial one is the PERMISSIVE end and the verdict uses it.",
+    "compared_against": {
+      "k_struct": "clearance + binding, UNCALIBRATED compile",
+      "k_eff_alpha": "clearance + alpha*uptake_proxy, alpha = 22.2235"
+    },
+    "decision_rule_fixed_now": {
+      "A_reframing_SUPPORTED": "k_ceiling_interstitial >= k_eff_alpha",
+      "B_partial_overlap": "k_struct <= k_ceiling_interstitial < k_eff_alpha",
+      "C_reframing_REFUTED": "k_ceiling_interstitial < k_struct"
+    },
+    "predicted_outcome": "B",
+    "predicted_band_k_ceiling_interstitial_per_s": [
+      0.0008,
+      0.0015
+    ],
+    "predicted_shortfall_vs_k_eff_alpha": "3x to 7x BELOW",
+    "registered_reading_of_outcome_B": "Under B, alpha asserts a perivascular sink ABOVE the ceiling that a MEASURED doxorubicin cell permeability can sustain. A binding CAPACITY cannot rescue that: capacity sets how long a flux can be absorbed, permeability sets the flux. So B is NOT 'the same hole counted twice'. It is a NEW, independent, measured UPPER BOUND that alpha violates, and it is a different finding from the one the scouting pass asserted.",
+    "sensitivity_arm": "repeat the ceiling with P_MDCK_MICROVESSEL = 32e-4 um/s, the highest measured DOX cell permeability Degerstedt cite (their ref 65, NOT verified at its own source), to establish whether the verdict's DIRECTION survives the top of the measured range"
+  },
+  "TEST_5_the_transvascular_term": {
+    "status": "definitional correction, established by reading code, not a test",
+    "finding_at_freeze": "tmesim/treatment/transvascular.py states in its own docstring that the repository has NEITHER factor of PS = P*(S/V): the shipped entry term is PS = vascular_density * bbb_penetrance * PS_SCALE_S_INV with PS_SCALE_S_INV = 1 s^-1 undocumented, and no measured vessel radius exists. There is therefore NO transvascular wall permeability in the engine to score.",
+    "and": "Degerstedt's P_cell is a CELL permeability, not a vessel-wall permeability, so it would be the wrong anchor for one even if the term existed. The task's 'transvascular permeability term' framing is corrected to 'cell-membrane permeability term'."
+  },
+  "what_this_cannot_establish_whatever_the_numbers": [
+    "HepG2 hepatoma in a collagen/fibrinogen gel is not GBM in brain; nothing here transfers a doxorubicin number to another compound or another tissue.",
+    "P_cell is APPARENT: it lumps active transport, binding and partition, and doxorubicin is a P-gp substrate and a DNA intercalator. The engine's P_mem is a PASSIVE permeability. These are not strictly the same object.",
+    "The authors state the fluorescence self-quenches above ~25 uM and that they are 'more likely to underestimate rather than overestimate' P_cell, so the measurement is a LOWER bound and every ceiling derived from it is a lower bound on a ceiling.",
+    "No absolute output of the simulator is validated or invalidated by this; the subject is one shipped parameter and one derived rate."
+  ]
+}
