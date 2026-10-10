@@ -89,22 +89,67 @@ from ..data.real.visium import load_sample
 # section still needs ~0.9 to 1.2 GB on this machine, so a 512 MB container
 # still cannot serve one at any `dx_um` -- the gap is 1.7x to 2.4x rather than
 # 6x, but it is a gap, and the refusal below must not imply it has closed.
+#
+# RE-MEASURED AGAIN 2026-10-10, same method, after `load_sample` was rebuilt in
+# `tmesim/data/real/visium.py` to assemble its CSR out of mmread's COO instead
+# of copying the matrix three times. That term fell 2.0x to 2.2x (GBM1 644.2 ->
+# 299.3 MiB) and the output is bit-identical -- `deconvolve_sample`'s `coords`
+# and `fractions` are `np.array_equal` to the pre-change values on all four
+# sections, max|d| exactly 0. The whole-call peaks below fell with it, 8 to 12
+# cold runs per section, maximum recorded:
+#
+#     section         | 2026-09-20 | 2026-10-10 | runs
+#     GBM1            |    1227.9  |     895.6  |  8
+#     GBM2            |     939.0  |     782.3  |  8
+#     GBM3            |     922.2  |     787.4  | 12
+#     10x_parent_gbm  |    1215.7  |     896.7  | 12
+#
+# The table had to move: 1227.9 against a real 895.6 is 332 MiB of refusal
+# aimed at hosts that can now serve the section. The gap to 512 MB is now
+# 1.53x to 1.75x, NOT the "1.7x to 2.4x" the paragraph above states -- that
+# figure is the 2026-09-20 one and is superseded here, not contradicted.
+#
+# THE DOMINANT TERM MOVED AGAIN, and it is no longer in the Visium loader.
+# Staged, cold, GBM1, after the change:
+#
+#     imports                     109.3 MiB peak
+#     load_sample(visium)         398.3     (+289.0)
+#     reference_gene_symbols      425.3     ( +27.0)
+#     build_signatures            952.8     (+527.5)  <-- now the largest
+#     CSR column subset + NNLS    952.8     (  +0.0)
+#
+# `build_signatures`' +527.5 MiB is `load_reference()` assembling the whole
+# 23,460 x 3,589 int32 reference frame (321 MiB resident) plus its parse
+# transient. It is a high-water rise here and was not one before only because
+# the old loader left ~450 MiB of freed-but-retained allocator arenas behind
+# for it to land in.
+#
+# AND 512 MB IS NOT REACHABLE. That is now measured rather than projected.
+# results/visium_load_memory_2026-10-10.md runs the pipeline with the
+# reference STREAMED -- never assembled, two chunked passes straight off the
+# gzip, which is the cheapest shape this computation has -- and with the full
+# spot x gene matrix dropped the moment the shared-gene submatrix exists.
+# Absolute peak RSS of that floor: GBM1 686.6, GBM2 542.1, GBM3 531.5,
+# 10x_parent_gbm 707.2 MiB. Every one is over 512, so no rewrite of
+# `build_signatures` gets there either, and the refusal stays.
 MEASURED_VISIUM_PEAK_MIB: Dict[str, float] = {
-    "GBM1": 1227.9,
-    "GBM2": 939.0,
-    "GBM3": 922.2,
-    "10x_parent_gbm": 1215.7,
+    "GBM1": 895.6,
+    "GBM2": 782.3,
+    "GBM3": 787.4,
+    "10x_parent_gbm": 896.7,
 }
 
 #: The CHEAPEST Visium deconvolution ever measured here, across every section
-#: and every run (GBM2, run 4: 869.9 MiB -- the same section whose maximum is
-#: 939.0; the run-to-run spread is the allocator, not the workload). Used as
-#: the threshold for a sample with no measurement of its own -- an ingested
-#: section, say. It is
+#: and every run (GBM3, 565.8 MiB -- a single low run against a mode of 750 to
+#: 790 for that same section; the run-to-run spread is the allocator, not the
+#: workload). Used as the threshold for a sample with no measurement of its own
+#: -- an ingested section, say. It is
 #: deliberately the minimum and not the mean: this is the figure below which
 #: NOTHING measured here has ever fitted, so refusing under it never refuses a
-#: run that was observed to succeed.
-MEASURED_VISIUM_MIN_MIB = 869.9
+#: run that was observed to succeed. It is the one constant here where the
+#: minimum is right and the maximum would be wrong, and it moved DOWN (869.9 ->
+#: 565.8) for the same reason the table above did.
+MEASURED_VISIUM_MIN_MIB = 565.8
 
 
 class DeconvolutionTooLargeForHost(MemoryError):
@@ -158,16 +203,17 @@ def check_visium_memory_budget(sample_id: str) -> None:
         f"{h['rss_bytes'] / mib:,.0f} MiB already resident)."
         f"\n\nThis is NOT a grid-size problem. TMESIM_MAX_GRID_CELLS counts "
         f"voxels and every byte above is spent before a grid exists, so no "
-        f"choice of dx_um avoids it. The measured cost is dominated by loading "
-        f"the Visium section itself -- its spot x gene matrix and image "
-        f"metadata -- not by the requested resolution."
+        f"choice of dx_um avoids it. The measured cost is dominated by reading "
+        f"the single-cell reference panel the section is deconvolved against "
+        f"-- a 23,460 x 3,589 counts matrix -- not by the requested resolution "
+        f"and no longer by the Visium section itself."
         f"\n\nOptions: (1) choose a Xenium section -- the Xenium path does not "
         f"load this reference at all, so none of the cost above applies to it "
         f"(its own cost was not measured in this pass); "
         f"(2) run Visium on an instance with more memory; or (3) set "
         f"{_OVERRIDE_ENV}=1 to attempt it anyway and accept that the container "
         f"may be OOM-killed. Measurements: "
-        f"results/scref_signatures_2026-09-20.md."
+        f"results/visium_load_memory_2026-10-10.md."
     )
 
 # ---------------------------------------------------------------------------

@@ -258,18 +258,148 @@ def _read_barcodes(matrix_dir: str) -> List[str]:
         return [ln.strip() for ln in fh if ln.strip()]
 
 
-def _read_matrix(matrix_dir: str):
-    """Read the MEX matrix as a scipy CSR of shape (n_genes, n_spots)."""
+#: Entries compared per chunk by :func:`_is_csr_canonical_order`. 2**20 int32
+#: entries is a 4 MiB slice and a 1 MiB boolean temporary, so the ordering
+#: check costs megabytes on a matrix whose index arrays are hundreds of them.
+_ORDER_CHECK_CHUNK = 1 << 20
+
+
+def _read_matrix_coo(matrix_dir: str):
+    """Read the MEX matrix as scipy COORDINATE format, (n_genes, n_spots).
+
+    This is ``mmread``'s own output, NOT converted. The conversion is what
+    costs the memory: ``mmread`` on GBM1 produces a 232.4 MiB COO at a
+    MEASURED peak of 286.4 MiB in isolation and 294.5 MiB inside the loader
+    -- near-optimal either way -- and every byte above that in the old reader
+    was spent turning that COO into the (n_spots, n_genes) CSR
+    the pipeline wants. :func:`_spots_by_genes_csr` does that turn without
+    copying the two big arrays. See results/visium_load_memory_2026-10-10.md.
+
+    A Matrix Market file written in ``array`` (dense) rather than
+    ``coordinate`` form makes ``mmread`` return a plain ndarray; it is
+    converted here so the one caller only ever sees coordinate format. No
+    Space Ranger output is written that way (the old reader would have raised
+    ``AttributeError`` on it).
+    """
     from scipy.io import mmread
+    from scipy.sparse import coo_matrix, issparse
 
     for name in ("matrix.mtx.gz", "matrix.mtx"):
         full = os.path.join(matrix_dir, name)
         if os.path.exists(full):
             if full.endswith(".gz"):
                 with gzip.open(full, "rb") as fh:
-                    return mmread(fh).tocsr()
-            return mmread(full).tocsr()
+                    m = mmread(fh)
+            else:
+                m = mmread(full)
+            if not issparse(m):
+                return coo_matrix(m)
+            return m.tocoo() if m.format != "coo" else m
     raise FileNotFoundError(f"no matrix.mtx(.gz) in {matrix_dir}")
+
+
+def _is_csr_canonical_order(rows, cols, chunk: int = _ORDER_CHECK_CHUNK) -> bool:
+    """Are ``(rows, cols)`` already in CSR canonical order?
+
+    Canonical means ``rows`` non-decreasing AND ``cols`` strictly increasing
+    within each row -- i.e. sorted with no duplicate ``(row, col)`` pair. That
+    is exactly the condition under which ``coo_matrix(...).tocsr()`` would
+    neither reorder nor sum anything, so a CSR assembled straight from these
+    arrays is BIT-IDENTICAL to the one that conversion produces. When it is
+    False the caller must do the real conversion instead.
+
+    Compared in chunks so the check never allocates an array proportional to
+    ``nnz``. ``np.diff(rows)`` would cost 58 MiB on GBM1 and ``np.bincount``
+    silently casts its input to ``intp``, which is 116 MiB; both were measured
+    and both are why this is a loop.
+    """
+    n = int(rows.size)
+    if n < 2:
+        return True
+    for lo in range(1, n, chunk):
+        hi = min(lo + chunk, n)
+        r, r_prev = rows[lo:hi], rows[lo - 1:hi - 1]
+        if np.any(r < r_prev):
+            return False
+        same_row = r == r_prev
+        c, c_prev = cols[lo:hi], cols[lo - 1:hi - 1]
+        if np.any(c[same_row] <= c_prev[same_row]):
+            return False
+    return True
+
+
+def _spots_by_genes_csr(coo, spots_axis: int, keep_idx, n_genes: int):
+    """Turn ``mmread``'s COO into the ``(n_kept_spots, n_genes)`` CSR.
+
+    The old reader did this in three steps, each a full copy of the matrix:
+
+        mat = mmread(...).tocsr()        # genes x spots  (+116 MiB)
+        mat[:, keep_idx]                 # a CSR column gather
+        .T.tocsr()                       # CSC -> CSR     (+174 MiB)
+
+    MEASURED on GBM1: +630.4 MiB over imports for a 174.3 MiB result, against
+    +296.4 MiB for this function. Two of those steps are avoidable outright
+    and one is avoidable on every section that exists here:
+
+    * **The column gather selects everything.** ``barcodes.tsv`` in a
+      *filtered* Space Ranger matrix already lists only in-tissue spots, so
+      ``keep_idx`` is ``arange(n_spots)`` for all four built-in sections
+      (MEASURED: 3,468 / 4,764 / 2,891 / 1,775 of 3,468 / 4,764 / 2,891 /
+      1,775). It is still computed and still applied when it is NOT the
+      identity -- a *raw* matrix carries ~1.5x more barcodes than there are
+      in-tissue spots -- but then it is applied to the COO's flat arrays,
+      where it costs the size of the output rather than a sparse gather.
+
+    * **The transpose needs no data movement.** A MEX file lists its entries
+      column-major (spot-major), rows ascending within a column, so in the
+      TRANSPOSED orientation they are already in CSR canonical order. The
+      gene index array is therefore already the CSR ``indices``, the value
+      array is already the CSR ``data``, and ``indptr`` is a ``searchsorted``
+      over the spot index array. Nothing is copied.
+
+    That ordering is a property of the file, not a guarantee, so it is
+    CHECKED (:func:`_is_csr_canonical_order`) rather than assumed, and a file
+    that fails the check falls through to the ordinary conversion, which
+    sorts and sums duplicates exactly as the old reader did.
+    """
+    from scipy.sparse import coo_matrix, csr_matrix
+
+    spot_of = coo.col if spots_axis == 1 else coo.row
+    gene_of = coo.row if spots_axis == 1 else coo.col
+    data = coo.data
+    n_spots_file = int(coo.shape[spots_axis])
+    n_keep = int(keep_idx.size)
+
+    if n_keep == n_spots_file and np.array_equal(
+        keep_idx, np.arange(n_spots_file)
+    ):
+        rows = spot_of           # the identity: no gather, no copy
+    else:
+        # New position of each file column, -1 for a column being dropped.
+        # int32 keeps the (nnz,) gather the same width as mmread's own index
+        # arrays; int64 would double it.
+        pos = np.full(n_spots_file, -1, dtype=np.int32)
+        pos[keep_idx] = np.arange(n_keep, dtype=np.int32)
+        rows = pos[spot_of]
+        kept = rows >= 0
+        if not bool(kept.all()):
+            rows = rows[kept]
+            gene_of = gene_of[kept]
+            data = data[kept]
+        del pos, kept
+
+    if _is_csr_canonical_order(rows, gene_of):
+        # indptr[i] = first entry whose row is >= i. Valid because `rows` is
+        # non-decreasing, which is what the check above establishes. The
+        # needle shares `rows`' dtype so that searchsorted cannot promote --
+        # and copy -- the big array.
+        indptr = np.searchsorted(
+            rows, np.arange(n_keep + 1, dtype=rows.dtype), side="left"
+        )
+        return csr_matrix(
+            (data, gene_of, indptr), shape=(n_keep, n_genes), copy=False
+        )
+    return coo_matrix((data, (rows, gene_of)), shape=(n_keep, n_genes)).tocsr()
 
 
 # ---------------------------------------------------------------------------
@@ -380,15 +510,19 @@ def load_from_dirs(
     umpp, spot_diam = _read_umpp(spatial_dir)
     ensembl_ids, symbols = _read_features(matrix_dir)
     barcodes_all = _read_barcodes(matrix_dir)
-    mat = _read_matrix(matrix_dir)  # (n_genes, n_spots) CSR
+    mat = _read_matrix_coo(matrix_dir)  # coordinate format, (n_genes, n_spots)
 
+    # Which AXIS of the file is the spots. MEX is genes x spots, so normally
+    # axis 1; the guard below catches a transposed/edge encoding by aligning on
+    # the counts that match. The old reader physically transposed the matrix
+    # here (`mat.T.tocsr()`, a full copy); an axis number does the same job,
+    # because nothing between here and `_spots_by_genes_csr` reads `mat`.
+    spots_axis = 1
     n_genes_file, n_spots_file = mat.shape
     if n_genes_file != len(symbols) or n_spots_file != len(barcodes_all):
-        # mmread gives (rows, cols); MEX is genes x spots. Guard against a
-        # transposed/edge encoding by aligning on the counts that match.
         if mat.shape == (len(barcodes_all), len(symbols)):
-            mat = mat.T.tocsr()
-            n_genes_file, n_spots_file = mat.shape
+            spots_axis = 0
+            n_spots_file, n_genes_file = mat.shape
 
     # keep only spots present in BOTH the matrix and the in-tissue position list
     keep_idx = [i for i, bc in enumerate(barcodes_all) if bc in coords_px]
@@ -409,7 +543,11 @@ def load_from_dirs(
     coords_um = np.column_stack([x_um, y_um])
 
     # expression -> (n_spots, n_genes)
-    expr = mat[:, keep_idx].T.tocsr()  # (n_spots, n_genes)
+    expr = _spots_by_genes_csr(mat, spots_axis, keep_idx, n_genes_file)
+    # Drop the COO. On the identity selection `expr` holds two of its three
+    # arrays, so this frees exactly the third (the spot index: 58.1 MiB on
+    # GBM1) -- and on a non-identity selection it frees all three.
+    del mat
     total_counts = np.asarray(expr.sum(axis=1)).ravel().astype(np.float64)
 
     out: Dict = {
