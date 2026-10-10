@@ -540,6 +540,37 @@ def jsonable(obj, _depth: int = 0):
     return str(obj)
 
 
+def _memo_stamp(spec: Dict) -> Optional[Dict]:
+    """The two memo keys for this run, or ``None`` if it cannot be keyed.
+
+    Imported lazily so ``jobs`` keeps its import graph: ``memo`` reads the
+    solver constants and ``CLAIM_SET_VERSION`` back out of this module.
+
+    A spec that cannot be canonicalised gets NO stamp rather than a partial
+    one, and a run without a stamp is never a memo candidate. The failure is
+    therefore towards re-solving, which costs time; the opposite failure costs
+    a wrong number.
+
+    Only the two anticipated failures are absorbed -- an unkeyable spec, and a
+    source or specimen file that cannot be read while the fingerprint is taken.
+    Anything else propagates and fails the run, deliberately: a bug in the
+    keying must not be able to hide behind a cache that quietly stops working.
+    """
+    from .memo import MEMO_FORMAT_VERSION, Unmemoisable, run_keys
+
+    try:
+        keys = run_keys(spec)
+    except (Unmemoisable, OSError):
+        return None
+    return {
+        "format": MEMO_FORMAT_VERSION,
+        "run_key": keys["run_key"],
+        "shape_key": keys["shape_key"],
+        "engine_digest": keys["components"]["engine"]["digest"],
+        "tissue_digest": keys["components"]["tissue_digest"],
+    }
+
+
 def _metric(value, reasons: Dict[str, str], name: str, reason: str):
     """Record a metric, or ``None`` plus ``reason`` when it is not a number.
 
@@ -853,6 +884,29 @@ def execute_run(spec: Dict, ctx: _Ctx,
         "pde_time_resolved": time_resolved,
         "pde_time_resolved_default": getattr(PDEConfig(), "time_resolved", None),
         "seed": SIM_SEED,
+        # --- the memo stamp ------------------------------------------------- #
+        # What this run's answer DEPENDS ON, reduced to two digests, so a later
+        # request for the same spec can be shown to be the same question rather
+        # than assumed to be. ``app/server/memo.py`` composes them from the
+        # canonicalised RunSpec, the solver constants just above, a fingerprint
+        # of the engine's source plus its one fitted constant, the section's
+        # file fingerprint, and CLAIM_SET_VERSION.
+        #
+        # It is written at EXECUTION time on purpose, like the caveats and the
+        # claim-set stamp beside it: the thing being recorded is what this run
+        # was computed against, which is a fact about this moment and is not
+        # recoverable afterwards. A run with no stamp -- every run in this store
+        # written before the field existed -- is therefore never a memo
+        # candidate, which is the only honest answer about a run whose engine
+        # state nobody wrote down.
+        #
+        # ``shape_key`` is the same composite with pk.plasma_peak and
+        # pk.half_life_s blanked, so two runs differing ONLY along those two
+        # axes share it. That is what lets a dose change be answered by the
+        # exact algebraic identity in that module instead of by a re-solve. It
+        # is a LOOKUP key and nothing more: the scaling itself is refused for
+        # every readout the identity does not cover.
+        "memo": _memo_stamp(spec),
         "engine_entrypoints": [
             "reconstruct.real_pipeline.reconstruct_real",
             "reconstruct.real_pipeline.apply_drug_sensitivity",

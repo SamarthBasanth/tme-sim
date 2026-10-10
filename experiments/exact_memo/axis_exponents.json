@@ -1,0 +1,1189 @@
+{
+ "n_rows": 921,
+ "alpha": 22.223477711172563,
+ "plasma_peak": {
+  "n_groups": 9,
+  "axis_ratios": [
+   4.0
+  ],
+  "readouts": {
+   "E_p10_uM": {
+    "n_pairs": 9,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.0,
+    "max_fold": 4.0,
+    "max_abs_dev_from_1": 3.0,
+    "max_abs_dev_from_axis_ratio": 0.0
+   },
+   "E_p50_uM": {
+    "n_pairs": 9,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.0,
+    "max_fold": 4.0,
+    "max_abs_dev_from_1": 3.0,
+    "max_abs_dev_from_axis_ratio": 0.0
+   },
+   "E_p90_uM": {
+    "n_pairs": 9,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.0,
+    "max_fold": 4.0,
+    "max_abs_dev_from_1": 3.0,
+    "max_abs_dev_from_axis_ratio": 0.0
+   },
+   "alpha_at_run": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_bbb_penetrance": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_binding_1_per_s": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_clearance_1_per_s": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_diffusivity_um2_s": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_ic50_uM": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_logp": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_mw": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "dx_um": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "frac_ENDOTHELIAL": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "frac_IMMUNE": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "frac_NECROTIC": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "frac_STROMAL": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "frac_TUMOR": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "half_life_s": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "low_o2_over_high_o2_exposure": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "max_darcy_speed_um_s": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "mean_ecm_density": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "mean_oxygen": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "mean_tissue_auc": {
+    "n_pairs": 9,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.0,
+    "max_fold": 4.0,
+    "max_abs_dev_from_1": 3.0,
+    "max_abs_dev_from_axis_ratio": 0.0
+   },
+   "mean_tumor_auc": {
+    "n_pairs": 9,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.0,
+    "max_fold": 4.0,
+    "max_abs_dev_from_1": 3.0,
+    "max_abs_dev_from_axis_ratio": 0.0
+   },
+   "mean_vascular_density": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "median_tumor_auc": {
+    "n_pairs": 9,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.0,
+    "max_fold": 4.0,
+    "max_abs_dev_from_1": 3.0,
+    "max_abs_dev_from_axis_ratio": 0.0
+   },
+   "n_cells": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "n_doses": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "n_tumor": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "n_viable_reach": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "penetration_index": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "penetration_length_analytic_um": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "penetration_length_um": {
+    "n_pairs": 9,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.9996508775288936,
+    "max_fold": 1.000000100734699,
+    "max_abs_dev_from_1": 0.00034912247110641115,
+    "max_abs_dev_from_axis_ratio": 0.7500872806177766
+   },
+   "plasma_mean_uM": {
+    "n_pairs": 9,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.0,
+    "max_fold": 4.0,
+    "max_abs_dev_from_1": 3.0,
+    "max_abs_dev_from_axis_ratio": 0.0
+   },
+   "plasma_peak": {
+    "n_pairs": 9,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.0,
+    "max_fold": 4.0,
+    "max_abs_dev_from_1": 3.0,
+    "max_abs_dev_from_axis_ratio": 0.0
+   },
+   "plasma_peak_uM": {
+    "n_pairs": 9,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.0,
+    "max_fold": 4.0,
+    "max_abs_dev_from_1": 3.0,
+    "max_abs_dev_from_axis_ratio": 0.0
+   },
+   "reach_E_ref": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "reach_headline_F": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "reach_headline_x": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "recon_build_s": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "tissue_coverage_fraction": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "total_time_s": {
+    "n_pairs": 9,
+    "bit_identical": 9,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "wall_clock_s": {
+    "n_pairs": 9,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.7328694094909478,
+    "max_fold": 1.7023316036719083,
+    "max_abs_dev_from_1": 0.7023316036719083,
+    "max_abs_dev_from_axis_ratio": 0.816782647627263
+   }
+  }
+ },
+ "half_life_s": {
+  "n_groups": 228,
+  "axis_ratios": [
+   4.0
+  ],
+  "readouts": {
+   "E_p10_uM": {
+    "n_pairs": 456,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 1.416069155118261,
+    "max_fold": 2.624935085355347,
+    "max_abs_dev_from_1": 1.624935085355347,
+    "max_abs_dev_from_axis_ratio": 0.6459827112204348
+   },
+   "E_p50_uM": {
+    "n_pairs": 456,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 1.4160691551182878,
+    "max_fold": 2.6249350853553386,
+    "max_abs_dev_from_1": 1.6249350853553386,
+    "max_abs_dev_from_axis_ratio": 0.645982711220428
+   },
+   "E_p90_uM": {
+    "n_pairs": 456,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 1.4160691551182765,
+    "max_fold": 2.624935085355395,
+    "max_abs_dev_from_1": 1.624935085355395,
+    "max_abs_dev_from_axis_ratio": 0.6459827112204308
+   },
+   "alpha_at_run": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_bbb_penetrance": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_binding_1_per_s": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_clearance_1_per_s": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_diffusivity_um2_s": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_ic50_uM": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_logp": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "drug_mw": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "dx_um": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "frac_ENDOTHELIAL": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "frac_IMMUNE": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "frac_NECROTIC": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "frac_STROMAL": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "frac_TUMOR": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "half_life_s": {
+    "n_pairs": 456,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.0,
+    "max_fold": 4.0,
+    "max_abs_dev_from_1": 3.0,
+    "max_abs_dev_from_axis_ratio": 0.0
+   },
+   "low_o2_over_high_o2_exposure": {
+    "n_pairs": 456,
+    "bit_identical": 16,
+    "bit_identical_all": false,
+    "min_fold": 0.9999999999999666,
+    "max_fold": 1.0000000000000198,
+    "max_abs_dev_from_1": 3.341771304121721e-14,
+    "max_abs_dev_from_axis_ratio": 0.7500000000000083
+   },
+   "max_darcy_speed_um_s": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "mean_ecm_density": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "mean_oxygen": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "mean_tissue_auc": {
+    "n_pairs": 456,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 1.4160691551183966,
+    "max_fold": 2.6249350853551157,
+    "max_abs_dev_from_1": 1.6249350853551157,
+    "max_abs_dev_from_axis_ratio": 0.6459827112204009
+   },
+   "mean_tumor_auc": {
+    "n_pairs": 456,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 1.4160691551183935,
+    "max_fold": 2.6249350853551237,
+    "max_abs_dev_from_1": 1.6249350853551237,
+    "max_abs_dev_from_axis_ratio": 0.6459827112204016
+   },
+   "mean_vascular_density": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "median_tumor_auc": {
+    "n_pairs": 456,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 1.4160691551182878,
+    "max_fold": 2.6249350853553386,
+    "max_abs_dev_from_1": 1.6249350853553386,
+    "max_abs_dev_from_axis_ratio": 0.645982711220428
+   },
+   "n_cells": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "n_doses": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "n_tumor": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "n_viable_reach": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "penetration_index": {
+    "n_pairs": 456,
+    "bit_identical": 5,
+    "bit_identical_all": false,
+    "min_fold": 0.999999999999923,
+    "max_fold": 1.0000000000000817,
+    "max_abs_dev_from_1": 8.171241461241152e-14,
+    "max_abs_dev_from_axis_ratio": 0.7500000000000193
+   },
+   "penetration_length_analytic_um": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "penetration_length_um": {
+    "n_pairs": 416,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.9987289886542837,
+    "max_fold": 1.0000452946101768,
+    "max_abs_dev_from_1": 0.0012710113457162775,
+    "max_abs_dev_from_axis_ratio": 0.7503177528364291
+   },
+   "plasma_mean_uM": {
+    "n_pairs": 456,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 1.4160691551184028,
+    "max_fold": 2.6249350853551046,
+    "max_abs_dev_from_1": 1.6249350853551046,
+    "max_abs_dev_from_axis_ratio": 0.6459827112203993
+   },
+   "plasma_peak": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "plasma_peak_uM": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "reach_E_ref": {
+    "n_pairs": 408,
+    "bit_identical": 408,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "reach_headline_F": {
+    "n_pairs": 408,
+    "bit_identical": 408,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "reach_headline_x": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "recon_build_s": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "tissue_coverage_fraction": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "total_time_s": {
+    "n_pairs": 456,
+    "bit_identical": 456,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.75
+   },
+   "wall_clock_s": {
+    "n_pairs": 456,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.25267333128291686,
+    "max_fold": 2.4238307951916176,
+    "max_abs_dev_from_1": 1.4238307951916176,
+    "max_abs_dev_from_axis_ratio": 0.9368316671792708
+   }
+  }
+ },
+ "total_time_s": {
+  "n_groups": 228,
+  "axis_ratios": [
+   6.0
+  ],
+  "readouts": {
+   "E_p10_uM": {
+    "n_pairs": 228,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.6891373489294296,
+    "max_fold": 3.9690008962954626,
+    "max_abs_dev_from_1": 2.9690008962954626,
+    "max_abs_dev_from_axis_ratio": 0.8851437751784283
+   },
+   "E_p50_uM": {
+    "n_pairs": 228,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.6866283491175404,
+    "max_fold": 1.4881179490380436,
+    "max_abs_dev_from_1": 0.4881179490380436,
+    "max_abs_dev_from_axis_ratio": 0.8855619418137433
+   },
+   "E_p90_uM": {
+    "n_pairs": 228,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.68795434048369,
+    "max_fold": 1.2048431257644936,
+    "max_abs_dev_from_1": 0.31204565951631,
+    "max_abs_dev_from_axis_ratio": 0.8853409432527184
+   },
+   "alpha_at_run": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "drug_bbb_penetrance": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "drug_binding_1_per_s": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "drug_clearance_1_per_s": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "drug_diffusivity_um2_s": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "drug_ic50_uM": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "drug_logp": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "drug_mw": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "dx_um": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "frac_ENDOTHELIAL": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "frac_IMMUNE": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "frac_NECROTIC": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "frac_STROMAL": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "frac_TUMOR": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "half_life_s": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "low_o2_over_high_o2_exposure": {
+    "n_pairs": 228,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.9990686236116582,
+    "max_fold": 2.1103091788051285,
+    "max_abs_dev_from_1": 1.1103091788051285,
+    "max_abs_dev_from_axis_ratio": 0.8334885627313903
+   },
+   "max_darcy_speed_um_s": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "mean_ecm_density": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "mean_oxygen": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "mean_tissue_auc": {
+    "n_pairs": 228,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.139599539645861,
+    "max_fold": 6.877971858522296,
+    "max_abs_dev_from_1": 5.877971858522296,
+    "max_abs_dev_from_axis_ratio": 0.3100667433923565
+   },
+   "mean_tumor_auc": {
+    "n_pairs": 228,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.135731033077415,
+    "max_fold": 7.01391853438554,
+    "max_abs_dev_from_1": 6.01391853438554,
+    "max_abs_dev_from_axis_ratio": 0.31071149448709745
+   },
+   "mean_vascular_density": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "median_tumor_auc": {
+    "n_pairs": 228,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 4.119770094705243,
+    "max_fold": 8.92870769422826,
+    "max_abs_dev_from_1": 7.92870769422826,
+    "max_abs_dev_from_axis_ratio": 0.4881179490380434
+   },
+   "n_cells": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "n_doses": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "n_tumor": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "n_viable_reach": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "penetration_index": {
+    "n_pairs": 228,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.9969272627817001,
+    "max_fold": 1.3162582817734663,
+    "max_abs_dev_from_1": 0.31625828177346627,
+    "max_abs_dev_from_axis_ratio": 0.83384545620305
+   },
+   "penetration_length_analytic_um": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "penetration_length_um": {
+    "n_pairs": 208,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.4838651422296271,
+    "max_fold": 1.3752083690365324,
+    "max_abs_dev_from_1": 0.5161348577703728,
+    "max_abs_dev_from_axis_ratio": 0.9193558096283955
+   },
+   "plasma_mean_uM": {
+    "n_pairs": 228,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.67717582692808,
+    "max_fold": 0.67717582692808,
+    "max_abs_dev_from_1": 0.32282417307192,
+    "max_abs_dev_from_axis_ratio": 0.8871373621786534
+   },
+   "plasma_peak": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "plasma_peak_uM": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "reach_E_ref": {
+    "n_pairs": 204,
+    "bit_identical": 204,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "reach_headline_F": {
+    "n_pairs": 204,
+    "bit_identical": 204,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "reach_headline_x": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "recon_build_s": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "tissue_coverage_fraction": {
+    "n_pairs": 228,
+    "bit_identical": 228,
+    "bit_identical_all": true,
+    "min_fold": 1.0,
+    "max_fold": 1.0,
+    "max_abs_dev_from_1": 0.0,
+    "max_abs_dev_from_axis_ratio": 0.8333333333333334
+   },
+   "total_time_s": {
+    "n_pairs": 228,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 6.0,
+    "max_fold": 6.0,
+    "max_abs_dev_from_1": 5.0,
+    "max_abs_dev_from_axis_ratio": 0.0
+   },
+   "wall_clock_s": {
+    "n_pairs": 228,
+    "bit_identical": 0,
+    "bit_identical_all": false,
+    "min_fold": 0.08971244944194098,
+    "max_fold": 6.492732950946085,
+    "max_abs_dev_from_1": 5.492732950946085,
+    "max_abs_dev_from_axis_ratio": 0.9850479250930099
+   }
+  }
+ }
+}

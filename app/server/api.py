@@ -2929,6 +2929,17 @@ def create_app(manager: Optional[JobManager] = None,
     from .preview import build_preview_router
     app.include_router(build_preview_router(jobs=jobs))
 
+    # The exact memo: a repeat of a solved spec, and an algebraically rescaled
+    # answer for a dose/half-life change, both without re-solving. Same
+    # placement rule as the routers above.
+    #
+    # Its key hashes the engine as well as the spec, so a change to the solver
+    # invalidates every memo rather than serving a number the current code
+    # would not produce. memo.py's own residual-risk section names the four
+    # gaps that remain, the first being that input DATA is not hashed.
+    from .memo_api import build_memo_router
+    app.include_router(build_memo_router(jobs=jobs))
+
     # The login portal (docs/AUTH_CONTRACT.md §1). Registered here, BEFORE
     # _mount_web, because /login has to win over the StaticFiles mount at `/`
     # -- starlette matches in registration order, so a route declared after

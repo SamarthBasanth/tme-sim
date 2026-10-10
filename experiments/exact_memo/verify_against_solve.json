@@ -1,0 +1,199 @@
+{
+ "section": "xenium_breast",
+ "dx_um": 30.0,
+ "total_time_s": 21600.0,
+ "base_plasma_peak_uM": 50.0,
+ "scaled_to_plasma_peak_uM": 150.0,
+ "dose_ratio": 3.0,
+ "dose_ratio_is_power_of_two": false,
+ "bit_exact_claimed": false,
+ "source_run_id": "r_00003",
+ "n_readouts_served": 19,
+ "worst_ulp": 14.0,
+ "worst_relative": 1.6757127829245762e-15,
+ "n_bit_identical": 7,
+ "rows": [
+  {
+   "readout": "extra_metrics.median_tumor_auc",
+   "basis": "proportional",
+   "declared_max_ulp": 53.0,
+   "scaled": 31222880.72443929,
+   "solved": 31222880.72443934,
+   "ulp": 14.0,
+   "rel": 1.6703796372524915e-15
+  },
+  {
+   "readout": "extra_metrics.tissue_median_over_plasma_mean",
+   "basis": "invariant",
+   "declared_max_ulp": 35.0,
+   "scaled": 15.495567915544031,
+   "solved": 15.495567915544056,
+   "ulp": 14.0,
+   "rel": 1.6049102483463476e-15
+  },
+  {
+   "readout": "extra_metrics.E_p50_uM",
+   "basis": "proportional",
+   "declared_max_ulp": 54.0,
+   "scaled": 1445.5037372425597,
+   "solved": 1445.503737242562,
+   "ulp": 10.0,
+   "rel": 1.5729718961292298e-15
+  },
+  {
+   "readout": "extra_metrics.median_E_over_ic50",
+   "basis": "proportional",
+   "declared_max_ulp": 53.0,
+   "scaled": 2.3851360026478075,
+   "solved": 2.3851360026478114,
+   "ulp": 9.0,
+   "rel": 1.6757127829245762e-15
+  },
+  {
+   "readout": "extra_metrics.tissue_median_over_plasma_peak",
+   "basis": "proportional",
+   "declared_max_ulp": 17.0,
+   "scaled": 9.636691581617065,
+   "solved": 9.63669158161708,
+   "ulp": 9.0,
+   "rel": 1.6589937966987968e-15
+  },
+  {
+   "readout": "extra_metrics.p10_E_over_ic50",
+   "basis": "proportional",
+   "declared_max_ulp": 27.0,
+   "scaled": 1.440285487562421,
+   "solved": 1.4402854875624196,
+   "ulp": 6.0,
+   "rel": 9.250024672573462e-16
+  },
+  {
+   "readout": "extra_metrics.E_p10_uM",
+   "basis": "proportional",
+   "declared_max_ulp": 27.0,
+   "scaled": 872.8802268115875,
+   "solved": 872.8802268115868,
+   "ulp": 6.0,
+   "rel": 7.814600507349259e-16
+  },
+  {
+   "readout": "extra_metrics.E_p90_uM",
+   "basis": "proportional",
+   "declared_max_ulp": 21.0,
+   "scaled": 2076.344087989574,
+   "solved": 2076.3440879895716,
+   "ulp": 5.0,
+   "rel": 1.0950674156487595e-15
+  },
+  {
+   "readout": "extra_metrics.penetration_index",
+   "basis": "invariant",
+   "declared_max_ulp": 34.0,
+   "scaled": 0.4929321019698086,
+   "solved": 0.49293210196980886,
+   "ulp": 5.0,
+   "rel": 5.630709686935522e-16
+  },
+  {
+   "readout": "metrics.mean_tumor_auc",
+   "basis": "proportional",
+   "declared_max_ulp": 2.0,
+   "scaled": 31648620.26376441,
+   "solved": 31648620.26376442,
+   "ulp": 2.0,
+   "rel": 2.3541565271501743e-16
+  },
+  {
+   "readout": "extra_metrics.mean_tissue_auc",
+   "basis": "proportional",
+   "declared_max_ulp": 2.0,
+   "scaled": 25910133.53187921,
+   "solved": 25910133.531879216,
+   "ulp": 2.0,
+   "rel": 2.875546969974821e-16
+  },
+  {
+   "readout": "extra_metrics.low_o2_over_high_o2_exposure",
+   "basis": "invariant",
+   "declared_max_ulp": 2.0,
+   "scaled": 0.8295849937627016,
+   "solved": 0.8295849937627013,
+   "ulp": 2.0,
+   "rel": 2.6765745112856523e-16
+  },
+  {
+   "readout": "extra_metrics.penetration_length_analytic_um",
+   "basis": "invariant",
+   "declared_max_ulp": 0.0,
+   "scaled": 268.6776521170916,
+   "solved": 268.6776521170916,
+   "ulp": 0.0,
+   "rel": 0.0
+  },
+  {
+   "readout": "extra_metrics.hypoxic_tumor_fraction",
+   "basis": "invariant",
+   "declared_max_ulp": 0.0,
+   "scaled": 0.11237957342540514,
+   "solved": 0.11237957342540514,
+   "ulp": 0.0,
+   "rel": 0.0
+  },
+  {
+   "readout": "extra_metrics.plasma_mean_uM",
+   "basis": "proportional",
+   "declared_max_ulp": 0.0,
+   "scaled": 93.28497962262713,
+   "solved": 93.28497962262713,
+   "ulp": 0.0,
+   "rel": 0.0
+  },
+  {
+   "readout": "extra_metrics.plasma_peak_uM",
+   "basis": "proportional",
+   "declared_max_ulp": 0.0,
+   "scaled": 150.0,
+   "solved": 150.0,
+   "ulp": 0.0,
+   "rel": 0.0
+  },
+  {
+   "readout": "extra_metrics.plasma_peak_over_ic50",
+   "basis": "proportional",
+   "declared_max_ulp": 0.0,
+   "scaled": 0.2475056903551514,
+   "solved": 0.2475056903551514,
+   "ulp": 0.0,
+   "rel": 0.0
+  },
+  {
+   "readout": "extra_metrics.n_tumor",
+   "basis": "invariant",
+   "declared_max_ulp": 0.0,
+   "scaled": 89785.0,
+   "solved": 89785.0,
+   "ulp": 0.0,
+   "rel": 0.0
+  },
+  {
+   "readout": "extra_metrics.exposure_window_s",
+   "basis": "invariant",
+   "declared_max_ulp": 0.0,
+   "scaled": 21600.0,
+   "solved": 21600.0,
+   "ulp": 0.0,
+   "rel": 0.0
+  }
+ ],
+ "refused": [
+  "extra_metrics.therapeutic_coverage_0_5x",
+  "extra_metrics.therapeutic_coverage_2x",
+  "extra_metrics.viable_tumor_fraction",
+  "mechanism",
+  "metrics.kill_fraction",
+  "metrics.penetration_length_um",
+  "metrics.therapeutic_coverage_1x",
+  "timelapse"
+ ],
+ "alpha": 22.223477711172563
+}

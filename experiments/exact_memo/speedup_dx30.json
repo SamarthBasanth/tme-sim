@@ -1,0 +1,25 @@
+{
+ "section": "xenium_breast",
+ "dx_um": 30.0,
+ "total_time_s": 21600.0,
+ "alpha": 22.223477711172563,
+ "loadavg": [
+  2.072265625,
+  1.9794921875,
+  1.8486328125
+ ],
+ "solve_cold_s": 9.73355221748352,
+ "solve_warm_s": [
+  6.939922094345093,
+  6.983781814575195
+ ],
+ "memo_hit_s": 0.00017380714416503906,
+ "memo_speedup_vs_warm_solve": 39928.86556927297,
+ "memo_speedup_vs_cold_solve": 56002.02606310014,
+ "scaled_answer_s": 0.0005140304565429688,
+ "scaled_speedup_vs_its_own_solve": 13957.213821892394,
+ "unsolved_dose_solve_s": 7.174432992935181,
+ "memo_mode": "exact_memo",
+ "scale_mode": "algebraic_scale",
+ "scale_bit_exact": false
+}

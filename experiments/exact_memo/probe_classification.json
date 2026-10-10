@@ -1,0 +1,4526 @@
+{
+ "source": "probe_scaling.json",
+ "n_cases": 5,
+ "cases": [
+  [
+   "gbmspace_at12_bra_4_fo_4_1",
+   "temozolomide"
+  ],
+  [
+   "gbmspace_at12_bra_4_fo_4_1",
+   "doxorubicin"
+  ],
+  [
+   "gbmspace_at12_bra_4_fo_4_1",
+   "vincristine"
+  ],
+  [
+   "xenium_breast",
+   "temozolomide"
+  ],
+  [
+   "xenium_breast",
+   "doxorubicin"
+  ]
+ ],
+ "verdict": {
+  "drug_params.bbb_penetrance": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "drug_params.binding_1_per_s": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "drug_params.clearance_1_per_s": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "drug_params.diffusivity_um2_s": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "drug_params.hill": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "drug_params.ic50_uM": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "drug_params.logp": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "drug_params.molecular_weight": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "drug_params.mw_from_structure": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "extra_metrics.E_p10_uM": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 4503599627370500.0,
+    "max_ulp_from_ratio": 26.0,
+    "min_fold": 1.4999999999999942,
+    "max_fold": 4.0
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 295874595841836.0,
+    "max_ulp_from_ratio": 7.0,
+    "min_fold": 1.023011482024146,
+    "max_fold": 1.0656973577410538
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 4659051380174287.0,
+    "max_ulp_from_ratio": 20.0,
+    "min_fold": 3.069034446072431,
+    "max_fold": 3.069034446072443
+   }
+  },
+  "extra_metrics.E_p50_uM": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 4503599627370519.0,
+    "max_ulp_from_ratio": 23.0,
+    "min_fold": 1.4999999999999996,
+    "max_fold": 4.0
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 295874595841838.0,
+    "max_ulp_from_ratio": 17.0,
+    "min_fold": 1.0230114820241427,
+    "max_fold": 1.0656973577410542
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 4659051380174286.0,
+    "max_ulp_from_ratio": 54.0,
+    "min_fold": 3.0690344460724157,
+    "max_fold": 3.0690344460724424
+   }
+  },
+  "extra_metrics.E_p90_uM": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 4503599627370503.0,
+    "max_ulp_from_ratio": 7.0,
+    "min_fold": 1.4999999999999984,
+    "max_fold": 4.0
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 295874595841853.0,
+    "max_ulp_from_ratio": 19.0,
+    "min_fold": 1.0230114820241452,
+    "max_fold": 1.0656973577410576
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 4659051380174301.0,
+    "max_ulp_from_ratio": 21.0,
+    "min_fold": 3.069034446072437,
+    "max_fold": 3.069034446072449
+   }
+  },
+  "extra_metrics.exposure_window_s": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "extra_metrics.hypoxic_tumor_fraction": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "extra_metrics.low_o2_over_high_o2_exposure": {
+   "dose": {
+    "class": "INVARIANT_2ulp",
+    "n": 15,
+    "max_ulp_from_1": 2.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0000000000000004
+   },
+   "half_life": {
+    "class": "INVARIANT_2ulp",
+    "n": 10,
+    "max_ulp_from_1": 2.0,
+    "max_ulp_from_ratio": 295874595841835.0,
+    "min_fold": 0.9999999999999998,
+    "max_fold": 1.0000000000000004
+   },
+   "both": {
+    "class": "INVARIANT_1ulp",
+    "n": 5,
+    "max_ulp_from_1": 1.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 0.9999999999999998,
+    "max_fold": 1.0000000000000002
+   }
+  },
+  "extra_metrics.mean_tissue_auc": {
+   "dose": {
+    "class": "SCALES_1ulp",
+    "n": 15,
+    "max_ulp_from_1": 4503599627370497.0,
+    "max_ulp_from_ratio": 1.0,
+    "min_fold": 1.4999999999999998,
+    "max_fold": 4.0
+   },
+   "half_life": {
+    "class": "SCALES_2ulp",
+    "n": 10,
+    "max_ulp_from_1": 295874595841836.0,
+    "max_ulp_from_ratio": 2.0,
+    "min_fold": 1.023011482024146,
+    "max_fold": 1.0656973577410538
+   },
+   "both": {
+    "class": "SCALES_2ulp",
+    "n": 5,
+    "max_ulp_from_1": 4659051380174282.0,
+    "max_ulp_from_ratio": 2.0,
+    "min_fold": 3.0690344460724392,
+    "max_fold": 3.0690344460724406
+   }
+  },
+  "extra_metrics.median_E_over_ic50": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 4503599627370519.0,
+    "max_ulp_from_ratio": 23.0,
+    "min_fold": 1.4999999999999996,
+    "max_fold": 4.0
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 295874595841838.0,
+    "max_ulp_from_ratio": 17.0,
+    "min_fold": 1.0230114820241427,
+    "max_fold": 1.0656973577410542
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 4659051380174286.0,
+    "max_ulp_from_ratio": 53.0,
+    "min_fold": 3.069034446072416,
+    "max_fold": 3.0690344460724424
+   }
+  },
+  "extra_metrics.median_tumor_auc": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 4503599627370519.0,
+    "max_ulp_from_ratio": 23.0,
+    "min_fold": 1.4999999999999996,
+    "max_fold": 4.0
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 295874595841838.0,
+    "max_ulp_from_ratio": 18.0,
+    "min_fold": 1.0230114820241425,
+    "max_fold": 1.0656973577410542
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 4659051380174286.0,
+    "max_ulp_from_ratio": 53.0,
+    "min_fold": 3.069034446072416,
+    "max_fold": 3.0690344460724424
+   }
+  },
+  "extra_metrics.n_tumor": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "extra_metrics.p10_E_over_ic50": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 4503599627370500.0,
+    "max_ulp_from_ratio": 27.0,
+    "min_fold": 1.499999999999994,
+    "max_fold": 4.0
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 295874595841835.0,
+    "max_ulp_from_ratio": 7.0,
+    "min_fold": 1.023011482024146,
+    "max_fold": 1.0656973577410536
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 4659051380174287.0,
+    "max_ulp_from_ratio": 21.0,
+    "min_fold": 3.0690344460724304,
+    "max_fold": 3.069034446072443
+   }
+  },
+  "extra_metrics.penetration_index": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 16.5,
+    "max_ulp_from_ratio": 4503599627370504.0,
+    "min_fold": 0.9999999999999963,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 33.5,
+    "max_ulp_from_ratio": 295874595841867.5,
+    "min_fold": 0.9999999999999926,
+    "max_fold": 1.000000000000001
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 15.5,
+    "max_ulp_from_ratio": 4659051380174288.0,
+    "min_fold": 0.9999999999999966,
+    "max_fold": 1.0000000000000002
+   }
+  },
+  "extra_metrics.penetration_length_analytic_um": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "extra_metrics.plasma_mean_uM": {
+   "dose": {
+    "class": "SCALES_EXACTLY",
+    "n": 15,
+    "max_ulp_from_1": 4503599627370496.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.5,
+    "max_fold": 4.0
+   },
+   "half_life": {
+    "class": "SCALES_EXACTLY",
+    "n": 10,
+    "max_ulp_from_1": 295874595841834.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0230114820241465,
+    "max_fold": 1.0656973577410533
+   },
+   "both": {
+    "class": "SCALES_EXACTLY",
+    "n": 5,
+    "max_ulp_from_1": 4659051380174280.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 3.0690344460724397,
+    "max_fold": 3.0690344460724397
+   }
+  },
+  "extra_metrics.plasma_peak_over_ic50": {
+   "dose": {
+    "class": "SCALES_EXACTLY",
+    "n": 15,
+    "max_ulp_from_1": 4503599627370496.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.5,
+    "max_fold": 4.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 4503599627370496.0,
+    "max_ulp_from_ratio": 155451752803784.0,
+    "min_fold": 3.0,
+    "max_fold": 3.0
+   }
+  },
+  "extra_metrics.plasma_peak_uM": {
+   "dose": {
+    "class": "SCALES_EXACTLY",
+    "n": 15,
+    "max_ulp_from_1": 4503599627370496.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.5,
+    "max_fold": 4.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 4503599627370496.0,
+    "max_ulp_from_ratio": 155451752803784.0,
+    "min_fold": 3.0,
+    "max_fold": 3.0
+   }
+  },
+  "extra_metrics.therapeutic_coverage_0_5x": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 1434550036454139.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.3185340960896486
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 252801361456392.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0561331784290946
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 1430907365539781.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.317725260665598
+   }
+  },
+  "extra_metrics.therapeutic_coverage_2x": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": Infinity,
+    "max_ulp_from_ratio": Infinity,
+    "min_fold": 1.0002744387727098,
+    "max_fold": 3.440342938794951
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 334632789649820.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0743034055727554
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": Infinity,
+    "max_ulp_from_ratio": Infinity,
+    "min_fold": 1.0002744387727098,
+    "max_fold": 2.983805668016194
+   }
+  },
+  "extra_metrics.tissue_median_over_plasma_mean": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 15.0,
+    "max_ulp_from_ratio": 4503599627370497.0,
+    "min_fold": 0.9999999999999997,
+    "max_fold": 1.0000000000000033
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 16.5,
+    "max_ulp_from_ratio": 295874595841837.0,
+    "min_fold": 0.9999999999999963,
+    "max_fold": 1.0000000000000007
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 35.0,
+    "max_ulp_from_ratio": 4659051380174298.0,
+    "min_fold": 0.9999999999999922,
+    "max_fold": 1.0000000000000009
+   }
+  },
+  "extra_metrics.tissue_median_over_plasma_peak": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 15.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 0.9999999999999998,
+    "max_fold": 1.0000000000000033
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 295874595841837.0,
+    "max_ulp_from_ratio": 17.0,
+    "min_fold": 1.0230114820241427,
+    "max_fold": 1.065697357741054
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 103634501869193.0,
+    "max_ulp_from_ratio": 4607234129239703.0,
+    "min_fold": 1.0230114820241387,
+    "max_fold": 1.0230114820241474
+   }
+  },
+  "extra_metrics.viable_tumor_fraction": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 3552839706036724.5,
+    "max_ulp_from_ratio": 6090407642716923.0,
+    "min_fold": 0.21111111111111114,
+    "max_fold": 0.9866750717328927
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 330202824002724.5,
+    "max_ulp_from_ratio": 626077419844558.5,
+    "min_fold": 0.9266802443991854,
+    "max_fold": 0.9990870359099207
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 3201132932693082.0,
+    "max_ulp_from_ratio": 6259617846520821.0,
+    "min_fold": 0.2892057026476578,
+    "max_fold": 0.9729588731414659
+   }
+  },
+  "metrics.kill_fraction": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 4485218575242244.0,
+    "max_ulp_from_ratio": 4495776566365634.0,
+    "min_fold": 1.0020955111944414,
+    "max_fold": 1.9959185865420759
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 213558803016386.0,
+    "max_ulp_from_ratio": 294632840126776.0,
+    "min_fold": 1.0001102900628653,
+    "max_fold": 1.047419580044036
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 3731837293933018.0,
+    "max_ulp_from_ratio": 4651228319169418.0,
+    "min_fold": 1.003474136980258,
+    "max_fold": 1.828634337575855
+   }
+  },
+  "metrics.mean_tumor_auc": {
+   "dose": {
+    "class": "SCALES_2ulp",
+    "n": 15,
+    "max_ulp_from_1": 4503599627370497.0,
+    "max_ulp_from_ratio": 2.0,
+    "min_fold": 1.4999999999999996,
+    "max_fold": 4.0
+   },
+   "half_life": {
+    "class": "SCALES_1ulp",
+    "n": 10,
+    "max_ulp_from_1": 295874595841835.0,
+    "max_ulp_from_ratio": 1.0,
+    "min_fold": 1.0230114820241463,
+    "max_fold": 1.0656973577410536
+   },
+   "both": {
+    "class": "SCALES_2ulp",
+    "n": 5,
+    "max_ulp_from_1": 4659051380174281.0,
+    "max_ulp_from_ratio": 2.0,
+    "min_fold": 3.069034446072439,
+    "max_fold": 3.06903444607244
+   }
+  },
+  "metrics.penetration_length_um": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 10489869.5,
+    "max_ulp_from_ratio": 4503599631902309.0,
+    "min_fold": 0.9999999976707811,
+    "max_fold": 1.000000000960032
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 11467648.0,
+    "max_ulp_from_ratio": 295874601031008.5,
+    "min_fold": 0.9999999988059155,
+    "max_fold": 1.0000000025463294
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 15986092.0,
+    "max_ulp_from_ratio": 4659051388167326.0,
+    "min_fold": 0.9999999964503745,
+    "max_fold": 1.0000000000773177
+   }
+  },
+  "metrics.therapeutic_coverage_1x": {
+   "dose": {
+    "class": "NEITHER",
+    "n": 15,
+    "max_ulp_from_1": 7588216096600740.0,
+    "max_ulp_from_ratio": 5336416282915492.0,
+    "min_fold": 1.0,
+    "max_fold": 8.110857664233576
+   },
+   "half_life": {
+    "class": "NEITHER",
+    "n": 10,
+    "max_ulp_from_1": 2517660120155021.0,
+    "max_ulp_from_ratio": 2221785524313187.0,
+    "min_fold": 1.0,
+    "max_fold": 1.5590328467153285
+   },
+   "both": {
+    "class": "NEITHER",
+    "n": 5,
+    "max_ulp_from_1": 7631772808325308.0,
+    "max_ulp_from_ratio": 5302247118238168.0,
+    "min_fold": 1.0,
+    "max_fold": 7.778375912408759
+   }
+  },
+  "provenance.alpha": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "provenance.claim_set.version": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "provenance.ic50_n_cell_lines": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "provenance.ic50_resolved_uM": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "provenance.ic50_uM": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "provenance.pd_hypoxia_resistance": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "provenance.pd_quiescent_resistance": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "provenance.pde_dt_s": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "provenance.pde_save_every": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "provenance.seed": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "provenance.sensitivity_mean": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.E_ref_uM_s": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.under_reached_fraction[0]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.under_reached_fraction[1]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.under_reached_fraction[2]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.under_reached_fraction[3]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.under_reached_fraction[4]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.under_reached_fraction[5]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.under_reached_fraction[6]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.x[0]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.x[1]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.x[2]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.x[3]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.x[4]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.x[5]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.curve.x[6]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.bin_um": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[0]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[10]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[11]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[12]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[13]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[14]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[15]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[16]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[17]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[18]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[19]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[1]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[20]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[21]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[22]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[23]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[24]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[2]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[3]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[4]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[5]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[6]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[7]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[8]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.count[9]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[0]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[10]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[11]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[12]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[13]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[14]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[15]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[16]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[17]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[18]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[19]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[1]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[20]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[21]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[22]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[23]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[24]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[2]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[3]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[4]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[5]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[6]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[7]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[8]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.distance_um[9]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.min_bin_count": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[0]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[10]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[11]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[12]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[13]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[14]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[15]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[16]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[17]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[18]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[19]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[1]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[20]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[21]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[22]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[23]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[24]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[2]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[3]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[4]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[5]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[6]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[7]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[8]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.falloff.normalised_mean_auc[9]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.headline_under_reached_fraction": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.headline_x": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.hypoxia_threshold": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.n_tumor": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "reach.n_viable": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.celltype_counts.ENDOTHELIAL": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.celltype_counts.IMMUNE": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.celltype_counts.NECROTIC": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.celltype_counts.STROMAL": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.celltype_counts.TUMOR": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.celltype_fractions.ENDOTHELIAL": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.celltype_fractions.IMMUNE": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.celltype_fractions.NECROTIC": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.celltype_fractions.STROMAL": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.celltype_fractions.TUMOR": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.dx_um": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.extent_um[0]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.extent_um[1]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.grid[0]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.grid[1]": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.max_darcy_speed_um_s": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.mean_ecm_density": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.mean_oxygen": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.mean_vascular_density": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.n_cells": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.n_tumor": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.reconstruction_build_time_s": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.sensitivity.max": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.sensitivity.mean_all_cells": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.sensitivity.mean_tumor": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.sensitivity.min": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.sensitivity.std_all_cells": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.sensitivity.std_tumor": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.tissue_coverage_fraction": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "report.tissue_disc_radius_um": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 6,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4503599627370496.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 4,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 295874595841834.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 2,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 4659051380174280.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  },
+  "timelapse.requested_frames": {
+   "dose": {
+    "class": "BIT_IDENTICAL",
+    "n": 15,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "half_life": {
+    "class": "BIT_IDENTICAL",
+    "n": 10,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   },
+   "both": {
+    "class": "BIT_IDENTICAL",
+    "n": 5,
+    "max_ulp_from_1": 0.0,
+    "max_ulp_from_ratio": 0.0,
+    "min_fold": 1.0,
+    "max_fold": 1.0
+   }
+  }
+ }
+}
