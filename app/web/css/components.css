@@ -177,10 +177,20 @@ select.inp {
    rather than in a caveat panel after the run. Populated from the `caveats`
    field of GET /api/sections (app/server/api.py::_with_caveats). */
 .section-caveats { margin-top: var(--sp-2); }
+/* --fs-disclosure, named rather than spelled: this is a sentence stating what
+   the chosen section cannot support, so it is governed by the floor in
+   tokens.css and moves when that moves.
+   The two literal var() fallbacks that used to be here — `var(--fs-xs, 11px)`
+   and `var(--warn, #b4884a)` — are gone. They could only fire if tokens.css
+   had not loaded, in which case nothing on the page is styled anyway, and
+   both carried a WRONG value for the token they stood in for (--fs-xs is
+   10.5px, not 11px; --warn is nowhere near #b4884a). A fallback nobody can
+   reach, holding a number nobody checked, is how a palette grows a second
+   copy of itself. */
 .section-caveats .hint {
-  font-size: var(--fs-xs, 11px);
+  font-size: var(--fs-disclosure);
   line-height: 1.45;
-  color: var(--warn, #b4884a);
+  color: var(--warn);
 }
 
 .field-err {
@@ -1612,11 +1622,21 @@ html[data-mode="stub"] .scalebar .txt::after {
   background: color-mix(in srgb, var(--bg-0) 88%, transparent);
   backdrop-filter: blur(2px);
 }
+/* Elevation comes from the two-step token, NOT from a literal. It used to be
+   `0 8px 32px color-mix(in srgb, black 40%, transparent)`, which is wrong in
+   two ways at once: a 32px bloom of 40% BLACK is a dark halo on a white page,
+   so the one screen the operator cannot get past was lit for dark mode only;
+   and it was one of three colour literals outside tokens.css, which is the
+   whole reason that file can be read as the palette. --elev-2 is the same
+   gesture re-picked per theme (dark 0 4px 14px / light 0 3px 12px), and the
+   1px ring is the hard edge an instrument panel has instead of a soft one.
+   Written as a ring rather than a border so the card's box is unchanged:
+   apikey.js measures nothing, but the geometry was already correct. */
 .gate-card {
   max-width: 380px;
   width: calc(100% - var(--sp-8) * 2);
   background: var(--bg-1);
-  box-shadow: 0 8px 32px color-mix(in srgb, black 40%, transparent);
+  box-shadow: var(--elev-2), 0 0 0 1px var(--line-2);
 }
 .gate-card .inp {
   height: var(--h-ctl);
@@ -1646,16 +1666,24 @@ html[data-mode="stub"] .scalebar .txt::after {
 /* A floating popover, NOT a full-screen modal -- position: fixed, anchored
    next to the real element each step is about (see welcome.js's
    positionCard()), with no backdrop over the rest of the dashboard. The
-   shadow (heavier than .notice's default) is what reads it as "floating
-   above the UI" instead of a normal docked panel, since there is no dim
-   backdrop doing that job here. */
+   shadow is what reads it as "floating above the UI" instead of a normal
+   docked panel, since there is no dim backdrop doing that job here.
+
+   It takes --elev-2 to do that, not a literal. It was `0 8px 28px
+   color-mix(in srgb, black 35%, transparent)`, i.e. a 28px bloom of 35% black
+   on the FIRST thing a new visitor ever sees — in light mode a grey smudge
+   under a card on a white page, which is the generic floating-card look this
+   console is specifically not. --elev-2 is re-picked per theme and is the same
+   step the sheet and the toast already use, so the three things in this app
+   that genuinely float now float by the same amount. The 1px ring stays
+   exactly as it was: the geometry welcome.js::positionCard measures is
+   unchanged, because a ring is outside the box and a border would not be. */
 .tour-popover {
   position: fixed;
   z-index: 1001; /* above .gate-overlay (1000), if the auth gate is also up */
   max-width: 340px;
   background: var(--bg-1);
-  box-shadow: 0 8px 28px color-mix(in srgb, black 35%, transparent),
-              0 0 0 1px var(--line-2);
+  box-shadow: var(--elev-2), 0 0 0 1px var(--line-2);
   /* THE CARD MUST FIT THE WINDOW, AND IT DID NOT.
      MEASURED at 720x450 (a 1440x900 laptop at 200% zoom): the first-run tour
      card is ~640px tall, `position: fixed`, and had no height bound at all.
@@ -1709,13 +1737,19 @@ html[data-mode="stub"] .scalebar .txt::after {
    about (e.g. the SECTION dropdown, the Submit run button) so a claim like
    "the dropdown top-left" has something for the eye to actually land on,
    rather than trusting the user to find it from a text description alone. */
+/* A 2px accent outline, and nothing else. There used to be a 4px 20%-accent
+   bloom under it as well; two concentric accent rings around the same element
+   is a glow, and a glow is the one thing this interface reserves for nothing
+   at all — the accent already means "affordance / selection / focus" and
+   adding a halo to it does not make it mean more. The outline is the mark the
+   focus ring uses, at the weight the focus ring uses, so the tour points at a
+   control the same way the keyboard does. */
 .tour-highlight {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius);
   position: relative;
   z-index: 1001;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* THE FINDING's survival rows, when they are controls.

@@ -52,8 +52,12 @@
   margin: var(--sp-3) 0 var(--sp-4);
   padding: var(--sp-4) var(--sp-5) var(--sp-5);
   background: var(--bg-2);
+  /* One hairline all the way round. The thickened neutral left edge that used
+     to sit on top of it marked nothing — a grid budget is an estimate, not a
+     severity — and a left rule in this app means severity or provenance and
+     nothing else (home.css `.boot` states the rule). When this box IS a
+     refusal it says so through `.gb-refusal` below, in the reserved hue. */
   border: 1px solid var(--line-1);
-  border-left: 3px solid var(--line-2);
 }
 
 .gb-head {

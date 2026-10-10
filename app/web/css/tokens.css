@@ -2,19 +2,25 @@
    tmesim Studio — design tokens
    ============================================================================
 
+   REFERENCE CLASS
+   ---------------
+   This is a scientific instrument console, and it is drawn like one: a
+   data-acquisition front panel in the lineage of Sectra / Barco reading
+   stations and Tektronix front panels. The consequences are specific and they
+   are what the rest of this file encodes — hairline rules instead of cards,
+   a 2px radius ceiling, one accent, hue reserved for state, dense fixed-height
+   rows, and labels set in tracked uppercase at the size of a legend rather
+   than a heading. Everything below is downstream of that one choice. If a
+   rule here would look at home on a marketing page, it is wrong for this one.
+
    TYPEFACE
    --------
-   Identity face is a Swiss neo-grotesque: Helvetica Neue / Neue Haas Grotesk,
-   falling back to Arimo / Liberation Sans / Arial. This is the lineage of
-   instrument and wayfinding lettering (Siemens Healthineers, Barco, Sectra
-   consoles) — it has no voice of its own, holds its counters at 10-11px, and
-   its tight, even colour lets a table of forty numbers read as one block
-   rather than forty words. Deliberately NOT Inter (its large x-height and
-   loose default tracking read as product-marketing at small sizes) and NOT
-   any geometric or humanist face with personality.
+   Atkinson Hyperlegible Next for text, Atkinson Hyperlegible Mono for every
+   quantity, both self-hosted by css/fonts.css. The full argument for the
+   family — including what is NOT a reason for it — is in that file's header,
+   stated once there rather than twice here.
 
-   Every numeral, identifier, code path, and unit is set in a monospace:
-   SF Mono / IBM Plex Mono / Roboto Mono / Menlo / Consolas, with
+   Every numeral, identifier, code path, and unit is set in the mono, with
    font-variant-numeric: tabular-nums so digits sit in fixed columns and a
    changing value never reflows the row it lives in. This is the single most
    important legibility decision in the whole interface.
@@ -124,6 +130,50 @@
   --lh-body:  1.35;
 
   --tr-wide: 0.06em;   /* for uppercase micro-labels only */
+
+  /* --- measure -----------------------------------------------------------
+     How wide a column of prose is allowed to get. The same consolidation the
+     space scale got, for the same reason: home.css alone capped prose at
+     68ch, 72ch, 76ch and 82ch, which is not a measure, it is four people
+     guessing. On a 1280px window those four caps put four consecutive blocks
+     of text on four different right edges, and a reader notices that as
+     untidiness long before they could name it.
+
+     THERE ARE TWO, AND THE SECOND IS THE FIRST PLUS PADDING. A paragraph's
+     max-width bounds the TEXT. A bordered card's max-width bounds the BOX,
+     which holds the same text plus its own two paddings — so a card capped at
+     --measure holds a column narrower than a bare paragraph beside it, and
+     capping both at one number is what produced the spread in the first
+     place. --measure-box is --measure + the ~4ch that var(--sp-6)/var(--sp-7)
+     of horizontal padding comes to at --fs-sm, which is why `.boot` had
+     already arrived at 76ch by hand.
+
+     THE UNIT CHANGED, AND THAT IS THE POINT. These caps were written in `ch`
+     on the assumption that 1ch is about one character, so "72ch" was read as
+     "72 characters" — a line length just inside the conventional 45-75 band.
+     MEASURED, in this face, at --fs-sm, against real copy from this page:
+
+         advance of "0"            7.4531 px
+         mean character of prose   4.9489 px      ratio 1.506
+         so a 72ch box is          536.6 px  and holds ~108 characters
+
+     `ch` is the advance of the digit ZERO, and in Atkinson Hyperlegible Next
+     the digits are half again as wide as the average lowercase letter — the
+     face is drawn for numeral disambiguation, so its figures are generous.
+     Every prose column on this page was therefore about 45% longer than the
+     number in the stylesheet claimed, and the 82ch blocks ran to ~123
+     characters a line. Nobody chose that; the unit chose it.
+
+     So the measure is now stated in px, which is also the only way four
+     different elements at four different font-sizes can share ONE column:
+     `ch` resolves against each element's own type size, so a shared `ch`
+     token would still have produced four different widths. 372px is 75
+     characters at the measured mean above — the top of the conventional band,
+     which suits an interface that is scanned more than it is read.
+
+     If the UI face ever changes, re-measure; do not convert this number. */
+  --measure:     372px;   /* ~75 characters of --fs-sm prose */
+  --measure-box: 398px;   /* --measure + var(--sp-7) of padding on both sides */
 
   /* --- space -------------------------------------------------------------
      ONE scale. Before this existed, gaps and paddings of 3, 4, 5, 6, 7, 8, 9,

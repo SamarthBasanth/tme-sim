@@ -122,13 +122,11 @@ const STEPS = [
     body: () => [
       h('div.hr-lbl', 'What it does'),
       h('p',
-        'Vivum reconstructs a real tumour tissue section from a measured ' +
-        'spatial-transcriptomics assay — every cell on the stage is a cell ' +
-        'somebody sequenced, at its own coordinates — and then solves drug ' +
-        'transport through that geometry. The output is a ', h('b', 'map'),
-        ': for one compound on one section, where the drug reaches and where ' +
-        'it does not. The viewer, the mechanism breakdown and every metric are ' +
-        'computed from that solve. Nothing on screen is an illustration.'),
+        'Every cell on the stage was sequenced at those coordinates, in a real ' +
+        'tumour section. Vivum solves drug transport through that geometry and ' +
+        'returns a ', h('b', 'map'), ': for one compound on one section, where ' +
+        'the drug reaches and where it does not. Every metric on screen is ' +
+        'computed from that solve. Nothing here is an illustration.'),
 
       // The tour was once the one first-run surface in the Studio that stated
       // no limit at all — it introduced a computed tumour response to someone
@@ -140,54 +138,49 @@ const STEPS = [
       h('p',
         'It does not predict what a patient will do. These sections carry ',
         h('b', 'no treatment-response label'),
-        ', so no number in this Studio has ever been scored against a patient ' +
-        'outcome. It is not a diagnostic, not a treatment-planning tool, and ',
+        ', so no number here has ever been scored against a patient outcome. ' +
+        'Not a diagnostic, not a treatment-planning tool, ',
         h('b', 'NOT FOR CLINICAL USE'),
-        '. Two readings in particular are off the table: the absolute level — ' +
-        'what fraction of a tumour dies — and setting one compound beside ' +
-        'another. Both were measured, both failed, and both were withdrawn.'),
+        '. Two readings are off the table: the absolute level — what fraction ' +
+        'of a tumour dies — and one compound against another. Both were ' +
+        'measured, both failed, both were withdrawn.'),
 
-      h('div.hr-lbl', 'What survives, and why that is the interesting part'),
+      h('div.hr-lbl', 'What survives'),
       h('p',
-        'Inside ', h('b', 'one'), ' map, for ', h('b', 'one'), ' compound: the ' +
-        'exposure in one region relative to the best-perfused tissue in that ' +
-        'same map. That reading survives for a reason rather than by ' +
-        'concession — the two factors measured to destroy the absolute level ' +
-        'rescale every point of the map together, so they cancel out of a ' +
-        'ratio between two points. What they do not cancel is error in the ' +
-        'transport law itself, which tilts the falloff instead of lifting it. ' +
-        'That law was scored blind and unfitted against 71 compounds — measured ' +
-        'by one method, in one cell line — and reproduces about a quarter of ' +
-        'the spread those measurements show. Read it as the best available ' +
-        'estimate of a shape, not as a measurement of one. Both halves of this ' +
-        'are restated, per run, in the CAVEATS panel — and never in smaller ' +
-        'type than the number they qualify.'),
+        'Inside ', h('b', 'one'), ' map, for ', h('b', 'one'), ' compound: ' +
+        'exposure in a region relative to the best-perfused tissue in that ' +
+        'same map. The two factors that destroyed the absolute level rescale ' +
+        'every point together, so they cancel out of a ratio. What does not ' +
+        'cancel is error in the transport law, which tilts the falloff instead ' +
+        'of lifting it. That law was scored blind and unfitted against 71 ' +
+        'compounds — one method, one cell line — and reproduces about a quarter ' +
+        'of the spread they show. It is the best available estimate of a shape, ' +
+        'not a measurement of one. CAVEATS restates both halves per run, never ' +
+        'in smaller type than the number they qualify.'),
 
       h('div.hr-lbl', 'What to press'),
       h('p',
-        'Left rail: a section is already chosen and a compound is already ' +
-        'filled in. Press ', h('b', 'Submit run'),
-        '. Right rail, when it lands: read ', h('b', 'The finding'), ', then ',
-        h('b', 'Caveats'), '. That is the entire loop, and everything else in ' +
-        'here is easier to read once a real result is on the screen.'),
+        'Left rail: a section and a compound are already filled in. Press ',
+        h('b', 'Submit run'), '. Right rail, when it lands: ',
+        h('b', 'The finding'), ', then ', h('b', 'Caveats'), '.'),
       // Only when the workspace handed this session a project. A reader who
       // arrived from a project card has one question the others do not have —
       // "does my run come back with me" — and it is worth answering on the
       // first card rather than the last.
       openedFromWorkspace()
         ? h('p',
-          'You came in from a project, and the top bar names it. A run is not ' +
-          'filed under it automatically: when one finishes you are offered a ' +
-          'specimen to attach it to, and nothing is attached until you pick one.')
+          'You came in from a project; the top bar names it. Nothing is filed ' +
+          'there automatically: when a run finishes you are offered a specimen ' +
+          'to attach it to, and nothing is attached until you pick one.')
         : null,
       h('p.dim',
-        `The ${STEPS.length - 1} cards after this one each point at the control they ` +
-        'are about. Leave whenever you like — this remembers where you stopped, ' +
-        'and ', h('b', 'tour'), ' in the top bar brings it back.'),
+        `The ${STEPS.length - 1} cards after this one point at one control each. `
+        + 'Leave whenever you like: ', h('b', 'tour'),
+        ' in the top bar resumes where you stopped.'),
     ],
   },
   {
-    title: '1 · The specimen you are looking at',
+    title: '1 · The specimen',
     selector: '#f-section',
     side: 'bottom',
     body: () => [
@@ -227,7 +220,7 @@ const STEPS = [
     ],
   },
   {
-    title: '2 · Or point it at your own tissue',
+    title: '2 · Your own tissue',
     selector: '#sect-tissue',
     side: 'right',
     body: () => [
@@ -248,7 +241,7 @@ const STEPS = [
     ],
   },
   {
-    title: '3 · Set it up, then submit',
+    title: '3 · Set up, then submit',
     selector: '#btn-submit-run',
     side: 'top',
     body: () => [
@@ -265,7 +258,7 @@ const STEPS = [
     ],
   },
   {
-    title: '4 · Read the result in this order',
+    title: '4 · Reading order',
     selector: '#sect-finding',
     side: 'left',
     body: () => [
@@ -292,21 +285,24 @@ const STEPS = [
     ],
   },
   {
-    title: '5 · Caveats are not the small print',
+    title: '5 · Caveats',
     selector: '.caveats',
     side: 'left',
     body: () => [
       h('p',
-        h('b', 'This panel'), ' states plainly what each number can and ' +
-        'cannot be read as, for the run you have open. It is never truncated, ' +
-        'never scrolled inside itself, and never set smaller than the number ' +
-        'it qualifies. Read it before quoting anything.'),
+        h('b', 'This panel'), ' states what each number can and cannot be read ' +
+        'as, for the run you have open. It is never truncated, never scrolled ' +
+        'inside itself, and never set smaller than the number it qualifies. ' +
+        'Read it before quoting anything.'),
+      // The closing line here used to be "An honest 'we do not know' is treated
+      // as a result, not as a gap to hide." Cut: it is a claim about the
+      // project's character, not about the panel, and the sentence before it
+      // already states the only part a reader can check. The retraction
+      // behaviour itself is untouched.
       h('p',
         'A stored run keeps the caveats it was written with, word for word, ' +
-        'even where this project has since retracted one of them — such a ' +
-        'record is marked as superseded rather than quietly rewritten. An ' +
-        'honest "we do not know" is treated here as a result, not as a gap to ' +
-        'hide.'),
+        'even where this project has since retracted one — that record is ' +
+        'marked superseded rather than quietly rewritten.'),
     ],
   },
   {
@@ -339,7 +335,7 @@ const STEPS = [
   // pre-empts the first real failure — which for a new operator is far more
   // likely than a successful exotic run.
   {
-    title: '7 · Where the work is kept, and when it goes wrong',
+    title: '7 · Where work is kept, and how it fails',
     selector: null,
     side: 'center',
     wide: true,

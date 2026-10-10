@@ -54,14 +54,12 @@ export function createApiKeyGate({ onSubmit }) {
 
   const form = h('form.gate-card.notice', { onsubmit: submit },
     h('h3', 'Access key required'),
-    h('p', 'This is a private deployment. Every /api/ request needs a key, '
-      + 'so that whoever runs this instance is not paying for anyone who '
-      + 'finds the URL.'),
+    h('p', 'A private deployment: every /api/ request needs a key, so whoever '
+      + 'runs this instance is not paying for anyone who finds the URL.'),
     h('p', { style: { color: 'var(--fg-2)' } },
-      'If someone shared this Studio with you, ask them for the key — there '
-      + 'is no self-service sign-up. If you are running it yourself, it is '
-      + 'the TMESIM_STUDIO_API_KEY you set on the host; with none set, the '
-      + 'server generates one and prints it once at startup next to '
+      'Shared with you? Ask them for the key — there is no self-service '
+      + 'sign-up. Running it yourself? It is TMESIM_STUDIO_API_KEY on the '
+      + 'host; with none set, the server prints one at startup next to '
       + '"api key".'),
     input,
     h('label.gate-remember', { style: { display: 'flex', gap: 'var(--sp-2)',

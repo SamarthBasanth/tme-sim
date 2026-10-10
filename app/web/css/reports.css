@@ -20,12 +20,20 @@
   overflow: auto;
 }
 
+/* The lead sentence of the panel. No left rule: this file's own header says
+   "one accent, semantic colour for state only", and a 2px --accent-dim edge
+   down a paragraph is the accent used as decoration — the thing both this
+   header and tokens.css say it is never used for. A lead paragraph is marked
+   out by sitting first and by being ruled off below, which is what the panel
+   head already does.
+   --fs-disclosure, named: this sentence is prose, so it is governed by the
+   floor in tokens.css rather than by a size that happens to equal it. */
 .rp .rp-lead {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-disclosure);
   line-height: 1.4;
   color: var(--fg-2);
-  border-left: 2px solid var(--accent-dim);
-  padding: var(--sp-2) 0 var(--sp-2) var(--sp-4);
+  padding: var(--sp-2) 0 var(--sp-4);
+  border-bottom: 1px solid var(--line-0);
 }
 .rp .rp-lead b { color: var(--fg-0); }
 

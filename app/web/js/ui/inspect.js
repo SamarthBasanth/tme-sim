@@ -572,10 +572,9 @@ export function createInspectPanel({ viewer, onChange, onBenchmark, onResetView,
     }
     const sel = Number.isInteger(viewer.selected) ? viewer.selected : -1;
     if (sel < 0) {
-      cellEmpty('No cell is pinned. Click a cell on the specimen and this panel '
-        + 'says what was measured on it, what the model derived from that, and '
-        + 'which mechanism band the run put it in. Clicking empty tissue, or '
-        + 'the unpin button on the specimen toolbar, clears it again.');
+      cellEmpty('No cell pinned. Click one: this panel then shows what was '
+        + 'measured on it, what the model derived, and its mechanism band. '
+        + 'Click empty tissue, or unpin on the stage toolbar, to clear.');
       return;
     }
     let info = null;

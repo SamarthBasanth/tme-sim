@@ -97,16 +97,26 @@
 
 /* ======================================================= page heading ==== */
 
+/* `letter-spacing` is 0, not the 0.01em that used to be here. tokens.css
+   publishes exactly one tracking token, --tr-wide, and says what it is for:
+   "uppercase micro-labels only". 0.01em was neither that token nor zero — at
+   19px it is 0.19px per character, too small to see and too arbitrary to
+   defend, there because a heading is supposed to have tracking. A number in a
+   stylesheet should be a token or a measurement.
+   No rule under this block: the standfirst is capped at --measure, so a
+   border on it would stop dead at 72ch and read as a stub rather than as a
+   header strip. The first `.home-sect > .home-h2` below carries the page's
+   first full-width rule, as it already did. */
 .home-h1 {
   font-size: var(--fs-xl);
   font-weight: 600;
   line-height: var(--lh-tight);
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   color: var(--fg-0);
 }
 .home-sub {
   margin-top: var(--sp-4);
-  max-width: 72ch;
+  max-width: var(--measure);
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-1);
@@ -140,7 +150,7 @@
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-1);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 .home-p + .home-p { margin-top: var(--sp-5); }
 .home-p b { color: var(--fg-0); font-weight: 600; }
@@ -155,12 +165,23 @@
 .home-status:empty { display: none; }
 .home-status { display: block; margin-top: var(--sp-8); }
 
+/* THE LEFT RULE MEANS SEVERITY. IT DOES NOT MEAN "THIS IS A CARD".
+   This box had `border-left: 3px solid var(--accent)` on top of its own full
+   1px border. Waiting for a server is not a warning, so that rule said
+   nothing; it was there because every other block of text on the page had
+   one too, which is exactly how a thickened left edge stops being a signal.
+   tokens.css already states the contract this broke — "Semantic colour is
+   reserved exclusively for state and is never used as decoration" — and the
+   accent's own line says it marks "interactive affordance, selection, and
+   focus — nothing else". A boot card is none of those.
+   The rule now holds across the app: a left rule on a block of text is a
+   severity (--warn / --crit, with the matching tinted fill) or a provenance
+   class (base.css's .prov-band ladder), and there is no third use. */
 .boot {
   border: 1px solid var(--line-2);
-  border-left: 3px solid var(--accent);
   background: var(--bg-1);
   padding: var(--sp-6) var(--sp-7);
-  max-width: 76ch;
+  max-width: var(--measure-box);
 }
 .boot-head {
   display: flex;
@@ -188,7 +209,7 @@
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-1);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 .boot-out {
   margin-top: var(--sp-5);
@@ -206,7 +227,7 @@
   border-left-width: 3px;
   border-left-style: solid;
   padding: var(--sp-6) var(--sp-7);
-  max-width: 82ch;
+  max-width: var(--measure-box);
   background: var(--bg-1);
 }
 .hbanner + .hbanner { margin-top: var(--sp-5); }
@@ -227,7 +248,7 @@
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-1);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 .hbanner > .hb-body > p + p { margin-top: var(--sp-4); }
 .hbanner > .hb-body b { color: var(--fg-0); }
@@ -268,7 +289,7 @@
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-1);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 .mount-miss > b { color: var(--warn); }
 .mount-miss > .mm-why {
@@ -287,7 +308,7 @@
   border: 1px solid var(--line-2);
   background: var(--bg-1);
   padding: var(--sp-8);
-  max-width: 82ch;
+  max-width: var(--measure-box);
 }
 .home-empty > h2 {
   font-size: var(--fs-lg);
@@ -300,7 +321,7 @@
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-1);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 .he-lede + .he-lede { margin-top: var(--sp-4); }
 .he-lede b { color: var(--fg-0); font-weight: 600; }
@@ -316,7 +337,7 @@
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-0);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 
 .he-steps {
@@ -352,7 +373,7 @@
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-1);
-  max-width: 68ch;
+  max-width: var(--measure);
 }
 .he-body > p b { color: var(--fg-0); font-weight: 600; }
 .he-act {
@@ -370,7 +391,7 @@
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-1);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 .he-foot a { color: var(--accent); }
 
@@ -397,13 +418,14 @@
    updated_at mean different things and a control that says only "recent" is
    the control lying about which one it used. Never smaller than the counts it
    carries: both are --fs-sm. */
+/* No left rule: see .boot above for the rule this page now keeps. A sentence
+   naming the sort order is not a severity. It sits in the text column with
+   everything else it is about. */
 .pgrid-basis {
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-1);
-  max-width: 82ch;
-  padding-left: var(--sp-5);
-  border-left: 2px solid var(--line-2);
+  max-width: var(--measure);
   margin-bottom: var(--sp-5);
 }
 .pgrid-basis b { color: var(--fg-0); font-weight: 600; }
@@ -431,7 +453,7 @@
   border: 1px solid var(--line-2);
   background: var(--bg-1);
   padding: var(--sp-7);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 .pgrid-none > p {
   font-size: var(--fs-sm);
@@ -508,7 +530,7 @@
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-1);
-  max-width: 82ch;
+  max-width: var(--measure);
 }
 .home-foot-limit b { color: var(--fg-0); font-weight: 700; }
 .home-foot-links {
@@ -530,7 +552,7 @@
   border-left-width: 3px;
   background: var(--crit-bg);
   padding: var(--sp-7);
-  max-width: 82ch;
+  max-width: var(--measure-box);
 }
 .home-noscript > h2 {
   font-size: var(--fs-md);
@@ -543,7 +565,7 @@
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--fg-1);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 .home-noscript > p + p { margin-top: var(--sp-4); }
 .home-noscript a { color: var(--accent); }
@@ -1149,7 +1171,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
-  max-width: 72ch;
+  max-width: var(--measure);
   padding: var(--sp-6) var(--sp-7);
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
