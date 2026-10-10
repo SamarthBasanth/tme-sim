@@ -44,7 +44,8 @@ grep -r localhost .next/static/
 * **`scripts/viewport-audit.mjs`** serves the built page at eleven viewports in
   both motion settings, samples the whole scroll timeline, and asserts that no
   beat is cut off by `.scroll-pin`'s `overflow: hidden`, that neither floating
-  panel intersects the copy beside it, and that nothing scrolls horizontally.
+  panel intersects the copy beside it, that no beat travels under the fixed
+  wordmark, and that nothing scrolls horizontally.
   It exists because every responsive rule in `app/globals.css` is justified by
   a number someone measured once by hand and could not measure again, and
   because 320x568 shipped with five of six beats clipped — losing, in two of
@@ -85,7 +86,14 @@ clipped ledger row is the one failure this page cannot have.
 
 ## Fonts
 
-Self-hosted via `next/font/google`: Archivo (display), Atkinson Hyperlegible
-Next (body) and Atkinson Hyperlegible Mono (instruments). Chosen in
-`app/layout.tsx`, which also records why Geist was rejected. Self-hosting is
-what lets the network audit assert zero third-party requests at runtime.
+Vendored, not fetched: the four `.woff2` files are committed in `app/fonts/`
+with their OFL licences and loaded through `next/font/local`. Newsreader
+(display), Atkinson Hyperlegible Next (body, roman + italic) and Atkinson
+Hyperlegible Mono (instruments). Chosen in `app/layout.tsx`, which also records
+why Geist and Archivo were rejected and why the fallback metrics are supplied
+by hand in `app/globals.css`.
+
+This is what lets the network audit assert zero third-party requests at
+runtime, and it is also why the build needs no egress and why the outlines are
+byte-pinned — the tightest beat on the page has 8.9px of vertical headroom, so a
+family re-cut upstream could change a line count with nothing in the diff.

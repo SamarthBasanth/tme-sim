@@ -212,11 +212,36 @@ function walkShipped(root) {
  * runtime behaviour while leaving the string in the bundle, and then this
  * entry would have had to become an exemption instead of a prohibition. An
  * exemption is a hole a real regression can hide in.
+ *
+ * THE TWO FONT ENTRIES' REASONS WERE REWRITTEN ON 2026-10-10, AND THE RULE WAS
+ * NOT TOUCHED. They used to read "next/font/google self-hosts at build time; a
+ * runtime hit here means it stopped", which described a page that no longer
+ * exists: `app/layout.tsx` moved to `next/font/local` against four .woff2 files
+ * committed in `app/fonts/`, so Google is not contacted at BUILD time either
+ * and "a runtime hit" is no longer the only thing these strings could mean.
+ * Leaving the old reason in place would have told whoever next sees this fail
+ * to look for a runtime fetch, when the likelier cause is now a
+ * `next/font/google` import coming back — which would also silently un-pin the
+ * outlines, on a page whose tightest beat has 8.9px of vertical headroom
+ * (`npm run audit:viewports`, 360x700 beat 06), and ship the binaries without
+ * the OFL licence text that app/fonts/ carries. Same verdict, same
+ * no-exemption rule, accurate instruction.
  */
 const FORBIDDEN = [
   ["www.gstatic.com", "drei's default DRACO decoder path, and Google's asset CDN generally."],
-  ["fonts.gstatic.com", "Google Fonts binaries. next/font/google self-hosts at build time; a runtime hit here means it stopped."],
-  ["fonts.googleapis.com", "Google Fonts CSS. Same: this appearing means a font is being fetched at runtime."],
+  [
+    "fonts.gstatic.com",
+    "Google Fonts binaries. All four faces are vendored in app/fonts/ and loaded " +
+      "through next/font/local, so nothing reaches Google at build time either -- " +
+      "this string means a next/font/google import or a hand-written @font-face src " +
+      "came back, not merely that a runtime fetch slipped through.",
+  ],
+  [
+    "fonts.googleapis.com",
+    "Google Fonts CSS. Same provenance, same conclusion: the faces are local, so " +
+      "this appearing means a stylesheet @import or a next/font/google call was " +
+      "reintroduced.",
+  ],
   ["cdn.jsdelivr.net", "drei's default KTX2/Basis transcoder path, and a general-purpose CDN."],
   ["unpkg.com", "General-purpose npm CDN; a common default for WASM and decoder assets."],
   ["cdnjs.cloudflare.com", "General-purpose script CDN."],

@@ -71,6 +71,38 @@
   --conc-high: #d8e219;
 
   /*
+   * HOW FAR DOWN A PINNED BEAT HAS TO START SO THAT IT NEVER TRAVELS UNDER THE
+   * WORDMARK. One number, because four tiers below had four, and three of them
+   * were wrong.
+   *
+   *   46.8px   the bottom of `.site-header__mark`'s box, measured at every one
+   *            of the eleven audited viewports on 2026-10-10 — it does not
+   *            move, the header's 1.5rem padding and the mark's line box are
+   *            both constants. (Two comments in this file said y≈44 until this
+   *            pass. That was the number before the display face changed.)
+   * + 26px     `sectionVisual` (lib/timeline.ts) translates a beat by
+   *            `(1 - opacity) * 26`, DOWNWARD while it arrives and UPWARD
+   *            while it leaves. The up half is the one that matters here, and
+   *            it is the half every "clears the wordmark" comment below used
+   *            to omit: they compared the beat's AT-REST top against the mark
+   *            and stopped there.
+   * = 72.8px   the floor. 4.75rem (76px) is what is actually used, because the
+   *            base rule and the `max-width: 820px` tier already floor at
+   *            4.75rem and one number beats two. It leaves 3.2px, which is the
+   *            clearance beat 02 already shipped with at 412x915, 768x1024,
+   *            1440x900 and 1512x950 — i.e. this is not a new tolerance, it is
+   *            the existing one applied to the tiers that had undercut it.
+   *
+   * MEASURED BEFORE, with the three tiers at 3.15/3.35/3.6rem: beat 02's and
+   * beat 05's kicker sat INSIDE the mark's box by 16.3px at 360x700, 360x740,
+   * 390x844 and 320x881, their headlines by up to 6.1px, and beat 02's kicker
+   * by 15.2px at 1280x720. `npm run audit:viewports` now measures this; it is
+   * the "UNDER THE WORDMARK" line, and it was red at five viewports until this
+   * token existed.
+   */
+  --chrome-clearance: 4.75rem;
+
+  /*
    * Newsreader + Atkinson Hyperlegible Next + Atkinson Hyperlegible Mono,
    * self-hosted from .woff2 files committed in app/fonts/ and loaded through
    * `next/font/local`. app/layout.tsx carries the full argument for the three
@@ -2153,9 +2185,20 @@ body::after {
 @media (prefers-reduced-motion: reduce) {
   /*
    * The fallback is the ONLY experience where content is in normal document
-   * flow, so it is the only one where text actually travels underneath the
-   * fixed header. The cinematic experience pins its sections, so nothing ever
-   * passes under the mark there and the soft scrim is enough.
+   * flow, so it is the only one where text travels CONTINUOUSLY underneath the
+   * fixed header: everything in the document passes behind the mark on the way
+   * up, which a gradient scrim cannot cover.
+   *
+   * The clause that used to end this sentence — "the cinematic experience pins
+   * its sections, so nothing ever passes under the mark there" — was false, and
+   * it is why nothing looked for the defect fixed on 2026-10-10. A pinned beat
+   * does not scroll, but `sectionVisual` translates it 26px upward as it fades
+   * out, and at 360x700 that put beat 02's and beat 05's eyebrow wholly inside
+   * the mark's box and their headlines 6.1px into it. The scrim is still the
+   * right treatment here, because the fix belongs in the layout that let the
+   * copy get there: see --chrome-clearance, and the "UNDER THE WORDMARK" line
+   * in `npm run audit:viewports`, which now fails rather than letting a comment
+   * carry the claim.
    *
    * Measured by sweeping 61 scroll positions at 390x844: the mark overlapped
    * running text at 34 distinct positions, and the gradient scrim left that
@@ -2574,16 +2617,21 @@ body:has(.reduced-motion-experience) .site-header::before {
  * where nobody looked, because the two viewports this page had been tuned at
  * were 1512x950 and 390x844.
  *
- * The clamp floors at the same 4.75rem the narrow layout already uses (which
- * clears the header band — the mark's box ends at y≈44 and the header scrim at
- * y≈71) and reaches the full 6.5rem at about 1160px of viewport height, so
- * nothing changes on the tall desktop this was composed at. Measured after, at
- * 1440x900: top 76, bottom 865.8, budget 874.
+ * The clamp floors at 4.75rem, which is --chrome-clearance: the mark's box ends
+ * at 46.8 (not the y≈44 this comment used to give — that was the previous
+ * display face) and the departure transform adds 26, so 72.8px is the floor and
+ * 76px is what clears it. It reaches the full 6.5rem at about 1160px of
+ * viewport height, so nothing changes on the tall desktop this was composed at.
+ * Measured after, at 1440x900: top 76, bottom 865.8, budget 874, and the kicker
+ * clears the mark by 3.2px at its worst position.
+ *
+ * This floor was already right. The three tiers that override it below were
+ * not, which is the whole of the 2026-10-10 fix.
  */
 .narrative-layer > .narrative-section:nth-child(2),
 .narrative-layer > .narrative-section:nth-child(5) {
   justify-content: flex-start;
-  padding-top: clamp(4.75rem, 8svh, 6.5rem);
+  padding-top: clamp(var(--chrome-clearance), 8svh, 6.5rem);
   padding-bottom: 2rem;
 }
 
@@ -2786,10 +2834,19 @@ body:has(.reduced-motion-experience) .site-header::before {
   .narrative-section {
     padding-left: clamp(1.15rem, 5vw, 1.5rem);
     padding-right: clamp(1.15rem, 5vw, 1.5rem);
-    /* Clears the wordmark (its box ends at y≈44) rather than the whole header
-       scrim. The scrim is a gradient to transparent and darkens text it passes
-       over on this ground, so sitting inside its tail costs nothing; sitting
-       under the MARK is the collision that matters. */
+    /* The target is the wordmark's box, not the whole header scrim: the scrim
+       is a gradient to transparent and darkens text it passes over on this
+       ground, so sitting inside its tail costs nothing, while sitting under
+       the MARK is the collision that matters. That part was right.
+       3.6rem is NOT the clearance, though, and the comment here used to claim
+       it was. It is the floor for the four beats that are vertically centred,
+       where the top edge is a function of content height rather than of this
+       number — see --chrome-clearance for the 72.8px a beat's top actually has
+       to reach, and nth-child(3) below for the one centred beat that needed
+       help reaching it. Measured at 360x700: beat 06 centres at 34.9, above
+       the floor and above the mark's 46.8, and misses it anyway because it is
+       centred copy against a left-set mark — 15.6px of horizontal clearance.
+       It has 8.9px of vertical spare, so there was nothing to spend on it. */
     padding-top: 3.6rem;
   }
 
@@ -2816,14 +2873,54 @@ body:has(.reduced-motion-experience) .site-header::before {
 
   /*
    * Beat 05 is six registered limits, a one-line headline and a one-line lead:
-   * it is ~90% ledger, so its top edge is the only thing left to spend once the
-   * rows are as tight as they get. 3.35rem still starts the kicker below the
-   * wordmark (y≈44).
+   * it is ~90% ledger, so its top edge looks like the only thing left to spend
+   * once the rows are as tight as they get. IT IS NOT SPENDABLE, and the
+   * comment that used to sit here is why this block now says so at length.
+   *
+   * It read: "3.35rem still starts the kicker below the wordmark (y≈44)". Both
+   * halves were wrong. The mark's box ends at 46.8, not 44; and 3.35rem
+   * (53.6px) starts the kicker below the mark only AT REST — the departure
+   * transform then carries the whole beat 26px up. Measured at 360x740,
+   * 390x844 and 320x881 with 3.35rem: the kicker ended up wholly inside the
+   * mark's box, 16.3px of intersection, and the headline under it by 2.9px.
+   *
+   * These two beats are `flex-start`, so their top edge IS this padding and
+   * nothing about the copy can move it — which is exactly why the clearance
+   * can be stated once, as a token, instead of re-derived per tier. What it
+   * costs is bottom headroom, and the measurement says that is affordable
+   * here in a way it is not anywhere else on these beats: at 360x740 beat 02
+   * keeps 35.2px of spare and beat 05 keeps 45.4px.
    */
   .narrative-layer > .narrative-section:nth-child(2),
   .narrative-layer > .narrative-section:nth-child(5) {
-    padding-top: 3.35rem;
+    padding-top: var(--chrome-clearance);
     padding-bottom: 0.25rem;
+  }
+
+  /*
+   * BEAT 03 IS THE ONE CENTRED BEAT THAT REACHES THE MARK, AND PADDING BUYS IT
+   * HALF OF WHAT IT SAYS.
+   *
+   * Beats 03 and 04 are vertically centred between this padding and the
+   * reservation that holds their readout panel off, so content moves by HALF
+   * of any padding change: 19.2px here is 9.6px of travel. Only beat 03 gets
+   * it. Beat 03's copy runs 448.7px at 360x740 against beat 04's ~385, so it
+   * is the taller block and the only one that centres high enough to reach the
+   * mark — measured, 66.5 at rest against the 72.8 it needs, while beat 04 sat
+   * at 98.2 and was never close.
+   *
+   * WHAT IT COSTS, STATED AS THE TRADE IT IS. At 360x740 the band between the
+   * clearance and the attribution panel is 476.1px and beat 03 needs 448.7 of
+   * it, so there are 27.4px to divide between two constraints that pull in
+   * opposite directions: clearing the mark pushes the copy down, clearing the
+   * panel pushes it up. Split evenly that is 3.2px each, which is where this
+   * lands it — the same 3.2px beat 02 already ships against the mark at four
+   * other viewports. Taking beat 04 through the same rule would have spent the
+   * metric panel's 8.5px clearance down to 2, for a collision beat 04 does not
+   * have.
+   */
+  .narrative-layer > .narrative-section:nth-child(3) {
+    padding-top: 4.8rem;
   }
 
   .narrative-layer > .narrative-section:nth-child(2) h2,
@@ -2988,10 +3085,23 @@ body:has(.reduced-motion-experience) .site-header::before {
     line-height: 1.45;
   }
 
-  .narrative-layer > .narrative-section:nth-child(2),
-  .narrative-layer > .narrative-section:nth-child(5) {
-    padding-top: 3.15rem;
-  }
+  /*
+   * THE TOP EDGE IS NOT AVAILABLE AT THIS TIER EITHER, AND THIS IS WHERE THE
+   * RULE THAT TOOK IT USED TO BE.
+   *
+   * It read `padding-top: 3.15rem` for beats 02 and 05 — 50.4px, i.e. 22.4px
+   * below the 72.8px a beat's top edge has to reach (see --chrome-clearance).
+   * Measured at 360x700 with it in place: both kickers sat wholly inside the
+   * wordmark's box (16.3px of intersection) and both headlines 6.1px into it,
+   * the deepest instance of this defect anywhere on the page. It is gone
+   * rather than raised, so the tier above's single value stands at every
+   * width and height.
+   *
+   * The height it was buying was not needed: at 360x700 beat 02 keeps 33.5px
+   * of bottom spare at the clearance and beat 05 keeps 29.2px. The beat that
+   * is genuinely out of room at this viewport is 06, at 8.9px — and 06 does
+   * not touch the mark.
+   */
 
   /* Scoped for the reason given in the tier above: the fallback scrolls and
      has nothing to gain from any of this. */
@@ -3015,7 +3125,13 @@ body:has(.reduced-motion-experience) .site-header::before {
    * in with the panels, which lose padding and gap at this height too.
    *
    * Without the em step beat 03's kicker floated up to y = 45.2 and grazed the
-   * wordmark, whose box ends at 46.8.
+   * wordmark, whose box ends at 46.8. That observation was right about the
+   * mark's box and wrong about what "grazed" means: 45.2 is the AT-REST top,
+   * and a beat that clears the mark at rest by any margin under 26px is still
+   * carried into it by the departure transform. The em step is kept — it buys
+   * the height the quoted measurement says it does — but the clearance is now
+   * stated once as --chrome-clearance and enforced by `npm run audit:viewports`
+   * rather than inferred from one beat's at-rest position.
    */
   .narrative-layer > .narrative-section:nth-child(3) > .narrative-section__body > p,
   .narrative-layer > .narrative-section:nth-child(4) > .narrative-section__body > p {
@@ -3083,11 +3199,17 @@ body:has(.reduced-motion-experience) .site-header::before {
     gap: 1rem;
   }
 
-  /* Clears the wordmark (box ends at y = 46.8) rather than the whole header
-     scrim, for the same reason the narrow block does. */
+  /* The target is the wordmark's box rather than the whole header scrim, for
+     the same reason the narrow block gives — but 3.6rem did not clear it, and
+     the comment here asserted that it did. Measured at 1280x720 with 3.6rem:
+     beat 02's kicker was 15.2px inside the mark's box on departure. 1440x900
+     and 1512x950 were never affected (their height is above this tier's
+     ceiling, so they take the base clamp, which floors at the same 4.75rem
+     this token holds). Costs beat 02 18.4px of bottom spare at 1280x720,
+     leaving 15.4px. */
   .narrative-layer > .narrative-section:nth-child(2),
   .narrative-layer > .narrative-section:nth-child(5) {
-    padding-top: 3.6rem;
+    padding-top: var(--chrome-clearance);
     padding-bottom: 1rem;
   }
 
