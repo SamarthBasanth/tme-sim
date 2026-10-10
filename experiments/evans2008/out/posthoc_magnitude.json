@@ -1,0 +1,142 @@
+{
+ "alpha": 22.223477711172563,
+ "dx_um": 8.0,
+ "sections": {
+  "xenium_319": {
+   "n_analysable": 2805,
+   "median_abs_slope_mmhg_per_um": 0.0009387680073338567,
+   "median_abs_slope_expected_group": 0.0010266036611358076,
+   "median_abs_slope_anti_group": 0.0003656814688263443,
+   "abs_drop_mmhg_percentiles": {
+    "50": 0.03803506393647993,
+    "90": 0.10288627676631386,
+    "99": 0.23179889529613348,
+    "100": 0.6166099151384739
+   },
+   "frac_abs_drop_below_0p1_mmhg": 0.8912655971479501,
+   "frac_abs_drop_below_0p01_mmhg": 0.10267379679144385
+  },
+  "xenium_io": {
+   "n_analysable": 7308,
+   "median_abs_slope_mmhg_per_um": 0.0026163437065169874,
+   "median_abs_slope_expected_group": 0.0031192438634600928,
+   "median_abs_slope_anti_group": 0.001213014181370289,
+   "abs_drop_mmhg_percentiles": {
+    "50": 0.10409742742620676,
+    "90": 0.2960122490423581,
+    "99": 0.5653940604504866,
+    "100": 1.7737277281549133
+   },
+   "frac_abs_drop_below_0p1_mmhg": 0.48700054734537496,
+   "frac_abs_drop_below_0p01_mmhg": 0.056239737274220034
+  },
+  "gse324268": {
+   "n_analysable": 4962,
+   "median_abs_slope_mmhg_per_um": 0.00234831050021169,
+   "median_abs_slope_expected_group": 0.0027572165355535284,
+   "median_abs_slope_anti_group": 0.0012708872557393213,
+   "abs_drop_mmhg_percentiles": {
+    "50": 0.09314835485129791,
+    "90": 0.2751523646825068,
+    "99": 0.5518861431477529,
+    "100": 0.9148461373660055
+   },
+   "frac_abs_drop_below_0p1_mmhg": 0.5326481257557436,
+   "frac_abs_drop_below_0p01_mmhg": 0.06166868198307134
+  }
+ },
+ "pooled_sign_split_vs_resolvability": [
+  {
+   "threshold_mmhg": 0.0,
+   "n": 15075,
+   "frac_of_all": 1.0,
+   "n_expected": 12188,
+   "n_anti": 2887,
+   "p_expected": 0.8084908789386401,
+   "cp95": [
+    0.802117087736803,
+    0.8147453970822206
+   ]
+  },
+  {
+   "threshold_mmhg": 0.01,
+   "n": 14070,
+   "frac_of_all": 0.9333333333333333,
+   "n_expected": 11641,
+   "n_anti": 2429,
+   "p_expected": 0.827363184079602,
+   "cp95": [
+    0.8210153733097711,
+    0.833575312461908
+   ]
+  },
+  {
+   "threshold_mmhg": 0.05,
+   "n": 9815,
+   "frac_of_all": 0.6510779436152571,
+   "n_expected": 8528,
+   "n_anti": 1287,
+   "p_expected": 0.8688741721854305,
+   "cp95": [
+    0.8620360060557724,
+    0.875492625441944
+   ]
+  },
+  {
+   "threshold_mmhg": 0.1,
+   "n": 6373,
+   "frac_of_all": 0.42275290215588723,
+   "n_expected": 5722,
+   "n_anti": 651,
+   "p_expected": 0.8978503059783461,
+   "cp95": [
+    0.8901535650444221,
+    0.9051807304614142
+   ]
+  },
+  {
+   "threshold_mmhg": 0.25,
+   "n": 1725,
+   "frac_of_all": 0.11442786069651742,
+   "n_expected": 1650,
+   "n_anti": 75,
+   "p_expected": 0.9565217391304348,
+   "cp95": [
+    0.945802075148779,
+    0.9656506786436752
+   ]
+  },
+  {
+   "threshold_mmhg": 0.5,
+   "n": 212,
+   "frac_of_all": 0.01406301824212272,
+   "n_expected": 211,
+   "n_anti": 1,
+   "p_expected": 0.9952830188679245,
+   "cp95": [
+    0.9740002897037926,
+    0.9998805835081496
+   ]
+  },
+  {
+   "threshold_mmhg": 1.0,
+   "n": 7,
+   "frac_of_all": 0.00046434494195688223,
+   "n_expected": 7,
+   "n_anti": 0,
+   "p_expected": 1.0,
+   "cp95": [
+    0.5903836027749966,
+    1.0
+   ]
+  }
+ ],
+ "pooled": {
+  "n": 15075,
+  "median_abs_slope_mmhg_per_um": 0.002019771835179518,
+  "median_abs_drop_mmhg": 0.0803576019562735,
+  "frac_abs_drop_below_0p1_mmhg": 0.5772470978441128,
+  "singleton_fraction_of_analysable": 0.6770149253731343,
+  "median_cells_per_analysable_vessel": 1.0
+ }
+}

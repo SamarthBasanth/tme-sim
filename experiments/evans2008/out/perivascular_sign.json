@@ -1,0 +1,671 @@
+{
+ "alpha": 22.223477711172563,
+ "runs": {
+  "xenium_319@dx8@linear@mc3": {
+   "section": "xenium_319",
+   "dx_um": 8.0,
+   "sink_form": "linear",
+   "min_count": 3,
+   "vessel_radius_um": 7.5,
+   "link_distance_um": 20.0,
+   "reference_po2_mmhg": 35.0,
+   "band_um": 10.0,
+   "n_bands": 5,
+   "band_centres_um": [
+    5.0,
+    15.0,
+    25.0,
+    35.0,
+    45.0
+   ],
+   "status": "ok",
+   "grid": [
+    635,
+    1012
+   ],
+   "extent_um": [
+    8096.0,
+    5080.0
+   ],
+   "n_unknowns": 642620,
+   "tissue_coverage_fraction": 0.6783542373408857,
+   "pipeline_field_is_bit_identical_to_solve_oxygen": true,
+   "field_o2_min": 0.290338576387222,
+   "field_o2_max": 0.4219338708857226,
+   "field_mmhg_min": 10.16185017355277,
+   "field_mmhg_max": 14.76768548100029,
+   "field_o2_exceeds_one_anywhere": false,
+   "vessel_segmentation": {
+    "n_vessels": 3091,
+    "n_endothelial_cells": 4295,
+    "mvd_per_mm2": 110.79196144282031,
+    "singleton_fraction": 0.8126819799417664,
+    "n_vessels_ge4_cells": 118,
+    "intervessel_nn_median_um": 37.80306410354146,
+    "tissue_area_mm2": 27.899136
+   },
+   "n_analysable": 2805,
+   "bands_1_5": {
+    "n_expected_sign": 2520,
+    "n_anti_gradient": 285,
+    "n_exact_zero": 0,
+    "n_signed": 2805,
+    "p_expected": 0.8983957219251337,
+    "p_expected_cp95": [
+     0.8866177360478943,
+     0.909334742954803
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 2520,
+      "n_anti_gradient": 285,
+      "p_expected": 0.8983957219251337
+     }
+    }
+   },
+   "bands_2_5": {
+    "n_expected_sign": 2380,
+    "n_anti_gradient": 425,
+    "n_exact_zero": 0,
+    "n_signed": 2805,
+    "p_expected": 0.8484848484848485,
+    "p_expected_cp95": [
+     0.8346750488663678,
+     0.861563139421476
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 2380,
+      "n_anti_gradient": 425,
+      "p_expected": 0.8484848484848485
+     }
+    }
+   },
+   "bands_1_5_vessels_ge4_cells": {
+    "n_expected_sign": 105,
+    "n_anti_gradient": 6,
+    "n_exact_zero": 0,
+    "n_signed": 111,
+    "p_expected": 0.9459459459459459,
+    "p_expected_cp95": [
+     0.8860555122954585,
+     0.9799073406955344
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 105,
+      "n_anti_gradient": 6,
+      "p_expected": 0.9459459459459459
+     }
+    }
+   },
+   "n_analysable_ge4_cells": 111,
+   "perivascular_mmhg": {
+    "band1_min": 10.23206002417483,
+    "band1_max": 14.7306839159979,
+    "band1_median": 12.260652292474838,
+    "band5_min": 10.200241992405228,
+    "band5_max": 14.657290779985093,
+    "band5_median": 12.224438206141258,
+    "band1_minus_band5_median": 0.036334558588603016,
+    "band1_minus_band5_max_abs": 0.6166099151384739
+   },
+   "slope_mmhg_per_um": {
+    "median": -0.000901520833174878,
+    "mean": -0.0011259354782411151,
+    "min": -0.015372110354431472,
+    "max": 0.004856629862393271,
+    "median_abs": 0.0009387680073338567
+   },
+   "class_counts": {
+    "mild_hypoxia": 2805
+   },
+   "n_distinct_evans_classes": 1,
+   "analysable_vessel_extent_um": {
+    "median": 0.0,
+    "max": 153.8347402619131
+   },
+   "analysable_cells_per_vessel": {
+    "median": 1.0,
+    "max": 22
+   },
+   "wall_clock_s": 11.36
+  },
+  "xenium_319@dx12@linear@mc3": {
+   "section": "xenium_319",
+   "dx_um": 12.0,
+   "sink_form": "linear",
+   "min_count": 3,
+   "vessel_radius_um": 7.5,
+   "link_distance_um": 20.0,
+   "reference_po2_mmhg": 35.0,
+   "band_um": 10.0,
+   "n_bands": 5,
+   "band_centres_um": [
+    5.0,
+    15.0,
+    25.0,
+    35.0,
+    45.0
+   ],
+   "status": "ok",
+   "grid": [
+    424,
+    675
+   ],
+   "extent_um": [
+    8100.0,
+    5088.0
+   ],
+   "n_unknowns": 286200,
+   "tissue_coverage_fraction": 0.6769811320754717,
+   "pipeline_field_is_bit_identical_to_solve_oxygen": true,
+   "field_o2_min": 0.29048375986763425,
+   "field_o2_max": 0.421941486078945,
+   "field_mmhg_min": 10.166931595367199,
+   "field_mmhg_max": 14.767952012763075,
+   "field_o2_exceeds_one_anywhere": false,
+   "vessel_segmentation": {
+    "n_vessels": 3091,
+    "n_endothelial_cells": 4295,
+    "mvd_per_mm2": 110.78738685421455,
+    "singleton_fraction": 0.8126819799417664,
+    "n_vessels_ge4_cells": 118,
+    "intervessel_nn_median_um": 37.80306410354146,
+    "tissue_area_mm2": 27.900288
+   },
+   "n_analysable": 2490,
+   "bands_1_5": {
+    "n_expected_sign": 2233,
+    "n_anti_gradient": 257,
+    "n_exact_zero": 0,
+    "n_signed": 2490,
+    "p_expected": 0.8967871485943775,
+    "p_expected_cp95": [
+     0.8841661848777044,
+     0.9084658577646271
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 2233,
+      "n_anti_gradient": 257,
+      "p_expected": 0.8967871485943775
+     }
+    }
+   },
+   "bands_2_5": {
+    "n_expected_sign": 2094,
+    "n_anti_gradient": 396,
+    "n_exact_zero": 0,
+    "n_signed": 2490,
+    "p_expected": 0.8409638554216867,
+    "p_expected_cp95": [
+     0.8259993090962995,
+     0.8551216257098322
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 2094,
+      "n_anti_gradient": 396,
+      "p_expected": 0.8409638554216867
+     }
+    }
+   },
+   "bands_1_5_vessels_ge4_cells": {
+    "n_expected_sign": 99,
+    "n_anti_gradient": 2,
+    "n_exact_zero": 0,
+    "n_signed": 101,
+    "p_expected": 0.9801980198019802,
+    "p_expected_cp95": [
+     0.9302949102050756,
+     0.997592827090742
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 99,
+      "n_anti_gradient": 2,
+      "p_expected": 0.9801980198019802
+     }
+    }
+   },
+   "n_analysable_ge4_cells": 101,
+   "perivascular_mmhg": {
+    "band1_min": 10.23549548451807,
+    "band1_max": 14.732756615026332,
+    "band1_median": 12.241055454330322,
+    "band5_min": 10.203319911832448,
+    "band5_max": 14.655489019096304,
+    "band5_median": 12.206975575449373,
+    "band1_minus_band5_median": 0.03533625280386676,
+    "band1_minus_band5_max_abs": 0.414805931982416
+   },
+   "slope_mmhg_per_um": {
+    "median": -0.0008692400716145765,
+    "mean": -0.001077805884529841,
+    "min": -0.010968548548530568,
+    "max": 0.004897052327007354,
+    "median_abs": 0.0009036785190050556
+   },
+   "class_counts": {
+    "mild_hypoxia": 2490
+   },
+   "n_distinct_evans_classes": 1,
+   "analysable_vessel_extent_um": {
+    "median": 0.0,
+    "max": 153.8347402619131
+   },
+   "analysable_cells_per_vessel": {
+    "median": 1.0,
+    "max": 22
+   },
+   "wall_clock_s": 5.04
+  },
+  "xenium_319@dx5@linear@mc3": {
+   "section": "xenium_319",
+   "dx_um": 5.0,
+   "sink_form": "linear",
+   "min_count": 3,
+   "vessel_radius_um": 7.5,
+   "link_distance_um": 20.0,
+   "reference_po2_mmhg": 35.0,
+   "band_um": 10.0,
+   "n_bands": 5,
+   "band_centres_um": [
+    5.0,
+    15.0,
+    25.0,
+    35.0,
+    45.0
+   ],
+   "status": "ok",
+   "grid": [
+    1015,
+    1619
+   ],
+   "extent_um": [
+    8095.0,
+    5075.0
+   ],
+   "n_unknowns": 1643285,
+   "tissue_coverage_fraction": 0.6791639916386993,
+   "pipeline_field_is_bit_identical_to_solve_oxygen": true,
+   "field_o2_min": 0.2903349364405633,
+   "field_o2_max": 0.42200532217824693,
+   "field_mmhg_min": 10.161722775419715,
+   "field_mmhg_max": 14.770186276238643,
+   "field_o2_exceeds_one_anywhere": false,
+   "vessel_segmentation": {
+    "n_vessels": 3091,
+    "n_endothelial_cells": 4295,
+    "mvd_per_mm2": 110.782574413562,
+    "singleton_fraction": 0.8126819799417664,
+    "n_vessels_ge4_cells": 118,
+    "intervessel_nn_median_um": 37.80306410354146,
+    "tissue_area_mm2": 27.9015
+   },
+   "n_analysable": 2910,
+   "bands_1_5": {
+    "n_expected_sign": 2609,
+    "n_anti_gradient": 301,
+    "n_exact_zero": 0,
+    "n_signed": 2910,
+    "p_expected": 0.8965635738831615,
+    "p_expected_cp95": [
+     0.8849256359345571,
+     0.9073969476834026
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 2609,
+      "n_anti_gradient": 301,
+      "p_expected": 0.8965635738831615
+     }
+    }
+   },
+   "bands_2_5": {
+    "n_expected_sign": 2470,
+    "n_anti_gradient": 440,
+    "n_exact_zero": 0,
+    "n_signed": 2910,
+    "p_expected": 0.8487972508591065,
+    "p_expected_cp95": [
+     0.8352593133847718,
+     0.8616296405598696
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 2470,
+      "n_anti_gradient": 440,
+      "p_expected": 0.8487972508591065
+     }
+    }
+   },
+   "bands_1_5_vessels_ge4_cells": {
+    "n_expected_sign": 106,
+    "n_anti_gradient": 5,
+    "n_exact_zero": 0,
+    "n_signed": 111,
+    "p_expected": 0.954954954954955,
+    "p_expected_cp95": [
+     0.8980066744111601,
+     0.9852144323114973
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 106,
+      "n_anti_gradient": 5,
+      "p_expected": 0.954954954954955
+     }
+    }
+   },
+   "n_analysable_ge4_cells": 111,
+   "perivascular_mmhg": {
+    "band1_min": 10.232810969118088,
+    "band1_max": 14.73042942641402,
+    "band1_median": 12.272054210805749,
+    "band5_min": 10.199683439207723,
+    "band5_max": 14.659694024272031,
+    "band5_median": 12.236064278412531,
+    "band1_minus_band5_median": 0.03716588287850087,
+    "band1_minus_band5_max_abs": 0.5984269261816078
+   },
+   "slope_mmhg_per_um": {
+    "median": -0.0009192424080013439,
+    "mean": -0.0011400266670554388,
+    "min": -0.014893540299569215,
+    "max": 0.004961940772052062,
+    "median_abs": 0.0009674210005889216
+   },
+   "class_counts": {
+    "mild_hypoxia": 2910
+   },
+   "n_distinct_evans_classes": 1,
+   "analysable_vessel_extent_um": {
+    "median": 0.0,
+    "max": 153.8347402619131
+   },
+   "analysable_cells_per_vessel": {
+    "median": 1.0,
+    "max": 22
+   },
+   "wall_clock_s": 60.41
+  },
+  "xenium_319@dx8@michaelis_menten@mc3": {
+   "section": "xenium_319",
+   "dx_um": 8.0,
+   "sink_form": "michaelis_menten",
+   "min_count": 3,
+   "vessel_radius_um": 7.5,
+   "link_distance_um": 20.0,
+   "reference_po2_mmhg": 35.0,
+   "band_um": 10.0,
+   "n_bands": 5,
+   "band_centres_um": [
+    5.0,
+    15.0,
+    25.0,
+    35.0,
+    45.0
+   ],
+   "status": "ok",
+   "grid": [
+    635,
+    1012
+   ],
+   "extent_um": [
+    8096.0,
+    5080.0
+   ],
+   "n_unknowns": 642620,
+   "tissue_coverage_fraction": 0.6783542373408857,
+   "pipeline_field_is_bit_identical_to_solve_oxygen": true,
+   "field_o2_min": 0.009628108812993889,
+   "field_o2_max": 0.10859576207595174,
+   "field_mmhg_min": 0.3369838084547861,
+   "field_mmhg_max": 3.800851672658311,
+   "field_o2_exceeds_one_anywhere": false,
+   "vessel_segmentation": {
+    "n_vessels": 3091,
+    "n_endothelial_cells": 4295,
+    "mvd_per_mm2": 110.79196144282031,
+    "singleton_fraction": 0.8126819799417664,
+    "n_vessels_ge4_cells": 118,
+    "intervessel_nn_median_um": 37.80306410354146,
+    "tissue_area_mm2": 27.899136
+   },
+   "n_analysable": 2805,
+   "bands_1_5": {
+    "n_expected_sign": 2667,
+    "n_anti_gradient": 138,
+    "n_exact_zero": 0,
+    "n_signed": 2805,
+    "p_expected": 0.9508021390374332,
+    "p_expected_cp95": [
+     0.9421371485189041,
+     0.9585101797540662
+    ],
+    "per_class": {
+     "moderate_hypoxia": {
+      "n_expected_sign": 2411,
+      "n_anti_gradient": 132,
+      "p_expected": 0.9480928037750688
+     },
+     "severe_hypoxia": {
+      "n_expected_sign": 256,
+      "n_anti_gradient": 6,
+      "p_expected": 0.9770992366412213
+     }
+    }
+   },
+   "bands_2_5": {
+    "n_expected_sign": 2539,
+    "n_anti_gradient": 266,
+    "n_exact_zero": 0,
+    "n_signed": 2805,
+    "p_expected": 0.9051693404634581,
+    "p_expected_cp95": [
+     0.8937219826190932,
+     0.9157629280268542
+    ],
+    "per_class": {
+     "moderate_hypoxia": {
+      "n_expected_sign": 2294,
+      "n_anti_gradient": 249,
+      "p_expected": 0.902084152575698
+     },
+     "severe_hypoxia": {
+      "n_expected_sign": 245,
+      "n_anti_gradient": 17,
+      "p_expected": 0.9351145038167938
+     }
+    }
+   },
+   "bands_1_5_vessels_ge4_cells": {
+    "n_expected_sign": 108,
+    "n_anti_gradient": 3,
+    "n_exact_zero": 0,
+    "n_signed": 111,
+    "p_expected": 0.972972972972973,
+    "p_expected_cp95": [
+     0.9230444249324207,
+     0.994391316783324
+    ],
+    "per_class": {
+     "moderate_hypoxia": {
+      "n_expected_sign": 106,
+      "n_anti_gradient": 3,
+      "p_expected": 0.9724770642201835
+     },
+     "severe_hypoxia": {
+      "n_expected_sign": 2,
+      "n_anti_gradient": 0,
+      "p_expected": 1.0
+     }
+    }
+   },
+   "n_analysable_ge4_cells": 111,
+   "perivascular_mmhg": {
+    "band1_min": 0.3958173282407078,
+    "band1_max": 3.7223264624673087,
+    "band1_median": 1.2086338520843325,
+    "band5_min": 0.36357299288558803,
+    "band5_max": 3.6420015343895544,
+    "band5_median": 1.1369638181401647,
+    "band1_minus_band5_median": 0.05487292720225079,
+    "band1_minus_band5_max_abs": 0.7595687631684218
+   },
+   "slope_mmhg_per_um": {
+    "median": -0.0013400356641365063,
+    "mean": -0.001636212761894799,
+    "min": -0.018951729960550362,
+    "max": 0.0027334685431438677,
+    "median_abs": 0.0013604294208093904
+   },
+   "class_counts": {
+    "moderate_hypoxia": 2543,
+    "severe_hypoxia": 262
+   },
+   "n_distinct_evans_classes": 2,
+   "analysable_vessel_extent_um": {
+    "median": 0.0,
+    "max": 153.8347402619131
+   },
+   "analysable_cells_per_vessel": {
+    "median": 1.0,
+    "max": 22
+   },
+   "wall_clock_s": 67.04
+  },
+  "xenium_319@dx8@linear@mc1": {
+   "section": "xenium_319",
+   "dx_um": 8.0,
+   "sink_form": "linear",
+   "min_count": 1,
+   "vessel_radius_um": 7.5,
+   "link_distance_um": 20.0,
+   "reference_po2_mmhg": 35.0,
+   "band_um": 10.0,
+   "n_bands": 5,
+   "band_centres_um": [
+    5.0,
+    15.0,
+    25.0,
+    35.0,
+    45.0
+   ],
+   "status": "ok",
+   "grid": [
+    635,
+    1012
+   ],
+   "extent_um": [
+    8096.0,
+    5080.0
+   ],
+   "n_unknowns": 642620,
+   "tissue_coverage_fraction": 0.6783542373408857,
+   "pipeline_field_is_bit_identical_to_solve_oxygen": true,
+   "field_o2_min": 0.290338576387222,
+   "field_o2_max": 0.4219338708857226,
+   "field_mmhg_min": 10.16185017355277,
+   "field_mmhg_max": 14.76768548100029,
+   "field_o2_exceeds_one_anywhere": false,
+   "vessel_segmentation": {
+    "n_vessels": 3091,
+    "n_endothelial_cells": 4295,
+    "mvd_per_mm2": 110.79196144282031,
+    "singleton_fraction": 0.8126819799417664,
+    "n_vessels_ge4_cells": 118,
+    "intervessel_nn_median_um": 37.80306410354146,
+    "tissue_area_mm2": 27.899136
+   },
+   "n_analysable": 2935,
+   "bands_1_5": {
+    "n_expected_sign": 2628,
+    "n_anti_gradient": 307,
+    "n_exact_zero": 0,
+    "n_signed": 2935,
+    "p_expected": 0.8954003407155026,
+    "p_expected_cp95": [
+     0.8837612292863425,
+     0.906244222420416
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 2628,
+      "n_anti_gradient": 307,
+      "p_expected": 0.8954003407155026
+     }
+    }
+   },
+   "bands_2_5": {
+    "n_expected_sign": 2479,
+    "n_anti_gradient": 456,
+    "n_exact_zero": 0,
+    "n_signed": 2935,
+    "p_expected": 0.844633730834753,
+    "p_expected_cp95": [
+     0.8310152266924467,
+     0.8575612233676504
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 2479,
+      "n_anti_gradient": 456,
+      "p_expected": 0.844633730834753
+     }
+    }
+   },
+   "bands_1_5_vessels_ge4_cells": {
+    "n_expected_sign": 106,
+    "n_anti_gradient": 6,
+    "n_exact_zero": 0,
+    "n_signed": 112,
+    "p_expected": 0.9464285714285714,
+    "p_expected_cp95": [
+     0.8870403407956796,
+     0.9800890546058889
+    ],
+    "per_class": {
+     "mild_hypoxia": {
+      "n_expected_sign": 106,
+      "n_anti_gradient": 6,
+      "p_expected": 0.9464285714285714
+     }
+    }
+   },
+   "n_analysable_ge4_cells": 112,
+   "perivascular_mmhg": {
+    "band1_min": 10.23206002417483,
+    "band1_max": 14.7306839159979,
+    "band1_median": 12.274029422124142,
+    "band5_min": 10.200241992405228,
+    "band5_max": 14.657290779985093,
+    "band5_median": 12.237735768884814,
+    "band1_minus_band5_median": 0.03674084203618477,
+    "band1_minus_band5_max_abs": 0.6166099151384739
+   },
+   "slope_mmhg_per_um": {
+    "median": -0.0009139777183936237,
+    "mean": -0.0011424811506874236,
+    "min": -0.015372110354431472,
+    "max": 0.004856629862393271,
+    "median_abs": 0.0009561359855762497
+   },
+   "class_counts": {
+    "mild_hypoxia": 2935
+   },
+   "n_distinct_evans_classes": 1,
+   "analysable_vessel_extent_um": {
+    "median": 0.0,
+    "max": 153.8347402619131
+   },
+   "analysable_cells_per_vessel": {
+    "median": 1.0,
+    "max": 22
+   },
+   "wall_clock_s": 15.74
+  }
+ }
+}
