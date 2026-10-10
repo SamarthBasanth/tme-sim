@@ -46,6 +46,17 @@ app/reports/
 # thing that must not be committed. Only the inputs are ever written here (every
 # compiled number is recomputed on read); see results/bring_your_own_compound.md.
 app/compounds/
+# tmesim Studio account store (docs/AUTH_CONTRACT.md §6). THE ONE STORE WHOSE
+# CONTENTS ARE SECRETS: users.json holds every password hash AND the random
+# `instance_secret` the session signing key is derived from, so a committed
+# copy hands over both the hashes to attack offline and the key to forge a
+# cookie for any account. §6 puts it under TMESIM_STATE_DIR, but the fallback
+# when that variable is unset -- which is the documented local workflow -- is
+# app/auth/, right here in the tree. Every sibling store above was ignored and
+# this one was not; `python -m app.server account reset-password` is the first
+# thing that writes a hash into it from a shell, so it is ignored now.
+# Guarded by tests/test_account_recovery.py.
+app/auth/
 
 # Private build store for the static export (regenerate: scripts/studio_export/export_studio_runs.py)
 results/export_runs/

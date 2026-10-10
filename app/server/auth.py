@@ -615,6 +615,80 @@ class UserStore:
                     return
         raise AuthError("no such account", status=404)
 
+    def set_disabled(self, user_id: str, disabled: bool) -> Dict:
+        """Turn an account off or back on. The ``disabled`` field of §6.
+
+        Written for the operator CLI (``python -m app.server account
+        disable``), which is the first thing in the product that sets this
+        field -- §6 defined it and nothing wrote it, so until now the only way
+        to lock an account out was to delete its row.
+
+        **THIS IS THE ONE LEVER THAT ENDS A LIVE SESSION.** §2 sessions are
+        signed tokens with no server-side record, so there is nothing to
+        revoke per session; what makes this field bite is that
+        :meth:`AuthService.user_for_request` re-reads the row on EVERY
+        request and returns ``None`` for a disabled one. So a cookie issued
+        ten minutes ago stops opening the gate on the next request, and
+        ``enable`` lets that same cookie back in until its own expiry. That
+        asymmetry is worth knowing before using ``enable`` as an undo.
+
+        The password is NOT touched, deliberately: disabling is not a
+        credential change, and an operator who disables an account to stop an
+        incident should not also have to re-issue a password to undo it.
+
+        Returns the updated row so the caller can report what it actually
+        wrote rather than what it asked for.
+        """
+        with self._lock:
+            doc = self._read()
+            for row in doc["users"]:
+                if isinstance(row, dict) and row.get("id") == user_id:
+                    row["disabled"] = bool(disabled)
+                    self._write(doc)
+                    return dict(row)
+        raise AuthError("no such account", status=404)
+
+    def list_accounts(self) -> List[Dict]:
+        """Every account, as :func:`operator_user` projections.
+
+        THE PROJECTION IS THE POINT: this returns rows that physically cannot
+        carry a password hash, so the operator CLI that prints them cannot
+        print one by accident. Handing out the raw rows and trusting the
+        caller to omit the hash is the same mistake ``public_user`` exists to
+        not make -- and a CLI's output goes into a terminal that scrolls into
+        a log, a screen share and a bug report.
+        """
+        with self._lock:
+            rows = list(self._read()["users"])
+        return [operator_user(r) for r in rows if isinstance(r, dict)]
+
+    def rotate_instance_secret(self) -> None:
+        """Replace ``instance_secret`` -- the signing key's source (§2).
+
+        The honest answer to "how do I sign everybody out", and the only one
+        that exists: §2's sessions carry no server-side record, so the sole
+        way to invalidate an already-issued cookie is to change the key its
+        HMAC was computed with. Doing that here invalidates EVERY session on
+        this deployment, for every account, which is why the CLI makes the
+        operator confirm it.
+
+        TWO THINGS IT DOES NOT DO, both stated by the command that calls it:
+
+        * it does not take effect under the running server --
+          :meth:`AuthService.secret` caches the key per process on purpose
+          (the same property ``TMESIM_STUDIO_API_KEY`` has), so a restart is
+          part of the operation rather than an afterthought;
+        * it does nothing at all when ``TMESIM_SESSION_SECRET`` is set, because
+          that variable wins and this value is then never consulted.
+
+        Passwords and accounts are untouched: this rotates a signing key, not
+        a credential.
+        """
+        with self._lock:
+            doc = self._read()
+            doc["instance_secret"] = secrets.token_hex(32)
+            self._write(doc)
+
     def mark_login(self, user_id: str) -> None:
         """Stamp ``last_login_at``. Best-effort: a successful login must not
         become a failed one because the stamp could not be written."""
@@ -644,6 +718,37 @@ def public_user(row: Optional[Dict]) -> Optional[Dict]:
         "email": row.get("email"),
         "created_at": row.get("created_at"),
         "last_login_at": row.get("last_login_at"),
+    }
+
+
+def operator_user(row: Optional[Dict]) -> Optional[Dict]:
+    """What the OPERATOR AT THE HOST may see. Still never the hash.
+
+    :func:`public_user` is the browser's projection and is reached over HTTP;
+    this one is reached only by ``python -m app.server account``, which runs
+    as the user that owns the store. The single difference is ``disabled``:
+    the operator has to be able to see which accounts are off, and a client
+    must not -- "that address is disabled here" is the same existence
+    disclosure the login route goes to some trouble not to make (see
+    ``_LOGIN_REFUSAL``), only in a politer voice.
+
+    So this is a SECOND allowlist rather than a flag on the first. Widening
+    ``public_user`` to carry ``disabled`` for the CLI's benefit would have put
+    the field on ``/api/auth/me`` as well, which is exactly the leak, and it
+    would have arrived as a convenience rather than as a decision.
+
+    An allowlist for the same reason ``public_user`` is one: ``password`` is
+    absent because it was never named, so a field added to the store later
+    cannot ride out of here on its own.
+    """
+    if not row:
+        return None
+    return {
+        "id": row.get("id"),
+        "email": row.get("email"),
+        "created_at": row.get("created_at"),
+        "last_login_at": row.get("last_login_at"),
+        "disabled": bool(row.get("disabled")),
     }
 
 

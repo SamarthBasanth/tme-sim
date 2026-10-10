@@ -33,6 +33,7 @@ import { int, dur, NULL_GLYPH } from '../util/fmt.js';
 import * as api from '../api.js';
 import { setApiKey, apiKeyStorage } from '../api.js';
 import { signOut, signOutWording } from '../auth/gate.js';
+import { passwordChangeSection } from '../auth/password.js';
 import { toast } from './toast.js';
 
 const TABS = [
@@ -285,6 +286,19 @@ export function createAccountPanel() {
         },
       }, 'Sign out');
       wrap.appendChild(h('div.btn-row', outBtn));
+
+      // The change-password form, BESIDE logout and behind the same `account`
+      // control, which is where the product owner asked for it. Only in the
+      // signed-in branch: `POST /api/auth/password` is session-only by design
+      // (an X-API-Key caller is a program and has no own password to change),
+      // so drawing the form for a key-only browser would be offering a
+      // control the server will always refuse.
+      //
+      // It is built by js/auth/password.js rather than here because the form
+      // has to agree with that route's body shape, and keeping the fetch and
+      // the fields in one module is what stops them drifting apart. This file
+      // only decides WHERE it goes.
+      wrap.appendChild(passwordChangeSection());
     } else if (s.checked) {
       wrap.appendChild(h('div.hint',
         'No session on this browser. Whatever access it has is coming from '
