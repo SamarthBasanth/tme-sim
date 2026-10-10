@@ -899,9 +899,47 @@ class TestTheGate:
                 method, url, json={} if method in ("POST", "PATCH", "PUT") else None)
             if resp.status_code != 401:
                 ungated.append((method, url, resp.status_code))
-        # /api/health is the ONE documented exemption, and it withholds in the
-        # handler instead -- see the next test.
-        assert [u[:2] for u in ungated] == [("GET", "/api/health")], ungated
+        # THE DECLARED EXEMPT SET. Every entry is a deliberate decision with a
+        # reason, and the assertion is still equality -- so an accidental
+        # exemption, or an include_router with the wrong prefix, goes red
+        # exactly as before. This list grew from one to five when the login
+        # portal landed (docs/AUTH_CONTRACT.md §1); it is not a licence to add
+        # a sixth without editing this comment.
+        #
+        #   GET  /api/health        liveness. Exempt from the GATE, not from
+        #                           withholding: the handler returns a bare
+        #                           {"ok": true} to an anonymous caller. See
+        #                           the next test.
+        #   GET  /api/auth/me       must NEVER 401 (§1) -- the page asks it to
+        #                           decide what to render, so a 401 would mean
+        #                           the sign-in page cannot load in order to
+        #                           let you sign in.
+        #   POST /api/auth/login    the route that OBTAINS a credential. A
+        #                           gate in front of it is a loop. 400 here is
+        #                           the empty body this sweep sends.
+        #   POST /api/auth/logout   clearing a cookie cannot require the
+        #                           cookie; HttpOnly means the page cannot
+        #                           remove a stale one itself.
+        #   POST /api/auth/signup   gated on the operator's BOOTSTRAP TOKEN in
+        #                           its own handler (§4), not on the
+        #                           middleware. 403 here is that refusal
+        #                           firing -- the route is exempt from the
+        #                           gate and still refuses a stranger.
+        exempt = [
+            ("GET", "/api/auth/me"),
+            ("GET", "/api/health"),
+            ("POST", "/api/auth/login"),
+            ("POST", "/api/auth/logout"),
+            ("POST", "/api/auth/signup"),
+        ]
+        assert sorted(u[:2] for u in ungated) == sorted(exempt), ungated
+        # The trap in exempting a PREFIX: the routes under it must still
+        # enforce something themselves. /api/auth/password is under the same
+        # exempt prefix and is NOT in the list above, because its handler
+        # requires a session of its own -- which is the property that makes
+        # the prefix exemption safe rather than a hole.
+        assert ("POST", "/api/auth/password") in [(m, u) for m, u in urls]
+        assert gated.post("/api/auth/password", json={}).status_code == 401
 
     def test_the_liveness_routes_tell_an_anonymous_caller_only_that_it_answers(
             self, gated):
@@ -955,7 +993,10 @@ class TestTheGate:
         """
         resp = gated.get("/api/runs", headers=header)
         assert resp.status_code == 401, resp.text
-        assert resp.json() == {"detail": "missing or incorrect X-API-Key header"}
+        # Names BOTH ways in. A session satisfies this gate as of
+        # 2026-10-09, so a refusal mentioning only the header sends a
+        # reader to find a key when signing in would have done.
+        assert resp.json() == {"detail": "missing or incorrect credentials: send an X-API-Key header, or sign in at /login for a browser session"}
         assert_no_leak(resp, extra=(API_KEY,))
 
     def test_a_host_header_that_smuggles_a_path_does_not_skip_the_gate(

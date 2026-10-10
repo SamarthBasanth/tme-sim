@@ -2020,6 +2020,20 @@ def create_app(manager: Optional[JobManager] = None,
                     status_code=413)
         return await call_next(request)
 
+    # The login portal's server side. Built BEFORE the gate because the gate
+    # closes over it: one AuthService per app, hung on app.state, so the gate
+    # and the /api/auth/* routes share one store, one signing key and one
+    # throttle table. Two instances would mean a throttle you can reset by
+    # hitting a different route, which is not a throttle.
+    #
+    # docs/AUTH_CONTRACT.md is the specification. Nothing here removes or
+    # weakens the X-API-Key path (§0): two credentials, one gate, either
+    # accepted.
+    from .auth import AuthService, build_auth_router
+
+    auth_service = AuthService()
+    app.state.auth = auth_service
+
     # Optional shared-secret gate on every /api/* route, OFF by default (empty
     # env var) so the local single-user workflow this app was built for is
     # completely unaffected. __main__.py sets TMESIM_STUDIO_API_KEY when a
@@ -2078,16 +2092,67 @@ def create_app(manager: Optional[JobManager] = None,
             # is not.
             is_liveness = (route_path in ("/healthz", "/api/health")
                            and request.method in ("GET", "HEAD"))
-            needs_key = not is_liveness and (
+            # THE LOGIN PORTAL'S OWN PATHS, and the only new ungated ones
+            # (docs/AUTH_CONTRACT.md §1). A credential gate in front of the
+            # page that obtains the credential is a loop: /login must render
+            # for an anonymous visitor, /api/auth/login must be callable by
+            # someone who has nothing yet, and /api/auth/me must never 401
+            # because the page asks it to decide what to draw.
+            #
+            # Exempting a PREFIX puts the burden on the routes under it, and
+            # that is where this could go wrong quietly: /api/auth/password
+            # and /api/auth/logout are not public operations, they are routes
+            # the middleware has stopped protecting. Each one re-establishes
+            # its own credential in its handler -- see auth.py, where the
+            # password route's 401 is its own.
+            #
+            # Matched on route_path like everything else here, so the exempt
+            # set is computed on the same string the router dispatches on.
+            is_auth_portal = (route_path == "/login"
+                              or route_path.startswith("/api/auth/"))
+            needs_key = not is_liveness and not is_auth_portal and (
                 route_path.startswith("/api/")
                 or request.method not in ("GET", "HEAD", "OPTIONS")
             )
             if needs_key and request.method != "OPTIONS":
+                # EITHER CREDENTIAL (§0). A browser session for people, the
+                # key for programs; neither is removed and the gate accepts
+                # both. The key is checked first because it is the cheap test
+                # -- one compare_digest against a string already in memory --
+                # while the session path reads a cookie, verifies an HMAC and
+                # looks the account up, so a program holding the key never
+                # pays for machinery it is not using.
+                #
                 # constant-time: a `!=` on a secret leaks its prefix by timing
-                if not secrets.compare_digest(
-                        request.headers.get("x-api-key", ""), api_key):
+                key_ok = secrets.compare_digest(
+                    request.headers.get("x-api-key", ""), api_key)
+                # user_for_request is total: no cookie, a tampered cookie, an
+                # expired one, a deleted or disabled account, or a store that
+                # cannot be read all come back None. So this gate fails closed
+                # on every session fault and falls through to the key exactly
+                # as it did before sessions existed.
+                session_ok = (not key_ok
+                              and auth_service.user_for_request(request)
+                              is not None)
+                if not key_ok and not session_ok:
+                    # THE WORDING IS UNCHANGED ON PURPOSE, and it is now
+                    # BOTH credentials are named, because a refusal that
+                    # lists one of the two ways in sends a reader to fetch
+                    # a key they may not need. Corrected 2026-10-09 when
+                    # sessions landed; the test below pins it exactly.
+                    # and this sentence names only the header.
+                    #
+                    # tests/test_api_hostile_input.py::
+                    # test_a_near_miss_key_is_refused_exactly_like_no_key
+                    # asserts this body with exact dict equality, as the
+                    # observable half of "a near-miss key is refused
+                    # identically to no key" -- so widening the sentence, or
+                    # adding a field naming the other credential, is a change
+                    # to that file and not to this one. Left for its owner
+                    # rather than edited around; the front end keys off the
+                    # 401 status and sends the user to /login.
                     return JSONResponse(
-                        {"detail": "missing or incorrect X-API-Key header"},
+                        {"detail": "missing or incorrect credentials: send an X-API-Key header, or sign in at /login for a browser session"},
                         status_code=401,
                     )
             return await call_next(request)
@@ -2815,9 +2880,13 @@ def create_app(manager: Optional[JobManager] = None,
         "oom_exposure": oom_exposure(
             _MAX_GRID_CELLS, _MAX_GRID_CELLS_SOURCE == "default"),
     }
+    # `auth=auth_service` is the SAME object the gate closed over, so the
+    # account panel reports the portal this process is actually running
+    # rather than a second reading of the environment.
     app.include_router(build_account_router(
         jobs=jobs, store=store, reports=reports, limits=_limits,
-        cache=RECON_CACHE, started_at=_PROCESS_STARTED_AT))
+        cache=RECON_CACHE, started_at=_PROCESS_STARTED_AT,
+        auth=auth_service))
 
     # The workspace router (docs/WORKSPACE_CONTRACT.md). Bound to the SAME job
     # manager and the SAME project store as the routes above, so the workspace
@@ -2851,6 +2920,19 @@ def create_app(manager: Optional[JobManager] = None,
     # break that shows up as a 404 nobody can explain. Pinned by
     # tests/test_browse_confinement.py both ways.
     app.include_router(build_browse_router())
+
+    # The login portal (docs/AUTH_CONTRACT.md §1). Registered here, BEFORE
+    # _mount_web, because /login has to win over the StaticFiles mount at `/`
+    # -- starlette matches in registration order, so a route declared after
+    # that mount still exists and is simply never reached.
+    #
+    # The SAME AuthService the gate closed over, so a cookie this router
+    # issues is one the gate accepts and the throttle is one table.
+    #
+    # `api_key` is handed over rather than re-read from the environment: it is
+    # the bootstrap token for sign-up (§4), and sign-up must require exactly
+    # the value the gate is enforcing.
+    app.include_router(build_auth_router(auth_service, api_key=api_key))
 
     # The UI, mounted LAST so /api always wins.
     _mount_web(app)

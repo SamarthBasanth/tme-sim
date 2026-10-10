@@ -20,8 +20,19 @@
 //                "you have no projects" — it is "nothing was answered" — and
 //                it is never allowed to look like the empty state.
 //
-// A fifth branch that is not a state: a 401 means a real, reachable server that
-// wants a key, and it gets the SAME gate the Studio uses (ui/apikey.js).
+// A fifth branch that is not a state: a 401 means a real, reachable server
+// that nothing this browser sent satisfied, and it now gets a SIGN-IN ROUTE
+// (js/auth/gate.js) rather than a field asking for a shared secret.
+//
+// WHY THIS PAGE DOES NOT REDIRECT, WHEN THE STUDIO DOES.
+// -----------------------------------------------------
+// The Studio sends a refused reader straight to /login, because nothing in the
+// Studio works without a credential. This page is the landing page: it has a
+// header, a footer, and honest copy about what this deployment is and is not,
+// and bouncing the root URL to a login form throws all of that away before
+// anybody has seen the product. So the chrome stays and the sign-in route is
+// rendered into the status region, in the slot the access-key banner used to
+// occupy. The asymmetry is the point, not an inconsistency.
 //
 // WHY THE SIBLING MODULES ARE IMPORTED DYNAMICALLY.
 // ------------------------------------------------
@@ -43,7 +54,7 @@ import { h, $, fill, clear } from '../util/dom.js';
 import * as api from '../api.js';
 import { dur, int } from '../util/fmt.js';
 import { createProjectGrid } from './projectGrid.js';
-import { createApiKeyGate } from '../ui/apikey.js';
+import { signInRoute } from '../auth/gate.js';
 
 /* ============================================================== theme ==== */
 
@@ -411,42 +422,35 @@ function unreachableBanner(err) {
 
 /* =============================================================== gate ==== */
 
-/** A 401 is a live server asking for a key. Same gate as the Studio, driven
- *  here so that one attempt is still exactly one /api/workspace call. */
-function showGate(onAuthed) {
+/**
+ * A 401 is a live server refusing what this browser sent. It gets a route to
+ * the sign-in page and NOT a credential field.
+ *
+ * What used to be here: a full-viewport card with a password input labelled
+ * `X-API-Key value`, which asked a visitor for the operator's shared secret
+ * and could not be answered by anyone who had not been handed it out of band.
+ * The input is gone from this page entirely — there is nothing here to type a
+ * secret into, which is the whole of what was asked for.
+ *
+ * `statusHost` is the same slot the old banner used, so the page's four states
+ * are untouched and the one /api/workspace call is still exactly one call.
+ */
+function showGate() {
   // A 401 is proof of a live server, so the page is not in stub mode and must
-  // not wear the synthetic chrome while the gate is up.
+  // not wear the synthetic chrome while the sign-in route is up.
   document.documentElement.setAttribute('data-mode', 'live');
   if (api.api) api.api.reachable = true;
   paintBackend();
-  fill(statusHost, banner('info', 'This deployment needs an access key', null,
-    [h('p', 'The server answered ', h('b', '401'), ' for ', h('span.mono', '/api/workspace'),
-      '. It is there, it is answering, and it wants a key before it will say what work it '
-      + 'holds.')],
-    []));
 
-  const gate = createApiKeyGate({
-    onSubmit: async (key, remember) => {
-      api.setApiKey(key, remember !== false);
-      try {
-        const ws = await api.getWorkspace();
-        gate.remove();
-        onAuthed({ ok: true, ws });
-        return true;
-      } catch (err) {
-        if (err && err.status === 401) {
-          // Confirmed wrong by the server. Clear it from both stores so a
-          // reload does not silently retry a key already known to be rejected.
-          api.setApiKey('');
-          return false;
-        }
-        gate.remove();
-        onAuthed({ ok: false, err });
-        return true;
-      }
-    },
-  });
-  document.body.appendChild(gate.node);
+  const route = signInRoute({ keyRejected: !!(api.api && api.api.keyRejected) });
+  fill(statusHost, banner('info', 'Sign in to see what this server holds', null,
+    // The status line, and then gate.js's own words. The two must not say the
+    // same thing twice: this one is the FACT (which route, which status) and
+    // everything after it is what the fact means.
+    [h('p', 'The server answered ', h('b', '401'), ' for ',
+      h('span.mono', '/api/workspace'), '.'),
+      ...route.body],
+    route.actions));
 }
 
 /* ============================================================== open ===== */
@@ -482,6 +486,15 @@ async function openProject(p) {
 initTheme();
 const themeBtn = $('#home-theme');
 if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
+
+/* api.js's default answer to a 401 is to navigate to /login. This page has a
+   better one — showGate() below, in its own status region, with the header and
+   footer still standing — so it claims the decision rather than being
+   redirected out of its own chrome. The handler is intentionally empty: every
+   401 this page can produce arrives at render() as a rejected promise, and
+   render() is where the route gets painted. Registering nothing would mean a
+   refresh that 401s silently navigated away mid-session. */
+api.setUnauthorizedHandler(() => { /* handled by render() -> showGate() */ });
 
 /* nav.js builds its OWN <header class="topbar nav-bar" role="banner"> and
    inserts it as the first child of `mount`. home.html ships a working static
@@ -651,7 +664,11 @@ function render(res) {
   /* --- UNREACHABLE: nothing answered ---------------------------------- */
   if (!res.ok) {
     const err = res.err;
-    if (err && err.status === 401) { showGate(render); return; }
+    // `clear(bodyHost)` has already run, so the sign-in route is the whole of
+    // what this page shows. The grid is deliberately NOT rendered in its
+    // `unreachable` state here: that state says "nothing was answered", and
+    // something was — a 401, which is a different sentence.
+    if (err && err.status === 401) { showGate(); return; }
 
     // ORDER MATTERS. The stub latch is checked BEFORE the status, because once
     // api.js has fallen back, the status on the error is js/mock.js's router

@@ -2307,8 +2307,15 @@ class TestEnvVarsAreDocumented:
             doc = fh.read()
         m = re.search(r"## 4\. Environment variables\s+(\w+)\.", doc)
         assert m, "the section no longer opens with a count"
+        # "thirteen" added when TMESIM_SESSION_SECRET landed (the login
+        # portal, docs/AUTH_CONTRACT.md §2). This table is the PARSER, not the
+        # guard: the guard is `stated == actual` below, and it is untouched.
+        # Without the word the assertion above it fires on "unparsable count"
+        # instead, which would report a vocabulary gap as a documentation
+        # defect and hide the real comparison.
         words = {"four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
-                 "nine": 9, "ten": 10, "eleven": 11, "twelve": 12}
+                 "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+                 "thirteen": 13}
         stated = words.get(m.group(1).lower())
         assert stated is not None, f"unparsable count {m.group(1)!r}"
         actual = len(self._vars_in_code())

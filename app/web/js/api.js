@@ -19,6 +19,12 @@
 //   GET    /api/limits                       (what this server will refuse)
 //   GET    /api/account                      (key, deployment, usage, billing)
 //
+// Plus the identity routes of docs/AUTH_CONTRACT.md §1:
+//   GET    /api/auth/me                      (never 401s; says who is signed in)
+//   POST   /api/auth/login                   (email + password -> cookie)
+//   POST   /api/auth/logout                  (clears it)
+//   POST   /api/auth/signup                  (bootstrap token; §4)
+//
 // Policy:
 //  * one automatic retry on a network error or 5xx, with a 400 ms backoff;
 //    4xx is never retried (the request itself is wrong).
@@ -80,6 +86,21 @@ export const api = {
                  || sessionStorage.getItem(API_KEY_STORAGE) || ''; }
     catch { return ''; }
   })(),
+  /** Whether the stored key is actually put on the wire. Normally true, and
+   *  the ONLY thing that flips it off is resolveSession() proving that the
+   *  stored key is being actively refused while the cookie is being accepted
+   *  -- see its comment. Nothing persists this: the key stays in storage and
+   *  the next page load sends it again, because "the server refused it once"
+   *  is not grounds for this module to delete an operator's secret. */
+  sendKey: true,
+  /** True once a 401 arrived while a key WAS on the wire: that key reached a
+   *  live server and was refused. Distinct from `authRequired`, which only
+   *  says the request had no credential the server would take. */
+  keyRejected: false,
+  /** The last answer from `GET /api/auth/me`, normalised. `checked: false`
+   *  means nobody has asked yet -- which is NOT the same as "nobody is signed
+   *  in", and no surface may render the second from the first. */
+  session: { checked: false, authenticated: false, email: null, via: null, firstRun: null, raw: null },
 };
 
 /** Which store the current key is actually in: 'local' (stay signed in on
@@ -120,6 +141,250 @@ export function setApiKey(key, persist = true) {
       sessionStorage.removeItem(API_KEY_STORAGE);
     }
   } catch { /* storage unavailable (private mode, etc.) -- key still works this session */ }
+  // A key the operator has just typed deserves to be tried, whatever the last
+  // one did. Without this, one rejection would mute every later key for the
+  // rest of the page load.
+  if (api.apiKey) api.sendKey = true;
+}
+
+/* ========================================================== identity ==== *
+ * WHAT A 401 MEANS NOW.
+ *
+ * It used to mean "ask this person for the shared secret", and a password
+ * field labelled `X-API-Key value` was the first thing a visitor met. It now
+ * means "send this PERSON to /login" (docs/AUTH_CONTRACT.md §1). The key path
+ * is untouched -- §0 and §7 both forbid weakening it, and a browser with a
+ * working key still never sees a login page, because a working key never
+ * produces the 401 that triggers one.
+ *
+ * `GET /api/auth/me` is the single source of truth for who is signed in, and
+ * the contract guarantees it NEVER 401s: it answers `{"authenticated": false}`
+ * for nobody. That guarantee is what makes it safe to call first, before any
+ * credential is known to exist, and it is why no surface here has to infer
+ * identity from the failure of something else.
+ */
+
+const LOGIN_PATH = '/login';
+
+/** Are we already on the sign-in page? Both the real route (`/login`) and the
+ *  file as a static server serves it (`/login.html`), because the browser
+ *  tests load the second and a redirect loop is not a thing to discover in
+ *  production. */
+export function onLoginPage() {
+  return /(^|\/)login(\.html)?\/?$/.test(location.pathname);
+}
+
+/** The sign-in page, carrying where to come back to.
+ *  `next` defaults to here; it is never /login itself, which is how a
+ *  redirect loop gets built out of two individually correct pieces. */
+export function signInHref(next) {
+  const here = next === undefined ? (location.pathname + location.search) : next;
+  if (!here || !String(here).startsWith('/') || /(^|\/)login(\.html)?\/?($|\?)/.test(String(here))) {
+    return LOGIN_PATH;
+  }
+  return LOGIN_PATH + '?next=' + encodeURIComponent(String(here));
+}
+
+let navigatingToLogin = false;
+
+/** Go to the sign-in page. Returns false if it declined to (already there, or
+ *  already going), so a caller can tell "handled" from "nothing happened".
+ *  `replace`, not `assign`: Back from /login should land wherever the reader
+ *  came FROM, not on the page that just refused them and would refuse again. */
+export function requireSignIn({ next } = {}) {
+  if (onLoginPage() || navigatingToLogin) return false;
+  navigatingToLogin = true;
+  location.replace(signInHref(next));
+  return true;
+}
+
+let unauthorizedHandler = null;
+
+/** Override what a 401 does on this page. A page that can show a sign-in
+ *  route in place rather than navigate away registers one of these; with none
+ *  registered the default is `requireSignIn()`. */
+export function setUnauthorizedHandler(fn) {
+  unauthorizedHandler = typeof fn === 'function' ? fn : null;
+}
+
+/** Record a 401 without acting on it. */
+function noteUnauthorized() {
+  api.authRequired = true;
+  if (api.apiKey && api.sendKey) api.keyRejected = true;
+}
+
+/** Record a 401 AND act on it -- the ordinary-route path.
+ *
+ *  Only routes that go through `call()`'s retry arm land here, and that
+ *  separation is deliberate rather than incidental. `probe()` and every
+ *  `noFallback` route record only, because their callers already branch on
+ *  the refusal themselves: `probe()` returns `{authRequired: true}` by
+ *  contract, and the Account panel deliberately 401s on purpose when it tries
+ *  a replacement key against the real server. Navigating away from either
+ *  would take the operator off the one surface that was about to explain the
+ *  refusal. */
+function sawUnauthorized(path) {
+  // A refusal from /api/auth/* is an ANSWER, not a gate. A wrong password is a
+  // 401 on /api/auth/login, and navigating away from the form the reader just
+  // submitted -- to the page they are already on -- would lose the one thing
+  // they need to see, which is why it was refused. Those routes are all
+  // `noFallback` and so never reach this function; this is the belt to that
+  // braces, because the next route added here will not remember.
+  if (String(path || '').startsWith('/api/auth/')) return;
+  noteUnauthorized();
+  if (unauthorizedHandler) {
+    try { unauthorizedHandler({ path, keyRejected: api.keyRejected }); return; }
+    catch { /* a broken handler must not swallow the gate */ }
+  }
+  requireSignIn();
+}
+
+/** Read `/api/auth/me` without assuming more shape than §1 writes down.
+ *
+ *  The contract fixes exactly one field -- `authenticated` -- because that is
+ *  the one every surface branches on. The e-mail, which credential was
+ *  honoured, and whether any account exists yet are read if the server sends
+ *  them under any of the obvious names, and left null if it does not: the
+ *  server is being built against this same contract by another agent, and a
+ *  page that threw on an unspecified field would be asserting a shape nobody
+ *  promised. Nothing is allowed to DEPEND on a null here -- in particular the
+ *  claim form is reachable whatever `firstRun` comes back as. */
+function normaliseMe(body) {
+  const b = (body && typeof body === 'object') ? body : {};
+  const user = (b.user && typeof b.user === 'object') ? b.user : b;
+  const pick = (...names) => {
+    for (const n of names) {
+      const v = b[n] !== undefined ? b[n] : user[n];
+      if (typeof v === 'string' && v !== '') return v;
+    }
+    return null;
+  };
+  let firstRun = null;
+  for (const k of ['first_run', 'firstRun', 'needs_setup', 'unclaimed']) {
+    if (typeof b[k] === 'boolean') { firstRun = b[k]; break; }
+  }
+  if (firstRun === null) {
+    for (const k of ['users_exist', 'any_users', 'claimed']) {
+      if (typeof b[k] === 'boolean') { firstRun = !b[k]; break; }
+    }
+  }
+  if (firstRun === null) {
+    for (const k of ['users', 'user_count', 'n_users', 'accounts']) {
+      const v = b[k];
+      if (typeof v === 'number') { firstRun = v === 0; break; }
+      if (Array.isArray(v)) { firstRun = v.length === 0; break; }
+    }
+  }
+  return {
+    checked: true,
+    authenticated: b.authenticated === true,
+    email: pick('email'),
+    via: pick('via', 'credential', 'method'),
+    firstRun,
+    raw: b,
+  };
+}
+
+/** GET /api/auth/me. `noFallback`, which here is a correctness requirement
+ *  rather than a preference: js/mock.js carries no auth routes, and the one
+ *  answer a mock could plausibly invent -- "yes, you are signed in" -- is a
+ *  claim about who can see this server's work. A failure propagates. */
+export async function getMe({ noKey = false } = {}) {
+  return normaliseMe(await call('GET', '/api/auth/me', { noFallback: true, noKey }));
+}
+
+/** Ask who is signed in, and recover from one specific trap.
+ *
+ *  THE TRAP: every browser that has used this product already has a key in
+ *  localStorage, and some of those keys are stale. The gate accepts EITHER
+ *  credential, but a server that validates the `X-API-Key` header it was
+ *  given before looking for a cookie will refuse a stale key and never reach
+ *  the perfectly good session sitting next to it. The reader then signs in
+ *  successfully and still cannot see anything, which looks like a broken
+ *  login and is really a dead secret from months ago.
+ *
+ *  So: if the normal call says nobody while a key is on the wire, ask once
+ *  more with the key header suppressed. If THAT says somebody, the key is the
+ *  problem; stop sending it for this page load (`api.sendKey`) and record
+ *  `keyRejected` so a surface can say so. The key is NOT deleted -- see
+ *  setApiKey. Costs one extra request, and only in the case that is otherwise
+ *  unexplainable. */
+export async function resolveSession() {
+  let me = await getMe();
+  if (!me.authenticated && api.apiKey && api.sendKey) {
+    let bare = null;
+    try { bare = await getMe({ noKey: true }); } catch { bare = null; }
+    if (bare && bare.authenticated) {
+      api.sendKey = false;
+      api.keyRejected = true;
+      me = bare;
+    }
+  }
+  api.session = me;
+  if (me.authenticated) { api.authRequired = false; }
+  return me;
+}
+
+/** POST /api/auth/login. Resolves with the new session; rejects with the
+ *  server's own reason (a 401 for wrong credentials, a 429 when throttled --
+ *  §7 requires the throttle, so the page has to be able to say so). */
+export async function login(email, password) {
+  await call('POST', '/api/auth/login', {
+    noFallback: true,
+    body: { email: String(email == null ? '' : email), password: String(password == null ? '' : password) },
+  });
+  api.authRequired = false;
+  // Immediately, and not on the next page: resolveSession is what detects a
+  // stale key masking the session that was just created.
+  return resolveSession();
+}
+
+/** POST /api/auth/signup -- the first-run claim (§4).
+ *
+ *  §1 and §4 pin WHAT the credential is (the operator's existing
+ *  `TMESIM_STUDIO_API_KEY`, deliberately not a new mechanism) and do not pin
+ *  where on the request it rides. So it rides both ways: as the `X-API-Key`
+ *  header, which is literally the documented header for that exact secret,
+ *  and as `bootstrap_token` in the body. One of the two is what the server
+ *  reads and the other is ignored. The header is an override for this call
+ *  only -- it never touches `api.apiKey`, so claiming an instance does not
+ *  quietly leave the operator's key stored in a browser that did not have it. */
+export async function signup({ email, password, token }) {
+  const t = String(token == null ? '' : token);
+  await call('POST', '/api/auth/signup', {
+    noFallback: true,
+    keyOverride: t,
+    body: {
+      email: String(email == null ? '' : email),
+      password: String(password == null ? '' : password),
+      bootstrap_token: t,
+    },
+  });
+  return resolveSession();
+}
+
+/** POST /api/auth/logout.
+ *
+ *  `forgetKey` defaults TRUE and that is a deliberate, load-bearing default:
+ *  the two credentials are independent, so clearing only the cookie on a
+ *  browser that also has a key leaves the reader fully able to read
+ *  everything while the UI tells them they are signed out. Of the two ways to
+ *  resolve that, the UI saying less is worse than the browser holding less --
+ *  and a key is re-pasteable, whereas a false belief about who can see what
+ *  is not recoverable at all. The caller is told which of the two happened so
+ *  it can say so rather than imply it. */
+export async function logout({ forgetKey = true } = {}) {
+  const hadKey = !!api.apiKey;
+  let cleared = false;
+  try {
+    await call('POST', '/api/auth/logout', { noFallback: true });
+    cleared = true;
+  } finally {
+    if (forgetKey && hadKey) setApiKey('');
+    api.session = { checked: true, authenticated: false, email: null, via: null, firstRun: null, raw: null };
+    api.keyRejected = false;
+  }
+  return { sessionCleared: cleared, keyForgotten: forgetKey && hadKey };
 }
 
 function setStub(on, why) {
@@ -129,7 +394,7 @@ function setStub(on, why) {
   if (api.onModeChange) api.onModeChange(api);
 }
 
-async function rawFetch(method, path, { body, binary, signal, timeoutMs } = {}) {
+async function rawFetch(method, path, { body, binary, signal, timeoutMs, noKey, keyOverride } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs || TIMEOUT_MS);
   if (signal) signal.addEventListener('abort', () => ctrl.abort(), { once: true });
@@ -138,7 +403,16 @@ async function rawFetch(method, path, { body, binary, signal, timeoutMs } = {}) 
     const headers = body !== undefined
       ? { 'content-type': 'application/json', accept: binary ? 'application/octet-stream' : 'application/json' }
       : { accept: binary ? 'application/octet-stream' : 'application/json' };
-    if (api.apiKey) headers['x-api-key'] = api.apiKey;
+    /* TWO CREDENTIALS, ONE GATE (docs/AUTH_CONTRACT.md §0), and this module
+       does not choose between them -- it CANNOT. `vivum_session` is HttpOnly
+       (§2), so no script on this page can read it, test it, or even tell that
+       it exists. So both go on the wire and the SERVER decides which one it
+       honours: `credentials: 'same-origin'` below carries the cookie whenever
+       the browser has one, and the header below carries the key whenever this
+       browser has one stored. A reader who only ever uses the key notices no
+       change, which is §0's compatibility bar. */
+    const key = noKey ? '' : (keyOverride || (api.sendKey ? api.apiKey : ''));
+    if (key) headers['x-api-key'] = key;
     // A network failure leaves `fetch` throwing a bare TypeError with no
     // status and no path — the one error shape that escapes this module
     // unlabelled. ui/toast.js classifies a failure by asking whether it is an
@@ -157,6 +431,12 @@ async function rawFetch(method, path, { body, binary, signal, timeoutMs } = {}) 
         body: body !== undefined ? JSON.stringify(body) : undefined,
         signal: ctrl.signal,
         cache: 'no-store',
+        // The session cookie rides on every call, or the gate never sees it.
+        // `same-origin` and not `include`: the app and the API are one origin
+        // (app/server mounts app/web itself), so `include` would buy nothing
+        // and would start sending this cookie to a cross-origin base URL if
+        // `api.base` were ever pointed at one.
+        credentials: 'same-origin',
       });
     } catch (e) {
       if (e && e.name === 'AbortError') throw e;
@@ -224,6 +504,9 @@ async function call(method, path, opts = {}) {
         setStub(true, status === 0 ? 'backend unreachable' : `backend ${status}`);
         return fromMock(method, path, opts);
       }
+      // A live server refused the credentials this call carried. That is a
+      // person who needs to sign in, never a prompt for a shared secret.
+      if (status === 401) sawUnauthorized(path);
       throw err;
     }
   }
@@ -272,15 +555,18 @@ export async function probe() {
     setStub(false);
     return { live: true, sections: secs };
   } catch (err) {
-    // A 401 means a REAL, reachable server that requires a key we don't have
-    // (or have wrong) -- fundamentally different from "not answering at
+    // A 401 means a REAL, reachable server that none of this browser's
+    // credentials satisfied -- fundamentally different from "not answering at
     // all," and must not be papered over with fake stub data: that would
     // silently show an operator plausible-looking numbers that are not this
-    // server's real reconstruction. Surface it and let main.js gate the app
-    // on a correct key instead.
+    // server's real reconstruction. Surface it, and let the page send the
+    // PERSON to /login (docs/AUTH_CONTRACT.md §1). `authRequired` keeps its
+    // old name and its old meaning -- "a live server refused us" -- so the
+    // callers that branch on it did not have to change; what changed is the
+    // remedy they offer, which is a sign-in route and no longer a key field.
     if (err instanceof ApiError && err.status === 401) {
       api.reachable = true;
-      api.authRequired = true;
+      noteUnauthorized();
       return { live: false, authRequired: true, sections: [] };
     }
     // SAY WHICH FAILURE IT WAS. "unreachable" and "did not answer in time" send

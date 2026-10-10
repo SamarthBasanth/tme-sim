@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Vivum — sign in</title>
+<!-- A sign-in page must not be indexed, and must not be prefetched into a
+     session someone did not ask for. -->
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="same-origin">
+<!-- Self-hosted faces, in the same order as home.html and index.html: the
+     three pages share every face, so a reader arriving here from either one
+     pays nothing. -->
+<link rel="preload" href="fonts/atkinson-next-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/atkinson-mono-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<!-- components.css carries .btn, .inp, .notice and .btn-row, which this page
+     consumes unchanged; auth.css adds only the .auth-* layer and is the one
+     stylesheet this page owns. The Studio's layout.css and home.css are NOT
+     loaded: this page has no rails, no grid and no top bar to style. -->
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/auth.css">
+<!-- Byte-identical to home.html's and index.html's favicon: one product, one mark. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23121619'/%3E%3Crect x='3' y='3' width='10' height='10' fill='none' stroke='%2338bcd6' stroke-width='1.6'/%3E%3Crect x='6' y='6' width='4' height='4' fill='%2338bcd6'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<div class="auth-shell scroll-y">
+
+  <header class="auth-top">
+    <div class="brand">
+      <span class="name"><b>Vivum</b> <span>Sign in</span></span>
+    </div>
+  </header>
+
+  <main class="auth-main" id="auth-main" tabindex="-1">
+
+    <!-- Server-delivered, so the first paint says something TRUE rather than
+         nothing. js/auth/loginPage.js replaces this within a frame of the
+         module executing, and renders its form before asking the server
+         anything — this instance can take 20-35 s to wake, and a sign-in page
+         that is blank for half a minute is a sign-in page nobody reaches. The
+         <noscript> below is the correction for the case where the module never
+         runs at all. -->
+    <div class="auth-boot" id="auth-root">
+      <div class="auth-card">
+        <h1 class="auth-h1">Sign in</h1>
+        <p class="auth-lede">Loading the sign-in form…</p>
+        <p class="auth-aside">
+          An account here is a way in, not a private space. This server keeps
+          one shared set of projects, runs and registered specimens, and every
+          account sees the same one.
+        </p>
+      </div>
+    </div>
+
+    <noscript>
+      <div class="auth-card">
+        <h2 class="auth-h1">JavaScript is turned off, so this form cannot be drawn.</h2>
+        <p>
+          Signing in is a single <code>POST</code> to <code>/api/auth/login</code>,
+          and the form that makes it is built in the browser. Nothing is wrong
+          with the server: the API is there and still answers.
+        </p>
+        <p>
+          To check that this deployment is alive without a browser that runs
+          scripts, request <code>/api/health</code> directly — it is plain JSON
+          and it answers without a credential. A program does not need this page
+          at all: <code>X-API-Key</code> works exactly as it always has.
+        </p>
+      </div>
+    </noscript>
+
+  </main>
+
+  <footer class="auth-foot" role="contentinfo">
+    <p>
+      <b>Simulation output.</b> Every number this server produces comes from a
+      model run. No run here has been scored against a patient outcome, and
+      nothing behind this sign-in is for clinical use.
+    </p>
+    <p class="auth-foot-links">
+      <a href="/api/health">Server health</a>
+      <span aria-hidden="true">·</span>
+      <a href="/">Workspace</a>
+    </p>
+  </footer>
+
+</div>
+
+<script type="module">
+  import { mountLoginPage } from './js/auth/loginPage.js';
+  const root = document.getElementById('auth-root');
+  // mountLoginPage REPLACES the contents of `root`, and does so as its first
+  // act. So the server-delivered placeholder above stays on screen until the
+  // real form is ready to take its place, and a throw anywhere before that
+  // leaves honest "loading" text rather than an empty page. A page that
+  // renders nothing is indistinguishable from a page still loading, which is
+  // how a dead page survived twenty-four minutes in this repository once.
+  root.classList.remove('auth-boot');
+  mountLoginPage(root);
+</script>
+</body>
+</html>

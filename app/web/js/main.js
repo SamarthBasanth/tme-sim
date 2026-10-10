@@ -19,7 +19,12 @@ import { toast, notifyError, notifyRunFailed } from './ui/toast.js';
 import { fieldMeta } from './fields.js';
 import { setSynthetic, setActiveRun } from './ui/provenance.js';
 import { num, int, auto, bytes, dur, NULL_GLYPH } from './util/fmt.js';
-import { ensureAuthenticated } from './ui/apikey.js';
+// Was './ui/apikey.js', whose gate put a password field labelled
+// `X-API-Key value` in front of every visitor. Same export name and the same
+// signature, so this call site did not change: what changed is that a refused
+// reader is now sent to /login instead of being asked for a shared secret
+// (docs/AUTH_CONTRACT.md §1). A browser holding a working key never reaches it.
+import { ensureAuthenticated } from './auth/gate.js';
 import { shouldShowWelcome, createWelcomeOverlay } from './ui/welcome.js';
 
 const store = createStore({ ...INITIAL });
@@ -296,11 +301,12 @@ async function boot() {
   api.api.onModeChange = paintBackendState;
 
   /* --- data ----------------------------------------------------------- */
-  // Blocks here (showing the access-key gate) if the backend is reachable
-  // but requires a key this browser doesn't have or has wrong. A no-op when
-  // no key is configured (the ordinary local/no-auth case) or when the
-  // backend is genuinely unreachable (probe() below falls back to stub, as
-  // before this gate existed).
+  // Never returns if the backend is reachable and refused this browser's
+  // credentials: it paints a sign-in card and navigates to /login?next=here,
+  // so boot deliberately stops rather than painting a Studio over a page that
+  // is in the middle of leaving. A no-op when no credential is required (the
+  // ordinary local case) or when the backend is genuinely unreachable
+  // (probe() below falls back to stub, as before this gate existed).
   await ensureAuthenticated(api.probe);
 
   const probe = await api.probe();

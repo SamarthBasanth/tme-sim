@@ -32,6 +32,7 @@ import { h, clear, $ } from '../util/dom.js';
 import { int, dur, NULL_GLYPH } from '../util/fmt.js';
 import * as api from '../api.js';
 import { setApiKey, apiKeyStorage } from '../api.js';
+import { signOut, signOutWording } from '../auth/gate.js';
 import { toast } from './toast.js';
 
 const TABS = [
@@ -168,6 +169,11 @@ export function createAccountPanel() {
     busy = true;
     err = null;
     render();
+    // FIRST, and in a try of its own: `/api/auth/me` never 401s
+    // (docs/AUTH_CONTRACT.md §1), so it is the one question here that still
+    // has an answer when the two below do not — and "who is signed in" is
+    // exactly what a reader looking at a refusal needs to see.
+    try { await api.resolveSession(); } catch { /* reported by the panel below */ }
     try {
       // Sequential, not Promise.all: if the first one 401s there is no point
       // asking the second, and a single clear failure beats two.
@@ -233,6 +239,63 @@ export function createAccountPanel() {
     const [where, whyWhere] = STORAGE_WORDS[store] || STORAGE_WORDS.unavailable;
 
     const wrap = h('div.acct-sec');
+
+    /* --- the session, and the way out of it -----------------------------
+       This is the `account` control the product owner asked for logout to be
+       reachable from, and it is above the key because a person reading this
+       panel is now far more likely to have arrived by signing in than by
+       pasting a secret. It states §5 where it will actually be read: a reader
+       who has just seen the word "account" is at the exact moment of assuming
+       that what follows is theirs. */
+    wrap.appendChild(h('div.hr-lbl', 'Signed in'));
+    const s = (api.api && api.api.session) || {};
+    if (s.authenticated) {
+      wrap.appendChild(h('div.tblwrap', h('table.tbl',
+        row('account', s.email || NULL_GLYPH,
+          'The e-mail this browser signed in with. It is an identifier and '
+          + 'nothing more: this server sends no mail to it.'),
+        row('credential accepted', s.via || NULL_GLYPH,
+          'Which of the two credentials the server honoured for the last '
+          + 'call: a browser session, or the X-API-Key header.'),
+        row('session cookie', 'vivum_session',
+          'HttpOnly, so no script on this page can read it — including this '
+          + 'panel, which is why the server is asked rather than the cookie '
+          + 'inspected.'))));
+      wrap.appendChild(h('div.caveat.info', h('span',
+        h('b', 'THIS SESSION PARTITIONS NOTHING. '),
+        'Projects, runs and registered specimens are ONE shared set, and '
+        + 'every account that can sign in here sees the same one. Being '
+        + 'signed in is not a private area and does not become one: nothing '
+        + 'is attributed, so there is no record of which account made any '
+        + 'project or any run. An account is a way in, not a space of your '
+        + 'own.')));
+      const outBtn = h('button.btn.sm', {
+        title: 'End the session, and forget the key stored in this browser too.',
+        onclick: async () => {
+          outBtn.disabled = true;
+          const out = await signOut();
+          toast(out.ok ? 'ok' : 'err',
+            out.ok ? 'Signed out' : 'The sign-out was not confirmed',
+            signOutWording(out));
+          outBtn.disabled = false;
+          // Back to the way in. Staying on a Studio whose every call will now
+          // be refused would be a dead screen with no route off it.
+          if (out.ok) window.location.assign('/login');
+          else render();
+        },
+      }, 'Sign out');
+      wrap.appendChild(h('div.btn-row', outBtn));
+    } else if (s.checked) {
+      wrap.appendChild(h('div.hint',
+        'No session on this browser. Whatever access it has is coming from '
+        + 'the key below, if anything.'));
+      wrap.appendChild(h('div.btn-row',
+        h('a.btn.sm', { href: api.signInHref() }, 'Sign in')));
+    } else {
+      wrap.appendChild(h('div.hint',
+        'This panel has not been able to ask the server who is signed in.'));
+    }
+
     wrap.appendChild(h('div.hr-lbl', 'This browser'));
     wrap.appendChild(h('div.tblwrap', h('table.tbl',
       row('key fingerprint', a.caller_fingerprint || NULL_GLYPH,

@@ -28,6 +28,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import secrets
 import time
 from typing import Dict, Optional
 
@@ -103,11 +104,20 @@ def build_account_router(
     limits: Dict,
     cache=None,
     started_at: Optional[float] = None,
+    auth=None,
 ) -> APIRouter:
     """Mount ``GET /api/limits`` and ``GET /api/account``.
 
     ``limits`` is the live limits dict from ``api.py``; see the module
     docstring for why it is passed rather than imported.
+
+    ``auth`` is the live :class:`app.server.auth.AuthService`, or ``None`` on a
+    caller that has not wired one. Passed for the same reason ``limits`` is:
+    the account panel reports what the login portal IS, and reading that from
+    the same object the gate uses means the panel cannot describe a
+    configuration the server is not running. ``None`` is reported as "no
+    session support in this process" rather than as "no accounts", because
+    those are different facts.
     """
     router = APIRouter()
     boot = float(started_at) if started_at is not None else time.time()
@@ -135,15 +145,20 @@ def build_account_router(
     def get_account(request: Request) -> Dict:
         """Who is calling, what this deployment is, what it has done, who pays.
 
-        Reached only with a valid key (the middleware in ``api.py`` gates every
-        ``/api/`` route), so ``auth.matches`` is always true when a caller sees
-        this. It is reported anyway rather than assumed, because the day this
-        route stops being gated is the day the field starts mattering, and a
-        field that is always ``true`` is at least a field that is WRONG
-        visibly rather than absent silently.
+        Reached with EITHER credential since the login portal landed
+        (``docs/AUTH_CONTRACT.md`` §0): the middleware in ``api.py`` gates
+        every ``/api/`` route and accepts an ``X-API-Key`` header or a browser
+        session. So ``auth.matches`` is NO LONGER always true when a caller
+        sees this -- a signed-in browser reaches this route with no key at
+        all, and reports ``matches: false`` with ``session.signed_in: true``.
+        That is the field doing its job rather than failing: it was always
+        documented as "reported rather than assumed, because the day this
+        route stops being gated is the day the field starts mattering", and
+        the day arrived.
         """
         configured = os.environ.get("TMESIM_STUDIO_API_KEY", "").strip()
         presented = request.headers.get("x-api-key", "")
+        session_user = auth.user_for_request(request) if auth is not None else None
 
         by_status: Dict[str, int] = {}
         for j in jobs.list():
@@ -159,7 +174,14 @@ def build_account_router(
             "auth": {
                 "required": bool(configured),
                 "header": "X-API-Key",
-                "scheme": "shared-secret",
+                # TWO credentials, one gate (AUTH_CONTRACT §0). This said
+                # "shared-secret" flat, which stopped being the whole truth
+                # the moment the gate started accepting a session cookie --
+                # and a client reading this field to decide what to offer
+                # would have offered only a key box.
+                "scheme": "shared-secret or browser session",
+                "schemes": ["shared-secret", "browser-session"],
+                "session": _session_block(auth, session_user),
                 "source": _key_source(),
                 # Fingerprint of the SERVER's key and of the CALLER's key,
                 # separately. They are equal here by construction; showing both
@@ -168,10 +190,21 @@ def build_account_router(
                 # to answer.
                 "key_fingerprint": key_fingerprint(configured),
                 "caller_fingerprint": key_fingerprint(presented),
-                "matches": bool(configured) and presented == configured,
-                # There is no sign-up, no user table, and no way to issue a
-                # second key. Saying so in the payload keeps the client from
-                # inventing an onboarding flow that the server cannot honour.
+                # compare_digest, not `==`. This was `presented == configured`
+                # -- a short-circuiting comparison against the real key on a
+                # route a caller can hit repeatedly, i.e. a timing oracle on
+                # the server's own secret. It is only a report field, which is
+                # exactly why it was easy to miss; the gate next door has used
+                # compare_digest since it was written, and there is no reason
+                # for a second standard in the same process.
+                "matches": bool(configured) and secrets.compare_digest(
+                    presented.encode("utf-8"), configured.encode("utf-8")),
+                # Sign-up EXISTS now and is still not self-service: it requires
+                # the operator's bootstrap token (AUTH_CONTRACT §4), and that
+                # requirement does not lapse once the first account exists. The
+                # field keeps its name and its value, and the reason it is
+                # false has changed from "there is no sign-up" to "sign-up is
+                # the operator's to perform".
                 "self_service_signup": False,
                 "rotatable_via_api": False,
                 "how_to_rotate": (
@@ -181,6 +214,11 @@ def build_account_router(
                 ),
             },
             "deployment": {
+                # Still reports whether a key is configured, which is what the
+                # name has always meant and what the panel renders. It is no
+                # longer the whole credential story -- `auth.schemes` is -- and
+                # the key being "single" and "shared" is unchanged: accounts
+                # did not make it per-person.
                 "single_shared_key": bool(configured),
                 "data_roots_confined": bool(
                     os.environ.get("TMESIM_STUDIO_DATA_ROOTS", "").strip()),
@@ -207,16 +245,79 @@ def build_account_router(
                 "reconstruction_cache": (
                     cache.stats() if cache is not None else None),
                 # The honest limitation, stated in the payload rather than
-                # left for the UI to remember: one key, no identities.
+                # The honest limitation, stated in the payload rather than left
+                # for the UI to remember. ITS REASON CHANGED AND ITS VALUE DID
+                # NOT: the old sentence said no run can be attributed BECAUSE
+                # there is only a shared key, and sessions made that reasoning
+                # false while leaving the conclusion true. A session identifies
+                # the person at the gate; nothing writes that identity onto a
+                # run, deliberately (AUTH_CONTRACT §5 -- a session partitions
+                # nothing), so there is still no run anyone can attribute.
+                #
+                # Rewritten rather than deleted because this is the field a UI
+                # would read before captioning a run with somebody's name.
                 "attribution": (
-                    "none — this deployment authenticates with a single "
-                    "shared key, so no run can be attributed to a person"
+                    "none — a run records no caller, so none can be "
+                    "attributed to a person. Signing in identifies you at the "
+                    "gate only: projects, runs and specimens are shared by "
+                    "everyone who can sign in to this deployment"
                 ),
             },
             "billing": _billing(),
         }
 
     return router
+
+
+def _session_block(auth, session_user: Optional[Dict]) -> Dict:
+    """What the login portal is on THIS process (``docs/AUTH_CONTRACT.md``).
+
+    Read off the live :class:`~app.server.auth.AuthService` rather than
+    restated here, so the panel cannot describe a portal the server is not
+    running. ``supported: False`` means this process built no auth service at
+    all -- a different fact from "nobody has an account", and reported as one.
+
+    ``password_algorithm`` is here because it can VARY BY INTERPRETER and must
+    not do so invisibly: ``hashlib.scrypt`` exists only where Python was built
+    against an SSL library that provides it, and ``auth.hash_password``
+    documents the substitution it makes where it is absent. An operator
+    deserves to be able to read which one their store is written with instead
+    of inferring it from the Python build.
+    """
+    from .auth import (COOKIE_NAME, PASSWORD_MIN_CHARS, SESSION_TTL_S,
+                       scrypt_available)
+
+    if auth is None:
+        return {
+            "supported": False,
+            "reason": ("this process built no authentication service, so the "
+                       "only credential is the X-API-Key header"),
+        }
+    try:
+        accounts = auth.store.count()
+    except Exception:  # noqa: BLE001 - a store fault is not an auth fault
+        # None is "cannot tell", which is not the claim "zero". Reporting zero
+        # here would make an unreadable store look like a fresh install, on
+        # the panel an operator would consult to find out why nobody can log
+        # in.
+        accounts = None
+    return {
+        "supported": True,
+        "cookie": COOKIE_NAME,
+        "signed_in": session_user is not None,
+        "signed_in_as": (session_user or {}).get("email"),
+        "accounts": accounts,
+        "lifetime_days": SESSION_TTL_S // 86400,
+        "refresh_on_use": False,
+        "secret_source": auth.secret_source(),
+        "password_min_length": PASSWORD_MIN_CHARS,
+        "password_algorithm": "scrypt" if scrypt_available() else "pbkdf2-sha256",
+        # §5, on the route whose job is to tell the truth about what is shared.
+        "partitions_data": False,
+        "note": ("A session identifies the person at the keyboard and "
+                 "partitions nothing: every signed-in account sees the same "
+                 "projects, runs and specimens."),
+    }
 
 
 def _billing() -> Dict:
@@ -250,8 +351,17 @@ def _billing() -> Dict:
         # single shared secret. Anyone reading this block needs that fact
         # before they read anything else in it.
         "blocked_on": [
-            "per-caller identity: the API authenticates with one shared key, "
-            "so there is no principal to bill",
+            # Still blocked, and the reason needed restating once sessions
+            # existed: the API does now know WHO is at the keyboard. What it
+            # does not do is write that onto a run, so there is still nothing
+            # linking usage to a principal. Leaving the old wording would have
+            # been a sentence that was true when written and had quietly
+            # stopped being true -- which is this repository's most persistent
+            # defect.
+            "per-run identity: a run records no caller. The X-API-Key "
+            "credential is a shared key with no person behind it, and a "
+            "browser session identifies the person at the gate but is never "
+            "written onto a run -- so there is no principal to bill",
             "a durable usage record: usage counts are an inventory of files "
             "on disk and go down when a run is deleted",
         ],

@@ -1,0 +1,243 @@
+/* auth.css — the sign-in page, and the `.auth-*` bits the in-app sign-in
+ * route drops into pages it does not own.
+ *
+ * SCOPE, deliberately narrow. Every selector in this file begins with an
+ * `.auth-` class. The login page loads tokens.css, base.css and
+ * components.css and consumes `.btn`, `.inp`, `.notice` and `.btn-row`
+ * unchanged, because a sign-in page with its own private button is a sign-in
+ * page that stops matching the product the first time either one is touched.
+ * Nothing here restyles a shared class, so this file cannot change the
+ * appearance of the Studio or the workspace even though `js/auth/gate.js`
+ * renders `.auth-aside` inside both of them.
+ *
+ * THEMING. Colour comes only from tokens.css, which already carries the
+ * light-theme overrides under `html[data-theme="light"]`, so this file needs
+ * no theme block of its own and must not grow one -- a hard-coded colour here
+ * is a light-mode bug that nobody sees until someone toggles the theme.
+ */
+
+/* ============================================================= shell ==== */
+
+/* base.css pins `html, body { overflow: hidden; height: 100% }` and the
+   Studio satisfies that with a fixed grid. A sign-in page is a document and
+   is legitimately taller than a short viewport (a phone in landscape, or a
+   laptop at 200% zoom), so the SHELL scrolls in y and the body still never
+   scrolls at all -- the same arrangement home.html uses. */
+.auth-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+}
+
+.auth-top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: var(--h-bar, 40px);
+  padding: 0 var(--sp-5);
+  border-bottom: 1px solid var(--line-1);
+  background: var(--bg-1);
+}
+/* layout.css owns `.brand` for the Studio and the workspace, and this page
+   does not load layout.css -- it has no rails, no grid and no top bar to
+   style. These two rules are the whole of what the mark needs here, and they
+   are scoped under .auth-top so they can never reach the other two pages. */
+.auth-top .brand .name { font-size: var(--fs-md); letter-spacing: 0.01em; }
+.auth-top .brand .name b { font-weight: 600; }
+.auth-top .brand .name span { color: var(--fg-2); font-weight: 400; }
+
+.auth-main {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--sp-7) var(--sp-5);
+}
+.auth-main:focus { outline: none; }
+
+.auth-host { width: 100%; max-width: 30rem; }
+
+/* ============================================================== card ==== */
+
+.auth-card {
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: var(--sp-6);
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius);
+}
+
+/* The placeholder state, before the module has run. Dimmed so it does not
+   read as a form that is refusing to accept input. */
+.auth-boot .auth-card { opacity: 0.72; }
+
+.auth-h1 {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+}
+.auth-lede {
+  margin: 0 0 var(--sp-5);
+  color: var(--fg-1);
+  line-height: var(--lh-body);
+}
+.auth-who { margin: 0 0 var(--sp-5); color: var(--fg-1); }
+.auth-via { color: var(--fg-2); font-family: var(--font-mono); font-size: var(--fs-sm); }
+
+/* ====================================================== the §5 block ==== */
+
+/* docs/AUTH_CONTRACT.md §5. Given real weight ON PURPOSE: it is the one thing
+   on this page a reader does not already believe, and every other login they
+   have ever used has taught them the opposite. It sits ABOVE the form, inside
+   the accent rule rather than in small print under the button, because small
+   print under a button is read after the decision it was meant to inform.
+   It is not styled as a warning -- nothing is going wrong, the store is
+   simply one store -- so it borrows the accent and not --warn. */
+.auth-shared {
+  margin: 0 0 var(--sp-6);
+  padding: var(--sp-4) var(--sp-5);
+  border-left: 2px solid var(--accent-dim);
+  background: var(--accent-bg);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.auth-shared-h {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  color: var(--fg-0);
+}
+.auth-shared p {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+}
+.auth-shared p:last-child { margin-bottom: 0; }
+.auth-shared-why { color: var(--fg-2); }
+
+/* ============================================================== form ==== */
+
+.auth-form { display: block; }
+
+.auth-field { margin: 0 0 var(--sp-5); }
+
+.auth-label {
+  display: block;
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+
+/* components.css styles `.inp` for inline controls inside dense panels; on
+   this page every field is the full width of the card. Width and box-sizing
+   only -- no colour, no border, no font, so the field still looks like every
+   other field in the product and follows it when that changes. */
+.auth-field .inp {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.auth-hint {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+
+.auth-form .btn-row { margin-top: var(--sp-6); }
+.auth-form .btn-row .btn { min-width: 9rem; }
+
+.auth-switch {
+  margin: var(--sp-5) 0 0;
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--line-0);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+
+/* ============================================================ status ==== */
+
+/* Empty until the server has said something, and it must collapse to nothing
+   when empty: a reserved blank strip above a button reads as a message that
+   failed to load. */
+.auth-status:empty { display: none; }
+
+.auth-msg {
+  margin-top: var(--sp-5);
+  padding: var(--sp-3) var(--sp-4);
+  border-left: 2px solid var(--line-2);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+}
+.auth-msg.info { border-left-color: var(--info);  background: var(--info-bg); }
+.auth-msg.ok   { border-left-color: var(--ok);    background: var(--ok-bg); }
+.auth-msg.warn { border-left-color: var(--warn);  background: var(--warn-bg); }
+.auth-msg.crit { border-left-color: var(--crit);  background: var(--crit-bg); }
+
+/* ============================================================= notes ==== */
+
+.auth-notes {
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--line-0);
+}
+
+/* Also rendered by js/auth/gate.js INSIDE the Studio's `.gate-card` and the
+   workspace's own `.hb-body` banner -- neither of which loads this file, since
+   index.html and home.html are not this agent's to edit. So it declares no
+   background and no spacing that assumes a container, and gate.js pairs it
+   with `.muted` from base.css (which all three pages DO load) for the colour.
+   On those two pages it therefore renders as an ordinary muted paragraph in
+   whatever box it is in; here it also gets the smaller size and the margins.
+   Nothing depends on this file reaching them, which is why no new shared class
+   was needed. */
+.auth-aside {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+}
+.auth-aside:last-child { margin-bottom: 0; }
+.auth-aside .mono { font-family: var(--font-mono); }
+
+/* ============================================================== foot ==== */
+
+.auth-foot {
+  flex: 0 0 auto;
+  padding: var(--sp-5);
+  border-top: 1px solid var(--line-1);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--fg-2);
+  text-align: center;
+}
+.auth-foot p { margin: 0 0 var(--sp-2); }
+.auth-foot p:last-child { margin-bottom: 0; }
+.auth-foot-links a { color: var(--fg-2); }
+.auth-foot-links a:hover { color: var(--fg-0); }
+.auth-foot-links span { margin: 0 var(--sp-3); }
+
+/* ============================================================ narrow ==== */
+
+/* A phone. The card loses its own frame and becomes the page, because a 30rem
+   card inside a 20rem viewport is a frame drawn around a horizontal scrollbar. */
+@media (max-width: 30rem) {
+  .auth-main { padding: var(--sp-5) var(--sp-4); }
+  .auth-card {
+    padding: var(--sp-5) 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+  }
+  .auth-form .btn-row .btn { width: 100%; }
+}

@@ -764,7 +764,7 @@ any directory it can read), and leave `TMESIM_STUDIO_EXPOSE_TRACEBACKS` unset.
 
 ## 4. Environment variables
 
-Twelve. There is no config file; these are the whole surface, and only five are
+Thirteen. There is no config file; these are the whole surface, and only six are
 security-relevant.
 
 This section said "Six" while the code read ten — `TMESIM_MAX_GRID_CELLS` had
@@ -838,13 +838,64 @@ Two related properties worth knowing:
   to `/api/protocol/*` only; a 64 MB body was buffered and parsed by the other
   six POST routes.
 
+### `TMESIM_SESSION_SECRET`
+
+**Optional. Leave it unset unless you have a reason.** It is the key that signs
+browser session cookies for the login portal (`docs/AUTH_CONTRACT.md` §2).
+
+Unset — the normal case — the server derives the signing key from a random
+`instance_secret` it generates once inside its own account store
+(`<state_dir>/auth/users.json`, mode `0600`). That is already a 256-bit random
+value nobody has to manage, so setting this variable buys you exactly two
+things and you should set it only if you want one of them:
+
+* **sessions that survive losing the account store.** With `TMESIM_STATE_DIR`
+  unset the store is ephemeral, so every redeploy invents a new
+  `instance_secret` and signs everyone out. Setting this pins the key.
+* **a way to sign every session out at once.** Change the value, restart, and
+  every cookie this deployment ever issued stops verifying. That is the only
+  revocation mechanism there is — sessions are signed tokens with no
+  server-side record, so changing a password cannot end the sessions already
+  issued, and `POST /api/auth/password` says so in its own response.
+
+Two properties worth knowing before you set it:
+
+* **It is NOT `TMESIM_STUDIO_API_KEY` and must not be set to it.** The contract
+  (§2) forbids deriving one from the other and gives the reason: rotating the
+  API key — something you do for CI, or because it leaked — would then silently
+  sign out every browser. The two secrets have different lifetimes on purpose.
+* **Shorter than 16 characters and the process refuses to start**, naming the
+  fix. A guessable session secret is a forgeable session cookie, which is every
+  account at once, and it fails with no symptom at all — so this is a refusal
+  rather than a warning, exactly as a malformed `TMESIM_MAX_GRID_CELLS` is.
+
+```
+TMESIM_SESSION_SECRET=$(python -c 'import secrets;print(secrets.token_urlsafe(32))')
+```
+
+Read once, at process start, like the other build-time variables: changing it
+needs a restart, which is also what makes it the revocation switch above.
+
+Note that **sign-up has no variable of its own**. `POST /api/auth/signup`
+requires the operator's existing `TMESIM_STUDIO_API_KEY` as a bootstrap token
+(§4) — deliberate reuse rather than a new mechanism — and with no key
+configured there is no token that could authorise sign-up, so the route refuses
+with 503 rather than falling open.
+
 ### `TMESIM_STATE_DIR`
 
 **Set this on any hosted deployment, or it keeps nothing.**
 
-`runs/` and `projects/` become children of this one directory. Unset, they sit
-at `app/runs/` and `app/projects/` exactly as they always have, so a local
-install is unaffected and nothing moves.
+`runs/`, `projects/` and `auth/` become children of this one directory. Unset,
+they sit at `app/runs/`, `app/projects/` and `app/auth/` exactly as they always
+have, so a local install is unaffected and nothing moves.
+
+`auth/` is the newest of the three and holds `users.json` — the login portal's
+accounts (`docs/AUTH_CONTRACT.md` §6), owner-only at `0600` inside a `0700`
+directory. It is under this variable for the same reason projects are, and with
+the same consequence stated the same way: on a host **with** a disk accounts
+survive a redeploy, and on a host **without** one they are destroyed by every
+redeploy exactly as projects are. If you want logins to persist, set this.
 
 Measured 2026-09-20 in a real container: both paths were hardcoded off the
 repository root, which puts them at `/app/app/runs` and `/app/app/projects` —
