@@ -569,7 +569,12 @@ export const SECTION_COPY: readonly SectionCopy[] = [
     kicker: "01",
     eyebrow: "Real measured tissue",
     headline: "See Where the Drug Actually Goes.",
-    body: "The section behind this text is a real one. Vivum rebuilds tumor architecture from spatial transcriptomics, then runs transport physics on the result to work out where a drug actually reaches.",
+    // 2026-10-09, length only. "runs transport physics on the result to work
+    // out where a drug actually reaches" -> "solves transport physics on it to
+    // find where a drug reaches". Nothing is claimed that was not claimed
+    // before: "solves" is the verb beat 02 already uses for the same thing,
+    // and "actually" is carried by the headline directly above it.
+    body: "The section behind this text is a real one. Vivum rebuilds tumor architecture from spatial transcriptomics, then solves transport physics on it to find where a drug reaches.",
     align: "left",
   },
   {
@@ -633,7 +638,18 @@ export const SECTION_COPY: readonly SectionCopy[] = [
      * a map that is exactly invariant. That is a statement about the
      * instrument, not about the map, and no version of it belongs in the copy.
      */
-    body: "Convection, diffusion and reaction, solved on that geometry. Interstitial pressure builds where vessels leak and drainage fails and pushes back against the drug coming in; oxygen and hypoxia solve on the same grid, and response follows Hill kinetics from the concentration each cell sees. What that buys is the shape of the field, not its magnitude — and the difference is measured, not asserted. One piece of it is exact rather than argued: how much drug the tissue can store is a number the engine assumes rather than measures, and it cannot move a converged field at all — checked to one part in a billion. It does move what a finite exposure window accumulates — the one regime the invariance does not cover.",
+    /*
+     * 2026-10-09, LENGTH ONLY, AND NOT ONE CLAUSE OF THE FOUR PROTECTED ONES
+     * WAS TOUCHED. "the shape of the field, not its magnitude", "the
+     * difference is measured, not asserted", "a number the engine assumes
+     * rather than measures ... checked to one part in a billion", and the
+     * closing exception are all verbatim. What changed: "pushes back against
+     * the drug coming in" -> "pushes back against incoming drug"; a comma
+     * splice between the pressure and oxygen clauses became a semicolon so
+     * the three solved quantities read as a list; "One piece of it" -> "One
+     * piece". 16 characters, no disclosure.
+     */
+    body: "Convection, diffusion and reaction, solved on that geometry. Interstitial pressure builds where vessels leak and drainage fails, and pushes back against incoming drug; oxygen and hypoxia solve on the same grid; response follows Hill kinetics from the concentration each cell sees. What that buys is the shape of the field, not its magnitude — and the difference is measured, not asserted. One piece is exact rather than argued: how much drug the tissue can store is a number the engine assumes rather than measures, and it cannot move a converged field at all — checked to one part in a billion. It does move what a finite exposure window accumulates — the one regime the invariance does not cover.",
     align: "left",
     /*
      * This beat used to be a four-item feature list with no number in it, and
@@ -821,7 +837,20 @@ export const SECTION_COPY: readonly SectionCopy[] = [
      * corrected here; what was missing was that it is a demonstration rather
      * than a feature.
      */
-    body: "In one section, tumor cells in the macrophage-densest quintile hold about 0.43 of drug exposure. In the sparsest, about 0.86 — a 2.0x spread inside a single tumor, where a well-mixed compartmental model returns exactly 1.0 by construction. That flatters us. Tissue-edge distance alone, with no immune input, reproduces 82% of it; nulls preserving the macrophages' clustering return 1.66 and 1.85. What these macrophages add is 1.08-1.21x — smaller, and measured. A compartment expresses neither. No shipped run carries the immune drug-loss term this needs: it did not improve the measured human-glioma anchor.",
+    /*
+     * 2026-10-09: "A compartment expresses neither." -> "A compartment
+     * expresses none of it." A grammar fix, not a softening, and it is the
+     * kind that quietly costs a reader the sentence. "Neither" takes two
+     * referents and by that point the paragraph has named four quantities —
+     * 2.0x, 82%, 1.66/1.85, 1.08-1.21x — so the word pointed at nothing
+     * recoverable. The claim is unchanged and is the one immune_sink_impact.md
+     * sec. 6 endorses: a compartmental model expresses no part of this,
+     * neither the raw spread nor the attributable remainder.
+     *
+     * Every number, both nulls, the 82% confound and the not-in-the-product
+     * sentence are untouched.
+     */
+    body: "In one section, tumor cells in the macrophage-densest quintile hold about 0.43 of drug exposure. In the sparsest, about 0.86 — a 2.0x spread inside a single tumor, where a well-mixed compartmental model returns exactly 1.0 by construction. That flatters us. Tissue-edge distance alone, with no immune input, reproduces 82% of it; nulls preserving the macrophages' clustering return 1.66 and 1.85. What these macrophages add is 1.08-1.21x — smaller, and measured. A compartment expresses none of it. No shipped run carries the immune drug-loss term this needs: it did not improve the measured human-glioma anchor.",
     align: "left",
   },
   {
@@ -1147,7 +1176,38 @@ export const SECTION_COPY: readonly SectionCopy[] = [
      * bought, what belongs here is the two DEMONSTRATED settings and nothing
      * else.
      */
-    body: "Vivum runs where your tissue already is: the solve is a single process on your own machine, and it sends no tissue or compound data anywhere. De-identified tissue only. Bring a section and a compound, and get back a per-cell verdict, the map that is the evidence for it, and the limits below attached to both, on your tissue, with your numbers in them.",
+    /*
+     * 2026-10-09 — THIS CUT IS WHAT PAID FOR THE TWO WITHDRAWN CLAUSES IN THE
+     * LEDGER BELOW, AND IT IS THE ONE KIND OF CUT THE RULE ABOVE PERMITS.
+     *
+     * The block above records that beat 06 had 7.2px of worst-case headroom at
+     * 360x700, under half a ledger detail line, and that "the next edit that
+     * needs a line on beat 06 has nothing left to sell and must take it out of
+     * the layout". Two things changed that. The layout did give room — the
+     * display face is no longer a condensed grotesque and this beat's headline
+     * now sets on ONE line at 360px where it took two (app/globals.css, the
+     * display-size block). And this sentence had 64 characters of framing in
+     * it that were not carrying a claim.
+     *
+     * WHAT WENT, AND WHY NONE OF IT IS A DISCLOSURE.
+     *   "Vivum runs where your tissue already is:" — a lead-in that restates
+     *   the headline directly above it ("Run it on your own tissue.") and the
+     *   clause four lines later ("your tissue"). Three statements of one fact.
+     *   "the map that is the evidence for it" -> "the map that is its
+     *   evidence" — the ordering this block insists on (verdict first, map
+     *   second and explicitly AS the evidence) is exactly preserved.
+     *   "on your tissue, with your numbers in them" -> "your tissue, your
+     *   numbers" — the substance this block protects, in fewer words.
+     *
+     * WHAT DID NOT MOVE, because all of it is load-bearing: the single-local-
+     * process claim and the "sends no tissue or compound data anywhere" scope
+     * (NOT broadened to outbound requests in general — see the provenance
+     * guardrail at the head of this file), "De-identified tissue only", the
+     * verdict-before-map ordering, the promise that the limits travel, the
+     * absence of the word "upload", and the absence of any naming of what the
+     * verdict's settings are.
+     */
+    body: "The solve is a single process on your own machine, and it sends no tissue or compound data anywhere. De-identified tissue only. Bring a section and a compound; get back a per-cell verdict, the map that is its evidence, and the limits below attached to both — your tissue, your numbers.",
     align: "center",
     /*
      * WHY A SECOND LEDGER EXISTS, AND WHY IT IS HERE RATHER THAN ON BEAT 05.
@@ -1300,11 +1360,30 @@ export const SECTION_COPY: readonly SectionCopy[] = [
          * first — a reader who takes away three routes without knowing that one
          * of them is not ours has the weaker half of the row.
          */
+        /*
+         * 2026-10-09 — THE WITHDRAWN INTERPRETIVE CLAUSE IS BOUGHT BACK. The
+         * block above registered it as the first thing this row should buy if
+         * beat 06 were ever given a line: "a reader who takes away three
+         * routes without knowing that one of them is not ours has the weaker
+         * half of the row". The line came from the beat 06 body (see the block
+         * above the body) and from the display face no longer costing this
+         * beat's headline a second line at 360px.
+         *
+         * It is written to carry BOTH halves in one clause — that the third
+         * route is tissue, and that the first two are ours — because either
+         * half alone is the weaker reading. It still carries NO COUNT, for the
+         * reason the block above gives: "2 of 2" would read as a statistic and
+         * there is none here (n = 3 donors, one compound, one configuration,
+         * one grid).
+         *
+         * The only other change is a comma splice to a colon before "no
+         * constant fixes both".
+         */
         {
           label: "The 03 verdict",
           state: "INVERTS THREE WAYS",
           detail:
-            "It comes from a one-way vascular leak with no path from tissue back to blood, which misses human microdialysis 12.8× high on one drug and 10.5× low on another, so no constant fixes both. Supply the missing term and the dominant limiter flips for 7 of 12 compounds, 03's included, relabelling 57.2% of its cells. Moving one conventional band threshold to the median survivor's own exposure flips it again. And so does another section of the same tumour.",
+            "It comes from a one-way vascular leak with no path from tissue back to blood, which misses human microdialysis 12.8× high on one drug and 10.5× low on another: no constant fixes both. Supply the missing term and the dominant limiter flips for 7 of 12 compounds, 03's included, relabelling 57.2% of its cells. Moving one conventional band threshold to the median survivor's own exposure flips it again. So does another section of the same tumour — the only one of the three that is tissue and not a choice of ours.",
         },
         /*
          * THE NUMBER CHANGED ON 2026-09-20 AND THE ROW GOT SMALLER, WHICH IS
@@ -1363,11 +1442,30 @@ export const SECTION_COPY: readonly SectionCopy[] = [
          * three") and do NOT quote 2.69x: a max/min over three sections is not
          * an error bar and a fold printed beside 2.2-3.0x would be read as one.
          */
+        /*
+         * 2026-10-09 — THE SPECIMEN CLAUSE IS BOUGHT BACK, QUALITATIVE, WITH
+         * NO FOLD QUOTED. The block above registered this as "the first thing
+         * this beat should buy if it is ever given room" and recorded exactly
+         * why its absence was the serious kind of defect: the omitted clause
+         * is a disclosure that costs us, so leaving it out made the page read
+         * SOFTER than the evidence.
+         *
+         * The two conditions that block set are both met. It is QUALITATIVE —
+         * "the most penetrable" of three, no number. And 2.69x is NOT quoted:
+         * a max/min over three sections is not an error bar, and printed next
+         * to 2.2-3.0x it would be read as one.
+         *
+         * It is also deliberately a SECOND sentence rather than a clause on
+         * the first, because the two effects are different kinds of fact and
+         * compound rather than overlap: the first is an error in the model's
+         * transport length, this is a property of the specimen. "So does"
+         * carries that they point the same way — both flatter the drug.
+         */
         {
           label: "“Arrives almost everywhere”",
           state: "2.2–3.0× TOO SHALLOW",
           detail:
-            "The map's one out-of-sample perivascular gradient is that much too shallow, from a transport length measured 2.45× too long. The error flatters the drug: it under-reports how much tumour goes untreated.",
+            "The map's one out-of-sample perivascular gradient is that much too shallow, from a transport length measured 2.45× too long. The error flatters the drug: it under-reports how much tumour goes untreated. So does the specimen — of three glioblastoma sections, 03's is the most penetrable.",
         },
         {
           label: "“Under-dosed”",

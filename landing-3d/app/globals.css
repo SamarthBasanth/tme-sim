@@ -71,11 +71,13 @@
   --conc-high: #d8e219;
 
   /*
-   * Archivo + Atkinson Hyperlegible Next + Atkinson Hyperlegible Mono,
-   * self-hosted via next/font/google. app/layout.tsx carries the full
-   * argument for the three faces, including why the "no network dependency"
-   * constraint that once pinned this to system Helvetica does not apply to
-   * that API, and why IBM Plex was left.
+   * Newsreader + Atkinson Hyperlegible Next + Atkinson Hyperlegible Mono,
+   * self-hosted from .woff2 files committed in app/fonts/ and loaded through
+   * `next/font/local`. app/layout.tsx carries the full argument for the three
+   * faces — why the display face is a serif, why both text roles come from
+   * one superfamily, why IBM Plex and Archivo were left, and why the files
+   * are vendored rather than fetched at build time. app/fonts/README.md
+   * carries the provenance and the licences.
    *
    * THE RULE THESE THREE EXIST TO SERVE, UNCHANGED AND NOT NEGOTIABLE:
    * every prose sentence is set in --font-sans and EVERY MEASURED QUANTITY,
@@ -83,24 +85,37 @@
    * as a claim; a number in mono reads as a reading. --font-display is the
    * voice and never carries data.
    *
-   * --font-display is a WIDTH-VARIABLE face and is always set with an
-   * explicit `font-stretch` below. That is what replaces the fixed condensed
-   * cut the page used before: the hierarchy here is carried by width contrast
-   * against the body face, not by size alone, and .scroll-pin clips at
-   * overflow:hidden, so display width is a fitting constraint rather than a
-   * preference. Do not drop the font-stretch declarations — without them the
-   * headings render at 100% width, gain a line, and push a ledger row out of
-   * the pinned viewport.
+   * --font-display IS THE ONLY SERIF ON THE PAGE AND THAT IS THE POINT. The
+   * three information types this page traffics in — the claim, the prose, the
+   * reading — now differ in KIND rather than in degree, so a reader can tell
+   * which register they are in without having measured anything. Before this
+   * the hierarchy was three sizes of one grotesque voice.
+   *
+   * --font-display is an OPTICALLY-SIZED face. `font-optical-sizing: auto` is
+   * the browser default and is what this page relies on: at a 77px heading
+   * the `opsz` axis tightens and sharpens the drawing, at a 15px ledger label
+   * it opens the spacing and thickens the hairlines so a small serif on
+   * #07080a does not disappear. It replaces the five hand-set `font-stretch`
+   * values the previous width-variable display face needed, and it replaces
+   * them for the same structural reason they existed: .scroll-pin clips at
+   * overflow:hidden, so the display face has to be fittable to the column or
+   * it silently truncates a disclosure. Do not set `font-optical-sizing:
+   * none` anywhere, and if you override `opsz` through
+   * `font-variation-settings`, name `wght` in the same declaration or the
+   * weight is taken from the file's default (400) instead of from
+   * `font-weight`.
    *
    * The system stacks are retained as fallbacks so a font failure degrades to
-   * something readable rather than to Times.
+   * something readable. The display stack now ends in a SERIF stack, not a
+   * sans one: a serif heading that fails over to Helvetica changes the page's
+   * voice, which is the whole thing the face was chosen for.
    */
   --font-sans:
     var(--font-atkinson), "Helvetica Neue", "Nimbus Sans", Arimo,
     "Liberation Sans", Arial, sans-serif;
   --font-display:
-    var(--font-archivo), var(--font-atkinson), "Helvetica Neue",
-    "Nimbus Sans", Arial, sans-serif;
+    var(--font-newsreader), "Iowan Old Style", "Source Serif 4", Charter,
+    "Liberation Serif", "Times New Roman", Times, serif;
   --font-mono:
     var(--font-atkinson-mono), "SF Mono", "Roboto Mono", "DejaVu Sans Mono",
     Menlo, Consolas, "Courier New", monospace;
@@ -184,9 +199,10 @@
  * the common case, not a guarantee on every device, and it is not written up
  * as one.
  *
- * No weight or style descriptor, matching what Next generates for `Archivo
- * Fallback`: one face per family covering the whole range, with the browser
- * synthesising bold and italic for the fraction of a second it is visible.
+ * No weight or style descriptor, matching what Next generates for a family it
+ * does have metrics for: one face per family covering the whole range, with
+ * the browser synthesising bold and italic for the fraction of a second it is
+ * visible.
  * ------------------------------------------------------------------------- */
 
 @font-face {
@@ -210,105 +226,109 @@
 }
 
 /* ---------------------------------------------------------------------------
- * FALLBACK METRICS FOR THE DISPLAY FACE — FOUR FACES, BECAUSE ARCHIVO IS USED
- * AT FOUR WIDTHS AND A WIDTH-VARIABLE FACE CANNOT HAVE ONE FALLBACK.
+ * FALLBACK METRICS FOR THE DISPLAY FACE — ONE FACE, BECAUSE THE OPTICAL SIZE
+ * AXIS IS PINNED PER ROLE AND THE TWO PINNED VALUES WERE CHOSEN TO AGREE.
  *
- * Next DOES have metrics for Archivo, and generated a fallback from them. That
- * fallback was measurably wrong here, and the reason is the width axis: the
- * table stores one set of numbers for the default width, while this page never
- * sets Archivo at its default width. Headings run at `font-stretch: 80%` — that
- * is deliberate and load-bearing (see the note in :root above) — so the real
- * face is about 18% narrower than the fallback Next computed for it. Measured
- * before this block, at 1512x950 with the woff2 delayed, the reduced-motion
- * headings jumped 55px in width on swap, gained a line, and pushed every beat
- * below them down 41.9px. That was the largest first-paint shift left on the
- * page after the two Atkinson faces were fixed.
+ * WHAT THIS REPLACES, AND WHY THE REPLACEMENT IS SMALLER. The previous display
+ * face was Archivo, a WIDTH-variable grotesque used at four `font-stretch`
+ * values, and a size-adjust is a constant: no single fallback can match a face
+ * whose width the stylesheet keeps changing. That needed four @font-face
+ * blocks partitioned by `font-stretch`, because CSS font matching selects
+ * within a family by stretch. Newsreader has no width axis, so that trick is
+ * neither available nor needed — but the problem it solved IS still here in a
+ * different costume, and it is worth stating because it is the thing that
+ * would otherwise be missed:
  *
- * A single @font-face cannot answer this, because `size-adjust` is a constant
- * and the requested width is not. But CSS font matching selects WITHIN a family
- * by `font-stretch`, so the family is declared four times, each face covering
- * the band around one of the four widths this stylesheet actually asks for:
+ *   THE OPTICAL SIZE AXIS CHANGES ADVANCE WIDTHS, BY A LOT, AND IT DOES IT
+ *   AUTOMATICALLY. `font-optical-sizing: auto` is the browser DEFAULT, so a
+ *   face with an `opsz` axis is silently re-drawn at every font-size. Measured
+ *   on this file (mean advance over the 43-character frequency-weighted string
+ *   @next/font uses, per em, weight 600):
  *
- *     80%  headings          .narrative-section h1/h2, reduced-motion h1/h2
- *     88%  the VIVUM mark    .site-header__mark
- *     92%  ledger labels     .ledger__label
- *     ~100% nothing today    kept so a future width degrades sensibly
+ *       opsz   6   24.585      opsz  36   19.512
+ *       opsz  14   20.698      opsz  48   20.018
+ *       opsz  18   18.754      opsz  60   20.524
+ *       opsz  24   19.007      opsz  72   21.030
  *
- * Every `var(--font-display)` declaration in this file sets an explicit
- * font-stretch (audited: five declarations, five stretch values, no default),
- * which is what makes the partition complete rather than hopeful.
+ *   Note it is NOT monotone — the narrowest fit is around the 18 pt default
+ *   and it widens in both directions. Note also that Chromium's `auto` maps
+ *   the axis from the font-size in PX, not in points, and clamps at the axis
+ *   maximum: a 76.8px heading gets opsz 72, not 57.6.
  *
- * THE NUMBERS BELOW ARE CALIBRATED, NOT DERIVED, AND THE FIRST ATTEMPT IS
- * RECORDED BECAUSE IT FAILED FOR AN INSTRUCTIVE REASON. Per em, mean advance
- * over the same 43-character string:
+ *   THE CONSEQUENCE FOR THIS PAGE, HAD IT BEEN LEFT ON `auto`: headings are
+ *   `clamp(2.3rem, 6.1vw, 4.8rem)` = 36.8px to 76.8px, so auto would run opsz
+ *   36.8 to 72 and the advance would run 19.53 to 21.03 — a 7.6% swing across
+ *   the responsive range. A fallback calibrated at the desktop end would be
+ *   7.6% too wide on a phone, which on a three-line h1 is about a line, i.e.
+ *   exactly the ~40px first-paint shift this whole block exists to stop.
  *
- *     Archivo 80%/650  0.39847     Arial 400         0.45630
- *     Archivo 88%/600  0.42308     Arial 600/650     0.49368  (real Arial Bold)
- *     Archivo 92%/600  0.43842
- *     Archivo 100%/400 0.45077
+ * SO `opsz` IS PINNED PER ROLE, `font-optical-sizing: none` ALONGSIDE IT. Two
+ * values, and they are not independent choices:
  *
- * Dividing those gives 80.71 / 85.70 / 88.81 / 98.79%, and three of the four
- * were wrong on the page. `local("Arial")` names ONE face — Arial Regular — so
- * a heading requested at weight 650 against this family is rendered with
- * SYNTHETIC bold, whose advances are not Arial Bold's. Shipped at the derived
- * values the headings still moved 36.8px on swap.
+ *     opsz 60    every heading (narrative h1/h2, both reduced-motion
+ *                headings). A display drawing that does NOT change between a
+ *                390px phone and a 1512px desktop — which is the right
+ *                typographic answer as well as the convenient one, because the
+ *                heading occupies about the same share of the viewport at both
+ *                and is read from proportionally closer.
+ *     opsz 14.4  the two small display roles, the VIVUM mark and the ledger
+ *                label, both at 15.2px. A text drawing: sturdier hairlines and
+ *                looser fit, which is what a 15px serif on #07080a needs.
  *
- * So each face was then measured through the fallback family itself, at the
- * real weight, the real width, the real tracking and the page's own strings,
- * and its size-adjust divided by the observed fallback/real width ratio. That
- * one correction took the four roles to within ~1% (h2 1.0006, h1 1.0075,
- * ledger label 0.9998, wordmark 0.9888) and took the measured heading shift
- * from 55px to 0.
+ *   14.4 IS NOT A ROUND NUMBER AND THAT IS THE POINT. It is the value whose
+ *   advance (20.52 per em) matches the heading role's at opsz 60 (20.52), to
+ *   0.1%. Picking it that way is what collapses four fallback faces into one:
+ *   both display roles now present the same metrics to the same size-adjust.
+ *   It is also within half a point of what `auto` would have chosen for a
+ *   15.2px element anyway, so nothing was distorted to get it.
  *
- * Archivo's ascent and descent are invariant along the width axis — verified,
- * `line-height: normal` measures 1.088 em at all four widths — so each face
- * takes the same 0.878 / 0.210 divided by its own size-adjust, and each
- * reproduces 1.088 em exactly. That is the arithmetic check on the four pairs
- * below, and it still holds after the calibration.
+ * THE NUMBERS BELOW, AND THE METHOD. Measured in the browser, not derived from
+ * the table — see the Atkinson block above for why that distinction matters
+ * here. Per em, mean advance over the same 43-character string, weight 600:
  *
- * These replace Next's generated `Archivo Fallback`; `adjustFontFallback:
- * false` in app/layout.tsx is what turns that one off. Do not re-enable it —
- * the two mechanisms would both claim the fallback slot and the one that won
- * would depend on stylesheet order.
+ *     Newsreader, opsz 60 / 14.4    20.524
+ *     the fallback family           17.939
+ *
+ *   size-adjust        20.524 / 17.939            = 114.41%
+ *   ascent-override    0.735 / 1.1441             =  64.24%
+ *   descent-override   0.265 / 1.1441             =  23.16%
+ *
+ * Newsreader's own `line-height: normal` measures 1.000 em (ascent 0.735 +
+ * descent 0.265 + zero line gap, read off the binary and confirmed in the
+ * browser), and (64.24% + 23.16%) x 114.41% = 1.000. That identity is the
+ * arithmetic check on the three values, the same check the Atkinson pair
+ * above carries.
+ *
+ * WHY THE FALLBACK LIST IS ONLY THE TIMES-METRIC FAMILY. Times New Roman,
+ * Liberation Serif, Tinos and Nimbus Roman are metric-compatible with each
+ * other, so one size-adjust is correct whichever of them wins. Georgia and
+ * DejaVu Serif are NOT — Georgia is materially wider — and naming them here
+ * would make the adjustment wrong on exactly the machines where they won.
+ * They stay in `--font-display`'s own stack as a last resort, where no
+ * adjustment is claimed for them.
+ *
+ * WHAT IS STILL APPROXIMATE, STATED RATHER THAN HIDDEN. Weight 600 against a
+ * family whose `src` names only regular-weight faces is rendered with
+ * SYNTHETIC bold. Measured, Chromium's synthetic bold is a stroke expansion
+ * and does not change advances (Times New Roman measures 17.939 at both 400
+ * and 600), so the ratio above holds — but that is a measured property of one
+ * engine's bolding, not a guarantee, and it is the same caveat the Archivo
+ * block recorded when its derived values came out wrong for this reason.
+ *
+ * PLATFORM CAVEAT, as above: where none of the four named faces exists the
+ * rule contributes nothing, the stack falls through to `--font-display`'s own
+ * system serifs, and no adjustment applies. That is the behaviour before this
+ * block existed, not a regression.
  * ------------------------------------------------------------------------- */
 
 @font-face {
-  font-family: "Archivo Width Fallback";
-  font-stretch: 62% 84%;
-  src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo");
-  size-adjust: 86.52%;
-  ascent-override: 101.48%;
-  descent-override: 24.27%;
-  line-gap-override: 0%;
-}
-
-@font-face {
-  font-family: "Archivo Width Fallback";
-  font-stretch: 85% 90%;
-  src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo");
-  size-adjust: 89.04%;
-  ascent-override: 98.61%;
-  descent-override: 23.58%;
-  line-gap-override: 0%;
-}
-
-@font-face {
-  font-family: "Archivo Width Fallback";
-  font-stretch: 91% 96%;
-  src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo");
-  size-adjust: 97.02%;
-  ascent-override: 90.5%;
-  descent-override: 21.64%;
-  line-gap-override: 0%;
-}
-
-@font-face {
-  font-family: "Archivo Width Fallback";
-  font-stretch: 97% 125%;
-  src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo");
-  size-adjust: 98.79%;
-  ascent-override: 88.88%;
-  descent-override: 21.26%;
+  font-family: "Newsreader Fallback";
+  src:
+    local("Times New Roman"), local("Liberation Serif"), local("Tinos"),
+    local("Nimbus Roman");
+  size-adjust: 114.41%;
+  ascent-override: 64.24%;
+  descent-override: 23.16%;
   line-gap-override: 0%;
 }
 
@@ -435,12 +455,14 @@ body::after {
 .site-header__mark {
   font-family: var(--font-display);
   font-size: 0.95rem;
-  /* Archivo's caps are wider and more open than the condensed cut this
-     replaced, so the nameplate reaches the same optical width on less
-     tracking. Held at 88% rather than the headings' narrower setting: a
-     five-letter mark has no fitting problem to solve and reads better
-     slightly more open than the copy it sits above. */
-  font-stretch: 88%;
+  /* The TEXT optical size, not the display one, and the difference is visible
+     at this size: at opsz 60 the hairlines of a 15px serif on #07080a thin to
+     the point where the mark reads as grey rather than as white. 14.4 is the
+     sturdier drawing, and it is the value the display fallback is calibrated
+     against — see the @font-face block above for why these two roles share
+     one number. */
+  font-optical-sizing: none;
+  font-variation-settings: "opsz" 14.4;
   letter-spacing: 0.28em;
   font-weight: 600;
   color: var(--ink);
@@ -708,42 +730,64 @@ body::after {
 }
 
 /*
- * Headings run on the display face, narrowed on its width axis to 80% and set
- * at 650. Narrowing lets the display size go up without the line count going
- * up with it, which is what keeps a three-line headline from crowding the
- * tissue behind it -- and, more importantly, keeps beats 02 and 05 inside a
- * viewport that clips silently.
+ * Headings run on the display face at its DISPLAY optical size, pinned, and
+ * at 600. See the "Newsreader Fallback" @font-face block above for why opsz
+ * is pinned rather than left on `auto` (it would swing the advance 7.6%
+ * across this clamp and cost a phone h1 a line on first paint) and for why
+ * the pinned value is 60.
  *
- * 650, not the 600 the previous condensed cut used: at 80% width the stems
- * thin visibly, and 600 read grey against a lit specimen rather than
- * authoritative. 700 was tested and closes the counters at the small end of
- * the clamp.
+ * 600, not the 650 the previous grotesque needed. That face was set at
+ * `font-stretch: 80%`, where the stems thinned and 600 read grey; this one is
+ * at its natural width with a serif's own stem contrast, and 650 renders it
+ * closer to a book-jacket bold than to a reported finding. 700 was tested and
+ * is the register the page has spent two years editing out of the copy.
  *
- * Sizes came DOWN slightly from the previous face. Archivo's x-height is
- * appreciably larger for the same em, so the old values rendered optically
- * bigger, not equal -- this is the re-tune, not a shrink. Leading is opened
- * for the same reason: a large x-height narrows the visual channel between
- * lines, so 1.02 on the old face is crowding on this one.
+ * TRACKING CAME UP, NOT DOWN. -0.012em was tightening a condensed grotesque;
+ * applied to a serif it jams the serifs of adjacent letters at the top of the
+ * clamp. -0.006em is a touch of display tightening and no more.
+ *
+ * SIZES CAME DOWN ~11%, AND THE REASON IS WIDTH, NOT SIZE. Measured, at the
+ * same px, on this page's own six headlines: Newsreader at opsz 60 sets them
+ * 17.9% to 26.8% WIDER than Archivo did at `font-stretch: 80%` / 650. That
+ * condensation was not decoration — the note it replaced says so outright,
+ * "narrowing lets the display size go up without the line count going up with
+ * it" — so dropping the width axis without dropping the size spends the whole
+ * budget it was buying. Left at the old numbers it cost a heading line on
+ * eleven beat/viewport pairs and clipped two of them (beat 02 at 1280x720 by
+ * 20.5px, beat 06 at 360x700 by 9.1px; npm run audit:viewports, exit 1).
+ *
+ * The cut is a size cut and NOT a legibility cut: nothing in --font-sans or
+ * --font-mono moved, so every caveat, detail and measured quantity on the
+ * page is set at exactly the size it was. And it is smaller than the width
+ * difference, because Newsreader's cap-height is 4.3% LARGER per em than
+ * Archivo's (0.720 against 0.690, measured off the rendered ink) — at 0.89x
+ * the size the capitals are only ~7% shorter, which is below the threshold at
+ * which a headline stops leading a page.
+ *
+ * Leading is unchanged. These numbers are load-bearing on three beats with
+ * under 12px of headroom, so every one of them was re-measured rather than
+ * assumed (npm run audit:viewports).
  */
 .narrative-section h1,
 .narrative-section h2 {
   font-family: var(--font-display);
-  font-stretch: 80%;
-  font-weight: 650;
+  font-optical-sizing: none;
+  font-variation-settings: "opsz" 60;
+  font-weight: 600;
   margin: 0;
   text-wrap: balance;
 }
 
 .narrative-section h1 {
-  font-size: clamp(2.3rem, 6.1vw, 4.8rem);
+  font-size: clamp(2.05rem, 5.45vw, 4.3rem);
   line-height: 1.06;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.006em;
 }
 
 .narrative-section h2 {
-  font-size: clamp(1.82rem, 4.3vw, 3.25rem);
+  font-size: clamp(1.62rem, 3.85vw, 2.9rem);
   line-height: 1.1;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
 }
 
 /*
@@ -1660,11 +1704,12 @@ body::after {
 
 .reduced-motion-experience__hero-copy h1 {
   font-family: var(--font-display);
-  font-stretch: 80%;
-  font-size: clamp(2rem, 6.6vw, 3.3rem);
+  font-optical-sizing: none;
+  font-variation-settings: "opsz" 60;
+  font-size: clamp(1.78rem, 5.9vw, 2.95rem);
   line-height: 1.08;
-  font-weight: 650;
-  letter-spacing: -0.012em;
+  font-weight: 600;
+  letter-spacing: -0.006em;
   margin: 0;
   max-width: 24ch;
 }
@@ -1710,11 +1755,12 @@ body::after {
 
 .reduced-motion-section h2 {
   font-family: var(--font-display);
-  font-stretch: 80%;
-  font-size: clamp(1.55rem, 4.2vw, 2.3rem);
+  font-optical-sizing: none;
+  font-variation-settings: "opsz" 60;
+  font-size: clamp(1.38rem, 3.75vw, 2.05rem);
   line-height: 1.14;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: -0.005em;
   margin: 0;
 }
 
@@ -2376,13 +2422,44 @@ body:has(.reduced-motion-experience) .site-header::before {
   border-top: 1px solid var(--hairline);
 }
 
-/* The label is the one place the display face appears at text size. It is set
-   nearer to normal width than the headings -- at 80% a 16px label reads as a
-   caption rather than as the name of a registered quantity. */
+/* The label is the one place the display face appears at text size, and it is
+   set at the TEXT optical size for it -- opsz 60 here would give a 15px serif
+   display hairlines on a near-black ground, which is the one thing a serif
+   does badly and the reason small-text cuts exist. 14.4 is also what the
+   display fallback is calibrated against; see the @font-face block above.
+
+   Keeping the label on the display face at all is deliberate: the row is a
+   serif NAME, a sans detail and a mono verdict, so the three columns of a
+   registered limit are three different kinds of type rather than three
+   weights of one. */
+/*
+ * LEADING IS NOW EXPLICIT ON BOTH HALVES OF THE ROW'S FIRST LINE, AND THAT IS
+ * A CONSEQUENCE OF THE FACE CHANGE RATHER THAN A SQUEEZE.
+ *
+ * `.ledger__row` is a grid with `align-items: baseline`, so the height of its
+ * first track is the TALLER of the label's line box and the verdict's. Neither
+ * declared a line-height, so both inherited 1.5 — a value composed for running
+ * prose in the sans. That was approximately right when the label was a
+ * grotesque whose own `line-height: normal` is 1.088em. It is wrong for a
+ * serif whose normal is 1.000em: the same 1.5 now buys half again as much
+ * leading as the face asks for, on a one-line label that has no second line to
+ * be separated from.
+ *
+ * 1.28 is still above the 1.0 em box, so no glyph is near the edge, and it is
+ * the same number for both so the shared baseline is unchanged. Measured, it
+ * takes 2.9px off every ledger row at 360x700 — 8.7px on beat 06 and 17.4px on
+ * beat 05, the two tightest blocks on the page.
+ *
+ * This is LEADING on a label, not type size and not text. Nothing in
+ * `.ledger__detail` moved: every registered limit is set at exactly the size
+ * and leading it was.
+ */
 .ledger__label {
   font-family: var(--font-display);
-  font-stretch: 92%;
+  font-optical-sizing: none;
+  font-variation-settings: "opsz" 14.4;
   font-size: 0.95rem;
+  line-height: 1.28;
   font-weight: 600;
   letter-spacing: 0.002em;
   color: var(--ink);
@@ -2434,6 +2511,11 @@ body:has(.reduced-motion-experience) .site-header::before {
   justify-self: end;
   font-family: var(--font-mono);
   font-size: 0.7rem;
+  /* Matched to the label's, for the reason given above it: these two share a
+     baseline in one grid track and the track is as tall as the taller box, so
+     leaving one of them on the inherited 1.5 would keep the whole row at the
+     old height and the label's correction would buy nothing. */
+  line-height: 1.28;
   font-weight: 500;
   letter-spacing: 0.045em;
   text-transform: uppercase;
@@ -2746,7 +2828,7 @@ body:has(.reduced-motion-experience) .site-header::before {
 
   .narrative-layer > .narrative-section:nth-child(2) h2,
   .narrative-layer > .narrative-section:nth-child(5) h2 {
-    font-size: 1.34rem;
+    font-size: 1.19rem;
   }
 
   .narrative-layer > .narrative-section:nth-child(2) .narrative-section__body,
@@ -2980,12 +3062,12 @@ body:has(.reduced-motion-experience) .site-header::before {
 
 @media (min-width: 821px) and (max-height: 860px) {
   .narrative-section h1 {
-    font-size: clamp(2.3rem, 5vw, 3.6rem);
+    font-size: clamp(2.05rem, 4.45vw, 3.2rem);
     line-height: 1.04;
   }
 
   .narrative-section h2 {
-    font-size: clamp(1.7rem, 2.9vw, 2.1rem);
+    font-size: clamp(1.52rem, 2.6vw, 1.87rem);
     line-height: 1.1;
   }
 

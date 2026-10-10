@@ -155,11 +155,95 @@ export default function SceneCanvas({ isMobile, mode }: SceneCanvasProps) {
           frameloop={isStatic ? "demand" : "always"}
           gl={{ antialias: true, powerPreference: "high-performance", alpha: false }}
           camera={{ position: [0, 0.05, 4.4], fov: 32, near: 0.1, far: 30 }}
+          /*
+           * SHADOWS OFF, AND THIS IS THE SETTING THAT MATCHES THE SUBJECT
+           * RATHER THAN A PERFORMANCE COMPROMISE. What ships in this canvas is
+           * a 40,887-point cloud (`THREE.Points`, unlit), two 0.007-radius
+           * translucent tubes, two full-screen shader quads and a handful of
+           * `meshBasicMaterial` markers. A shadow map needs opaque casters with
+           * surface area; a point cloud has neither, and three.js will not cast
+           * from `Points` at all. Enabling shadows here would allocate a depth
+           * target and a second scene traversal per frame to render nothing.
+           * See SceneLighting for what replaces the occlusion cue.
+           */
           shadows={false}
           onCreated={({ scene, gl }) => {
             scene.background = new THREE.Color("#07080a");
             scene.fog = new THREE.Fog("#07080a", 6, 14);
             gl.setClearColor("#07080a", 1);
+
+            /*
+             * COLOUR SPACE AND TONE MAPPING, SET HERE RATHER THAN INHERITED,
+             * AND THE REASON IS A CLAIM THIS PAGE MAKES ABOUT ITS OWN IMAGE.
+             *
+             * These two were never set. R3F's default is
+             * `ACESFilmicToneMapping` (react-three-fiber applies it on first
+             * configure, and it overrides anything passed in the `gl` prop —
+             * which is why this is in `onCreated`, the one place that runs
+             * after). ACES is the right default for a lit PBR scene. It is the
+             * wrong transform for this one, for two specific reasons.
+             *
+             * (1) IT BREAKS THE SWATCH KEY. GLTFTumor says of the point cloud's
+             * colours: "The HUES are untouched. They remain exactly the
+             * CELLTYPE_COLORS that `tmesim.viz.explainer` uses for every figure
+             * in results/, so the page and the papers still agree and the
+             * SpecimenCaption swatches remain the key." That was true of the
+             * DATA and false of the PICTURE. Verified both ways. The GLB's
+             * COLOR_0 bytes are the correct linear-light encodings of the four
+             * swatch hexes (tumour (172,28,27) is #d65d5c converted exactly),
+             * so nothing was wrong upstream — and then ACES moved them on the
+             * way out. Measured off the rendered canvas at 1440x900 against the
+             * DOM swatches, which are plain sRGB hex and cannot move:
+             *
+             *     stromal      hue -8.2 deg, saturation 0.63x
+             *     immune       hue -4.8 deg, saturation 0.81x
+             *     endothelial  hue +2.5 deg, saturation 0.89x
+             *     tumour       hue +2.1 deg, saturation 0.84x
+             *
+             * A key that does not match the thing it is a key to is a defect on
+             * a page whose argument is that its figures are checkable.
+             *
+             * (2) IT MAKES A MEASURED QUANTITY NON-LINEAR. The point cloud is
+             * additively blended specifically so that accumulated brightness
+             * encodes local cell density — GLTFTumor again: "brightness here is
+             * carrying real information rather than asserting any". A filmic
+             * curve is an S-shape: it compresses the top, so equal increments
+             * of density stop producing equal increments of brightness exactly
+             * where the tissue is densest. `LinearToneMapping` is a pure scale,
+             * so the encoding stays proportional and the exposure below is the
+             * single knob that decides where it clips.
+             *
+             * EXPOSURE IS 1.0 BECAUSE IT MEASURED CORRECT, NOT BECAUSE IT IS
+             * THE DEFAULT, AND THE PREDICTION THAT SENT ME LOOKING WAS WRONG.
+             * The expectation was that dropping ACES's highlight roll-off
+             * would clip the dense core and that exposure would have to come
+             * down to buy it back. It does not, because ACES is not only a
+             * curve: three.js scales by `exposure / 0.6` before applying it,
+             * so the shipped transform was brightening the midtones by 1.67x
+             * and then compressing the top, and the two effects very nearly
+             * cancel over the range this tissue occupies. Measured on the
+             * rendered canvas at 1440x900, ACES against linear at 1.0, over
+             * ~124k tissue pixels:
+             *
+             *     clipped pixels   2 -> 1      (0.002% -> 0.001% of tissue)
+             *     p99.9 luminance  251 -> 246  (MORE headroom, not less)
+             *     median           99 -> 98    (unchanged within noise)
+             *
+             * So GLTFTumor's criterion — the densest region sits just below
+             * clipping — still holds at exposure 1.0, and the point opacity of
+             * 0.55 it was tuned to does not need to move. Mean absolute hue
+             * error against the swatches fell 4.4 deg -> 2.0 deg and the worst
+             * saturation loss 0.63x -> 0.93x.
+             *
+             * WHAT THE RESIDUAL IS, SO IT IS NOT READ AS A REMAINING BUG: the
+             * ~2 deg that is left is additive OVERLAP, not transform error. A
+             * tumour point drawn over a stromal point sums to a colour that is
+             * neither, which is the encoding working as designed. It is a
+             * floor, and no tone mapping setting can go below it.
+             */
+            gl.outputColorSpace = THREE.SRGBColorSpace;
+            gl.toneMapping = THREE.LinearToneMapping;
+            gl.toneMappingExposure = 1;
           }}
         >
           {isStatic && <DrawOnCommit />}

@@ -294,8 +294,9 @@ function assertNotVacuous({ scene, responses, requests }) {
   const fonts = requests.filter((r) => /\.woff2?($|\?)/.test(r.url));
   if (!fonts.length) {
     problems.push(
-      "no webfont was requested. next/font/google is supposed to self-host and serve woff2 " +
-        "from this origin; zero font requests means the self-hosting path was not exercised.",
+      "no webfont was requested. The four .woff2 files in app/fonts/ are vendored and served " +
+        "from this origin through next/font/local; zero font requests means the self-hosted " +
+        "path was not exercised and a foreign font fetch could not have been observed.",
     );
   }
   return problems;
