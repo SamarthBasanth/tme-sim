@@ -1,0 +1,285 @@
+{
+ "n_rows_ok": 921,
+ "n_rows_total": 921,
+ "alpha": 22.223477711172563,
+ "dx_um": 30.0,
+ "axis_sensitivity": {
+  "half_life_s": {
+   "n_comparison_groups": 228,
+   "max_fold_change_per_target": {
+    "E_p90_over_p10": {
+     "max": 1.0000000000001659,
+     "median": 1.000000000000044,
+     "n": 228
+    },
+    "penetration_length_um": {
+     "max": 1.0012726288714509,
+     "median": 1.000000007628582,
+     "n": 209
+    },
+    "median_auc_over_peak": {
+     "max": 3.7170896085598355,
+     "median": 3.7170896085594554,
+     "n": 228
+    },
+    "penetration_index": {
+     "max": 1.0000000000000817,
+     "median": 1.0000000000000218,
+     "n": 228
+    },
+    "reach_headline_F": {
+     "max": 1.0,
+     "median": 1.0,
+     "n": 149
+    },
+    "E_p50_uM": {
+     "max": 3.7170896085598355,
+     "median": 3.717089608559456,
+     "n": 228
+    }
+   }
+  },
+  "plasma_peak": {
+   "n_comparison_groups": 9,
+   "max_fold_change_per_target": {
+    "E_p90_over_p10": {
+     "max": 1.0,
+     "median": 1.0,
+     "n": 9
+    },
+    "penetration_length_um": {
+     "max": 1.0003492444001745,
+     "median": 1.0000000591980913,
+     "n": 9
+    },
+    "median_auc_over_peak": {
+     "max": 1.0,
+     "median": 1.0,
+     "n": 9
+    },
+    "penetration_index": {
+     "max": 1.0,
+     "median": 1.0,
+     "n": 9
+    },
+    "E_p50_uM": {
+     "max": 4.0,
+     "median": 4.0,
+     "n": 9
+    },
+    "reach_headline_F": {
+     "max": 1.0,
+     "median": 1.0,
+     "n": 2
+    }
+   }
+  },
+  "total_time_s": {
+   "n_comparison_groups": 228,
+   "max_fold_change_per_target": {
+    "E_p90_over_p10": {
+     "max": 3.7169188850803536,
+     "median": 1.0400563581740712,
+     "n": 228
+    },
+    "penetration_length_um": {
+     "max": 2.0666915483765753,
+     "median": 1.0102583242537375,
+     "n": 208
+    },
+    "median_auc_over_peak": {
+     "max": 8.928707694228262,
+     "median": 4.4140840350967725,
+     "n": 228
+    },
+    "penetration_index": {
+     "max": 1.3162582817734663,
+     "median": 1.0107813266093257,
+     "n": 228
+    },
+    "reach_headline_F": {
+     "max": 1.0,
+     "median": 1.0,
+     "n": 149
+    },
+    "E_p50_uM": {
+     "max": 1.4881179490380436,
+     "median": 1.3618872685044607,
+     "n": 228
+    }
+   }
+  }
+ },
+ "reach_ladder": {
+  "n_rows": 921,
+  "n_null_reason": 96,
+  "n_headline_F_finite": 825,
+  "n_headline_F_exactly_zero": 227,
+  "frac_headline_F_exactly_zero": 0.27515151515151515,
+  "headline_F_min": 0.0,
+  "headline_F_max": 0.6188418778650087,
+  "headline_F_median": 0.017386155667994403,
+  "n_distinct_ladders": 1,
+  "compound_fold_change": null,
+  "n_configs_where_F_moves_with_compound": 121,
+  "n_configs_checked": 139
+ },
+ "across_donor_spread": {
+  "E_p90_over_p10": {
+   "config": "temozolomide, 50 uM peak, 14400 s half-life, 1 dose, 21600 s window, dx=30 um",
+   "n_donors": 20,
+   "min": 1.6203361362238646,
+   "max": 56.9346594125407,
+   "fold_spread": 35.13756074417058,
+   "abs_range": 55.314323276316834,
+   "per_donor_median": {
+    "at12": 8.990991153933157,
+    "at10": 8.879269425291854,
+    "at11": 5.461585355306631,
+    "at13": 15.469782915136518,
+    "at14": 1.7724903602660647,
+    "at15": 56.9346594125407,
+    "at3": 6.570154383956282,
+    "at4": 3.346110906754781,
+    "at5": 17.2005320159595,
+    "at6": 17.524295845480932,
+    "at7": 7.787566509473531,
+    "at9": 2.3502049992862544,
+    "visium_10x_parent_gbm": 5.549876330436641,
+    "visium_gbm1": 9.845419552981806,
+    "visium_gbm2": 1.6203361362238646,
+    "visium_gbm3": 1.8180552517615554,
+    "xenium_319": 1.9935720609199155,
+    "xenium_breast": 2.378727371994595,
+    "xenium_io": 2.3211182478545296,
+    "gse324268": 2.529295957357542
+   },
+   "valid_only_per_donor_median": {
+    "xenium_319": 1.9935720609199155,
+    "xenium_breast": 2.378727371994595,
+    "xenium_io": 2.3211182478545296,
+    "gse324268": 2.529295957357542
+   },
+   "valid_only_fold_spread": 1.2687256241895875
+  },
+  "penetration_length_um": {
+   "config": "temozolomide, 50 uM peak, 14400 s half-life, 1 dose, 21600 s window, dx=30 um",
+   "n_donors": 19,
+   "min": 62.774839825187826,
+   "max": 412.9085426833775,
+   "fold_spread": 6.577612047011576,
+   "abs_range": 350.1337028581897,
+   "per_donor_median": {
+    "at12": 112.30484229786975,
+    "at10": 159.44725613106124,
+    "at11": 62.774839825187826,
+    "at13": 84.14577485869512,
+    "at14": 159.9910926838449,
+    "at15": 88.88222721172812,
+    "at3": 198.5075784969481,
+    "at4": 210.16482852821247,
+    "at6": 103.78383261961778,
+    "at7": 190.59900642451663,
+    "at9": 201.49750234800752,
+    "visium_10x_parent_gbm": 66.26795856607801,
+    "visium_gbm1": 71.87140969416096,
+    "visium_gbm2": 412.9085426833775,
+    "visium_gbm3": 301.2024753836017,
+    "xenium_319": 277.68964040999685,
+    "xenium_breast": 125.56419734227532,
+    "xenium_io": 133.16164748093735,
+    "gse324268": 103.18376856415217
+   },
+   "valid_only_per_donor_median": {
+    "xenium_319": 277.68964040999685,
+    "xenium_breast": 125.56419734227532,
+    "xenium_io": 133.16164748093735,
+    "gse324268": 103.18376856415217
+   },
+   "valid_only_fold_spread": 2.691214367086715
+  },
+  "median_auc_over_peak": {
+   "config": "temozolomide, 50 uM peak, 14400 s half-life, 1 dose, 21600 s window, dx=30 um",
+   "n_donors": 20,
+   "min": 47500.632956566784,
+   "max": 1342053.1275003024,
+   "fold_spread": 28.25337356509412,
+   "abs_range": 1294552.4945437356,
+   "per_donor_median": {
+    "at12": 355335.3139622182,
+    "at10": 93273.85168866561,
+    "at11": 166278.25621245947,
+    "at13": 73461.93995543019,
+    "at14": 1319712.5823405262,
+    "at15": 47500.632956566784,
+    "at3": 444242.8778279491,
+    "at4": 663492.905414084,
+    "at5": 79392.78873966579,
+    "at6": 108452.30360981537,
+    "at7": 88299.84357078973,
+    "at9": 1033559.9171156926,
+    "visium_10x_parent_gbm": 343130.47271863377,
+    "visium_gbm1": 273397.4866923651,
+    "visium_gbm2": 1342053.1275003024,
+    "visium_gbm3": 1238370.718310568,
+    "xenium_319": 79991.82403400842,
+    "xenium_breast": 208152.53816292863,
+    "xenium_io": 308686.33972963685,
+    "gse324268": 346570.650351538
+   },
+   "valid_only_per_donor_median": {
+    "xenium_319": 79991.82403400842,
+    "xenium_breast": 208152.53816292863,
+    "xenium_io": 308686.33972963685,
+    "gse324268": 346570.650351538
+   },
+   "valid_only_fold_spread": 4.332575916811122
+  },
+  "penetration_index": {
+   "config": "temozolomide, 50 uM peak, 14400 s half-life, 1 dose, 21600 s window, dx=30 um",
+   "n_donors": 20,
+   "min": 0.09785616971236114,
+   "max": 0.5825562214297801,
+   "fold_spread": 5.953188471837274,
+   "abs_range": 0.48470005171741903,
+   "per_donor_median": {
+    "at12": 0.27908983945823485,
+    "at10": 0.18083231062212596,
+    "at11": 0.153370116123818,
+    "at13": 0.09785616971236114,
+    "at14": 0.5778601367660691,
+    "at15": 0.111576103199321,
+    "at3": 0.2526710939053661,
+    "at4": 0.3228513818528875,
+    "at5": 0.18587433789856292,
+    "at6": 0.11397331247452869,
+    "at7": 0.1646640020976488,
+    "at9": 0.2942940489627758,
+    "visium_10x_parent_gbm": 0.31125749553810333,
+    "visium_gbm1": 0.28794464224063676,
+    "visium_gbm2": 0.5228149253820884,
+    "visium_gbm3": 0.5825562214297801,
+    "xenium_319": 0.5064801899043162,
+    "xenium_breast": 0.4929321019698086,
+    "xenium_io": 0.5169238167029119,
+    "gse324268": 0.45714341583989887
+   },
+   "valid_only_per_donor_median": {
+    "xenium_319": 0.5064801899043162,
+    "xenium_breast": 0.4929321019698086,
+    "xenium_io": 0.5169238167029119,
+    "gse324268": 0.45714341583989887
+   },
+   "valid_only_fold_spread": 1.1307694670679658
+  }
+ },
+ "solver_cost_dx30": {
+  "n": 921,
+  "wall_median_s": 2.1925840377807617,
+  "wall_p90_s": 5.7665252685546875,
+  "wall_max_s": 54.25047564506531,
+  "warm_median_s": 2.1498208045959473,
+  "warm_max_s": 54.25047564506531,
+  "recon_build_s_median": 1.793267011642456
+ }
+}

@@ -1,0 +1,195 @@
+{
+ "coarse_vs_fine_grid_differs": {
+  "note": "only pairs where dx changed the grid are compared; the rest are the identical solve twice",
+  "n_pairs_grid_differs": 12,
+  "n_pairs_grid_identical": 18,
+  "sections_grid_differs": [
+   "xenium_319",
+   "xenium_breast"
+  ],
+  "sections_grid_identical": [
+   "gbmspace_at10_bra_5_fo_1_1",
+   "gbmspace_at13_bra_3_fo_1_1",
+   "visium_gbm2"
+  ],
+  "grids": {
+   "xenium_319": {
+    "coarse": [
+     170,
+     271
+    ],
+    "fine": [
+     424,
+     675
+    ]
+   },
+   "xenium_breast": {
+    "coarse": [
+     184,
+     252
+    ],
+    "fine": [
+     458,
+     628
+    ]
+   },
+   "gbmspace_at10_bra_5_fo_1_1": {
+    "coarse": [
+     54,
+     54
+    ],
+    "fine": [
+     54,
+     54
+    ]
+   },
+   "gbmspace_at13_bra_3_fo_1_1": {
+    "coarse": [
+     54,
+     54
+    ],
+    "fine": [
+     54,
+     54
+    ]
+   },
+   "visium_gbm2": {
+    "coarse": [
+     54,
+     55
+    ],
+    "fine": [
+     54,
+     55
+    ]
+   }
+  },
+  "targets": {
+   "E_p90_over_p10": {
+    "n": 12,
+    "median_rel_err": 0.007132559626060712,
+    "p90_rel_err": 0.012001473762142535,
+    "max_rel_err": 0.017619996350758897,
+    "median_rel_err_pct": 0.7132559626060712,
+    "p90_rel_err_pct": 1.2001473762142536,
+    "max_rel_err_pct": 1.7619996350758897,
+    "median_abs_err": 0.024797022150895964,
+    "max_abs_err": 0.09089332263845673
+   },
+   "penetration_length_um": {
+    "n": 12,
+    "median_rel_err": 0.01805289569798698,
+    "p90_rel_err": 0.14504725909602748,
+    "max_rel_err": 0.1604052758374064,
+    "median_rel_err_pct": 1.805289569798698,
+    "p90_rel_err_pct": 14.504725909602747,
+    "max_rel_err_pct": 16.04052758374064,
+    "median_abs_err": 1.293010039877089,
+    "max_abs_err": 17.315812571989625
+   },
+   "penetration_index": {
+    "n": 12,
+    "median_rel_err": 0.002241550852689078,
+    "p90_rel_err": 0.004994398371256654,
+    "max_rel_err": 0.01040918390398682,
+    "median_rel_err_pct": 0.2241550852689078,
+    "p90_rel_err_pct": 0.49943983712566536,
+    "max_rel_err_pct": 1.040918390398682,
+    "median_abs_err": 0.0007408873309854291,
+    "max_abs_err": 0.0032681722222257514
+   },
+   "median_auc_over_peak": {
+    "n": 12,
+    "median_rel_err": 0.0012289554565840424,
+    "p90_rel_err": 0.0030706689033815878,
+    "max_rel_err": 0.0032148268418212378,
+    "median_rel_err_pct": 0.12289554565840424,
+    "p90_rel_err_pct": 0.30706689033815876,
+    "max_rel_err_pct": 0.3214826841821238,
+    "median_abs_err": 22.671344699755082,
+    "max_abs_err": 1039.6630761781707
+   }
+  },
+  "wall_coarse": {
+   "n": 12,
+   "median_s": 8.667764902114868,
+   "min_s": 6.740272045135498,
+   "max_s": 12.2391517162323,
+   "loadavg_1m_min": 2.9794921875,
+   "loadavg_1m_max": 9.7802734375
+  },
+  "wall_fine": {
+   "n": 12,
+   "median_s": 58.77110505104065,
+   "min_s": 45.44049572944641,
+   "max_s": 83.712167263031,
+   "loadavg_1m_min": 2.37451171875,
+   "loadavg_1m_max": 6.18310546875
+  },
+  "cost_ratio_fine_over_coarse_medians": 6.780422140510635
+ },
+ "valid_only_across_donor_spread": {
+  "config": "temozolomide, 50 uM peak, 14400 s half-life, 1 dose, 21600 s window, dx = 30 um",
+  "n_rows": 4,
+  "sections": [
+   "gse324268",
+   "xenium_319",
+   "xenium_breast",
+   "xenium_io"
+  ],
+  "targets": {
+   "E_p90_over_p10": {
+    "n_donors": 4,
+    "per_section": {
+     "xenium_319": 1.9935720609199155,
+     "xenium_breast": 2.378727371994595,
+     "xenium_io": 2.3211182478545296,
+     "gse324268": 2.529295957357542
+    },
+    "min": 1.9935720609199155,
+    "max": 2.529295957357542,
+    "abs_range": 0.5357238964376265,
+    "fold_spread": 1.2687256241895875
+   },
+   "penetration_length_um": {
+    "n_donors": 4,
+    "per_section": {
+     "xenium_319": 277.68964040999685,
+     "xenium_breast": 125.56419734227532,
+     "xenium_io": 133.16164748093735,
+     "gse324268": 103.18376856415217
+    },
+    "min": 103.18376856415217,
+    "max": 277.68964040999685,
+    "abs_range": 174.5058718458447,
+    "fold_spread": 2.691214367086715
+   },
+   "penetration_index": {
+    "n_donors": 4,
+    "per_section": {
+     "xenium_319": 0.5064801899043162,
+     "xenium_breast": 0.4929321019698086,
+     "xenium_io": 0.5169238167029119,
+     "gse324268": 0.45714341583989887
+    },
+    "min": 0.45714341583989887,
+    "max": 0.5169238167029119,
+    "abs_range": 0.059780400863013006,
+    "fold_spread": 1.1307694670679658
+   },
+   "median_auc_over_peak": {
+    "n_donors": 4,
+    "per_section": {
+     "xenium_319": 79991.82403400842,
+     "xenium_breast": 208152.53816292863,
+     "xenium_io": 308686.33972963685,
+     "gse324268": 346570.650351538
+    },
+    "min": 79991.82403400842,
+    "max": 346570.650351538,
+    "abs_range": 266578.82631752954,
+    "fold_spread": 4.332575916811122
+   }
+  }
+ }
+}

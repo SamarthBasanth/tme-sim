@@ -1,0 +1,1226 @@
+{
+ "alpha": 22.223477711172563,
+ "preview_dx_um": 30.0,
+ "shipped_dx_um": 12.0,
+ "pk": {
+  "plasma_peak": 50.0,
+  "half_life_s": 14400.0,
+  "n_doses": 1,
+  "dose_interval_s": 86400.0,
+  "total_time_s": 21600.0
+ },
+ "compounds": [
+  "temozolomide",
+  "cisplatin",
+  "doxorubicin",
+  "lomustine",
+  "methotrexate",
+  "vincristine"
+ ],
+ "pairs": [
+  {
+   "section": "xenium_319",
+   "drug": "temozolomide",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 9.944191932678223,
+    "recon_build_s": 1.4913849830627441,
+    "recon_cache_hit": false,
+    "grid": [
+     170,
+     271
+    ],
+    "loadavg_1m": 9.03564453125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.9935720609199155,
+    "penetration_length_um": 277.68964040999685,
+    "penetration_index": 0.5064801899043162,
+    "median_auc_over_peak": 79991.82403400842
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 45.44049572944641,
+    "recon_build_s": 2.0098748207092285,
+    "recon_cache_hit": false,
+    "grid": [
+     424,
+     675
+    ],
+    "loadavg_1m": 5.1015625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.9944090080526955,
+    "penetration_length_um": 278.4919817884945,
+    "penetration_index": 0.5084247515977943,
+    "median_auc_over_peak": 80086.94446635712
+   }
+  },
+  {
+   "section": "xenium_319",
+   "drug": "cisplatin",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 9.77459192276001,
+    "recon_build_s": 1.4913849830627441,
+    "recon_cache_hit": true,
+    "grid": [
+     170,
+     271
+    ],
+    "loadavg_1m": 8.83447265625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 2.374976857716855,
+    "penetration_length_um": 146.2098848390715,
+    "penetration_index": 0.43726356528435284,
+    "median_auc_over_peak": 207652.483780777
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 53.94700598716736,
+    "recon_build_s": 2.0098748207092285,
+    "recon_cache_hit": true,
+    "grid": [
+     424,
+     675
+    ],
+    "loadavg_1m": 3.8857421875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 2.3836509590910877,
+    "penetration_length_um": 163.52569741106112,
+    "penetration_index": 0.4375807527139856,
+    "median_auc_over_peak": 207534.39079251685
+   }
+  },
+  {
+   "section": "xenium_319",
+   "drug": "doxorubicin",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 12.2391517162323,
+    "recon_build_s": 1.4913849830627441,
+    "recon_cache_hit": true,
+    "grid": [
+     170,
+     271
+    ],
+    "loadavg_1m": 9.28271484375,
+    "n_cpu": 10,
+    "E_p90_over_p10": 3.8255118104067547,
+    "penetration_length_um": 44.116501525145885,
+    "penetration_index": 0.3107019000111997,
+    "median_auc_over_peak": 1311.221177090308
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 54.67180013656616,
+    "recon_build_s": 2.0098748207092285,
+    "recon_cache_hit": true,
+    "grid": [
+     424,
+     675
+    ],
+    "loadavg_1m": 3.54150390625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 3.7965624962498574,
+    "penetration_length_um": 51.60109958651037,
+    "penetration_index": 0.31397007223342543,
+    "median_auc_over_peak": 1315.2599047797798
+   }
+  },
+  {
+   "section": "xenium_319",
+   "drug": "lomustine",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 10.711529016494751,
+    "recon_build_s": 1.4913849830627441,
+    "recon_cache_hit": true,
+    "grid": [
+     170,
+     271
+    ],
+    "loadavg_1m": 9.7802734375,
+    "n_cpu": 10,
+    "E_p90_over_p10": 2.0229672299145505,
+    "penetration_length_um": 260.88905893363983,
+    "penetration_index": 0.5007053164384774,
+    "median_auc_over_peak": 111874.64236491613
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 54.89945697784424,
+    "recon_build_s": 2.0098748207092285,
+    "recon_cache_hit": true,
+    "grid": [
+     424,
+     675
+    ],
+    "loadavg_1m": 3.19287109375,
+    "n_cpu": 10,
+    "E_p90_over_p10": 2.0235201187666494,
+    "penetration_length_um": 259.00921183101224,
+    "penetration_index": 0.5032185905474938,
+    "median_auc_over_peak": 111905.15613458019
+   }
+  },
+  {
+   "section": "xenium_319",
+   "drug": "methotrexate",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 7.4842610359191895,
+    "recon_build_s": 1.4913849830627441,
+    "recon_cache_hit": true,
+    "grid": [
+     170,
+     271
+    ],
+    "loadavg_1m": 8.50390625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 3.40601130276668,
+    "penetration_length_um": 51.99472227502685,
+    "penetration_index": 0.33346338206733467,
+    "median_auc_over_peak": 1811.5077027854982
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 55.58527898788452,
+    "recon_build_s": 2.0098748207092285,
+    "recon_cache_hit": true,
+    "grid": [
+     424,
+     675
+    ],
+    "loadavg_1m": 3.396484375,
+    "n_cpu": 10,
+    "E_p90_over_p10": 3.3839373627878895,
+    "penetration_length_um": 61.92835754999063,
+    "penetration_index": 0.3344067890305167,
+    "median_auc_over_peak": 1812.9913777010852
+   }
+  },
+  {
+   "section": "xenium_319",
+   "drug": "vincristine",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 6.740272045135498,
+    "recon_build_s": 1.4913849830627441,
+    "recon_cache_hit": true,
+    "grid": [
+     170,
+     271
+    ],
+    "loadavg_1m": 8.78369140625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 3.4009991234322605,
+    "penetration_length_um": 49.88939762648255,
+    "penetration_index": 0.33318823538173187,
+    "median_auc_over_peak": 561.8565165128805
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 54.18193984031677,
+    "recon_build_s": 2.0098748207092285,
+    "recon_cache_hit": true,
+    "grid": [
+     424,
+     675
+    ],
+    "loadavg_1m": 3.58837890625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 3.371145180912902,
+    "penetration_length_um": 56.18662525681462,
+    "penetration_index": 0.3348159118716631,
+    "median_auc_over_peak": 561.978987293011
+   }
+  },
+  {
+   "section": "gbmspace_at10_bra_5_fo_1_1",
+   "drug": "temozolomide",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 9.548250913619995,
+    "recon_build_s": 7.746790885925293,
+    "recon_cache_hit": false,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.423828125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 8.879269425291854,
+    "penetration_length_um": 161.52484777402606,
+    "penetration_index": 0.2215098984843348,
+    "median_auc_over_peak": 114442.02143802063
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 3.9219441413879395,
+    "recon_build_s": 2.3255221843719482,
+    "recon_cache_hit": false,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.36474609375,
+    "n_cpu": 10,
+    "E_p90_over_p10": 8.879269425291854,
+    "penetration_length_um": 161.52484777402606,
+    "penetration_index": 0.2215098984843348,
+    "median_auc_over_peak": 114442.02143802063
+   }
+  },
+  {
+   "section": "gbmspace_at10_bra_5_fo_1_1",
+   "drug": "cisplatin",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.3573927879333496,
+    "recon_build_s": 7.746790885925293,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.3095703125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 16.971342942337102,
+    "penetration_length_um": 168.41222656216829,
+    "penetration_index": 0.16758815788328715,
+    "median_auc_over_peak": 268004.55632974603
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.3971331119537354,
+    "recon_build_s": 2.3255221843719482,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.25537109375,
+    "n_cpu": 10,
+    "E_p90_over_p10": 16.971342942337102,
+    "penetration_length_um": 168.41222656216829,
+    "penetration_index": 0.16758815788328715,
+    "median_auc_over_peak": 268004.55632974603
+   }
+  },
+  {
+   "section": "gbmspace_at10_bra_5_fo_1_1",
+   "drug": "doxorubicin",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.400209903717041,
+    "recon_build_s": 7.746790885925293,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.3095703125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 63.670450049043325,
+    "penetration_length_um": 113.04873419136366,
+    "penetration_index": 0.12503720533753596,
+    "median_auc_over_peak": 1475.4735151718153
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.395050048828125,
+    "recon_build_s": 2.3255221843719482,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.25537109375,
+    "n_cpu": 10,
+    "E_p90_over_p10": 63.670450049043325,
+    "penetration_length_um": 113.04873419136366,
+    "penetration_index": 0.12503720533753596,
+    "median_auc_over_peak": 1475.4735151718153
+   }
+  },
+  {
+   "section": "gbmspace_at10_bra_5_fo_1_1",
+   "drug": "lomustine",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.4842700958251953,
+    "recon_build_s": 7.746790885925293,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.3095703125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 9.484453830740318,
+    "penetration_length_um": 162.6734629959149,
+    "penetration_index": 0.21163262211307413,
+    "median_auc_over_peak": 157271.2592066304
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.4500441551208496,
+    "recon_build_s": 2.3255221843719482,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.25537109375,
+    "n_cpu": 10,
+    "E_p90_over_p10": 9.484453830740318,
+    "penetration_length_um": 162.6734629959149,
+    "penetration_index": 0.21163262211307413,
+    "median_auc_over_peak": 157271.2592066304
+   }
+  },
+  {
+   "section": "gbmspace_at10_bra_5_fo_1_1",
+   "drug": "methotrexate",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.5165748596191406,
+    "recon_build_s": 7.746790885925293,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.3095703125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 48.98577128524183,
+    "penetration_length_um": 119.39427770602201,
+    "penetration_index": 0.13049707751960418,
+    "median_auc_over_peak": 2117.802582728652
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.5182011127471924,
+    "recon_build_s": 2.3255221843719482,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.15478515625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 48.98577128524183,
+    "penetration_length_um": 119.39427770602201,
+    "penetration_index": 0.13049707751960418,
+    "median_auc_over_peak": 2117.802582728652
+   }
+  },
+  {
+   "section": "gbmspace_at10_bra_5_fo_1_1",
+   "drug": "vincristine",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.3499877452850342,
+    "recon_build_s": 7.746790885925293,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.36474609375,
+    "n_cpu": 10,
+    "E_p90_over_p10": 48.490535447406366,
+    "penetration_length_um": 118.38472132091735,
+    "penetration_index": 0.12947009676419058,
+    "median_auc_over_peak": 655.3874365135189
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.4243948459625244,
+    "recon_build_s": 2.3255221843719482,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.15478515625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 48.490535447406366,
+    "penetration_length_um": 118.38472132091735,
+    "penetration_index": 0.12947009676419058,
+    "median_auc_over_peak": 655.3874365135189
+   }
+  },
+  {
+   "section": "gbmspace_at13_bra_3_fo_1_1",
+   "drug": "temozolomide",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 3.0403411388397217,
+    "recon_build_s": 1.3651950359344482,
+    "recon_cache_hit": false,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.15478515625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 18.122677753782508,
+    "penetration_length_um": 195.08892647419069,
+    "penetration_index": 0.09785616971236114,
+    "median_auc_over_peak": 73461.93995543019
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 2.974879026412964,
+    "recon_build_s": 1.256639003753662,
+    "recon_cache_hit": false,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.05810546875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 18.122677753782508,
+    "penetration_length_um": 195.08892647419069,
+    "penetration_index": 0.09785616971236114,
+    "median_auc_over_peak": 73461.93995543019
+   }
+  },
+  {
+   "section": "gbmspace_at13_bra_3_fo_1_1",
+   "drug": "cisplatin",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.4798450469970703,
+    "recon_build_s": 1.3651950359344482,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.06201171875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 52.036956819177,
+    "penetration_length_um": 127.20605916757982,
+    "penetration_index": 0.07598357729759549,
+    "median_auc_over_peak": 188602.76239162407
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.4778270721435547,
+    "recon_build_s": 1.256639003753662,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.05810546875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 52.036956819177,
+    "penetration_length_um": 127.20605916757982,
+    "penetration_index": 0.07598357729759549,
+    "median_auc_over_peak": 188602.76239162407
+   }
+  },
+  {
+   "section": "gbmspace_at13_bra_3_fo_1_1",
+   "drug": "doxorubicin",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.4462308883666992,
+    "recon_build_s": 1.3651950359344482,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.06201171875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 532.0723313886207,
+    "penetration_length_um": 76.44156178594638,
+    "penetration_index": 0.06392462816242507,
+    "median_auc_over_peak": 1056.0948310472486
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.4458699226379395,
+    "recon_build_s": 1.256639003753662,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.05810546875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 532.0723313886207,
+    "penetration_length_um": 76.44156178594638,
+    "penetration_index": 0.06392462816242507,
+    "median_auc_over_peak": 1056.0948310472486
+   }
+  },
+  {
+   "section": "gbmspace_at13_bra_3_fo_1_1",
+   "drug": "lomustine",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.4074981212615967,
+    "recon_build_s": 1.3651950359344482,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.06201171875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 18.95972435213996,
+    "penetration_length_um": 190.64431700655436,
+    "penetration_index": 0.09386309137136227,
+    "median_auc_over_peak": 102171.27410334226
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.4697620868682861,
+    "recon_build_s": 1.256639003753662,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.05810546875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 18.95972435213996,
+    "penetration_length_um": 190.64431700655436,
+    "penetration_index": 0.09386309137136227,
+    "median_auc_over_peak": 102171.27410334226
+   }
+  },
+  {
+   "section": "gbmspace_at13_bra_3_fo_1_1",
+   "drug": "methotrexate",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.4543161392211914,
+    "recon_build_s": 1.3651950359344482,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 2.9765625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 322.5738836244302,
+    "penetration_length_um": 81.90198142775587,
+    "penetration_index": 0.06614693362922784,
+    "median_auc_over_peak": 1426.7845081676498
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.4243457317352295,
+    "recon_build_s": 1.256639003753662,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.05322265625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 322.5738836244302,
+    "penetration_length_um": 81.90198142775587,
+    "penetration_index": 0.06614693362922784,
+    "median_auc_over_peak": 1426.7845081676498
+   }
+  },
+  {
+   "section": "gbmspace_at13_bra_3_fo_1_1",
+   "drug": "vincristine",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.5213360786437988,
+    "recon_build_s": 1.3651950359344482,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 2.9765625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 317.19955324747446,
+    "penetration_length_um": 82.35650798333562,
+    "penetration_index": 0.06643319732349134,
+    "median_auc_over_peak": 441.0627453120373
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.4944968223571777,
+    "recon_build_s": 1.256639003753662,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     54
+    ],
+    "loadavg_1m": 3.05322265625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 317.19955324747446,
+    "penetration_length_um": 82.35650798333562,
+    "penetration_index": 0.06643319732349134,
+    "median_auc_over_peak": 441.0627453120373
+   }
+  },
+  {
+   "section": "visium_gbm2",
+   "drug": "temozolomide",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 3.2741098403930664,
+    "recon_build_s": 1.5665359497070312,
+    "recon_cache_hit": false,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 3.048828125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.6203361362238646,
+    "penetration_length_um": 412.9085426833775,
+    "penetration_index": 0.5228149253820884,
+    "median_auc_over_peak": 1342053.1275003024
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 3.210270881652832,
+    "recon_build_s": 1.62752103805542,
+    "recon_cache_hit": false,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 2.966796875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.6203361362238646,
+    "penetration_length_um": 412.9085426833775,
+    "penetration_index": 0.5228149253820884,
+    "median_auc_over_peak": 1342053.1275003024
+   }
+  },
+  {
+   "section": "visium_gbm2",
+   "drug": "cisplatin",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.4617531299591064,
+    "recon_build_s": 1.5665359497070312,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 3.048828125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.6478154309420272,
+    "penetration_length_um": 341.3380507530352,
+    "penetration_index": 0.48862708718331,
+    "median_auc_over_peak": 3713505.5957165593
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.371272087097168,
+    "recon_build_s": 1.62752103805542,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 2.966796875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.6478154309420272,
+    "penetration_length_um": 341.3380507530352,
+    "penetration_index": 0.48862708718331,
+    "median_auc_over_peak": 3713505.5957165593
+   }
+  },
+  {
+   "section": "visium_gbm2",
+   "drug": "doxorubicin",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.3561041355133057,
+    "recon_build_s": 1.5665359497070312,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 3.048828125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.6355259953731374,
+    "penetration_length_um": 301.92211195546696,
+    "penetration_index": 0.4573605597892165,
+    "median_auc_over_peak": 25670.68591483368
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.3923289775848389,
+    "recon_build_s": 1.62752103805542,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 2.966796875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.6355259953731374,
+    "penetration_length_um": 301.92211195546696,
+    "penetration_index": 0.4573605597892165,
+    "median_auc_over_peak": 25670.68591483368
+   }
+  },
+  {
+   "section": "visium_gbm2",
+   "drug": "lomustine",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.4386951923370361,
+    "recon_build_s": 1.5665359497070312,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 3.048828125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.598721020681992,
+    "penetration_length_um": 439.07627872608595,
+    "penetration_index": 0.5247184513099113,
+    "median_auc_over_peak": 1920337.8783295548
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.4121017456054688,
+    "recon_build_s": 1.62752103805542,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 2.88916015625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.598721020681992,
+    "penetration_length_um": 439.07627872608595,
+    "penetration_index": 0.5247184513099113,
+    "median_auc_over_peak": 1920337.8783295548
+   }
+  },
+  {
+   "section": "visium_gbm2",
+   "drug": "methotrexate",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.3950128555297852,
+    "recon_build_s": 1.5665359497070312,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 2.96435546875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.6390234001591033,
+    "penetration_length_um": 303.90956021859023,
+    "penetration_index": 0.46359401220056856,
+    "median_auc_over_peak": 34801.08446203987
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.3626291751861572,
+    "recon_build_s": 1.62752103805542,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 2.88916015625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.6390234001591033,
+    "penetration_length_um": 303.90956021859023,
+    "penetration_index": 0.46359401220056856,
+    "median_auc_over_peak": 34801.08446203987
+   }
+  },
+  {
+   "section": "visium_gbm2",
+   "drug": "vincristine",
+   "source": "visium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 1.3895819187164307,
+    "recon_build_s": 1.5665359497070312,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 2.96435546875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.6225917362164255,
+    "penetration_length_um": 325.17228445213,
+    "penetration_index": 0.4662954873784677,
+    "median_auc_over_peak": 10848.78713634251
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 1.4091460704803467,
+    "recon_build_s": 1.62752103805542,
+    "recon_cache_hit": true,
+    "grid": [
+     54,
+     55
+    ],
+    "loadavg_1m": 2.88916015625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 1.6225917362164255,
+    "penetration_length_um": 325.17228445213,
+    "penetration_index": 0.4662954873784677,
+    "median_auc_over_peak": 10848.78713634251
+   }
+  },
+  {
+   "section": "xenium_breast",
+   "drug": "temozolomide",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 11.778795957565308,
+    "recon_build_s": 2.6167538166046143,
+    "recon_cache_hit": false,
+    "grid": [
+     184,
+     252
+    ],
+    "loadavg_1m": 2.9794921875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 2.378727371994595,
+    "penetration_length_um": 125.56419734227532,
+    "penetration_index": 0.4929321019698086,
+    "median_auc_over_peak": 208152.53816292863
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 76.75238704681396,
+    "recon_build_s": 4.26903510093689,
+    "recon_cache_hit": false,
+    "grid": [
+     458,
+     628
+    ],
+    "loadavg_1m": 2.65234375,
+    "n_cpu": 10,
+    "E_p90_over_p10": 2.367482850388102,
+    "penetration_length_um": 124.68924670972704,
+    "penetration_index": 0.49303274141396225,
+    "median_auc_over_peak": 208417.26901187492
+   }
+  },
+  {
+   "section": "xenium_breast",
+   "drug": "cisplatin",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 8.273195028305054,
+    "recon_build_s": 2.6167538166046143,
+    "recon_cache_hit": true,
+    "grid": [
+     184,
+     252
+    ],
+    "loadavg_1m": 3.283203125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 2.9181624246592808,
+    "penetration_length_um": 88.60235157854252,
+    "penetration_index": 0.4319666229690474,
+    "median_auc_over_peak": 556917.067506763
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 61.95693111419678,
+    "recon_build_s": 4.26903510093689,
+    "recon_cache_hit": true,
+    "grid": [
+     458,
+     628
+    ],
+    "loadavg_1m": 2.37451171875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 2.8906423203362794,
+    "penetration_length_um": 89.16716328782023,
+    "penetration_index": 0.4319675916862691,
+    "median_auc_over_peak": 557956.7305829412
+   }
+  },
+  {
+   "section": "xenium_breast",
+   "drug": "doxorubicin",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 8.558173894882202,
+    "recon_build_s": 2.6167538166046143,
+    "recon_cache_hit": true,
+    "grid": [
+     184,
+     252
+    ],
+    "loadavg_1m": 3.2392578125,
+    "n_cpu": 10,
+    "E_p90_over_p10": 5.249425755282346,
+    "penetration_length_um": 48.33052395163256,
+    "penetration_index": 0.32339589350751535,
+    "median_auc_over_peak": 3488.8730314118006
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 65.83759212493896,
+    "recon_build_s": 4.26903510093689,
+    "recon_cache_hit": true,
+    "grid": [
+     458,
+     628
+    ],
+    "loadavg_1m": 2.7607421875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 5.158532432643889,
+    "penetration_length_um": 49.65099346268093,
+    "penetration_index": 0.3239342612063042,
+    "median_auc_over_peak": 3500.1253282668513
+   }
+  },
+  {
+   "section": "xenium_breast",
+   "drug": "lomustine",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 8.777355909347534,
+    "recon_build_s": 2.6167538166046143,
+    "recon_cache_hit": true,
+    "grid": [
+     184,
+     252
+    ],
+    "loadavg_1m": 3.275390625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 2.4059519095138993,
+    "penetration_length_um": 119.34824462369583,
+    "penetration_index": 0.48881764437508807,
+    "median_auc_over_peak": 292069.8488389666
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 83.712167263031,
+    "recon_build_s": 4.26903510093689,
+    "recon_cache_hit": true,
+    "grid": [
+     458,
+     628
+    ],
+    "loadavg_1m": 6.18310546875,
+    "n_cpu": 10,
+    "E_p90_over_p10": 2.3900818118459943,
+    "penetration_length_um": 119.79188490674271,
+    "penetration_index": 0.4888537139221973,
+    "median_auc_over_peak": 292546.2510515611
+   }
+  },
+  {
+   "section": "xenium_breast",
+   "drug": "methotrexate",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 8.359919786453247,
+    "recon_build_s": 2.6167538166046143,
+    "recon_cache_hit": true,
+    "grid": [
+     184,
+     252
+    ],
+    "loadavg_1m": 3.1728515625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 4.549221709218562,
+    "penetration_length_um": 54.412669963080276,
+    "penetration_index": 0.3431002693309831,
+    "median_auc_over_peak": 4822.191722011356
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 67.46162700653076,
+    "recon_build_s": 4.26903510093689,
+    "recon_cache_hit": true,
+    "grid": [
+     458,
+     628
+    ],
+    "loadavg_1m": 3.765625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 4.5061616602134045,
+    "penetration_length_um": 55.67822053178608,
+    "penetration_index": 0.3444731624702819,
+    "median_auc_over_peak": 4837.020641746807
+   }
+  },
+  {
+   "section": "xenium_breast",
+   "drug": "vincristine",
+   "source": "xenium",
+   "spatial_spread_valid": null,
+   "coarse": {
+    "status": "ok",
+    "wall_clock_s": 8.543291091918945,
+    "recon_build_s": 2.6167538166046143,
+    "recon_cache_hit": true,
+    "grid": [
+     184,
+     252
+    ],
+    "loadavg_1m": 3.072265625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 4.548205210444641,
+    "penetration_length_um": 54.03163284580597,
+    "penetration_index": 0.341481902001958,
+    "median_auc_over_peak": 1495.6916339998463
+   },
+   "fine": {
+    "status": "ok",
+    "wall_clock_s": 66.91079115867615,
+    "recon_build_s": 4.26903510093689,
+    "recon_cache_hit": true,
+    "grid": [
+     458,
+     628
+    ],
+    "loadavg_1m": 2.91650390625,
+    "n_cpu": 10,
+    "E_p90_over_p10": 4.4942673784224505,
+    "penetration_length_um": 54.76416198390385,
+    "penetration_index": 0.3418668655257172,
+    "median_auc_over_peak": 1496.395664456356
+   }
+  }
+ ],
+ "timing": {
+  "coarse": {
+   "n": 30,
+   "median_s": 3.0403411388397217,
+   "min_s": 1.3499877452850342,
+   "max_s": 12.2391517162323,
+   "warm_median_s": 1.4842700958251953,
+   "warm_n": 25,
+   "loadavg_1m_min": 2.96435546875,
+   "loadavg_1m_max": 9.7802734375,
+   "n_cpu": 10
+  },
+  "fine": {
+   "n": 30,
+   "median_s": 2.974879026412964,
+   "min_s": 1.3626291751861572,
+   "max_s": 83.712167263031,
+   "warm_median_s": 1.4778270721435547,
+   "warm_n": 25,
+   "loadavg_1m_min": 2.37451171875,
+   "loadavg_1m_max": 6.18310546875,
+   "n_cpu": 10
+  }
+ },
+ "coarse_vs_fine": {
+  "E_p90_over_p10": {
+   "n_pairs": 30,
+   "mae": 0.011115568709245408,
+   "median_ae": 0.0,
+   "max_ae": 0.09089332263845673,
+   "median_rel_err": 0.0,
+   "max_rel_err": 0.017619996350758897,
+   "mean_rel_err": 0.0029141046866590823
+  },
+  "penetration_length_um": {
+   "n_pairs": 30,
+   "mae": 1.6305137954166709,
+   "median_ae": 0.0,
+   "max_ae": 17.315812571989625,
+   "median_rel_err": 0.0,
+   "max_rel_err": 0.1604052758374064,
+   "mean_rel_err": 0.020443814799969453
+  },
+  "penetration_index": {
+   "n_pairs": 30,
+   "mae": 0.00043493936592659357,
+   "median_ae": 0.0,
+   "max_ae": 0.0032681722222257514,
+   "median_rel_err": 0.0,
+   "max_rel_err": 0.01040918390398682,
+   "mean_rel_err": 0.0011563111873546157
+  },
+  "median_auc_over_peak": {
+   "n_pairs": 30,
+   "mae": 68.56511494746968,
+   "median_ae": 0.0,
+   "max_ae": 1039.6630761781707,
+   "median_rel_err": 0.0,
+   "max_rel_err": 0.0032148268418212378,
+   "mean_rel_err": 0.0005883133748324083
+  }
+ },
+ "elapsed_s": 922.6015660762787,
+ "alpha_end": 22.223477711172563
+}

@@ -1,0 +1,96 @@
+### main sweep finished
+### stage: ladder_sweep
+    cisplatin        2.27s F=0.019993848046754845 ladder=[0.0, 0.001845585973546601, 0.012919101814826207, 0.019993848046754845, 0.03583512765302984, 0.09335589049523224, 0.5335281451860966]
+    doxorubicin      2.04s F=0.022608428175945862 ladder=[0.0, 0.006305752076284221, 0.013841894801599508, 0.022608428175945862, 0.0379883112888342, 0.13334358658874193, 0.6093509689326361]
+    lomustine        2.04s F=0.01799446324207936 ladder=[0.0, 0.0, 0.004306367271608736, 0.01799446324207936, 0.033220547523838816, 0.08874192556136573, 0.4833897262380806]
+    methotrexate     2.01s F=0.022608428175945862 ladder=[0.0, 0.004152568440479852, 0.013226699477083975, 0.022608428175945862, 0.03506613349738542, 0.12596124269455553, 0.5958166717932943]
+    vincristine      1.86s F=0.022608428175945862 ladder=[0.0, 0.004152568440479852, 0.013226699477083975, 0.022608428175945862, 0.0352199323285143, 0.12596124269455553, 0.5838203629652414]
+
+=== xenium_breast  donor=xenium_breast  valid=True
+    temozolomide    18.64s F=0.001708150317227916 ladder=[0.001708150317227916, 0.001708150317227916, 0.001708150317227916, 0.001708150317227916, 0.005856515373352855, 0.2525622254758419, 0.8862859931673988]
+    cisplatin       12.85s F=0.005856515373352855 ladder=[0.001708150317227916, 0.001708150317227916, 0.0021961932650073207, 0.005856515373352855, 0.014641288433382138, 0.27379209370424595, 0.8421181063933626]
+    doxorubicin     16.28s F=0.02318204001952172 ladder=[0.0036603221083455345, 0.0061005368472425575, 0.010980966325036604, 0.02318204001952172, 0.08052708638360176, 0.4807223035627135, 0.8094192288921425]
+    lomustine       13.60s F=0.001708150317227916 ladder=[0.001708150317227916, 0.001708150317227916, 0.001708150317227916, 0.001708150317227916, 0.00634455832113226, 0.255734504636408, 0.8848218643240605]
+    methotrexate    14.60s F=0.01683748169838946 ladder=[0.0026842362127867253, 0.004392386530014641, 0.009272816007808687, 0.01683748169838946, 0.06686188384577843, 0.4492435334309419, 0.8103953147877013]
+    vincristine     15.17s F=0.01708150317227916 ladder=[0.0026842362127867253, 0.004392386530014641, 0.009272816007808687, 0.01708150317227916, 0.06686188384577843, 0.4572962420693021, 0.8111273792093704]
+[alpha] ladder end: 22.223477711172563 OK
+
+[ladder] 228/228 rows ok, 204 with a populated ladder, 4 invariance pairs, 0 violations, 17.1 min -> /Users/samarthbasanth/tme-sim/.claude/worktrees/agent-aa00537b356e06796/experiments/surrogate_feasibility/ladder_data.json
+    inv xenium_319             temozolomide headline_same=True ladder_same=True
+    inv xenium_319             cisplatin    headline_same=True ladder_same=True
+    inv visium_gbm2            temozolomide headline_same=True ladder_same=True
+    inv visium_gbm2            cisplatin    headline_same=True ladder_same=True
+### stage: coarse_baseline
+    doxorubicin    dx=  12    1.39s grid=[54, 55] E_p90/p10=1.6355259953731374 L=301.92211195546696
+    lomustine      dx=  12    1.41s grid=[54, 55] E_p90/p10=1.598721020681992 L=439.07627872608595
+    methotrexate   dx=  12    1.36s grid=[54, 55] E_p90/p10=1.6390234001591033 L=303.90956021859023
+    vincristine    dx=  12    1.41s grid=[54, 55] E_p90/p10=1.6225917362164255 L=325.17228445213
+
+=== xenium_breast  src=xenium  (6 compounds x 2 resolutions)
+    temozolomide   dx=  30   11.78s grid=[184, 252] E_p90/p10=2.378727371994595 L=125.56419734227532
+    cisplatin      dx=  30    8.27s grid=[184, 252] E_p90/p10=2.9181624246592808 L=88.60235157854252
+    doxorubicin    dx=  30    8.56s grid=[184, 252] E_p90/p10=5.249425755282346 L=48.33052395163256
+    lomustine      dx=  30    8.78s grid=[184, 252] E_p90/p10=2.4059519095138993 L=119.34824462369583
+    methotrexate   dx=  30    8.36s grid=[184, 252] E_p90/p10=4.549221709218562 L=54.412669963080276
+    vincristine    dx=  30    8.54s grid=[184, 252] E_p90/p10=4.548205210444641 L=54.03163284580597
+/Users/samarthbasanth/tme-sim/.claude/worktrees/agent-aa00537b356e06796/tmesim/sim/engine.py:351: RuntimeWarning: advection is past the STRICT positivity bound: dt*(max|vx| + max|vy|)/dx = 0.5857 > 0.5. The necessary CFL check above passed at 0.4829 <= 1 and the solve proceeds, because on real Darcy fields the two maxima are near-colocated and no undershoot has been measured. But the guarantee is gone: positivity now rests on the smoothness of this velocity field, not on the check. If the post-step max(C, 0) clamp ever fires, this is why.
+  transport = simulate_drug_transport(
+    temozolomide   dx=  12   76.75s grid=[458, 628] E_p90/p10=2.367482850388102 L=124.68924670972704
+    cisplatin      dx=  12   61.96s grid=[458, 628] E_p90/p10=2.8906423203362794 L=89.16716328782023
+    doxorubicin    dx=  12   65.84s grid=[458, 628] E_p90/p10=5.158532432643889 L=49.65099346268093
+    lomustine      dx=  12   83.71s grid=[458, 628] E_p90/p10=2.3900818118459943 L=119.79188490674271
+    methotrexate   dx=  12   67.46s grid=[458, 628] E_p90/p10=4.5061616602134045 L=55.67822053178608
+    vincristine    dx=  12   66.91s grid=[458, 628] E_p90/p10=4.4942673784224505 L=54.76416198390385
+[alpha] coarse end: 22.223477711172563 OK
+
+=== coarse (dx=30) vs fine (dx=12), same solver ===
+  E_p90_over_p10             n= 30 median_rel_err=  0.000%  max_rel_err=  1.762%  MAE=0.01112
+  penetration_length_um      n= 30 median_rel_err=  0.000%  max_rel_err= 16.041%  MAE=1.631
+  penetration_index          n= 30 median_rel_err=  0.000%  max_rel_err=  1.041%  MAE=0.0004349
+  median_auc_over_peak       n= 30 median_rel_err=  0.000%  max_rel_err=  0.321%  MAE=68.57
+  timing: {"coarse": {"n": 30, "median_s": 3.0403411388397217, "min_s": 1.3499877452850342, "max_s": 12.2391517162323, "warm_median_s": 1.4842700958251953, "warm_n": 25, "loadavg_1m_min": 2.96435546875, "loadavg_1m_max": 9.7802734375, "n_cpu": 10}, "fine": {"n": 30, "median_s": 2.974879026412964, "min_s": 1.3626291751861572, "max_s": 83.712167263031, "warm_median_s": 1.4778270721435547, "warm_n": 25, "loadavg_1m_min": 2.37451171875, "loadavg_1m_max": 6.18310546875, "n_cpu": 10}}
+
+[coarse] -> /Users/samarthbasanth/tme-sim/.claude/worktrees/agent-aa00537b356e06796/experiments/surrogate_feasibility/coarse_baseline.json
+### stage: analyse
+### stage: fit
+      pk_only        nfeat=  8 ridge_skill=0.0 hgb_skill=-0.0008
+      all            nfeat= 37 ridge_skill=-1584664115.7856 hgb_skill=-0.0223
+  penetration_length_um
+      compound_only  nfeat= 19 ridge_skill=0.0617 hgb_skill=-0.3167
+      tissue_only    nfeat= 26 ridge_skill=-8.8032 hgb_skill=-0.0706
+      pk_only        nfeat=  8 ridge_skill=0.0145 hgb_skill=0.0552
+      all            nfeat= 37 ridge_skill=-11.5053 hgb_skill=-0.1073
+  median_auc_over_peak
+      compound_only  nfeat= 19 ridge_skill=0.1708 hgb_skill=0.0047
+      tissue_only    nfeat= 26 ridge_skill=0.0823 hgb_skill=0.7103
+      pk_only        nfeat=  8 ridge_skill=0.0288 hgb_skill=0.1809
+      all            nfeat= 37 ridge_skill=-0.0416 hgb_skill=0.7454
+/Users/samarthbasanth/tme-sim/.venv/lib/python3.9/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/samarthbasanth/tme-sim/.venv/lib/python3.9/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/samarthbasanth/tme-sim/.venv/lib/python3.9/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+/Users/samarthbasanth/tme-sim/.venv/lib/python3.9/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/samarthbasanth/tme-sim/.venv/lib/python3.9/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/samarthbasanth/tme-sim/.venv/lib/python3.9/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+/Users/samarthbasanth/tme-sim/.venv/lib/python3.9/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: divide by zero encountered in matmul
+  ret = a @ b
+/Users/samarthbasanth/tme-sim/.venv/lib/python3.9/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: overflow encountered in matmul
+  ret = a @ b
+/Users/samarthbasanth/tme-sim/.venv/lib/python3.9/site-packages/sklearn/utils/extmath.py:203: RuntimeWarning: invalid value encountered in matmul
+  ret = a @ b
+
+[cost] final models (trained on every row):
+    E_p90_over_p10           ridge  n=  921 train=0.009s size=3012B predict1=0.419ms
+    E_p90_over_p10           hgb    n=  921 train=1.241s size=719693B predict1=4.0476ms
+    penetration_length_um    ridge  n=  843 train=0.012s size=3012B predict1=0.4236ms
+    penetration_length_um    hgb    n=  843 train=0.878s size=719165B predict1=3.9105ms
+    median_auc_over_peak     ridge  n=  921 train=0.01s size=3012B predict1=0.4251ms
+    median_auc_over_peak     hgb    n=  921 train=0.944s size=719693B predict1=3.8686ms
+
+[fit] -> /Users/samarthbasanth/tme-sim/.claude/worktrees/agent-aa00537b356e06796/experiments/surrogate_feasibility/fit_results.json
+### ALL STAGES DONE
