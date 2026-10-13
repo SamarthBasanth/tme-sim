@@ -349,3 +349,84 @@ class TestTheBodyCapCannotBeLiedTo:
                            json={"name": "small one"}).status_code == 201
         assert client.get("/api/workspace", headers=headers).status_code == 200
         assert client.get("/healthz").status_code == 200
+
+
+class TestTheOpenInstanceFlag:
+    """`TMESIM_STUDIO_OPEN` removes the credential. Deliberately, and only when
+    asked.
+
+    A non-loopback bind normally INVENTS an API key and prints it once, because
+    a public instance that authenticates nobody is almost always a forgotten
+    variable rather than a decision. This flag is how an operator says they
+    meant it — for a demo instance that should open straight into the
+    simulator.
+
+    Three properties, and the second matters more than the first: the flag
+    works, THE DEFAULT IS UNCHANGED WITHOUT IT, and a configured key beats the
+    flag rather than the other way round.
+    """
+
+    @staticmethod
+    def _main():
+        import app.server.__main__ as m
+        return m
+
+    def test_the_flag_is_off_unless_explicitly_set(self, monkeypatch):
+        m = self._main()
+        monkeypatch.delenv("TMESIM_STUDIO_OPEN", raising=False)
+        assert m._open_instance() is False
+        # An empty value is not consent.
+        monkeypatch.setenv("TMESIM_STUDIO_OPEN", "")
+        assert m._open_instance() is False
+        monkeypatch.setenv("TMESIM_STUDIO_OPEN", "0")
+        assert m._open_instance() is False
+
+    @pytest.mark.parametrize("word", ["1", "true", "TRUE", "yes", "on"])
+    def test_the_documented_spellings_all_work(self, monkeypatch, word):
+        m = self._main()
+        monkeypatch.setenv("TMESIM_STUDIO_OPEN", word)
+        assert m._open_instance() is True
+
+    def test_the_note_names_what_is_still_in_force(self):
+        """An operator reading only the banner must not conclude that opening
+        the instance also removed the limits that keep it alive."""
+        note = self._main()._open_instance_note()
+        for kept in ("data_cache", "4 MB", "grid ceiling", "memory refusals"):
+            assert kept in note, f"the banner does not say {kept!r} still applies"
+        # And it must not soften the exposure.
+        assert "DELETE" in note
+        assert "TMESIM_STUDIO_API_KEY" in note, "no way back is named"
+
+    def test_a_configured_key_is_not_voided_by_the_flag(self, monkeypatch):
+        """THE PRECEDENCE THAT MATTERS. A stale OPEN left over from a demo must
+        never silently un-protect an instance somebody believed was closed —
+        that is a protection disappearing with no symptom.
+
+        monkeypatch, not raw os.environ: the first version of this test set the
+        variables directly and leaked them into 46 later tests in the same
+        session. Exactly the isolation defect this file comments on elsewhere.
+        """
+        from fastapi.testclient import TestClient
+
+        import app.server.api as api
+
+        monkeypatch.setenv("TMESIM_STUDIO_API_KEY", "k" * 24)
+        monkeypatch.setenv("TMESIM_STUDIO_OPEN", "1")
+        client = TestClient(api.create_app())
+        assert client.get("/api/workspace").status_code == 401, (
+            "a configured key was voided by TMESIM_STUDIO_OPEN; a stale flag "
+            "must never silently open a closed instance")
+        assert client.get(
+            "/api/workspace", headers={"X-API-Key": "k" * 24}).status_code == 200
+
+    def test_no_key_means_no_gate_at_all(self, monkeypatch):
+        """The flag's whole point: with no key configured, every /api/ route
+        answers anonymously."""
+        from fastapi.testclient import TestClient
+
+        import app.server.api as api
+
+        monkeypatch.delenv("TMESIM_STUDIO_API_KEY", raising=False)
+        client = TestClient(api.create_app())
+        for path in ("/api/workspace", "/api/sections", "/api/defaults"):
+            assert client.get(path).status_code == 200, path
