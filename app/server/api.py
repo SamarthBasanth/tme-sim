@@ -3216,7 +3216,47 @@ def _mount_web(app: FastAPI) -> None:
         def home_page():
             return _page(home)
 
+    _mount_landing(app, web_dir)
+
     app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
+
+
+def _mount_landing(app: FastAPI, web_dir: str) -> None:
+    """Serve the exported marketing page at ``/landing``, if it was built.
+
+    ``landing-3d/`` is a Next.js app. Built with ``VIVUM_STATIC_EXPORT=1`` it
+    emits plain files that need no Node at runtime, and this mounts them so the
+    page ships with the Studio image instead of needing a second host and a
+    second dashboard. Absent the directory this is a no-op: an image built
+    without the export serves exactly what it served before.
+
+    TWO MOUNTS, NOT ONE, AND THE SECOND IS THE LOAD-BEARING ONE. ``basePath``
+    rewrites the URLs Next itself emits -- the chunks, the fonts, the favicon.
+    It does NOT rewrite a path written as a string literal in component code,
+    and the scene has two: ``/models/tumor.glb`` and the vendored DRACO
+    decoders under ``/draco/`` (``components/canvas/tumorGLTF.ts``). Those are
+    requested from the ROOT at runtime whatever prefix the page is served
+    under, so they are mounted at the root as well. Get this wrong and nothing
+    errors: the page renders, the canvas stays empty, and the only symptom is
+    two 404s in a network tab nobody is watching.
+    """
+    landing = os.path.join(web_dir, "landing")
+    if not os.path.exists(os.path.join(landing, "index.html")):
+        return
+
+    from fastapi.staticfiles import StaticFiles
+
+    for name in ("models", "draco"):
+        asset_dir = os.path.join(landing, name)
+        if os.path.isdir(asset_dir):
+            app.mount(
+                "/" + name,
+                StaticFiles(directory=asset_dir),
+                name="landing_" + name,
+            )
+
+    app.mount("/landing", StaticFiles(directory=landing, html=True),
+              name="landing")
 
 
 _app: Optional[FastAPI] = None

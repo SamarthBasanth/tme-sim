@@ -128,6 +128,23 @@ const SECURITY_HEADERS = [
   { key: "Strict-Transport-Security", value: "max-age=63072000" },
 ];
 
+/**
+ * STATIC EXPORT, AND WHO SETS THE HEADERS THEN.
+ *
+ * `VIVUM_STATIC_EXPORT=1` builds this page to plain files in `out/` so it can
+ * be served by the Python Studio at `/landing` -- a deploy path that needs a
+ * git push and nothing else, which is the only path available when the hosting
+ * dashboard is not reachable. Vercel builds are unaffected: without the flag
+ * this file is byte-for-byte the configuration that was verified.
+ *
+ * `headers()` is NOT honoured by `output: "export"` -- there is no server left
+ * to send them. Next errors on the combination rather than dropping them
+ * silently, which is why the two are mutually exclusive below. The headers do
+ * not disappear: `app/server/landing.py` sends the same list, and a test
+ * asserts the two agree rather than trusting that they do.
+ */
+const STATIC_EXPORT = process.env.VIVUM_STATIC_EXPORT === "1";
+
 const nextConfig: NextConfig = {
   /**
    * `X-Powered-By: Next.js` on every response is free reconnaissance and buys
@@ -135,17 +152,31 @@ const nextConfig: NextConfig = {
    */
   poweredByHeader: false,
 
-  async headers() {
-    return [
-      {
-        // Everything, including `/models/*.glb`, `/draco/*` and the static
-        // chunks. Headers are matched before the filesystem, so `public/`
-        // assets are covered too.
-        source: "/:path*",
-        headers: SECURITY_HEADERS,
-      },
-    ];
-  },
+  ...(STATIC_EXPORT
+    ? {
+        output: "export" as const,
+        // The Studio owns `/`. Served under a prefix, every emitted asset URL
+        // has to carry it or the page loads and the scene never does; Next
+        // rewrites `/_next/*` from `basePath` alone, so this one line is the
+        // whole adaptation. It applies ONLY to the static build -- a Vercel
+        // deploy still owns its own root.
+        basePath: "/landing",
+      }
+    : {
+        async headers() {
+          return [
+            {
+              // Everything, including `/models/*.glb`, `/draco/*` and the
+              // static chunks. Headers are matched before the filesystem, so
+              // `public/` assets are covered too.
+              source: "/:path*",
+              headers: SECURITY_HEADERS,
+            },
+          ];
+        },
+      }),
 };
+
+export { SECURITY_HEADERS };
 
 export default nextConfig;

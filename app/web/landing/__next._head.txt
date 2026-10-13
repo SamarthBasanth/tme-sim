@@ -1,0 +1,6 @@
+1:"$Sreact.fragment"
+2:I[97367,["/landing/_next/static/chunks/158myu8e_yme3.js"],"ViewportBoundary"]
+3:I[97367,["/landing/_next/static/chunks/158myu8e_yme3.js"],"MetadataBoundary"]
+4:"$Sreact.suspense"
+5:I[27201,["/landing/_next/static/chunks/158myu8e_yme3.js"],"IconMark"]
+0:{"rsc":["$","$1","h",{"children":[null,["$","$L2",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","div",null,{"hidden":true,"children":["$","$L3",null,{"children":["$","$4",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"Vivum — See Where the Drug Actually Goes"}],["$","meta","1",{"name":"description","content":"Vivum reconstructs real tumor tissue from spatial biology data and simulates drug transport physics through it — penetration, exposure, and delivery, scored against real measured tissue benchmarks with the failures published alongside the passes. For research use: not for diagnostic or treatment-planning use, and patient response is not predicted."}],["$","link","2",{"rel":"icon","href":"/landing/favicon.ico?favicon.2vob68tjqpejf.ico","sizes":"256x256","type":"image/x-icon"}],["$","$L5","3",{}]]}]}]}],null]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"UjzjBBayrbmkPNXrCWtU_"}
