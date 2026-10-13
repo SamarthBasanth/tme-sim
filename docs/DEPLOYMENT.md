@@ -770,8 +770,8 @@ any directory it can read), and leave `TMESIM_STUDIO_EXPOSE_TRACEBACKS` unset.
 
 ## 4. Environment variables
 
-Fourteen. There is no config file; these are the whole surface, and only seven
-are security-relevant.
+Thirteen. There is no config file; these are the whole surface, and only six are
+security-relevant.
 
 This section said "Six" while the code read ten — `TMESIM_MAX_GRID_CELLS` had
 been load-bearing for a while and was never listed here, which is the failure
@@ -876,38 +876,6 @@ Two related properties worth knowing:
   declared Content-Length, before a handler buffers it. That cap used to apply
   to `/api/protocol/*` only; a 64 MB body was buffered and parsed by the other
   six POST routes.
-
-### `TMESIM_STUDIO_OPEN` — run with NO credential, deliberately
-
-**Security-relevant, and the only variable here whose purpose is to REMOVE a
-protection.** Unset is the safe default; nothing changes without it.
-
-A non-loopback bind normally invents an API key and prints it once, because a
-public instance that authenticates nobody is almost always an accident — a
-forgotten variable rather than a decision. Set this to `1`/`true`/`yes`/`on`
-and that invention is skipped: no key, no gate, every `/api/` route answers
-anybody who reaches the URL.
-
-**What that opens.** Submitting runs (CPU, refusable on memory but not free),
-creating and **deleting** projects, and reading every run on the server.
-`POST /api/sections/scan` and `GET /api/browse` read directories on the host —
-still confined to `data_cache` by `TMESIM_STUDIO_DATA_ROOTS`, which a
-non-loopback bind sets automatically, so it is not a filesystem-wide read, but
-it is a real one inside that root.
-
-**What it does not touch.** The scan/browse confinement, the 4 MB request cap,
-the grid ceiling and the Visium memory refusals all stay in force. Those keep
-the process alive rather than decide who is asking, and an open instance needs
-them more, not less.
-
-**If a key is also configured, the key wins** and the flag is ignored with a
-loud banner line. The reverse — a stale `OPEN` silently voiding a key somebody
-set on purpose — is a protection that disappears with no symptom. Refusing to
-boot on the contradiction was the other option and is worse: it takes a live
-site down over something with an obvious safe reading.
-
-To close an open instance: unset this and set `TMESIM_STUDIO_API_KEY`. The
-sign-in portal exists and is not wired to anything while this is set.
 
 ### `TMESIM_SESSION_SECRET`
 

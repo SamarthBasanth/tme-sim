@@ -122,34 +122,6 @@ def _no_auth_warning(host: str) -> str:
     ))
 
 
-def _open_instance_note() -> str:
-    """Printed after :func:`_no_auth_warning` when the operator asked for this.
-
-    The warning above is written for the case this almost always is -- a
-    forgotten variable. When TMESIM_STUDIO_OPEN is set it is not that, and a
-    warning whose only remedy is "set a key" reads as a bug report against a
-    deliberate decision. Everything it says about EXPOSURE still holds and is
-    not softened here; what this adds is that somebody chose it, and how to
-    undo it.
-    """
-    return "\n".join((
-        "  ..  This instance is open ON PURPOSE: TMESIM_STUDIO_OPEN is set.",
-        "  ..  Everything above about exposure is still true -- being",
-        "  ..  deliberate does not make it private. Anyone with the URL can",
-        "  ..  submit runs, and create and DELETE projects.",
-        "  ..",
-        "  ..  Still in force, because they keep the process alive rather than",
-        "  ..  decide who is asking: the scan/browse confinement to",
-        "  ..  data_cache, the 4 MB request cap, the grid ceiling and the",
-        "  ..  memory refusals.",
-        "  ..",
-        "  ..  To close it: unset TMESIM_STUDIO_OPEN and set",
-        "  ..  TMESIM_STUDIO_API_KEY=<a-real-secret>. Sign-in exists and is",
-        "  ..  not wired to anything while this is set.",
-        "",
-    ))
-
-
 # --------------------------------------------------------------------------- #
 # `account` — the operator commands (docs/AUTH_CONTRACT.md §7)
 # --------------------------------------------------------------------------- #
@@ -772,37 +744,6 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _open_instance() -> bool:
-    """Is this deployment deliberately running with NO credential at all?
-
-    EXPLICIT, NEVER INFERRED. The default on a non-loopback bind is to invent a
-    key and print it once, because a public instance that authenticates nobody
-    is almost always an accident -- an operator who forgot the variable, not an
-    operator who chose. That default stays exactly as it was; this only gives
-    the operator a way to say they meant it.
-
-    WHAT IT ACTUALLY OPENS, stated here because the banner has to say it and
-    because nobody should have to read the gate to find out:
-
-      * every /api/ route answers anybody who finds the URL -- submitting runs
-        (which costs CPU and can be refused for memory, but is not free),
-        creating and DELETING projects, and reading every run on the server;
-      * POST /api/sections/scan and GET /api/browse read directories on the
-        host. They stay confined by TMESIM_STUDIO_DATA_ROOTS, which a
-        non-loopback bind sets to <repo>/data_cache a few lines below, so this
-        is not a filesystem-wide read -- but it is a real one inside that root.
-
-    What it does NOT do: it does not disable the confinement, the request body
-    cap, the grid ceiling or the memory refusals. Those are about keeping the
-    process alive, not about who is asking, and an open instance needs them
-    MORE rather than less.
-
-    Any of 1/true/yes/on, case-insensitive. A bare empty value is not consent.
-    """
-    return os.environ.get("TMESIM_STUDIO_OPEN", "").strip().lower() in (
-        "1", "true", "yes", "on")
-
-
 def main(argv=None) -> int:
     """Parse, then either serve or run an operator command.
 
@@ -831,20 +772,9 @@ def _serve(args) -> int:
         # (Docker ENV, systemd, a shell export) rather than silently clobber
         # it -- only decide a value ourselves when the environment has none.
         api_key = os.environ.get("TMESIM_STUDIO_API_KEY", "")
-        if not api_key and not is_loopback and not _open_instance():
+        if not api_key and not is_loopback:
             api_key = secrets.token_urlsafe(24)
             generated = True
-    # BOTH SET: THE KEY WINS, LOUDLY. Never the other way round.
-    #
-    # If TMESIM_STUDIO_OPEN could void a configured key, then a stale variable
-    # left over from a demo would silently un-protect an instance somebody
-    # believed was closed, and the symptom would be no symptom at all. Refusing
-    # to start was the other candidate and is worse: it takes a live site down
-    # over a contradiction that has an obvious safe reading.
-    #
-    # So the key stays in force, the gate stays on, and the banner says the
-    # flag was ignored and what to do about it.
-    _open_ignored = bool(api_key) and _open_instance()
     os.environ["TMESIM_STUDIO_API_KEY"] = api_key
     # Record WHICH of the three sources won, for /api/account to report.
     #
@@ -957,13 +887,6 @@ def _serve(args) -> int:
                   "loopback address")
         print(_no_auth_warning(args.host), end="")
 
-        if _open_instance():
-            print(_open_instance_note(), end="")
-    if _open_ignored:
-        print("  !!  TMESIM_STUDIO_OPEN is set and IGNORED: an API key is "
-              "configured,", file=sys.stderr)
-        print("  !!  so the gate is ON. Remove TMESIM_STUDIO_API_KEY to open "
-              "this instance.", file=sys.stderr)
     # Reported for the same reason the key is: the operator's one chance to
     # notice that a capability is or is not confined is the line they are
     # already reading. Deliberately OUTSIDE the key's if/else -- the scan path

@@ -90,36 +90,8 @@ services:
       # is closer to read access as the server's uid than to a password — which
       # is why the image runs as uid 10001 and why the line below confines the
       # scanner to the tissue directory.
-      # OPEN INSTANCE, FOR NOW. The product owner asked for a demo anyone
-      # can open: landing page straight into the simulator, no credential.
-      #
-      # Both lines are needed and the pair is the point. Removing the key
-      # alone is NOT enough — app/server/__main__.py invents one on any
-      # non-loopback bind and prints it once, so the instance would still be
-      # gated by a secret nobody saved. TMESIM_STUDIO_OPEN is what suppresses
-      # that invention, and it is deliberately explicit: the default protects
-      # every other deployment and does not move.
-      #
-      # If a key is ever set again, THE KEY WINS and this flag is ignored with
-      # a banner line, so re-closing the instance is one dashboard change and
-      # cannot be half-done.
-      #
-      # docs/DEPLOYMENT.md sec.4 states what this opens: submitting runs, and
-      # creating and DELETING projects, by anyone with the URL. The scan and
-      # browse confinement, the request cap, the grid ceiling and the memory
-      # refusals all stay on — they keep the process alive rather than decide
-      # who is asking.
-      - key: TMESIM_STUDIO_OPEN
-        value: "1"
-
-      # - key: TMESIM_STUDIO_API_KEY
-      #   generateValue: true
-      #
-      # Commented out rather than deleted so re-closing the instance is
-      # uncommenting one block. Note Render does not remove a variable that is
-      # already set on the service when it disappears from this file — if this
-      # service has TMESIM_STUDIO_API_KEY in its dashboard, it must be deleted
-      # there too or the gate stays on.
+      - key: TMESIM_STUDIO_API_KEY
+        generateValue: true
 
       # WHAT MAKES THE DISK BELOW ACTUALLY HOLD ANYTHING.
       #
